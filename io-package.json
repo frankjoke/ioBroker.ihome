@@ -1,0 +1,116 @@
+{
+    "common": {
+        "name": "visual-interface",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "Initial release of visual interface adapter",
+                "de": "Erste Veröffentlichung des Visual-Interface-Adapters",
+                "ru": "Первый выпуск визуального интерфейс-адаптера",
+                "pt": "Primeiro lançamento do adaptador de interface visual",
+                "nl": "Eerste release van de visual interface adapter",
+                "fr": "Première version de l'adaptateur d'interface visuelle",
+                "it": "Prima versione dell'adattatore di interfaccia visiva",
+                "es": "Primera versión del adaptador de interfaz visual",
+                "pl": "Pierwsze wydanie adaptera interfejsu wizualnego",
+                "uk": "Перший випуск адаптера візуального інтерфейсу",
+                "zh-cn": "首次发布可视化界面适配器"
+            }
+        },
+        "titleLang": {
+            "en": "Visual Interface",
+            "de": "Visuelle Schnittstelle",
+            "ru": "Визуальный интерфейс",
+            "pt": "Interface Visual",
+            "nl": "Visuele Interface",
+            "fr": "Interface Visuelle",
+            "it": "Interfaccia Visiva",
+            "es": "Interfaz Visual",
+            "pl": "Interfejs Wizualny",
+            "uk": "Візуальний Інтерфейс",
+            "zh-cn": "可视化界面"
+        },
+        "desc": {
+            "en": "Visual interface adapter for ioBroker home automation with Svelte SPA",
+            "de": "Visuelle Schnittstellen-Adaptation für ioBroker Smart Home mit Svelte SPA",
+            "ru": "Адаптер визуального интерфейса для ioBroker умного дома с Svelte SPA",
+            "pt": "Adaptador de interface visual para automação residencial ioBroker com Svelte SPA",
+            "nl": "Visuele interface-adapter voor ioBroker thuisautomatisering met Svelte SPA",
+            "fr": "Adaptateur d'interface visuelle pour l'automatisation domiciliaire ioBroker avec Svelte SPA",
+            "it": "Adattatore di interfaccia visiva per l'automazione domestica ioBroker con Svelte SPA",
+            "es": "Adaptador de interfaz visual para automatización del hogar ioBroker con Svelte SPA",
+            "pl": "Adapter interfejsu wizualnego dla automatyki domowej ioBroker z Svelte SPA",
+            "uk": "Адаптер візуального інтерфейсу для автоматизаціїбудинку ioBroker з Svelte SPA",
+            "zh-cn": "用于ioBroker家庭自动化的Svelte SPA可视化界面适配器"
+        },
+        "authors": [
+            "Commander <commander@example.com>"
+        ],
+        "keywords": [
+            "ioBroker",
+            "visual",
+            "interface",
+            "home",
+            "automation",
+            "SPA",
+            "PWA",
+            "Svelte",
+            "dashboard",
+            "control"
+        ],
+        "licenseInformation": {
+            "type": "free",
+            "license": "MIT"
+        },
+        "platform": "Javascript/Node.js",
+        "icon": "visual-interface.png",
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/yourusername/ioBroker.visual-interface/main/admin/visual-interface.png",
+        "readme": "https://github.com/yourusername/ioBroker.visual-interface/blob/main/README.md",
+        "loglevel": "info",
+        "tier": 3,
+        "mode": "daemon",
+        "type": "general",
+        "compact": true,
+        "adminUI": {
+            "config": "json",
+            "tab": "materialize"
+        },
+        "adminTab": {
+            "singleton": true,
+            "name": {
+                "en": "Visual Interface",
+                "de": "Visuelle Schnittstelle",
+                "ru": "Визуальный интерфейс",
+                "pt": "Interface Visual",
+                "nl": "Visuele Interface",
+                "fr": "Interface Visuelle",
+                "it": "Interfaccia Visiva",
+                "es": "Interfaz Visual",
+                "pl": "Interfejs Wizualny",
+                "uk": "Візуальний Інтерфейс",
+                "zh-cn": "可视化界面"
+            },
+            "link": ""
+        },
+        "supportCustoms": true,
+        "dependencies": [
+            {
+                "js-controller": ">=6.0.11"
+            }
+        ],
+        "globalDependencies": [
+            {
+                "admin": ">=7.0.23"
+            }
+        ]
+    },
+    "native": {
+        "width": 800,
+        "height": 600,
+        "backgroundColor": "#ffffff",
+        "refreshInterval": 5
+    },
+    "objects": [],
+    "instanceObjects": []
+}

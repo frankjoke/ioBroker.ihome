@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+www/
+.svelte-kit/
+build/
+dist/
+
+# Generated / tooling caches
+graphify-out/
+.playwright-mcp/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic Display Widget</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --border-radius: 4px;
+            --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .widget-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .widget {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+        }
+        
+        .widget-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .widget-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        
+        .widget-subtitle {
+            font-size: 1rem;
+            color: var(--secondary-color);
+        }
+        
+        .display-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin: 20px 0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .display-value.loading {
+            color: var(--secondary-color);
+            font-style: italic;
+        }
+        
+        .display-value.error {
+            color: var(--danger-color);
+        }
+        
+        .display-value.success {
+            color: var(--success-color);
+        }
+        
+        .display-value.warning {
+            color: var(--warning-color);
+        }
+        
+        .display-value.info {
+            color: var(--info-color);
+        }
+        
+        .unit-label {
+            display: block;
+            font-size: 1.2rem;
+            text-align: center;
+            color: var(--secondary-color);
+            margin-top: 10px;
+        }
+        
+        .last-updated {
+            font-size: 0.9rem;
+            text-align: center;
+            color: var(--secondary-color);
+            margin-top: 20px;
+            font-style: italic;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected {
+            background-color: var(--success-color);
+        }
+        
+        .status-disconnected {
+            background-color: var(--danger-color);
+        }
+        
+        .status-waiting {
+            background-color: var(--warning-color);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        @media (max-width: 480px) {
+            .widget {
+                padding: 20px;
+            }
+            
+            .widget-title {
+                font-size: 1.25rem;
+            }
+            
+            .display-value {
+                font-size: 2.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn {
+                width: 100%;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+        <div class="widget">
+            <div class="widget-header">
+                <h2 class="widget-title">ioBroker Data Display</h2>
+                <p class="widget-subtitle">Real-time visualization of your smart home data</p>
+            </div>
+            
+            <div class="display-value" id="displayValue">Loading...</div>
+            <div class="unit-label" id="unitLabel"></div>
+            <div class="last-updated" id="lastUpdated">Last updated: --</div>
+            
+            <div class="controls">
+                <button class="btn btn-primary" id="refreshBtn">Refresh Now</button>
+                <button class="btn btn-secondary" id="toggleAutoBtn">Disable Auto-refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Basic visualization widget for ioBroker Visual Interface Adapter
+        class BasicDisplayWidget {
+            constructor() {
+                this.socket = null;
+                this.displayValue = document.getElementById('displayValue');
+                this.unitLabel = document.getElementById('unitLabel');
+                this.lastUpdated = document.getElementById('lastUpdated');
+                this.refreshBtn = document.getElementById('refreshBtn');
+                this.toggleAutoBtn = document.getElementById('toggleAutoBtn');
+                
+                // Configuration - these would normally come from adapter config
+                this.dataPoint = 'javascript.0.widget.display.value'; // Example data point
+                this.unit = ''; // Unit to display (e.g., °C, %, etc.)
+                this.autoRefresh = true;
+                this.refreshInterval = 5000; // 5 seconds
+                this.refreshTimer = null;
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.connectSocket();
+                this.startAutoRefresh();
+            }
+            
+            setupEventListeners() {
+                this.refreshBtn.addEventListener('click', () => this.fetchDataPoint());
+                this.toggleAutoBtn.addEventListener('click', () => this.toggleAutoRefresh());
+            }
+            
+            connectSocket() {
+                try {
+                    // Connect to the WebSocket server (same origin as the page)
+                    this.socket = io();
+                    
+                    this.socket.on('connect', () => {
+                        this.updateStatus('connected', 'Connected to ioBroker');
+                        this.fetchDataPoint(); // Get initial data
+                    });
+                    
+                    this.socket.on('disconnect', () => {
+                        this.updateStatus('disconnected', 'Disconnected from ioBroker');
+                    });
+                    
+                    this.socket.on('stateChange', (data) => {
+                        // Update display when state changes
+                        if (data.id === this.dataPoint) {
+                            this.updateDisplay(data.state);
+                        }
+                    });
+                    
+                    this.socket.on('adapterInfo', (info) => {
+                        console.log('Adapter info received:', info);
+                    });
+                    
+                } catch (error) {
+                    console.error('Failed to connect to socket:', error);
+                    this.updateStatus('disconnected', 'Connection failed');
+                }
+            }
+            
+            updateStatus(status, message) {
+                // Update UI based on connection status
+                const statusIndicator = document.createElement('span');
+                statusIndicator.className = `status-indicator status-${status}`;
+                
+                const statusText = document.createElement('span');
+                statusText.textContent = message;
+                
+                // Remove existing status indicator if any
+                const existingStatus = this.displayValue.parentElement.querySelector('.status-indicator');
+                if (existingStatus) {
+                    existingStatus.remove();
+                }
+                
+                // Add new status indicator
+                const statusContainer = document.createElement('div');
+                statusContainer.style.display = 'flex';
+                statusContainer.style.alignItems = 'center';
+                statusContainer.style.justifyContent = 'center';
+                statusContainer.style.marginBottom = '15px';
+                statusContainer.appendChild(statusIndicator);
+                statusContainer.appendChild(statusText);
+                
+                // Insert after widget header
+                const widgetHeader = this.displayValue.parentElement.querySelector('.widget-header');
+                widgetHeader.insertAdjacentElement('afterend', statusContainer);
+            }
+            
+            fetchDataPoint() {
+                if (!this.socket || !this.socket.connected) {
+                    this.displayValue.textContent = 'No connection';
+                    this.displayValue.className = 'display-value error';
+                    return;
+                }
+                
+                this.displayValue.textContent = 'Loading...';
+                this.displayValue.className = 'display-value loading';
+                
+                // Request state from adapter via socket
+                this.socket.emit('getState', this.dataPoint, (response) => {
+                    if (response && !response.error) {
+                        this.updateDisplay(response);
+                    } else {
+                        this.displayValue.textContent = 'Error fetching data';
+                        this.displayValue.className = 'display-value error';
+                        console.error('Failed to fetch data point:', response);
+                    }
+                });
+            }
+            
+            updateDisplay(state) {
+                if (!state) {
+                    this.displayValue.textContent = 'No data';
+                    this.displayValue.className = 'display-value warning';
+                    return;
+                }
+                
+                // Format the value based on its type
+                let formattedValue = state.val;
+                if (typeof state.val === 'number') {
+                    formattedValue = state.val.toFixed(2); // Show 2 decimal places for numbers
+                } else if (state.val === null) {
+                    formattedValue = 'NULL';
+                } else if (state.val === undefined) {
+                    formattedValue = 'UNDEFINED';
+                }
+                
+                this.displayValue.textContent = formattedValue;
+                this.displayValue.className = 'display-value'; // Reset to default styling
+                
+                // Update unit label if unit is configured
+                if (this.unit) {
+                    this.unitLabel.textContent = this.unit;
+                } else {
+                    this.unitLabel.textContent = '';
+                }
+                
+                // Update timestamp
+                const now = new Date();
+                this.lastUpdated.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+                
+                // Apply value-based styling
+                this.applyValueStyling(state.val);
+            }
+            
+            applyValueStyling(value) {
+                // Remove any existing value-based classes
+                this.displayValue.classList.remove('success', 'warning', 'error', 'info');
+                
+                // Apply styling based on value (example logic - customize as needed)
+                if (typeof value === 'number') {
+                    // Example: temperature-like values
+                    if (value >= 30) {
+                        this.displayValue.classList.add('warning'); // Hot
+                    } else if (value <= 0) {
+                        this.displayValue.classList.add('info'); // Cold
+                    } else if (value > 20 && value < 30) {
+                        this.displayValue.classList.add('success'); // Comfortable
+                    }
+                }
+            }
+            
+            startAutoRefresh() {
+                if (this.autoRefresh) {
+                    this.refreshTimer = setInterval(() => {
+                        this.fetchDataPoint();
+                    }, this.refreshInterval);
+                    
+                    this.toggleAutoBtn.textContent = 'Disable Auto-refresh';
+                }
+            }
+            
+            stopAutoRefresh() {
+                if (this.refreshTimer) {
+                    clearInterval(this.refreshTimer);
+                    this.refreshTimer = null;
+                }
+                
+                this.toggleAutoBtn.textContent = 'Enable Auto-refresh';
+            }
+            
+            toggleAutoRefresh() {
+                if (this.autoRefresh) {
+                    this.stopAutoRefresh();
+                } else {
+                    this.startAutoRefresh();
+                }
+                this.autoRefresh = !this.autoRefresh;
+            }
+            
+            // Public method to update configuration
+            updateConfig(config) {
+                if (config.dataPoint !== undefined) {
+                    this.dataPoint = config.dataPoint;
+                }
+                if (config.unit !== undefined) {
+                    this.unit = config.unit;
+                }
+                if (config.refreshInterval !== undefined) {
+                    this.refreshInterval = config.refreshInterval;
+                    if (this.autoRefresh) {
+                        this.stopAutoRefresh();
+                        this.startAutoRefresh();
+                    }
+                }
+                
+                // Fetch data with new configuration
+                this.fetchDataPoint();
+            }
+            
+            // Cleanup method
+            destroy() {
+                this.stopAutoRefresh();
+                if (this.socket) {
+                    this.socket.disconnect();
+                }
+            }
+        }
+        
+        // Initialize the widget when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.basicDisplayWidget = new BasicDisplayWidget();
+        });
+        
+        // Make widget globally accessible for potential external configuration
+        window.BasicDisplayWidget = BasicDisplayWidget;
+    </script>
+</body>
+</html>

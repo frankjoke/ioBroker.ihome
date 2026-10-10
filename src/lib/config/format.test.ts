@@ -1,0 +1,43 @@
+import { it, expect } from "vitest";
+import { formatAge, formatValue, contrastColor } from "$lib/config/format";
+
+it("returns dark text for light colors", () => {
+  expect(contrastColor("#ffcc00")).toBe("#1a1a1a");
+});
+it("returns light text for dark colors", () => {
+  expect(contrastColor("#003366")).toBe("#ffffff");
+});
+it("expands 3-digit hex", () => {
+  expect(contrastColor("#fff")).toBe("#1a1a1a");
+});
+it("falls back for a non-hex color", () => {
+  expect(contrastColor("rebeccapurple")).toBe("#1a1a1a");
+});
+
+const now = 1_000_000_000_000;
+it("formats 'now' under 4s", () =>
+  expect(formatAge(now - 1000, now)).toBe("now"));
+it("formats seconds", () => expect(formatAge(now - 5000, now)).toBe("5s"));
+it("formats minutes", () =>
+  expect(formatAge(now - 3 * 60_000, now)).toBe("3m"));
+it("formats hours", () =>
+  expect(formatAge(now - 2 * 3_600_000, now)).toBe("2h"));
+it("formats days", () =>
+  expect(formatAge(now - 2 * 86_400_000, now)).toBe("2d"));
+it("returns empty for a missing timestamp", () =>
+  expect(formatAge(0, now)).toBe(""));
+it("formats a value with a unit", () =>
+  expect(formatValue(23.5, "°C")).toBe("23.5 °C"));
+it("formats booleans", () => expect(formatValue(true)).toBe("true"));
+it("formats booleans from an OFF/ON unit pair", () => {
+  expect(formatValue(false, "OFF/ON")).toBe("OFF");
+  expect(formatValue(true, "OFF/ON")).toBe("ON");
+});
+it("formats booleans from an arbitrary false/true pair", () => {
+  expect(formatValue(false, "CLOSED/OPEN")).toBe("CLOSED");
+  expect(formatValue(true, "CLOSED/OPEN")).toBe("OPEN");
+});
+it("ignores a unit without a pair for booleans", () =>
+  expect(formatValue(true, "°C")).toBe("true"));
+it("formats objects as JSON", () =>
+  expect(formatValue({ a: 1 })).toBe('{"a":1}'));

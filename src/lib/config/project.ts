@@ -1,0 +1,29 @@
+import type { Control, Device } from "$lib/types/device";
+
+/** Keep only the persisted model fields of a control (drop enriched extras). */
+export function projectControl(c: Control): Control {
+  return {
+    id: c.id,
+    feature: c.feature,
+    stateId: c.stateId,
+    writable: c.writable,
+    label: c.label,
+    unit: c.unit,
+    hidden: c.hidden,
+    transform: c.transform,
+  };
+}
+
+/** Keep only the persisted model fields of a device and its controls. */
+export function projectDevice(d: Device): Device {
+  return {
+    id: d.id,
+    name: d.name,
+    type: d.type,
+    room: d.room,
+    section: d.section,
+    panel: d.panel,
+    icon: d.icon,
+    controls: (d.controls ?? []).map(projectControl),
+  };
+}
