@@ -6,6 +6,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
+  import { switchControlKind } from "$lib/config/control-kind";
 
   let {
     control,
@@ -26,18 +27,9 @@
   const isVirtual = $derived(control.kind === "virtual");
 
   function setKind(kind: string) {
-    if (kind === "virtual") {
-      onChange({
-        ...control,
-        kind: "virtual",
-        writable: false,
-        stateId: undefined,
-        transform: undefined,
-        virtual: control.virtual ?? { expr: "" },
-      });
-    } else {
-      onChange({ ...control, kind: undefined, virtual: undefined });
-    }
+    onChange(
+      switchControlKind(control, kind === "virtual" ? "virtual" : "state"),
+    );
   }
 
   const features = $derived(DEVICE_FEATURES[deviceType] ?? []);

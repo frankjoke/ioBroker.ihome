@@ -4,6 +4,7 @@
   import {
     sanitizeLabel,
     computeVirtual,
+    newLocalTaken,
     type LocalControl,
   } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
@@ -42,7 +43,7 @@
 
   // Local variable legend (state controls only), mirroring buildScope's naming.
   const legend = $derived.by(() => {
-    const taken = new Set<string>();
+    const taken = newLocalTaken();
     return siblings
       .filter((c) => c.kind !== "virtual")
       .map((c) => ({

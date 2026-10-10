@@ -58,6 +58,35 @@ describe("roundValue", () => {
     expect(roundValue("x", 2)).toBe("x");
     expect(roundValue(10.129, undefined)).toBe(10.129);
   });
+  it("clamps an out-of-range precision instead of throwing", () => {
+    expect(roundValue(1.234, 200)).toBe(1.234);
+    expect(roundValue(1.234, -1)).toBe(1.234);
+  });
+});
+
+describe("buildScope name collisions", () => {
+  it("suffixes locals that collide with helper names or reserved words", () => {
+    const { locals } = buildScope(
+      [
+        { kind: "state", label: "Sum", liveValue: 3 },
+        { kind: "state", label: "New", liveValue: 4 },
+      ],
+      pool,
+    );
+    expect(locals.sum2).toBe(3);
+    expect(locals.new2).toBe(4);
+  });
+  it("keeps a formula working when a label collides with a helper", () => {
+    const r = computeVirtual(
+      { virtual: { expr: "sum2 + new2" } },
+      [
+        { kind: "state", label: "Sum", liveValue: 3 },
+        { kind: "state", label: "New", liveValue: 4 },
+      ],
+      pool,
+    );
+    expect(r.value).toBe(7);
+  });
 });
 
 const pool: PoolEntry[] = [

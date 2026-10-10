@@ -20,6 +20,77 @@ export interface VirtualResult {
   error?: string;
 }
 
+/** Names injected as helper globals; locals must never shadow these. */
+const HELPER_NAMES = [
+  "values",
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max",
+  "any",
+  "all",
+  "get",
+  "device",
+];
+
+/** Words that cannot be a function parameter name (incl. strict-mode extras). */
+const RESERVED_LOCAL_NAMES = new Set([
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "else",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "import",
+  "in",
+  "instanceof",
+  "new",
+  "null",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+  "with",
+  "yield",
+  "let",
+  "static",
+  "await",
+  "implements",
+  "interface",
+  "package",
+  "private",
+  "protected",
+  "public",
+  "eval",
+  "arguments",
+]);
+
+/** A fresh `taken` set seeded so locals never shadow a helper or a keyword. */
+export function newLocalTaken(): Set<string> {
+  return new Set<string>([...HELPER_NAMES, ...RESERVED_LOCAL_NAMES]);
+}
+
 /** Turn a human label into a JS identifier; collisions get an index suffix. */
 export function sanitizeLabel(
   label: string | undefined,
@@ -69,7 +140,9 @@ export function evaluateVirtual(expr: string, scope: Scope): VirtualResult {
 /** Round a numeric result to `precision` decimals; pass other values through. */
 export function roundValue(v: unknown, precision?: number): unknown {
   if (typeof v !== "number" || typeof precision !== "number") return v;
-  return Number(v.toFixed(precision));
+  const p = Math.trunc(precision);
+  if (p < 0 || p > 100) return v;
+  return Number(v.toFixed(p));
 }
 
 export interface LocalControl {
@@ -157,7 +230,7 @@ function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
 
 /** Locals from the device's state controls + helpers over the pool. */
 export function buildScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
-  const taken = new Set<string>();
+  const taken = newLocalTaken();
   const locals: Record<string, unknown> = {};
   for (const c of controls) {
     if (c.kind === "virtual") continue;
