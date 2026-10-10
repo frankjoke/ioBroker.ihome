@@ -5,20 +5,32 @@
   import { formatAge, formatValue } from "$lib/config/format";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import TransformEditor from "./TransformEditor.svelte";
+  import VirtualEditor from "./VirtualEditor.svelte";
+  import { switchControlKind } from "$lib/config/control-kind";
 
   let {
     control,
     deviceType,
+    siblings = [],
     onChange,
     onRemove,
   }: {
     control: Control;
     deviceType: DeviceType;
+    siblings?: Control[];
     onChange: (c: Control) => void;
     onRemove: () => void;
   } = $props();
 
   let showTransform = $state(false);
+
+  const isVirtual = $derived(control.kind === "virtual");
+
+  function setKind(kind: string) {
+    onChange(
+      switchControlKind(control, kind === "virtual" ? "virtual" : "state"),
+    );
+  }
 
   const features = $derived(DEVICE_FEATURES[deviceType] ?? []);
   const featureOptions = $derived(
@@ -36,6 +48,7 @@
   );
 
   function live() {
+    if (!control.stateId) return undefined;
     const st: any = ioBroker.states.get(control.stateId);
     if (st) return { val: st.val, ts: st.ts };
     return getPickerValue(control.stateId);
@@ -51,39 +64,53 @@
 <div class="control-row">
   <div class="line">
     <select
-      class="feature"
-      value={control.feature}
-      onchange={(e) => onChange({ ...control, feature: e.currentTarget.value })}
+      class="kind"
+      value={control.kind ?? "state"}
+      onchange={(e) => setKind(e.currentTarget.value)}
+      aria-label="Control kind"
     >
-      {#each featureOptions as f (f.feature)}
-        <option value={f.feature}>{f.label}</option>
-      {/each}
+      <option value="state">State</option>
+      <option value="virtual">Virtual</option>
     </select>
 
-    <div class="state">
-      <span class="state-id mono">{control.stateId}</span>
-      <span class="state-val">{valueLabel}</span>
-    </div>
-
-    <label class="check"
-      ><input
-        type="checkbox"
-        checked={control.writable}
+    {#if !isVirtual}
+      <select
+        class="feature"
+        value={control.feature}
         onchange={(e) =>
-          onChange({ ...control, writable: e.currentTarget.checked })}
-      /> writable</label
-    >
+          onChange({ ...control, feature: e.currentTarget.value })}
+      >
+        {#each featureOptions as f (f.feature)}
+          <option value={f.feature}>{f.label}</option>
+        {/each}
+      </select>
 
-    <button
-      type="button"
-      class="icon-btn"
-      class:active={showTransform}
-      title="Transform"
-      aria-label="Toggle transform"
-      onclick={() => (showTransform = !showTransform)}
-    >
-      <span class="material-symbols-outlined">functions</span>
-    </button>
+      <div class="state">
+        <span class="state-id mono">{control.stateId}</span>
+        <span class="state-val">{valueLabel}</span>
+      </div>
+
+      <label class="check"
+        ><input
+          type="checkbox"
+          checked={control.writable}
+          onchange={(e) =>
+            onChange({ ...control, writable: e.currentTarget.checked })}
+        /> writable</label
+      >
+
+      <button
+        type="button"
+        class="icon-btn"
+        class:active={showTransform}
+        title="Transform"
+        aria-label="Toggle transform"
+        onclick={() => (showTransform = !showTransform)}
+      >
+        <span class="material-symbols-outlined">functions</span>
+      </button>
+    {/if}
+
     <button
       type="button"
       class="icon-btn"
@@ -114,7 +141,9 @@
     >
   </div>
 
-  {#if showTransform}
+  {#if isVirtual}
+    <VirtualEditor {control} {siblings} onChange={(c) => onChange(c)} />
+  {:else if showTransform}
     <TransformEditor
       transform={control.transform}
       sampleValue={live()?.val}

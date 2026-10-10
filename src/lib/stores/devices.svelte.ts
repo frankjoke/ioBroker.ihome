@@ -6,6 +6,7 @@ import type {
 } from "$lib/types/device";
 import { applyRead } from "$lib/utils/transform";
 import { widgetFor } from "$lib/config/features";
+import { computeVirtual, type PoolEntry } from "$lib/config/virtual-ops";
 import { readable } from "svelte/store";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -80,7 +81,34 @@ export function getUsedStateIds(): Set<string> {
 }
 
 // ---------------------------------------------------------------- enrichment
+/** Every state referenced by a device, with its live value and metadata. */
+function buildVirtualPool(): PoolEntry[] {
+  const pool: PoolEntry[] = [];
+  for (const device of canonicalRegistry.devices ?? []) {
+    for (const control of device.controls ?? []) {
+      if (!control.stateId) continue;
+      const st: any = stateSource?.get(control.stateId);
+      const obj: any = objectSource?.get(control.stateId);
+      pool.push({
+        stateId: control.stateId,
+        value: applyRead(st?.val, control.transform),
+        role: obj?.common?.role,
+        room: device.room ?? obj?.common?.room,
+        device: device.name,
+        feature: control.feature,
+        label: control.label ?? control.feature,
+      });
+    }
+  }
+  return pool;
+}
+
+export function getVirtualPool(): PoolEntry[] {
+  return buildVirtualPool();
+}
+
 function _devicesEnriched(): EnrichedDevice[] {
+  const pool = buildVirtualPool();
   const result = (canonicalRegistry.devices ?? []).map((device) => {
     const controls: EnrichedControl[] = (device.controls ?? []).map(
       (control: Control) => {
@@ -99,6 +127,17 @@ function _devicesEnriched(): EnrichedDevice[] {
         };
       },
     );
+    for (const c of controls) {
+      if (c.kind === "virtual") {
+        const { value, error } = computeVirtual(c, controls, pool);
+        c.liveValue = value;
+        c.virtualError = error;
+        c.available = true;
+        c.exists = true;
+        c.displayRoom = device.room ?? c.displayRoom;
+        c.widget = "value";
+      }
+    }
     const deviceDisplayRoom =
       device.room ?? controls.find((c) => c.displayRoom)?.displayRoom;
     return {

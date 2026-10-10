@@ -105,6 +105,20 @@
     controls = controls.filter((_, j) => j !== i);
   }
 
+  function addVirtual() {
+    controls = [
+      ...controls,
+      {
+        id: crypto.randomUUID(),
+        kind: "virtual",
+        feature: "value",
+        writable: false,
+        label: "",
+        virtual: { expr: "" },
+      },
+    ];
+  }
+
   function save() {
     onSave(
       projectDevice({
@@ -180,15 +194,26 @@
   <div class="controls">
     <div class="controls-head">
       <h4>Controls</h4>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Add state"
-        aria-label="Add state"
-        onclick={() => (showPicker = true)}
-      >
-        <span class="material-symbols-outlined">add</span>
-      </button>
+      <div class="head-actions">
+        <button
+          type="button"
+          class="icon-btn"
+          title="Add virtual state"
+          aria-label="Add virtual state"
+          onclick={addVirtual}
+        >
+          <span class="material-symbols-outlined">functions</span>
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          title="Add state"
+          aria-label="Add state"
+          onclick={() => (showPicker = true)}
+        >
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
     </div>
     {#if controls.length === 0}
       <p class="text-muted">No controls yet — add a state.</p>
@@ -197,6 +222,7 @@
       <ControlRow
         {control}
         deviceType={type}
+        siblings={controls}
         onChange={(c) => updateControl(i, c)}
         onRemove={() => removeControl(i)}
       />
@@ -284,6 +310,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .head-actions {
+    display: flex;
+    gap: 0.35rem;
   }
 
   .actions {

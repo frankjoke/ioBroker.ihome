@@ -4,6 +4,7 @@ import type { Control, Device } from "$lib/types/device";
 export function projectControl(c: Control): Control {
   return {
     id: c.id,
+    kind: c.kind,
     feature: c.feature,
     stateId: c.stateId,
     writable: c.writable,
@@ -11,6 +12,7 @@ export function projectControl(c: Control): Control {
     unit: c.unit,
     hidden: c.hidden,
     transform: c.transform,
+    virtual: c.virtual,
   };
 }
 
