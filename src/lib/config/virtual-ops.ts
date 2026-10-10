@@ -113,7 +113,7 @@ function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
       return pred ? vs.filter(pred).length : vs.length;
     },
     sum: (f: Filter = {}) =>
-      values(f).reduce((a, b) => a + (Number(b) || 0), 0),
+      values(f).reduce((a: number, b: unknown) => a + (Number(b) || 0), 0),
     avg: (f: Filter = {}) => {
       const ns = numbers(f);
       return ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : undefined;
