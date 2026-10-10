@@ -46,15 +46,22 @@ export interface ControlCommon {
   [key: string]: any;
 }
 
+export interface VirtualSpec {
+  expr: string;
+  precision?: number;
+}
+
 export interface Control {
   id: string;
+  kind?: "state" | "virtual";
   feature: string;
-  stateId: string;
+  stateId?: string;
   writable: boolean;
   label?: string;
   unit?: string;
   hidden?: boolean;
   transform?: Transform;
+  virtual?: VirtualSpec;
   common?: ControlCommon;
 }
 
@@ -92,6 +99,7 @@ export interface EnrichedControl extends Control {
   displayRoom?: string;
   object?: any;
   widget?: Widget;
+  virtualError?: string;
 }
 
 export interface EnrichedDevice extends Device {
