@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Control } from "$lib/types/device";
+  import { untrack } from "svelte";
   import { applyRead } from "$lib/utils/transform";
   import {
     sanitizeLabel,
@@ -10,15 +11,11 @@
   import { getVirtualPool } from "$lib/stores/devices";
   import {
     getFormulas,
-    getFormula,
     addFormula,
+    upsertFormula,
   } from "$lib/stores/formulas.svelte";
   import { saveFormulas } from "$lib/formulas.svelte.js";
-  import {
-    applyTemplate,
-    syncFormulaId,
-    detachTemplate,
-  } from "$lib/config/formulas";
+  import { applyTemplate, detachTemplate } from "$lib/config/formulas";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue } from "$lib/config/format";
 
@@ -34,49 +31,33 @@
     onChange: (c: Control) => void;
   } = $props();
 
-  const templates = $derived(getFormulas());
-  const sourceName = $derived(
-    control.formulaId
-      ? (getFormula(control.formulaId)?.name ?? "custom")
-      : "custom",
-  );
+  // Local draft — the modal edits here and commits on Save.
+  const init = untrack(() => ({
+    expr: control.virtual?.expr ?? "",
+    precision: control.virtual?.precision,
+    unit: control.unit ?? "",
+    formulaId: control.formulaId as string | undefined,
+  }));
+  let expr = $state(init.expr);
+  let precision = $state<number | undefined>(init.precision);
+  let unit = $state(init.unit);
+  let formulaId = $state<string | undefined>(init.formulaId);
   let newTemplateName = $state("");
 
-  function setExpr(expr: string) {
-    const next = { ...control, virtual: { ...control.virtual, expr } };
-    onChange(
-      syncFormulaId(next, { version: 0, updatedAt: 0, formulas: templates }),
-    );
-  }
-  function pickTemplate(id: string) {
-    if (id === "") return onChange(detachTemplate(control));
-    const t = templates.find((x) => x.id === id);
-    if (t) onChange(applyTemplate(control, t));
-  }
-  function saveAsTemplate() {
-    const name = newTemplateName.trim() || control.label || "New template";
-    const id = crypto.randomUUID();
-    addFormula({
-      id,
-      name,
-      expr: control.virtual?.expr ?? "",
-      precision: control.virtual?.precision,
-      unit: control.unit,
-    });
-    saveFormulas();
-    onChange({ ...control, formulaId: id });
-    newTemplateName = "";
-  }
-  function setPrecision(v: string) {
-    onChange({
-      ...control,
-      virtual: {
-        ...control.virtual,
-        expr: control.virtual?.expr ?? "",
-        precision: v === "" ? undefined : Number(v),
-      },
-    });
-  }
+  const templates = $derived(getFormulas());
+  const sourceTemplate = $derived(
+    formulaId ? templates.find((t) => t.id === formulaId) : undefined,
+  );
+  const changed = $derived(!!sourceTemplate && sourceTemplate.expr !== expr);
+  const hasName = $derived(newTemplateName.trim() !== "");
+  const actionLabel = $derived(
+    hasName
+      ? "Save as new template"
+      : changed
+        ? "Update template"
+        : "Save as template",
+  );
+  const actionEnabled = $derived(hasName || changed);
 
   function liveOf(c: Control): unknown {
     if (c.kind === "virtual" || !c.stateId) return undefined;
@@ -105,8 +86,49 @@
   );
 
   const preview = $derived(
-    computeVirtual({ virtual: control.virtual }, locals, getVirtualPool()),
+    computeVirtual({ virtual: { expr, precision } }, locals, getVirtualPool()),
   );
+
+  function pickTemplate(id: string) {
+    if (id === "") {
+      formulaId = undefined;
+      return;
+    }
+    const t = templates.find((x) => x.id === id);
+    if (t) {
+      expr = t.expr;
+      precision = t.precision;
+      if (t.unit !== undefined) unit = t.unit;
+      formulaId = t.id;
+    }
+  }
+
+  function runTemplateAction() {
+    if (hasName) {
+      const id = crypto.randomUUID();
+      addFormula({ id, name: newTemplateName.trim(), expr, precision, unit });
+      saveFormulas();
+      formulaId = id;
+      newTemplateName = "";
+    } else if (changed && sourceTemplate) {
+      upsertFormula({ ...sourceTemplate, expr, precision, unit });
+      saveFormulas();
+    }
+  }
+
+  function save() {
+    const keep =
+      sourceTemplate && sourceTemplate.expr === expr ? formulaId : undefined;
+    let next: Control = {
+      ...control,
+      unit: unit || undefined,
+      formulaId: keep,
+      virtual: { expr, precision },
+    };
+    if (!keep) next = detachTemplate(next);
+    onChange(next);
+    onClose();
+  }
 </script>
 
 <div class="modal" role="dialog" aria-modal="true" aria-label="Virtual state">
@@ -125,9 +147,9 @@
 
     <div class="template-bar">
       <label class="field">
-        <span class="label-mono">Template ({sourceName})</span>
+        <span class="label-mono">Template</span>
         <select
-          value={control.formulaId ?? ""}
+          value={formulaId ?? ""}
           onchange={(e) => pickTemplate(e.currentTarget.value)}
         >
           <option value="">— custom —</option>
@@ -141,20 +163,20 @@
         placeholder="new template name"
         bind:value={newTemplateName}
       />
-      <button type="button" class="btn" onclick={saveAsTemplate}
-        >Save as template</button
+      <button
+        type="button"
+        class="btn"
+        disabled={!actionEnabled}
+        onclick={runTemplateAction}
       >
+        {actionLabel}
+      </button>
     </div>
 
     <div class="virtual-editor">
       <label class="field">
         <span class="label-mono">Expression</span>
-        <textarea
-          rows="3"
-          spellcheck="false"
-          class="mono"
-          value={control.virtual?.expr ?? ""}
-          oninput={(e) => setExpr(e.currentTarget.value)}
+        <textarea rows="3" spellcheck="false" class="mono" bind:value={expr}
         ></textarea>
       </label>
 
@@ -166,7 +188,7 @@
               type="button"
               class="var"
               title="Insert"
-              onclick={() => setExpr((control.virtual?.expr ?? "") + l.name)}
+              onclick={() => (expr += l.name)}
             >
               <code>{l.name}</code> = {formatValue(l.value)}
             </button>
@@ -191,19 +213,32 @@
             type="number"
             min="0"
             max="10"
-            value={control.virtual?.precision ?? ""}
-            oninput={(e) => setPrecision(e.currentTarget.value)}
+            value={precision ?? ""}
+            oninput={(e) =>
+              (precision =
+                e.currentTarget.value === ""
+                  ? undefined
+                  : Number(e.currentTarget.value))}
           /></label
+        >
+        <label class="field small"
+          ><span class="label-mono">Unit</span>
+          <input type="text" bind:value={unit} /></label
         >
         <div class="preview">
           <span class="label-mono">Result</span>
           {#if preview.error}
             <span class="err">{preview.error}</span>
           {:else}
-            <span class="mono">{formatValue(preview.value, control.unit)}</span>
+            <span class="mono">{formatValue(preview.value, unit)}</span>
           {/if}
         </div>
       </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn" onclick={onClose}>Cancel</button>
+      <button type="button" class="btn btn-primary" onclick={save}>Save</button>
     </div>
   </div>
 </div>
@@ -314,5 +349,10 @@
   .err {
     color: var(--danger-color, #c0392b);
     font-size: var(--body-sm);
+  }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
 </style>

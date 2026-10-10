@@ -209,7 +209,6 @@
     {#each controls as control, i (control.id)}
       <ControlRow
         {control}
-        deviceType={type}
         siblings={controls}
         autoOpen={control.id === autoOpenId}
         onChange={(c) => updateControl(i, c)}

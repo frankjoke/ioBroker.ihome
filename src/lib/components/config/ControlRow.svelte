@@ -1,23 +1,22 @@
 <script lang="ts">
-  import type { Control, DeviceType } from "$lib/types/device";
-  import { DEVICE_FEATURES } from "$lib/config/features";
+  import type { Control } from "$lib/types/device";
   import { getPickerValue } from "$lib/picker-values.svelte.js";
   import { formatAge, formatValue } from "$lib/config/format";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { applyRead } from "$lib/utils/transform";
+  import { computeVirtual, type LocalControl } from "$lib/config/virtual-ops";
+  import { getVirtualPool } from "$lib/stores/devices";
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
-  import { switchControlKind } from "$lib/config/control-kind";
 
   let {
     control,
-    deviceType,
     siblings = [],
     autoOpen = false,
     onChange,
     onRemove,
   }: {
     control: Control;
-    deviceType: DeviceType;
     siblings?: Control[];
     autoOpen?: boolean;
     onChange: (c: Control) => void;
@@ -33,27 +32,6 @@
     if (autoOpen) showFormula = true;
   });
 
-  function setKind(kind: string) {
-    onChange(
-      switchControlKind(control, kind === "virtual" ? "virtual" : "state"),
-    );
-  }
-
-  const features = $derived(DEVICE_FEATURES[deviceType] ?? []);
-  const featureOptions = $derived(
-    features.some((f) => f.feature === control.feature)
-      ? features
-      : [
-          {
-            feature: control.feature,
-            label: control.feature,
-            widget: "value" as const,
-            roleHints: [],
-          },
-          ...features,
-        ],
-  );
-
   function live() {
     if (!control.stateId) return undefined;
     const st: any = ioBroker.states.get(control.stateId);
@@ -66,32 +44,48 @@
     if (!l) return "…";
     return `${formatValue(l.val, control.unit)} · ${formatAge(l.ts)}`;
   });
+
+  function liveOf(c: Control): unknown {
+    if (c.kind === "virtual" || !c.stateId) return undefined;
+    const st: any = ioBroker.states.get(c.stateId);
+    return st ? applyRead(st.val, c.transform) : undefined;
+  }
+
+  const virtualValue = $derived.by(() => {
+    if (!isVirtual) return undefined;
+    const locals: LocalControl[] = siblings.map((c) => ({
+      kind: c.kind,
+      label: c.label,
+      feature: c.feature,
+      liveValue: liveOf(c),
+    }));
+    return computeVirtual(
+      { virtual: control.virtual },
+      locals,
+      getVirtualPool(),
+    );
+  });
 </script>
 
 <div class="control-row">
   <div class="line">
-    <select
-      class="kind"
-      value={control.kind ?? "state"}
-      onchange={(e) => setKind(e.currentTarget.value)}
-      aria-label="Control kind"
-    >
-      <option value="state">State</option>
-      <option value="virtual">Virtual</option>
-    </select>
-
-    {#if !isVirtual}
-      <select
-        class="feature"
-        value={control.feature}
-        onchange={(e) =>
-          onChange({ ...control, feature: e.currentTarget.value })}
-      >
-        {#each featureOptions as f (f.feature)}
-          <option value={f.feature}>{f.label}</option>
-        {/each}
-      </select>
-
+    {#if isVirtual}
+      <div class="state">
+        <span class="state-id mono"
+          >{control.virtual?.expr || "(empty formula)"}</span
+        >
+        <span class="state-val">
+          {#if virtualValue?.error}
+            <span class="err" title={virtualValue.error}>error</span>
+          {:else}
+            {formatValue(virtualValue?.value, control.unit)}
+          {/if}
+        </span>
+      </div>
+      <button type="button" class="btn" onclick={() => (showFormula = true)}>
+        Edit formula
+      </button>
+    {:else}
       <div class="state">
         <span class="state-id mono">{control.stateId}</span>
         <span class="state-val">{valueLabel}</span>
@@ -138,25 +132,19 @@
         oninput={(e) => onChange({ ...control, label: e.currentTarget.value })}
       /></label
     >
-    <label class="field"
-      ><span class="label-mono">Unit</span>
-      <input
-        type="text"
-        value={control.unit ?? ""}
-        oninput={(e) => onChange({ ...control, unit: e.currentTarget.value })}
-      /></label
-    >
+    {#if !isVirtual}
+      <label class="field"
+        ><span class="label-mono">Unit</span>
+        <input
+          type="text"
+          value={control.unit ?? ""}
+          oninput={(e) => onChange({ ...control, unit: e.currentTarget.value })}
+        /></label
+      >
+    {/if}
   </div>
 
   {#if isVirtual}
-    <div class="line">
-      <span class="text-muted"
-        >Formula: {control.virtual?.expr ? "set" : "empty"}</span
-      >
-      <button type="button" class="btn" onclick={() => (showFormula = true)}>
-        Edit formula
-      </button>
-    </div>
     {#if showFormula}
       <VirtualEditor
         {control}
@@ -238,5 +226,9 @@
 
   .icon-btn.active {
     color: var(--primary);
+  }
+
+  .err {
+    color: var(--danger-color, #c0392b);
   }
 </style>
