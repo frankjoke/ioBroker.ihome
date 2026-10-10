@@ -20,12 +20,31 @@ it("strips non-model fields from a control", () => {
     id: "c",
     feature: "power",
     stateId: "a.0.b",
+    kind: undefined,
+    virtual: undefined,
     writable: true,
     label: undefined,
     unit: undefined,
     hidden: undefined,
     transform: undefined,
   });
+});
+
+it("keeps kind and virtual on a projected virtual control", () => {
+  const c: any = {
+    id: "v",
+    kind: "virtual",
+    feature: "value",
+    writable: false,
+    label: "Dew point",
+    virtual: { expr: "temperature - 5", precision: 1 },
+    liveValue: 9,
+    widget: "value",
+  };
+  const out = projectControl(c);
+  expect(out.kind).toBe("virtual");
+  expect(out.virtual).toEqual({ expr: "temperature - 5", precision: 1 });
+  expect(out).not.toHaveProperty("liveValue");
 });
 
 it("projects a device and its controls", () => {
