@@ -105,11 +105,14 @@
     controls = controls.filter((_, j) => j !== i);
   }
 
+  let autoOpenId = $state<string | null>(null);
+
   function addVirtual() {
+    const id = crypto.randomUUID();
     controls = [
       ...controls,
       {
-        id: crypto.randomUUID(),
+        id,
         kind: "virtual",
         feature: "value",
         writable: false,
@@ -117,6 +120,7 @@
         virtual: { expr: "" },
       },
     ];
+    autoOpenId = id;
   }
 
   function save() {
@@ -207,6 +211,7 @@
         {control}
         deviceType={type}
         siblings={controls}
+        autoOpen={control.id === autoOpenId}
         onChange={(c) => updateControl(i, c)}
         onRemove={() => removeControl(i)}
       />

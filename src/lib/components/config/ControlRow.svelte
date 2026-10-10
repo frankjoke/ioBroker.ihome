@@ -12,19 +12,26 @@
     control,
     deviceType,
     siblings = [],
+    autoOpen = false,
     onChange,
     onRemove,
   }: {
     control: Control;
     deviceType: DeviceType;
     siblings?: Control[];
+    autoOpen?: boolean;
     onChange: (c: Control) => void;
     onRemove: () => void;
   } = $props();
 
   let showTransform = $state(false);
+  let showFormula = $state(false);
 
   const isVirtual = $derived(control.kind === "virtual");
+
+  $effect(() => {
+    if (autoOpen) showFormula = true;
+  });
 
   function setKind(kind: string) {
     onChange(
@@ -142,7 +149,22 @@
   </div>
 
   {#if isVirtual}
-    <VirtualEditor {control} {siblings} onChange={(c) => onChange(c)} />
+    <div class="line">
+      <span class="text-muted"
+        >Formula: {control.virtual?.expr ? "set" : "empty"}</span
+      >
+      <button type="button" class="btn" onclick={() => (showFormula = true)}>
+        Edit formula
+      </button>
+    </div>
+    {#if showFormula}
+      <VirtualEditor
+        {control}
+        {siblings}
+        onClose={() => (showFormula = false)}
+        onChange={(c) => onChange(c)}
+      />
+    {/if}
   {:else if showTransform}
     <TransformEditor
       transform={control.transform}
