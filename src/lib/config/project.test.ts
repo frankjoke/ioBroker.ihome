@@ -22,12 +22,23 @@ it("strips non-model fields from a control", () => {
     stateId: "a.0.b",
     kind: undefined,
     virtual: undefined,
+    formulaId: undefined,
     writable: true,
     label: undefined,
     unit: undefined,
     hidden: undefined,
     transform: undefined,
   });
+});
+
+it("keeps formulaId on a projected control", () => {
+  const c: any = {
+    id: "v",
+    feature: "value",
+    writable: false,
+    formulaId: "t1",
+  };
+  expect(projectControl(c).formulaId).toBe("t1");
 });
 
 it("keeps kind and virtual on a projected virtual control", () => {
