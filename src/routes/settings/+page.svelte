@@ -1,7 +1,15 @@
-<script>
+<script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import {
+    getFormulas,
+    upsertFormula,
+    deleteFormula,
+  } from "$lib/stores/formulas.svelte";
+  import { saveFormulas } from "$lib/formulas.svelte.js";
+  import type { FormulaTemplate } from "$lib/types/device";
   import ioPackage from "../../../io-package.json";
 
   const storage = getStorage();
@@ -9,6 +17,35 @@
 
   function applyAndReload() {
     location.reload();
+  }
+
+  let editing = $state<FormulaTemplate | null>(null);
+  let showForm = $state(false);
+  let pendingDelete = $state<FormulaTemplate | null>(null);
+
+  const formulas = $derived(getFormulas());
+
+  function startAdd() {
+    editing = { id: crypto.randomUUID(), name: "", expr: "" };
+    showForm = true;
+  }
+  function startEdit(t: FormulaTemplate) {
+    editing = { ...t };
+    showForm = true;
+  }
+  function save() {
+    if (!editing) return;
+    upsertFormula({ ...editing, name: editing.name.trim() || "Untitled" });
+    saveFormulas();
+    showForm = false;
+    editing = null;
+  }
+  function confirmDelete() {
+    if (pendingDelete) {
+      deleteFormula(pendingDelete.id);
+      saveFormulas();
+    }
+    pendingDelete = null;
   }
 </script>
 
@@ -83,6 +120,124 @@
 
   <section class="card settings-card">
     <div class="card-header">
+      <span class="material-symbols-outlined">functions</span>
+      <h2 class="card-title">Formula templates</h2>
+    </div>
+    <div class="card-body settings-card-body">
+      {#if formulas.length === 0}
+        <p class="text-muted hint">No templates yet.</p>
+      {/if}
+      <ul class="formula-list">
+        {#each formulas as t (t.id)}
+          <li class="formula-row">
+            <div class="formula-main">
+              <span class="formula-name">{t.name}</span>
+              <code class="formula-expr">{t.expr}</code>
+              {#if t.unit}<span class="text-muted">{t.unit}</span>{/if}
+            </div>
+            <div class="formula-actions">
+              <button
+                type="button"
+                class="icon-btn"
+                title="Edit"
+                aria-label="Edit"
+                onclick={() => startEdit(t)}
+              >
+                <span class="material-symbols-outlined">edit</span>
+              </button>
+              <button
+                type="button"
+                class="icon-btn"
+                title="Delete"
+                aria-label="Delete"
+                onclick={() => (pendingDelete = t)}
+              >
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+            </div>
+          </li>
+        {/each}
+      </ul>
+      <button type="button" class="btn btn-primary" onclick={startAdd}
+        >Add template</button
+      >
+    </div>
+  </section>
+
+  {#if showForm && editing}
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Formula template"
+    >
+      <div class="modal-card card">
+        <h3>{editing.name ? "Edit template" : "New template"}</h3>
+        <label class="field"
+          ><span class="label-mono">Name</span>
+          <input type="text" bind:value={editing.name} /></label
+        >
+        <label class="field"
+          ><span class="label-mono">Expression</span>
+          <textarea rows="3" class="mono" bind:value={editing.expr}
+          ></textarea></label
+        >
+        <div class="form-grid">
+          <label class="field"
+            ><span class="label-mono">Unit</span>
+            <input type="text" bind:value={editing.unit} /></label
+          >
+          <label class="field"
+            ><span class="label-mono">Precision</span>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              value={editing.precision ?? ""}
+              oninput={(e) =>
+                (editing.precision =
+                  e.currentTarget.value === ""
+                    ? undefined
+                    : Number(e.currentTarget.value))}
+            /></label
+          >
+        </div>
+        <label class="field"
+          ><span class="label-mono">Notes</span>
+          <input type="text" bind:value={editing.notes} /></label
+        >
+        <div class="actions">
+          <button
+            type="button"
+            class="btn"
+            onclick={() => {
+              showForm = false;
+              editing = null;
+            }}>Cancel</button
+          >
+          <button type="button" class="btn btn-primary" onclick={save}
+            >Save</button
+          >
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if pendingDelete}
+    <ConfirmModal
+      title="Delete template"
+      confirmLabel="Delete"
+      onConfirm={confirmDelete}
+      onCancel={() => (pendingDelete = null)}
+    >
+      <p>
+        Delete <strong>{pendingDelete.name}</strong>? Devices keep their copy.
+      </p>
+    </ConfirmModal>
+  {/if}
+
+  <section class="card settings-card">
+    <div class="card-header">
       <span class="material-symbols-outlined">info</span>
       <h2 class="card-title">About</h2>
     </div>
@@ -91,7 +246,7 @@
         >Visual interface for ioBroker smart home control</span
       >
       <span class="about-version mono"
-        >{ioPackage.common.title} v{ioPackage.common.version}</span
+        >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
       >
     </div>
   </section>
@@ -168,5 +323,93 @@
 
   .about-version {
     color: var(--text-muted);
+  }
+
+  .formula-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .formula-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+  }
+
+  .formula-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .formula-name {
+    font-weight: 600;
+  }
+
+  .formula-expr {
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40ch;
+  }
+
+  .formula-actions {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .icon-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .modal-card {
+    width: min(520px, 100%);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modal-card h3 {
+    margin: 0;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
 </style>

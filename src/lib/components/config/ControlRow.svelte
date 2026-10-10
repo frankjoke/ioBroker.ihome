@@ -1,51 +1,36 @@
 <script lang="ts">
-  import type { Control, DeviceType } from "$lib/types/device";
-  import { DEVICE_FEATURES } from "$lib/config/features";
+  import type { Control } from "$lib/types/device";
   import { getPickerValue } from "$lib/picker-values.svelte.js";
   import { formatAge, formatValue } from "$lib/config/format";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { applyRead } from "$lib/utils/transform";
+  import { computeVirtual, type LocalControl } from "$lib/config/virtual-ops";
+  import { getVirtualPool } from "$lib/stores/devices";
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
-  import { switchControlKind } from "$lib/config/control-kind";
 
   let {
     control,
-    deviceType,
     siblings = [],
+    autoOpen = false,
     onChange,
     onRemove,
   }: {
     control: Control;
-    deviceType: DeviceType;
     siblings?: Control[];
+    autoOpen?: boolean;
     onChange: (c: Control) => void;
     onRemove: () => void;
   } = $props();
 
   let showTransform = $state(false);
+  let showFormula = $state(false);
 
   const isVirtual = $derived(control.kind === "virtual");
 
-  function setKind(kind: string) {
-    onChange(
-      switchControlKind(control, kind === "virtual" ? "virtual" : "state"),
-    );
-  }
-
-  const features = $derived(DEVICE_FEATURES[deviceType] ?? []);
-  const featureOptions = $derived(
-    features.some((f) => f.feature === control.feature)
-      ? features
-      : [
-          {
-            feature: control.feature,
-            label: control.feature,
-            widget: "value" as const,
-            roleHints: [],
-          },
-          ...features,
-        ],
-  );
+  $effect(() => {
+    if (autoOpen) showFormula = true;
+  });
 
   function live() {
     if (!control.stateId) return undefined;
@@ -59,32 +44,61 @@
     if (!l) return "…";
     return `${formatValue(l.val, control.unit)} · ${formatAge(l.ts)}`;
   });
+
+  function liveOf(c: Control): unknown {
+    if (c.kind === "virtual" || !c.stateId) return undefined;
+    const st: any = ioBroker.states.get(c.stateId);
+    return st ? applyRead(st.val, c.transform) : undefined;
+  }
+
+  const virtualValue = $derived.by(() => {
+    if (!isVirtual) return undefined;
+    const locals: LocalControl[] = siblings.map((c) => ({
+      kind: c.kind,
+      label: c.label,
+      feature: c.feature,
+      liveValue: liveOf(c),
+    }));
+    return computeVirtual(
+      { virtual: control.virtual },
+      locals,
+      getVirtualPool(),
+    );
+  });
+
+  function shortFormula(expr: string | undefined): string {
+    if (!expr) return "(empty formula)";
+    return expr.length > 60 ? expr.slice(0, 60) + "…" : expr;
+  }
 </script>
 
 <div class="control-row">
   <div class="line">
-    <select
-      class="kind"
-      value={control.kind ?? "state"}
-      onchange={(e) => setKind(e.currentTarget.value)}
-      aria-label="Control kind"
-    >
-      <option value="state">State</option>
-      <option value="virtual">Virtual</option>
-    </select>
+    <span class="kind-badge">{isVirtual ? "Formula" : "State"}</span>
 
-    {#if !isVirtual}
-      <select
-        class="feature"
-        value={control.feature}
-        onchange={(e) =>
-          onChange({ ...control, feature: e.currentTarget.value })}
+    {#if isVirtual}
+      <div class="state">
+        <span class="state-id mono" title={control.virtual?.expr ?? ""}
+          >{shortFormula(control.virtual?.expr)}</span
+        >
+        <span class="state-val">
+          {#if virtualValue?.error}
+            <span class="err" title={virtualValue.error}>error</span>
+          {:else}
+            {formatValue(virtualValue?.value, control.unit)}
+          {/if}
+        </span>
+      </div>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Edit formula"
+        aria-label="Edit formula"
+        onclick={() => (showFormula = true)}
       >
-        {#each featureOptions as f (f.feature)}
-          <option value={f.feature}>{f.label}</option>
-        {/each}
-      </select>
-
+        <span class="material-symbols-outlined">edit</span>
+      </button>
+    {:else}
       <div class="state">
         <span class="state-id mono">{control.stateId}</span>
         <span class="state-val">{valueLabel}</span>
@@ -142,7 +156,14 @@
   </div>
 
   {#if isVirtual}
-    <VirtualEditor {control} {siblings} onChange={(c) => onChange(c)} />
+    {#if showFormula}
+      <VirtualEditor
+        {control}
+        {siblings}
+        onClose={() => (showFormula = false)}
+        onChange={(c) => onChange(c)}
+      />
+    {/if}
   {:else if showTransform}
     <TransformEditor
       transform={control.transform}
@@ -176,8 +197,22 @@
     min-width: 8rem;
   }
 
+  .kind-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    padding: 2px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill, 999px);
+    white-space: nowrap;
+  }
+
   .state-id {
+    display: block;
     font-size: 0.75rem;
+    max-width: 40ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -216,5 +251,9 @@
 
   .icon-btn.active {
     color: var(--primary);
+  }
+
+  .err {
+    color: var(--danger-color, #c0392b);
   }
 </style>

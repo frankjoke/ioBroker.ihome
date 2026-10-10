@@ -51,6 +51,21 @@ export interface VirtualSpec {
   precision?: number;
 }
 
+export interface FormulaTemplate {
+  id: string;
+  name: string;
+  expr: string;
+  precision?: number;
+  unit?: string;
+  notes?: string;
+}
+
+export interface FormulaLibrary {
+  version: number;
+  updatedAt: number;
+  formulas: FormulaTemplate[];
+}
+
 export interface Control {
   id: string;
   kind?: "state" | "virtual";
@@ -62,6 +77,7 @@ export interface Control {
   hidden?: boolean;
   transform?: Transform;
   virtual?: VirtualSpec;
+  formulaId?: string;
   common?: ControlCommon;
 }
 

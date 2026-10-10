@@ -13,6 +13,7 @@ export function projectControl(c: Control): Control {
     hidden: c.hidden,
     transform: c.transform,
     virtual: c.virtual,
+    formulaId: c.formulaId,
   };
 }
 
