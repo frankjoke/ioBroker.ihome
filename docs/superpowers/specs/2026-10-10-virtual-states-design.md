@@ -60,7 +60,8 @@ export interface Control {
 ```
 
 `EnrichedControl` for a virtual control: `liveValue` = computed result,
-`exists = available = true`, `widget = "value"` (or `"enum"`). `Device` and
+`exists = available = true`, `widget = "value"` (or `"enum"`), and
+`virtualError?: string` carries any evaluation error. `Device` and
 `DeviceRegistry` are unchanged.
 
 ## 3. Engine (`src/lib/config/virtual-ops.ts`, new)
@@ -109,6 +110,10 @@ Pure and testable; mirrors the existing `runStep` result shape `{ value, error? 
 - **Virtual**: hides stateId / writable / transform; shows label, unit, precision, and
   mounts `VirtualEditor`.
 
+`DeviceForm.svelte` gains an **Add virtual state** button (next to *Add state*) that appends
+a `{ kind: "virtual", feature: "value", virtual: { expr: "" } }` control; `ControlRow`
+receives the sibling controls so the editor can build the local variable scope.
+
 **`VirtualEditor.svelte` (new)** — the formula workbench:
 
 - **Expression** — monospace textarea for `expr`.
@@ -120,28 +125,32 @@ Pure and testable; mirrors the existing `runStep` result shape `{ value, error? 
   formatted **result**, or an inline **error** (syntax error / unknown variable / empty
   aggregate), and a hint when the result is `undefined`.
 
-## 6. Rendering (`src/routes/devices/+page.svelte`)
+## 6. Rendering (dashboard, `src/routes/+page.svelte`)
 
-A virtual control renders with the `value` widget (read-only), formatted via the existing
-`formatValue` / `formatBoolean`. On evaluation error it shows `—` with an inline warning and
-is never writable.
+Widgets render on the dashboard (`src/routes/+page.svelte`); `/devices` is the CRUD config
+page. A virtual control renders with the `value` widget (read-only), formatted via the
+existing `formatValue` / `formatBoolean`. On evaluation error it shows `—` with an inline
+warning and is never writable.
 
 ## 7. Files
 
 **Edit**
-- `src/lib/types/device.ts` — `kind`, `VirtualSpec`, `virtual?` on `Control`; virtual
-  handling in `EnrichedControl`.
+- `src/lib/types/device.ts` — `kind`, `VirtualSpec`, `virtual?` on `Control`; `virtualError`
+  on `EnrichedControl`.
+- `src/lib/stores/devices.svelte.ts` — build the device-state pool, enrich virtual controls
+  (compute `liveValue` / `virtualError` / `widget`), export `getVirtualPool()`.
 - `src/lib/components/config/ControlRow.svelte` — kind selector + mount `VirtualEditor`.
-- `src/routes/devices/+page.svelte` — render virtual value + error state.
-- `src/lib/config/features.ts` — allow a virtual display feature (default `value`).
+- `src/lib/components/config/DeviceForm.svelte` — *Add virtual state* button; pass siblings.
+- `src/routes/+page.svelte` — render virtual value + error state (dashboard widget).
 
 **New**
-- `src/lib/config/virtual-ops.ts` — `sanitizeLabel`, `buildScope`, `evaluateVirtual`,
-  helpers.
+- `src/lib/config/virtual-ops.ts` — `sanitizeLabel`, `buildScope`, `computeVirtual`,
+  `evaluateVirtual`, helpers.
 - `src/lib/config/virtual-ops.test.ts`.
-- `src/lib/stores/virtual-pool.svelte.ts` — flatten device controls into the pool; enrich
-  virtual controls (compute `liveValue`, `widget`).
 - `src/lib/components/config/VirtualEditor.svelte`.
+
+(No separate `virtual-pool` store: pool building is a pure step inside the existing
+`devices.svelte.ts` enrichment; the engine stays in `virtual-ops.ts`.)
 
 All new/edited Svelte components use Svelte 5 runes and TypeScript; no new runtime deps.
 
