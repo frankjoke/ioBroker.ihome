@@ -80,6 +80,10 @@
                 >{control.label || control.feature}</span
               >
 
+              {#if control.virtualError}
+                <span class="err" title={control.virtualError}>⚠</span>
+              {/if}
+
               {#if !control.available}
                 <span class="text-muted">unavailable</span>
               {:else if control.widget === "switch"}
@@ -224,6 +228,11 @@
 
   .mono {
     font-family: var(--font-mono);
+    font-size: var(--body-sm);
+  }
+
+  .err {
+    color: var(--danger-color, #c0392b);
     font-size: var(--body-sm);
   }
 
