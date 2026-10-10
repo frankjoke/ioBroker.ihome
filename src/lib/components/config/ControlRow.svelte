@@ -65,14 +65,21 @@
       getVirtualPool(),
     );
   });
+
+  function shortFormula(expr: string | undefined): string {
+    if (!expr) return "(empty formula)";
+    return expr.length > 60 ? expr.slice(0, 60) + "…" : expr;
+  }
 </script>
 
 <div class="control-row">
   <div class="line">
+    <span class="kind-badge">{isVirtual ? "Formula" : "State"}</span>
+
     {#if isVirtual}
       <div class="state">
-        <span class="state-id mono"
-          >{control.virtual?.expr || "(empty formula)"}</span
+        <span class="state-id mono" title={control.virtual?.expr ?? ""}
+          >{shortFormula(control.virtual?.expr)}</span
         >
         <span class="state-val">
           {#if virtualValue?.error}
@@ -82,8 +89,14 @@
           {/if}
         </span>
       </div>
-      <button type="button" class="btn" onclick={() => (showFormula = true)}>
-        Edit formula
+      <button
+        type="button"
+        class="icon-btn"
+        title="Edit formula"
+        aria-label="Edit formula"
+        onclick={() => (showFormula = true)}
+      >
+        <span class="material-symbols-outlined">edit</span>
       </button>
     {:else}
       <div class="state">
@@ -132,16 +145,14 @@
         oninput={(e) => onChange({ ...control, label: e.currentTarget.value })}
       /></label
     >
-    {#if !isVirtual}
-      <label class="field"
-        ><span class="label-mono">Unit</span>
-        <input
-          type="text"
-          value={control.unit ?? ""}
-          oninput={(e) => onChange({ ...control, unit: e.currentTarget.value })}
-        /></label
-      >
-    {/if}
+    <label class="field"
+      ><span class="label-mono">Unit</span>
+      <input
+        type="text"
+        value={control.unit ?? ""}
+        oninput={(e) => onChange({ ...control, unit: e.currentTarget.value })}
+      /></label
+    >
   </div>
 
   {#if isVirtual}
@@ -186,8 +197,22 @@
     min-width: 8rem;
   }
 
+  .kind-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    padding: 2px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill, 999px);
+    white-space: nowrap;
+  }
+
   .state-id {
+    display: block;
     font-size: 0.75rem;
+    max-width: 40ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
