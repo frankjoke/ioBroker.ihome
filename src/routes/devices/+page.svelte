@@ -2,7 +2,9 @@
   import {
     getCanonicalRegistry,
     setCanonicalRegistry,
+    devicesEnrichedStore,
   } from "$lib/stores/devices";
+  import { formatValue } from "$lib/config/format";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
@@ -16,7 +18,7 @@
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
-  import type { Device } from "$lib/types/device";
+  import type { Device, EnrichedControl } from "$lib/types/device";
 
   let editing = $state<Device | null>(null);
   let showForm = $state(false);
@@ -30,6 +32,21 @@
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const devices = $derived(getCanonicalRegistry().devices ?? []);
   const rooms = $derived(roomList(ioBroker.enums));
+
+  const enrichedById = $derived(
+    new Map($devicesEnrichedStore.map((d) => [d.id, d])),
+  );
+
+  function summaries(device: Device): string {
+    const controls = (enrichedById.get(device.id)?.controls ??
+      device.controls) as EnrichedControl[];
+    return (controls ?? [])
+      .filter((c) => !c.hidden)
+      .map(
+        (c) => `${c.label || c.feature}: ${formatValue(c.liveValue, c.unit)}`,
+      )
+      .join(", ");
+  }
 
   const roomOptions = $derived(
     rooms.map((r) => ({ value: r.id, label: r.label })),
@@ -199,12 +216,7 @@
             <span class="device-meta text-muted">
               <span class="badge badge-secondary">{d.type}</span>
               {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
-              <span
-                >{d.controls?.length ?? 0} control{(d.controls?.length ?? 0) ===
-                1
-                  ? ""
-                  : "s"}</span
-              >
+              <span class="device-values">{summaries(d)}</span>
             </span>
           </div>
           <div class="device-actions">
