@@ -71,3 +71,111 @@ export function roundValue(v: unknown, precision?: number): unknown {
   if (typeof v !== "number" || typeof precision !== "number") return v;
   return Number(v.toFixed(precision));
 }
+
+export interface LocalControl {
+  kind?: "state" | "virtual";
+  label?: string;
+  feature?: string;
+  liveValue?: unknown;
+}
+
+export interface Filter {
+  role?: string;
+  room?: string;
+  device?: string;
+  feature?: string;
+  label?: string;
+}
+
+/** Match a pool entry against a filter: `role` is a substring, the rest exact. */
+function matches(e: PoolEntry, f: Filter): boolean {
+  return (
+    (!f.role || String(e.role ?? "").includes(f.role)) &&
+    (!f.room || e.room === f.room) &&
+    (!f.device || e.device === f.device) &&
+    (!f.feature || e.feature === f.feature) &&
+    (!f.label || String(e.label ?? "").toLowerCase() === f.label.toLowerCase())
+  );
+}
+
+/** Build the helper API over the device-state pool. */
+function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
+  const values = (f: Filter = {}) =>
+    pool.filter((e) => matches(e, f)).map((e) => e.value);
+  const numbers = (f: Filter = {}) =>
+    values(f)
+      .map(Number)
+      .filter((n) => !Number.isNaN(n));
+  return {
+    values,
+    count: (f: Filter = {}, pred?: (v: unknown) => boolean) => {
+      const vs = values(f);
+      return pred ? vs.filter(pred).length : vs.length;
+    },
+    sum: (f: Filter = {}) =>
+      values(f).reduce((a, b) => a + (Number(b) || 0), 0),
+    avg: (f: Filter = {}) => {
+      const ns = numbers(f);
+      return ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : undefined;
+    },
+    min: (f: Filter = {}) => {
+      const ns = numbers(f);
+      return ns.length ? Math.min(...ns) : undefined;
+    },
+    max: (f: Filter = {}) => {
+      const ns = numbers(f);
+      return ns.length ? Math.max(...ns) : undefined;
+    },
+    any: (f: Filter = {}, pred?: (v: unknown) => boolean) =>
+      values(f).some((v) => (pred ? pred(v) : !!v)),
+    all: (f: Filter = {}, pred?: (v: unknown) => boolean) => {
+      const vs = values(f);
+      return vs.length ? vs.every((v) => (pred ? pred(v) : !!v)) : true;
+    },
+    get: (ref: string | { device?: string; label?: string }) => {
+      if (typeof ref === "string") {
+        return pool.find((e) => e.stateId === ref)?.value;
+      }
+      const hit = pool.find(
+        (e) =>
+          (!ref.device || e.device === ref.device) &&
+          (!ref.label ||
+            String(e.label ?? "").toLowerCase() === ref.label.toLowerCase()),
+      );
+      return hit?.value;
+    },
+    device: (name: string) => {
+      const out: Record<string, unknown> = {};
+      const taken = new Set<string>();
+      for (const e of pool.filter((x) => x.device === name)) {
+        out[sanitizeLabel(e.label || e.feature, taken)] = e.value;
+      }
+      return out;
+    },
+  };
+}
+
+/** Locals from the device's state controls + helpers over the pool. */
+export function buildScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
+  const taken = new Set<string>();
+  const locals: Record<string, unknown> = {};
+  for (const c of controls) {
+    if (c.kind === "virtual") continue;
+    locals[sanitizeLabel(c.label || c.feature, taken)] = c.liveValue;
+  }
+  return { locals, helpers: makeHelpers(pool) };
+}
+
+/** Compute a virtual control's value (rounding applied); never throws. */
+export function computeVirtual(
+  control: { virtual?: VirtualSpec },
+  siblings: LocalControl[],
+  pool: PoolEntry[],
+): VirtualResult {
+  const { value, error } = evaluateVirtual(
+    control.virtual?.expr ?? "",
+    buildScope(siblings, pool),
+  );
+  if (error) return { value: undefined, error };
+  return { value: roundValue(value, control.virtual?.precision) };
+}
