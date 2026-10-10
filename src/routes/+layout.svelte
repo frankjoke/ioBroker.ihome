@@ -11,6 +11,7 @@
     setObjectSource,
   } from "$lib/stores/devices.svelte.js";
   import { initRegistry } from "$lib/registry.svelte.js";
+  import { initFormulas } from "$lib/formulas.svelte.js";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import { pages, pageHref } from "$lib/pages.js";
@@ -59,6 +60,7 @@
 
   onMount(() => {
     initRegistry();
+    initFormulas();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if (getTheme() === "auto") applyTheme();
