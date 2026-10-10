@@ -4,6 +4,7 @@ import {
   seedLibrary,
   applyTemplate,
   syncFormulaId,
+  detachTemplate,
   migrateLibrary,
 } from "$lib/config/formulas";
 import type { Control } from "$lib/types/device";
@@ -83,6 +84,21 @@ describe("syncFormulaId", () => {
       formulaId: "gone",
     };
     expect(syncFormulaId(c, lib).formulaId).toBeUndefined();
+  });
+});
+
+describe("detachTemplate", () => {
+  it("removes formulaId but keeps the expression", () => {
+    const c: Control = {
+      id: "c",
+      feature: "value",
+      writable: false,
+      virtual: { expr: "a - b" },
+      formulaId: "t1",
+    };
+    const out = detachTemplate(c);
+    expect(out.formulaId).toBeUndefined();
+    expect(out.virtual?.expr).toBe("a - b");
   });
 });
 

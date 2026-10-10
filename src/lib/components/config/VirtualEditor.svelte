@@ -14,7 +14,11 @@
     addFormula,
   } from "$lib/stores/formulas.svelte";
   import { saveFormulas } from "$lib/formulas.svelte.js";
-  import { applyTemplate, syncFormulaId } from "$lib/config/formulas";
+  import {
+    applyTemplate,
+    syncFormulaId,
+    detachTemplate,
+  } from "$lib/config/formulas";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue } from "$lib/config/format";
 
@@ -45,6 +49,7 @@
     );
   }
   function pickTemplate(id: string) {
+    if (id === "") return onChange(detachTemplate(control));
     const t = templates.find((x) => x.id === id);
     if (t) onChange(applyTemplate(control, t));
   }

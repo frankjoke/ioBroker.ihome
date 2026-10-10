@@ -67,6 +67,13 @@ export function applyTemplate(
   };
 }
 
+/** Detach a control from its template, keeping its own expression. */
+export function detachTemplate(control: Control): Control {
+  const next = { ...control };
+  delete next.formulaId;
+  return next;
+}
+
 /** Drop formulaId when the template is gone or the expression no longer matches. */
 export function syncFormulaId(
   control: Control,
@@ -76,9 +83,7 @@ export function syncFormulaId(
   if (!id) return control;
   const tpl = library.formulas.find((t) => t.id === id);
   if (tpl && tpl.expr === control.virtual?.expr) return control;
-  const next = { ...control };
-  delete next.formulaId;
-  return next;
+  return detachTemplate(control);
 }
 
 /** Normalise arbitrary persisted data into a FormulaLibrary; never throws. */
