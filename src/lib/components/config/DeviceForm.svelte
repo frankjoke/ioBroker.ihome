@@ -173,22 +173,6 @@
         onChange={(v) => (room = v[0] ?? "")}
       /></label
     >
-    <label class="field"
-      ><span class="label-mono">Section</span>
-      <input type="text" bind:value={section} /></label
-    >
-    <label class="field"
-      ><span class="label-mono">Panel</span>
-      <input type="text" bind:value={panel} /></label
-    >
-    <label class="field"
-      ><span class="label-mono">Icon</span>
-      <input
-        type="text"
-        placeholder="e.g. lightbulb"
-        bind:value={icon}
-      /></label
-    >
   </div>
 
   <div class="controls">
