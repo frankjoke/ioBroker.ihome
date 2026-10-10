@@ -93,10 +93,12 @@
     </div>
     <div class="ref">
       <span class="label-mono">Helpers</span>
-      <code>values(f)</code><code>count(f, pred?)</code><code>sum/avg/min/max(f)</code
+      <code>values(f)</code><code>count(f, pred?)</code><code
+        >sum/avg/min/max(f)</code
       >
-      <code>any/all(f, pred?)</code><code>get(stateId)</code
-      ><code>get(device + label)</code><code>device(name).label</code>
+      <code>any/all(f, pred?)</code><code>get(stateId)</code><code
+        >get(device + label)</code
+      ><code>device(name).label</code>
       <span class="label-mono">filter: role·room·device·feature·label</span>
     </div>
   </div>

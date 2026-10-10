@@ -109,7 +109,12 @@ const pool: PoolEntry[] = [
 ];
 
 const siblings: LocalControl[] = [
-  { kind: "state", label: "Temperature", feature: "temperature", liveValue: 21 },
+  {
+    kind: "state",
+    label: "Temperature",
+    feature: "temperature",
+    liveValue: 21,
+  },
   { kind: "state", label: "Humidity", feature: "humidity", liveValue: 55 },
 ];
 
