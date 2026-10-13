@@ -294,10 +294,11 @@
     width: 100%;
     height: 48px;
     display: block;
+    color: var(--primary-color);
   }
 
   .spark polyline {
-    stroke: var(--primary);
+    stroke: currentColor;
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
   }

@@ -92,10 +92,11 @@
     height: 24px;
     display: block;
     flex: none;
+    color: var(--primary-color);
   }
 
   .spark polyline {
-    stroke: var(--primary);
+    stroke: currentColor;
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
   }

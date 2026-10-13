@@ -282,7 +282,7 @@
   }
 
   .icon-btn.active {
-    color: var(--primary);
+    color: var(--primary-color);
   }
 
   .err {
