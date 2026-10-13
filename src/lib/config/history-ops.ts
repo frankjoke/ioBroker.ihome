@@ -76,3 +76,99 @@ export function toSeries(result: any): HistoryPoint[] {
   points.sort((a, b) => a.ts - b.ts);
   return points.filter((p, i) => i === 0 || p.ts !== points[i - 1].ts);
 }
+
+/** Count and numeric range of a series. */
+export function summarize(series: HistoryPoint[]): {
+  count: number;
+  min?: number;
+  max?: number;
+} {
+  if (!series.length) return { count: 0, min: undefined, max: undefined };
+  let min = series[0].val;
+  let max = series[0].val;
+  for (const p of series) {
+    if (p.val < min) min = p.val;
+    if (p.val > max) max = p.val;
+  }
+  return { count: series.length, min, max };
+}
+
+/**
+ * Drop points outside the window, then cap to the newest `count` (or
+ * `windowMs / stepMs`) points when downsampling.
+ */
+export function trimSeries(
+  series: HistoryPoint[],
+  opts: { windowMs: number; count?: number; stepMs?: number; now: number },
+): HistoryPoint[] {
+  const cutoff = opts.now - opts.windowMs;
+  let out = series.filter((p) => p.ts >= cutoff);
+  const cap =
+    opts.count ?? (opts.stepMs ? Math.ceil(opts.windowMs / opts.stepMs) : undefined);
+  if (cap && out.length > cap) out = out.slice(out.length - cap);
+  return out;
+}
+
+/**
+ * Append a live point to a fetched series when it is strictly newer, keeping
+ * the window trimmed. Returns the same array when nothing changed.
+ */
+export function appendLive(
+  series: HistoryPoint[],
+  point: HistoryPoint,
+  spec: HistorySpec,
+  now: number,
+): HistoryPoint[] {
+  const last = series[series.length - 1];
+  if (last && point.ts <= last.ts) return series;
+  return trimSeries([...series, point], {
+    windowMs: durationMs(spec),
+    count: spec.count,
+    stepMs: stepMs(spec),
+    now,
+  });
+}
+
+/** SVG polyline `points` for a series, y inverted; empty string for no points. */
+export function sparklinePoints(
+  series: HistoryPoint[],
+  width: number,
+  height: number,
+  pad = 0,
+): string {
+  if (!series.length) return "";
+  const flat = `${pad},${height / 2} ${width - pad},${height / 2}`;
+  if (series.length === 1) return flat;
+  const min = Math.min(...series.map((p) => p.val));
+  const max = Math.max(...series.map((p) => p.val));
+  if (max === min) return flat;
+  const span = max - min;
+  const n = series.length;
+  return series
+    .map((p, i) => {
+      const x = pad + (i / (n - 1)) * (width - 2 * pad);
+      const y = height - pad - ((p.val - min) / span) * (height - 2 * pad);
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
+/** "last 24h" / "last 7d". */
+export function durationLabel(spec: HistorySpec): string {
+  return `last ${spec.duration}${spec.durationUnit === "days" ? "d" : "h"}`;
+}
+
+/** "200 samples" / "30min max" / "raw". */
+export function granularityLabel(spec: HistorySpec): string {
+  if (spec.count) return `${spec.count} samples`;
+  if (spec.step) {
+    const unit =
+      spec.stepUnit === "seconds"
+        ? "s"
+        : spec.stepUnit === "hours"
+          ? "h"
+          : "min";
+    return `${spec.step}${unit} ${spec.aggregate ?? "average"}`;
+  }
+  return "raw";
+}

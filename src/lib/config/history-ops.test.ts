@@ -6,6 +6,12 @@ import {
   historyKey,
   buildHistoryOptions,
   toSeries,
+  summarize,
+  trimSeries,
+  appendLive,
+  sparklinePoints,
+  durationLabel,
+  granularityLabel,
   type HistorySpec,
 } from "$lib/config/history-ops";
 
@@ -127,5 +133,103 @@ describe("toSeries", () => {
   it("returns [] for an empty or malformed response", () => {
     expect(toSeries({ result: [] })).toEqual([]);
     expect(toSeries(undefined)).toEqual([]);
+  });
+});
+
+describe("summarize", () => {
+  it("counts and finds min/max", () => {
+    expect(summarize([{ ts: 1, val: 10 }, { ts: 2, val: 30 }])).toEqual({
+      count: 2,
+      min: 10,
+      max: 30,
+    });
+  });
+  it("handles an empty series", () => {
+    expect(summarize([])).toEqual({ count: 0, min: undefined, max: undefined });
+  });
+});
+
+describe("trimSeries", () => {
+  const now = 100_000;
+  const series = [
+    { ts: now - 10_000, val: 1 },
+    { ts: now - 1_000, val: 2 },
+    { ts: now, val: 3 },
+  ];
+  it("drops points older than the window", () => {
+    expect(trimSeries(series, { windowMs: 5_000, now })).toEqual([
+      { ts: now - 1_000, val: 2 },
+      { ts: now, val: 3 },
+    ]);
+  });
+  it("caps to the newest `count` points", () => {
+    expect(trimSeries(series, { windowMs: 60_000, count: 1, now })).toEqual([
+      { ts: now, val: 3 },
+    ]);
+  });
+  it("caps to the step window when downsampling", () => {
+    expect(trimSeries(series, { windowMs: 60_000, stepMs: 30_000, now })).toEqual([
+      { ts: now - 1_000, val: 2 },
+      { ts: now, val: 3 },
+    ]);
+  });
+});
+
+describe("appendLive", () => {
+  const spec: HistorySpec = { duration: 1, durationUnit: "hours" };
+  const now = 100_000;
+  it("appends a strictly newer point", () => {
+    expect(appendLive([{ ts: 99_000, val: 1 }], { ts: 100_000, val: 2 }, spec, now)).toEqual([
+      { ts: 99_000, val: 1 },
+      { ts: 100_000, val: 2 },
+    ]);
+  });
+  it("returns the same array for an older or equal point", () => {
+    const s = [{ ts: 100_000, val: 1 }];
+    expect(appendLive(s, { ts: 100_000, val: 9 }, spec, now)).toBe(s);
+    expect(appendLive(s, { ts: 90_000, val: 9 }, spec, now)).toBe(s);
+  });
+  it("trims to the window while appending", () => {
+    const s = [{ ts: now - 2 * 3_600_000, val: 1 }];
+    expect(appendLive(s, { ts: now, val: 2 }, spec, now)).toEqual([{ ts: now, val: 2 }]);
+  });
+});
+
+describe("sparklinePoints", () => {
+  it("is empty for no points", () => {
+    expect(sparklinePoints([], 100, 20)).toBe("");
+  });
+  it("draws a flat mid-line for one point or a flat series", () => {
+    expect(sparklinePoints([{ ts: 1, val: 5 }], 100, 20, 0)).toBe("0,10 100,10");
+    expect(
+      sparklinePoints([{ ts: 0, val: 5 }, { ts: 10, val: 5 }], 100, 20, 0),
+    ).toBe("0,10 100,10");
+  });
+  it("maps time to x and value to y (inverted)", () => {
+    expect(
+      sparklinePoints([{ ts: 0, val: 0 }, { ts: 10, val: 10 }], 100, 20, 0),
+    ).toBe("0,20 100,0");
+  });
+});
+
+describe("labels", () => {
+  it("describes the duration", () => {
+    expect(durationLabel({ duration: 24, durationUnit: "hours" })).toBe("last 24h");
+    expect(durationLabel({ duration: 7, durationUnit: "days" })).toBe("last 7d");
+  });
+  it("describes the granularity", () => {
+    expect(granularityLabel({ duration: 24, durationUnit: "hours", count: 200 })).toBe(
+      "200 samples",
+    );
+    expect(
+      granularityLabel({
+        duration: 1,
+        durationUnit: "hours",
+        step: 30,
+        stepUnit: "minutes",
+        aggregate: "max",
+      }),
+    ).toBe("30min max");
+    expect(granularityLabel({ duration: 1, durationUnit: "hours" })).toBe("raw");
   });
 });
