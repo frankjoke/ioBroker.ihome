@@ -8,7 +8,9 @@ in the browser: works.
 
 ## State of the codebase
 
-- Branch `main`, **no remote**. Working tree clean. Everything merged.
+- Branch `main`, **no remote**. The history merge is committed; the two same-day
+  follow-ups below (history "…" fix + device-row age) are **uncommitted** in the
+  working tree.
 - This session's work: branch `feature/history-controls` → merged (`--no-ff`).
 - Spec/plan:
   - `docs/superpowers/specs/2026-10-13-history-controls-design.md`
@@ -92,3 +94,74 @@ is bounded by the **window** (plus a hard 2000-point cap), never by `count`, so 
   the response-shape bug was found. (`.ts` modules import fine in Node 24 via type stripping.)
 - Tests: Vitest, node env, `requireAssertions: true`; files at
   `src/**/*.{test,spec}.{js,ts}`. Svelte 5 runes + TypeScript in new components; no new deps.
+
+## Follow-up fix (same day) — history summaries stuck on "…"
+
+**Symptom:** after the merge, every history summary (device list + control rows)
+showed `…` forever; the editor preview stuck on "loading…". Manual Refresh did
+nothing.
+
+**Root cause (not a logic bug):** Vite dev-server HMR gave the *same* store
+module two different `?t=` cache-bust hashes after the merge, so
+`/src/lib/stores/history.svelte.ts?t=A` (imported by `+layout.svelte`) and
+`…?t=B` (imported by `HistorySummary`/`HistoryEditor`) became **two separate
+module instances**. `setHistoryClient(ioBroker)` populated the layout's copy;
+the components called `ensureHistory` on their copy where `client` was `null`,
+so `ensureHistory` always early-returned and the cache never filled → `…`.
+Production is unaffected (Rollup dedupes). Verified live: injecting the client
+into the components' instance made the first summary render `195 pts`.
+
+**Fix:** removed the module-global client entirely. `ensureHistory`/
+`refreshHistory` now take the `HistoryClient` as their first argument; the two
+components pass the shared `ioBroker` they already import. Dropped
+`setHistoryClient` and the `+layout.svelte` call; tests pass the fake client
+directly. This is immune to HMR module duplication and needs no dev-server
+restart.
+
+**Also:** `stores/devices.svelte.ts` has the same latent pattern
+(`setStateSource`/`setObjectSource` module globals injected by the layout). It
+is *not* currently desynced (live values render), so it was left alone — but a
+future HMR of that store could reproduce the same class of bug there.
+
+**Checks:** `npm test` 180 passed (15 files); `npm run check` 0/0;
+`npm run lint` clean; `npm run build` OK (writes `www/`). Graph refreshed.
+
+## Follow-up feature (same day) — device row shows how long since last update
+
+**Ask:** for each device list entry, after the control values, show how long ago
+the device last reported — to spot a dead device vs. a switch that was just
+toggled.
+
+**Built (one file, `src/routes/devices/+page.svelte`):**
+
+- `lastUpdate(device)` — newest `ts` across the device's **state-backed**
+  controls (`ioBroker.states.get(stateId)?.ts`); virtual controls have no state
+  and don't contribute.
+- Rendered after `{summaries(d)}` in the device-meta line: a clock icon
+  (`material-symbols-outlined` → `schedule`, `aria-hidden`) followed by
+  `agoLabel` → `17s ago` / `26m ago` / `2d ago`, or `just now` for the `<4s`
+  bucket. `title` shows the absolute time. Nothing renders when no control has a
+  timestamp.
+- Reuses `formatAge()` from `lib/config/format.ts`. No new deps, no new
+  component.
+
+**Deliberate limits:** `ts` (last *update*) was chosen over `lc` (last value
+*change*) — a sensor posting readings keeps it fresh, which is the "is it
+delivering data" signal. The age does **not** tick on a timer; it refreshes on
+the next state change, same as the live values.
+
+**Checks:** `npm run check` 0/0; `npm run lint` clean; `npm test` 180 passed;
+graph refreshed. Verified live in the browser (all 10 rows).
+
+## Open items for next session
+
+- Commit the two same-day follow-ups (history "…" fix + device-row age).
+- Optional: harden `stores/devices.svelte.ts` the same way (drop the
+  `setStateSource`/`setObjectSource` module globals) — the latent twin of the
+  history bug.
+- Optional: make the device-row age tick on a timer instead of on state change.
+- Earlier still-open items (from the 2026-10-11 handoff): formula seed-on-empty
+  decision; `applyTemplate` clearing `unit`; template `<select>` race; unguarded
+  `migrateLibrary`; `initFormulas` no-retry; Settings modal title flip;
+  `addFormula` unused; switch-widget hardcoded `"On"/"Off"`; possibly-dead root
+  `verify.js`.
