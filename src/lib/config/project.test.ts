@@ -23,6 +23,7 @@ it("strips non-model fields from a control", () => {
     kind: undefined,
     virtual: undefined,
     formulaId: undefined,
+    history: undefined,
     writable: true,
     label: undefined,
     unit: undefined,
@@ -55,6 +56,20 @@ it("keeps kind and virtual on a projected virtual control", () => {
   const out = projectControl(c);
   expect(out.kind).toBe("virtual");
   expect(out.virtual).toEqual({ expr: "temperature - 5", precision: 1 });
+  expect(out).not.toHaveProperty("liveValue");
+});
+
+it("keeps history on a projected control", () => {
+  const c: any = {
+    id: "h",
+    feature: "temperature",
+    stateId: "a.0.temp",
+    writable: false,
+    history: { duration: 24, durationUnit: "hours", count: 200 },
+    liveValue: 21,
+  };
+  const out = projectControl(c);
+  expect(out.history).toEqual({ duration: 24, durationUnit: "hours", count: 200 });
   expect(out).not.toHaveProperty("liveValue");
 });
 
