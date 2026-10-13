@@ -66,6 +66,25 @@ export interface FormulaLibrary {
   formulas: FormulaTemplate[];
 }
 
+export type HistoryDurationUnit = "hours" | "days";
+export type HistoryAggregate =
+  | "average"
+  | "min"
+  | "max"
+  | "total"
+  | "count"
+  | "none"
+  | "onchange";
+
+export interface HistorySpec {
+  duration: number;
+  durationUnit: HistoryDurationUnit;
+  count?: number;
+  step?: number;
+  stepUnit?: "seconds" | "minutes" | "hours";
+  aggregate?: HistoryAggregate;
+}
+
 export interface Control {
   id: string;
   kind?: "state" | "virtual";
@@ -78,6 +97,7 @@ export interface Control {
   transform?: Transform;
   virtual?: VirtualSpec;
   formulaId?: string;
+  history?: HistorySpec;
   common?: ControlCommon;
 }
 
