@@ -136,6 +136,18 @@ describe("buildHistoryOptions", () => {
 });
 
 describe("toSeries", () => {
+  it("accepts the socket's bare array response (err, rows, step, sessionId)", () => {
+    expect(
+      toSeries([
+        { ts: 2, val: 20, ack: true, from: "x" },
+        { ts: 1, val: 10 },
+      ]),
+    ).toEqual([
+      { ts: 1, val: 10 },
+      { ts: 2, val: 20 },
+    ]);
+  });
+
   it("keeps only finite numeric { ts, val }, sorted and de-duped", () => {
     const res = {
       result: [
@@ -154,7 +166,9 @@ describe("toSeries", () => {
   });
   it("returns [] for an empty or malformed response", () => {
     expect(toSeries({ result: [] })).toEqual([]);
+    expect(toSeries([])).toEqual([]);
     expect(toSeries(undefined)).toEqual([]);
+    expect(toSeries(null)).toEqual([]);
   });
 });
 

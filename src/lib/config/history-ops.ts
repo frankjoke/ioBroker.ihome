@@ -64,7 +64,13 @@ export function buildHistoryOptions(
 
 /** Reduce a `getHistory` response to sorted, de-duped `{ ts, val }` pairs. */
 export function toSeries(result: any): HistoryPoint[] {
-  const rows = Array.isArray(result?.result) ? result.result : [];
+  // The socket callback is (err, rows, step, sessionId): `rows` is the array
+  // itself. Tolerate a `{ result: [...] }` wrapper too.
+  const rows = Array.isArray(result)
+    ? result
+    : Array.isArray(result?.result)
+      ? result.result
+      : [];
   const points: HistoryPoint[] = [];
   for (const r of rows) {
     const ts = r?.ts;

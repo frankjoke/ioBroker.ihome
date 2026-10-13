@@ -21,7 +21,7 @@ beforeEach(() => setHistoryClient(null));
 
 describe("ensureHistory / readHistory", () => {
   it("marks empty when the range has no points", async () => {
-    setHistoryClient(client(async () => ({ result: [] })));
+    setHistoryClient(client(async () => []));
     ensureHistory("a.0.empty", spec);
     await vi.waitFor(() =>
       expect(readHistory("a.0.empty", spec)?.status).toBe("empty"),
@@ -46,7 +46,7 @@ describe("ensureHistory / readHistory", () => {
     setHistoryClient(
       client(async () => {
         calls++;
-        return { result: [] };
+        return [];
       }, false),
     );
     ensureHistory("a.0.off", spec);
@@ -56,9 +56,7 @@ describe("ensureHistory / readHistory", () => {
 
   it("reduces the response to { ts, val } pairs", async () => {
     setHistoryClient(
-      client(async () => ({
-        result: [{ ts: 1, val: 5, from: "x", ack: true }],
-      })),
+      client(async () => [{ ts: 1, val: 5, from: "x", ack: true }]),
     );
     ensureHistory("a.0.pairs", spec);
     await vi.waitFor(() =>
@@ -71,7 +69,7 @@ describe("ensureHistory / readHistory", () => {
 describe("noteLive", () => {
   it("appends strictly newer points and ignores older/equal ones", async () => {
     const t0 = Date.now();
-    setHistoryClient(client(async () => ({ result: [{ ts: t0, val: 1 }] })));
+    setHistoryClient(client(async () => [{ ts: t0, val: 1 }]));
     ensureHistory("a.0.live", spec);
     await vi.waitFor(() =>
       expect(readHistory("a.0.live", spec)?.status).toBe("ready"),
@@ -90,7 +88,7 @@ describe("noteLive", () => {
   });
 
   it("is a no-op before the series has loaded", () => {
-    setHistoryClient(client(async () => ({ result: [] })));
+    setHistoryClient(client(async () => []));
     expect(() => noteLive("a.0.none", spec, { ts: 1, val: 1 })).not.toThrow();
     expect(readHistory("a.0.none", spec)).toBeUndefined();
   });
