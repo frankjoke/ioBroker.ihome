@@ -8,6 +8,7 @@
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
+  import HistorySummary from "$lib/components/config/HistorySummary.svelte";
   import EnumBadge from "$lib/components/common/EnumBadge.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
@@ -218,6 +219,9 @@
               {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
               <span class="device-values">{summaries(d)}</span>
             </span>
+            {#each (d.controls ?? []).filter((c) => c.history && c.stateId) as c (c.id)}
+              <HistorySummary control={c} />
+            {/each}
           </div>
           <div class="device-actions">
             <button
