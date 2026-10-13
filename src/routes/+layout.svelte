@@ -12,7 +12,6 @@
   } from "$lib/stores/devices.svelte.js";
   import { initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
-  import { setHistoryClient } from "$lib/stores/history.svelte";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import { pages, pageHref } from "$lib/pages.js";
@@ -35,9 +34,6 @@
     namespace: storage.namespace || "admin.0",
     url: buildUrl(storage.hostPort),
   });
-
-  // give the history store its broker access (no import cycle, testable store)
-  setHistoryClient(ioBroker);
 
   let footerOpen = $state(false);
   // active tab is derived from the SvelteKit hash router's resolved route

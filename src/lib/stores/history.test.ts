@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
-  setHistoryClient,
   ensureHistory,
   readHistory,
   noteLive,
@@ -17,24 +16,26 @@ function client(
   return { connected, getHistory };
 }
 
-beforeEach(() => setHistoryClient(null));
-
 describe("ensureHistory / readHistory", () => {
   it("marks empty when the range has no points", async () => {
-    setHistoryClient(client(async () => []));
-    ensureHistory("a.0.empty", spec);
+    ensureHistory(
+      client(async () => []),
+      "a.0.empty",
+      spec,
+    );
     await vi.waitFor(() =>
       expect(readHistory("a.0.empty", spec)?.status).toBe("empty"),
     );
   });
 
   it("marks error with a message when getHistory rejects", async () => {
-    setHistoryClient(
+    ensureHistory(
       client(async () => {
         throw new Error("no history adapter");
       }),
+      "a.0.err",
+      spec,
     );
-    ensureHistory("a.0.err", spec);
     await vi.waitFor(() =>
       expect(readHistory("a.0.err", spec)?.status).toBe("error"),
     );
@@ -43,22 +44,24 @@ describe("ensureHistory / readHistory", () => {
 
   it("does not fetch while disconnected", () => {
     let calls = 0;
-    setHistoryClient(
+    ensureHistory(
       client(async () => {
         calls++;
         return [];
       }, false),
+      "a.0.off",
+      spec,
     );
-    ensureHistory("a.0.off", spec);
     expect(readHistory("a.0.off", spec)).toBeUndefined();
     expect(calls).toBe(0);
   });
 
   it("reduces the response to { ts, val } pairs", async () => {
-    setHistoryClient(
+    ensureHistory(
       client(async () => [{ ts: 1, val: 5, from: "x", ack: true }]),
+      "a.0.pairs",
+      spec,
     );
-    ensureHistory("a.0.pairs", spec);
     await vi.waitFor(() =>
       expect(readHistory("a.0.pairs", spec)?.status).toBe("ready"),
     );
@@ -69,8 +72,11 @@ describe("ensureHistory / readHistory", () => {
 describe("noteLive", () => {
   it("appends strictly newer points and ignores older/equal ones", async () => {
     const t0 = Date.now();
-    setHistoryClient(client(async () => [{ ts: t0, val: 1 }]));
-    ensureHistory("a.0.live", spec);
+    ensureHistory(
+      client(async () => [{ ts: t0, val: 1 }]),
+      "a.0.live",
+      spec,
+    );
     await vi.waitFor(() =>
       expect(readHistory("a.0.live", spec)?.status).toBe("ready"),
     );
@@ -88,7 +94,6 @@ describe("noteLive", () => {
   });
 
   it("is a no-op before the series has loaded", () => {
-    setHistoryClient(client(async () => []));
     expect(() => noteLive("a.0.none", spec, { ts: 1, val: 1 })).not.toThrow();
     expect(readHistory("a.0.none", spec)).toBeUndefined();
   });

@@ -80,7 +80,7 @@
   // Debounce the preview fetch so typing a duration doesn't fire one
   // getHistory per keystroke.
   const schedulePreview = debounce(
-    (stateId: string, s: HistorySpec) => ensureHistory(stateId, s),
+    (stateId: string, s: HistorySpec) => ensureHistory(ioBroker, stateId, s),
     250,
   );
 
@@ -105,7 +105,7 @@
   );
 
   function refresh() {
-    if (control.stateId) refreshHistory(control.stateId, draftSpec);
+    if (control.stateId) refreshHistory(ioBroker, control.stateId, draftSpec);
   }
   function save() {
     onChange({ ...control, history: draft });

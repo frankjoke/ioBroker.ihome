@@ -20,7 +20,7 @@
 
   $effect(() => {
     if (!control.stateId || !spec) return;
-    ensureHistory(control.stateId, spec);
+    ensureHistory(ioBroker, control.stateId, spec);
     const st: any = ioBroker.states?.get(control.stateId);
     if (st && typeof st.ts === "number" && Number.isFinite(st.val)) {
       noteLive(control.stateId, spec, { ts: st.ts, val: st.val });
@@ -36,7 +36,8 @@
   );
 
   function refresh() {
-    if (control.stateId && spec) refreshHistory(control.stateId, spec);
+    if (control.stateId && spec)
+      refreshHistory(ioBroker, control.stateId, spec);
   }
 </script>
 

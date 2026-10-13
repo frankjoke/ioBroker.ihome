@@ -17,9 +17,10 @@ export interface HistoryEntry {
 }
 
 /**
- * The ioBroker bits this store needs, injected by the layout so the store
- * never imports the socket module (same no-cycle pattern as the device store)
- * and stays unit-testable.
+ * The ioBroker bits this store needs. Passed in by the caller (the components
+ * already import the shared socket module) so the store never imports it and
+ * stays unit-testable. Deliberately *not* a module global: a hot-reloaded
+ * duplicate of this module would otherwise hold a null client.
  */
 export interface HistoryClient {
   connected: boolean | number;
@@ -29,20 +30,16 @@ export interface HistoryClient {
   ): Promise<unknown>;
 }
 
-let client: HistoryClient | null = null;
-export function setHistoryClient(c: HistoryClient | null): void {
-  client = c;
-}
-
 const cache = new SvelteMap<string, HistoryEntry>();
 
 async function load(
+  client: HistoryClient,
   key: string,
   stateId: string,
   spec: HistorySpec,
 ): Promise<void> {
   try {
-    const res = await client!.getHistory(stateId, buildHistoryOptions(spec));
+    const res = await client.getHistory(stateId, buildHistoryOptions(spec));
     const series = toSeries(res);
     cache.set(key, {
       status: series.length ? "ready" : "empty",
@@ -60,20 +57,28 @@ async function load(
 }
 
 /** Fetch the series once for a state + spec; a no-op while disconnected. */
-export function ensureHistory(stateId: string, spec: HistorySpec): void {
+export function ensureHistory(
+  client: HistoryClient,
+  stateId: string,
+  spec: HistorySpec,
+): void {
   if (!client?.connected) return;
   const key = historyKey(stateId, spec);
   if (cache.has(key)) return;
   cache.set(key, { status: "loading", series: [], fetchedAt: 0 });
-  void load(key, stateId, spec);
+  void load(client, key, stateId, spec);
 }
 
 /** Re-fetch the whole range for a state + spec. */
-export function refreshHistory(stateId: string, spec: HistorySpec): void {
+export function refreshHistory(
+  client: HistoryClient,
+  stateId: string,
+  spec: HistorySpec,
+): void {
   if (!client?.connected) return;
   const key = historyKey(stateId, spec);
   cache.set(key, { status: "loading", series: [], fetchedAt: 0 });
-  void load(key, stateId, spec);
+  void load(client, key, stateId, spec);
 }
 
 /**
