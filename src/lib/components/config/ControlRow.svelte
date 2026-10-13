@@ -6,8 +6,10 @@
   import { applyRead } from "$lib/utils/transform";
   import { computeVirtual, type LocalControl } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
+  import { historyEnabled } from "$lib/config/history-ops";
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
+  import HistoryEditor from "./HistoryEditor.svelte";
 
   let {
     control,
@@ -25,8 +27,12 @@
 
   let showTransform = $state(false);
   let showFormula = $state(false);
+  let showHistory = $state(false);
 
   const isVirtual = $derived(control.kind === "virtual");
+  const canHistory = $derived(
+    !!control.stateId && historyEnabled(ioBroker.objects.get(control.stateId)),
+  );
 
   $effect(() => {
     if (autoOpen) showFormula = true;
@@ -113,6 +119,19 @@
         /> writable</label
       >
 
+      {#if canHistory}
+        <button
+          type="button"
+          class="icon-btn"
+          class:active={!!control.history}
+          title="History"
+          aria-label="History"
+          onclick={() => (showHistory = true)}
+        >
+          <span class="material-symbols-outlined">history</span>
+        </button>
+      {/if}
+
       <button
         type="button"
         class="icon-btn"
@@ -169,6 +188,14 @@
       transform={control.transform}
       sampleValue={live()?.val}
       onChange={(t) => onChange({ ...control, transform: t })}
+    />
+  {/if}
+
+  {#if showHistory}
+    <HistoryEditor
+      {control}
+      onChange={(c) => onChange(c)}
+      onClose={() => (showHistory = false)}
     />
   {/if}
 </div>
