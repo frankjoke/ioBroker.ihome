@@ -16,7 +16,10 @@
     ensureHistory,
     readHistory,
     refreshHistory,
+    noteLive,
   } from "$lib/stores/history.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { debounce } from "$lib/utils/debounce";
 
   let {
     control,
@@ -64,12 +67,37 @@
     return Number.isFinite(n) ? n : undefined;
   }
 
+  // The draft spec, so effects track the fields rather than the draft object.
+  const draftSpec = $derived<HistorySpec>({
+    duration: draft.duration,
+    durationUnit: draft.durationUnit,
+    count: draft.count,
+    step: draft.step,
+    stepUnit: draft.stepUnit,
+    aggregate: draft.aggregate,
+  });
+
+  // Debounce the preview fetch so typing a duration doesn't fire one
+  // getHistory per keystroke.
+  const schedulePreview = debounce(
+    (stateId: string, s: HistorySpec) => ensureHistory(stateId, s),
+    250,
+  );
+
   $effect(() => {
-    if (control.stateId) ensureHistory(control.stateId, draft);
+    if (control.stateId) schedulePreview(control.stateId, draftSpec);
+  });
+
+  $effect(() => {
+    if (!control.stateId) return;
+    const st: any = ioBroker.states?.get(control.stateId);
+    if (st && typeof st.ts === "number" && Number.isFinite(st.val)) {
+      noteLive(control.stateId, draftSpec, { ts: st.ts, val: st.val });
+    }
   });
 
   const entry = $derived(
-    control.stateId ? readHistory(control.stateId, draft) : undefined,
+    control.stateId ? readHistory(control.stateId, draftSpec) : undefined,
   );
   const summary = $derived(entry ? summarize(entry.series) : undefined);
   const points = $derived(
@@ -77,7 +105,7 @@
   );
 
   function refresh() {
-    if (control.stateId) refreshHistory(control.stateId, draft);
+    if (control.stateId) refreshHistory(control.stateId, draftSpec);
   }
   function save() {
     onChange({ ...control, history: draft });

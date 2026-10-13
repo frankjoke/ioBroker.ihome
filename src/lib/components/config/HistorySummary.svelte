@@ -10,14 +10,21 @@
     ensureHistory,
     readHistory,
     refreshHistory,
+    noteLive,
   } from "$lib/stores/history.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   let { control }: { control: Control } = $props();
 
   const spec = $derived(control.history);
 
   $effect(() => {
-    if (control.stateId && spec) ensureHistory(control.stateId, spec);
+    if (!control.stateId || !spec) return;
+    ensureHistory(control.stateId, spec);
+    const st: any = ioBroker.states?.get(control.stateId);
+    if (st && typeof st.ts === "number" && Number.isFinite(st.val)) {
+      noteLive(control.stateId, spec, { ts: st.ts, val: st.val });
+    }
   });
 
   const entry = $derived(

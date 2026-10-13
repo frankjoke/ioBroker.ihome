@@ -189,16 +189,11 @@ describe("trimSeries", () => {
       { ts: now, val: 3 },
     ]);
   });
-  it("caps to the newest `count` points", () => {
-    expect(trimSeries(series, { windowMs: 60_000, count: 1, now })).toEqual([
-      { ts: now, val: 3 },
-    ]);
+  it("returns the input array unchanged when nothing is dropped", () => {
+    expect(trimSeries(series, { windowMs: 60_000, now })).toBe(series);
   });
-  it("caps to the step window when downsampling", () => {
-    expect(
-      trimSeries(series, { windowMs: 60_000, stepMs: 30_000, now }),
-    ).toEqual([
-      { ts: now - 1_000, val: 2 },
+  it("caps to the newest `max` points when given", () => {
+    expect(trimSeries(series, { windowMs: 60_000, max: 1, now })).toEqual([
       { ts: now, val: 3 },
     ]);
   });
@@ -224,6 +219,22 @@ describe("appendLive", () => {
     const s = [{ ts: now - 2 * 3_600_000, val: 1 }];
     expect(appendLive(s, { ts: now, val: 2 }, spec, now)).toEqual([
       { ts: now, val: 2 },
+    ]);
+  });
+  it("does not evict fetched points because of a sample count", () => {
+    const counted: HistorySpec = {
+      duration: 1,
+      durationUnit: "hours",
+      count: 2,
+    };
+    const base = [
+      { ts: 1_000, val: 1 },
+      { ts: 2_000, val: 2 },
+    ];
+    expect(appendLive(base, { ts: 3_000, val: 3 }, counted, 3_000)).toEqual([
+      { ts: 1_000, val: 1 },
+      { ts: 2_000, val: 2 },
+      { ts: 3_000, val: 3 },
     ]);
   });
 });

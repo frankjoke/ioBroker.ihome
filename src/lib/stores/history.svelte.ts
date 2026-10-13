@@ -1,6 +1,6 @@
 import { SvelteMap } from "svelte/reactivity";
+import { untrack } from "svelte";
 import type { HistorySpec } from "$lib/types/device";
-import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   buildHistoryOptions,
   historyKey,
@@ -16,6 +16,24 @@ export interface HistoryEntry {
   error?: string;
 }
 
+/**
+ * The ioBroker bits this store needs, injected by the layout so the store
+ * never imports the socket module (same no-cycle pattern as the device store)
+ * and stays unit-testable.
+ */
+export interface HistoryClient {
+  connected: boolean | number;
+  getHistory(
+    stateId: string,
+    options: Record<string, unknown>,
+  ): Promise<unknown>;
+}
+
+let client: HistoryClient | null = null;
+export function setHistoryClient(c: HistoryClient | null): void {
+  client = c;
+}
+
 const cache = new SvelteMap<string, HistoryEntry>();
 
 async function load(
@@ -24,7 +42,7 @@ async function load(
   spec: HistorySpec,
 ): Promise<void> {
   try {
-    const res = await ioBroker.getHistory(stateId, buildHistoryOptions(spec));
+    const res = await client!.getHistory(stateId, buildHistoryOptions(spec));
     const series = toSeries(res);
     cache.set(key, {
       status: series.length ? "ready" : "empty",
@@ -43,7 +61,7 @@ async function load(
 
 /** Fetch the series once for a state + spec; a no-op while disconnected. */
 export function ensureHistory(stateId: string, spec: HistorySpec): void {
-  if (!ioBroker.connected) return;
+  if (!client?.connected) return;
   const key = historyKey(stateId, spec);
   if (cache.has(key)) return;
   cache.set(key, { status: "loading", series: [], fetchedAt: 0 });
@@ -52,31 +70,38 @@ export function ensureHistory(stateId: string, spec: HistorySpec): void {
 
 /** Re-fetch the whole range for a state + spec. */
 export function refreshHistory(stateId: string, spec: HistorySpec): void {
-  if (!ioBroker.connected) return;
+  if (!client?.connected) return;
   const key = historyKey(stateId, spec);
   cache.set(key, { status: "loading", series: [], fetchedAt: 0 });
   void load(key, stateId, spec);
 }
 
 /**
- * The cached entry, with the live state value appended when it is newer.
- * Pure — never mutates the cache (it runs during render).
+ * The cached entry. Pure — the live tail is fed in by `noteLive`, so reading
+ * during render never mutates state.
  */
 export function readHistory(
   stateId: string,
   spec: HistorySpec,
 ): HistoryEntry | undefined {
-  const entry = cache.get(historyKey(stateId, spec));
-  if (!entry || entry.status !== "ready") return entry;
-  const st: any = ioBroker.states?.get(stateId);
-  if (st && typeof st.ts === "number" && typeof st.val === "number") {
-    const series = appendLive(
-      entry.series,
-      { ts: st.ts, val: st.val },
-      spec,
-      Date.now(),
-    );
-    return series === entry.series ? entry : { ...entry, series };
-  }
-  return entry;
+  return cache.get(historyKey(stateId, spec));
+}
+
+/**
+ * Persist a live sample onto a loaded series when it is strictly newer,
+ * trimming the window. Callers feed this from their own effect.
+ */
+export function noteLive(
+  stateId: string,
+  spec: HistorySpec,
+  point: HistoryPoint,
+): void {
+  untrack(() => {
+    const key = historyKey(stateId, spec);
+    const entry = cache.get(key);
+    if (!entry || entry.status !== "ready") return;
+    const series = appendLive(entry.series, point, spec, Date.now());
+    if (series === entry.series) return;
+    cache.set(key, { ...entry, series });
+  });
 }

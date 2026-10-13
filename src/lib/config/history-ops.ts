@@ -94,21 +94,25 @@ export function summarize(series: HistoryPoint[]): {
 }
 
 /**
- * Drop points outside the window, then cap to the newest `count` (or
- * `windowMs / stepMs`) points when downsampling.
+ * Drop points outside the window, then cap to the newest `max` points when
+ * given. Returns the input array unchanged when nothing is dropped.
  */
 export function trimSeries(
   series: HistoryPoint[],
-  opts: { windowMs: number; count?: number; stepMs?: number; now: number },
+  opts: { windowMs: number; now: number; max?: number },
 ): HistoryPoint[] {
   const cutoff = opts.now - opts.windowMs;
-  let out = series.filter((p) => p.ts >= cutoff);
-  const cap =
-    opts.count ??
-    (opts.stepMs ? Math.ceil(opts.windowMs / opts.stepMs) : undefined);
-  if (cap && out.length > cap) out = out.slice(out.length - cap);
-  return out;
+  let start = 0;
+  while (start < series.length && series[start].ts < cutoff) start++;
+  const end = series.length;
+  if (opts.max && end - start > opts.max) start = end - opts.max;
+  if (start === 0 && end === series.length) return series;
+  return series.slice(start, end);
 }
+
+// ponytail: hard cap keeps the sparkline cheap; the window (not `count`)
+// bounds the visible span, so the "last Nh" label stays honest.
+const MAX_LIVE_POINTS = 2000;
 
 /**
  * Append a live point to a fetched series when it is strictly newer, keeping
@@ -124,9 +128,8 @@ export function appendLive(
   if (last && point.ts <= last.ts) return series;
   return trimSeries([...series, point], {
     windowMs: durationMs(spec),
-    count: spec.count,
-    stepMs: stepMs(spec),
     now,
+    max: MAX_LIVE_POINTS,
   });
 }
 
