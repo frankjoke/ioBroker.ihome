@@ -4,7 +4,7 @@
     setCanonicalRegistry,
     devicesEnrichedStore,
   } from "$lib/stores/devices";
-  import { formatValue } from "$lib/config/format";
+  import { formatAge, formatValue } from "$lib/config/format";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
@@ -47,6 +47,25 @@
         (c) => `${c.label || c.feature}: ${formatValue(c.liveValue, c.unit)}`,
       )
       .join(", ");
+  }
+
+  /** Newest `ts` across the device's state-backed controls, or undefined. */
+  function lastUpdate(device: Device): number | undefined {
+    let latest: number | undefined;
+    for (const c of device.controls ?? []) {
+      if (!c.stateId) continue;
+      const ts = ioBroker.states.get(c.stateId)?.ts;
+      if (typeof ts === "number" && (latest === undefined || ts > latest)) {
+        latest = ts;
+      }
+    }
+    return latest;
+  }
+
+  /** "24m ago" / "just now". */
+  function agoLabel(ts: number): string {
+    const age = formatAge(ts);
+    return age === "now" ? "just now" : `${age} ago`;
   }
 
   const roomOptions = $derived(
@@ -211,6 +230,7 @@
 
     <div class="device-list">
       {#each sortedDevices as d (d.id)}
+        {@const seen = lastUpdate(d)}
         <div class="card device-row">
           <div class="device-main">
             <span class="device-name">{d.name}</span>
@@ -218,6 +238,16 @@
               <span class="badge badge-secondary">{d.type}</span>
               {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
               <span class="device-values">{summaries(d)}</span>
+              {#if seen !== undefined}
+                <span
+                  class="device-updated"
+                  title={new Date(seen).toLocaleString()}
+                >
+                  <span class="material-symbols-outlined" aria-hidden="true"
+                    >schedule</span
+                  >{agoLabel(seen)}</span
+                >
+              {/if}
             </span>
             {#each (d.controls ?? []).filter((c) => c.history && c.stateId) as c (c.id)}
               <HistorySummary control={c} />
@@ -377,11 +407,22 @@
     flex-wrap: wrap;
   }
 
+  .device-updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .device-updated .material-symbols-outlined {
+    font-size: 1em;
+  }
+
   .device-actions {
     display: flex;
     gap: 0.35rem;
   }
-
   .icon-btn {
     display: inline-flex;
     align-items: center;
