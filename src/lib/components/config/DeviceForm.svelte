@@ -2,7 +2,6 @@
   import type { Control, Device, DeviceType } from "$lib/types/device";
   import { untrack } from "svelte";
   import ControlRow from "./ControlRow.svelte";
-  import HistorySummary from "./HistorySummary.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { projectDevice } from "$lib/config/project";
@@ -215,9 +214,6 @@
         onChange={(c) => updateControl(i, c)}
         onRemove={() => removeControl(i)}
       />
-    {/each}
-    {#each controls.filter((c) => c.history && c.stateId) as c (c.id)}
-      <HistorySummary control={c} />
     {/each}
   </div>
 

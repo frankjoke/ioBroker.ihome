@@ -10,6 +10,7 @@
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
   import HistoryEditor from "./HistoryEditor.svelte";
+  import HistorySummary from "./HistorySummary.svelte";
 
   let {
     control,
@@ -173,6 +174,10 @@
       /></label
     >
   </div>
+
+  {#if !isVirtual && control.history && control.stateId}
+    <HistorySummary {control} />
+  {/if}
 
   {#if isVirtual}
     {#if showFormula}
