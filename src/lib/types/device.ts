@@ -68,13 +68,7 @@ export interface FormulaLibrary {
 
 export type HistoryDurationUnit = "hours" | "days";
 export type HistoryAggregate =
-  | "average"
-  | "min"
-  | "max"
-  | "total"
-  | "count"
-  | "none"
-  | "onchange";
+  "average" | "min" | "max" | "total" | "count" | "none" | "onchange";
 
 export interface HistorySpec {
   duration: number;

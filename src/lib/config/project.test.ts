@@ -69,7 +69,11 @@ it("keeps history on a projected control", () => {
     liveValue: 21,
   };
   const out = projectControl(c);
-  expect(out.history).toEqual({ duration: 24, durationUnit: "hours", count: 200 });
+  expect(out.history).toEqual({
+    duration: 24,
+    durationUnit: "hours",
+    count: 200,
+  });
   expect(out).not.toHaveProperty("liveValue");
 });
 

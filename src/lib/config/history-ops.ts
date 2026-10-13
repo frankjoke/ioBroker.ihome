@@ -104,7 +104,8 @@ export function trimSeries(
   const cutoff = opts.now - opts.windowMs;
   let out = series.filter((p) => p.ts >= cutoff);
   const cap =
-    opts.count ?? (opts.stepMs ? Math.ceil(opts.windowMs / opts.stepMs) : undefined);
+    opts.count ??
+    (opts.stepMs ? Math.ceil(opts.windowMs / opts.stepMs) : undefined);
   if (cap && out.length > cap) out = out.slice(out.length - cap);
   return out;
 }

@@ -21,7 +21,9 @@ const DAY = 86_400_000;
 describe("historyEnabled", () => {
   it("is true when a custom entry is enabled", () => {
     expect(
-      historyEnabled({ common: { custom: { "history.0": { enabled: true } } } }),
+      historyEnabled({
+        common: { custom: { "history.0": { enabled: true } } },
+      }),
     ).toBe(true);
   });
   it("is true when a custom entry omits enabled (only false disables)", () => {
@@ -29,7 +31,9 @@ describe("historyEnabled", () => {
   });
   it("is false when every custom entry is disabled", () => {
     expect(
-      historyEnabled({ common: { custom: { "history.0": { enabled: false } } } }),
+      historyEnabled({
+        common: { custom: { "history.0": { enabled: false } } },
+      }),
     ).toBe(false);
   });
   it("is false without custom or object", () => {
@@ -45,10 +49,20 @@ describe("durationMs / stepMs", () => {
   });
   it("converts the step unit and returns undefined when absent", () => {
     expect(
-      stepMs({ duration: 1, durationUnit: "hours", step: 30, stepUnit: "minutes" }),
+      stepMs({
+        duration: 1,
+        durationUnit: "hours",
+        step: 30,
+        stepUnit: "minutes",
+      }),
     ).toBe(1_800_000);
     expect(
-      stepMs({ duration: 1, durationUnit: "hours", step: 45, stepUnit: "seconds" }),
+      stepMs({
+        duration: 1,
+        durationUnit: "hours",
+        step: 45,
+        stepUnit: "seconds",
+      }),
     ).toBe(45_000);
     expect(stepMs({ duration: 1, durationUnit: "hours" })).toBeUndefined();
   });
@@ -68,8 +82,16 @@ describe("buildHistoryOptions", () => {
   const now = 1_000_000_000_000;
   it("uses count when set", () => {
     expect(
-      buildHistoryOptions({ duration: 24, durationUnit: "hours", count: 200 }, now),
-    ).toEqual({ start: now - 24 * HOUR, end: now, ignoreNull: true, count: 200 });
+      buildHistoryOptions(
+        { duration: 24, durationUnit: "hours", count: 200 },
+        now,
+      ),
+    ).toEqual({
+      start: now - 24 * HOUR,
+      end: now,
+      ignoreNull: true,
+      count: 200,
+    });
   });
   it("uses step + aggregate when only step is set", () => {
     expect(
@@ -107,9 +129,9 @@ describe("buildHistoryOptions", () => {
     ).toEqual({ start: now - HOUR, end: now, ignoreNull: true, count: 10 });
   });
   it("raw when neither is set", () => {
-    expect(buildHistoryOptions({ duration: 1, durationUnit: "hours" }, now)).toEqual(
-      { start: now - HOUR, end: now, ignoreNull: true },
-    );
+    expect(
+      buildHistoryOptions({ duration: 1, durationUnit: "hours" }, now),
+    ).toEqual({ start: now - HOUR, end: now, ignoreNull: true });
   });
 });
 
@@ -138,7 +160,12 @@ describe("toSeries", () => {
 
 describe("summarize", () => {
   it("counts and finds min/max", () => {
-    expect(summarize([{ ts: 1, val: 10 }, { ts: 2, val: 30 }])).toEqual({
+    expect(
+      summarize([
+        { ts: 1, val: 10 },
+        { ts: 2, val: 30 },
+      ]),
+    ).toEqual({
       count: 2,
       min: 10,
       max: 30,
@@ -168,7 +195,9 @@ describe("trimSeries", () => {
     ]);
   });
   it("caps to the step window when downsampling", () => {
-    expect(trimSeries(series, { windowMs: 60_000, stepMs: 30_000, now })).toEqual([
+    expect(
+      trimSeries(series, { windowMs: 60_000, stepMs: 30_000, now }),
+    ).toEqual([
       { ts: now - 1_000, val: 2 },
       { ts: now, val: 3 },
     ]);
@@ -179,7 +208,9 @@ describe("appendLive", () => {
   const spec: HistorySpec = { duration: 1, durationUnit: "hours" };
   const now = 100_000;
   it("appends a strictly newer point", () => {
-    expect(appendLive([{ ts: 99_000, val: 1 }], { ts: 100_000, val: 2 }, spec, now)).toEqual([
+    expect(
+      appendLive([{ ts: 99_000, val: 1 }], { ts: 100_000, val: 2 }, spec, now),
+    ).toEqual([
       { ts: 99_000, val: 1 },
       { ts: 100_000, val: 2 },
     ]);
@@ -191,7 +222,9 @@ describe("appendLive", () => {
   });
   it("trims to the window while appending", () => {
     const s = [{ ts: now - 2 * 3_600_000, val: 1 }];
-    expect(appendLive(s, { ts: now, val: 2 }, spec, now)).toEqual([{ ts: now, val: 2 }]);
+    expect(appendLive(s, { ts: now, val: 2 }, spec, now)).toEqual([
+      { ts: now, val: 2 },
+    ]);
   });
 });
 
@@ -200,27 +233,49 @@ describe("sparklinePoints", () => {
     expect(sparklinePoints([], 100, 20)).toBe("");
   });
   it("draws a flat mid-line for one point or a flat series", () => {
-    expect(sparklinePoints([{ ts: 1, val: 5 }], 100, 20, 0)).toBe("0,10 100,10");
+    expect(sparklinePoints([{ ts: 1, val: 5 }], 100, 20, 0)).toBe(
+      "0,10 100,10",
+    );
     expect(
-      sparklinePoints([{ ts: 0, val: 5 }, { ts: 10, val: 5 }], 100, 20, 0),
+      sparklinePoints(
+        [
+          { ts: 0, val: 5 },
+          { ts: 10, val: 5 },
+        ],
+        100,
+        20,
+        0,
+      ),
     ).toBe("0,10 100,10");
   });
   it("maps time to x and value to y (inverted)", () => {
     expect(
-      sparklinePoints([{ ts: 0, val: 0 }, { ts: 10, val: 10 }], 100, 20, 0),
+      sparklinePoints(
+        [
+          { ts: 0, val: 0 },
+          { ts: 10, val: 10 },
+        ],
+        100,
+        20,
+        0,
+      ),
     ).toBe("0,20 100,0");
   });
 });
 
 describe("labels", () => {
   it("describes the duration", () => {
-    expect(durationLabel({ duration: 24, durationUnit: "hours" })).toBe("last 24h");
-    expect(durationLabel({ duration: 7, durationUnit: "days" })).toBe("last 7d");
+    expect(durationLabel({ duration: 24, durationUnit: "hours" })).toBe(
+      "last 24h",
+    );
+    expect(durationLabel({ duration: 7, durationUnit: "days" })).toBe(
+      "last 7d",
+    );
   });
   it("describes the granularity", () => {
-    expect(granularityLabel({ duration: 24, durationUnit: "hours", count: 200 })).toBe(
-      "200 samples",
-    );
+    expect(
+      granularityLabel({ duration: 24, durationUnit: "hours", count: 200 }),
+    ).toBe("200 samples");
     expect(
       granularityLabel({
         duration: 1,
@@ -230,6 +285,8 @@ describe("labels", () => {
         aggregate: "max",
       }),
     ).toBe("30min max");
-    expect(granularityLabel({ duration: 1, durationUnit: "hours" })).toBe("raw");
+    expect(granularityLabel({ duration: 1, durationUnit: "hours" })).toBe(
+      "raw",
+    );
   });
 });
