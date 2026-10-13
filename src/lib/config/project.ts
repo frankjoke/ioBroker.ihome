@@ -14,6 +14,7 @@ export function projectControl(c: Control): Control {
     transform: c.transform,
     virtual: c.virtual,
     formulaId: c.formulaId,
+    history: c.history,
   };
 }
 

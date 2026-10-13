@@ -112,12 +112,17 @@ the live state cache is injected with the existing `setStateSource`).
   `ioBroker.getHistory`), calling `buildHistoryOptions` + `toSeries`. Empty result ⇒
   `status: "empty"`.
 - `refreshHistory(stateId, spec)` — re-fetch the whole range for that key.
-- `getHistory(stateId, spec)` — returns the current entry; if the live state's `ts` is
-  newer than the last cached point, appends that single `{ts, val}` and runs
-  `trimSeries`, so the series stays current **without refetching** and without
-  duplicating on repeat renders.
+- `readHistory(stateId, spec)` — returns the current entry. **Pure** — the live tail is
+  fed in separately (below), so reading during render never mutates state.
+- `noteLive(stateId, spec, point)` — persists a live `{ts, val}` onto a loaded series
+  when it is strictly newer than the last point, trimming the window (and a hard
+  point cap). The components call it from the same effect that loads the row, so the
+  series stays current **without refetching** and accumulates successive live samples.
+- The broker access is **injected** (`setHistoryClient`) by the layout — the store never
+  imports the socket module (no cycle) and stays unit-testable with a stub client.
 - No timers, no prefetch: only keys that a rendered row/modal asks for are fetched,
-  and live appends stop when nothing reads the store.
+  and live appends stop when nothing feeds the store. (The editor debounces its
+  preview fetch so typing a duration does not fire one request per keystroke.)
 
 ## 5. UI
 
@@ -200,6 +205,10 @@ All new/edited Svelte components use Svelte 5 runes and TypeScript; no new runti
 - Loading: **lazy** — fetch the full range when a history row/modal first renders,
   then **append live updates** instead of refetching; manual refresh re-fetches.
 - Display: summary + inline sparkline **both in the editor and on the devices page**.
+- Store: **broker access injected** (`setHistoryClient`); `readHistory` is a pure read and
+  `noteLive` persists live samples (moved out of the render path). Live appends are bounded
+  by the **window** (plus a hard cap), never by `count`/`step`, so the "last Nh" label stays
+  honest. The editor's preview fetch is **debounced**.
 
 ### Open questions
 - Should a history line be collapsible/hidden by default once there are many? Defer
