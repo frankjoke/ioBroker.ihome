@@ -41,7 +41,7 @@ a separate control row would duplicate `stateId`/label/unit and could dangle.
 ```ts
 export type HistoryDurationUnit = "hours" | "days";
 export type HistoryAggregate =
-  | "average" | "min" | "max" | "last" | "total" | "count" | "none";
+  | "average" | "min" | "max" | "total" | "count" | "none" | "onchange";
 
 export interface HistorySpec {
   duration: number;                    // e.g. 24
