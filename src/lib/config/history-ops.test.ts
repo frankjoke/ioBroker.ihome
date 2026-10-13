@@ -12,8 +12,8 @@ import {
   sparklinePoints,
   durationLabel,
   granularityLabel,
-  type HistorySpec,
 } from "$lib/config/history-ops";
+import type { HistorySpec } from "$lib/types/device";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
