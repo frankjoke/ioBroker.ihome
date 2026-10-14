@@ -6,7 +6,7 @@
 // global): Vite HMR can hand this module two instances, and a module-global
 // client then desyncs them — see the 2026-10-13 handoff.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { parsePageRegistry } from "$lib/config/pages-ops";
+import { loadPages, parsePageRegistry } from "$lib/config/pages-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import type { PageRegistry } from "$lib/types/display";
 
@@ -77,27 +77,26 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
         console.error("initPages ensurePagesObject:", e);
       }
       const st = await ioBroker.getState(PAGE_LIST_ID);
-      if (!st) {
+      if (!ioBroker.connected) {
+        // Not reachable after the wait — leave the promise unset so a later
+        // call retries instead of caching an empty registry.
         initPromise = null;
         return;
       }
-      st.onUpdate = (_cl, state) => {
-        const parsed = parsePageRegistry(state?.val);
-        if (!parsed) return true;
-        const asString = JSON.stringify(parsed);
-        if (lastSent !== null && lastSent === asString) return true;
-        setPageRegistry(parsed);
-        return true;
-      };
-      const parsed = parsePageRegistry(st.value);
-      if (parsed?.pages?.length) {
-        setPageRegistry(parsed);
-        return;
+      if (st) {
+        st.onUpdate = (_cl, state) => {
+          const parsed = parsePageRegistry(state?.val);
+          if (!parsed) return true;
+          const asString = JSON.stringify(parsed);
+          if (lastSent !== null && lastSent === asString) return true;
+          setPageRegistry(parsed);
+          return true;
+        };
       }
-      const fresh = seed?.();
-      if (fresh) {
-        setPageRegistry(fresh);
-        savePages();
+      const resolved = loadPages(st?.value, seed);
+      if (resolved?.pages?.length) {
+        setPageRegistry(resolved);
+        if (resolved.seeded) savePages();
       }
     })().catch((e) => {
       console.error("initPages:", e);

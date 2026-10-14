@@ -127,9 +127,10 @@ function groupId(prefix: string, id: string): string {
 }
 
 /**
- * The first-run page set: one page of function groups (the broker's functions
- * are the sane axis) and one page of room groups. Both use filters, so a device
- * added later appears without touching the pages.
+ * The first-run page set: a room page (rooms lead — `Device.room` is populated,
+ * while `Device.functions` is a new field nothing has filled yet) and a function
+ * page. Both use filters, so a device added later appears without touching the
+ * pages.
  */
 export function seedPages(
   functions: { id: string; label: string }[],
@@ -141,16 +142,6 @@ export function seedPages(
     seeded: true,
     pages: [
       {
-        id: "home",
-        title: "Home",
-        icon: "home",
-        groups: functions.map((f) => ({
-          id: groupId("fn", f.id),
-          title: f.label,
-          member: { function: f.id },
-        })),
-      },
-      {
         id: "rooms",
         title: "Rooms",
         icon: "meeting_room",
@@ -158,6 +149,16 @@ export function seedPages(
           id: groupId("room", r.id),
           title: r.label,
           member: { room: r.id },
+        })),
+      },
+      {
+        id: "home",
+        title: "Home",
+        icon: "home",
+        groups: functions.map((f) => ({
+          id: groupId("fn", f.id),
+          title: f.label,
+          member: { function: f.id },
         })),
       },
     ],
@@ -179,4 +180,24 @@ export function parsePageRegistry(raw: unknown): PageRegistry | null {
       pages: pages as Page[],
     };
   });
+}
+
+/**
+ * Decide what the page registry should be after loading: the stored pages when
+ * there are any, otherwise a first-run seed, otherwise nothing.
+ *
+ * Seeding hangs off "the document has no pages", not off "the state read
+ * succeeded": a freshly created ioBroker state has an object but no value, and
+ * reading it reports *not found* — the empty case and the missing case look the
+ * same from here, and both must seed.
+ */
+export function loadPages(
+  raw: unknown,
+  seed?: () => PageRegistry,
+): PageRegistry | null {
+  const parsed = parsePageRegistry(raw);
+  if (parsed?.pages?.length) return parsed;
+  const fresh = seed?.();
+  if (fresh) return fresh;
+  return parsed;
 }

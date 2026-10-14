@@ -43,6 +43,9 @@
   // active tab is derived from the SvelteKit hash router's resolved route
   const current = $derived(page.route?.id ?? "/");
   const isConnected = $derived(!!ioBroker.connected);
+  // The display routes own the whole viewport: no config header, no page
+  // padding, no max width (spec §3). Their own slim bar is inside the page.
+  const isDisplay = $derived(current === "/" || current.startsWith("/p/"));
 
   // Load all device states once the socket is up and the object cache is ready,
   // then again for any state objects that appear later. Pages read the shared
@@ -97,7 +100,7 @@
   <title>iHome</title>
 </svelte:head>
 
-<div class="app-shell">
+<div class="app-shell" class:display={isDisplay}>
   <header class="app-header">
     <a class="brand" href={`${base}/#/`}>
       <img src={`${base}/house-controller.svg`} alt="" width="30" height="30" />
@@ -345,6 +348,17 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 24px;
+  }
+
+  /* The display owns the viewport: its own slim bar, no config chrome. */
+  .app-shell.display .app-header {
+    display: none;
+  }
+
+  .app-shell.display .app-main {
+    max-width: none;
+    margin: 0;
+    padding: 0;
   }
 
   /* ---------------------------------------------------------- footer */

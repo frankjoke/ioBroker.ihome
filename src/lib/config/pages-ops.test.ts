@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   filterDevices,
   matchesMember,
+  loadPages,
   parsePageRegistry,
   resolvePage,
   seedPages,
@@ -139,14 +140,16 @@ it("seeds one page of function groups and one page of room groups", () => {
     [{ id: "enum.rooms.WZ", label: "Wohn-Ess-Z" }],
   );
   expect(reg.seeded).toBe(true);
-  expect(reg.pages.map((p) => p.id)).toEqual(["home", "rooms"]);
-  expect(reg.pages[0].groups[0].member).toEqual({
+  // Rooms lead: they are populated today, while `functions` on a device is a new
+  // field nobody has filled yet, so a function page would open empty.
+  expect(reg.pages.map((p) => p.id)).toEqual(["rooms", "home"]);
+  expect(reg.pages[0].groups[0].member).toEqual({ room: "enum.rooms.WZ" });
+  expect(reg.pages[0].groups[0].title).toBe("Wohn-Ess-Z");
+  expect(reg.pages[0].groups[0].id).toBe("room:enum.rooms.WZ");
+  expect(reg.pages[1].groups[0].member).toEqual({
     function: "enum.functions.Licht",
   });
-  expect(reg.pages[0].groups[0].title).toBe("Licht");
-  expect(reg.pages[1].groups[0].member).toEqual({ room: "enum.rooms.WZ" });
-  expect(reg.pages[1].groups[0].title).toBe("Wohn-Ess-Z");
-  expect(reg.pages[0].groups[0].id).toBe("fn:enum.functions.Licht");
+  expect(reg.pages[1].groups[0].title).toBe("Licht");
 });
 
 it("parses a page registry and rejects junk", () => {
@@ -160,4 +163,26 @@ it("parses a page registry and rejects junk", () => {
   ).toBe(1);
   expect(parsePageRegistry({ val: "{bad json" })).toBeNull();
   expect(parsePageRegistry({ seeded: true, pages: [] })?.seeded).toBe(true);
+});
+
+it("keeps loaded pages and seeds an empty document", () => {
+  const loaded = { pages: [{ id: "a", title: "A", groups: [] }] };
+  expect(loadPages(loaded)?.pages[0].id).toBe("a");
+  const seeded = loadPages(null, () => ({
+    version: 0,
+    updatedAt: 1,
+    seeded: true,
+    pages: [{ id: "s", title: "S", groups: [] }],
+  }));
+  expect(seeded?.seeded).toBe(true);
+  expect(seeded?.pages[0].id).toBe("s");
+  expect(loadPages(null)).toBeNull();
+  expect(
+    loadPages({ pages: [] }, () => ({
+      version: 0,
+      updatedAt: 1,
+      seeded: true,
+      pages: [],
+    }))?.seeded,
+  ).toBe(true);
 });
