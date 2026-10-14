@@ -1,3 +1,5 @@
+import type { Size, Slot, Rule } from "$lib/types/display";
+
 export type DeviceType =
   | "Switch"
   | "Light"
@@ -92,6 +94,7 @@ export interface Control {
   virtual?: VirtualSpec;
   formulaId?: string;
   history?: HistorySpec;
+  rules?: Rule[];
   common?: ControlCommon;
 }
 
@@ -100,10 +103,19 @@ export interface Device {
   name: string;
   type: DeviceType;
   room?: string;
+  // deprecated: superseded by page groups (spec §4.1.5) — kept so old registries still parse
   section?: string;
+  // deprecated: superseded by page groups (spec §4.1.5) — kept so old registries still parse
   panel?: string;
   icon?: string;
   title?: string;
+  functions?: string[];
+  favorites?: string[];
+  tags?: string[];
+  template?: string;
+  size?: Size;
+  slots?: Slot[];
+  watch?: string[];
   alarm?: any;
   meta?: any;
   controls: Control[];

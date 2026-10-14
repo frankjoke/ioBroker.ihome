@@ -15,6 +15,7 @@ export function projectControl(c: Control): Control {
     virtual: c.virtual,
     formulaId: c.formulaId,
     history: c.history,
+    rules: c.rules,
   };
 }
 
@@ -28,6 +29,13 @@ export function projectDevice(d: Device): Device {
     section: d.section,
     panel: d.panel,
     icon: d.icon,
+    functions: d.functions,
+    favorites: d.favorites,
+    tags: d.tags,
+    template: d.template,
+    size: d.size,
+    slots: d.slots,
+    watch: d.watch,
     controls: (d.controls ?? []).map(projectControl),
   };
 }

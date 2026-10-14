@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { projectControl, projectDevice } from "$lib/config/project";
+import type { Device } from "$lib/types/device";
 
 it("strips non-model fields from a control", () => {
   const c: any = {
@@ -96,4 +97,42 @@ it("projects a device and its controls", () => {
   const out = projectDevice(d);
   expect(out.name).toBe("D");
   expect(out.controls[0]).not.toHaveProperty("widget");
+});
+
+it("projects the display fields of a device", () => {
+  const d: Device = {
+    id: "d1",
+    name: "Light",
+    type: "Light",
+    functions: ["enum.functions.Licht"],
+    favorites: ["enum.favorites.EG"],
+    tags: ["eg", "night"],
+    template: "light-v2",
+    size: { w: 2, h: 1 },
+    watch: ["alias.0.EG.Relay.SET"],
+    slots: [
+      {
+        kind: "icon",
+        source: "power",
+        rules: [{ when: "power", icon: "lightbulb" }],
+      },
+    ],
+    controls: [
+      {
+        id: "c1",
+        feature: "power",
+        writable: true,
+        rules: [{ when: "!power", tone: "info" }],
+      },
+    ],
+  };
+  const p = projectDevice(d);
+  expect(p.functions).toEqual(["enum.functions.Licht"]);
+  expect(p.favorites).toEqual(["enum.favorites.EG"]);
+  expect(p.tags).toEqual(["eg", "night"]);
+  expect(p.template).toBe("light-v2");
+  expect(p.size).toEqual({ w: 2, h: 1 });
+  expect(p.watch).toEqual(["alias.0.EG.Relay.SET"]);
+  expect(p.slots).toEqual(d.slots);
+  expect(p.controls[0].rules).toEqual([{ when: "!power", tone: "info" }]);
 });
