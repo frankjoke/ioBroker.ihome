@@ -214,16 +214,16 @@ watch?: string[];       // raw state ids referenced by rules/expressions
 
 | preset | size | slots (beyond icon + name) |
 |---|---|---|
-| Switch | 1x2 | value (state text, On/Off), badge: ago/offline |
-| Button | 1x2 | button |
-| Light | 1x2 | level (brightness), color, value, badge: ago/offline; icon rules for on/off colour, glow and `disabled` |
+| Switch | 1x1 | value (state text, On/Off), badge: ago/offline; icon rules with `disabled` when off |
+| Button | 1x1 | button |
+| Light | 1x1 | level (brightness), color, value, badge: ago/offline; icon rules for on/off colour, glow and `disabled` |
 | Thermostat | 2x1 | value (actual), level (setpoint), enum (mode), badge: ago/offline |
-| Thermometer | 1x2 | value (temp), value (humidity), badge: ago/offline/battery |
+| Thermometer | 1x1 | value ×2 (positional: the device's first two readings), badge: ago/offline/battery |
 | Blind | 2x1 | level (position), button (stop) |
-| Window | 1x2 | value (open/closed); icon rules with `disabled` when closed |
-| Motion | 1x2 | value (On/Off), icon rules (active / idle+`disabled`), badge: ago **of the motion control** + offline |
+| Window | 1x1 | value (open/closed); icon rules with `disabled` when closed |
+| Motion | 1x1 | value (On/Off), icon rules (active / idle+`disabled`), badge: ago **of the motion control** + offline |
 | AC | 2x2 | switch, enum (mode), level (temperature), level (fan) |
-| Value | 1x2 | value, badge: ago/offline |
+| Value | 1x1 | value (positional), badge: ago/offline |
 | Custom | 1x1 | value, switch, level |
 
 Sizes are preferences: a readout is a narrow tall card (1 wide, 2 modules high), a device with
@@ -295,6 +295,18 @@ backgrounds.
   feature match always wins, so renaming a label can only add a match, never steal one.
 - `disabled` from a rule dims what it matches — the whole tile, or just the glyph — without
   disabling it: an "off" light is still the thing you tap to switch on.
+- **Badges live in corners, and the corner means something**: an `ago` badge is bottom-left
+  ("how long ago"), `battery` / `offline` / `alarm` / `error` are top-right ("something is
+  wrong"), anything else — a reading, power consumption — is top-left; bottom-right is free for
+  later. A slot may override with `options.position`. More than three in one corner collapse to
+  `+n`.
+- **A readout declares how many values it shows, not what they are called.** A `value` slot with
+  no `source` takes the next control no earlier slot used, so a Thermometer shows the device's
+  first two readings whatever they are (`Temperatur`, `Luftfeuchtigkeit`, feature or no feature).
+  Because a preset may repeat a kind, `options.index` is part of a slot's identity
+  (`kind:source:index`) — without it two readout slots merge into one.
+- **A tile's name drops a redundant type suffix**: `Garten-Pool.Light` on a Light tile reads
+  `Garten-Pool`. `Device.title` (set from the device form's "Tile title") overrides both.
 - The modal reuses the existing control widgets (`ControlRow`).
 
 ## 7. Interaction

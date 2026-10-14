@@ -7,6 +7,7 @@ import {
   primaryControl,
   resolveControl,
   resolveTemplate,
+  tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
 import type { Template } from "$lib/types/display";
@@ -213,4 +214,37 @@ it("resolves a slot source feature-first, then id, state id, and finally label",
   expect(resolveControl(controls, "Battery")?.id).toBe("c1");
   expect(resolveControl(controls, "nothing")).toBeUndefined();
   expect(resolveControl(controls, undefined)).toBeUndefined();
+});
+
+it("derives a tile title, dropping a trailing device-type suffix", () => {
+  expect(tileTitle({ name: "Garten-Pool.Light", type: "Light" })).toBe(
+    "Garten-Pool",
+  );
+  expect(tileTitle({ name: "Bad.Thermometer", type: "Thermometer" })).toBe(
+    "Bad",
+  );
+  expect(tileTitle({ name: "Brunnen", type: "Switch" })).toBe("Brunnen");
+  // a name that only looks like a suffix in different case still strips
+  expect(tileTitle({ name: "Pool.light", type: "Light" })).toBe("Pool");
+  // something unrelated is left alone
+  expect(tileTitle({ name: "Keller.Motion", type: "Light" })).toBe(
+    "Keller.Motion",
+  );
+  // an explicit title wins over both
+  expect(
+    tileTitle({ name: "Garten-Pool.Light", type: "Light", title: "Poollicht" }),
+  ).toBe("Poollicht");
+});
+
+it("keeps repeated readout slots distinct by index", () => {
+  const merged = mergeSlots([
+    [
+      { kind: "value", options: { index: 1 } },
+      { kind: "value", options: { index: 2 } },
+    ],
+    [{ kind: "value", options: { index: 2 }, unit: "°C" }],
+  ]);
+  expect(merged.length).toBe(2);
+  expect(merged[0].options?.index).toBe(1);
+  expect(merged[1].unit).toBe("°C");
 });

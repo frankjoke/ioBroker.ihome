@@ -15,9 +15,15 @@ export interface ResolvedTemplate {
   slots: Slot[];
 }
 
-/** Slot identity: one slot per kind+source, so a later layer can override it. */
+/**
+ * Slot identity: one slot per kind+source, plus `options.index` so a preset can
+ * declare *several* readout slots of the same kind ("show two values") and still
+ * have each one addressable by a later layer.
+ */
 function slotKey(slot: Slot): string {
-  return `${slot.kind}:${slot.source ?? ""}`;
+  const index = slot.options?.index;
+  const suffix = typeof index === "number" ? `:${index}` : "";
+  return `${slot.kind}:${slot.source ?? ""}${suffix}`;
 }
 
 /**
@@ -89,6 +95,29 @@ export function resolveTemplate(
     features: user?.features?.length ? user.features : base.features,
     slots: mergeSlots([base.slots, user?.slots ?? [], device.slots ?? []]),
   };
+}
+
+/**
+ * The name a tile shows. Device names default to `Room.Type` (see
+ * `suggestDeviceName`), so the type suffix is redundant *on a tile that is already
+ * shaped by its type* — "Garten-Pool.Light" reads as "Garten-Pool". An explicit
+ * `Device.title` (set in the device config) always wins.
+ */
+export function tileTitle(device: {
+  name?: string;
+  type?: string;
+  title?: string;
+}): string {
+  const explicit = String(device?.title ?? "").trim();
+  if (explicit) return explicit;
+  const name = String(device?.name ?? "");
+  const type = String(device?.type ?? "");
+  if (!type) return name;
+  const suffix = `.${type}`;
+  if (name.toLowerCase().endsWith(suffix.toLowerCase())) {
+    return name.slice(0, -suffix.length);
+  }
+  return name;
 }
 
 /**

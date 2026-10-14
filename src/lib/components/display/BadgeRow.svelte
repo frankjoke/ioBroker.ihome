@@ -1,7 +1,10 @@
 <script lang="ts">
-  import type { ResolvedBadge } from "$lib/config/rule-ops";
+  import type { BadgeCorner, ResolvedBadge } from "$lib/config/rule-ops";
 
-  let { badges }: { badges: ResolvedBadge[] } = $props();
+  let {
+    badges,
+    corner = "bottom-left",
+  }: { badges: ResolvedBadge[]; corner?: BadgeCorner } = $props();
 
   const MAX = 3;
   const shown = $derived((badges ?? []).slice(0, MAX));
@@ -9,7 +12,7 @@
 </script>
 
 {#if shown.length}
-  <div class="badges">
+  <div class="badges {corner}">
     {#each shown as b (b.source)}
       <span class="badge {b.tone}" title={b.title ?? b.label}>
         <span class="material-symbols-outlined" aria-hidden="true"
@@ -28,13 +31,38 @@
 {/if}
 
 <style>
+  /* Pinned to a corner so position carries meaning: bottom-left is "how long
+     ago", top-right is "something is wrong", top-left is a reading. */
   .badges {
+    position: absolute;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    max-width: 100%;
+    gap: 3px;
+    max-width: 92%;
+    pointer-events: none;
+  }
+
+  .badges.top-left {
+    top: 3px;
+    left: 4px;
+  }
+
+  .badges.top-right {
+    top: 3px;
+    right: 4px;
+    justify-content: flex-end;
+  }
+
+  .badges.bottom-left {
+    bottom: 3px;
+    left: 4px;
+  }
+
+  .badges.bottom-right {
+    bottom: 3px;
+    right: 4px;
+    justify-content: flex-end;
   }
 
   .badge {

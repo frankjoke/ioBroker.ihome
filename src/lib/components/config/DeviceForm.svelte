@@ -37,6 +37,9 @@
   );
 
   let name = $state(init?.name ?? "");
+  // Optional display name for the tile: the display drops a trailing ".Type"
+  // from the device name, and this overrides whatever is left.
+  let title = $state(init?.title ?? "");
   let type = $state<DeviceType>(init?.type ?? "Custom");
   let room = $state(init?.room ?? "");
   let section = $state(init?.section ?? "");
@@ -137,6 +140,7 @@
       projectDevice({
         id: device?.id ?? crypto.randomUUID(),
         name: name.trim() || "Device",
+        title: title.trim() || undefined,
         type,
         room: room || undefined,
         section: section || undefined,
@@ -173,6 +177,14 @@
     <label class="field"
       ><span class="label-mono">Name</span>
       <input type="text" bind:value={name} /></label
+    >
+    <label class="field"
+      ><span class="label-mono">Tile title</span>
+      <input
+        type="text"
+        bind:value={title}
+        placeholder="defaults to the name"
+      /></label
     >
     <label class="field"
       ><span class="label-mono">Type</span>

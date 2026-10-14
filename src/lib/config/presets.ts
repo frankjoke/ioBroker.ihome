@@ -44,7 +44,14 @@ export const PRESETS: Record<DeviceType, Template> = {
     size: { w: 1, h: 1 },
     features: DEVICE_FEATURES.Switch,
     slots: [
-      icon("power", "power_settings_new"),
+      icon("power", "power_settings_new", [
+        { when: "truthy(power)", color: "var(--primary-color)" },
+        {
+          when: "!truthy(power)",
+          color: "var(--text-muted)",
+          disabled: true,
+        },
+      ]),
       { kind: "value", source: "power" },
       ago,
       offline,
@@ -119,9 +126,12 @@ export const PRESETS: Record<DeviceType, Template> = {
     size: { w: 1, h: 1 },
     features: DEVICE_FEATURES.Thermometer,
     slots: [
+      // Positional values: the tile shows the device's readings in order, which
+      // works whatever the controls are called ("Temperatur", "Luftfeuchtigkeit")
+      // and whatever feature they carry.
       icon("temperature", "device_thermostat"),
-      { kind: "value", source: "temperature" },
-      { kind: "value", source: "humidity" },
+      { kind: "value", options: { index: 1 } },
+      { kind: "value", options: { index: 2 } },
       ago,
       offline,
       badge("battery", "warn"),
@@ -219,12 +229,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     type: "Value",
     size: { w: 1, h: 1 },
     features: DEVICE_FEATURES.Value,
-    slots: [
-      icon("value", "speed"),
-      { kind: "value", source: "value" },
-      ago,
-      offline,
-    ],
+    slots: [icon("value", "speed"), { kind: "value" }, ago, offline],
   },
   Custom: {
     id: "Custom",

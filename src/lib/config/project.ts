@@ -29,6 +29,7 @@ export function projectDevice(d: Device): Device {
     section: d.section,
     panel: d.panel,
     icon: d.icon,
+    title: d.title,
     functions: d.functions,
     favorites: d.favorites,
     tags: d.tags,

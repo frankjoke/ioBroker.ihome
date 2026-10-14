@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   AGO_WARN_MS,
   agoBadge,
+  badgePosition,
   evalRule,
   offlineBadge,
   resolveBadges,
@@ -267,4 +268,30 @@ it("carries a disabled flag through the resolved style", () => {
   expect(resolveStyle([{ when: "true", disabled: false }], scope)).toEqual({
     disabled: false,
   });
+});
+
+it("gives each badge kind its corner, overridable", () => {
+  expect(badgePosition({ kind: "badge", source: "ago" })).toBe("bottom-left");
+  expect(badgePosition({ kind: "badge", source: "battery" })).toBe("top-right");
+  expect(badgePosition({ kind: "badge", source: "offline" })).toBe("top-right");
+  expect(badgePosition({ kind: "badge", source: "alarm" })).toBe("top-right");
+  // anything else is a value-ish reading
+  expect(badgePosition({ kind: "badge", source: "Brunnen.Leistung" })).toBe(
+    "top-left",
+  );
+  expect(
+    badgePosition({
+      kind: "badge",
+      source: "ago",
+      options: { position: "top-right" },
+    }),
+  ).toBe("top-right");
+  // a junk position falls back to the kind's corner
+  expect(
+    badgePosition({
+      kind: "badge",
+      source: "ago",
+      options: { position: "middle" },
+    }),
+  ).toBe("bottom-left");
 });

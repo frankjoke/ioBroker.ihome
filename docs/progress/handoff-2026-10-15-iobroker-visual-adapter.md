@@ -221,3 +221,27 @@ there — but that is the accident you asked me to remove, so I left it inert.
   in `sessionStorage` (`iHome.edit`), not module state: the module-global trap that broke the
   history store under Vite HMR. Cmd/Ctrl+Enter is the keyboard form of the same shortcut.
 - Spec §5's layout table and §7's interaction list updated to match.
+
+## Follow-up 4 — four observations from your test pass
+
+1. **Switch tiles did not dim when off** — the Switch preset's icon simply had no rules (Light,
+   Window and Motion did). It now has `truthy(power)` / `!truthy(power)` rules with `disabled`
+   when off. Grounded in your config: `Brunnen` is a Switch with `power` + two `value` controls.
+2. **`Garten-Pool.Thermometer` showed no values** — its four controls all carry feature `value`
+   with German labels ("Temperatur", "Luftfeuchtigkeit"), so neither feature *nor* label could
+   match the preset's English `temperature`/`humidity`. Readouts are now **positional**: a
+   `value` slot with no `source` takes the next control no earlier slot used. Thermometers show
+   their first two readings whatever they are called. This exposed a second bug: slot identity
+   was `kind:source`, so two sourceless value slots **merged into one** — `options.index` is now
+   part of the identity (and of the render key).
+3. **Badge corners.** `ago` is bottom-left, `battery`/`offline`/`alarm`/`error` top-right, a
+   reading top-left, bottom-right free for later; `options.position` overrides. Verified live:
+   the ago badge renders bottom-left.
+4. **Tile titles drop a redundant type suffix** — `Garten-Pool.Light` reads `Garten-Pool`,
+   `Bad.Thermometer` reads `Bad`. The device form gained a **"Tile title"** field
+   (`Device.title`, now persisted) that overrides it.
+
+**Worth your attention:** stripping the suffix makes same-room siblings collide —
+`Garten-Pool.Light` and `Garten-Pool.Thermometer` both read **"Garten-Pool"**, and you have two
+tiles titled **"Keller"** (a Light and a Motion). The icon and values distinguish them, but if
+that bothers you, the "Tile title" field is the lever (e.g. "Poollicht", "Keller Bewegung").

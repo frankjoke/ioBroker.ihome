@@ -5,13 +5,17 @@
     primaryControl,
     resolveControl,
     resolveTemplate,
+    tileTitle,
   } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
+    badgePosition,
     resolveBadges,
     resolveStyle,
     ruleScope,
+    type BadgeCorner,
+    type ResolvedBadge,
     type TimeSource,
   } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
@@ -56,15 +60,31 @@
   // Slots that render nothing are dropped, so a template can name features a
   // device does not have without leaving gaps (spec §10), and a rule can hide a
   // slot by value.
-  const slots = $derived(
-    template.slots.filter((slot) => {
-      if (slot.kind === "badge") return false; // badges render as a row (Task 11)
-      const control = controlFor(slot);
-      if (slotStyle(slot, control).hidden === true) return false;
-      if (slot.kind === "icon") return true;
-      return !!control;
-    }),
-  );
+  /**
+   * Slots and the controls they show, resolved in one pass.
+   *
+   * A slot with no `source` takes the next control no earlier slot has used —
+   * that is how a readout preset says "show two values" without knowing what the
+   * device calls them (`Temperatur`/`Luftfeuchtigkeit` carry no feature the
+   * preset could match).
+   */
+  const resolved = $derived.by(() => {
+    const used = new Set<string>();
+    const out: { slot: Slot; control?: EnrichedControl }[] = [];
+    for (const slot of template.slots) {
+      if (slot.kind === "badge") continue; // badges live in the corners
+      const control = slot.source
+        ? controlFor(slot)
+        : shownControls.find((c) => !used.has(c.id));
+      if (control) used.add(control.id);
+      if (slot.kind !== "icon" && !control) continue;
+      if (slotStyle(slot, control).hidden === true) continue;
+      out.push({ slot, control });
+    }
+    return out;
+  });
+
+  const slots = $derived(resolved.map((r) => r.slot));
 
   // The icon slot carries the type's on/off colour and glow, so it drives the
   // tile's accent; the values reach CSS through custom properties (spec §6).
@@ -116,15 +136,30 @@
 
   // Badges render once, at the end of the tile, wherever the badge slots sit in
   // the template. `ago` and `offline` need no control: they read the device.
-  const badges = $derived(
-    resolveBadges(
-      template.slots.filter((s) => s.kind === "badge"),
-      device,
-      clock,
-      Date.now(),
-      getVirtualPool(),
-    ),
-  );
+  const badgeSlots = $derived(template.slots.filter((s) => s.kind === "badge"));
+
+  // Badges land in the corner their kind belongs to (spec §6), so the layout of
+  // a tile carries meaning instead of being one row at the bottom.
+  const corners = $derived.by(() => {
+    const byCorner: Record<BadgeCorner, ResolvedBadge[]> = {
+      "top-left": [],
+      "top-right": [],
+      "bottom-left": [],
+      "bottom-right": [],
+    };
+    for (const slot of badgeSlots) {
+      for (const badge of resolveBadges(
+        [slot],
+        device,
+        clock,
+        Date.now(),
+        getVirtualPool(),
+      )) {
+        byCorner[badgePosition(slot)].push(badge);
+      }
+    }
+    return byCorner;
+  });
 
   function truthy(v: unknown): boolean {
     return v === true || v === "true" || v === 1 || v === "1";
@@ -146,7 +181,7 @@
    * would be the last thing between you and a switched-on lamp.
    */
   const extraControls = $derived(
-    shownControls.filter((c) => !slots.some((s) => controlFor(s) === c)),
+    shownControls.filter((c) => !resolved.some((r) => r.control === c)),
   );
 
   /** Ctrl/Cmd+click anywhere on the tile -> that device's config. */
@@ -234,22 +269,24 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  <span class="tile-name">{device.name}</span>
+  <span class="tile-name">{tileTitle(device)}</span>
   <div class="tile-body">
-    {#each slots as slot (`${slot.kind}:${slot.source ?? ""}`)}
-      {@const slotControl = controlFor(slot)}
+    {#each resolved as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
       <SlotRenderer
-        {slot}
+        slot={r.slot}
         {device}
-        control={slotControl}
-        style={slotStyle(slot, slotControl)}
-        onPrimary={slotControl && slotControl === primary
+        control={r.control}
+        style={slotStyle(r.slot, r.control)}
+        onPrimary={r.control && r.control === primary
           ? togglePrimary
           : undefined}
       />
     {/each}
   </div>
-  <BadgeRow {badges} />
+  <BadgeRow badges={corners["top-left"]} corner="top-left" />
+  <BadgeRow badges={corners["top-right"]} corner="top-right" />
+  <BadgeRow badges={corners["bottom-left"]} corner="bottom-left" />
+  <BadgeRow badges={corners["bottom-right"]} corner="bottom-right" />
 </div>
 
 {#if modalOpen}

@@ -14,6 +14,41 @@ export type BadgeTone = "info" | "ok" | "warn" | "danger";
 
 const TONES: BadgeTone[] = ["info", "ok", "warn", "danger"];
 
+/** Which corner of a tile a badge lives in. */
+export type BadgeCorner =
+  "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+const CORNERS: BadgeCorner[] = [
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right",
+];
+
+/**
+ * Where a badge kind belongs by default, because position carries meaning:
+ * how long ago it changed (bottom-left), something wrong (top-right), a reading
+ * (top-left). A slot may override it with `options.position`.
+ */
+const BADGE_CORNERS: Record<string, BadgeCorner> = {
+  ago: "bottom-left",
+  battery: "top-right",
+  offline: "top-right",
+  alarm: "top-right",
+  error: "top-right",
+};
+
+export function badgePosition(slot: Slot): BadgeCorner {
+  const explicit = slot.options?.position;
+  if (
+    typeof explicit === "string" &&
+    CORNERS.includes(explicit as BadgeCorner)
+  ) {
+    return explicit as BadgeCorner;
+  }
+  return BADGE_CORNERS[String(slot.source ?? "")] ?? "top-left";
+}
+
 /** An `ago` badge turns warn once a state is older than this. */
 export const AGO_WARN_MS = 86_400_000;
 

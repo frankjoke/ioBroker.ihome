@@ -11,6 +11,8 @@ import {
   type FilterableDevice,
 } from "$lib/config/pages-ops";
 import type { Page } from "$lib/types/display";
+import { PRESETS } from "$lib/config/presets";
+import { DEVICE_TYPES } from "$lib/config/features";
 
 const dev = (over: Partial<FilterableDevice>): FilterableDevice => ({
   id: "x",
@@ -309,4 +311,16 @@ it("backfills device functions and favorites from the broker enums", () => {
   // An explicit assignment is never overwritten.
   expect(out[1].functions).toEqual(["enum.functions.Mine"]);
   expect(out[2].functions).toBeUndefined();
+});
+
+it("a thermometer preset declares two readout slots, not one", () => {
+  const thermos = PRESETS.Thermometer.slots.filter((s) => s.kind === "value");
+  expect(thermos.map((s) => s.options?.index)).toEqual([1, 2]);
+  // and no preset loses a repeated slot to the merge key
+  for (const type of DEVICE_TYPES) {
+    const keys = PRESETS[type].slots.map(
+      (s) => `${s.kind}:${s.source ?? ""}:${s.options?.index ?? ""}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  }
 });
