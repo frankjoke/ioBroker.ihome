@@ -63,6 +63,26 @@ let usedStateCache: {
   ids: new SvelteSet(),
 };
 
+// Raw state ids a rule reads with the pool helper, e.g. get("alias.0.X.SET").
+// Targeted extraction for *registration only* — the expression itself is still
+// evaluated by `evaluateVirtual`; this exists so a raw id is subscribed before
+// it is read. An id the pattern misses degrades to "that rule never matches"
+// (spec §14), never to a crash.
+const GET_STATE_RE = /\bget\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+function addRuleStateIds(
+  rules: { when?: string }[] | undefined,
+  into: Set<string>,
+): void {
+  for (const rule of rules ?? []) {
+    const expr = rule?.when;
+    if (!expr) continue;
+    GET_STATE_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = GET_STATE_RE.exec(expr))) into.add(match[1]);
+  }
+}
+
 export function getUsedStateIds(): Set<string> {
   if (
     usedStateCache.reg === canonicalRegistry &&
@@ -72,8 +92,11 @@ export function getUsedStateIds(): Set<string> {
   }
   const ids = new SvelteSet<string>(PROGRAM_STATE_IDS);
   for (const device of canonicalRegistry.devices ?? []) {
+    for (const id of device.watch ?? []) ids.add(id);
+    for (const slot of device.slots ?? []) addRuleStateIds(slot.rules, ids);
     for (const control of device.controls ?? []) {
       if (control.stateId) ids.add(control.stateId);
+      addRuleStateIds(control.rules, ids);
     }
   }
   usedStateCache = { reg: canonicalRegistry, ver: programVersion, ids };
