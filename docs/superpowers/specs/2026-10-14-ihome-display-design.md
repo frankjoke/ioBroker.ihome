@@ -308,9 +308,13 @@ backgrounds.
   wrong"), anything else — a reading, power consumption — is top-left; bottom-right is free for
   later. A slot may override with `options.position`. More than three in one corner collapse to
   `+n`.
-- **A readout declares how many values it shows, not what they are called.** A `value` slot with
-  no `source` takes the next control no earlier slot used, so a Thermometer shows the device's
-  first two readings whatever they are (`Temperatur`, `Luftfeuchtigkeit`, feature or no feature).
+- **A readout declares *what* it shows, then how many.** A `value` slot may carry a
+  readout hint — `options.pick: "temperature" | "humidity" | "power" | "energy" | "battery"` —
+  which the renderer matches against the ioBroker **role** first, then the **label** (which may be
+  German: "Luftfeuchtigkeit"), then the **unit**. So every thermometer reads temperature before
+  humidity, whatever order its controls happen to be in; the template fixes the tile, not the
+  config. A slot with no hint takes the next control no earlier slot used (positional fallback),
+  and anything the tile does not show is what the enlargement is for.
   Because a preset may repeat a kind, `options.index` is part of a slot's identity
   (`kind:source:index`) — without it two readout slots merge into one.
 - **A tile's name drops a redundant type suffix**: `Garten-Pool.Light` on a Light tile reads

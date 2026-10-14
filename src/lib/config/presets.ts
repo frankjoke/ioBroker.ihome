@@ -129,9 +129,12 @@ export const PRESETS: Record<DeviceType, Template> = {
       // Positional values: the tile shows the device's readings in order, which
       // works whatever the controls are called ("Temperatur", "Luftfeuchtigkeit")
       // and whatever feature they carry.
+      // Temperature first, humidity second — picked by role, so every
+      // thermometer reads the same way whatever its control order is. Anything
+      // else the device has (dew point, wind chill) stays in the enlargement.
       icon("temperature", "device_thermostat"),
-      { kind: "value", options: { index: 1 } },
-      { kind: "value", options: { index: 2 } },
+      { kind: "value", options: { index: 1, pick: "temperature" } },
+      { kind: "value", options: { index: 2, pick: "humidity" } },
       ago,
       offline,
       badge("battery", "warn"),

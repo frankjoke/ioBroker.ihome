@@ -263,3 +263,21 @@ that bothers you, the "Tile title" field is the lever (e.g. "Poollicht", "Keller
   Verified: 0 badge/content overlaps, 0 truncated values.
 - Same session, seen live: `Brunnen` switched **on** by you shows the on-state colour
   (`var(--primary-color)`) and no dimming — the Switch rules working both ways.
+
+## Follow-up 6 — the template fixes the readout order
+
+You were right that the tile should be decided by the template, not by the order the controls
+happen to sit in: `Garten` showed °C-then-% while `Terrasse` showed %-then-°C, purely because
+their control arrays differ.
+
+- A `value` slot can now carry a **readout hint**: `options.pick: "temperature" | "humidity" |
+  "power" | "energy" | "battery"`. The renderer matches it against the ioBroker **role** first
+  (your broker has `value.temperature` / `value.humidity`), then the **label** (German works:
+  "Luftfeuchtigkeit"), then the **unit** (°C, %, W, Wh). Grounded in a check of the actual
+  states: `alias.0.GartenPool.GartenTemperatur.ACTUAL` = `value.temperature`/°C and `.SECOND` =
+  `value.humidity`/%, same for Terrasse.
+- The Thermometer preset declares `temperature` then `humidity`, so **all three thermometers now
+  read the same way** (live: Bad 11.3 °C / 49.23 %, Terrasse 7.6 °C / 83 %, Garten 9.7 °C / 86 %).
+- A hint that matches nothing falls back to position, so an odd device still shows something.
+  Dew point, wind chill and the rest stay out of the tile and appear in the enlargement — which
+  is exactly the "unless all data is displayed" rule doing its job.

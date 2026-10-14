@@ -3,6 +3,7 @@ import {
   PRESETS,
   mergeSlots,
   parseTemplateRegistry,
+  pickControl,
   presetForType,
   primaryControl,
   resolveControl,
@@ -247,4 +248,40 @@ it("keeps repeated readout slots distinct by index", () => {
   expect(merged.length).toBe(2);
   expect(merged[0].options?.index).toBe(1);
   expect(merged[1].unit).toBe("°C");
+});
+
+it("picks a readout by role, wherever it sits in the control order", () => {
+  const humidityFirst = [
+    { id: "h", role: "value.humidity", unit: "%", label: "Luftfeuchtigkeit" },
+    { id: "t", role: "value.temperature", unit: "°C", label: "Temperatur" },
+  ];
+  const used = new Set<string>();
+  // role beats position: temperature first even though humidity is control #1
+  expect(pickControl(humidityFirst, "temperature", used)?.id).toBe("t");
+  used.add("t");
+  expect(pickControl(humidityFirst, "humidity", used)?.id).toBe("h");
+});
+
+it("falls back from role to label to unit, and skips used controls", () => {
+  const byUnit = [{ id: "u", unit: "°C" }];
+  expect(pickControl(byUnit, "temperature", new Set())?.id).toBe("u");
+  const byLabel = [{ id: "l", label: "Luftfeuchtigkeit" }];
+  expect(pickControl(byLabel, "humidity", new Set())?.id).toBe("l");
+  const two = [
+    { id: "t1", role: "value.temperature" },
+    { id: "t2", role: "value.temperature" },
+  ];
+  const used = new Set<string>(["t1"]);
+  expect(pickControl(two, "temperature", used)?.id).toBe("t2");
+  expect(
+    pickControl([{ id: "x", unit: "W" }], "humidity", new Set()),
+  ).toBeUndefined();
+});
+
+it("gives the thermometer preset a fixed readout order", () => {
+  const values = PRESETS.Thermometer.slots.filter((s) => s.kind === "value");
+  expect(values.map((s) => s.options?.pick)).toEqual([
+    "temperature",
+    "humidity",
+  ]);
 });

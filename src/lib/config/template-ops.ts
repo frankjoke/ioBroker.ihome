@@ -120,6 +120,66 @@ export function tileTitle(device: {
   return name;
 }
 
+/** What a `pick` hint looks for, in the order the signals are trusted. */
+const PICK_HINTS: Record<
+  string,
+  { roles: string[]; words: string[]; units: string[] }
+> = {
+  temperature: {
+    roles: ["temperature"],
+    words: ["temp"],
+    units: ["°c", "°f", "k"],
+  },
+  humidity: {
+    roles: ["humidity"],
+    words: ["feucht", "humid"],
+    units: ["%"],
+  },
+  power: { roles: ["power"], words: ["leistung", "power"], units: ["w", "kw"] },
+  energy: {
+    roles: ["energy", "consumption"],
+    words: ["verbrauch", "energy"],
+    units: ["wh", "kwh"],
+  },
+  battery: { roles: ["battery"], words: ["batterie", "battery"], units: [] },
+};
+
+export interface Pickable {
+  id?: string;
+  role?: string;
+  unit?: string;
+  label?: string;
+}
+
+/**
+ * The control a readout *hint* wants — `temperature`, `humidity`, `power`, … —
+ * independent of where it sits in the device's control order and of what the
+ * device calls it.
+ *
+ * The signals are trusted in this order: the ioBroker **role** (your broker
+ * carries `value.temperature` / `value.humidity`), then the **label** (which may
+ * be German: "Luftfeuchtigkeit"), then the **unit**. Nothing matched means the
+ * caller falls back to position, so an odd device still shows something.
+ */
+export function pickControl<T extends Pickable>(
+  controls: T[],
+  hint: string | undefined,
+  used: Set<string>,
+): T | undefined {
+  const spec = hint ? PICK_HINTS[hint] : undefined;
+  if (!spec) return undefined;
+  const free = (controls ?? []).filter((c) => !used.has(String(c.id ?? "")));
+  const has = (haystack: unknown, needles: string[]) => {
+    const text = String(haystack ?? "").toLowerCase();
+    return needles.some((n) => text.includes(n));
+  };
+  return (
+    free.find((c) => has(c.role, spec.roles)) ??
+    free.find((c) => has(c.label, spec.words)) ??
+    free.find((c) => has(c.unit, spec.units))
+  );
+}
+
 /**
  * Which control a slot's `source` points at (spec §4.1), most specific first:
  * the control's feature, its id, its state id, and — last resort, because real

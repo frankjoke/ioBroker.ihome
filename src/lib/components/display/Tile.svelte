@@ -2,6 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { applyWrite } from "$lib/utils/transform";
   import {
+    pickControl,
     primaryControl,
     resolveControl,
     resolveTemplate,
@@ -39,6 +40,16 @@
   const span = $derived(clampSpan(template.size, bp));
   const primary = $derived(primaryControl(shownControls));
 
+  /** The shape a readout hint matches against: role, label, unit. */
+  function pickable(controls: EnrichedControl[]) {
+    return controls.map((c) => ({
+      id: c.id,
+      role: c.object?.common?.role ?? c.common?.role,
+      unit: c.unit,
+      label: c.label ?? c.feature,
+    }));
+  }
+
   // Spec §4.1 + label fallback: feature → control id → state id → label.
   function controlFor(slot: Slot): EnrichedControl | undefined {
     if (!slot.source) return undefined;
@@ -73,9 +84,20 @@
     const out: { slot: Slot; control?: EnrichedControl }[] = [];
     for (const slot of template.slots) {
       if (slot.kind === "badge") continue; // badges live in the corners
+      // A readout hint is matched against the pickable shape, then mapped back
+      // to the control it names; position is only the fallback.
+      const picked = slot.source
+        ? undefined
+        : pickControl(
+            pickable(shownControls),
+            String(slot.options?.pick ?? ""),
+            used,
+          );
       const control = slot.source
         ? controlFor(slot)
-        : shownControls.find((c) => !used.has(c.id));
+        : ((picked
+            ? shownControls.find((c) => c.id === picked.id)
+            : undefined) ?? shownControls.find((c) => !used.has(c.id)));
       if (control) used.add(control.id);
       if (slot.kind !== "icon" && !control) continue;
       if (slotStyle(slot, control).hidden === true) continue;
