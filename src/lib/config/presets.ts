@@ -20,6 +20,12 @@ const badge = (source: string, tone?: string): Slot => ({
 });
 
 const ago = badge("ago");
+/** "How long since the last motion" — not since the battery last reported. */
+const agoSince = (of: string, from: "ts" | "lc" = "lc"): Slot => ({
+  kind: "badge",
+  source: "ago",
+  options: { of, from },
+});
 const offline = badge("offline");
 
 const icon = (source: string, glyph: string, rules?: Slot["rules"]): Slot => ({
@@ -169,7 +175,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     slots: [
       icon("motion", "sensors"),
       { kind: "value", source: "motion" },
-      ago,
+      agoSince("motion"),
       offline,
     ],
   },

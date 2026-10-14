@@ -11,6 +11,7 @@ import {
 } from "$lib/stores/devices";
 import { loadUsedStates } from "$lib/states.svelte.js";
 import { migrateRegistry } from "$lib/config/transform-ops";
+import { backfillEnumFields } from "$lib/config/pages-ops";
 
 let initPromise = null;
 let saveTimer = null;
@@ -50,6 +51,32 @@ async function ensureRegistryObject() {
       native: {},
     });
   }
+}
+
+/**
+ * One-time bridge from the broker's enum membership to the device fields the
+ * display filters on: ioBroker admin/rega already knows which states belong to
+ * `enum.functions.*` / `enum.favorites.*`, so a device gets those filled in when
+ * it has none of its own. Explicit values are never overwritten.
+ *
+ * Runs after the registry and the enum cache are loaded; writes only when
+ * something actually changed.
+ */
+export function backfillDeviceEnums() {
+  if (!ioBroker.connected) return;
+  const reg = getCanonicalRegistry();
+  const { devices, changed } = backfillEnumFields(
+    reg.devices ?? [],
+    ioBroker.enums,
+  );
+  if (!changed) return;
+  console.log("[registry] filled enum fields on", changed, "device(s)");
+  setCanonicalRegistry({
+    version: (reg.version ?? 0) + 1,
+    updatedAt: Date.now(),
+    devices,
+  });
+  saveRegistry();
 }
 
 export function saveRegistry() {

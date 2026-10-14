@@ -4,7 +4,12 @@
   import { resolveTemplate, primaryControl } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
-  import { resolveStyle, ruleScope, resolveBadges } from "$lib/config/rule-ops";
+  import {
+    resolveBadges,
+    resolveStyle,
+    ruleScope,
+    type TimeSource,
+  } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
@@ -73,18 +78,42 @@
     };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
   );
 
-  /** Newest `ts` across the device's state-backed controls (same rule as the
-   *  device list's "last update"). */
-  function lastTs(): number | undefined {
-    let latest: number | undefined;
-    for (const c of device.controls ?? []) {
-      if (!c.stateId) continue;
-      const ts = (ioBroker.states as Map<string, any>).get(c.stateId)?.ts;
-      if (typeof ts === "number" && (latest === undefined || ts > latest)) {
-        latest = ts;
+  /**
+   * Badge clock. `at()` answers "when did this control last report/change?";
+   * with no source it falls back to the newest timestamp on the device, which is
+   * the right question for a sensor but the wrong one for a motion detector —
+   * hence `options.of` on the badge (see `rule-ops`).
+   */
+  const clock: TimeSource = {
+    at(source, from) {
+      const states = ioBroker.states as Map<string, any>;
+      const pick = (stateId: string | undefined) => {
+        if (!stateId) return undefined;
+        const st = states.get(stateId);
+        const v = from === "lc" ? st?.lc : st?.ts;
+        return typeof v === "number" ? v : undefined;
+      };
+      if (source) {
+        const controls = shownControls;
+        const control =
+          controls.find((c) => c.feature === source) ??
+          controls.find((c) => c.id === source);
+        if (control) return pick(control.stateId);
+        return pick(source); // a raw state id
       }
-    }
-    return latest;
+      let latest: number | undefined;
+      for (const c of controls0()) {
+        const v = pick(c.stateId);
+        if (typeof v === "number" && (latest === undefined || v > latest)) {
+          latest = v;
+        }
+      }
+      return latest;
+    },
+  };
+
+  function controls0() {
+    return (device.controls ?? []).filter((c) => !c.hidden);
   }
 
   // Badges render once, at the end of the tile, wherever the badge slots sit in
@@ -93,7 +122,7 @@
     resolveBadges(
       template.slots.filter((s) => s.kind === "badge"),
       device,
-      lastTs(),
+      clock,
       Date.now(),
       getVirtualPool(),
     ),

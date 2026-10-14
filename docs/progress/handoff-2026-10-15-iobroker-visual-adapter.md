@@ -147,3 +147,34 @@ Pre-flight and per-task:
   created myself (see ruling 21). `pageList` now holds the seeded Rooms + Home pages.
 - `www/` is eslint-ignored at the root but a `.svelte-kit/` generated **inside** `src/` is
   not — keep `cwd` at the repo root when running `svelte-kit`/`svelte-check`/`eslint`.
+
+## Follow-up (same session) — two findings from your first test pass
+
+1. **The seeded "Home" page was empty and looked like the old Home was deleted.**
+   The display replacing `/` is intentional (spec A6) and no config was lost — `#/devices`
+   still lists every device. The *empty page* was a real gap: its groups filter by
+   `Device.functions`, a new field nothing filled. Fixed by **backfilling that field once
+   from the broker's own enum membership** (`backfillEnumFields` in `pages-ops`,
+   `backfillDeviceEnums` in `registry.svelte.js`, run from the layout once both the
+   registry and the enum cache are loaded). ioBroker registers membership on the *channel*,
+   so a new `enumsOfState()` walker unions the state and its parent folders — the thing
+   `roomForState` already did for rooms. Live result: 7 of 10 devices got functions
+   (`Bad.Thermometer` → Klima, `Garten-Pool.Light` → Licht, …) and the Home page now renders
+   groups (Klima 3, Licht 3, Umwelt 1). Explicit values are never overwritten, and the
+   seed now skips an axis that has no enums (a broker with neither rooms nor functions gets
+   no pages rather than a page that can never show anything).
+2. **The `ago` badge read the wrong control.** It used the device-wide newest `ts` (the
+   rule inherited from the 2026-10-13 device-row work), so a battery or level update made a
+   dead motion sensor look fresh. A badge can now name its control:
+   `{ kind: "badge", source: "ago", options: { of: "motion", from: "lc" } }` — `of` is a
+   feature/control id/state id, `from` is `ts` (still reporting) or `lc` (last value change).
+   Omitting `of` keeps the device-wide behaviour. The Motion preset now uses
+   `of: "motion", from: "lc"`.
+
+Also added: `TimeSource` (the Tile builds it over the live state map) and tests for all of
+it — 231 tests, check 0/0, lint clean, build OK.
+
+**Concurrency note:** the backfill writes the whole `deviceList` document (the existing
+store pattern is last-write-wins). It only fires when the device set changes (once, here),
+but if two tabs edit at the same moment one edit can lose. Worth a version check before
+write if it ever bites.

@@ -1,5 +1,6 @@
-import type { DeviceType } from "$lib/types/device";
+import type { Device, DeviceType } from "$lib/types/device";
 import type { Group, Member, Page, PageRegistry } from "$lib/types/display";
+import { enumsOfState } from "$lib/config/rooms";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 
 /** A device reduced to what filtering needs. */
@@ -137,32 +138,38 @@ export function seedPages(
   functions: { id: string; label: string }[],
   rooms: { id: string; label: string }[],
 ): PageRegistry {
+  const pages: Page[] = [];
+  if (rooms.length) {
+    pages.push({
+      id: "rooms",
+      title: "Rooms",
+      icon: "meeting_room",
+      groups: rooms.map((r) => ({
+        id: groupId("room", r.id),
+        title: r.label,
+        member: { room: r.id },
+      })),
+    });
+  }
+  if (functions.length) {
+    pages.push({
+      id: "home",
+      title: "Home",
+      icon: "home",
+      groups: functions.map((f) => ({
+        id: groupId("fn", f.id),
+        title: f.label,
+        member: { function: f.id },
+      })),
+    });
+  }
   return {
     version: 0,
     updatedAt: Date.now(),
     seeded: true,
-    pages: [
-      {
-        id: "rooms",
-        title: "Rooms",
-        icon: "meeting_room",
-        groups: rooms.map((r) => ({
-          id: groupId("room", r.id),
-          title: r.label,
-          member: { room: r.id },
-        })),
-      },
-      {
-        id: "home",
-        title: "Home",
-        icon: "home",
-        groups: functions.map((f) => ({
-          id: groupId("fn", f.id),
-          title: f.label,
-          member: { function: f.id },
-        })),
-      },
-    ],
+    // Only axes that exist: an axis with no enums would seed a page that can
+    // never show a device (`Device.functions` has nothing to match).
+    pages,
   };
 }
 
@@ -240,4 +247,44 @@ export function loadPages(
   return parsed
     ? { kind: "loaded", registry: parsed }
     : { kind: "invalid", registry: null };
+}
+
+/**
+ * Fill in `functions` / `favorites` on devices that have none, from the
+ * membership the broker already maintains on the *states* (ioBroker admin /
+ * rega keeps `enum.functions.*` and `enum.favorites.*` member lists). Explicit
+ * assignments are never overwritten, and a device with no state-backed control
+ * is left alone.
+ *
+ * The display filters on the device fields (spec §4.1.6: explicit, not derived),
+ * so this is the one-time bridge from what the broker knows to what the display
+ * reads. The phase-4 editors maintain it from there.
+ */
+export function backfillEnumFields(
+  devices: Device[],
+  enums: any,
+): { devices: Device[]; changed: number } {
+  let changed = 0;
+  const out = (devices ?? []).map((device) => {
+    if (device.functions?.length || device.favorites?.length) return device;
+    const functions = new Set<string>();
+    const favorites = new Set<string>();
+    for (const control of device.controls ?? []) {
+      if (!control.stateId) continue;
+      for (const id of enumsOfState(enums, control.stateId, "functions")) {
+        functions.add(id);
+      }
+      for (const id of enumsOfState(enums, control.stateId, "favorites")) {
+        favorites.add(id);
+      }
+    }
+    if (!functions.size && !favorites.size) return device;
+    changed++;
+    return {
+      ...device,
+      ...(functions.size ? { functions: [...functions] } : {}),
+      ...(favorites.size ? { favorites: [...favorites] } : {}),
+    };
+  });
+  return { devices: out, changed };
 }

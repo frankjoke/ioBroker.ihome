@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  backfillEnumFields,
   filterDevices,
   matchesMember,
   loadPages,
@@ -228,4 +229,84 @@ it("rejects documents that would crash the renderer", () => {
 
 it("treats a group without a member as matching nothing", () => {
   expect(matchesMember(dev({}), undefined as never)).toBe(false);
+});
+
+it("seeds only the axes that can actually render", () => {
+  const both = seedPages(
+    [{ id: "enum.functions.Licht", label: "Licht" }],
+    [{ id: "enum.rooms.WZ", label: "WZ" }],
+  );
+  expect(both.pages.map((p) => p.id)).toEqual(["rooms", "home"]);
+
+  const roomsOnly = seedPages([], [{ id: "enum.rooms.WZ", label: "WZ" }]);
+  expect(roomsOnly.pages.map((p) => p.id)).toEqual(["rooms"]);
+
+  const functionsOnly = seedPages(
+    [{ id: "enum.functions.Licht", label: "Licht" }],
+    [],
+  );
+  expect(functionsOnly.pages.map((p) => p.id)).toEqual(["home"]);
+
+  // A broker with neither axis gets no pages (the display says so honestly)
+  // rather than a page that can never show anything.
+  expect(seedPages([], []).pages).toEqual([]);
+});
+
+it("backfills device functions and favorites from the broker enums", () => {
+  const enums: any = {
+    get: (id: string) =>
+      ({
+        "alias.0.EG.Light.SET": {
+          functions: [{ _id: "enum.functions.Licht" }],
+          favorites: [{ _id: "enum.favorites.EG" }],
+        },
+        "alias.0.EG.Light.BRIGHTNESS": {
+          functions: [{ _id: "enum.functions.Licht" }],
+        },
+      })[id],
+  };
+  const devices: any[] = [
+    {
+      id: "d1",
+      name: "L",
+      type: "Light",
+      controls: [
+        {
+          id: "c1",
+          feature: "power",
+          writable: true,
+          stateId: "alias.0.EG.Light.SET",
+        },
+        {
+          id: "c2",
+          feature: "brightness",
+          writable: true,
+          stateId: "alias.0.EG.Light.BRIGHTNESS",
+        },
+      ],
+    },
+    {
+      id: "d2",
+      name: "Keep",
+      type: "Switch",
+      functions: ["enum.functions.Mine"],
+      favorites: ["enum.favorites.Mine"],
+      controls: [
+        {
+          id: "c3",
+          feature: "power",
+          writable: true,
+          stateId: "alias.0.EG.Light.SET",
+        },
+      ],
+    },
+    { id: "d3", name: "NoState", type: "Value", controls: [] },
+  ];
+  const { devices: out, changed } = backfillEnumFields(devices, enums);
+  expect(changed).toBe(1);
+  expect(out[0].functions).toEqual(["enum.functions.Licht"]);
+  expect(out[0].favorites).toEqual(["enum.favorites.EG"]);
+  // An explicit assignment is never overwritten.
+  expect(out[1].functions).toEqual(["enum.functions.Mine"]);
+  expect(out[2].functions).toBeUndefined();
 });

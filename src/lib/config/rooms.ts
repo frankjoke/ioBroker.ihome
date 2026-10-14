@@ -64,6 +64,24 @@ export function roomsOf(enums: any, id: string): string[] {
   return enumsOf(enums, id, "rooms");
 }
 
+/**
+ * Enum ids of `type` for a state, walking up through its parent folders.
+ *
+ * ioBroker registers membership on the *member* id — usually a channel — while
+ * devices reference the state below it (`…TemperaturBad.ACTUAL`). Union of every
+ * level, so a state-level and a channel-level membership are both kept.
+ */
+export function enumsOfState(enums: any, id: string, type: string): string[] {
+  const out: string[] = [];
+  const parts = String(id ?? "").split(".");
+  for (let n = parts.length; n >= 2; n--) {
+    for (const found of enumsOf(enums, parts.slice(0, n).join("."), type)) {
+      if (!out.includes(found)) out.push(found);
+    }
+  }
+  return out;
+}
+
 /** Function enum ids a state belongs to (enum.functions.*). */
 export function functionsOf(enums: any, id: string): string[] {
   return enumsOf(enums, id, "functions");

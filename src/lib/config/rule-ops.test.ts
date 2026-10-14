@@ -211,3 +211,44 @@ it("skips a hidden control's badge", () => {
   );
   expect(badges).toEqual([]);
 });
+
+it("lets an ago badge name the control it watches", () => {
+  const time = {
+    at: (source: string | undefined, from: "ts" | "lc") => {
+      if (source === "motion")
+        return from === "lc" ? NOW - 90_000_000 : NOW - 1000;
+      return NOW - 1000; // device-wide newest: a battery just reported
+    },
+  };
+  const motionOnly = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: "ago",
+        options: { of: "motion", from: "lc" },
+      },
+    ],
+    {
+      controls: [
+        { id: "c", feature: "motion", available: true, liveValue: true },
+      ],
+    },
+    time,
+    NOW,
+  );
+  // 25h since the last *motion*, even though the device reported seconds ago.
+  expect(motionOnly[0].tone).toBe("warn");
+  expect(motionOnly[0].label).toBe("1d");
+
+  const deviceWide = resolveBadges(
+    [{ kind: "badge", source: "ago" }],
+    {
+      controls: [
+        { id: "c", feature: "motion", available: true, liveValue: true },
+      ],
+    },
+    time,
+    NOW,
+  );
+  expect(deviceWide[0].tone).toBe("info");
+});

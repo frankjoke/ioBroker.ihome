@@ -10,9 +10,13 @@
     setStateSource,
     setObjectSource,
   } from "$lib/stores/devices.svelte.js";
-  import { initRegistry } from "$lib/registry.svelte.js";
+  import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
-  import { initPages, loadViewState } from "$lib/stores/pages.svelte.js";
+  import {
+    initPages,
+    loadViewState,
+    waitForEnumCache,
+  } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
@@ -57,6 +61,14 @@
     setObjectSource(ioBroker.objects);
     void ioBroker.objects.size;
     loadUsedStates();
+    // Fill any device whose functions/favorites are empty from the broker's own
+    // enum membership, once the enums are in (a no-op when nothing changed).
+    void (async () => {
+      // both gates: the registry must be loaded and the enum cache populated
+      await initRegistry();
+      await waitForEnumCache();
+      backfillDeviceEnums();
+    })();
   });
 
   $effect(() => {

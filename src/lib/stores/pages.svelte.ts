@@ -8,8 +8,11 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { loadPages, parsePageRegistry } from "$lib/config/pages-ops";
 
-/** Wait for the enum cache: `connected` flips before objects/enums are in. */
-async function waitForEnums(ms = 8000): Promise<void> {
+/**
+ * Wait for the enum cache: `connected` flips before objects/enums are in, and
+ * anything that reads rooms/functions (seeding, the enum backfill) needs it.
+ */
+export async function waitForEnumCache(ms = 8000): Promise<void> {
   const until = Date.now() + ms;
   while (Date.now() < until) {
     const rooms = (ioBroker.enums as any)?.getList?.("rooms");
@@ -87,7 +90,7 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
         console.error("initPages ensurePagesObject:", e);
       }
       // Seeding from an empty enum cache would write pages with no groups.
-      await waitForEnums();
+      await waitForEnumCache();
       const st = await ioBroker.getState(PAGE_LIST_ID);
       if (!ioBroker.connected) {
         // Not reachable after the wait — leave the promise unset so a later

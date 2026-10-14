@@ -27,6 +27,14 @@ export interface ResolvedStyle {
   tone?: string;
 }
 
+/**
+ * Where an `ago` badge reads its time from. The Tile builds it over the live
+ * state map; a badge that names no control gets the device-wide newest `ts`.
+ */
+export interface TimeSource {
+  at(source: string | undefined, from: "ts" | "lc"): number | undefined;
+}
+
 export interface ResolvedBadge {
   source: string;
   icon: string;
@@ -200,10 +208,14 @@ function controlBadge(
 export function resolveBadges(
   slots: Slot[],
   device: BadgeDevice,
-  ts: number | undefined,
+  time: TimeSource | number | undefined,
   now: number,
   pool: PoolEntry[] = [],
 ): ResolvedBadge[] {
+  // Accept a bare number too (the device-wide newest `ts`).
+  const stamp = typeof time === "number" ? time : undefined;
+  const clock: TimeSource =
+    typeof time === "object" && time !== null ? time : { at: () => stamp };
   const scope = ruleScope((device.controls ?? []) as LocalControl[], pool);
   const offline = offlineBadge(device);
   const out: ResolvedBadge[] = [];
@@ -211,8 +223,16 @@ export function resolveBadges(
     if (slot.kind !== "badge") continue;
     let badge: ResolvedBadge | undefined;
     // An offline device says *that*, not a misleading "how long ago it was".
-    if (slot.source === "ago") badge = offline ? undefined : agoBadge(ts, now);
-    else if (slot.source === "offline") badge = offline;
+    if (slot.source === "ago") {
+      // `options.of` names the control to watch — the whole point of an `ago`
+      // badge on a motion sensor is the last *motion*, not the last battery
+      // report. `options.from` picks `ts` (still reporting) or `lc` (last value
+      // change); the default is the device-wide newest `ts`.
+      const of =
+        typeof slot.options?.of === "string" ? slot.options.of : undefined;
+      const from = slot.options?.from === "lc" ? "lc" : "ts";
+      badge = offline ? undefined : agoBadge(clock.at(of, from), now);
+    } else if (slot.source === "offline") badge = offline;
     else if (slot.source) badge = controlBadge(slot, device, scope);
     if (badge) out.push(badge);
   }

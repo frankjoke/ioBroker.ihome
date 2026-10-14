@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   roomForState,
   roomsOf,
+  enumsOfState,
   functionsOf,
   favoritesOf,
   enumShortId,
@@ -111,4 +112,39 @@ it("reads any enum type off a member id", () => {
   expect(favoritesOf(enums, "alias.0.EG.Light")).toEqual(["enum.favorites.EG"]);
   expect(favoritesOf(enums, "alias.0.EG.Plug")).toEqual([]);
   expect(favoritesOf(enums, "alias.0.Missing")).toEqual([]);
+});
+
+it("collects enum membership from the state and its parent folders", () => {
+  const enums: any = {
+    get: (id: string) =>
+      ({
+        // ioBroker registers membership on the channel, not on each state
+        "alias.0.1Stock.TemperaturBad": {
+          functions: [{ _id: "enum.functions.Klima" }],
+        },
+        "alias.0.EG.Light": {
+          functions: [{ _id: "enum.functions.Licht" }],
+          favorites: [{ _id: "enum.favorites.EG" }],
+        },
+      })[id],
+  };
+  expect(
+    enumsOfState(enums, "alias.0.1Stock.TemperaturBad.ACTUAL", "functions"),
+  ).toEqual(["enum.functions.Klima"]);
+  expect(enumsOfState(enums, "alias.0.EG.Light.SET", "functions")).toEqual([
+    "enum.functions.Licht",
+  ]);
+  // both a state-level and a channel-level membership are kept
+  const both: any = {
+    get: (id: string) =>
+      ({
+        "a.0.Channel": { functions: [{ _id: "enum.functions.A" }] },
+        "a.0.Channel.SET": { functions: [{ _id: "enum.functions.B" }] },
+      })[id],
+  };
+  expect(enumsOfState(both, "a.0.Channel.SET", "functions")).toEqual([
+    "enum.functions.B",
+    "enum.functions.A",
+  ]);
+  expect(enumsOfState(enums, "a.0.Nothing", "functions")).toEqual([]);
 });
