@@ -2,6 +2,7 @@ import type { Size, Slot, Rule } from "$lib/types/display";
 
 export type DeviceType =
   | "Switch"
+  | "Button"
   | "Light"
   | "Thermostat"
   | "Blind"

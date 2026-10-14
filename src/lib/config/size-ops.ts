@@ -8,7 +8,7 @@ export interface TileSpan {
   h: number;
 }
 
-export const DEFAULT_SPAN: TileSpan = { w: 1, h: 1 };
+export const DEFAULT_SPAN: Size = { w: 1, h: 1 };
 
 export interface BreakpointDef {
   name: Breakpoint;

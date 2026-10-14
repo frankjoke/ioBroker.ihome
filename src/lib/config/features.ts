@@ -2,6 +2,7 @@ import type { DeviceType, Widget } from "$lib/types/device";
 
 export const DEVICE_TYPES: DeviceType[] = [
   "Switch",
+  "Button",
   "Light",
   "Thermostat",
   "Blind",
@@ -18,6 +19,8 @@ export interface FeatureDef {
   label: string;
   widget: Widget;
   roleHints: string[];
+  /** A template may insist a device of its type supplies this feature. */
+  required?: boolean;
 }
 
 export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
@@ -27,6 +30,14 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       label: "Power",
       widget: "switch",
       roleHints: ["switch", "power"],
+    },
+  ],
+  Button: [
+    {
+      feature: "press",
+      label: "Press",
+      widget: "button",
+      roleHints: ["button"],
     },
   ],
   Light: [
@@ -201,6 +212,7 @@ export function roleLabel(obj: any): string {
 }
 
 const ROLE_TYPE_RULES: { test: RegExp; type: DeviceType }[] = [
+  { test: /button|taste/, type: "Button" },
   { test: /light|dimmer|lamp/, type: "Light" },
   { test: /blind|curtain|shutter/, type: "Blind" },
   { test: /window/, type: "Window" },
