@@ -8,6 +8,7 @@
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
+  import TileModal from "./TileModal.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
   import type { Slot } from "$lib/types/display";
 
@@ -98,14 +99,43 @@
   }
 
   function onActivate() {
-    // The body acts on the primary control: toggle a switch, else nothing yet
-    // (the full-control modal arrives in Task 13).
-    if (!primary || primary.widget !== "switch" || !primary.writable) return;
-    if (!primary.stateId) return;
-    const v = applyWrite(!truthy(primary.liveValue), primary.transform);
-    ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
-      console.warn("Failed to set state:", e);
-    });
+    // A long-press already opened the modal; swallow the click it produced.
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    // The body acts on the primary control: a writable switch toggles, anything
+    // else opens the full control set (spec §7).
+    if (primary?.widget === "switch" && primary.writable) {
+      if (!primary.stateId) return;
+      const v = applyWrite(!truthy(primary.liveValue), primary.transform);
+      ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
+        console.warn("Failed to set state:", e);
+      });
+      return;
+    }
+    if ((device.controls ?? []).length) modalOpen = true;
+  }
+
+  let modalOpen = $state(false);
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let suppressClick = false;
+
+  /** Touch long-press (500 ms) opens the modal, like the corner affordance. */
+  function onPointerDown(e: PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      suppressClick = true;
+      modalOpen = true;
+    }, 500);
+  }
+
+  function cancelPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
   }
 
   function onKey(e: KeyboardEvent) {
@@ -127,7 +157,27 @@
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
   onclick={onActivate}
   onkeydown={onKey}
+  onpointerdown={onPointerDown}
+  onpointerup={cancelPress}
+  onpointercancel={cancelPress}
+  onpointerleave={cancelPress}
 >
+  {#if (device.controls ?? []).length}
+    <button
+      type="button"
+      class="expand"
+      title="All controls"
+      aria-label="All controls"
+      onclick={(e) => {
+        e.stopPropagation();
+        modalOpen = true;
+      }}
+    >
+      <span class="material-symbols-outlined" aria-hidden="true"
+        >open_in_full</span
+      >
+    </button>
+  {/if}
   <span class="tile-name">{device.name}</span>
   <div class="tile-body">
     {#each slots as slot (`${slot.kind}:${slot.source ?? ""}`)}
@@ -141,6 +191,10 @@
   </div>
   <BadgeRow {badges} />
 </div>
+
+{#if modalOpen}
+  <TileModal {device} onClose={() => (modalOpen = false)} />
+{/if}
 
 <style>
   .tile {
@@ -179,6 +233,36 @@
     font-weight: 600;
     overflow-wrap: anywhere;
     max-width: 100%;
+  }
+
+  /* Corner affordance: opens the full control set (the tile body's own action
+     stays the primary control). */
+  .expand {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-pill);
+    background: transparent;
+    color: var(--text-muted);
+    opacity: 0.55;
+    cursor: pointer;
+  }
+
+  .expand:hover {
+    opacity: 1;
+    background-color: var(--surface-container);
+    color: var(--text-color);
+  }
+
+  .expand .material-symbols-outlined {
+    font-size: 15px;
   }
 
   .tile-body {
