@@ -203,3 +203,21 @@ write if it ever bites.
 **Still open, and worth your call:** for a tile that already shows every control, a body tap now
 does *nothing* (my reading of "unless all data is displayed"). The alternative would be to toggle
 there — but that is the accident you asked me to remove, so I left it inert.
+
+## Follow-up 3 — half-width tiles + Ctrl/Cmd+click to config
+
+- **Default size revised.** My earlier `1x2` was a misread of your intent (you were comparing
+  against tiles you thought were 2x2 but were 1x1). A tile's `w` is now counted in **half
+  modules**: the column module (`--tile-w` 75/85/95px for phone/tablet/desktop) is half the row
+  module (`--tile-h` 150/170/190px), so `w: 1` is the half-width card you asked for and `w: 2`
+  is the old full width. Readout presets are back to `1x1` (Switch, Button, Light, Thermometer,
+  Window, Motion, Value); Thermostat/Blind are `2x1`, AC `2x2`. CSS `span` takes only integers,
+  which is why the column got finer rather than the span fractional. Live: 13 columns at 1400px,
+  tiles 97x190, no overflow. A long device name wraps (or edit its label in the config).
+- **Ctrl/Cmd+click a tile opens that device's config.** It lands on `#/devices` with the form
+  already open for that device (verified: name field showed "Brunnen" for the tile clicked).
+  The click is handled in the **capture phase**, because an action button stops propagation —
+  otherwise Ctrl+clicking a light's icon would have just switched the light. The request travels
+  in `sessionStorage` (`iHome.edit`), not module state: the module-global trap that broke the
+  history store under Vite HMR. Cmd/Ctrl+Enter is the keyboard form of the same shortcut.
+- Spec §5's layout table and §7's interaction list updated to match.

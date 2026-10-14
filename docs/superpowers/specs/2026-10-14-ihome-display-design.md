@@ -241,15 +241,19 @@ One CSS grid per group: `grid-template-columns: repeat(auto-fill, minmax(var(--t
 `grid-auto-rows: var(--tile-min)` (square modules). A tile spans
 `min(w, var(--max-w))` columns and `min(h, var(--max-h))` rows:
 
-| breakpoint | `--tile-min` | `--max-w` | `--max-h` |
-|---|---|---|---|
-| phone `<600px` | 150px | 1 | 2 |
-| tablet `600–1024px` | 170px | 2 | 2 |
-| desktop `>1024px` | 190px | 4 | 4 |
+| breakpoint | `--tile-w` | `--tile-h` | `--max-w` | `--max-h` |
+|---|---|---|---|---|
+| phone `<600px` | 75px | 150px | 2 | 2 |
+| tablet `600–1024px` | 85px | 170px | 4 | 3 |
+| desktop `>1024px` | 95px | 190px | 4 | 4 |
 
-So `2x2` degrades to `1x2` on a phone, `4x2` to `2x2` on a tablet, and hints are honoured
-as written on desktop. No absolute placement exists anywhere, so a new device can only
-append.
+The **column** module is half the **row** module, because a tile's `w` is counted in
+half-modules: `w: 1` is the half-width card a readout wants, `w: 2` the width a plain tile used
+to have, `w: 4` a double-wide one. CSS `span` only takes integers, so a finer column is how
+"0.5 wide" is expressed — the `Size` model stays whole numbers and a long name simply wraps.
+
+So a `4x2` degrades to `2x2` on a phone and `4x3` on a tablet, and hints are honoured as written
+on desktop. No absolute placement exists anywhere, so a new device can only append.
 
 Groups render as sections: quiet header (`title`, count, collapse toggle) when `title` is
 set, header-less (continuous rows) when it is not. Page-level background only — no per-group
@@ -303,6 +307,10 @@ backgrounds.
   show, and acting on the primary control there is exactly the accident this rule prevents.
 - No corner affordance (the body is the affordance); a touch long-press (500 ms) opens the same
   modal. Focus-trapped, Esc/backdrop closes, sliders `stopPropagation` so dragging never opens it.
+- **Ctrl/Cmd+click a tile** opens that device's form in the config (`#/devices`). The request
+  travels in `sessionStorage`, not module state: Vite can hand a hot-reloaded module to two
+  importers as two instances, and the display must not care which copy the config reads. The
+  Devices page consumes it and waits for the registry if it has not loaded yet.
 - Filter chips are ephemeral view state, persisted to `localStorage` (like the last opened
   page and each group's collapsed flag) — never to config. They filter within the current
   page and show a match count. A group that filters down to nothing is hidden unless it

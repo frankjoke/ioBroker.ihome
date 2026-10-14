@@ -14,8 +14,16 @@ export interface BreakpointDef {
   name: Breakpoint;
   /** Inclusive lower bound in CSS pixels; `breakpointFor` reads this. */
   minWidth: number;
-  /** Module size — emitted as the `--tile-min` custom property. */
-  tileMin: number;
+  /**
+   * Column module (`--tile-w`) and row module (`--tile-h`).
+   *
+   * The column module is **half** the row module, because a tile's `w` is
+   * counted in half-modules: `w: 1` is a half-width card, `w: 2` the width a
+   * plain tile used to have. CSS `span` only takes integers, so a finer column
+   * is how a "0.5 wide" tile is expressed.
+   */
+  tileW: number;
+  tileH: number;
   /** Column/row span cap — emitted as `--max-w` / `--max-h`. */
   maxW: number;
   maxH: number;
@@ -26,9 +34,9 @@ export interface BreakpointDef {
  * these as CSS custom properties, so the stylesheet never repeats a value.
  */
 export const BREAKPOINTS: BreakpointDef[] = [
-  { name: "phone", minWidth: 0, tileMin: 150, maxW: 1, maxH: 2 },
-  { name: "tablet", minWidth: 600, tileMin: 170, maxW: 2, maxH: 2 },
-  { name: "desktop", minWidth: 1025, tileMin: 190, maxW: 4, maxH: 4 },
+  { name: "phone", minWidth: 0, tileW: 75, tileH: 150, maxW: 2, maxH: 2 },
+  { name: "tablet", minWidth: 600, tileW: 85, tileH: 170, maxW: 4, maxH: 3 },
+  { name: "desktop", minWidth: 1025, tileW: 95, tileH: 190, maxW: 4, maxH: 4 },
 ];
 
 /** The breakpoint a viewport width falls in: phone <600, tablet 600–1024, desktop >1024. */

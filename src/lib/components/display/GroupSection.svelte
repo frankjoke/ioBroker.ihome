@@ -98,10 +98,8 @@
   .grid {
     display: grid;
     gap: 8px;
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(var(--tile-min, 190px), 1fr)
-    );
-    grid-auto-rows: var(--tile-min, 190px);
+    /* Half-width columns + full-height rows: `w: 1` is a half-width card. */
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-w, 95px), 1fr));
+    grid-auto-rows: var(--tile-h, 190px);
   }
 </style>

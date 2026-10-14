@@ -28,8 +28,8 @@
   });
 
   const bp = $derived<Breakpoint>(breakpointFor(width));
-  const tileMin = $derived(
-    BREAKPOINTS.find((b) => b.name === bp)?.tileMin ?? 190,
+  const def = $derived(
+    BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
   );
 
   type DisplayDevice = EnrichedDevice & FilterableDevice;
@@ -47,7 +47,7 @@
   const matchCount = $derived(groups.reduce((n, g) => n + g.devices.length, 0));
 
   const pageStyle = $derived(
-    `--tile-min: ${tileMin}px; ${backgroundCss(page.background)}`,
+    `--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(page.background)}`,
   );
 
   function backgroundCss(bg: Background | undefined): string {

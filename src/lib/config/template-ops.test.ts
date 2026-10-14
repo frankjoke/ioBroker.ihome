@@ -131,11 +131,12 @@ it("gives every device type a preset", () => {
 });
 
 it("carries the preset sizes", () => {
-  // Simple readouts are narrow and tall (1x2); multi-control devices stay wide.
-  expect(PRESETS.Switch.size).toEqual({ w: 1, h: 2 });
-  expect(PRESETS.Light.size).toEqual({ w: 1, h: 2 });
-  expect(PRESETS.Thermometer.size).toEqual({ w: 1, h: 2 });
-  expect(PRESETS.Motion.size).toEqual({ w: 1, h: 2 });
+  // A readout is one half-module wide and one module high; multi-control
+  // devices stay wide.
+  expect(PRESETS.Switch.size).toEqual({ w: 1, h: 1 });
+  expect(PRESETS.Light.size).toEqual({ w: 1, h: 1 });
+  expect(PRESETS.Thermometer.size).toEqual({ w: 1, h: 1 });
+  expect(PRESETS.Motion.size).toEqual({ w: 1, h: 1 });
   expect(PRESETS.Thermostat.size).toEqual({ w: 2, h: 1 });
   expect(PRESETS.Blind.size).toEqual({ w: 2, h: 1 });
   expect(PRESETS.AC.size).toEqual({ w: 2, h: 2 });

@@ -19,6 +19,11 @@
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
+  import { onMount } from "svelte";
+  import {
+    requestDeviceConfig,
+    takeRequestedDeviceConfig,
+  } from "$lib/pages.js";
   import type { Device, EnrichedControl } from "$lib/types/device";
 
   let editing = $state<Device | null>(null);
@@ -130,6 +135,20 @@
     if (d) commit(devices.filter((x) => x.id !== d.id));
     pendingDelete = null;
   }
+
+  // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
+  // waits for the registry, in case the request arrives before it is loaded.
+  let requestedId = $state("");
+  onMount(() => {
+    requestedId = takeRequestedDeviceConfig();
+  });
+  $effect(() => {
+    if (!requestedId) return;
+    const d = devices.find((x) => x.id === requestedId);
+    if (!d) return;
+    requestedId = "";
+    editDevice(d);
+  });
 
   function onSave(d: Device) {
     const idx = devices.findIndex((x) => x.id === d.id);

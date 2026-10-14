@@ -15,6 +15,7 @@
     type TimeSource,
   } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
+  import { requestDeviceConfig, wantsDeviceConfig } from "$lib/pages.js";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
@@ -148,7 +149,28 @@
     shownControls.filter((c) => !slots.some((s) => controlFor(s) === c)),
   );
 
-  function onActivate() {
+  /** Ctrl/Cmd+click anywhere on the tile -> that device's config. */
+  function openDeviceConfig() {
+    requestDeviceConfig(device.id);
+    location.hash = "#/devices";
+  }
+
+  function onCapture(event: MouseEvent) {
+    if (!wantsDeviceConfig(event)) return;
+    // Capture phase: the action buttons stopPropagation, so without this a
+    // Ctrl+click on a light's icon would just switch the light.
+    event.stopPropagation();
+    event.preventDefault();
+    openDeviceConfig();
+  }
+
+  function onActivate(event?: MouseEvent) {
+    // Ctrl/Cmd+click is the shortcut to the device's config — the one place a
+    // tile cannot reach on its own.
+    if (wantsDeviceConfig(event)) {
+      openDeviceConfig();
+      return;
+    }
     // A long-press already opened the modal; swallow the click it produced.
     if (suppressClick) {
       suppressClick = false;
@@ -181,12 +203,15 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    // Enter/Space on a nested control (the corner button, a slider, a select)
-    // must do its own thing, not the tile's.
+    // Enter/Space on a nested control (a slider, a select, a button) must do its
+    // own thing, not the tile's.
     if (e.target !== e.currentTarget) return;
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    onActivate();
+    // Cmd/Ctrl+Enter is the keyboard form of the config shortcut.
+    onActivate(
+      wantsDeviceConfig(e) ? ({ metaKey: true } as MouseEvent) : undefined,
+    );
   }
 </script>
 
@@ -201,6 +226,7 @@
   class:interactive={extraControls.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
+  onclickcapture={onCapture}
   onclick={onActivate}
   onkeydown={onKey}
   onpointerdown={onPointerDown}
