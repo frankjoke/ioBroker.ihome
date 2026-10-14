@@ -306,9 +306,11 @@ builder wizard) — the data model is what has to be right first.
 
 - `pageList` absent on first load → seed once, marked `seeded: true`: one "Home" page with
   one group per **function** (the broker's functions are sane: `Heizung`, `Klima`, `Licht`)
-  plus a "Rooms" page with one group per room as **explicit ids** — the messy derived state
-  (22 rooms incl. `Vorzimmer`/`vorraum` duplicates and unresolved `upstairs`/`basement`
-  names) is a starting point to rename and merge, not a permanent constraint.
+  plus a "Rooms" page with one group per room. Both pages seed group *filters* (one code path,
+  and it keeps working before the editors of §8 exist); the messy derived taxonomy — 22 rooms
+  incl. `Vorzimmer`/`vorraum` duplicates and unresolved `upstairs`/`basement` names — is a
+  starting point you rename, merge, or pin to explicit ids at editing time, not a permanent
+  constraint.
 - `templateList` absent → empty list; presets come from code.
 - Existing registries are untouched: new `Device` fields are optional and
   `migrateRegistry` keeps working.
