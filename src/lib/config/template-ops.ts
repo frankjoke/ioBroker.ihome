@@ -92,6 +92,29 @@ export function resolveTemplate(
 }
 
 /**
+ * Which control a slot's `source` points at (spec §4.1), most specific first:
+ * the control's feature, its id, its state id, and — last resort, because real
+ * device configs name a state by its label ("Motion") — its label.
+ *
+ * Label matching is a fallback, never a preference: a feature match always wins,
+ * so a renaming in the config can only ever add a match, not steal one.
+ */
+export function resolveControl<
+  T extends { feature?: string; id?: string; stateId?: string; label?: string },
+>(controls: T[], source: string | undefined): T | undefined {
+  if (!source) return undefined;
+  const list = controls ?? [];
+  const byLabel = (t: T) =>
+    String(t.label ?? "").toLowerCase() === source.toLowerCase();
+  return (
+    list.find((c) => c.feature === source) ??
+    list.find((c) => c.id === source) ??
+    list.find((c) => c.stateId === source) ??
+    list.find(byLabel)
+  );
+}
+
+/**
  * The control a tile body acts on: a writable switch toggles, a level opens the
  * modal. Anything else is left to the modal alone.
  */

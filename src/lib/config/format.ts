@@ -24,6 +24,16 @@ export function nameText(name: unknown): string {
   return Object.values(name as Record<string, string>).join(" ");
 }
 
+/**
+ * Text for a tile slot: booleans read On/Off (or the configured pair in the
+ * unit, e.g. "Aus/Ein") rather than true/false, everything else goes through
+ * `formatValue`.
+ */
+export function formatSlotText(v: unknown, unit?: string): string {
+  if (typeof v === "boolean") return formatBoolean(v, unit || "Off/On");
+  return formatValue(v, unit);
+}
+
 /** Pick readable text (#1a1a1a or #fff) for a background colour. */
 export function contrastColor(color: string): string {
   const hex = String(color ?? "")

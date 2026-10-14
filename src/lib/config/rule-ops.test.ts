@@ -252,3 +252,19 @@ it("lets an ago badge name the control it watches", () => {
   );
   expect(deviceWide[0].tone).toBe("info");
 });
+
+it("carries a disabled flag through the resolved style", () => {
+  const scope = ruleScope([{ feature: "motion", liveValue: false }], []);
+  const style = resolveStyle(
+    [{ when: "!truthy(motion)", disabled: true, color: "var(--text-muted)" }],
+    scope,
+  );
+  expect(style.disabled).toBe(true);
+  // A non-matching condition stays out of the style entirely.
+  expect(
+    resolveStyle([{ when: "truthy(motion)", disabled: true }], scope),
+  ).toEqual({});
+  expect(resolveStyle([{ when: "true", disabled: false }], scope)).toEqual({
+    disabled: false,
+  });
+});

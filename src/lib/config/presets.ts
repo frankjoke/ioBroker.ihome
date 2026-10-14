@@ -41,7 +41,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Switch",
     builtin: true,
     type: "Switch",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Switch,
     slots: [
       icon("power", "power_settings_new"),
@@ -55,7 +55,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Button",
     builtin: true,
     type: "Button",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Button,
     slots: [
       icon("press", "touch_app"),
@@ -69,7 +69,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Light",
     builtin: true,
     type: "Light",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Light,
     slots: [
       // `truthy(...)`: power arrives as true, 1, "1" or "true" depending on the
@@ -85,6 +85,7 @@ export const PRESETS: Record<DeviceType, Template> = {
           when: "!truthy(power)",
           icon: "lightbulb_outline",
           color: "var(--text-muted)",
+          disabled: true,
         },
       ]),
       { kind: "value", source: "power" },
@@ -115,7 +116,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Thermometer",
     builtin: true,
     type: "Thermometer",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Thermometer,
     slots: [
       icon("temperature", "device_thermostat"),
@@ -145,7 +146,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Window",
     builtin: true,
     type: "Window",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Window,
     slots: [
       icon("open", "window", [
@@ -158,6 +159,7 @@ export const PRESETS: Record<DeviceType, Template> = {
           when: "!truthy(open)",
           icon: "window_closed",
           color: "var(--text-muted)",
+          disabled: true,
         },
       ]),
       { kind: "value", source: "open" },
@@ -170,10 +172,24 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Motion",
     builtin: true,
     type: "Motion",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Motion,
     slots: [
-      icon("motion", "sensors"),
+      // Idle is dimmed ("disabled") rather than invisible, and the value slot
+      // reads On/Off so the tile says what it is doing.
+      icon("motion", "sensors", [
+        {
+          when: "truthy(motion)",
+          icon: "directions_run",
+          color: "var(--primary-color)",
+        },
+        {
+          when: "!truthy(motion)",
+          icon: "directions_walk",
+          color: "var(--text-muted)",
+          disabled: true,
+        },
+      ]),
       { kind: "value", source: "motion" },
       agoSince("motion"),
       offline,
@@ -201,7 +217,7 @@ export const PRESETS: Record<DeviceType, Template> = {
     name: "Value",
     builtin: true,
     type: "Value",
-    size: { w: 1, h: 1 },
+    size: { w: 1, h: 2 },
     features: DEVICE_FEATURES.Value,
     slots: [
       icon("value", "speed"),

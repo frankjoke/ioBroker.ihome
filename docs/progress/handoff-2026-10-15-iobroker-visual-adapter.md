@@ -178,3 +178,28 @@ it — 231 tests, check 0/0, lint clean, build OK.
 store pattern is last-write-wins). It only fires when the device set changes (once, here),
 but if two tabs edit at the same moment one edit can lose. Worth a version check before
 write if it ever bites.
+
+## Follow-up 2 — tile UX round from your testing
+
+- **Motion shows its state.** The Motion preset now carries an `On/Off` value slot and icon rules
+  (active `directions_run` / idle `directions_walk`), and every on/off preset (Light, Window,
+  Motion) uses the new `Rule.disabled` to dim when off. Dimming is visual only — the control
+  stays tappable, so an "off" light is still the thing you switch on.
+- **The action is on the control, not the tile.** The icon and the On/Off text are the buttons
+  that operate a device; a tile-body tap *enlarges* (opens the modal) only when the tile does
+  not already show every control, and does nothing when it does. The corner ⤢ arrow is gone.
+  This is why clicking a light tile no longer switches it.
+- **Sizes**: readouts are now narrow tall cards (1 wide x 2 modules) — Switch, Button, Light,
+  Thermometer, Window, Motion, Value; Thermostat/Blind stay 2x1, AC 2x2.
+- **Source resolution gained a label fallback** (feature → control id → state id → **label**),
+  because your `Keller.Motion` keeps the motion state on a control whose feature is `power` but
+  whose label is "Motion". Its tile now shows `OFF` and an `ago` badge of **14h** — the last
+  *motion*, not the last battery/brightness report. A feature match still wins, so relabelling
+  can only add matches.
+- `ago` badges accept `options.of` (which control) and `options.from` (`ts` = still reporting,
+  `lc` = last value change, falling back to `ts`), and `formatSlotText` renders bare booleans as
+  On/Off (a configured unit pair like "Aus/Ein" still wins). 235 tests, check 0/0, lint clean.
+
+**Still open, and worth your call:** for a tile that already shows every control, a body tap now
+does *nothing* (my reading of "unless all data is displayed"). The alternative would be to toggle
+there — but that is the accident you asked me to remove, so I left it inert.

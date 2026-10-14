@@ -65,6 +65,8 @@ export interface Rule {
   glow?: boolean;
   background?: string;
   hidden?: boolean;
+  /** Render as switched-off: dimmed. The control stays usable. */
+  disabled?: boolean;
   tone?: string; // badge tone: info | ok | warn | danger
 }
 

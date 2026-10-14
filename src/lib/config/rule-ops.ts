@@ -24,6 +24,7 @@ export interface ResolvedStyle {
   glow?: boolean;
   background?: string;
   hidden?: boolean;
+  disabled?: boolean;
   tone?: string;
 }
 
@@ -116,6 +117,7 @@ export function resolveStyle(rules: Rule[], scope: Scope): ResolvedStyle {
     if (rule.glow !== undefined) style.glow = rule.glow;
     if (rule.background !== undefined) style.background = rule.background;
     if (rule.hidden !== undefined) style.hidden = rule.hidden;
+    if (rule.disabled !== undefined) style.disabled = rule.disabled;
     if (rule.tone !== undefined) style.tone = rule.tone;
   }
   return style;

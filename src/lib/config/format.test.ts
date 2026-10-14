@@ -1,5 +1,10 @@
 import { it, expect } from "vitest";
-import { formatAge, formatValue, contrastColor } from "$lib/config/format";
+import {
+  formatAge,
+  formatValue,
+  contrastColor,
+  formatSlotText,
+} from "$lib/config/format";
 
 it("returns dark text for light colors", () => {
   expect(contrastColor("#ffcc00")).toBe("#1a1a1a");
@@ -41,3 +46,14 @@ it("ignores a unit without a pair for booleans", () =>
   expect(formatValue(true, "°C")).toBe("true"));
 it("formats objects as JSON", () =>
   expect(formatValue({ a: 1 })).toBe('{"a":1}'));
+
+it("renders a bare boolean as On/Off for a slot", () => {
+  expect(formatSlotText(true, undefined)).toBe("On");
+  expect(formatSlotText(false, "")).toBe("Off");
+  // A configured pair wins, so German installs keep "Ein"/"Aus".
+  expect(formatSlotText(true, "Aus/Ein")).toBe("Ein");
+  expect(formatSlotText(false, "Aus/Ein")).toBe("Aus");
+  // Numbers keep their unit.
+  expect(formatSlotText(21.5, "°C")).toBe("21.5 °C");
+  expect(formatSlotText(null, "°C")).toBe("—");
+});

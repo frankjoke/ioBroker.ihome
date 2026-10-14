@@ -1,7 +1,11 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { applyWrite } from "$lib/utils/transform";
-  import { resolveTemplate, primaryControl } from "$lib/config/template-ops";
+  import {
+    primaryControl,
+    resolveControl,
+    resolveTemplate,
+  } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -30,15 +34,10 @@
   const span = $derived(clampSpan(template.size, bp));
   const primary = $derived(primaryControl(shownControls));
 
-  // Spec §4.1: a slot's source resolves control feature → control id → state id.
+  // Spec §4.1 + label fallback: feature → control id → state id → label.
   function controlFor(slot: Slot): EnrichedControl | undefined {
     if (!slot.source) return undefined;
-    const controls = shownControls;
-    return (
-      controls.find((c) => c.feature === slot.source) ??
-      controls.find((c) => c.id === slot.source) ??
-      controls.find((c) => c.stateId === slot.source)
-    );
+    return resolveControl(shownControls, slot.source);
   }
 
   // Rule locals are the device's controls (by label, falling back to feature) plus
@@ -90,14 +89,12 @@
       const pick = (stateId: string | undefined) => {
         if (!stateId) return undefined;
         const st = states.get(stateId);
-        const v = from === "lc" ? st?.lc : st?.ts;
+        // "last change", or the last update when the broker has no lc for it.
+        const v = from === "lc" ? (st?.lc ?? st?.ts) : st?.ts;
         return typeof v === "number" ? v : undefined;
       };
       if (source) {
-        const controls = shownControls;
-        const control =
-          controls.find((c) => c.feature === source) ??
-          controls.find((c) => c.id === source);
+        const control = resolveControl(shownControls, source);
         if (control) return pick(control.stateId);
         return pick(source); // a raw state id
       }
@@ -132,23 +129,34 @@
     return v === true || v === "true" || v === 1 || v === "1";
   }
 
+  /** The one action a tile can perform: toggle its primary switch. */
+  function togglePrimary() {
+    if (!primary || primary.widget !== "switch") return;
+    if (!primary.writable || !primary.available || !primary.stateId) return;
+    const v = applyWrite(!truthy(primary.liveValue), primary.transform);
+    ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
+      console.warn("Failed to set state:", e);
+    });
+  }
+
+  /**
+   * A control the tile does not already show. The enlargement only earns a click
+   * when there is something more to show — otherwise a stray tap on a light
+   * would be the last thing between you and a switched-on lamp.
+   */
+  const extraControls = $derived(
+    shownControls.filter((c) => !slots.some((s) => controlFor(s) === c)),
+  );
+
   function onActivate() {
     // A long-press already opened the modal; swallow the click it produced.
     if (suppressClick) {
       suppressClick = false;
       return;
     }
-    // The body acts on the primary control: a writable switch toggles, anything
-    // else opens the full control set (spec §7).
-    if (primary?.widget === "switch" && primary.writable && primary.available) {
-      if (!primary.stateId) return;
-      const v = applyWrite(!truthy(primary.liveValue), primary.transform);
-      ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
-        console.warn("Failed to set state:", e);
-      });
-      return;
-    }
-    if (shownControls.length) modalOpen = true;
+    // Body tap = enlarge (spec §7). The action lives on the control itself —
+    // the icon and the On/Off text — so nothing switches by accident.
+    if (extraControls.length) modalOpen = true;
   }
 
   let modalOpen = $state(false);
@@ -188,8 +196,9 @@
 <div
   class="tile"
   class:glow={tileStyle.glow === true}
+  class:disabled={tileStyle.disabled === true}
   style="grid-column: span {span.w}; grid-row: span {span.h}; {tileVars}"
-  class:interactive={primary?.widget === "switch" && primary.writable}
+  class:interactive={extraControls.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
   onclick={onActivate}
@@ -199,30 +208,18 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  {#if shownControls.length}
-    <button
-      type="button"
-      class="expand"
-      title="All controls"
-      aria-label="All controls"
-      onclick={(e) => {
-        e.stopPropagation();
-        modalOpen = true;
-      }}
-    >
-      <span class="material-symbols-outlined" aria-hidden="true"
-        >open_in_full</span
-      >
-    </button>
-  {/if}
   <span class="tile-name">{device.name}</span>
   <div class="tile-body">
     {#each slots as slot (`${slot.kind}:${slot.source ?? ""}`)}
+      {@const slotControl = controlFor(slot)}
       <SlotRenderer
         {slot}
         {device}
-        control={controlFor(slot)}
-        style={slotStyle(slot, controlFor(slot))}
+        control={slotControl}
+        style={slotStyle(slot, slotControl)}
+        onPrimary={slotControl && slotControl === primary
+          ? togglePrimary
+          : undefined}
       />
     {/each}
   </div>
@@ -272,34 +269,9 @@
     max-width: 100%;
   }
 
-  /* Corner affordance: opens the full control set (the tile body's own action
-     stays the primary control). */
-  .expand {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: var(--border-radius-pill);
-    background: transparent;
-    color: var(--text-muted);
-    opacity: 0.55;
-    cursor: pointer;
-  }
-
-  .expand:hover {
-    opacity: 1;
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
-
-  .expand .material-symbols-outlined {
-    font-size: 15px;
+  /* A rule can ask for the switched-off look. */
+  .tile.disabled {
+    opacity: 0.6;
   }
 
   .tile-body {

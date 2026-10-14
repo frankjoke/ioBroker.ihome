@@ -143,6 +143,7 @@ export interface Rule {
   glow?: boolean;
   background?: string;
   hidden?: boolean;
+  disabled?: boolean;                  // dimmed "switched off" look; stays usable
   tone?: string;                       // badge tone: info | ok | warn | danger
 }
 
@@ -213,17 +214,22 @@ watch?: string[];       // raw state ids referenced by rules/expressions
 
 | preset | size | slots (beyond icon + name) |
 |---|---|---|
-| Switch | 1x1 | value (state text), badge: ago/offline |
-| Button | 1x1 | button |
-| Light | 1x1 | level (brightness), color, value, badge: ago/offline; icon rules for on/off colour + glow |
+| Switch | 1x2 | value (state text, On/Off), badge: ago/offline |
+| Button | 1x2 | button |
+| Light | 1x2 | level (brightness), color, value, badge: ago/offline; icon rules for on/off colour, glow and `disabled` |
 | Thermostat | 2x1 | value (actual), level (setpoint), enum (mode), badge: ago/offline |
-| Thermometer | 1x1 | value (temp), value (humidity), badge: ago/offline/battery |
+| Thermometer | 1x2 | value (temp), value (humidity), badge: ago/offline/battery |
 | Blind | 2x1 | level (position), button (stop) |
-| Window | 1x1 | value (open/closed) |
-| Motion | 1x1 | value (last motion + ago) |
+| Window | 1x2 | value (open/closed); icon rules with `disabled` when closed |
+| Motion | 1x2 | value (On/Off), icon rules (active / idle+`disabled`), badge: ago **of the motion control** + offline |
 | AC | 2x2 | switch, enum (mode), level (temperature), level (fan) |
-| Value | 1x1 | value, badge: ago/offline |
+| Value | 1x2 | value, badge: ago/offline |
 | Custom | 1x1 | value, switch, level |
+
+Sizes are preferences: a readout is a narrow tall card (1 wide, 2 modules high), a device with
+several controls is wide (2x1) and the AC is a 2x2 block. `clampSpan` degrades all of them per
+breakpoint (§5).
+
 
 Derived readings need no sensor: dew point and room health (as in the Thermometer brief) are
 **virtual controls** on the device, reusing the existing `VirtualSpec` expression engine and

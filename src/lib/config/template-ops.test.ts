@@ -5,6 +5,7 @@ import {
   parseTemplateRegistry,
   presetForType,
   primaryControl,
+  resolveControl,
   resolveTemplate,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
@@ -129,11 +130,24 @@ it("gives every device type a preset", () => {
   }
 });
 
-it("carries the spec's preset sizes", () => {
-  expect(PRESETS.Switch.size).toEqual({ w: 1, h: 1 });
+it("carries the preset sizes", () => {
+  // Simple readouts are narrow and tall (1x2); multi-control devices stay wide.
+  expect(PRESETS.Switch.size).toEqual({ w: 1, h: 2 });
+  expect(PRESETS.Light.size).toEqual({ w: 1, h: 2 });
+  expect(PRESETS.Thermometer.size).toEqual({ w: 1, h: 2 });
+  expect(PRESETS.Motion.size).toEqual({ w: 1, h: 2 });
   expect(PRESETS.Thermostat.size).toEqual({ w: 2, h: 1 });
   expect(PRESETS.Blind.size).toEqual({ w: 2, h: 1 });
   expect(PRESETS.AC.size).toEqual({ w: 2, h: 2 });
+});
+
+it("dims an idle motion sensor", () => {
+  const icon = PRESETS.Motion.slots.find((s) => s.kind === "icon");
+  expect(icon?.rules?.map((r) => r.when)).toEqual([
+    "truthy(motion)",
+    "!truthy(motion)",
+  ]);
+  expect(icon?.rules?.[1].disabled).toBe(true);
 });
 
 it("gives the light its on/off icon rules and the thermometer its battery badge", () => {
@@ -182,4 +196,20 @@ it("rejects a template registry entry that would crash the renderer", () => {
   expect(
     parseTemplateRegistry({ templates: [{ id: "t" }] })?.templates.length,
   ).toBe(1);
+});
+
+it("resolves a slot source feature-first, then id, state id, and finally label", () => {
+  const controls = [
+    { id: "c1", feature: "value", label: "Battery", stateId: "a.0.BATTERY" },
+    { id: "c2", feature: "power", label: "Motion", stateId: "a.0.MOTION" },
+  ];
+  // feature wins over an id or label that happens to match
+  expect(resolveControl(controls, "power")?.id).toBe("c2");
+  expect(resolveControl(controls, "c1")?.id).toBe("c1");
+  expect(resolveControl(controls, "a.0.MOTION")?.id).toBe("c2");
+  // a real device may name the state's *label* and nothing else (Keller.Motion)
+  expect(resolveControl(controls, "motion")?.id).toBe("c2");
+  expect(resolveControl(controls, "Battery")?.id).toBe("c1");
+  expect(resolveControl(controls, "nothing")).toBeUndefined();
+  expect(resolveControl(controls, undefined)).toBeUndefined();
 });
