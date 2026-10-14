@@ -49,10 +49,29 @@ export function roomName(enums: any, id: string): string {
   return localizeName(e?.common?.name) || enumShortId(id);
 }
 
+/**
+ * Enum ids of one type that `id` is a member of. `EnumMap` indexes every enum
+ * type the same way (`enum.<type>.<name>.common.members`), so this covers
+ * rooms, functions, favorites and anything else ioBroker grows.
+ */
+export function enumsOf(enums: any, id: string, type: string): string[] {
+  const e: any = enums?.get(id);
+  return (e?.[type] ?? []).map((r: any) => r._id);
+}
+
 /** Room enum ids a state belongs to. */
 export function roomsOf(enums: any, id: string): string[] {
-  const e: any = enums?.get(id);
-  return (e?.rooms ?? []).map((r: any) => r._id);
+  return enumsOf(enums, id, "rooms");
+}
+
+/** Function enum ids a state belongs to (enum.functions.*). */
+export function functionsOf(enums: any, id: string): string[] {
+  return enumsOf(enums, id, "functions");
+}
+
+/** Favorites enum ids a state belongs to (enum.favorites.*). */
+export function favoritesOf(enums: any, id: string): string[] {
+  return enumsOf(enums, id, "favorites");
 }
 
 /**

@@ -1,6 +1,9 @@
 import { it, expect } from "vitest";
 import {
   roomForState,
+  roomsOf,
+  functionsOf,
+  favoritesOf,
   enumShortId,
   enumLabelFromObject,
   enumLabel,
@@ -84,4 +87,28 @@ it("prefers the state's own room over a parent's", () => {
 it("returns undefined when no room is found anywhere", () => {
   const enums: any = { get: () => undefined };
   expect(roomForState(enums, "alias.0.a.b.c")).toBeUndefined();
+});
+
+it("reads any enum type off a member id", () => {
+  const enums: any = {
+    get: (id: string) =>
+      ({
+        "alias.0.EG.Light": {
+          rooms: [{ _id: "enum.rooms.WZ" }],
+          functions: [{ _id: "enum.functions.Licht" }],
+          favorites: [{ _id: "enum.favorites.EG" }],
+        },
+        "alias.0.EG.Plug": {
+          functions: [{ _id: "enum.functions.Licht" }],
+          favorites: [],
+        },
+      })[id],
+  };
+  expect(roomsOf(enums, "alias.0.EG.Light")).toEqual(["enum.rooms.WZ"]);
+  expect(functionsOf(enums, "alias.0.EG.Light")).toEqual([
+    "enum.functions.Licht",
+  ]);
+  expect(favoritesOf(enums, "alias.0.EG.Light")).toEqual(["enum.favorites.EG"]);
+  expect(favoritesOf(enums, "alias.0.EG.Plug")).toEqual([]);
+  expect(favoritesOf(enums, "alias.0.Missing")).toEqual([]);
 });
