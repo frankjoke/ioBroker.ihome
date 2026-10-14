@@ -2,6 +2,8 @@
   import ControlWidget from "./slots/ControlWidget.svelte";
   import IconSlot from "./slots/IconSlot.svelte";
   import ValueSlot from "./slots/ValueSlot.svelte";
+  import SparklineSlot from "./slots/SparklineSlot.svelte";
+  import HistoryListSlot from "./slots/HistoryListSlot.svelte";
   import type { Slot } from "$lib/types/display";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
 
@@ -22,7 +24,9 @@
     slot.kind === "level" ||
       slot.kind === "color" ||
       slot.kind === "enum" ||
-      slot.kind === "button",
+      slot.kind === "button" ||
+      slot.kind === "sparkline" ||
+      slot.kind === "history-list",
   );
   const show = $derived(!needsControl || !!control);
 </script>
@@ -32,6 +36,10 @@
     <IconSlot {slot} {style} fallback={device.icon} />
   {:else if slot.kind === "value"}
     <ValueSlot {slot} {control} />
+  {:else if slot.kind === "sparkline" && control}
+    <SparklineSlot {control} />
+  {:else if slot.kind === "history-list" && control}
+    <HistoryListSlot {control} count={Number(slot.options?.count ?? 4)} />
   {:else if needsControl && control}
     <ControlWidget {control} />
   {/if}
