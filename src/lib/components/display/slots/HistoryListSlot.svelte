@@ -1,6 +1,10 @@
 <script lang="ts">
   import { formatAge, formatValue } from "$lib/config/format";
-  import { ensureHistory, readHistory } from "$lib/stores/history.svelte";
+  import {
+    ensureHistory,
+    noteLive,
+    readHistory,
+  } from "$lib/stores/history.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import type { EnrichedControl } from "$lib/types/device";
 
@@ -12,6 +16,11 @@
   $effect(() => {
     if (!control.stateId || !spec) return;
     ensureHistory(ioBroker, control.stateId, spec);
+    // Feed live samples, or a tablet left open keeps drawing the fetched range.
+    const st: any = (ioBroker.states as any)?.get(control.stateId);
+    if (st && typeof st.ts === "number" && Number.isFinite(st.val)) {
+      noteLive(control.stateId, spec, { ts: st.ts, val: st.val });
+    }
   });
 
   const entry = $derived(

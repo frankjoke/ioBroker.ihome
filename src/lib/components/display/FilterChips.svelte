@@ -8,8 +8,13 @@
     onChange,
   }: { chips: FilterChips; onChange: (next: FilterChips) => void } = $props();
 
+  // Exact category only: `EnumMap.getList` falls back to *every* list when the
+  // name is unknown, which would render other categories' entries as options
+  // with `undefined` ids.
   function options(type: string): { id: string; label: string }[] {
-    return ((ioBroker.enums?.getList(type) as any[]) ?? []).map((e: any) => ({
+    const list = (ioBroker.enums as any)?.list?.[type];
+    if (!Array.isArray(list)) return [];
+    return list.map((e: any) => ({
       id: e._id,
       label: enumLabelFromObject(e),
     }));
@@ -28,48 +33,45 @@
 
 <div class="chips">
   {#if rooms.length}
-    <label class="chip">
-      <span class="sr-only">Room</span>
-      <select
-        value={chips.room ?? ""}
-        onchange={(e) => set("room", e.currentTarget.value)}
-      >
-        <option value="">All rooms</option>
-        {#each rooms as r (r.id)}
-          <option value={r.id}>{r.label}</option>
-        {/each}
-      </select>
-    </label>
+    <select
+      class="chip"
+      aria-label="Filter by room"
+      value={chips.room ?? ""}
+      onchange={(e) => set("room", e.currentTarget.value)}
+    >
+      <option value="">All rooms</option>
+      {#each rooms as r (r.id)}
+        <option value={r.id}>{r.label}</option>
+      {/each}
+    </select>
   {/if}
 
   {#if functions.length}
-    <label class="chip">
-      <span class="sr-only">Function</span>
-      <select
-        value={chips.function ?? ""}
-        onchange={(e) => set("function", e.currentTarget.value)}
-      >
-        <option value="">All functions</option>
-        {#each functions as f (f.id)}
-          <option value={f.id}>{f.label}</option>
-        {/each}
-      </select>
-    </label>
+    <select
+      class="chip"
+      aria-label="Filter by function"
+      value={chips.function ?? ""}
+      onchange={(e) => set("function", e.currentTarget.value)}
+    >
+      <option value="">All functions</option>
+      {#each functions as f (f.id)}
+        <option value={f.id}>{f.label}</option>
+      {/each}
+    </select>
   {/if}
 
   {#if favorites.length}
-    <label class="chip">
-      <span class="sr-only">Favorite</span>
-      <select
-        value={chips.favorite ?? ""}
-        onchange={(e) => set("favorite", e.currentTarget.value)}
-      >
-        <option value="">All favorites</option>
-        {#each favorites as f (f.id)}
-          <option value={f.id}>{f.label}</option>
-        {/each}
-      </select>
-    </label>
+    <select
+      class="chip"
+      aria-label="Filter by favorite"
+      value={chips.favorite ?? ""}
+      onchange={(e) => set("favorite", e.currentTarget.value)}
+    >
+      <option value="">All favorites</option>
+      {#each favorites as f (f.id)}
+        <option value={f.id}>{f.label}</option>
+      {/each}
+    </select>
   {/if}
 
   {#if active}
@@ -93,9 +95,17 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
-  .chip select {
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chip {
+    flex: 0 0 auto;
     max-width: 11rem;
     padding: 3px 6px;
     border: 1px solid var(--border-color);
@@ -106,6 +116,7 @@
   }
 
   .clear {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -126,14 +137,5 @@
 
   .clear .material-symbols-outlined {
     font-size: 16px;
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 </style>

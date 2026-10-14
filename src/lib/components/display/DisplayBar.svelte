@@ -36,7 +36,9 @@
     {/each}
   </nav>
 
-  <FilterChips chips={view.chips} onChange={setChips} />
+  <div class="chips-slot">
+    <FilterChips chips={view.chips} onChange={setChips} />
+  </div>
 
   <a
     class="icon-btn"
@@ -139,5 +141,38 @@
 
   .icon-btn .material-symbols-outlined {
     font-size: 20px;
+  }
+
+  /* On a phone the bar gets two rows: navigation, then filters. */
+  @media (max-width: 768px) {
+    .bar {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "brand chips gear"
+        "tabs tabs tabs";
+      row-gap: 0.25rem;
+    }
+
+    .page-tabs {
+      min-width: 0;
+    }
+
+    .brand {
+      grid-area: brand;
+    }
+
+    .chips-slot {
+      grid-area: chips;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .page-tabs {
+      grid-area: tabs;
+    }
+
+    .bar > .icon-btn:last-child {
+      grid-area: gear;
+    }
   }
 </style>

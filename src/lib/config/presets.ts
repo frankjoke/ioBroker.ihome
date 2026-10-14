@@ -14,7 +14,9 @@ import { DEVICE_FEATURES } from "$lib/config/features";
 const badge = (source: string, tone?: string): Slot => ({
   kind: "badge",
   source,
-  ...(tone ? { tone } : {}),
+  // `tone` is a *rule* field, not a slot field: express it as one so the badge
+  // renderer actually sees it.
+  ...(tone ? { rules: [{ when: "true", tone }] } : {}),
 });
 
 const ago = badge("ago");
@@ -64,9 +66,20 @@ export const PRESETS: Record<DeviceType, Template> = {
     size: { w: 1, h: 1 },
     features: DEVICE_FEATURES.Light,
     slots: [
+      // `truthy(...)`: power arrives as true, 1, "1" or "true" depending on the
+      // adapter. Colours are theme tokens — "amber" is not a CSS colour.
       icon("power", "lightbulb", [
-        { when: "power", icon: "lightbulb", color: "amber", glow: true },
-        { when: "!power", icon: "lightbulb_outline", color: "grey" },
+        {
+          when: "truthy(power)",
+          icon: "lightbulb",
+          color: "var(--warning-color)",
+          glow: true,
+        },
+        {
+          when: "!truthy(power)",
+          icon: "lightbulb_outline",
+          color: "var(--text-muted)",
+        },
       ]),
       { kind: "value", source: "power" },
       { kind: "level", source: "brightness" },
@@ -130,8 +143,16 @@ export const PRESETS: Record<DeviceType, Template> = {
     features: DEVICE_FEATURES.Window,
     slots: [
       icon("open", "window", [
-        { when: "open", icon: "window_open", color: "amber" },
-        { when: "!open", icon: "window_closed", color: "grey" },
+        {
+          when: "truthy(open)",
+          icon: "window_open",
+          color: "var(--warning-color)",
+        },
+        {
+          when: "!truthy(open)",
+          icon: "window_closed",
+          color: "var(--text-muted)",
+        },
       ]),
       { kind: "value", source: "open" },
       ago,
@@ -149,6 +170,7 @@ export const PRESETS: Record<DeviceType, Template> = {
       icon("motion", "sensors"),
       { kind: "value", source: "motion" },
       ago,
+      offline,
     ],
   },
   AC: {

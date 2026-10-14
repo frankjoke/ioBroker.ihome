@@ -124,6 +124,15 @@
   }
 
   function save() {
+    // This form edits the legacy fields only. The display fields (template,
+    // size, slots, watch, tags, functions, favorites) and each control's rules
+    // belong to the page/template editors, so they are carried over untouched —
+    // an edit here must never delete them.
+    const before = device?.controls ?? [];
+    const controlsWithRules = controls.map((c) => {
+      const prev = before.find((k) => k.id === c.id);
+      return prev?.rules ? { ...c, rules: prev.rules } : c;
+    });
     onSave(
       projectDevice({
         id: device?.id ?? crypto.randomUUID(),
@@ -133,7 +142,14 @@
         section: section || undefined,
         panel: panel || undefined,
         icon: icon || undefined,
-        controls,
+        functions: device?.functions,
+        favorites: device?.favorites,
+        tags: device?.tags,
+        template: device?.template,
+        size: device?.size,
+        slots: device?.slots,
+        watch: device?.watch,
+        controls: controlsWithRules,
       }),
     );
   }

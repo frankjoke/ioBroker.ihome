@@ -138,7 +138,10 @@ it("carries the spec's preset sizes", () => {
 
 it("gives the light its on/off icon rules and the thermometer its battery badge", () => {
   const icon = PRESETS.Light.slots.find((s) => s.kind === "icon");
-  expect(icon?.rules?.map((r) => r.when)).toEqual(["power", "!power"]);
+  expect(icon?.rules?.map((r) => r.when)).toEqual([
+    "truthy(power)",
+    "!truthy(power)",
+  ]);
   expect(
     PRESETS.Thermometer.slots
       .filter((s) => s.kind === "badge")
@@ -156,5 +159,27 @@ it("parses a template registry and rejects junk", () => {
   expect(
     parseTemplateRegistry({ val: { templates: [{ id: "t" }] } })?.templates
       .length,
+  ).toBe(1);
+});
+
+it("resolves an explicit built-in preset id", () => {
+  const r = resolveTemplate(
+    {
+      id: "d",
+      name: "D",
+      type: "Custom",
+      template: "Thermostat",
+      controls: [],
+    },
+    [],
+  );
+  expect(r.slots).toEqual(PRESETS.Thermostat.slots);
+  expect(r.size).toEqual(PRESETS.Thermostat.size);
+});
+
+it("rejects a template registry entry that would crash the renderer", () => {
+  expect(parseTemplateRegistry({ templates: [null] })).toBeNull();
+  expect(
+    parseTemplateRegistry({ templates: [{ id: "t" }] })?.templates.length,
   ).toBe(1);
 });

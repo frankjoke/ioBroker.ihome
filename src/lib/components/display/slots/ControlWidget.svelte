@@ -60,6 +60,7 @@
   <div class="level">
     <input
       type="range"
+      aria-label={control.label || control.feature}
       min={common.min ?? 0}
       max={common.max ?? 100}
       step={common.step ?? 1}
@@ -84,6 +85,7 @@
   />
 {:else if control.widget === "enum"}
   <select
+    aria-label={control.label || control.feature}
     value={String(control.liveValue ?? "")}
     disabled={!control.writable}
     onpointerdown={stop}

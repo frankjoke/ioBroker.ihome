@@ -108,8 +108,10 @@ export function getUsedStateIds(): Set<string> {
 function buildVirtualPool(): PoolEntry[] {
   const pool: PoolEntry[] = [];
   for (const device of canonicalRegistry.devices ?? []) {
+    const seen = new SvelteSet<string>();
     for (const control of device.controls ?? []) {
       if (!control.stateId) continue;
+      seen.add(control.stateId);
       const st: any = stateSource?.get(control.stateId);
       const obj: any = objectSource?.get(control.stateId);
       pool.push({
@@ -121,6 +123,13 @@ function buildVirtualPool(): PoolEntry[] {
         feature: control.feature,
         label: control.label ?? control.feature,
       });
+    }
+    // `watch` ids are subscribed for rules; they must be readable too, or a
+    // rule's get("<id>") silently returns undefined (spec §14).
+    for (const id of device.watch ?? []) {
+      if (!id || seen.has(id)) continue;
+      const st: any = stateSource?.get(id);
+      pool.push({ stateId: id, value: st?.val, device: device.name });
     }
   }
   return pool;

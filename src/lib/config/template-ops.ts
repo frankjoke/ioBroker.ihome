@@ -54,7 +54,11 @@ export function templateById(
   templates: Template[],
 ): Template | undefined {
   if (!id) return undefined;
-  return templates.find((t) => t.id === id);
+  // A device may name a user template *or* a built-in preset (spec §4).
+  return (
+    templates.find((t) => t.id === id) ??
+    (PRESETS as Record<string, Template>)[id]
+  );
 }
 
 /**
@@ -74,8 +78,11 @@ export function resolveTemplate(
   device: Device,
   userTemplates: Template[],
 ): ResolvedTemplate {
-  const user = templateById(device.template, userTemplates);
-  const base = presetForType(user?.basedOn ?? device.type);
+  const chosen = templateById(device.template, userTemplates);
+  // Only a *user* template contributes its own layer; a chosen preset already is
+  // the base (merging it twice would duplicate every rule).
+  const user = chosen?.builtin ? undefined : chosen;
+  const base = presetForType(user?.basedOn ?? chosen?.type ?? device.type);
   return {
     type: device.type,
     size: device.size ?? user?.size ?? base.size ?? DEFAULT_SPAN,
@@ -98,10 +105,17 @@ export function primaryControl<
 }
 
 /** Read a persisted user-template registry; null when there is nothing usable. */
+function isTemplateEntry(v: unknown): v is Template {
+  if (!v || typeof v !== "object") return false;
+  const t = v as Record<string, unknown>;
+  return typeof t.id === "string" && !!t.id;
+}
+
 export function parseTemplateRegistry(raw: unknown): TemplateRegistry | null {
   return parseDoc(raw, (value) => {
     const templates = value.templates;
     if (!Array.isArray(templates)) return null;
+    if (!templates.every(isTemplateEntry)) return null;
     return {
       version: num(value.version, 0),
       updatedAt: num(value.updatedAt, Date.now()),

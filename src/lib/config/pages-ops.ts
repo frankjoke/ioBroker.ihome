@@ -1,6 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { Group, Member, Page, PageRegistry } from "$lib/types/display";
-import { num, parseDoc } from "$lib/config/doc-parse";
+import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 
 /** A device reduced to what filtering needs. */
 export interface FilterableDevice {
@@ -33,6 +33,7 @@ export interface ResolvedGroup<T = FilterableDevice> {
  * configured (spec §4.1.3), so a stray group can never swallow the registry.
  */
 export function matchesMember(d: FilterableDevice, m: Member): boolean {
+  if (!d || !m) return false; // a half-written group matches nothing
   const checks: boolean[] = [];
   if (m.ids) checks.push(m.ids.includes(d.id));
   if (m.room) checks.push(d.room === m.room);
@@ -169,10 +170,34 @@ export function seedPages(
  * Read a persisted page registry. Anything unusable returns null so the caller
  * can seed instead of losing the pages that are already loaded.
  */
+function isGroup(v: unknown): v is Group {
+  if (!v || typeof v !== "object") return false;
+  const g = v as Record<string, unknown>;
+  return (
+    typeof g.id === "string" &&
+    !!g.id &&
+    !!g.member &&
+    typeof g.member === "object"
+  );
+}
+
+function isPage(v: unknown): v is Page {
+  if (!v || typeof v !== "object") return false;
+  const page = v as Record<string, unknown>;
+  return (
+    typeof page.id === "string" &&
+    !!page.id &&
+    Array.isArray(page.groups) &&
+    page.groups.every(isGroup)
+  );
+}
+
 export function parsePageRegistry(raw: unknown): PageRegistry | null {
   return parseDoc(raw, (value) => {
     const pages = value.pages;
     if (!Array.isArray(pages)) return null;
+    // A document the renderer would crash on is not a document we accept.
+    if (!pages.every(isPage)) return null;
     return {
       version: num(value.version, 0),
       updatedAt: num(value.updatedAt, Date.now()),
@@ -191,13 +216,28 @@ export function parsePageRegistry(raw: unknown): PageRegistry | null {
  * reading it reports *not found* — the empty case and the missing case look the
  * same from here, and both must seed.
  */
+export type LoadedPages =
+  | { kind: "loaded"; registry: PageRegistry }
+  | { kind: "seeded"; registry: PageRegistry }
+  | { kind: "absent"; registry: null }
+  | { kind: "invalid"; registry: null };
+
 export function loadPages(
   raw: unknown,
   seed?: () => PageRegistry,
-): PageRegistry | null {
-  const parsed = parsePageRegistry(raw);
-  if (parsed?.pages?.length) return parsed;
-  const fresh = seed?.();
-  if (fresh) return fresh;
-  return parsed;
+): LoadedPages {
+  const value = unwrapDoc(raw);
+  if (value === undefined || value === null || value === "") {
+    const fresh = seed?.();
+    return fresh
+      ? { kind: "seeded", registry: fresh }
+      : { kind: "absent", registry: null };
+  }
+  const parsed = parsePageRegistry(value);
+  // A stored document is authoritative — including an empty one (the user may
+  // have deleted every page on purpose). Unreadable content is reported, not
+  // replaced: overwriting it would destroy whatever was there.
+  return parsed
+    ? { kind: "loaded", registry: parsed }
+    : { kind: "invalid", registry: null };
 }

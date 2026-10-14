@@ -85,7 +85,14 @@ export function initTemplates(): Promise<void> {
         return true;
       };
       const parsed = parseTemplateRegistry(st.value);
+      // Templates are only ever absent (never seeded), so nothing is written
+      // here: an unreadable document must not be replaced by an empty one.
       if (parsed) setTemplateRegistry(parsed);
+      else if (st.value != null && st.value !== "") {
+        console.error(
+          "templateList is unreadable — leaving it untouched rather than overwriting it",
+        );
+      }
     })().catch((e) => {
       console.error("initTemplates:", e);
       initPromise = null;

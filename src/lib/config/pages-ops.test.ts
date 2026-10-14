@@ -165,24 +165,67 @@ it("parses a page registry and rejects junk", () => {
   expect(parsePageRegistry({ seeded: true, pages: [] })?.seeded).toBe(true);
 });
 
-it("keeps loaded pages and seeds an empty document", () => {
+it("keeps loaded pages and only seeds an absent document", () => {
   const loaded = { pages: [{ id: "a", title: "A", groups: [] }] };
-  expect(loadPages(loaded)?.pages[0].id).toBe("a");
+  expect(loadPages(loaded).registry?.pages[0].id).toBe("a");
   const seeded = loadPages(null, () => ({
     version: 0,
     updatedAt: 1,
     seeded: true,
     pages: [{ id: "s", title: "S", groups: [] }],
   }));
-  expect(seeded?.seeded).toBe(true);
-  expect(seeded?.pages[0].id).toBe("s");
-  expect(loadPages(null)).toBeNull();
+  expect(seeded.kind).toBe("seeded");
+  expect(seeded.registry?.pages[0].id).toBe("s");
+  expect(loadPages(null).kind).toBe("absent");
+  // A stored-but-empty document stays empty: deleting every page is a choice,
+  // and re-seeding it on the next boot would undo it.
   expect(
     loadPages({ pages: [] }, () => ({
       version: 0,
       updatedAt: 1,
       seeded: true,
-      pages: [],
-    }))?.seeded,
-  ).toBe(true);
+      pages: [{ id: "s", title: "S", groups: [] }],
+    })).kind,
+  ).toBe("loaded");
+});
+
+it("distinguishes absent, invalid and empty documents", () => {
+  const seed = () => ({
+    version: 0,
+    updatedAt: 1,
+    seeded: true as const,
+    pages: [{ id: "s", title: "S", groups: [] }],
+  });
+  // Absent (an object exists but was never written) → seed, and only here.
+  expect(loadPages(null, seed).kind).toBe("seeded");
+  expect(loadPages(undefined, seed).kind).toBe("seeded");
+  expect(loadPages("", seed).kind).toBe("seeded");
+  // A stored document is authoritative, even an empty one (the user may have
+  // deleted every page on purpose).
+  expect(loadPages({ pages: [] }, seed).kind).toBe("loaded");
+  expect(loadPages({ pages: [] }, seed).registry?.pages).toEqual([]);
+  // Unreadable content must NOT be overwritten by a seed.
+  expect(loadPages("{bad json", seed).kind).toBe("invalid");
+  expect(loadPages({ nope: 1 }, seed).kind).toBe("invalid");
+  // Absent with no seed available is just absent.
+  expect(loadPages(null).kind).toBe("absent");
+});
+
+it("rejects documents that would crash the renderer", () => {
+  expect(parsePageRegistry({ pages: [null] })).toBeNull();
+  expect(parsePageRegistry({ pages: [{ id: "p" }] })).toBeNull();
+  expect(
+    parsePageRegistry({
+      pages: [{ id: "p", title: "P", groups: [{ id: "g" }] }],
+    }),
+  ).toBeNull();
+  expect(
+    parsePageRegistry({
+      pages: [{ id: "p", title: "P", groups: [{ id: "g", member: {} }] }],
+    })?.pages.length,
+  ).toBe(1);
+});
+
+it("treats a group without a member as matching nothing", () => {
+  expect(matchesMember(dev({}), undefined as never)).toBe(false);
 });

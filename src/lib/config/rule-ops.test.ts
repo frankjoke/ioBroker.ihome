@@ -115,3 +115,99 @@ it("names rule locals after the control feature, not its label", () => {
   // the label stays available too, for formulas already written that way
   expect(evalRule({ when: "ein_aus === false" }, scope)).toBe(true);
 });
+
+it("lets a feature local win over another control's label", () => {
+  const scope = ruleScope(
+    [
+      { feature: "state", label: "Power", liveValue: "not the switch" },
+      { feature: "power", label: "Leistung", liveValue: true },
+    ],
+    [],
+  );
+  // `power` is the feature of the second control, and must not be stolen by the
+  // first control's label (which lands on `power2`).
+  expect(evalRule({ when: "power === true" }, scope)).toBe(true);
+  expect(evalRule({ when: "state === 'not the switch'" }, scope)).toBe(true);
+  expect(evalRule({ when: "power2 === 'not the switch'" }, scope)).toBe(true);
+});
+
+it("sees virtual readings as locals too", () => {
+  const scope = ruleScope(
+    [
+      {
+        kind: "virtual",
+        feature: "dewPoint",
+        label: "Dew point",
+        liveValue: 11.5,
+      },
+    ],
+    [],
+  );
+  expect(evalRule({ when: "dewPoint < 12" }, scope)).toBe(true);
+});
+
+it("normalises on/off values with the truthy helper", () => {
+  for (const v of [true, 1, "1", "true"]) {
+    const scope = ruleScope([{ feature: "power", liveValue: v }], []);
+    expect(evalRule({ when: "truthy(power)" }, scope)).toBe(true);
+  }
+  for (const v of [false, 0, "0", "false", undefined]) {
+    const scope = ruleScope([{ feature: "power", liveValue: v }], []);
+    expect(evalRule({ when: "truthy(power)" }, scope)).toBe(false);
+  }
+});
+
+it("resolves a badge source feature-first and merges control rules", () => {
+  const badges = resolveBadges(
+    [{ kind: "badge", source: "battery" }],
+    {
+      controls: [
+        { id: "battery", feature: "other", available: true, liveValue: 99 },
+        {
+          id: "c2",
+          feature: "battery",
+          available: true,
+          liveValue: 8,
+          rules: [{ when: "truthy(true)", tone: "warn" }],
+        },
+      ],
+    },
+    undefined,
+    NOW,
+  );
+  expect(badges[0].label).toBe("8");
+  expect(badges[0].tone).toBe("warn");
+});
+
+it("drops ago when the device is offline but keeps offline", () => {
+  const badges = resolveBadges(
+    [
+      { kind: "badge", source: "ago" },
+      { kind: "badge", source: "offline" },
+    ],
+    { controls: [{ id: "c", available: false, liveValue: 1 }] },
+    NOW - 60_000,
+    NOW,
+  );
+  expect(badges.map((b) => b.source)).toEqual(["offline"]);
+});
+
+it("skips a hidden control's badge", () => {
+  const badges = resolveBadges(
+    [{ kind: "badge", source: "battery" }],
+    {
+      controls: [
+        {
+          id: "c",
+          feature: "battery",
+          available: true,
+          hidden: true,
+          liveValue: 8,
+        },
+      ],
+    },
+    undefined,
+    NOW,
+  );
+  expect(badges).toEqual([]);
+});

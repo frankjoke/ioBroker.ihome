@@ -14,16 +14,21 @@
 
   let { device, bp }: { device: EnrichedDevice; bp: Breakpoint } = $props();
 
+  /** Hidden controls are not part of the tile at all. */
+  const shownControls = $derived(
+    (device.controls ?? []).filter((c) => !c.hidden),
+  );
+
   const template = $derived(
     resolveTemplate(device, getTemplateRegistry().templates),
   );
   const span = $derived(clampSpan(template.size, bp));
-  const primary = $derived(primaryControl(device.controls));
+  const primary = $derived(primaryControl(shownControls));
 
   // Spec §4.1: a slot's source resolves control feature → control id → state id.
   function controlFor(slot: Slot): EnrichedControl | undefined {
     if (!slot.source) return undefined;
-    const controls = device.controls ?? [];
+    const controls = shownControls;
     return (
       controls.find((c) => c.feature === slot.source) ??
       controls.find((c) => c.id === slot.source) ??
@@ -65,7 +70,7 @@
   const tileVars = $derived(
     `--tile-accent: ${tileStyle.color ?? "transparent"}; --tile-glow: ${
       tileStyle.glow ? 1 : 0
-    };`,
+    };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
   );
 
   /** Newest `ts` across the device's state-backed controls (same rule as the
@@ -106,7 +111,7 @@
     }
     // The body acts on the primary control: a writable switch toggles, anything
     // else opens the full control set (spec §7).
-    if (primary?.widget === "switch" && primary.writable) {
+    if (primary?.widget === "switch" && primary.writable && primary.available) {
       if (!primary.stateId) return;
       const v = applyWrite(!truthy(primary.liveValue), primary.transform);
       ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
@@ -114,7 +119,7 @@
       });
       return;
     }
-    if ((device.controls ?? []).length) modalOpen = true;
+    if (shownControls.length) modalOpen = true;
   }
 
   let modalOpen = $state(false);
@@ -139,6 +144,9 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    // Enter/Space on a nested control (the corner button, a slider, a select)
+    // must do its own thing, not the tile's.
+    if (e.target !== e.currentTarget) return;
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
     onActivate();
@@ -162,7 +170,7 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  {#if (device.controls ?? []).length}
+  {#if shownControls.length}
     <button
       type="button"
       class="expand"

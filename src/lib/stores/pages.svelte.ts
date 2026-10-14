@@ -7,6 +7,16 @@
 // client then desyncs them — see the 2026-10-13 handoff.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { loadPages, parsePageRegistry } from "$lib/config/pages-ops";
+
+/** Wait for the enum cache: `connected` flips before objects/enums are in. */
+async function waitForEnums(ms = 8000): Promise<void> {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    const rooms = (ioBroker.enums as any)?.getList?.("rooms");
+    if (Array.isArray(rooms) && rooms.length > 0) return;
+    await ioBroker.wait(200);
+  }
+}
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import type { PageRegistry } from "$lib/types/display";
 
@@ -76,6 +86,8 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       } catch (e) {
         console.error("initPages ensurePagesObject:", e);
       }
+      // Seeding from an empty enum cache would write pages with no groups.
+      await waitForEnums();
       const st = await ioBroker.getState(PAGE_LIST_ID);
       if (!ioBroker.connected) {
         // Not reachable after the wait — leave the promise unset so a later
@@ -93,10 +105,15 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
           return true;
         };
       }
-      const resolved = loadPages(st?.value, seed);
-      if (resolved?.pages?.length) {
-        setPageRegistry(resolved);
-        if (resolved.seeded) savePages();
+      const loaded = loadPages(st?.value, seed);
+      if (loaded.registry) setPageRegistry(loaded.registry);
+      // Persist only a seed this run created — a stored document is never
+      // rewritten (C1: a failed read must not overwrite config).
+      if (loaded.kind === "seeded") savePages();
+      if (loaded.kind === "invalid") {
+        console.error(
+          "pageList is unreadable — leaving it untouched rather than overwriting it",
+        );
       }
     })().catch((e) => {
       console.error("initPages:", e);

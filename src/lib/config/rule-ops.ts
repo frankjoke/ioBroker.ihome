@@ -1,6 +1,7 @@
 import type { Rule, Slot } from "$lib/types/display";
 import {
   buildScope,
+  newLocalTaken,
   sanitizeLabel,
   evaluateVirtual,
   type LocalControl,
@@ -41,6 +42,7 @@ export interface BadgeDevice {
     id?: string;
     feature?: string;
     available?: boolean;
+    hidden?: boolean;
     liveValue?: unknown;
     unit?: string;
     rules?: Rule[];
@@ -56,16 +58,33 @@ export interface BadgeDevice {
  */
 export function ruleScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
   const base = buildScope(controls, pool);
-  const locals: Record<string, unknown> = { ...base.locals };
-  const taken = new Set(Object.keys(locals));
+  const taken = newLocalTaken();
+  const locals: Record<string, unknown> = {};
+  // Features (virtual readings included) are reserved first, so a preset rule
+  // naming a feature can never be shadowed by another control's label.
   for (const c of controls ?? []) {
-    if (c.kind === "virtual") continue;
-    const name = sanitizeLabel(c.feature, new Set<string>());
-    if (!name || taken.has(name)) continue;
-    locals[name] = c.liveValue;
-    taken.add(name);
+    locals[sanitizeLabel(c.feature, taken)] = c.liveValue;
+    // Convenience alias: `dewPoint` as well as `dewpoint`, when it is a legal
+    // identifier and nothing else claimed it.
+    const raw = String(c.feature ?? "");
+    if (
+      /^[A-Za-z_$][\w$]*$/.test(raw) &&
+      raw !== sanitizeLabel(raw, new Set())
+    ) {
+      if (!(raw in locals)) locals[raw] = c.liveValue;
+    }
   }
-  return { locals, helpers: base.helpers };
+  // Labels come second and take a suffix on collision, so a formula written
+  // against a label keeps working without stealing a feature name.
+  for (const c of controls ?? []) {
+    locals[sanitizeLabel(c.label, taken)] = c.liveValue;
+  }
+  return { locals, helpers: { ...base.helpers, truthy } };
+}
+
+/** On/off values as ioBroker stores them: true, 1, "1", "true". */
+function truthy(v: unknown): boolean {
+  return v === true || v === 1 || v === "1" || v === "true";
 }
 
 /**
@@ -128,16 +147,42 @@ function toneOf(style: ResolvedStyle): BadgeTone {
 }
 
 /** Resolve a badge slot against a device control; no source → no badge. */
+interface BadgeControl {
+  id?: string;
+  feature?: string;
+  available?: boolean;
+  hidden?: boolean;
+  liveValue?: unknown;
+  unit?: string;
+  rules?: Rule[];
+}
+
+/** Feature first, then id — the precedence slot sources use (spec §4.1). */
+function badgeControl(
+  device: BadgeDevice,
+  source: string | undefined,
+): BadgeControl | undefined {
+  const controls = ((device.controls ?? []) as BadgeControl[]).filter(
+    (c) => !c.hidden,
+  );
+  return (
+    controls.find((c) => c.feature === source) ??
+    controls.find((c) => c.id === source)
+  );
+}
+
 function controlBadge(
   slot: Slot,
   device: BadgeDevice,
   scope: Scope,
 ): ResolvedBadge | undefined {
-  const control = (device.controls ?? []).find(
-    (c) => c.feature === slot.source || c.id === slot.source,
-  );
+  const control = badgeControl(device, slot.source);
   if (!control) return undefined;
-  const style = resolveStyle(slot.rules ?? [], scope);
+  // Slot rules first, the control's own defaults last (spec §4.1.1).
+  const style = resolveStyle(
+    [...(slot.rules ?? []), ...(control.rules ?? [])],
+    scope,
+  );
   return {
     source: String(slot.source),
     icon: style.icon ?? "info",
@@ -160,12 +205,14 @@ export function resolveBadges(
   pool: PoolEntry[] = [],
 ): ResolvedBadge[] {
   const scope = ruleScope((device.controls ?? []) as LocalControl[], pool);
+  const offline = offlineBadge(device);
   const out: ResolvedBadge[] = [];
   for (const slot of slots ?? []) {
     if (slot.kind !== "badge") continue;
     let badge: ResolvedBadge | undefined;
-    if (slot.source === "ago") badge = agoBadge(ts, now);
-    else if (slot.source === "offline") badge = offlineBadge(device);
+    // An offline device says *that*, not a misleading "how long ago it was".
+    if (slot.source === "ago") badge = offline ? undefined : agoBadge(ts, now);
+    else if (slot.source === "offline") badge = offline;
     else if (slot.source) badge = controlBadge(slot, device, scope);
     if (badge) out.push(badge);
   }
