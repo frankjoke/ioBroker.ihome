@@ -1,6 +1,8 @@
 <script lang="ts">
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import type { Group, Size } from "$lib/types/display";
+  import type { EnrichedDevice } from "$lib/types/device";
+  import Tile from "./Tile.svelte";
 
   let {
     group,
@@ -8,7 +10,7 @@
     bp,
   }: {
     group: Group;
-    devices: { id: string; name: string; size?: Size }[];
+    devices: (EnrichedDevice & { size?: Size })[];
     bp: Breakpoint;
   } = $props();
 </script>
@@ -26,14 +28,7 @@
 
   <div class="grid">
     {#each devices as d (d.id)}
-      {@const span = clampSpan(d.size, bp)}
-      <!-- Task 9 replaces this placeholder with <Tile {device} /> -->
-      <div
-        class="tile"
-        style="grid-column: span {span.w}; grid-row: span {span.h};"
-      >
-        <span class="tile-name">{d.name}</span>
-      </div>
+      <Tile device={d} {bp} />
     {/each}
   </div>
 </section>
@@ -77,24 +72,5 @@
       minmax(var(--tile-min, 190px), 1fr)
     );
     grid-auto-rows: var(--tile-min, 190px);
-  }
-
-  .tile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    min-width: 0;
-    overflow: hidden;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md, 12px);
-    background-color: var(--surface-container-lowest);
-  }
-
-  .tile-name {
-    font-size: var(--body-sm);
-    font-weight: 600;
-    overflow-wrap: anywhere;
   }
 </style>
