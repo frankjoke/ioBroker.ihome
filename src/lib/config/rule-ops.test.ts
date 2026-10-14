@@ -105,3 +105,13 @@ it("falls back to info for a junk tone and honours a rule's tone", () => {
   expect(badges[0].tone).toBe("info");
   expect(badges[1].tone).toBe("warn");
 });
+
+it("names rule locals after the control feature, not its label", () => {
+  const scope = ruleScope(
+    [{ feature: "power", label: "Ein/Aus", liveValue: false }],
+    [],
+  );
+  expect(evalRule({ when: "!power" }, scope)).toBe(true);
+  // the label stays available too, for formulas already written that way
+  expect(evalRule({ when: "ein_aus === false" }, scope)).toBe(true);
+});

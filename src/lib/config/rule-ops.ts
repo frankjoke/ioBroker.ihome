@@ -1,6 +1,7 @@
 import type { Rule, Slot } from "$lib/types/display";
 import {
   buildScope,
+  sanitizeLabel,
   evaluateVirtual,
   type LocalControl,
   type PoolEntry,
@@ -47,12 +48,24 @@ export interface BadgeDevice {
 }
 
 /**
- * Rule expressions see the device's controls the same way virtual formulas do:
- * locals named after each control's label (falling back to its feature), plus
- * the pool helpers (`get`, `values`, `sum`, …). One language, one skill.
+ * Rule expressions see the device's controls under **feature** names
+ * (`power`, `brightness`, …) — a preset must not depend on what a device's label
+ * happens to say. Label names are kept too, so a formula already written
+ * against a label keeps working, and the pool helpers (`get`, `values`, …) come
+ * along as in the virtual-formula editor. One language, one skill.
  */
 export function ruleScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
-  return buildScope(controls, pool);
+  const base = buildScope(controls, pool);
+  const locals: Record<string, unknown> = { ...base.locals };
+  const taken = new Set(Object.keys(locals));
+  for (const c of controls ?? []) {
+    if (c.kind === "virtual") continue;
+    const name = sanitizeLabel(c.feature, new Set<string>());
+    if (!name || taken.has(name)) continue;
+    locals[name] = c.liveValue;
+    taken.add(name);
+  }
+  return { locals, helpers: base.helpers };
 }
 
 /**

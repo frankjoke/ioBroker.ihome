@@ -3,6 +3,8 @@
   import { applyWrite } from "$lib/utils/transform";
   import { resolveTemplate, primaryControl } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import { getVirtualPool } from "$lib/stores/devices";
+  import { resolveStyle, ruleScope } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import SlotRenderer from "./SlotRenderer.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
@@ -27,14 +29,41 @@
     );
   }
 
+  // Rule locals are the device's controls (by label, falling back to feature) plus
+  // the pool helpers — the same language the formula editor uses.
+  const scope = $derived(ruleScope(device.controls ?? [], getVirtualPool()));
+
+  /** Slot rules first, the control's own defaults last — the last match wins. */
+  function slotStyle(slot: Slot, control?: EnrichedControl) {
+    return resolveStyle(
+      [...(slot.rules ?? []), ...(control?.rules ?? [])],
+      scope,
+    );
+  }
+
   // Slots that render nothing are dropped, so a template can name features a
-  // device does not have without leaving gaps (spec §10).
+  // device does not have without leaving gaps (spec §10), and a rule can hide a
+  // slot by value.
   const slots = $derived(
     template.slots.filter((slot) => {
       if (slot.kind === "badge") return false; // badges render as a row (Task 11)
+      const control = controlFor(slot);
+      if (slotStyle(slot, control).hidden === true) return false;
       if (slot.kind === "icon") return true;
-      return !!controlFor(slot);
+      return !!control;
     }),
+  );
+
+  // The icon slot carries the type's on/off colour and glow, so it drives the
+  // tile's accent; the values reach CSS through custom properties (spec §6).
+  const iconSlot = $derived(
+    template.slots.find((s) => s.kind === "icon") ?? { kind: "icon" as const },
+  );
+  const tileStyle = $derived(slotStyle(iconSlot, controlFor(iconSlot)));
+  const tileVars = $derived(
+    `--tile-accent: ${tileStyle.color ?? "transparent"}; --tile-glow: ${
+      tileStyle.glow ? 1 : 0
+    };`,
   );
 
   function truthy(v: unknown): boolean {
@@ -64,7 +93,8 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="tile"
-  style="grid-column: span {span.w}; grid-row: span {span.h};"
+  class:glow={tileStyle.glow === true}
+  style="grid-column: span {span.w}; grid-row: span {span.h}; {tileVars}"
   class:interactive={primary?.widget === "switch" && primary.writable}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
@@ -74,7 +104,12 @@
   <span class="tile-name">{device.name}</span>
   <div class="tile-body">
     {#each slots as slot (`${slot.kind}:${slot.source ?? ""}`)}
-      <SlotRenderer {slot} {device} control={controlFor(slot)} style={{}} />
+      <SlotRenderer
+        {slot}
+        {device}
+        control={controlFor(slot)}
+        style={slotStyle(slot, controlFor(slot))}
+      />
     {/each}
   </div>
 </div>
@@ -102,6 +137,13 @@
 
   .tile.interactive:hover {
     background-color: var(--surface-container);
+  }
+
+  /* One shared glow rule: a static shadow, no animation (a wall tablet should
+     not burn CPU animating tiles). */
+  .tile.glow {
+    box-shadow: 0 0 12px var(--tile-accent);
+    border-color: var(--tile-accent, var(--border-color));
   }
 
   .tile-name {
