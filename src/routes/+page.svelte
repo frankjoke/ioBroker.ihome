@@ -1,10 +1,14 @@
 <script lang="ts">
   import DisplayBar from "$lib/components/display/DisplayBar.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
-  import { getPageRegistry } from "$lib/stores/pages.svelte.js";
+  import { getPageRegistry, view } from "$lib/stores/pages.svelte.js";
 
   const pages = $derived(getPageRegistry().pages ?? []);
-  const current = $derived(pages[0]);
+  // A wall tablet reboots on the page you left it on; a page that no longer
+  // exists falls back to the first one.
+  const current = $derived(
+    pages.find((p) => p.id === view.lastPage) ?? pages[0],
+  );
 </script>
 
 <svelte:head>

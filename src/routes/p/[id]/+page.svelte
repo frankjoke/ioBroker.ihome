@@ -2,7 +2,7 @@
   import { page as route } from "$app/state";
   import DisplayBar from "$lib/components/display/DisplayBar.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
-  import { getPageRegistry } from "$lib/stores/pages.svelte.js";
+  import { getPageRegistry, setLastPage } from "$lib/stores/pages.svelte.js";
 
   const pages = $derived(getPageRegistry().pages ?? []);
   // An unknown id falls back to the first page rather than showing nothing —
@@ -10,6 +10,10 @@
   const current = $derived(
     pages.find((p) => p.id === route.params?.id) ?? pages[0],
   );
+
+  $effect(() => {
+    if (current) setLastPage(current.id);
+  });
 </script>
 
 <svelte:head>

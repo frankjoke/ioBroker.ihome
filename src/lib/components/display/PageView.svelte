@@ -2,10 +2,12 @@
   import { onMount } from "svelte";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import {
+    filterDevices,
     resolvePage,
     toFilterable,
     type FilterableDevice,
   } from "$lib/config/pages-ops";
+  import { view } from "$lib/stores/pages.svelte.js";
   import {
     BREAKPOINTS,
     breakpointFor,
@@ -35,7 +37,14 @@
   const devices = $derived<DisplayDevice[]>(
     $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
   );
-  const groups = $derived(resolvePage(page, devices));
+  // Chips narrow what the groups see; a group that empties out disappears
+  // unless it asks for empties (resolvePage handles that).
+  const visible = $derived(filterDevices(devices, view.chips));
+  const groups = $derived(resolvePage(page, visible));
+  const filtered = $derived(
+    !!(view.chips.room || view.chips.function || view.chips.favorite),
+  );
+  const matchCount = $derived(groups.reduce((n, g) => n + g.devices.length, 0));
 
   const pageStyle = $derived(
     `--tile-min: ${tileMin}px; ${backgroundCss(page.background)}`,
@@ -54,12 +63,23 @@
 </script>
 
 <div class="page" style={pageStyle}>
+  {#if filtered}
+    <p class="count text-muted">
+      {matchCount}
+      {matchCount === 1 ? "device" : "devices"}
+    </p>
+  {/if}
+
   {#if groups.length === 0}
-    <p class="empty text-muted">This page has no devices yet.</p>
+    <p class="empty text-muted">
+      {filtered
+        ? "No devices match the filters."
+        : "This page has no devices yet."}
+    </p>
   {/if}
 
   {#each groups as g (g.group.id)}
-    <GroupSection group={g.group} devices={g.devices} {bp} />
+    <GroupSection group={g.group} devices={g.devices} {bp} pageId={page.id} />
   {/each}
 </div>
 
@@ -75,5 +95,11 @@
   .empty {
     padding: 2rem;
     text-align: center;
+  }
+
+  .count {
+    margin: 0;
+    font-size: var(--body-sm);
+    font-variant-numeric: tabular-nums;
   }
 </style>

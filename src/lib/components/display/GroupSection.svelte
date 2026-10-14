@@ -2,35 +2,54 @@
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import type { Group, Size } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
+  import { isCollapsed, toggleCollapsed } from "$lib/stores/pages.svelte.js";
   import Tile from "./Tile.svelte";
 
   let {
     group,
     devices,
     bp,
+    pageId,
   }: {
     group: Group;
     devices: (EnrichedDevice & { size?: Size })[];
     bp: Breakpoint;
+    pageId: string;
   } = $props();
+
+  // Collapsed state is view state, per page+group, remembered in localStorage.
+  const collapsed = $derived(isCollapsed(pageId, group.id));
 </script>
 
 <section class="group">
   {#if group.title}
     <h2 class="group-title">
-      {#if group.icon}<span class="material-symbols-outlined" aria-hidden="true"
-          >{group.icon}</span
-        >{/if}
-      <span>{group.title}</span>
-      <span class="count">{devices.length}</span>
+      <button
+        type="button"
+        class="title-toggle"
+        aria-expanded={!collapsed}
+        onclick={() => toggleCollapsed(pageId, group.id)}
+      >
+        <span class="material-symbols-outlined" aria-hidden="true"
+          >{collapsed ? "chevron_right" : "expand_more"}</span
+        >
+        {#if group.icon}<span
+            class="material-symbols-outlined"
+            aria-hidden="true">{group.icon}</span
+          >{/if}
+        <span>{group.title}</span>
+        <span class="count">{devices.length}</span>
+      </button>
     </h2>
   {/if}
 
-  <div class="grid">
-    {#each devices as d (d.id)}
-      <Tile device={d} {bp} />
-    {/each}
-  </div>
+  {#if !collapsed}
+    <div class="grid">
+      {#each devices as d (d.id)}
+        <Tile device={d} {bp} />
+      {/each}
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -50,7 +69,19 @@
     letter-spacing: 0.01em;
   }
 
-  .group-title .material-symbols-outlined {
+  .title-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 2px 6px 2px 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .title-toggle .material-symbols-outlined {
     font-size: 18px;
     color: var(--text-muted);
   }

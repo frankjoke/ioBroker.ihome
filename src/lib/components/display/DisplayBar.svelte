@@ -1,6 +1,12 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { getPageRegistry } from "$lib/stores/pages.svelte.js";
+  import {
+    getPageRegistry,
+    setChips,
+    setLastPage,
+    view,
+  } from "$lib/stores/pages.svelte.js";
+  import FilterChips from "./FilterChips.svelte";
 
   let { currentId }: { currentId?: string } = $props();
 
@@ -20,6 +26,7 @@
         class:active={p.id === currentId}
         href={`${base}/#/p/${p.id}`}
         aria-current={p.id === currentId ? "page" : undefined}
+        onclick={() => setLastPage(p.id)}
       >
         {#if p.icon}<span class="material-symbols-outlined" aria-hidden="true"
             >{p.icon}</span
@@ -28,6 +35,8 @@
       </a>
     {/each}
   </nav>
+
+  <FilterChips chips={view.chips} onChange={setChips} />
 
   <a
     class="icon-btn"
@@ -45,7 +54,7 @@
     top: 0;
     z-index: 50;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     align-items: center;
     gap: 0.75rem;
     min-height: 48px;

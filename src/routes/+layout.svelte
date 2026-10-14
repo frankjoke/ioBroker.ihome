@@ -12,7 +12,7 @@
   } from "$lib/stores/devices.svelte.js";
   import { initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
-  import { initPages } from "$lib/stores/pages.svelte.js";
+  import { initPages, loadViewState } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
@@ -69,6 +69,7 @@
     initRegistry();
     initFormulas();
     initTemplates();
+    loadViewState();
     // Seed the display pages from the broker's own enums, once (spec §9).
     initPages(() =>
       seedPages(
