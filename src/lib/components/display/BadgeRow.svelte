@@ -41,27 +41,29 @@
     gap: 3px;
     max-width: 92%;
     pointer-events: none;
+    /* A hair outside the tile so the corner reads as *the* corner. */
+    --corner: -3px;
   }
 
   .badges.top-left {
-    top: 3px;
-    left: 4px;
+    top: var(--corner);
+    left: var(--corner);
   }
 
   .badges.top-right {
-    top: 3px;
-    right: 4px;
+    top: var(--corner);
+    right: var(--corner);
     justify-content: flex-end;
   }
 
   .badges.bottom-left {
-    bottom: 3px;
-    left: 4px;
+    bottom: var(--corner);
+    left: var(--corner);
   }
 
   .badges.bottom-right {
-    bottom: 3px;
-    right: 4px;
+    bottom: var(--corner);
+    right: var(--corner);
     justify-content: flex-end;
   }
 

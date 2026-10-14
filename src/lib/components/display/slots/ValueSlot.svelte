@@ -40,10 +40,11 @@
     font-family: var(--font-mono);
     font-size: var(--body-md, 0.95rem);
     font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     max-width: 100%;
+    /* Wrap rather than truncate: on a narrow tile the unit drops to the next
+       line ("49.23" / "%"), and the row grows to fit. A clipped number is a
+       wrong number. */
+    overflow-wrap: break-word;
   }
 
   .value.action {

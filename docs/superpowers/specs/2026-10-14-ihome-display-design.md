@@ -243,9 +243,9 @@ One CSS grid per group: `grid-template-columns: repeat(auto-fill, minmax(var(--t
 
 | breakpoint | `--tile-w` | `--tile-h` | `--max-w` | `--max-h` |
 |---|---|---|---|---|
-| phone `<600px` | 75px | 150px | 2 | 2 |
-| tablet `600–1024px` | 85px | 170px | 4 | 3 |
-| desktop `>1024px` | 95px | 190px | 4 | 4 |
+| phone `<600px` | 45px | 90px | 2 | 2 |
+| tablet `600–1024px` | 51px | 102px | 4 | 3 |
+| desktop `>1024px` | 57px | 114px | 4 | 4 |
 
 The **column** module is half the **row** module, because a tile's `w` is counted in
 half-modules: `w: 1` is the half-width card a readout wants, `w: 2` the width a plain tile used
@@ -254,6 +254,12 @@ to have, `w: 4` a double-wide one. CSS `span` only takes integers, so a finer co
 
 So a `4x2` degrades to `2x2` on a phone and `4x3` on a tablet, and hints are honoured as written
 on desktop. No absolute placement exists anywhere, so a new device can only append.
+
+`--tile-h` is a **minimum**: the row track is `minmax(--tile-h, auto)`, so a tile whose content
+needs more (a two-value readout, a wrapped name, a corner badge) grows instead of clipping, and
+every tile in that row shares the height. Font and icon sizes are deliberately untouched —
+shrinking the module must never shrink what you read. Values wrap onto a second line rather than
+ellipsising: a clipped number is a wrong number.
 
 Groups render as sections: quiet header (`title`, count, collapse toggle) when `title` is
 set, header-less (continuous rows) when it is not. Page-level background only — no per-group
@@ -295,7 +301,9 @@ backgrounds.
   feature match always wins, so renaming a label can only add a match, never steal one.
 - `disabled` from a rule dims what it matches — the whole tile, or just the glyph — without
   disabling it: an "off" light is still the thing you tap to switch on.
-- **Badges live in corners, and the corner means something**: an `ago` badge is bottom-left
+- **Badges live in corners, a couple of pixels outside the tile edge** (they may sit on the
+  border/glow), and a tile that has one reserves the band it lives in, so a badge never covers a
+  value. The corner carries meaning: : an `ago` badge is bottom-left
   ("how long ago"), `battery` / `offline` / `alarm` / `error` are top-right ("something is
   wrong"), anything else — a reading, power consumption — is top-left; bottom-right is free for
   later. A slot may override with `options.position`. More than three in one corner collapse to

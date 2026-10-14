@@ -245,3 +245,21 @@ there — but that is the accident you asked me to remove, so I left it inert.
 `Garten-Pool.Light` and `Garten-Pool.Thermometer` both read **"Garten-Pool"**, and you have two
 tiles titled **"Keller"** (a Light and a Motion). The icon and values distinguish them, but if
 that bothers you, the "Tile title" field is the lever (e.g. "Poollicht", "Keller Bewegung").
+
+## Follow-up 5 — smaller modules, badges in the corner
+
+- **Modules down to 60%**: `--tile-w` 45/51/57px (phone/tablet/desktop), `--tile-h` 90/102/114px.
+  Font and icon sizes are untouched, as asked.
+- **`--tile-h` is now a *minimum*** (`grid-auto-rows: minmax(var(--tile-h), auto)`), so a tile
+  whose content needs more grows instead of clipping — measured live: tiles with a badge and
+  wrapped values come out 59x142/163, plain ones 59x114. Effective area is ~45% of the previous
+  `97x190`, with the width exactly 60%.
+- **Values wrap instead of ellipsising** ("49.23" / "%"). The previous `nowrap + ellipsis` clipped
+  three readings at the new width — a clipped number is a wrong number.
+- **Badges sit 2px outside the tile** (`--corner: -3px`, verified `dx = -2`, `dy = -2` from the
+  edge), so the corner reads as the corner. A tile with a badge **reserves its band**
+  (`class:has-top-badge` / `has-bottom-badge` + 15px padding) — a scoped style cannot reach into
+  the `BadgeRow` child, so `:has()` was not an option; the tile knows its corners and says so.
+  Verified: 0 badge/content overlaps, 0 truncated values.
+- Same session, seen live: `Brunnen` switched **on** by you shows the on-state colour
+  (`var(--primary-color)`) and no dimming — the Switch rules working both ways.

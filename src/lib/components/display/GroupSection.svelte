@@ -97,9 +97,11 @@
 
   .grid {
     display: grid;
-    gap: 8px;
+    gap: 6px;
     /* Half-width columns + full-height rows: `w: 1` is a half-width card. */
-    grid-template-columns: repeat(auto-fill, minmax(var(--tile-w, 95px), 1fr));
-    grid-auto-rows: var(--tile-h, 190px);
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-w, 57px), 1fr));
+    /* The row height is a *minimum*: a tile with more content grows rather than
+       clipping its values (font and icon sizes never shrink). */
+    grid-auto-rows: minmax(var(--tile-h, 114px), auto);
   }
 </style>

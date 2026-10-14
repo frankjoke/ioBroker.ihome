@@ -257,6 +257,10 @@
   class="tile"
   class:glow={tileStyle.glow === true}
   class:disabled={tileStyle.disabled === true}
+  class:has-top-badge={corners["top-left"].length > 0 ||
+    corners["top-right"].length > 0}
+  class:has-bottom-badge={corners["bottom-left"].length > 0 ||
+    corners["bottom-right"].length > 0}
   style="grid-column: span {span.w}; grid-row: span {span.h}; {tileVars}"
   class:interactive={extraControls.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
@@ -300,10 +304,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.3rem;
-    padding: 0.5rem;
+    gap: 0.2rem;
+    padding: 3px;
     min-width: 0;
-    overflow: hidden;
+    /* No overflow clipping: a badge is allowed to sit on the tile's own edge. */
     text-align: center;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md, 12px);
@@ -332,6 +336,17 @@
     max-width: 100%;
   }
 
+  /* A badge that pokes into the corner must not sit on a value: reserve the band
+     it occupies, only on tiles that actually have one (a scoped style cannot
+     reach into the BadgeRow child, so the tile tells us itself). */
+  .tile.has-top-badge {
+    padding-top: 15px;
+  }
+
+  .tile.has-bottom-badge {
+    padding-bottom: 15px;
+  }
+
   /* A rule can ask for the switched-off look. */
   .tile.disabled {
     opacity: 0.6;
@@ -341,7 +356,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.15rem;
     min-width: 0;
     max-width: 100%;
   }

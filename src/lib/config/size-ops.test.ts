@@ -33,9 +33,9 @@ it("keeps the values the stylesheet needs", () => {
   expect(
     BREAKPOINTS.map((b) => [b.name, b.tileW, b.tileH, b.maxW, b.maxH]),
   ).toEqual([
-    ["phone", 75, 150, 2, 2],
-    ["tablet", 85, 170, 4, 3],
-    ["desktop", 95, 190, 4, 4],
+    ["phone", 45, 90, 2, 2],
+    ["tablet", 51, 102, 4, 3],
+    ["desktop", 57, 114, 4, 4],
   ]);
   // the column module is half the row module, which is what makes `w: 1` a
   // half-width card
