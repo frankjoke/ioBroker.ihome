@@ -263,8 +263,8 @@ backgrounds.
 
 | kind | renders | reuses |
 |---|---|---|
-| `icon` | material symbol, colour/glow by rules | — |
-| `value` | formatted number/text + unit | `formatValue` |
+| `icon` | material symbol, colour/glow/dim by rules | — |
+| `value` | formatted number/text + unit; a bare boolean reads On/Off | `formatSlotText` |
 | `level` | range slider (writable) | existing level widget |
 | `color` | colour picker (writable) | existing colour widget |
 | `enum` | select from `common.states` | existing enum widget |
@@ -280,13 +280,29 @@ backgrounds.
   (`battery`, `error`) plus two the renderer derives without any control: `ago` (newest
   `ts` across state-backed controls) and `offline` (`available`/`exists` false). Unavailable
   devices still render, carrying the `offline` badge, so a dead sensor stays visible.
+- An `ago` badge **names the control it watches** — `{ source: "ago", options: { of: "motion",
+  from: "lc" } }` — because "newest timestamp on the device" is the wrong question for a motion
+  detector (a battery report would keep a dead sensor looking fresh). `of` is a feature, control
+  id, state id or label; `from` is `ts` (still reporting) or `lc` (last value change, falling back
+  to `ts` when the broker has no `lc`). With no `of` the device-wide newest `ts` stands, which is
+  right for a sensor that only reports readings.
+- **Source resolution** for a slot or a badge is feature → control id → state id → **label** (last
+  resort, because a real config can name a state "Motion" while its feature says `power`). A
+  feature match always wins, so renaming a label can only add a match, never steal one.
+- `disabled` from a rule dims what it matches — the whole tile, or just the glyph — without
+  disabling it: an "off" light is still the thing you tap to switch on.
 - The modal reuses the existing control widgets (`ControlRow`).
 
 ## 7. Interaction
 
-- Tile body tap: toggle for `switch` sources, otherwise open the modal.
-- Corner affordance (⤢) and long-press open the **modal** with the full control set —
-  focus-trapped, Esc closes, sliders `stopPropagation` so dragging never opens it.
+- The **action lives on the control**, not on the tile: the icon and the value text of the
+  primary control are the buttons that operate it (pointer and keyboard), so a stray tap can
+  never switch a lamp.
+- The **tile body tap enlarges**: it opens the modal with the full control set when the tile
+  does not already show every control, and does nothing when it does — there is nothing more to
+  show, and acting on the primary control there is exactly the accident this rule prevents.
+- No corner affordance (the body is the affordance); a touch long-press (500 ms) opens the same
+  modal. Focus-trapped, Esc/backdrop closes, sliders `stopPropagation` so dragging never opens it.
 - Filter chips are ephemeral view state, persisted to `localStorage` (like the last opened
   page and each group's collapsed flag) — never to config. They filter within the current
   page and show a match count. A group that filters down to nothing is hidden unless it
