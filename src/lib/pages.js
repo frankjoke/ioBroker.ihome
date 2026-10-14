@@ -13,7 +13,6 @@
 
 /** @type {Page[]} */
 export const pages = [
-  { id: "/", label: "Home", icon: "home", title: "Home" },
   { id: "/devices", label: "Devices", icon: "devices", title: "Devices" },
 ];
 

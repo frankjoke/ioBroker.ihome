@@ -1,5 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { Group, Member, Page, PageRegistry } from "$lib/types/display";
+import { num, parseDoc } from "$lib/config/doc-parse";
 
 /** A device reduced to what filtering needs. */
 export interface FilterableDevice {
@@ -161,4 +162,21 @@ export function seedPages(
       },
     ],
   };
+}
+
+/**
+ * Read a persisted page registry. Anything unusable returns null so the caller
+ * can seed instead of losing the pages that are already loaded.
+ */
+export function parsePageRegistry(raw: unknown): PageRegistry | null {
+  return parseDoc(raw, (value) => {
+    const pages = value.pages;
+    if (!Array.isArray(pages)) return null;
+    return {
+      version: num(value.version, 0),
+      updatedAt: num(value.updatedAt, Date.now()),
+      ...(value.seeded ? { seeded: true } : {}),
+      pages: pages as Page[],
+    };
+  });
 }

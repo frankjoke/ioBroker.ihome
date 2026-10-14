@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   PRESETS,
   mergeSlots,
+  parseTemplateRegistry,
   presetForType,
   primaryControl,
   resolveTemplate,
@@ -143,4 +144,17 @@ it("gives the light its on/off icon rules and the thermometer its battery badge"
       .filter((s) => s.kind === "badge")
       .map((s) => s.source),
   ).toEqual(["ago", "offline", "battery"]);
+});
+
+it("parses a template registry and rejects junk", () => {
+  expect(parseTemplateRegistry(null)).toBeNull();
+  expect(parseTemplateRegistry({ templates: "x" })).toBeNull();
+  expect(parseTemplateRegistry('{"templates":[]}')?.templates).toEqual([]);
+  expect(
+    parseTemplateRegistry({ templates: [{ id: "t" }] })?.templates.length,
+  ).toBe(1);
+  expect(
+    parseTemplateRegistry({ val: { templates: [{ id: "t" }] } })?.templates
+      .length,
+  ).toBe(1);
 });

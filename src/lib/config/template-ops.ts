@@ -1,8 +1,10 @@
 import type { Device, DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
 import type { Size, Slot, Template } from "$lib/types/display";
+import type { TemplateRegistry } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import { DEFAULT_SPAN } from "$lib/config/size-ops";
+import { num, parseDoc } from "$lib/config/doc-parse";
 
 export { PRESETS };
 
@@ -93,4 +95,17 @@ export function primaryControl<
     controls.find((c) => c.writable === true && c.widget === "switch") ??
     controls.find((c) => c.widget === "level")
   );
+}
+
+/** Read a persisted user-template registry; null when there is nothing usable. */
+export function parseTemplateRegistry(raw: unknown): TemplateRegistry | null {
+  return parseDoc(raw, (value) => {
+    const templates = value.templates;
+    if (!Array.isArray(templates)) return null;
+    return {
+      version: num(value.version, 0),
+      updatedAt: num(value.updatedAt, Date.now()),
+      templates: templates as Template[],
+    };
+  });
 }

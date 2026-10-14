@@ -12,6 +12,10 @@
   } from "$lib/stores/devices.svelte.js";
   import { initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
+  import { initPages } from "$lib/stores/pages.svelte.js";
+  import { initTemplates } from "$lib/stores/templates.svelte.js";
+  import { seedPages } from "$lib/config/pages-ops";
+  import { enumLabelFromObject } from "$lib/config/rooms";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import { pages, pageHref } from "$lib/pages.js";
@@ -61,6 +65,20 @@
   onMount(() => {
     initRegistry();
     initFormulas();
+    initTemplates();
+    // Seed the display pages from the broker's own enums, once (spec §9).
+    initPages(() =>
+      seedPages(
+        (ioBroker.enums.getList("functions") ?? []).map((e) => ({
+          id: e._id,
+          label: enumLabelFromObject(e),
+        })),
+        (ioBroker.enums.getList("rooms") ?? []).map((e) => ({
+          id: e._id,
+          label: enumLabelFromObject(e),
+        })),
+      ),
+    );
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if (getTheme() === "auto") applyTheme();
@@ -76,14 +94,14 @@
 </script>
 
 <svelte:head>
-  <title>ioBroker Visual Interface</title>
+  <title>iHome</title>
 </svelte:head>
 
 <div class="app-shell">
   <header class="app-header">
     <a class="brand" href={`${base}/#/`}>
       <img src={`${base}/house-controller.svg`} alt="" width="30" height="30" />
-      <span class="brand-name">ioBroker Visual</span>
+      <span class="brand-name">iHome</span>
     </a>
 
     <nav class="tab-bar" aria-label="Pages">

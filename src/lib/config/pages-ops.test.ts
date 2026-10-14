@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   filterDevices,
   matchesMember,
+  parsePageRegistry,
   resolvePage,
   seedPages,
   toFilterable,
@@ -146,4 +147,17 @@ it("seeds one page of function groups and one page of room groups", () => {
   expect(reg.pages[1].groups[0].member).toEqual({ room: "enum.rooms.WZ" });
   expect(reg.pages[1].groups[0].title).toBe("Wohn-Ess-Z");
   expect(reg.pages[0].groups[0].id).toBe("fn:enum.functions.Licht");
+});
+
+it("parses a page registry and rejects junk", () => {
+  expect(parsePageRegistry("nope")).toBeNull();
+  expect(parsePageRegistry({ pages: "x" })).toBeNull();
+  expect(parsePageRegistry('{"version":2,"pages":[]}')?.pages).toEqual([]);
+  expect(
+    parsePageRegistry({
+      val: { pages: [{ id: "p", title: "P", groups: [] }] },
+    })?.pages.length,
+  ).toBe(1);
+  expect(parsePageRegistry({ val: "{bad json" })).toBeNull();
+  expect(parsePageRegistry({ seeded: true, pages: [] })?.seeded).toBe(true);
 });
