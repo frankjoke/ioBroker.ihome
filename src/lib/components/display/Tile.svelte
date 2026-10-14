@@ -4,9 +4,10 @@
   import { resolveTemplate, primaryControl } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
-  import { resolveStyle, ruleScope } from "$lib/config/rule-ops";
+  import { resolveStyle, ruleScope, resolveBadges } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import SlotRenderer from "./SlotRenderer.svelte";
+  import BadgeRow from "./BadgeRow.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
   import type { Slot } from "$lib/types/display";
 
@@ -66,6 +67,32 @@
     };`,
   );
 
+  /** Newest `ts` across the device's state-backed controls (same rule as the
+   *  device list's "last update"). */
+  function lastTs(): number | undefined {
+    let latest: number | undefined;
+    for (const c of device.controls ?? []) {
+      if (!c.stateId) continue;
+      const ts = (ioBroker.states as Map<string, any>).get(c.stateId)?.ts;
+      if (typeof ts === "number" && (latest === undefined || ts > latest)) {
+        latest = ts;
+      }
+    }
+    return latest;
+  }
+
+  // Badges render once, at the end of the tile, wherever the badge slots sit in
+  // the template. `ago` and `offline` need no control: they read the device.
+  const badges = $derived(
+    resolveBadges(
+      template.slots.filter((s) => s.kind === "badge"),
+      device,
+      lastTs(),
+      Date.now(),
+      getVirtualPool(),
+    ),
+  );
+
   function truthy(v: unknown): boolean {
     return v === true || v === "true" || v === 1 || v === "1";
   }
@@ -112,6 +139,7 @@
       />
     {/each}
   </div>
+  <BadgeRow {badges} />
 </div>
 
 <style>
