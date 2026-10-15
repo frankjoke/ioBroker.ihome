@@ -44,6 +44,8 @@ export interface Placement {
   id: string;
   device: string;
   title?: string;
+  /** Start a new line before this tile even if it would still fit. */
+  newLine?: boolean;
   tile?: TileConfig;
 }
 
@@ -54,6 +56,8 @@ export interface Group {
   /** Filter hint only (A8): a section's members are its `tiles`, not this. */
   member?: Member;
   appearance?: SectionAppearance;
+  /** Start a new line before this section even if it would still fit. */
+  newLine?: boolean;
   showEmpty?: boolean;
   /** The section's contents, in display order — the truth (A8/A9). */
   tiles?: Placement[];
