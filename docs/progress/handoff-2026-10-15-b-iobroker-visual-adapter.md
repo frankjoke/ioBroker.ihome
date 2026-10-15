@@ -179,10 +179,13 @@ Presets still render, so it is benign today.
   movement in the tree (I9), the picker's focus trap + the tree's keyboard contract (I11), the pass's
   tall-tile occupancy (M1), deep-copy on duplicate (M2), the AppBar's stale active tab (M3). All are P2
   or its own slice — none is a data-loss path.
-- Named leftover (one command, not yet done): the five remaining `crypto.randomUUID()` call sites
-  (`DeviceForm`, `VirtualEditor`, `StatePicker`, `devices/+page`, `settings/+page`) still throw on plain
-  HTTP when creating a device. Replace with `newId()` from `$lib/utils/ids`.
-- Next, in order: the `newId` sweep above → commit the review's leftovers → then P2 (the tile editor:
-  slots, glow/rules, live tile preview, seed `templateList`).
-- Still parked and unanswered from the earlier session: the Brunnen double-toggle (device-side), the dead
-  `layoutEdit` + Tile edit-mode guards, and the unused `house-controller.svg`.
+- Cleanup pass (commit `b0a5459`, the user's pick): every `crypto.randomUUID()` site now uses `newId()`
+  (`DeviceForm`, `VirtualEditor`, `StatePicker`, `devices/+page`, `settings/+page` — and `pages-ops.ts`,
+  which the review fix pass had in fact missed), the dead `layoutEdit` + Tile edit-mode guards are gone
+  (Ctrl/Cmd+click is the one route to a tile's placement), and the 2 pre-existing lint errors are fixed.
+  Gates: `check` 0/0, 285 tests, build ok, **eslint 0 problems** (was 2 errors).
+- Next, in order: P2 — the tile editor (slots, glow/rules, live tile preview, seed `templateList`).
+  Everything else — the deferred rulings in the ledger, packaging, the repo push — waits until there is
+  a working V1.
+- Still parked and unanswered from the earlier session: the Brunnen double-toggle (device-side) and the
+  unused `house-controller.svg`.
