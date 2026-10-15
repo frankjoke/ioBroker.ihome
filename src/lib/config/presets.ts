@@ -44,8 +44,10 @@ export const PRESETS: Record<DeviceType, Template> = {
     size: { w: 1, h: 1 },
     features: DEVICE_FEATURES.Switch,
     slots: [
+      // A switch glows green when it is on (a light glows amber): the accent is
+      // the icon slot's resolved colour, so this rule colours both.
       icon("power", "power_settings_new", [
-        { when: "truthy(power)", color: "var(--primary-color)" },
+        { when: "truthy(power)", color: "var(--success-color)", glow: true },
         {
           when: "!truthy(power)",
           color: "var(--text-muted)",
