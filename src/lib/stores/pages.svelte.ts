@@ -170,17 +170,13 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
 }
 
 // ---------------------------------------------------------------- view state
-// Chips and the last opened page are *view* state: they belong to this browser,
-// never to the config document, so they live in localStorage (one key) and are
-// read once, at startup.
-import type { FilterChips } from "$lib/config/pages-ops";
+// The last opened page is *view* state: it belongs to this browser, never to the
+// config document, so it lives in localStorage (one key) and is read once, at
+// startup.
 
 const VIEW_KEY = "iHome.view";
 
-export const view = $state<{
-  chips: FilterChips;
-  lastPage: string;
-}>({ chips: {}, lastPage: "" });
+export const view = $state<{ lastPage: string }>({ lastPage: "" });
 
 /** Read the persisted view state once, from the layout's onMount. */
 export function loadViewState(): void {
@@ -188,7 +184,6 @@ export function loadViewState(): void {
     const raw = localStorage.getItem(VIEW_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<typeof view>;
-    view.chips = parsed?.chips ?? {};
     view.lastPage = parsed?.lastPage ?? "";
   } catch {
     // A corrupt blob must not break the display; defaults stay.
@@ -200,18 +195,12 @@ function persistViewState(): void {
     localStorage.setItem(
       VIEW_KEY,
       JSON.stringify({
-        chips: view.chips,
         lastPage: view.lastPage,
       }),
     );
   } catch {
     // Storage full/blocked: view state is a nicety, not a requirement.
   }
-}
-
-export function setChips(next: FilterChips): void {
-  view.chips = next;
-  persistViewState();
 }
 
 export function setLastPage(id: string): void {

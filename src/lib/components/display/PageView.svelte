@@ -3,7 +3,6 @@
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { backgroundCss } from "$lib/config/appearance";
   import {
-    filterDevices,
     resolvePage,
     toFilterable,
     type FilterableDevice,
@@ -12,7 +11,6 @@
   import { layoutSection, modulesFor } from "$lib/config/section-layout";
   import { resolveTemplate } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
-  import { view } from "$lib/stores/pages.svelte.js";
   import {
     BREAKPOINTS,
     breakpointFor,
@@ -43,15 +41,8 @@
   const devices = $derived<DisplayDevice[]>(
     $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
   );
-  // Chips narrow what the groups see; a group that empties out disappears
-  // unless it asks for empties (resolvePage handles that).
-  const visible = $derived(filterDevices(devices, view.chips));
   // A section renders its placements, in order — not the filter it came from (A8).
-  const groups = $derived(resolvePage(page, visible));
-  const filtered = $derived(
-    !!(view.chips.room || view.chips.function || view.chips.favorite),
-  );
-  const matchCount = $derived(groups.reduce((n, g) => n + g.tiles.length, 0));
+  const groups = $derived(resolvePage(page, devices));
 
   const templates = $derived(getTemplateRegistry().templates);
   // How many tile modules fit on one line at this width — the page's own padding
@@ -72,19 +63,8 @@
 </script>
 
 <div class="page" style={pageStyle}>
-  {#if filtered}
-    <p class="count text-muted">
-      {matchCount}
-      {matchCount === 1 ? "device" : "devices"}
-    </p>
-  {/if}
-
   {#if groups.length === 0}
-    <p class="empty text-muted">
-      {filtered
-        ? "No devices match the filters."
-        : "This page has no devices yet."}
-    </p>
+    <p class="empty text-muted">This page has no devices yet.</p>
   {/if}
 
   {#each sections as s (s.group.id)}
@@ -120,11 +100,5 @@
   .empty {
     padding: 2rem;
     text-align: center;
-  }
-
-  .count {
-    margin: 0;
-    font-size: var(--body-sm);
-    font-variant-numeric: tabular-nums;
   }
 </style>

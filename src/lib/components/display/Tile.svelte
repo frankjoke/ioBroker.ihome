@@ -361,11 +361,6 @@
   onpointerleave={cancelPress}
 >
   <span class="tile-name">{title ?? tileTitle(device)}</span>
-  {#if layoutEdit.on}
-    <span class="material-symbols-outlined edit-cue" aria-hidden="true"
-      >edit</span
-    >
-  {/if}
   <div class="tile-body">
     {#each resolved as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
       <SlotRenderer
