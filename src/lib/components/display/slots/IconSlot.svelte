@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Slot } from "$lib/types/display";
+  import { logPointer } from "$lib/utils/dbg";
 
   let {
     slot,
@@ -34,6 +35,7 @@
     aria-label="Toggle"
     onclick={(e) => {
       e.stopPropagation();
+      logPointer("click icon", e);
       onPrimary();
     }}>{glyph}</button
   >

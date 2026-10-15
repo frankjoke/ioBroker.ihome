@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
+  import { logPointer } from "$lib/utils/dbg";
   import {
     pickControl,
     primaryControl,
@@ -200,11 +201,16 @@
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
     if (!primary || primary.widget !== "switch") return;
+    const from = truthy(primary.liveValue);
     // Guarded and locked: two arrivals of the same press (a double click, a
     // duplicated handler) must not become two toggles.
-    writeControl(ioBroker, primary, !truthy(primary.liveValue), Date.now(), {
+    const sent = writeControl(ioBroker, primary, !from, Date.now(), {
       lockMs: 3000,
     });
+    // Debug tracing for the intermittent double-toggle (grep "ihome-dbg").
+    console.log(
+      `[ihome-dbg] tile toggle ${primary.stateId} from=${from} to=${!from} ${sent ? "sent" : "REFUSED"} @${Date.now()}`,
+    );
   }
 
   /**
@@ -223,6 +229,9 @@
   }
 
   function onCapture(event: MouseEvent) {
+    // Capture phase: this sees *every* click inside the tile, including one that
+    // landed on no button at all — the case a held press can produce.
+    logPointer("click tile-capture", event);
     if (!wantsDeviceConfig(event)) return;
     // Capture phase: the action buttons stopPropagation, so without this a
     // Ctrl+click on a light's icon would just switch the light.
@@ -300,6 +309,8 @@
   onclickcapture={onCapture}
   onclick={onActivate}
   onkeydown={onKey}
+  onpointerdowncapture={(e) => logPointer("down", e)}
+  onpointerupcapture={(e) => logPointer("up", e)}
   onpointerdown={onPointerDown}
   onpointerup={cancelPress}
   onpointercancel={cancelPress}
