@@ -208,7 +208,8 @@ it("patches one placement and leaves its siblings alone", () => {
   expect(reg0.pages[0].groups[0].tiles?.[1].title).toBeUndefined();
 });
 
-it("patches a page (its title) without touching its sections", () => {  const next = patchPage(regWithTiles(), "p", { title: "Wohnen" });
+it("patches a page (its title) without touching its sections", () => {
+  const next = patchPage(regWithTiles(), "p", { title: "Wohnen" });
   expect(next.pages[0].title).toBe("Wohnen");
   expect(next.pages[0].groups).toHaveLength(2);
   expect(next.pages[0].groups[0].tiles).toHaveLength(1);
