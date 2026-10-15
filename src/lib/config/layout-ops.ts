@@ -1,3 +1,4 @@
+import { newId } from "$lib/utils/ids";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 /**
@@ -8,8 +9,6 @@ import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
  * that names a page/section/placement which does not exist returns the registry
  * with its pages untouched — a stale editor action must never destroy config.
  */
-
-const newId = (): string => crypto.randomUUID();
 
 /** Where to drop a placement: by index (a move), not by id (an address). */
 export interface PlacementMove {
@@ -356,10 +355,17 @@ export function movePlacement(
     }));
   }
 
-  const moving = (reg.pages ?? [])
+  const source = (reg.pages ?? [])
     .find((page) => page.id === from.pageId)
-    ?.groups.find((group) => group.id === from.sectionId)?.tiles?.[from.index];
-  if (!moving) return reg;
+    ?.groups.find((group) => group.id === from.sectionId);
+  const target = (reg.pages ?? [])
+    .find((page) => page.id === to.pageId)
+    ?.groups.find((group) => group.id === to.sectionId);
+  const moving = source?.tiles?.[from.index];
+  // Nothing is removed until a real destination exists: a stale editor action
+  // (a section deleted in another tab) must never lose the placement.
+  if (!moving || !target) return reg;
+  if (to.index < 0 || to.index > (target.tiles ?? []).length) return reg;
 
   const removed = mapSection(reg, from.pageId, from.sectionId, (section) => ({
     ...section,

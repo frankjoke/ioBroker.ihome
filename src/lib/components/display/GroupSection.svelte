@@ -21,10 +21,16 @@
     pageId: string;
   } = $props();
 
-  /** The section is exactly as wide as its tiles need (the pass decided). */
+  /**
+   * The section is exactly as wide as its tiles need (the pass decided), plus
+   * its own decoration: a bordered section subtracts border and padding from that
+   * width (`box-sizing: border-box`), so they have to be added back or the grid
+   * spills out of the border (review I5).
+   */
+  const decoration = $derived(group.appearance?.border === true ? 14 : 0);
   const width = $derived(
     modules > 0
-      ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px);`
+      ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px + ${decoration}px);`
       : "",
   );
   const background = $derived(
@@ -79,11 +85,6 @@
     flex: 0 1 auto;
     min-width: min(100%, var(--tile-w, 57px));
     max-width: 100%;
-  }
-
-  /* A section that asks for a new line takes the whole line, whatever fits. */
-  .group.new-line {
-    flex-basis: 100%;
   }
 
   /* `appearance.border: true` draws the section's box; absent is today's look. */

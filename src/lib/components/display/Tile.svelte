@@ -345,8 +345,9 @@
     corners["top-right"].length > 0}
   class:has-bottom-badge={corners["bottom-left"].length > 0 ||
     corners["bottom-right"].length > 0}
-  style="grid-column: span {span.w}; grid-row: span {span.h}; {tileVars}"
-  style:grid-column-start={newLine ? 1 : undefined}
+  style="grid-column: {newLine
+    ? '1'
+    : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
   class:interactive={extraControls.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}

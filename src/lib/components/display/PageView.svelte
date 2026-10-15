@@ -9,12 +9,11 @@
     type ResolvedTile,
   } from "$lib/config/pages-ops";
   import { layoutSection, modulesFor } from "$lib/config/section-layout";
-  import { resolveTemplate } from "$lib/config/template-ops";
+  import { effectiveSpan } from "$lib/config/template-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import {
     BREAKPOINTS,
     breakpointFor,
-    clampSpan,
     type Breakpoint,
   } from "$lib/config/size-ops";
   import GroupSection from "./GroupSection.svelte";
@@ -48,9 +47,9 @@
   // How many tile modules fit on one line at this width — the page's own padding
   // (12px each side) and the grid gap (6px), matching the CSS below.
   const maxModules = $derived(modulesFor(width, def.tileW, 6, 24));
-  /** A tile's width in modules: its placement's size, else its template's. */
+  /** A tile's width in modules — the *same* calculation the tile renders with. */
   const spanOf = (t: ResolvedTile<DisplayDevice>): number =>
-    clampSpan(resolveTemplate(t.device, templates).size, bp).w;
+    effectiveSpan(t.placement.tile, t.device, templates, bp).w;
   // The pass interprets the tree: which row/column each tile gets, and how wide
   // each section is (as wide as its tiles need).
   const sections = $derived(
@@ -68,6 +67,11 @@
   {/if}
 
   {#each sections as s (s.group.id)}
+    {#if s.group.newLine}
+      <!-- A full-width, zero-height item: it pushes everything after it onto a
+           new line, and the section keeps its own width (review I6). -->
+      <div class="break" aria-hidden="true"></div>
+    {/if}
     <GroupSection
       group={s.group}
       tiles={s.tiles}
@@ -89,6 +93,14 @@
     gap: 1.25rem;
     min-height: 100vh;
     padding: 12px;
+  }
+
+  /* A `newLine` section is preceded by this: full width, no height, so the
+     section itself starts on a fresh line at its own width. */
+  .break {
+    flex-basis: 100%;
+    height: 0;
+    margin: 0;
   }
 
   @media (max-width: 599px) {

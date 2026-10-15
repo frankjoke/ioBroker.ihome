@@ -173,6 +173,15 @@ export function migratePageRegistry(
   if (pages.length === 0 && !reg.updatedAt) {
     return { registry: reg, changed: false };
   }
+  // An empty device list means "nothing loaded yet", not "there are no devices".
+  // Migrating a legacy section now would freeze `tiles: []` into the user's
+  // document, and the next migration would see that section as complete.
+  const legacy = pages.some((page) =>
+    (page.groups ?? []).some((group) => !Array.isArray(group.tiles)),
+  );
+  if (legacy && devices.length === 0) {
+    return { registry: reg, changed: false };
+  }
   const needsTiles = pages.some((page) =>
     (page.groups ?? []).some((group) => !Array.isArray(group.tiles)),
   );
@@ -303,13 +312,34 @@ export function seedPages(
  * Read a persisted page registry. Anything unusable returns null so the caller
  * can seed instead of losing the pages that are already loaded.
  */
+function isPlacement(v: unknown): boolean {
+  if (!v || typeof v !== "object") return false;
+  const t = v as Record<string, unknown>;
+  if (typeof t.id !== "string" || !t.id) return false;
+  if (typeof t.device !== "string" || !t.device) return false;
+  if (t.title !== undefined && typeof t.title !== "string") return false;
+  if (t.newLine !== undefined && typeof t.newLine !== "boolean") return false;
+  if (t.tile !== undefined && (!t.tile || typeof t.tile !== "object")) {
+    return false;
+  }
+  return true;
+}
+
 function isGroup(v: unknown): v is Group {
   if (!v || typeof v !== "object") return false;
   const g = v as Record<string, unknown>;
   if (typeof g.id !== "string" || !g.id) return false;
   // `member` is a filter hint now (A8) — a section may carry no member at all —
   // but when it is there it must still be an object.
-  return g.member === undefined || (!!g.member && typeof g.member === "object");
+  if (!(g.member === undefined || (!!g.member && typeof g.member === "object")))
+    return false;
+  // A missing list is a legacy section the migration completes; a list that is
+  // there must actually be placements. Accepting junk here would let the
+  // migration overwrite it with `[]` and let the renderer throw on `null`.
+  if (g.tiles === undefined) return true;
+  if (!Array.isArray(g.tiles) || !g.tiles.every(isPlacement)) return false;
+  const ids = (g.tiles as { id: string }[]).map((t) => t.id);
+  return new Set(ids).size === ids.length;
 }
 
 function isPage(v: unknown): v is Page {
@@ -352,6 +382,16 @@ export type LoadedPages =
   | { kind: "seeded"; registry: PageRegistry }
   | { kind: "absent"; registry: null }
   | { kind: "invalid"; registry: null };
+
+/**
+ * May the stored document be written back after this load? Only a document we
+ * actually read (`loaded`) or one we just seeded may be replaced — an `absent`
+ * (nothing loaded, e.g. a dropped socket) or `invalid` (unreadable) read must
+ * never be overwritten with whatever is in memory.
+ */
+export function mayWritePages(kind: LoadedPages["kind"] | null): boolean {
+  return kind === "loaded" || kind === "seeded";
+}
 
 export function loadPages(
   raw: unknown,

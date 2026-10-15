@@ -3,7 +3,12 @@ import type { FeatureDef } from "$lib/config/features";
 import type { Size, Slot, Template } from "$lib/types/display";
 import type { TemplateRegistry } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
-import { DEFAULT_SPAN } from "$lib/config/size-ops";
+import {
+  DEFAULT_SPAN,
+  clampSpan,
+  type Breakpoint,
+  type TileSpan,
+} from "$lib/config/size-ops";
 import { num, parseDoc } from "$lib/config/doc-parse";
 
 export { PRESETS };
@@ -242,4 +247,24 @@ export function parseTemplateRegistry(raw: unknown): TemplateRegistry | null {
       templates: templates as Template[],
     };
   });
+}
+
+/**
+ * The size a tile actually renders at: its placement's own size when it has one,
+ * else its template's, clamped per breakpoint.
+ *
+ * The renderer, the section layout pass and the editor's size selectors must all
+ * use this one calculation — they drifted apart once, and a section was sized for
+ * a width its tiles no longer had.
+ */
+export function effectiveSpan(
+  tile: { size?: Size } | undefined,
+  device: unknown,
+  templates: Template[],
+  bp: Breakpoint,
+): TileSpan {
+  return clampSpan(
+    tile?.size ?? resolveTemplate(device as Device, templates).size,
+    bp,
+  );
 }

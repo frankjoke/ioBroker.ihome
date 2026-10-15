@@ -8,9 +8,11 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   loadPages,
+  mayWritePages,
   migratePageRegistry,
   parsePageRegistry,
   type FilterableDevice,
+  type LoadedPages,
 } from "$lib/config/pages-ops";
 
 /**
@@ -46,6 +48,9 @@ let initPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSent: string | null = null;
 let saveFailed = $state(false);
+/** How the stored document last loaded — nothing may be written unless a read
+ *  actually succeeded (`loaded`) or this run seeded it (`seeded`). */
+let pagesLoadKind = $state<LoadedPages["kind"] | null>(null);
 
 /**
  * True while the last document write failed, so the editor can say "not saved"
@@ -53,6 +58,15 @@ let saveFailed = $state(false);
  */
 export function getLayoutSaveFailed(): boolean {
   return saveFailed;
+}
+
+/**
+ * May the editor write? False until a document has been read or seeded, and
+ * false for an unreadable one — see `mayWritePages`. The editor disables its
+ * actions on this, so a failed read cannot be replaced by an empty document.
+ */
+export function isLayoutWritable(): boolean {
+  return mayWritePages(pagesLoadKind);
 }
 
 /**
@@ -82,6 +96,12 @@ export function savePages(): void {
   if (saveTimer) clearTimeout(saveTimer);
   const snapshot = JSON.stringify(getPageRegistry());
   saveTimer = setTimeout(() => {
+    // A disconnected socket resolves `emitAsync` without sending anything, so a
+    // write would look successful while the broker never saw it (review I1).
+    if (!ioBroker.connected) {
+      saveFailed = true;
+      return;
+    }
     lastSent = snapshot;
     ioBroker
       .setState(PAGE_LIST_ID, snapshot)
@@ -95,10 +115,21 @@ export function savePages(): void {
   }, 250);
 }
 
-/** The editor's only write path: replace the registry and persist it. */
-export function commitLayout(next: PageRegistry): void {
+/**
+ * The editor's only write path: replace the registry and persist it. Refuses
+ * until a document has been read or seeded, so an unreadable or half-loaded one
+ * is never replaced by whatever is in memory (review C1).
+ */
+export function commitLayout(next: PageRegistry): boolean {
+  if (!isLayoutWritable()) {
+    console.error(
+      "pageList is not writable yet (no successful load) — the change was not saved",
+    );
+    return false;
+  }
   setPageRegistry(next);
   savePages();
+  return true;
 }
 
 /**
@@ -152,6 +183,7 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
         };
       }
       const loaded = loadPages(st?.value, seed);
+      pagesLoadKind = loaded.kind;
       if (loaded.registry) setPageRegistry(loaded.registry);
       // Persist only a seed this run created — a stored document is never
       // rewritten (C1: a failed read must not overwrite config).

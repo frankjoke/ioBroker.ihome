@@ -12,6 +12,7 @@
   import {
     setStateSource,
     setObjectSource,
+    getCanonicalRegistry,
     devicesEnrichedStore,
   } from "$lib/stores/devices.svelte.js";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
@@ -84,7 +85,14 @@
       // inside initPages (a partial device list would migrate sections to empty).
       // `initPages` is memoised: this is either the same load or the first one.
       await initPages(seedDisplayPages);
-      migrateLayout($devicesEnrichedStore.map((d) => toFilterable(d)));
+      // Migrate from the *canonical* device list — a synchronous snapshot — not
+      // from the enriched display store, which polls every 50ms and can still
+      // hold the pre-backfill (or empty) device set (review C2). Without devices
+      // the migration would freeze `tiles: []` into the user's document.
+      const canonical = getCanonicalRegistry().devices ?? [];
+      if (canonical.length) {
+        migrateLayout(canonical.map((d) => toFilterable(d)));
+      }
     })();
   });
 
