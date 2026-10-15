@@ -203,7 +203,7 @@
     // Guarded and locked: two arrivals of the same press (a double click, a
     // duplicated handler) must not become two toggles.
     writeControl(ioBroker, primary, !truthy(primary.liveValue), Date.now(), {
-      lockMs: 750,
+      lockMs: 3000,
     });
   }
 

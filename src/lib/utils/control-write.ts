@@ -13,18 +13,30 @@ export interface WriteClient {
 
 /**
  * Toggles in flight, keyed by state id: a press is refused while an earlier one
- * is still landing.
+ * is still unconfirmed.
  *
- * Without this, two clicks in the same instant — a double click, or a handler
- * that fires twice — both read the *old* value and write the *same* new value,
- * which the device then applies twice: one press, two toggles. A slider must not
- * be locked (every step of a drag has to land), so only toggle-shaped writes pass
- * `lockMs`.
+ * Two presses close together both read the *old* value and write the *same* new
+ * value, which the device applies twice — one press, two toggles. A fixed timer
+ * cannot tell a slow double-tap from a deliberate second press, so the guard is
+ * the **value**: once the live value equals what we wrote, the broker has it and
+ * the next press is allowed immediately; until then (or until the ceiling) writes
+ * are refused. A slider never passes `lockMs` — every step of a drag must land.
  */
-const locks = new Map<string, number>();
+const pending = new Map<string, { wrote: unknown; until: number }>();
 
 export function resetWriteLocks(): void {
-  locks.clear();
+  pending.clear();
+}
+
+/** Booleans compare by their ioBroker truth (true/1/"1"/"true"). */
+function same(a: unknown, b: unknown): boolean {
+  const boolish = (v: unknown) =>
+    v === true || v === "true" || v === 1 || v === "1"
+      ? true
+      : v === false || v === "false" || v === 0 || v === "0"
+        ? false
+        : v;
+  return boolish(a) === boolish(b);
 }
 
 export interface WriteOptions {
@@ -41,6 +53,7 @@ export function writeControl(
   client: WriteClient,
   control: Pick<Control, "stateId" | "writable" | "transform"> & {
     available?: boolean;
+    liveValue?: unknown;
   },
   value: unknown,
   now = Date.now(),
@@ -50,9 +63,15 @@ export function writeControl(
   if (!id || !control.writable || control.available === false) return false;
   const lockMs = options.lockMs ?? 0;
   if (lockMs > 0) {
-    const until = locks.get(id);
-    if (until !== undefined && now < until) return false;
-    locks.set(id, now + lockMs);
+    const inFlight = pending.get(id);
+    if (inFlight) {
+      // Confirmed by the broker (the live value is the one we wrote) or past the
+      // ceiling: this press is a fresh intention, not a duplicate.
+      // "confirmed" = the live value is now the one we wrote.
+      const confirmed = same(control.liveValue, inFlight.wrote);
+      if (!confirmed && now < inFlight.until) return false;
+    }
+    pending.set(id, { wrote: value, until: now + lockMs });
   }
   const v = applyWrite(value, control.transform);
   client.setState(id, v).catch((e: unknown) => {

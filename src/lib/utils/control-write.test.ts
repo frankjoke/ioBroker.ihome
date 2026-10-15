@@ -65,3 +65,21 @@ it("refuses to write a control that cannot take it", () => {
   ).toBe(false);
   expect(client.writes).toEqual([]);
 });
+
+it("holds a toggle until the broker confirms it, not for a fixed time", () => {
+  resetWriteLocks();
+  const client = fakeClient();
+  const live = { ...control, available: true, liveValue: false };
+
+  expect(writeControl(client, live, true, 1000, { lockMs: 3000 })).toBe(true);
+  // still unconfirmed at 10s? no: the ceiling is the guard, the value is the truth
+  live.liveValue = false;
+  expect(writeControl(client, live, true, 1100, { lockMs: 3000 })).toBe(false);
+  // the broker echoes it back -> the next press is allowed at once
+  live.liveValue = true;
+  expect(writeControl(client, live, false, 1200, { lockMs: 3000 })).toBe(true);
+  // ...and a press that arrives after the ceiling is allowed even without an echo
+  live.liveValue = false;
+  expect(writeControl(client, live, true, 9000, { lockMs: 3000 })).toBe(true);
+  expect(client.writes).toEqual([true, false, true]);
+});

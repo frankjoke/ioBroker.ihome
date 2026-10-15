@@ -13,7 +13,8 @@
   /** `lock` is for toggles: one press must mean one change of state, never two. */
   function write(value: unknown, lock = false) {
     writeControl(ioBroker, control, value, Date.now(), {
-      lockMs: lock ? 750 : 0,
+      // The lock is the *value*: released as soon as the broker confirms it.
+      lockMs: lock ? 3000 : 0,
     });
   }
 
