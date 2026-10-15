@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Control } from "$lib/types/device";
+  import { newId } from "$lib/utils/ids";
   import { untrack } from "svelte";
   import { applyRead } from "$lib/utils/transform";
   import {
@@ -105,7 +106,7 @@
 
   function runTemplateAction() {
     if (hasName) {
-      const id = crypto.randomUUID();
+      const id = newId();
       addFormula({ id, name: newTemplateName.trim(), expr, precision, unit });
       saveFormulas();
       formulaId = id;

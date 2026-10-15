@@ -1,5 +1,4 @@
 import { it, expect } from "vitest";
-import { applyWrite } from "$lib/utils/transform";
 import { writeControl, resetWriteLocks } from "$lib/utils/control-write";
 
 function fakeClient() {

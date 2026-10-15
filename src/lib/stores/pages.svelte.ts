@@ -69,12 +69,6 @@ export function isLayoutWritable(): boolean {
   return mayWritePages(pagesLoadKind);
 }
 
-/**
- * Display edit mode, session-only (never persisted): while on, a tap on a tile
- * opens its placement in the editor instead of operating the control.
- */
-export const layoutEdit = $state({ on: false });
-
 async function ensurePagesObject() {
   const obj = await ioBroker.getObject(PAGE_LIST_ID);
   if (!obj) {

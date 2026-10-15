@@ -4,6 +4,7 @@
     setCanonicalRegistry,
     devicesEnrichedStore,
   } from "$lib/stores/devices";
+  import { newId } from "$lib/utils/ids";
   import { formatAge, formatValue } from "$lib/config/format";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -121,7 +122,7 @@
 
   function duplicateDevice(d: Device) {
     const copy = JSON.parse(JSON.stringify(d)) as Device;
-    copy.id = crypto.randomUUID();
+    copy.id = newId();
     copy.name = `${d.name} copy`;
     commit([...devices, copy]);
   }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DeviceType, Control } from "$lib/types/device";
+  import { newId } from "$lib/utils/ids";
   import {
     collectStates,
     applyFilters,
@@ -90,7 +91,7 @@
     const controls = [...selection].map((id): Control => {
       const obj = objects.get(id);
       return {
-        id: crypto.randomUUID(),
+        id: newId(),
         feature: suggestFeature(obj, deviceType) ?? "value",
         stateId: id,
         writable: !!obj?.common?.write,

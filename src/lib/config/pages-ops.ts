@@ -1,4 +1,5 @@
 import type { Device, DeviceType } from "$lib/types/device";
+import { newId } from "$lib/utils/ids";
 import type {
   Group,
   Member,
@@ -204,7 +205,7 @@ export function migratePageRegistry(
           : {
               ...group,
               tiles: (resolved.get(group.id) ?? []).map((d) => ({
-                id: crypto.randomUUID(),
+                id: newId(),
                 device: d.id,
               })),
             },

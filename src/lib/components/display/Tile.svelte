@@ -26,7 +26,7 @@
     requestPlacementConfig,
     wantsDeviceConfig,
   } from "$lib/pages.js";
-  import { layoutEdit } from "$lib/stores/pages.svelte.js";
+  import { SvelteSet } from "svelte/reactivity";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
@@ -105,7 +105,7 @@
    * preset could match).
    */
   const resolved = $derived.by(() => {
-    const used = new Set<string>();
+    const used = new SvelteSet<string>();
     const out: { slot: Slot; control?: EnrichedControl }[] = [];
     for (const slot of template.slots) {
       if (slot.kind === "badge") continue; // badges live in the corners
@@ -224,11 +224,6 @@
 
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
-    // In edit mode a tap means "edit this tile", never "operate the device".
-    if (layoutEdit.on) {
-      openEditor();
-      return;
-    }
     if (!primary || primary.widget !== "switch") return;
     const from = truthy(primary.liveValue);
     // Guarded and locked: two arrivals of the same press (a double click, a
@@ -282,11 +277,6 @@
     // Ctrl/Cmd+click is the shortcut to the editor — the one place a tile cannot
     // reach on its own.
     if (wantsDeviceConfig(event)) {
-      openEditor();
-      return;
-    }
-    // Edit mode: every tap opens the editor instead of operating the tile.
-    if (layoutEdit.on) {
       openEditor();
       return;
     }

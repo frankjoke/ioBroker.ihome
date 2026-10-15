@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Control, Device, DeviceType } from "$lib/types/device";
+  import { newId } from "$lib/utils/ids";
   import { untrack } from "svelte";
   import ControlRow from "./ControlRow.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
@@ -111,7 +112,7 @@
   let autoOpenId = $state<string | null>(null);
 
   function addVirtual() {
-    const id = crypto.randomUUID();
+    const id = newId();
     controls = [
       ...controls,
       {
@@ -138,7 +139,7 @@
     });
     onSave(
       projectDevice({
-        id: device?.id ?? crypto.randomUUID(),
+        id: device?.id ?? newId(),
         name: name.trim() || "Device",
         title: title.trim() || undefined,
         type,

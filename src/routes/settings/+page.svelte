@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { newId } from "$lib/utils/ids";
   import { getStorage } from "$lib/tools.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
@@ -26,7 +27,7 @@
   const formulas = $derived(getFormulas());
 
   function startAdd() {
-    editing = { id: crypto.randomUUID(), name: "", expr: "" };
+    editing = { id: newId(), name: "", expr: "" };
     showForm = true;
   }
   function startEdit(t: FormulaTemplate) {
