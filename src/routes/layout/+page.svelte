@@ -18,6 +18,7 @@
     commitLayout,
     getLayoutSaveFailed,
     getPageRegistry,
+    isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
 
@@ -29,6 +30,9 @@
   const devices = $derived($devicesEnrichedStore);
   const rooms = $derived(roomList(ioBroker.enums));
   const saveFailed = $derived(getLayoutSaveFailed());
+  // No document has been read (or it is unreadable): every write is refused, so
+  // the editor says so rather than looking like it works.
+  const writable = $derived(isLayoutWritable());
 
   // A tile on the display handed us its placement (Ctrl/Cmd+click, or a tap in
   // edit mode): select it so the pane opens on what was clicked.
@@ -77,12 +81,21 @@
       <span class="badge badge-danger" title="The last write to pageList failed"
         >not saved</span
       >
+    {:else if !writable}
+      <span
+        class="badge badge-danger"
+        title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
+        >not editable</span
+      >
     {/if}
     <button
       type="button"
       class="icon-btn primary"
-      title="Add page"
+      title={writable
+        ? "Add page"
+        : "Not editable: the page document did not load"}
       aria-label="Add page"
+      disabled={!writable}
       onclick={() => commitLayout(addPage(registry))}
     >
       <span class="material-symbols-outlined">add</span>
