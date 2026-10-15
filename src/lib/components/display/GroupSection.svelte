@@ -2,17 +2,18 @@
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import type { Group, Size } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
+  import type { ResolvedTile } from "$lib/config/pages-ops";
   import { isCollapsed, toggleCollapsed } from "$lib/stores/pages.svelte.js";
   import Tile from "./Tile.svelte";
 
   let {
     group,
-    devices,
+    tiles,
     bp,
     pageId,
   }: {
     group: Group;
-    devices: (EnrichedDevice & { size?: Size })[];
+    tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
     bp: Breakpoint;
     pageId: string;
   } = $props();
@@ -38,15 +39,15 @@
             aria-hidden="true">{group.icon}</span
           >{/if}
         <span>{group.title}</span>
-        <span class="count">{devices.length}</span>
+        <span class="count">{tiles.length}</span>
       </button>
     </h2>
   {/if}
 
   {#if !collapsed}
     <div class="grid">
-      {#each devices as d (d.id)}
-        <Tile device={d} {bp} />
+      {#each tiles as t (t.placement.id)}
+        <Tile device={t.device} {bp} />
       {/each}
     </div>
   {/if}

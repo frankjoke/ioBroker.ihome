@@ -6,7 +6,12 @@
 // global): Vite HMR can hand this module two instances, and a module-global
 // client then desyncs them — see the 2026-10-13 handoff.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { loadPages, parsePageRegistry } from "$lib/config/pages-ops";
+import {
+  loadPages,
+  migratePageRegistry,
+  parsePageRegistry,
+  type FilterableDevice,
+} from "$lib/config/pages-ops";
 
 /**
  * Wait for the enum cache: `connected` flips before objects/enums are in, and
@@ -67,6 +72,23 @@ export function savePages(): void {
       .setState(PAGE_LIST_ID, snapshot)
       .catch((e) => console.error("save pages:", e));
   }, 250);
+}
+
+/** The editor's only write path: replace the registry and persist it. */
+export function commitLayout(next: PageRegistry): void {
+  setPageRegistry(next);
+  savePages();
+}
+
+/**
+ * The one-time bridge from a filter-based document to placements (A15), called
+ * once both the registry and the device list are loaded. It is a no-op when the
+ * document is already current, so it is safe on every connect.
+ */
+export function migrateLayout(devices: FilterableDevice[]): boolean {
+  const { registry, changed } = migratePageRegistry(getPageRegistry(), devices);
+  if (changed) commitLayout(registry);
+  return changed;
 }
 
 /**

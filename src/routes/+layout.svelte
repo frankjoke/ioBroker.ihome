@@ -12,16 +12,18 @@
   import {
     setStateSource,
     setObjectSource,
+    devicesEnrichedStore,
   } from "$lib/stores/devices.svelte.js";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
   import {
     initPages,
     loadViewState,
+    migrateLayout,
     waitForEnumCache,
   } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
-  import { seedPages } from "$lib/config/pages-ops";
+  import { seedPages, toFilterable } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
@@ -79,8 +81,28 @@
       await initRegistry();
       await waitForEnumCache();
       backfillDeviceEnums();
+      // One-time bridge from a filter-based document to placements (A15). It
+      // needs the pages *and* the complete device list, so it runs here and not
+      // inside initPages (a partial device list would migrate sections to empty).
+      // `initPages` is memoised: this is either the same load or the first one.
+      await initPages(seedDisplayPages);
+      migrateLayout($devicesEnrichedStore.map((d) => toFilterable(d)));
     })();
   });
+
+  /** The first-run page set: seeded from the broker's own room/function enums. */
+  function seedDisplayPages() {
+    return seedPages(
+      (ioBroker.enums.getList("functions") ?? []).map((e) => ({
+        id: e._id,
+        label: enumLabelFromObject(e),
+      })),
+      (ioBroker.enums.getList("rooms") ?? []).map((e) => ({
+        id: e._id,
+        label: enumLabelFromObject(e),
+      })),
+    );
+  }
 
   $effect(() => {
     // keep <html> in sync with the persisted theme
@@ -94,18 +116,7 @@
     initTemplates();
     loadViewState();
     // Seed the display pages from the broker's own enums, once (spec §9).
-    initPages(() =>
-      seedPages(
-        (ioBroker.enums.getList("functions") ?? []).map((e) => ({
-          id: e._id,
-          label: enumLabelFromObject(e),
-        })),
-        (ioBroker.enums.getList("rooms") ?? []).map((e) => ({
-          id: e._id,
-          label: enumLabelFromObject(e),
-        })),
-      ),
-    );
+    initPages(seedDisplayPages);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       if (getTheme() === "auto") applyTheme();

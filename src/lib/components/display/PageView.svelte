@@ -3,7 +3,7 @@
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import {
     filterDevices,
-    resolveByMember,
+    resolvePage,
     toFilterable,
     type FilterableDevice,
   } from "$lib/config/pages-ops";
@@ -38,15 +38,14 @@
     $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
   );
   // Chips narrow what the groups see; a group that empties out disappears
-  // unless it asks for empties (resolveByMember handles that).
+  // unless it asks for empties (resolvePage handles that).
   const visible = $derived(filterDevices(devices, view.chips));
-  // Task 3 switches this to the placement-based resolver; until then the display
-  // still resolves by the section's filter (the migration converts it).
-  const groups = $derived(resolveByMember(page, visible));
+  // A section renders its placements, in order — not the filter it came from (A8).
+  const groups = $derived(resolvePage(page, visible));
   const filtered = $derived(
     !!(view.chips.room || view.chips.function || view.chips.favorite),
   );
-  const matchCount = $derived(groups.reduce((n, g) => n + g.devices.length, 0));
+  const matchCount = $derived(groups.reduce((n, g) => n + g.tiles.length, 0));
 
   const pageStyle = $derived(
     `--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(page.background)}`,
@@ -81,7 +80,7 @@
   {/if}
 
   {#each groups as g (g.group.id)}
-    <GroupSection group={g.group} devices={g.devices} {bp} pageId={page.id} />
+    <GroupSection group={g.group} tiles={g.tiles} {bp} pageId={page.id} />
   {/each}
 </div>
 

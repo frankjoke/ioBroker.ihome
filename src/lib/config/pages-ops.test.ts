@@ -8,6 +8,7 @@ import {
   migratePageRegistry,
   PAGE_REGISTRY_VERSION,
   resolveByMember,
+  resolvePage,
   seedPages,
   toFilterable,
   type FilterableDevice,
@@ -411,4 +412,52 @@ it("migrates an empty section to an empty list and never invents placements", ()
   };
   const { registry } = migratePageRegistry(reg, [dev({})]);
   expect(registry.pages[0].groups[0].tiles).toEqual([]);
+});
+
+// ------------------------------------------------------- resolving placements
+// Task 3: the display walks a section's placements, not its filter.
+
+it("resolves a page from its placement lists, in order, skipping dangling devices", () => {
+  const page: Page = {
+    id: "p",
+    title: "P",
+    groups: [
+      {
+        id: "g",
+        tiles: [
+          { id: "t1", device: "b" },
+          { id: "t2", device: "gone" },
+          { id: "t3", device: "a" },
+        ],
+      },
+    ],
+  };
+  const res = resolvePage(page, [dev({ id: "a" }), dev({ id: "b" })]);
+  expect(res[0].tiles.map((t) => t.device.id)).toEqual(["b", "a"]);
+  expect(res[0].tiles.map((t) => t.placement.id)).toEqual(["t1", "t3"]);
+});
+
+it("shows the same device in two sections (no claiming)", () => {
+  const page: Page = {
+    id: "p",
+    title: "P",
+    groups: [
+      { id: "g1", tiles: [{ id: "t1", device: "a" }] },
+      { id: "g2", tiles: [{ id: "t2", device: "a" }] },
+    ],
+  };
+  expect(resolvePage(page, [dev({ id: "a" })])).toHaveLength(2);
+});
+
+it("keeps an empty placement list invisible unless showEmpty", () => {
+  const page: Page = {
+    id: "p",
+    title: "P",
+    groups: [
+      { id: "g1", tiles: [] },
+      { id: "g2", tiles: [], showEmpty: true },
+    ],
+  };
+  const res = resolvePage(page, [dev({})]);
+  expect(res.map((r) => r.group.id)).toEqual(["g2"]);
 });

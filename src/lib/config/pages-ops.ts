@@ -1,5 +1,11 @@
 import type { Device, DeviceType } from "$lib/types/device";
-import type { Group, Member, Page, PageRegistry } from "$lib/types/display";
+import type {
+  Group,
+  Member,
+  Page,
+  PageRegistry,
+  Placement,
+} from "$lib/types/display";
 import { enumsOfState } from "$lib/config/rooms";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 
@@ -23,9 +29,22 @@ export interface FilterChips {
   favorite?: string;
 }
 
-export interface ResolvedGroup<T = FilterableDevice> {
+/** Legacy shape: a section with the devices its filter claims (the migration only). */
+export interface MemberGroup<T = FilterableDevice> {
   group: Group;
   devices: T[];
+}
+
+/** One tile of a section, with the device its placement points at. */
+export interface ResolvedTile<T = FilterableDevice> {
+  placement: Placement;
+  device: T;
+}
+
+/** What the display renders: a section and its tiles, in order. */
+export interface ResolvedGroup<T = FilterableDevice> {
+  group: Group;
+  tiles: ResolvedTile<T>[];
 }
 
 /**
@@ -66,7 +85,7 @@ function claims(group: Group): boolean {
 export function resolveByMember<T extends FilterableDevice>(
   page: Page,
   devices: T[],
-): ResolvedGroup<T>[] {
+): MemberGroup<T>[] {
   const groups = page.groups ?? [];
   const claimed = new Set<string>();
   const byGroup = new Map<string, T[]>();
@@ -90,6 +109,34 @@ export function resolveByMember<T extends FilterableDevice>(
   return groups
     .map((group) => ({ group, devices: byGroup.get(group.id) ?? [] }))
     .filter((r) => r.devices.length > 0 || r.group.showEmpty === true);
+}
+
+/**
+ * Resolve a page for the display: every section's placements, in order, each with
+ * the device it points at.
+ *
+ * A placement whose device is not in the registry is **skipped** (the section
+ * keeps rendering its other tiles), and a section with nothing to show disappears
+ * unless it asks for empties. Membership is explicit now (A8), so the same device
+ * may appear in more than one section — nothing is claimed.
+ */
+export function resolvePage<T extends FilterableDevice>(
+  page: Page,
+  devices: T[],
+): ResolvedGroup<T>[] {
+  const byId = new Map(devices.map((d) => [d.id, d]));
+  return (page.groups ?? [])
+    .map((group) => {
+      const tiles: ResolvedTile<T>[] = [];
+      for (const placement of group.tiles ?? []) {
+        const device = byId.get(placement.device);
+        if (!device) continue; // dangling: the device is gone from the registry
+        if (device.visibleControls < 1 && group.showEmpty !== true) continue;
+        tiles.push({ placement, device });
+      }
+      return { group, tiles };
+    })
+    .filter((r) => r.tiles.length > 0 || r.group.showEmpty === true);
 }
 
 /** The page-registry schema version this build writes (A15). */
