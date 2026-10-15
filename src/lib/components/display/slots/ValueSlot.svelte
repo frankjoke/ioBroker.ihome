@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatSlotText } from "$lib/config/format";
+  import { splitValueUnit } from "$lib/config/format";
   import type { Slot } from "$lib/types/display";
   import type { EnrichedControl } from "$lib/types/device";
 
@@ -7,17 +7,20 @@
     slot,
     control,
     onPrimary,
+    emphasis = "primary",
   }: {
     slot: Slot;
     control?: EnrichedControl;
     /** Set when this slot *is* the tile's action — then it is the button. */
     onPrimary?: () => void;
+    /** The tile's main reading is bold; the rest are quieter. */
+    emphasis?: "primary" | "secondary";
   } = $props();
 
-  const text = $derived(
+  const parts = $derived(
     control
-      ? formatSlotText(control.liveValue, slot.unit ?? control.unit)
-      : "—",
+      ? splitValueUnit(control.liveValue, slot.unit ?? control.unit)
+      : { value: "—", unit: "" },
   );
 </script>
 
@@ -25,26 +28,51 @@
   <button
     type="button"
     class="value mono action"
+    class:secondary={emphasis === "secondary"}
     title="Toggle"
     onclick={(e) => {
       e.stopPropagation();
       onPrimary();
-    }}>{text}</button
+    }}
+    >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
+      >{/if}</button
   >
 {:else}
-  <span class="value mono">{text}</span>
+  <span class="value mono" class:secondary={emphasis === "secondary"}
+    >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
+      >{/if}</span
+  >
 {/if}
 
 <style>
+  /* The main reading: bold, a notch smaller than it used to be (0.95 → 0.90rem). */
   .value {
     font-family: var(--font-mono);
-    font-size: var(--body-md, 0.95rem);
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.15;
     max-width: 100%;
     /* Wrap rather than truncate: on a narrow tile the unit drops to the next
        line ("49.23" / "%"), and the row grows to fit. A clipped number is a
        wrong number. */
     overflow-wrap: break-word;
+  }
+
+  /* Its unit: 20% smaller again, and not bold. */
+  .value .unit {
+    font-size: 0.72rem;
+    font-weight: 400;
+    margin-left: 0.15em;
+  }
+
+  /* Secondary readings (humidity, dew point, …): quiet, not bold. */
+  .value.secondary {
+    font-size: 0.84rem;
+    font-weight: 400;
+  }
+
+  .value.secondary .unit {
+    font-size: 0.67rem;
   }
 
   .value.action {

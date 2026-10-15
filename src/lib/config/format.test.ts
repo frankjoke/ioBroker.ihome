@@ -1,9 +1,10 @@
 import { it, expect } from "vitest";
 import {
-  formatAge,
-  formatValue,
   contrastColor,
+  formatAge,
   formatSlotText,
+  formatValue,
+  splitValueUnit,
 } from "$lib/config/format";
 
 it("returns dark text for light colors", () => {
@@ -56,4 +57,18 @@ it("renders a bare boolean as On/Off for a slot", () => {
   // Numbers keep their unit.
   expect(formatSlotText(21.5, "°C")).toBe("21.5 °C");
   expect(formatSlotText(null, "°C")).toBe("—");
+});
+
+it("splits a slot's value from its unit so the unit can be styled apart", () => {
+  expect(splitValueUnit(11.3, "°C")).toEqual({ value: "11.3", unit: "°C" });
+  expect(splitValueUnit(42, "%")).toEqual({ value: "42", unit: "%" });
+  expect(splitValueUnit(21.5, undefined)).toEqual({ value: "21.5", unit: "" });
+  // a boolean's unit is its false/true pair, so it is consumed as the label
+  expect(splitValueUnit(false, "OFF/ON")).toEqual({ value: "OFF", unit: "" });
+  expect(splitValueUnit(true, "OFF/ON")).toEqual({ value: "ON", unit: "" });
+  expect(splitValueUnit(true, undefined)).toEqual({ value: "On", unit: "" });
+  // nothing to show: the unit would be noise
+  expect(splitValueUnit(null, "°C")).toEqual({ value: "—", unit: "" });
+  expect(splitValueUnit(undefined, "°C")).toEqual({ value: "—", unit: "" });
+  expect(splitValueUnit("abc", "x")).toEqual({ value: "abc", unit: "x" });
 });

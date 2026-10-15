@@ -108,6 +108,16 @@
 
   const slots = $derived(resolved.map((r) => r.slot));
 
+  /** The tile's first reading is the headline; the rest are supporting. */
+  const mainValueKey = $derived(
+    (() => {
+      const first = resolved.find((r) => r.slot.kind === "value");
+      return first
+        ? `${first.slot.kind}:${first.slot.source ?? ""}:${first.slot.options?.index ?? ""}`
+        : "";
+    })(),
+  );
+
   // The icon slot carries the type's on/off colour and glow, so it drives the
   // tile's accent; the values reach CSS through custom properties (spec §6).
   const iconSlot = $derived(
@@ -306,6 +316,10 @@
         onPrimary={r.control && r.control === primary
           ? togglePrimary
           : undefined}
+        emphasis={`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}` ===
+        mainValueKey
+          ? "primary"
+          : "secondary"}
       />
     {/each}
   </div>

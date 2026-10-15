@@ -25,6 +25,26 @@ export function nameText(name: unknown): string {
 }
 
 /**
+ * A slot's value and its unit as separate strings, so a tile can set the unit
+ * smaller and un-bold than the number it belongs to.
+ *
+ * A boolean's unit is its false/true pair ("OFF/ON", "Aus/Ein"), so it is
+ * consumed as the label and never repeated; a missing value shows "—" with no
+ * unit, because "— °C" is noise.
+ */
+export function splitValueUnit(
+  v: unknown,
+  unit?: string,
+): { value: string; unit: string } {
+  if (v === null || v === undefined) return { value: "—", unit: "" };
+  if (typeof v === "boolean") {
+    return { value: formatBoolean(v, unit || "Off/On"), unit: "" };
+  }
+  if (typeof v === "object") return { value: JSON.stringify(v), unit: "" };
+  return { value: String(v), unit: unit ? String(unit) : "" };
+}
+
+/**
  * Text for a tile slot: booleans read On/Off (or the configured pair in the
  * unit, e.g. "Aus/Ein") rather than true/false, everything else goes through
  * `formatValue`.

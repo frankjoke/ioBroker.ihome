@@ -319,6 +319,12 @@ backgrounds.
   (`kind:source:index`) — without it two readout slots merge into one. A **badge** takes the same
   hint (`options.pick: "power"`), so a switch can badge its watts without naming the device's
   label. Units are matched *exactly*: `Wh` is not a watt.
+- **A value slot sets its number and its unit apart**, so the hierarchy says what matters: the
+  tile's **first** value slot is the headline (bold, 0.90rem — a notch down from the old 0.95 so
+  the bold face does not grow the block), its **unit** is 20% smaller and not bold (0.72rem/400),
+  and **secondary** readings (humidity, dew point) are regular weight and slightly smaller again
+  (0.84rem/400, unit 0.67rem). The split comes from `splitValueUnit`; a boolean's unit is its
+  false/true pair ("Aus/Ein"), so it is used as the label and never repeated.
 - **Tile content hangs from the top**, not centred: tiles sitting side by side in a row then share
   their baselines instead of floating to different heights (a light with one value and a
   thermometer with two used to sit at different levels).

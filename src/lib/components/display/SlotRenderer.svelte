@@ -13,12 +13,14 @@
     control,
     style,
     onPrimary,
+    emphasis,
   }: {
     slot: Slot;
     device: EnrichedDevice;
     control?: EnrichedControl;
     style: { icon?: string; color?: string; disabled?: boolean };
     onPrimary?: () => void;
+    emphasis?: "primary" | "secondary";
   } = $props();
 
   // Kinds with a control are useless without one; icon/value fall back.
@@ -37,7 +39,7 @@
   {#if slot.kind === "icon"}
     <IconSlot {slot} {style} fallback={device.icon} {onPrimary} />
   {:else if slot.kind === "value"}
-    <ValueSlot {slot} {control} {onPrimary} />
+    <ValueSlot {slot} {control} {onPrimary} {emphasis} />
   {:else if slot.kind === "sparkline" && control}
     <SparklineSlot {control} />
   {:else if slot.kind === "history-list" && control}

@@ -294,3 +294,20 @@ their control arrays differ.
   values) in the same row used to float at different levels; measured now, both `Garten` tiles
   share `nameTop 7 / iconTop 28 / valueTop 64`. A tile with a top badge reserves that band (15px),
   so all top-badged tiles line up with each other.
+
+## Follow-up 8 — value/unit typography
+
+The value slot now splits the number from its unit (`splitValueUnit`) so they can be styled apart,
+and a tile ranks its value slots:
+
+| element | size | weight |
+|---|---|---|
+| main value (first value slot) | 0.90rem | **700** |
+| its unit | 0.72rem (−20%) | 400 |
+| secondary value (humidity, …) | 0.84rem | 400 |
+| its unit | 0.67rem (−20%) | 400 |
+
+Measured live: 14.4px/700 + 11.52px/400 (exactly −20%), secondary 13.44px/400 + 10.72px/400. The
+main value is 0.95→0.90rem, so bolding it does not grow the block. A boolean's unit is its
+false/true pair ("Aus/Ein"), so it stays the label and is never repeated — `Brunnen` reads `OFF`,
+not `OFF OFF/ON`. Device name (12px/600) and badge (11px/500) are untouched.
