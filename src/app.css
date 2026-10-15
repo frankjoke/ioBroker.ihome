@@ -7,6 +7,12 @@
 
 /* Light theme (default) */
 :root {
+  /* Form controls the app does not style itself (the layout tree's icon
+     buttons, select dropdowns, scrollbars) are painted by the browser from the
+     UA palette — which stays LIGHT unless the page says otherwise. In dark mode
+     that left a light-grey button face under a muted grey icon. Declaring the
+     scheme per theme makes the browser use matching dark defaults. */
+  color-scheme: light;
   /* core surfaces */
   --background-color: #f7f8fc;
   --surface-color: #ffffff;
@@ -89,6 +95,7 @@
 
 /* Dark theme — Stitch "Aura Core OS" */
 html.dark {
+  color-scheme: dark;
   --background-color: #0f131c;
   --surface-color: #1c2028;
   --surface-container-lowest: #0a0e16;

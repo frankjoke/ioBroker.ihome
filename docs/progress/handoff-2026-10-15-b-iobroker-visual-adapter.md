@@ -189,3 +189,18 @@ Presets still render, so it is benign today.
   a working V1.
 - Still parked and unanswered from the earlier session: the Brunnen double-toggle (device-side) and the
   unused `house-controller.svg`.
+- Later still (2026-10-16), two layout-editor fixes from the user's own watching:
+  1. `a7085db` — a section row adds tiles with the same `+` as a page row; the "Add tile" text line is
+     gone (the section's filter hint is a different thing and stayed).
+  2. dark-mode icon contrast: the tree's action buttons were the only icon buttons in the app with no
+     styling of their own, so they kept the browser's default button face — a light grey that does not
+     follow the theme — and the row faded them with `opacity: 0.35`. That gave the icons 1.8:1 in dark
+     (against 6.4:1 in light). Now: no UA face, colour for de-emphasis instead of opacity,
+     `--text-muted` → `--text-color` on hover/selected, i.e. exactly what the bar's and the device list's
+     buttons do. Plus `color-scheme` per theme in `app.css`, so browser-painted controls (selects,
+     scrollbars) stop rendering light in dark mode.
+- **Live-check trap worth knowing**: this app ships `src/service-worker.js`, and a browser profile that
+  once served a *build* on a port keeps a workbox service worker there. It answers with its precache —
+  including a cached 500 — so `npm run dev` on that port appears broken ("500 Internal Error" while curl
+  gets 200) and stale bundles/HMR reloads appear. Use a port never used for a build, or unregister the
+  worker for that origin, before trusting a live check.

@@ -505,16 +505,30 @@
     padding: 0 6px;
   }
 
+  /* De-emphasis by *colour*, never by opacity. Opacity blends the icon with
+     whatever is behind it, so the same 0.35 that reads as "greyed until hover"
+     on a light card makes the icons disappear on a dark one. Every other icon
+     button in the app (the bar, the device list) switches between --text-muted
+     and --text-color for this reason; these do the same now. */
   .row-actions {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    opacity: 0.35;
   }
 
-  .node:hover .row-actions,
-  .node.selected .row-actions {
-    opacity: 1;
+  .row-actions .icon-btn {
+    /* No UA button face, exactly like the device list's buttons: the icon sits
+       on the card, so its contrast comes from the card, in either theme. */
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .row-actions .icon-btn:hover,
+  .node:hover .row-actions .icon-btn,
+  .node.selected .row-actions .icon-btn {
+    color: var(--text-color);
   }
 
   .add-tile {
