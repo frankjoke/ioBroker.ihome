@@ -227,6 +227,7 @@
         group={section}
         tiles={resolveSection(section, displayDevices)}
         {bp}
+        pageId={page?.id ?? ""}
       />
     </div>
   {:else if selection.kind === "tile" && tile}

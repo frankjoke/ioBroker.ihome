@@ -70,7 +70,7 @@
   {/if}
 
   {#each groups as g (g.group.id)}
-    <GroupSection group={g.group} tiles={g.tiles} {bp} />
+    <GroupSection group={g.group} tiles={g.tiles} {bp} pageId={page.id} />
   {/each}
 </div>
 

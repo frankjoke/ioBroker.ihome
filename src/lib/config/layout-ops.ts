@@ -34,6 +34,34 @@ export type LayoutSelection =
   | { kind: "section"; pageId: string; sectionId: string }
   | ({ kind: "tile" } & PlacementAnchor);
 
+/**
+ * Read a placement handoff back out of storage. Anything a stale tab or an older
+ * build could have left there returns null, so a bad value can never select a
+ * tile that does not exist.
+ */
+export function parsePlacementRef(raw: unknown): PlacementAnchor | null {
+  if (typeof raw !== "string" || !raw) return null;
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const { pageId, sectionId, placementId } = value;
+  if (
+    typeof pageId === "string" &&
+    pageId &&
+    typeof sectionId === "string" &&
+    sectionId &&
+    typeof placementId === "string" &&
+    placementId
+  ) {
+    return { pageId, sectionId, placementId };
+  }
+  return null;
+}
+
 function withPages(
   reg: PageRegistry,
   fn: (pages: Page[]) => Page[],

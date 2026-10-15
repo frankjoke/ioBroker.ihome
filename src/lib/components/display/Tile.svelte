@@ -21,18 +21,25 @@
     type TimeSource,
   } from "$lib/config/rule-ops";
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
-  import { requestDeviceConfig, wantsDeviceConfig } from "$lib/pages.js";
+  import {
+    requestDeviceConfig,
+    requestPlacementConfig,
+    wantsDeviceConfig,
+  } from "$lib/pages.js";
+  import { layoutEdit } from "$lib/stores/pages.svelte.js";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
   import type { Slot, TileConfig } from "$lib/types/display";
+  import type { PlacementAnchor } from "$lib/config/layout-ops";
 
   let {
     device,
     bp,
     title,
     tile,
+    anchor,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -40,6 +47,8 @@
     title?: string;
     /** The placement's own config: its size wins over the template's (A9). */
     tile?: TileConfig;
+    /** Where this tile sits on a page — what the display hands the editor (A16). */
+    anchor?: PlacementAnchor;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -212,6 +221,11 @@
 
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
+    // In edit mode a tap means "edit this tile", never "operate the device".
+    if (layoutEdit.on) {
+      openEditor();
+      return;
+    }
     if (!primary || primary.widget !== "switch") return;
     const from = truthy(primary.liveValue);
     // Guarded and locked: two arrivals of the same press (a double click, a
@@ -234,8 +248,17 @@
     shownControls.filter((c) => !resolved.some((r) => r.control === c)),
   );
 
-  /** Ctrl/Cmd+click anywhere on the tile -> that device's config. */
-  function openDeviceConfig() {
+  /**
+   * Open this tile's placement in the layout editor (A16). A tile rendered
+   * without an anchor — an editor preview, say — falls back to the device form;
+   * the device shortcut was the stopgap while no tile editor existed.
+   */
+  function openEditor() {
+    if (anchor) {
+      requestPlacementConfig(anchor);
+      location.hash = "#/layout";
+      return;
+    }
     requestDeviceConfig(device.id);
     location.hash = "#/devices";
   }
@@ -249,14 +272,19 @@
     // Ctrl+click on a light's icon would just switch the light.
     event.stopPropagation();
     event.preventDefault();
-    openDeviceConfig();
+    openEditor();
   }
 
   function onActivate(event?: MouseEvent) {
-    // Ctrl/Cmd+click is the shortcut to the device's config — the one place a
-    // tile cannot reach on its own.
+    // Ctrl/Cmd+click is the shortcut to the editor — the one place a tile cannot
+    // reach on its own.
     if (wantsDeviceConfig(event)) {
-      openDeviceConfig();
+      openEditor();
+      return;
+    }
+    // Edit mode: every tap opens the editor instead of operating the tile.
+    if (layoutEdit.on) {
+      openEditor();
       return;
     }
     // A long-press already opened the modal; swallow the click it produced.
@@ -329,6 +357,11 @@
   onpointerleave={cancelPress}
 >
   <span class="tile-name">{title ?? tileTitle(device)}</span>
+  {#if layoutEdit.on}
+    <span class="material-symbols-outlined edit-cue" aria-hidden="true"
+      >edit</span
+    >
+  {/if}
   <div class="tile-body">
     {#each resolved as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
       <SlotRenderer

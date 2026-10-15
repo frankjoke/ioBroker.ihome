@@ -1,3 +1,5 @@
+import { parsePlacementRef } from "$lib/config/layout-ops";
+
 /**
  * Programmatic page registry — the header tab bar is rendered from this
  * list. To add a page: append an entry here and create a matching route
@@ -62,4 +64,33 @@ export function takeRequestedDeviceConfig() {
 /** Should this click open the device config instead of the tile's own action? */
 export function wantsDeviceConfig(event) {
   return !!(event?.metaKey || event?.ctrlKey);
+}
+
+const CONFIG_PLACEMENT_KEY = "iHome.editLayout";
+
+/**
+ * Ask the layout editor to open one tile's placement, then navigate.
+ *
+ * Same `sessionStorage` reasoning as the device handoff above; the value is JSON
+ * so the editor can reject anything a stale tab left behind.
+ *
+ * @param {{ pageId: string, sectionId: string, placementId: string }} ref
+ */
+export function requestPlacementConfig(ref) {
+  try {
+    sessionStorage.setItem(CONFIG_PLACEMENT_KEY, JSON.stringify(ref));
+  } catch {
+    /* private mode: the shortcut just navigates without selecting */
+  }
+}
+
+/** The requested placement, cleared as it is taken, or null. */
+export function takeRequestedPlacement() {
+  try {
+    const raw = sessionStorage.getItem(CONFIG_PLACEMENT_KEY);
+    sessionStorage.removeItem(CONFIG_PLACEMENT_KEY);
+    return parsePlacementRef(raw);
+  } catch {
+    return null;
+  }
 }

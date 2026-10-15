@@ -10,10 +10,12 @@
     group,
     tiles,
     bp,
+    pageId,
   }: {
     group: Group;
     tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
     bp: Breakpoint;
+    pageId: string;
   } = $props();
 </script>
 
@@ -40,6 +42,7 @@
         {bp}
         title={t.placement.title}
         tile={t.placement.tile}
+        anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
       />
     {/each}
   </div>

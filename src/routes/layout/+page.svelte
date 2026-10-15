@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
+  import { takeRequestedPlacement } from "$lib/pages.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList } from "$lib/config/rooms";
   import {
@@ -27,6 +29,13 @@
   const devices = $derived($devicesEnrichedStore);
   const rooms = $derived(roomList(ioBroker.enums));
   const saveFailed = $derived(getLayoutSaveFailed());
+
+  // A tile on the display handed us its placement (Ctrl/Cmd+click, or a tap in
+  // edit mode): select it so the pane opens on what was clicked.
+  onMount(() => {
+    const requested = takeRequestedPlacement();
+    if (requested) selection = { kind: "tile", ...requested };
+  });
 
   function confirmDelete(): void {
     const target = pendingDelete;

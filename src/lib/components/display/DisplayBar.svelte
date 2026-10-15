@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import {
     getPageRegistry,
+    layoutEdit,
     setChips,
     setLastPage,
     view,
@@ -40,6 +41,19 @@
     <FilterChips chips={view.chips} onChange={setChips} />
   </div>
 
+  <button
+    type="button"
+    class="icon-btn"
+    class:active={layoutEdit.on}
+    title={layoutEdit.on ? "Leave edit mode" : "Edit the layout"}
+    aria-pressed={layoutEdit.on}
+    onclick={() => (layoutEdit.on = !layoutEdit.on)}
+  >
+    <span class="material-symbols-outlined"
+      >{layoutEdit.on ? "edit_off" : "edit"}</span
+    >
+  </button>
+
   <a
     class="icon-btn"
     href={`${base}/#/devices`}
@@ -56,7 +70,7 @@
     top: 0;
     z-index: 50;
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto auto auto;
     align-items: center;
     gap: 0.75rem;
     min-height: 48px;
@@ -137,6 +151,12 @@
     text-decoration: none;
     background-color: var(--surface-container);
     color: var(--text-color);
+  }
+
+  /* Edit mode on: the toggle says so, and every tile shows a pencil. */
+  .icon-btn.active {
+    color: var(--primary-color);
+    background-color: var(--surface-container);
   }
 
   .icon-btn .material-symbols-outlined {

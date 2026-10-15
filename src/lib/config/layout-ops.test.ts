@@ -13,6 +13,7 @@ import {
   movePage,
   movePlacement,
   moveSection,
+  parsePlacementRef,
   patchPage,
   patchPlacement,
   patchSection,
@@ -207,10 +208,25 @@ it("patches one placement and leaves its siblings alone", () => {
   expect(reg0.pages[0].groups[0].tiles?.[1].title).toBeUndefined();
 });
 
-it("patches a page (its title) without touching its sections", () => {
-  const next = patchPage(regWithTiles(), "p", { title: "Wohnen" });
+it("patches a page (its title) without touching its sections", () => {  const next = patchPage(regWithTiles(), "p", { title: "Wohnen" });
   expect(next.pages[0].title).toBe("Wohnen");
   expect(next.pages[0].groups).toHaveLength(2);
   expect(next.pages[0].groups[0].tiles).toHaveLength(1);
   expect(regWithTiles().pages[0].title).toBe("P");
+});
+
+it("reads a placement handoff, and refuses anything a stale tab could hold", () => {
+  const ref = { pageId: "p", sectionId: "g", placementId: "t1" };
+  expect(parsePlacementRef(JSON.stringify(ref))).toEqual(ref);
+  // a value the display never wrote, or one half-written by an older build
+  expect(parsePlacementRef(null)).toBeNull();
+  expect(parsePlacementRef("")).toBeNull();
+  expect(parsePlacementRef("{oops")).toBeNull();
+  expect(parsePlacementRef(JSON.stringify({ pageId: 1 }))).toBeNull();
+  expect(
+    parsePlacementRef(JSON.stringify({ pageId: "p", sectionId: "g" })),
+  ).toBeNull();
+  expect(parsePlacementRef(JSON.stringify({ ...ref, extra: true }))).toEqual(
+    ref,
+  );
 });
