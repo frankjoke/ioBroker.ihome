@@ -158,3 +158,31 @@ Presets still render, so it is benign today.
 5. Still open from before (unchanged): phase-4 editors (`/pages`, `/templates`), `w: 2` for two-value
    thermometers, unused `energy` hint, duplicate tile titles, momentary-button devices mis-typed as
    Light, and the missing `templateList` document.
+
+---
+
+## 7. Later the same day — whole-branch review of the layout editor
+
+- Committed since §6 step 2: the rename/identity glow and the `[ihome-dbg]` tracing (both in), plus the
+  post-plan layout/flow/bar work (see `.superpowers/sdd/2026-10-15-ihome-layout-editor/progress.md`).
+- The P1 branch review ran (`bb10915..e293dd6`, 19 commits, reviewer on `gpt-6-astra`). Verdict: not
+  mergeable as-is — 3 Critical, 11 Important, 4 Minor. The Criticals were all **data loss on the live
+  `pageList`**: migrating from an unknown device list, accepting junk placements then rewriting them,
+  and writing without a successful load. Also `crypto.randomUUID` (needs a secure context) would have
+  thrown on the real plain-HTTP broker.
+- Fixed in four commits (`319d2e7`, `53a3804`, `879b445`, `0dc3267`): the three Criticals, the offline
+  save, `newId()`, one shared `effectiveSpan`, the `newLine` tile width, the bordered-section width, the
+  `newLine` section break, `movePlacement` validation, the editor's size fields, the connection footer.
+  Red-first tests in `src/lib/config/review-fixes.test.ts`; `check` 0/0, 285 tests, build ok, lint at the
+  2 pre-existing errors.
+- Deferred by ruling (in the ledger, with costs): change-device in the pane (I8), cross-section tile
+  movement in the tree (I9), the picker's focus trap + the tree's keyboard contract (I11), the pass's
+  tall-tile occupancy (M1), deep-copy on duplicate (M2), the AppBar's stale active tab (M3). All are P2
+  or its own slice — none is a data-loss path.
+- Named leftover (one command, not yet done): the five remaining `crypto.randomUUID()` call sites
+  (`DeviceForm`, `VirtualEditor`, `StatePicker`, `devices/+page`, `settings/+page`) still throw on plain
+  HTTP when creating a device. Replace with `newId()` from `$lib/utils/ids`.
+- Next, in order: the `newId` sweep above → commit the review's leftovers → then P2 (the tile editor:
+  slots, glow/rules, live tile preview, seed `templateList`).
+- Still parked and unanswered from the earlier session: the Brunnen double-toggle (device-side), the dead
+  `layoutEdit` + Tile edit-mode guards, and the unused `house-controller.svg`.
