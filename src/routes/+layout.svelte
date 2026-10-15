@@ -56,7 +56,6 @@
     url: buildUrl(storage.hostPort),
   });
 
-  let footerOpen = $state(!ioBroker.connected);
   const current = $derived(page.route?.id ?? "/");
   const isConnected = $derived(!!ioBroker.connected);
   // The display routes own the whole viewport: no config header, no page
@@ -148,7 +147,7 @@
     {@render children()}
   </main>
 
-  {#if footerOpen || !isConnected}
+  {#if !isConnected}
     <footer class="app-footer">
       <div class="footer-inner">
         <div class="footer-heading">
