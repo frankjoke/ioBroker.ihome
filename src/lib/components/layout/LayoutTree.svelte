@@ -525,9 +525,7 @@
     cursor: pointer;
   }
 
-  .row-actions .icon-btn:hover,
-  .node:hover .row-actions .icon-btn,
-  .node.selected .row-actions .icon-btn {
+  .row-actions .icon-btn:hover {
     color: var(--text-color);
   }
 

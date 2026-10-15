@@ -52,7 +52,17 @@ export function createReactiveStorage(values = [], config = {}) {
     // initialize
     const json = storage?.getItem(keyWithPrefix);
     if (json) {
-      item.value = JSON.parse(json);
+      try {
+        item.value = JSON.parse(json);
+      } catch {
+        // A corrupt value — hand-edited, or written by another tool on this
+        // origin — used to throw here, during module init, which took the whole
+        // app down with it. Fall back to the default and repair the entry.
+        item.value = init ?? null;
+        if (init !== null && init !== undefined) {
+          storage?.setItem(keyWithPrefix, JSON.stringify(init));
+        }
+      }
     } else if (init !== null && init !== undefined) {
       storage?.setItem(keyWithPrefix, JSON.stringify(init));
     }
