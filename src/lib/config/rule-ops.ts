@@ -9,6 +9,7 @@ import {
   type Scope,
 } from "$lib/config/virtual-ops";
 import { formatAge, formatValue } from "$lib/config/format";
+import { pickControl } from "$lib/config/template-ops";
 
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
 
@@ -89,6 +90,8 @@ export interface BadgeDevice {
     hidden?: boolean;
     liveValue?: unknown;
     unit?: string;
+    label?: string;
+    role?: string;
     rules?: Rule[];
   }[];
 }
@@ -202,14 +205,23 @@ interface BadgeControl {
   rules?: Rule[];
 }
 
-/** Feature first, then id — the precedence slot sources use (spec §4.1). */
+/**
+ * The control a badge reads: an explicit `source` (feature → id), or a readout
+ * hint (`options.pick: "power"`) so a preset can badge a reading the device names
+ * in its own way (`Brunnen.Leistung`).
+ */
 function badgeControl(
   device: BadgeDevice,
   source: string | undefined,
+  pick: string | undefined,
 ): BadgeControl | undefined {
   const controls = ((device.controls ?? []) as BadgeControl[]).filter(
     (c) => !c.hidden,
   );
+  if (pick) {
+    const chosen = pickControl(controls, pick, new Set());
+    if (chosen) return chosen;
+  }
   return (
     controls.find((c) => c.feature === source) ??
     controls.find((c) => c.id === source)
@@ -221,7 +233,9 @@ function controlBadge(
   device: BadgeDevice,
   scope: Scope,
 ): ResolvedBadge | undefined {
-  const control = badgeControl(device, slot.source);
+  const pick =
+    typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
+  const control = badgeControl(device, slot.source, pick);
   if (!control) return undefined;
   // Slot rules first, the control's own defaults last (spec §4.1.1).
   const style = resolveStyle(
@@ -269,8 +283,12 @@ export function resolveBadges(
         typeof slot.options?.of === "string" ? slot.options.of : undefined;
       const from = slot.options?.from === "lc" ? "lc" : "ts";
       badge = offline ? undefined : agoBadge(clock.at(of, from), now);
-    } else if (slot.source === "offline") badge = offline;
-    else if (slot.source) badge = controlBadge(slot, device, scope);
+    } else if (slot.source === "offline") {
+      badge = offline;
+    } else if (slot.source || typeof slot.options?.pick === "string") {
+      // A badge reads a control either by name or by readout hint.
+      badge = controlBadge(slot, device, scope);
+    }
     if (badge) out.push(badge);
   }
   return out;

@@ -325,9 +325,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    /* Top-aligned, not centred: side-by-side tiles in a row then share their
+       baselines instead of floating to different heights. */
+    justify-content: flex-start;
     gap: 0.2rem;
-    padding: 3px;
+    padding: 6px 3px 3px;
     min-width: 0;
     /* No overflow clipping: a badge is allowed to sit on the tile's own edge. */
     text-align: center;

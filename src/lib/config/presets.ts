@@ -53,6 +53,9 @@ export const PRESETS: Record<DeviceType, Template> = {
         },
       ]),
       { kind: "value", source: "power" },
+      // The watts, in the top-left reading corner — a switch's second question
+      // after "is it on".
+      { kind: "badge", options: { pick: "power" } },
       ago,
       offline,
     ],

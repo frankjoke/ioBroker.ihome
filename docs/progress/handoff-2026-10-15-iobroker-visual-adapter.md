@@ -281,3 +281,16 @@ their control arrays differ.
 - A hint that matches nothing falls back to position, so an odd device still shows something.
   Dew point, wind chill and the rest stay out of the tile and appear in the enlargement — which
   is exactly the "unless all data is displayed" rule doing its job.
+
+## Follow-up 7 — Brunnen's watts, and top-aligned tiles
+
+- **A badge can name what it shows** the same way a readout slot can: `{ kind: "badge",
+  options: { pick: "power" } }` resolves by role → label → unit, so it works on your device
+  without naming `Brunnen.Leistung`. The Switch preset now carries it, and it lands in the top-left
+  "reading" corner by default. Live: `Brunnen` shows `0 W` top-left (pump off) plus its ago badge
+  bottom-left. Unit matching is now *exact* — `Wh` was satisfying the `W` hint before, so
+  `Brunnen.Verbrauch` could have been badged as power.
+- **Tiles are top-aligned, not vertically centred.** A light (one value) and a thermometer (two
+  values) in the same row used to float at different levels; measured now, both `Garten` tiles
+  share `nameTop 7 / iconTop 28 / valueTop 64`. A tile with a top badge reserves that band (15px),
+  so all top-badged tiles line up with each other.

@@ -316,7 +316,12 @@ backgrounds.
   config. A slot with no hint takes the next control no earlier slot used (positional fallback),
   and anything the tile does not show is what the enlargement is for.
   Because a preset may repeat a kind, `options.index` is part of a slot's identity
-  (`kind:source:index`) — without it two readout slots merge into one.
+  (`kind:source:index`) — without it two readout slots merge into one. A **badge** takes the same
+  hint (`options.pick: "power"`), so a switch can badge its watts without naming the device's
+  label. Units are matched *exactly*: `Wh` is not a watt.
+- **Tile content hangs from the top**, not centred: tiles sitting side by side in a row then share
+  their baselines instead of floating to different heights (a light with one value and a
+  thermometer with two used to sit at different levels).
 - **A tile's name drops a redundant type suffix**: `Garten-Pool.Light` on a Light tile reads
   `Garten-Pool`. `Device.title` (set from the device form's "Tile title") overrides both.
 - The modal reuses the existing control widgets (`ControlRow`).

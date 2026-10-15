@@ -173,10 +173,18 @@ export function pickControl<T extends Pickable>(
     const text = String(haystack ?? "").toLowerCase();
     return needles.some((n) => text.includes(n));
   };
+  // A unit is compared *exactly*: "Wh" must not satisfy a watt, and "%" is
+  // humidity only once the role and label passes have had their say.
+  const unitIs = (c: T) =>
+    spec.units.includes(
+      String(c.unit ?? "")
+        .trim()
+        .toLowerCase(),
+    );
   return (
     free.find((c) => has(c.role, spec.roles)) ??
     free.find((c) => has(c.label, spec.words)) ??
-    free.find((c) => has(c.unit, spec.units))
+    free.find(unitIs)
   );
 }
 

@@ -285,3 +285,15 @@ it("gives the thermometer preset a fixed readout order", () => {
     "humidity",
   ]);
 });
+
+it("matches a hint's unit exactly, so Wh is not a watt", () => {
+  expect(
+    pickControl([{ id: "wh", unit: "Wh" }], "power", new Set()),
+  ).toBeUndefined();
+  expect(pickControl([{ id: "w", unit: "W" }], "power", new Set())?.id).toBe(
+    "w",
+  );
+  expect(
+    pickControl([{ id: "c", unit: "°C" }], "temperature", new Set())?.id,
+  ).toBe("c");
+});

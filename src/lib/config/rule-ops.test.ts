@@ -295,3 +295,45 @@ it("gives each badge kind its corner, overridable", () => {
     }),
   ).toBe("bottom-left");
 });
+
+it("a badge can name what it shows by hint", () => {
+  const device = {
+    controls: [
+      {
+        id: "sw",
+        feature: "power",
+        label: "Brunnen",
+        unit: "OFF/ON",
+        role: "switch",
+        available: true,
+        liveValue: true,
+      },
+      {
+        id: "p",
+        feature: "value",
+        label: "Brunnen.Leistung",
+        unit: "W",
+        role: "value.power",
+        available: true,
+        liveValue: 1126,
+      },
+      {
+        id: "e",
+        feature: "value",
+        label: "Brunnen.Verbrauch",
+        unit: "Wh",
+        role: "value",
+        available: true,
+        liveValue: 49376,
+      },
+    ],
+  };
+  const badges = resolveBadges(
+    [{ kind: "badge", options: { pick: "power" } }],
+    device,
+    undefined,
+    NOW,
+  );
+  expect(badges[0].label).toBe("1126 W");
+  expect(badges[0].tone).toBe("info");
+});
