@@ -11,7 +11,12 @@
     moveSection,
     type LayoutSelection,
   } from "$lib/config/layout-ops";
-  import type { PageRegistry } from "$lib/types/display";
+  import {
+    matchesMember,
+    toFilterable,
+    type FilterableDevice,
+  } from "$lib/config/pages-ops";
+  import type { Group, PageRegistry } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
 
   let {
@@ -21,6 +26,7 @@
     onSelect,
     onChange,
     onDelete,
+    onAddTile,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -29,13 +35,13 @@
     onChange: (next: PageRegistry) => void;
     /** Page and section deletion asks first — the route owns the dialog. */
     onDelete: (selection: LayoutSelection) => void;
+    /** Opens the device picker for a section — the route owns the dialog. */
+    onAddTile: (pageId: string, sectionId: string) => void;
   } = $props();
 
   // Folded tree nodes. Local and transient: how the tree looks is a view of the
   // config, never config itself.
   let folded = $state<Record<string, boolean>>({});
-  // The device picked in a section's inline "add tile" select, per section.
-  let picked = $state<Record<string, string>>({});
 
   const toggleFold = (id: string): void => {
     folded = { ...folded, [id]: !folded[id] };
@@ -44,17 +50,16 @@
   const deviceOf = (id: string): EnrichedDevice | undefined =>
     devices.find((d) => d.id === id);
 
-  /** The devices a section could still take: everything not listed yet. */
-  function addableDevices(sectionId: string): EnrichedDevice[] {
-    const page = registry.pages.find((p) =>
-      p.groups.some((g) => g.id === sectionId),
-    );
-    const listed = new Set(
-      (page?.groups.find((g) => g.id === sectionId)?.tiles ?? []).map(
-        (t) => t.device,
-      ),
-    );
-    return devices.filter((d) => !listed.has(d.id));
+  /**
+   * The devices the section's filter hint matches that are not in it yet — the
+   * "these belong here too" line under a migrated section.
+   */
+  function hintMissing(section: Group): FilterableDevice[] {
+    if (!section.member) return [];
+    const listed = new Set((section.tiles ?? []).map((t) => t.device));
+    return devices
+      .map((d) => toFilterable(d))
+      .filter((d) => !listed.has(d.id) && matchesMember(d, section.member!));
   }
 </script>
 
@@ -370,25 +375,34 @@
           <!-- A placeholder until the picker dialog (Task 9) replaces it: pick a
                device that is not in this section yet and add it as a tile. -->
           <div class="add-tile">
-            <select aria-label="Device to add" bind:value={picked[section.id]}>
-              <option value="">Add a device…</option>
-              {#each addableDevices(section.id) as device (device.id)}
-                <option value={device.id}>{device.name}</option>
-              {/each}
-            </select>
             <button
               type="button"
               class="btn"
-              disabled={!picked[section.id]}
-              onclick={() => {
-                onChange(
-                  appendDevices(registry, page.id, section.id, [
-                    picked[section.id],
-                  ]),
-                );
-                picked[section.id] = "";
-              }}>Add tile</button
+              onclick={() => onAddTile(page.id, section.id)}
             >
+              Add tile
+            </button>
+            {#if hintMissing(section).length}
+              <span class="text-muted hint-missing"
+                >{hintMissing(section).length} matching this section's filter
+                {hintMissing(section).length === 1 ? "is" : "are"} not here</span
+              >
+              <button
+                type="button"
+                class="btn"
+                onclick={() =>
+                  onChange(
+                    appendDevices(
+                      registry,
+                      page.id,
+                      section.id,
+                      hintMissing(section).map((d) => d.id),
+                    ),
+                  )}
+              >
+                Add them
+              </button>
+            {/if}
           </div>
         {/if}
       {/each}
@@ -506,6 +520,10 @@
     align-items: center;
     gap: 0.4rem;
     margin: 2px 0 6px 3rem;
+  }
+
+  .hint-missing {
+    font-size: 0.75rem;
   }
 
   .empty-tree {

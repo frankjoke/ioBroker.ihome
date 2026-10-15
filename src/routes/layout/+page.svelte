@@ -1,9 +1,13 @@
 <script lang="ts">
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { roomList } from "$lib/config/rooms";
   import {
     addPage,
+    appendDevices,
     deletePage,
     deleteSection,
     type LayoutSelection,
@@ -17,9 +21,11 @@
 
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
+  let pickerFor = $state<{ pageId: string; sectionId: string } | null>(null);
 
   const registry = $derived(getPageRegistry());
   const devices = $derived($devicesEnrichedStore);
+  const rooms = $derived(roomList(ioBroker.enums));
   const saveFailed = $derived(getLayoutSaveFailed());
 
   function confirmDelete(): void {
@@ -83,6 +89,7 @@
         onSelect={(next) => (selection = next)}
         onChange={commitLayout}
         onDelete={(target) => (pendingDelete = target)}
+        onAddTile={(pageId, sectionId) => (pickerFor = { pageId, sectionId })}
       />
     </div>
 
@@ -100,6 +107,27 @@
     </aside>
   </div>
 </div>
+
+{#if pickerFor}
+  {@const target = pickerFor}
+  <DevicePicker
+    {devices}
+    {rooms}
+    enums={ioBroker.enums}
+    listed={(
+      registry.pages
+        .find((p) => p.id === target.pageId)
+        ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
+    ).map((t) => t.device)}
+    onAdd={(deviceIds) => {
+      commitLayout(
+        appendDevices(registry, target.pageId, target.sectionId, deviceIds),
+      );
+      pickerFor = null;
+    }}
+    onClose={() => (pickerFor = null)}
+  />
+{/if}
 
 {#if pendingDelete}
   <ConfirmModal
