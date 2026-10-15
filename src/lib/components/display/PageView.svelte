@@ -7,11 +7,16 @@
     resolvePage,
     toFilterable,
     type FilterableDevice,
+    type ResolvedTile,
   } from "$lib/config/pages-ops";
+  import { layoutSection, modulesFor } from "$lib/config/section-layout";
+  import { resolveTemplate } from "$lib/config/template-ops";
+  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { view } from "$lib/stores/pages.svelte.js";
   import {
     BREAKPOINTS,
     breakpointFor,
+    clampSpan,
     type Breakpoint,
   } from "$lib/config/size-ops";
   import GroupSection from "./GroupSection.svelte";
@@ -48,6 +53,19 @@
   );
   const matchCount = $derived(groups.reduce((n, g) => n + g.tiles.length, 0));
 
+  const templates = $derived(getTemplateRegistry().templates);
+  // How many tile modules fit on one line at this width — the page's own padding
+  // (12px each side) and the grid gap (6px), matching the CSS below.
+  const maxModules = $derived(modulesFor(width, def.tileW, 6, 24));
+  /** A tile's width in modules: its placement's size, else its template's. */
+  const spanOf = (t: ResolvedTile<DisplayDevice>): number =>
+    clampSpan(resolveTemplate(t.device, templates).size, bp).w;
+  // The pass interprets the tree: which row/column each tile gets, and how wide
+  // each section is (as wide as its tiles need).
+  const sections = $derived(
+    groups.map((g) => layoutSection(g.group, g.tiles, spanOf, maxModules)),
+  );
+
   const pageStyle = $derived(
     `--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(page.background)}`,
   );
@@ -69,8 +87,14 @@
     </p>
   {/if}
 
-  {#each groups as g (g.group.id)}
-    <GroupSection group={g.group} tiles={g.tiles} {bp} pageId={page.id} />
+  {#each sections as s (s.group.id)}
+    <GroupSection
+      group={s.group}
+      tiles={s.tiles}
+      modules={s.modules}
+      {bp}
+      pageId={page.id}
+    />
   {/each}
 </div>
 

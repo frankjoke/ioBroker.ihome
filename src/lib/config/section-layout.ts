@@ -1,4 +1,4 @@
-import type { Group, Placement } from "$lib/types/display";
+import type { Group } from "$lib/types/display";
 import type { ResolvedTile } from "$lib/config/pages-ops";
 
 /**
@@ -22,15 +22,12 @@ export function modulesFor(
 }
 
 /** One tile with the position the renderer gives it (module units, 0-based). */
-export interface PlacedTile<T = unknown> {
-  tile: ResolvedTile<T>;
-  /** The tree entry itself: its `id` and `newLine` drive the placement. */
-  placement: Placement;
+export type PlacedTile<T = unknown> = ResolvedTile<T> & {
   row: number;
   column: number;
   /** Its width in modules, clamped to what the page can show. */
   span: number;
-}
+};
 
 export interface PlacedSection<T = unknown> {
   group: Group;
@@ -63,7 +60,7 @@ export function layoutSection<T>(
       row += 1;
       column = 0;
     }
-    placed.push({ tile, placement: tile.placement, row, column, span });
+    placed.push({ ...tile, row, column, span });
     column += span;
     widest = Math.max(widest, column);
   }

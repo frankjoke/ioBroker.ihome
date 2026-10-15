@@ -9,22 +9,36 @@
   let {
     group,
     tiles,
+    modules = 0,
     bp,
     pageId,
   }: {
     group: Group;
     tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
+    /** The section's width in tile modules from the layout pass; 0 → fluid. */
+    modules?: number;
     bp: Breakpoint;
     pageId: string;
   } = $props();
+
+  /** The section is exactly as wide as its tiles need (the pass decided). */
+  const width = $derived(
+    modules > 0
+      ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px);`
+      : "",
+  );
+  const background = $derived(
+    group.appearance?.background
+      ? backgroundCss(group.appearance.background)
+      : "",
+  );
 </script>
 
 <section
   class="group"
   class:bordered={group.appearance?.border === true}
-  style={group.appearance?.background
-    ? backgroundCss(group.appearance.background)
-    : ""}
+  class:new-line={group.newLine === true}
+  style="{background} {width}"
 >
   {#if group.title}
     <h2 class="group-title">
@@ -35,13 +49,19 @@
     </h2>
   {/if}
 
-  <div class="grid">
+  <div
+    class="grid"
+    style={modules > 0
+      ? `grid-template-columns: repeat(${modules}, var(--tile-w, 57px));`
+      : ""}
+  >
     {#each tiles as t (t.placement.id)}
       <Tile
         device={t.device}
         {bp}
         title={t.placement.title}
         tile={t.placement.tile}
+        newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
       />
     {/each}
@@ -59,6 +79,11 @@
     flex: 0 1 auto;
     min-width: min(100%, var(--tile-w, 57px));
     max-width: 100%;
+  }
+
+  /* A section that asks for a new line takes the whole line, whatever fits. */
+  .group.new-line {
+    flex-basis: 100%;
   }
 
   /* `appearance.border: true` draws the section's box; absent is today's look. */

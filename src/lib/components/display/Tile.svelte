@@ -40,6 +40,7 @@
     title,
     tile,
     anchor,
+    newLine,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -49,6 +50,8 @@
     tile?: TileConfig;
     /** Where this tile sits on a page — what the display hands the editor (A16). */
     anchor?: PlacementAnchor;
+    /** The tree asks for a line break before this tile. */
+    newLine?: boolean;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -343,6 +346,7 @@
   class:has-bottom-badge={corners["bottom-left"].length > 0 ||
     corners["bottom-right"].length > 0}
   style="grid-column: span {span.w}; grid-row: span {span.h}; {tileVars}"
+  style:grid-column-start={newLine ? 1 : undefined}
   class:interactive={extraControls.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
