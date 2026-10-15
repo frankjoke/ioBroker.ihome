@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { applyWrite } from "$lib/utils/transform";
+  import { writeControl } from "$lib/utils/control-write";
   import { formatValue } from "$lib/config/format";
   import type { EnrichedControl } from "$lib/types/device";
 
@@ -10,11 +10,10 @@
     return v === true || v === "true" || v === 1 || v === "1";
   }
 
-  function write(value: unknown) {
-    if (!control.available || !control.writable || !control.stateId) return;
-    const v = applyWrite(value, control.transform);
-    ioBroker.setState(control.stateId, v).catch((e: unknown) => {
-      console.warn("Failed to set state:", e);
+  /** `lock` is for toggles: one press must mean one change of state, never two. */
+  function write(value: unknown, lock = false) {
+    writeControl(ioBroker, control, value, Date.now(), {
+      lockMs: lock ? 750 : 0,
     });
   }
 
@@ -51,7 +50,7 @@
     disabled={!control.writable}
     onclick={(e) => {
       e.stopPropagation();
-      write(!truthy(control.liveValue));
+      write(!truthy(control.liveValue), true);
     }}
   >
     {truthy(control.liveValue) ? "On" : "Off"}
@@ -103,7 +102,7 @@
     disabled={!control.writable}
     onclick={(e) => {
       e.stopPropagation();
-      write(true);
+      write(true, true);
     }}
   >
     Press

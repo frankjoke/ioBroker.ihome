@@ -5,7 +5,7 @@
   import { page } from "$app/state";
   import { ioBrokerStart } from "$lib/ioBrokerConnect.svelte.js";
   import { defineStorage } from "$lib/tools.svelte";
-  import { loadUsedStates } from "$lib/states.svelte.js";
+  import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
     setStateSource,
     setObjectSource,
@@ -60,7 +60,7 @@
     setStateSource(ioBroker.states);
     setObjectSource(ioBroker.objects);
     void ioBroker.objects.size;
-    loadUsedStates();
+    void reloadUsedStates();
     // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).
     void (async () => {

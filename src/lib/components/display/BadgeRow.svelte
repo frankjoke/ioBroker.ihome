@@ -41,8 +41,11 @@
     gap: 3px;
     max-width: 92%;
     pointer-events: none;
-    /* A hair outside the tile so the corner reads as *the* corner. */
-    --corner: -3px;
+    /* Outside the tile so the corner reads as *the* corner — far enough to sit
+       on the border/glow. The offsets are measured from the *padding* box, so the
+       tile's 1px border eats one: -5px lands the badge 4px clear of the edge.
+       The grid gap is 6px, so two facing badges still clear each other. */
+    --corner: -5px;
   }
 
   .badges.top-left {

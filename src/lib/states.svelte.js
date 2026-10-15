@@ -13,6 +13,18 @@ let rerun = false;
 // cache and only these are updated on stateChange. Runs once after the
 // connection and again whenever the registry adds new state ids; batches yield
 // to keep the UI responsive.
+/**
+ * Re-read every used state from scratch. Call this on every (re)connect: the
+ * `loaded` set otherwise keeps ids that may have changed while we were away, and
+ * a stale value is not cosmetic here — a toggle writes *relative* to it, so one
+ * press would toggle twice (or appear to do nothing) until something else
+ * refreshed the value.
+ */
+export async function reloadUsedStates() {
+  loaded.clear();
+  return loadUsedStates();
+}
+
 export async function loadUsedStates() {
   if (loading) {
     rerun = true;

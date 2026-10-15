@@ -311,3 +311,38 @@ Measured live: 14.4px/700 + 11.52px/400 (exactly −20%), secondary 13.44px/400 
 main value is 0.95→0.90rem, so bolding it does not grow the block. A boolean's unit is its
 false/true pair ("Aus/Ein"), so it stays the label and is never repeated — `Brunnen` reads `OFF`,
 not `OFF OFF/ON`. Device name (12px/600) and badge (11px/500) are untouched.
+
+## Follow-up 9 — the double-toggle, and corners 4px out
+
+Your instinct pointed at the right area. Two distinct causes, both now fixed:
+
+1. **Stale live values.** `loadUsedStates()` skipped every id it had already loaded, so after a
+   socket blip (I had seen a `CLOSE_ABNORMAL` earlier) the cache kept pre-blip values forever. A
+   press then writes *relative to a value that was never true* — which reads exactly like "one
+   press toggles twice": press once, nothing (or the wrong thing) happens, press again and it
+   moves twice. `reloadUsedStates()` now clears the set and re-reads from the broker on every
+   (re)connect.
+2. **Two events, one press** (double click, or a duplicated handler): the second event can read the
+   already-changed value and write the opposite. `writeControl` (new, `src/lib/utils/control-write.ts`)
+   puts a short **750 ms lock per state id** on toggle-shaped writes; sliders pass no lock so every
+   step of a drag still lands. Both tile and modal now write through this one helper.
+   **Verified live** on `Brunnen`: two presses 250 ms apart flipped it exactly once (`false → true`),
+   app in sync, then I put it back (`finalValue: false`, as found).
+
+**On your principle — you can trust the display here:** nothing in the app writes a value into the
+live cache. The vendored socket client has no `setState` of its own (0 occurrences), so our write
+only *emits* to the broker; the only writers of the cache are `stateChange` (`ioBrokerConnect.svelte.js:269`)
+and `getState` (line 443). No component paints its own outcome.
+
+One related detail worth knowing, pre-existing: `ioBrokerConnect.setState` wraps a plain value as
+`{ val, ts: Date.now(), from: namespace }`, so *we* stamp the timestamp we send. It does not change
+what is displayed, but an `ago` badge can read "now" for a change the broker has not confirmed yet.
+Left alone (changing it touches ack semantics) — flagging it as a candidate.
+
+Also: **badges now sit 4px clear of the tile edge** on all four corners (`--corner: -5px`; the
+offsets are measured from the padding box, so the 1px border eats one — that is why the previous
+`-4px` measured as `-3`). Facing badges keep 23px clearance.
+
+**Incidental finding from testing a light:** `alias.0.Keller.AbstellraumLicht.SET` behaves as a
+*momentary* button (writing true leaves it false), so a Light tile on it can never show a stable
+state. That device wants the `Button` type (the type exists now) — a config matter, not code.

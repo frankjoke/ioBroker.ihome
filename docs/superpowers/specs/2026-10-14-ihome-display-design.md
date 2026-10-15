@@ -301,7 +301,18 @@ backgrounds.
   feature match always wins, so renaming a label can only add a match, never steal one.
 - `disabled` from a rule dims what it matches — the whole tile, or just the glyph — without
   disabling it: an "off" light is still the thing you tap to switch on.
-- **Badges live in corners, a couple of pixels outside the tile edge** (they may sit on the
+- **The display only ever moves on the broker's word.** `writeControl` emits
+  `setState` and nothing else: no component writes a value into the live cache, and the only
+  writers of that cache are the socket's `stateChange` handler and `getState`. A press may not
+  paint its own outcome, because a value shown that ioBroker has not confirmed is a value that
+  will fight the truth coming back.
+- **A toggle is one write per press**: `writeControl` holds a short per-state lock for
+  toggle-shaped writes (75 ms of drift and a slow echo would otherwise let the *second* event of
+  one press read the already-changed value and write the opposite). Sliders pass no lock — every
+  step of a drag must land. The live cache is also reloaded from the broker on every (re)connect
+  (`reloadUsedStates`), because a stale value makes the next press write relative to a value that
+  was never true.
+- **Badges live in corners, four pixels outside the tile edge** (they may sit on the
   border/glow), and a tile that has one reserves the band it lives in, so a badge never covers a
   value. The corner carries meaning: : an `ago` badge is bottom-left
   ("how long ago"), `battery` / `offline` / `alarm` / `error` are top-right ("something is

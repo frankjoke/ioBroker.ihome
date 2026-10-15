@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { applyWrite } from "$lib/utils/transform";
+  import { writeControl } from "$lib/utils/control-write";
   import {
     pickControl,
     primaryControl,
@@ -200,10 +200,10 @@
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
     if (!primary || primary.widget !== "switch") return;
-    if (!primary.writable || !primary.available || !primary.stateId) return;
-    const v = applyWrite(!truthy(primary.liveValue), primary.transform);
-    ioBroker.setState(primary.stateId, v).catch((e: unknown) => {
-      console.warn("Failed to set state:", e);
+    // Guarded and locked: two arrivals of the same press (a double click, a
+    // duplicated handler) must not become two toggles.
+    writeControl(ioBroker, primary, !truthy(primary.liveValue), Date.now(), {
+      lockMs: 750,
     });
   }
 
