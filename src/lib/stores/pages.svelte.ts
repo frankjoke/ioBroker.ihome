@@ -45,6 +45,21 @@ export function setPageRegistry(reg: PageRegistry): void {
 let initPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSent: string | null = null;
+let saveFailed = $state(false);
+
+/**
+ * True while the last document write failed, so the editor can say "not saved"
+ * instead of pretending the change landed.
+ */
+export function getLayoutSaveFailed(): boolean {
+  return saveFailed;
+}
+
+/**
+ * Display edit mode, session-only (never persisted): while on, a tap on a tile
+ * opens its placement in the editor instead of operating the control.
+ */
+export const layoutEdit = $state({ on: false });
 
 async function ensurePagesObject() {
   const obj = await ioBroker.getObject(PAGE_LIST_ID);
@@ -70,7 +85,13 @@ export function savePages(): void {
     lastSent = snapshot;
     ioBroker
       .setState(PAGE_LIST_ID, snapshot)
-      .catch((e) => console.error("save pages:", e));
+      .then(() => {
+        saveFailed = false;
+      })
+      .catch((e) => {
+        saveFailed = true;
+        console.error("save pages:", e);
+      });
   }, 250);
 }
 
