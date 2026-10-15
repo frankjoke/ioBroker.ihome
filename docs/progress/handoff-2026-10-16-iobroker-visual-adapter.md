@@ -54,6 +54,23 @@ the touch long-press path (touch-only, and it swallows the click it produced) ·
 1. **Compare against iqontrol** (`192.168.178.9:8082/iqontrol`): press the same device the same way.
    If it doubles there too, it is the device/adapter (hm-rpc/hm-rega alias semantics), not our UI.
    This is one minute and settles most of it.
+   **The user's observation (2026-10-15, late): iQontrol also shows the change only ~1 s AFTER the
+   click** — it sends `setState` and paints only when the updated state arrives, i.e. no optimistic
+   paint, same rule this display follows. Two consequences:
+   - the comparison must be judged **with that delay in mind** (press once, wait ≥2 s before
+     concluding nothing happened);
+   - a ~1 s wait with no feedback is itself an invitation to press again — which is a *second write*
+     from a second press, not a double. This makes "user pressed twice because nothing seemed to
+     happen" a strong alternative explanation for the symptom, alongside the momentary-button case.
+   - ~1 s echo latency also justifies the 3 s ceiling in the guard (a shorter timer would have been
+     extended by the slow adapter anyway).
+
+   **Candidate follow-up (if that is the explanation): give feedback without painting the value.**
+   While a toggle write is unconfirmed, show that the press registered — e.g. a subtle pending state on
+   the value/icon (reduced opacity or a small dot) that clears when the broker's value arrives. It keeps
+   the display honest (never shows an unconfirmed value) while removing the "nothing happened, press
+   again" reflex. The pending map in `writeControl` already knows exactly this state and can expose it
+   (`isPending(id)`), so the UI change is small.
 2. **Instrument writes and changes.** Add a temporary `?debug=` flag (or `console.log`):
    `[write] <id> <val> <at>` in `writeControl`, and `[change] <id> <val> <at>` in the `stateChange`
    handler (`ioBrokerConnect.svelte.js:266`). Press once and read the console:
