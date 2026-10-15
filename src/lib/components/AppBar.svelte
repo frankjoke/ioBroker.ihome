@@ -1,26 +1,38 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { page as route } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     getPageRegistry,
-    layoutEdit,
     setLastPage,
+    view,
   } from "$lib/stores/pages.svelte.js";
+  import { pages as configPages, pageHref } from "$lib/pages.js";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
 
-  let { currentId }: { currentId?: string } = $props();
+  /**
+   * One bar for the whole app, in two states. The left half follows the state:
+   * the tree's pages + a pencil (which opens the layout editor) on the display,
+   * the editor's own tabs + an eye (back to the display) in the editor. The
+   * right half — theme, connection, system settings — never moves.
+   */
+  const routeId = $derived(route.route?.id ?? "/");
+  const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
 
-  const pages = $derived(getPageRegistry().pages ?? []);
+  const treePages = $derived(getPageRegistry().pages ?? []);
+  /** Which tree page the display is showing (a bookmarked id, else the last one). */
+  const currentId = $derived(
+    isDisplay
+      ? (route.params?.id ?? view.lastPage ?? treePages[0]?.id ?? "")
+      : "",
+  );
   const isConnected = $derived(!!ioBroker.connected);
-  // One page is not a navigation: the tabs appear as soon as there is a second
-  // one, and the first page is the display's default.
-  const showTabs = $derived(pages.length > 1);
 </script>
 
 <header class="bar">
-  {#if showTabs}
-    <nav class="page-tabs" aria-label="Pages">
-      {#each pages as p (p.id)}
+  <nav class="tabs" aria-label={isDisplay ? "Pages" : "Configuration"}>
+    {#if isDisplay}
+      {#each treePages as p (p.id)}
         <a
           class="tab"
           class:active={p.id === currentId}
@@ -34,23 +46,40 @@
           <span class="tab-label">{p.title}</span>
         </a>
       {/each}
-    </nav>
-  {/if}
+      <a
+        class="tab icon-tab"
+        href={`${base}/#/layout`}
+        title="Edit the layout"
+        aria-label="Edit the layout"
+      >
+        <span class="material-symbols-outlined">edit</span>
+      </a>
+    {:else}
+      {#each configPages as p (p.id)}
+        <a
+          class="tab"
+          class:active={routeId === p.id}
+          href={pageHref(p.id, base)}
+          aria-current={routeId === p.id ? "page" : undefined}
+        >
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >{p.icon}</span
+          >
+          <span class="tab-label">{p.label}</span>
+        </a>
+      {/each}
+      <a
+        class="tab icon-tab"
+        href={`${base}/#/`}
+        title="Back to the display"
+        aria-label="Back to the display"
+      >
+        <span class="material-symbols-outlined">visibility</span>
+      </a>
+    {/if}
+  </nav>
 
   <div class="actions">
-    <button
-      type="button"
-      class="icon-btn"
-      class:active={layoutEdit.on}
-      title={layoutEdit.on ? "Leave edit mode" : "Edit the layout"}
-      aria-pressed={layoutEdit.on}
-      onclick={() => (layoutEdit.on = !layoutEdit.on)}
-    >
-      <span class="material-symbols-outlined"
-        >{layoutEdit.on ? "edit_off" : "edit"}</span
-      >
-    </button>
-
     <ThemeToggle />
 
     <a
@@ -79,9 +108,6 @@
 </header>
 
 <style>
-  /* The display owns the viewport, so the bar is only what the display needs:
-     the tree's page tabs (when there is more than one page), the edit toggle,
-     the theme switch, the connection state and the system settings. */
   .bar {
     position: sticky;
     top: 0;
@@ -96,7 +122,7 @@
     backdrop-filter: blur(8px);
   }
 
-  .page-tabs {
+  .tabs {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -106,7 +132,7 @@
     scrollbar-width: none;
   }
 
-  .page-tabs::-webkit-scrollbar {
+  .tabs::-webkit-scrollbar {
     display: none;
   }
 
@@ -137,6 +163,12 @@
     font-size: 18px;
   }
 
+  /* The pencil (display) and the eye (editor) sit in the tab row as the last
+     entry, so both states read as one bar. */
+  .icon-tab {
+    padding: 6px 10px;
+  }
+
   .actions {
     display: flex;
     align-items: center;
@@ -150,23 +182,14 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    border: none;
-    background: transparent;
     border-radius: var(--border-radius-pill);
     color: var(--text-muted);
-    cursor: pointer;
   }
 
   .icon-btn:hover {
     text-decoration: none;
     background-color: var(--surface-container);
     color: var(--text-color);
-  }
-
-  /* Edit mode on: the toggle says so; the tiles only change how they respond. */
-  .icon-btn.active {
-    color: var(--primary-color);
-    background-color: var(--surface-container);
   }
 
   .icon-btn .material-symbols-outlined {

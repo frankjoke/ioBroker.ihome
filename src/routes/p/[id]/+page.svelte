@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page as route } from "$app/state";
-  import DisplayBar from "$lib/components/display/DisplayBar.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
   import { getPageRegistry, setLastPage } from "$lib/stores/pages.svelte.js";
 
@@ -21,8 +20,6 @@
 </svelte:head>
 
 <div class="display">
-  <DisplayBar currentId={current?.id} />
-
   {#if current}
     {#key current.id}
       <PageView page={current} />

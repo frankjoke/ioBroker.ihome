@@ -26,8 +26,7 @@
   import { seedPages, toFilterable } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
-  import ThemeToggle from "$lib/ThemeToggle.svelte";
-  import { pages, pageHref } from "$lib/pages.js";
+  import AppBar from "$lib/components/AppBar.svelte";
 
   let { children } = $props();
 
@@ -56,8 +55,7 @@
     url: buildUrl(storage.hostPort),
   });
 
-  let footerOpen = $state(false);
-  // active tab is derived from the SvelteKit hash router's resolved route
+  let footerOpen = $state(!ioBroker.connected);
   const current = $derived(page.route?.id ?? "/");
   const isConnected = $derived(!!ioBroker.connected);
   // The display routes own the whole viewport: no config header, no page
@@ -136,56 +134,7 @@
 </svelte:head>
 
 <div class="app-shell" class:display={isDisplay}>
-  <header class="app-header">
-    <a class="brand" href={`${base}/#/`}>
-      <img src={`${base}/house-controller.svg`} alt="" width="30" height="30" />
-      <span class="brand-name">iHome</span>
-    </a>
-
-    <nav class="tab-bar" aria-label="Pages">
-      {#each pages as p (p.id)}
-        <a
-          class="tab"
-          class:active={current === p.id}
-          href={pageHref(p.id, base)}
-          aria-current={current === p.id ? "page" : undefined}
-        >
-          <span class="material-symbols-outlined">{p.icon}</span>
-          <span class="tab-label">{p.label}</span>
-        </a>
-      {/each}
-    </nav>
-
-    <div class="header-actions">
-      <ThemeToggle />
-      <a
-        class="icon-btn"
-        class:active={current === "/settings"}
-        href={`${base}/#/settings`}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <span class="material-symbols-outlined">settings</span>
-      </a>
-      <button
-        type="button"
-        class="icon-btn status-btn"
-        class:connected={isConnected}
-        title={isConnected
-          ? "Connected — show/hide connection details"
-          : "Disconnected — show/hide connection details"}
-        aria-label={isConnected
-          ? "Connected. Toggle connection footer"
-          : "Disconnected. Toggle connection footer"}
-        aria-expanded={footerOpen || !isConnected}
-        onclick={() => (footerOpen = !footerOpen)}
-      >
-        <span class="material-symbols-outlined"
-          >{isConnected ? "wifi" : "wifi_off"}</span
-        >
-      </button>
-    </div>
-  </header>
+  <AppBar />
 
   <main class="app-main">
     {@render children()}
@@ -248,133 +197,6 @@
     min-height: 100vh;
   }
 
-  /* ---------------------------------------------------------- header */
-
-  .app-header {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.7rem 24px;
-    background-color: var(--surface-container-low);
-    border-bottom: 1px solid var(--border-color);
-    backdrop-filter: blur(8px);
-  }
-
-  .brand {
-    justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-weight: 700;
-    font-size: 1.05rem;
-    letter-spacing: -0.01em;
-    color: var(--text-color);
-  }
-
-  .brand:hover {
-    text-decoration: none;
-  }
-
-  .brand img {
-    border-radius: 8px;
-  }
-
-  /* centered tab bar, rendered from the page registry */
-  .tab-bar {
-    justify-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 4px;
-    background-color: var(--surface-container-lowest);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill);
-  }
-
-  .tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 16px;
-    border-radius: var(--border-radius-pill);
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    transition:
-      background-color var(--transition-fast),
-      color var(--transition-fast);
-  }
-
-  .tab:hover {
-    text-decoration: none;
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
-
-  .tab.active {
-    background-color: var(--primary-container);
-    color: var(--on-primary-container);
-  }
-
-  .tab .material-symbols-outlined {
-    font-size: 18px;
-  }
-
-  .header-actions {
-    justify-self: end;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-pill);
-    background-color: transparent;
-    color: var(--text-muted);
-    transition:
-      background-color var(--transition-fast),
-      color var(--transition-fast);
-  }
-
-  .icon-btn:hover {
-    text-decoration: none;
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
-
-  .icon-btn.active {
-    background-color: var(--primary-container);
-    color: var(--on-primary-container);
-  }
-
-  .status-btn .material-symbols-outlined {
-    font-size: 20px;
-  }
-
-  .status-btn.connected .material-symbols-outlined {
-    color: var(--tertiary);
-    font-variation-settings:
-      "FILL" 1,
-      "wght" 400,
-      "GRAD" 0,
-      "opsz" 24;
-  }
-
-  .status-btn:not(.connected) .material-symbols-outlined {
-    color: var(--warning-color);
-  }
-
   /* ------------------------------------------------------------ main */
 
   .app-main {
@@ -383,11 +205,6 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 24px;
-  }
-
-  /* The display owns the viewport: its own slim bar, no config chrome. */
-  .app-shell.display .app-header {
-    display: none;
   }
 
   .app-shell.display .app-main {
@@ -469,36 +286,8 @@
   /* -------------------------------------------------------- responsive */
 
   @media (max-width: 768px) {
-    .app-header {
-      grid-template-columns: auto 1fr;
-      grid-template-areas:
-        "brand actions"
-        "tabs tabs";
-      row-gap: 0.5rem;
-      padding: 0.6rem 16px;
-    }
-
-    .brand {
-      grid-area: brand;
-    }
-
-    .header-actions {
-      grid-area: actions;
-    }
-
-    .tab-bar {
-      grid-area: tabs;
-      justify-self: stretch;
-      justify-content: center;
-      overflow-x: auto;
-    }
-
     .app-main {
       padding: 16px;
-    }
-
-    .field input {
-      min-width: 140px;
     }
   }
 </style>
