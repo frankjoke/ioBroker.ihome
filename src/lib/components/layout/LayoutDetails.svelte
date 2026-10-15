@@ -12,7 +12,13 @@
     toFilterable,
     type FilterableDevice,
   } from "$lib/config/pages-ops";
-  import { BREAKPOINTS, breakpointFor } from "$lib/config/size-ops";
+  import {
+    BREAKPOINTS,
+    breakpointFor,
+    type TileSpan,
+  } from "$lib/config/size-ops";
+  import { effectiveSpan } from "$lib/config/template-ops";
+  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import type {
@@ -20,6 +26,7 @@
     Group,
     PageRegistry,
     Placement,
+    Size,
   } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
 
@@ -117,11 +124,29 @@
     onChange(patchPlacement(registry, page.id, section.id, tile.id, patch));
   }
 
+  /**
+   * The size the tile actually renders at: its placement's own size when set,
+   * else its template's — the same calculation the display and the section pass
+   * use. The fields must never show (or write back) a size other than this, or
+   * editing one axis silently changes the other.
+   */
+  function effectiveTileSpan(): TileSpan {
+    if (!tile) return { w: 1, h: 1 };
+    return effectiveSpan(
+      tile.tile,
+      devices.find((d) => d.id === tile!.device),
+      getTemplateRegistry().templates,
+      bp,
+    );
+  }
+
   function setSize(axis: "w" | "h", raw: string): void {
     if (!tile) return;
     const value = Number(raw);
     if (!value) return;
-    const size = { w: tile.tile?.size?.w ?? 1, h: tile.tile?.size?.h ?? 1 };
+    // `effectiveSpan` clamps to the breakpoint's maximum (never above 4), so the
+    // values are a valid Size.
+    const size = { ...effectiveTileSpan() } as Size;
     size[axis] = value as 1 | 2 | 3 | 4;
     setTile({ tile: { ...(tile.tile ?? {}), size } });
   }
@@ -279,7 +304,7 @@
             <select
               aria-label={`Size ${axis}`}
               value={String(
-                (axis === "w" ? tile.tile?.size?.w : tile.tile?.size?.h) ?? 1,
+                axis === "w" ? effectiveTileSpan().w : effectiveTileSpan().h,
               )}
               onchange={(e) =>
                 setSize(axis as "w" | "h", e.currentTarget.value)}
