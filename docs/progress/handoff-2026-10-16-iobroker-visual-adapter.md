@@ -1,145 +1,119 @@
-# Handoff — iHome display: OPEN double-toggle, and where the branch stands
+# Handoff — 2026-10-16 — iobroker-visual-adapter
 
-**Date:** 2026-10-16 (written 2026-10-15 late, after the user stopped for the night)
-**Project:** `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`
-**Branch:** `feature/ihome-display` — 27 commits, cut from `main` @ `af3661c`, **not merged, no remote**
-**Read first if you need the full history:** `docs/progress/handoff-2026-10-15-iobroker-visual-adapter.md`
-(this file is only the *current* state + the open bug; that one has the whole session, the 45 rulings
-and the reviewer's findings)
+Previous handoff: `handoff-2026-10-15-b-iobroker-visual-adapter.md` (display basics, rename/identity,
+serving findings). This session was the P1 review + fix pass and a round of layout-editor polish the user
+drove by watching the app.
 
 ---
 
-## 1. THE OPEN BUG — one press sometimes toggles a switch twice
+## 1. Where we are
 
-**Symptom (user's words):** pressing `ON` or the icon on a switch sometimes toggles twice (the device
-ends where it started, or moves two steps). Intermittent — "still happens some time".
+- Branch `feature/ihome-display` at **`1e186d5`**, working tree clean. No remote, nothing pushed, nothing
+  merged. 30 commits since the review base `bb10915`.
+- **All gates green:** `npm run check` 0 errors / 0 warnings, `npm test` **285 passed** (25 files),
+  `npm run lint` **0 problems** (was 2 pre-existing errors), `npm run build` writes `www/`.
+  `graphify update .` refreshed `graphify-out/`.
+- Live broker `192.168.178.9` (admin 8081, web.0 8082). The display and the editor were verified live
+  against the real document: **2 pages / 32 sections / 16 placements / version 1**, unchanged by any check
+  this session (no broker write happened).
+- P1 (the layout editor) is implemented, reviewed, fixed, and (in the reviewer's scope) still not
+  *re-reviewed* — a fresh reviewer has only confirmed the findings, not the fixes.
 
-### What the code provably does (verified today, with evidence)
+## 2. What happened today, in order
 
-- **The display is broker-only.** Nothing paints a write's outcome locally:
-  - the vendored client has **no `setState`** of its own (`grep -c setState src/lib/iobroker.socket.io.js` → 0),
-    so our write only *emits* to the broker;
-  - the only writers of the live state cache are the socket's `stateChange` handler
-    (`src/lib/ioBrokerConnect.svelte.js:269`) and `getState` (line 443);
-  - no component assigns into that cache (grep for `states.update|states.set` returns only those two).
-- **One write path:** `writeControl()` in `src/lib/utils/control-write.ts`, called by `Tile.togglePrimary`
-  (`Tile.svelte`) and by `ControlWidget.write` (the modal + slider/switch widgets).
-- **A single press produced a single write** when measured (sampled the broker's `ts` across one click).
+**P1 branch review** — `bb10915..e293dd6` (19 commits), reviewer on `opencode/gpt-6-astra`, package
+`.superpowers/sdd/2026-10-15-ihome-layout-editor/review-bb10915..e293dd6.diff`. Verdict: **not mergeable**
+— 3 Critical, 11 Important, 4 Minor. Every Critical was the same class: **data loss on the user's live
+`pageList`** (migrating from an unknown device list; junk placements accepted then rewritten to `[]` or
+thrown on; writing without a successful load). Plus `crypto.randomUUID` — needs a secure context, so
+creating/duplicating/migrating would have **thrown on the plain-HTTP broker**; it only ever worked because
+testing happened on localhost.
 
-### Fixed today (all committed)
+**Fix pass** (red-first tests in `src/lib/config/review-fixes.test.ts`, 6 cases):
 
-1. **Stale live values after a socket blip** — the most likely cause of "sometimes". `loadUsedStates()`
-   skipped ids it had already loaded, so after a disconnect (a `CLOSE_ABNORMAL` was seen in the console
-   this session) the cache kept pre-blip values forever; a press then writes *relative to a value that was
-   never true*. `reloadUsedStates()` (`src/lib/states.svelte.js`) now clears the set and re-reads
-   everything from the broker on every (re)connect (called from `+layout.svelte`'s connect `$effect`).
-2. **Two events for one press** — `writeControl` now refuses a toggle while an earlier one is
-   unconfirmed: it allows the next press as soon as the live value equals what we wrote, with a 3 s
-   ceiling. Sliders pass no lock (every step of a drag must land). Tests in
-   `src/lib/utils/control-write.test.ts` (4 cases: lock, confirmation shortcut, ceiling, sliders,
-   unwritable control).
+| commit | what |
+| --- | --- |
+| `319d2e7` | C1–C3 + I1–I7 + I10: write gate (`mayWritePages`/`isLayoutWritable`), migration refuses while no device is known + migrates from the canonical snapshot, `isPlacement` validation, the disconnected-save failure, `newId()`, one shared `effectiveSpan`, the `newLine` tile width, the bordered-section width, the `newLine` section break, `movePlacement` validation, the size fields |
+| `53a3804` | the editor says "not editable" + disables Add page when the document did not load |
+| `879b445` | size fields show the size the tile renders at (a 2×1 preset no longer shows 1×1) |
+| `0dc3267` | the connection footer really is disconnected-only (`footerOpen` used to stick) |
 
-**Verified live** on `Brunnen`: two presses 250 ms apart flipped it **exactly once**, app in sync; the
-state was restored afterwards. **Caveat to tell the user:** by design a *deliberate* second press within
-a few hundred ms is now **refused** — that is the guard doing its job; the ceiling releases after 3 s.
+**Deferred by ruling** (in the ledger, each with its cost — not dropped): I8 change-device in the pane,
+I9 cross-section tile movement, I11 the picker's focus trap + the tree's keyboard contract, M1 tall-tile
+occupancy in the pass, M2 deep copy on duplicate, M3 the AppBar's stale active tab.
 
-### Also ruled out today
+**Cleanup the user picked** — `b0a5459`: every `crypto.randomUUID()` → `newId()` (including `pages-ops.ts`,
+which the fix pass had missed), the dead `layoutEdit` + Tile edit-mode guards deleted (Ctrl/Cmd+click is
+the one route to a tile's placement), 2 pre-existing lint errors fixed.
 
-Optimistic local painting · a duplicated handler in the tile · the pill and icon double-binding ·
-the touch long-press path (touch-only, and it swallows the click it produced) · `applyWrite`/transform
-(the affected controls have no transform).
+**Layout-editor polish, driven by the user watching it:**
 
-### Do tomorrow, in this order (cheapest decisive first)
+- `a7085db` — a section adds tiles with the same `+` as a page row; the "Add tile" text line is gone. The
+  section's filter hint ("N matching this section's filter are not here · Add them") is a different thing
+  and stayed; it now renders only when there is a hint.
+- `9313889` — dark-mode icon contrast. The tree's action buttons were the only icon buttons in the app
+  with no styling of their own: they kept the browser's default button face (a light grey that never
+  follows the theme) and the row faded them with `opacity: 0.35`, which blends with whatever is behind.
+  Dark measured **1.8:1**; the bar's and device list's buttons instead switch `--text-muted` →
+  `--text-color`. The tree does that now: **5.15:1 idle / 12.6:1 hover** dark, 6.42:1 / 17:1 light. Also
+  `color-scheme` per theme in `app.css` (browser-painted controls — the pane's selects, scrollbars — were
+  rendering light in dark mode).
+- `f35c3f4` — hovering a row no longer lights up every icon; the row's background carries the affordance
+  and only the button under the cursor goes to `--text-color`. Verified live: row hover leaves one
+  distinct icon colour, button hover moves that one icon and leaves the other four muted.
+- `1e186d5` — the row hover was *invisible* in dark mode: the dark palette defines `--surface-color` and
+  `--surface-container` as the **same** `#1c2028`, so the hover painted the identical colour (contrast
+  1.00; light was 1.12). New `--row-hover` token: light keeps its value, dark takes the page background
+  (`#0f131c` on the `#1c2028` card, 1.14 — same direction and strength as light).
 
-1. **Compare against iqontrol** (`192.168.178.9:8082/iqontrol`): press the same device the same way.
-   If it doubles there too, it is the device/adapter (hm-rpc/hm-rega alias semantics), not our UI.
-   This is one minute and settles most of it.
-   **The user's observation (2026-10-15, late): iQontrol also shows the change only ~1 s AFTER the
-   click** — it sends `setState` and paints only when the updated state arrives, i.e. no optimistic
-   paint, same rule this display follows. Two consequences:
-   - the comparison must be judged **with that delay in mind** (press once, wait ≥2 s before
-     concluding nothing happened);
-   - a ~1 s wait with no feedback is itself an invitation to press again — which is a *second write*
-     from a second press, not a double. This makes "user pressed twice because nothing seemed to
-     happen" a strong alternative explanation for the symptom, alongside the momentary-button case.
-   - ~1 s echo latency also justifies the 3 s ceiling in the guard (a shorter timer would have been
-     extended by the slow adapter anyway).
+**Hardening found while chasing that:** `src/lib/localStorage.js` parsed stored values unguarded, so a
+single corrupt entry threw during module init and took the whole app down. It now falls back to the
+entry's default and repairs it.
 
-   **Candidate follow-up (if that is the explanation): give feedback without painting the value.**
-   While a toggle write is unconfirmed, show that the press registered — e.g. a subtle pending state on
-   the value/icon (reduced opacity or a small dot) that clears when the broker's value arrives. It keeps
-   the display honest (never shows an unconfirmed value) while removing the "nothing happened, press
-   again" reflex. The pending map in `writeControl` already knows exactly this state and can expose it
-   (`isPending(id)`), so the UI change is small.
-2. **Instrument writes and changes.** Add a temporary `?debug=` flag (or `console.log`):
-   `[write] <id> <val> <at>` in `writeControl`, and `[change] <id> <val> <at>` in the `stateChange`
-   handler (`ioBrokerConnect.svelte.js:266`). Press once and read the console:
-   - **1 write + 2 changes** → the broker/adapter produces the second change: the device is momentary,
-     or the adapter reports a *different* value than requested (we write boolean `true`, it reports
-     `1`/`"true"` → the tile flips again). Not our UI.
-   - **2 writes** → a second DOM activation reached the handler. Log
-     `event.type`, `event.detail`, `event.isTrusted`, `pointerType` and `timeStamp` from the pill/icon
-     handler to identify it (candidates: a touch double-tap ≥3 s apart, a synthesised click after
-     `pointerup`, or an assistive/OS-level repeat).
-3. **Check the device's semantics.** Confirmed today: `alias.0.Keller.AbstellraumLicht.SET` is
-   **momentary** (writing `true` leaves it `false`), so a *Light* tile on it can never show a stable
-   state and every press looks like a double toggle. That device wants type **`Button`** in `#/devices`.
-   Check whether the "other switches" the user mentions are momentary too (same test: read the state,
-   write `true`, read again).
-4. **The `ts` stamp we send.** `ioBrokerConnect.setState` wraps a plain value as
-   `{ val, ts: Date.now(), from: namespace }` (`src/lib/ioBrokerConnect.svelte.js:502`). Sending `from`
-   + `ts` may make the broker/adapter treat it as already-acknowledged, which can change how the real
-   device's report arrives (a visible extra flip). Experiment on **one** device: emit
-   `{ val, ack: false }` instead and watch the write/change log from step 2. Careful: this brushes
-   against ack semantics and the adapter may re-report asynchronously.
-5. Only if step 2 shows **2 writes**: the durable fix is to make the activation unambiguous — e.g.
-   drive toggles from `pointerup` only (never `click`), or dedupe by `event.timeStamp` per pointer id,
-   rather than relying on the value guard.
+## 3. Two live-check traps — they will cost you the same hour
 
----
+1. **Don't write raw localStorage values.** The app's reactive storage (`localStorage.js` → JSON) expects
+   `JSON.stringify(value)`. Writing a raw `"dark"` for `__VISUAL__:theme` throws at module init → the app
+   renders SvelteKit's **"500 Internal Error"** page while `curl` still gets 200, which sends you hunting
+   for a server/proxy problem. Use `JSON.stringify("dark")`. (Now guarded, but keep doing it.)
+2. **The service worker answers from its precache.** The repo ships `src/service-worker.js`; a port that
+   once served a *build* keeps a workbox worker there, serving cached pages (I saw a cached 500 and stale
+   bundles). Use a port never used for a build, or DevTools → **Application → Service Workers → "Update on
+   reload"**, or Unregister + Clear site data. This is also the explanation for the "harness keeps
+   reloading" note in the earlier handoff. Note the worker has **no `skipWaiting()`/`clients.claim()`** —
+   after a deploy the new worker *waits* until every tab of the app is closed.
 
-## 2. Where the branch stands
+## 4. Next session, in order
 
-- `npm test` **249 passed (21 files)**, `npm run check` **0/0**, `npm run lint` clean,
-  `npm run build` writes `www/`. Everything below is committed on `feature/ihome-display`.
-- Display: `/` and `#/p/<id>`, slim bar with page tabs + room/function/favorite chips, module grid,
-  tiles with slots, badges, modal, Ctrl/Cmd+click → that device's config (`sessionStorage` handoff).
-- Data: `0_userdata.0.Test.AiHome.pageList` + `...templateList`; devices' `functions`/`favorites`
-  backfilled once from the broker's enum membership (channel-aware walk).
-- Presets: 11 types, half-width modules (`w` counts half-modules), per-breakpoint clamps, `minmax(row, auto)`
-  so rows grow instead of clipping.
-- Readouts: `options.pick` hints (`temperature`/`humidity`/`power`/`energy`/`battery`) on both value
-  slots and badges; label fallback; exact unit match.
-- Typography: main value 0.90rem/700, unit 0.72rem/400 (−20%), secondary 0.84rem/400, its unit 0.67rem.
-- Badges: four corners, 4 px outside the edge, corner = meaning (`ago` bottom-left, `battery`/`alarm`/
-  `offline` top-right, readings top-left), band reserved so they never cover a value.
+1. **P2 — the tile editor** (the next real slice): slots/values on a placement, glow/rules, a live tile
+   preview rendered by the display's own components, and seeding the missing `templateList` document
+   (currently `null`). The user's stated pattern: **`+` on a tile row adds a value/device to that tile**,
+   same icon one level down — so the tile's `+` lands together with the slots editor, not before it.
+2. The deferred rulings ride along; I8/I9 need the picker.
+3. Optional small wins: `skipWaiting` + dropping the leftover debug logging in `service-worker.js`.
+4. Then packaging (jsonConfig instead of the legacy `admin/index.html`, a real `main.js`, `@iobroker/testing`,
+   the Adapter Checker, install on the Pi) and the repo push (`frankjoke/ioBroker.ihome`). The user's rule:
+   finish a working V1 first.
 
-### Open items (unchanged, in rough priority)
+## 5. Parked / unanswered
 
-1. **The double-toggle above** — the only *bug*.
-2. **Phase 4 editors** (`/pages`, `/templates`, per-device overrides) — the biggest remaining piece, and
-   the one that would stop these "can you make the tile look like X" iterations needing code changes.
-3. `w: 2` for two-value thermometers (values currently wrap to two lines at the 60% width) — one number
-   per preset in `src/lib/config/presets.ts`.
-4. `energy` hint defined but unused; `Brunnen.Verbrauch` (Wh, 49376) is the natural first user.
-5. Duplicate tile titles after suffix stripping (`Keller` ×2, `Garten-Pool` ×2) — the device form's
-   **Tile title** field is the lever; a "strip only if unique in the group" rule is a small change.
-6. Momentary-button devices mis-typed as Light (see 1.3).
-7. Deferred minor from the reviewer: presets and their nested objects stay mutable.
-8. Earlier still-open items from the 2026-10-11 handoff are listed in the 2026-10-15 handoff.
+- Brunnen double-toggle (parked as device-side; the `[ihome-dbg]` tracing is still in).
+- Unused `house-controller.svg`.
+- Earlier open gaps, unchanged: duplicate tile titles (`Keller` ×2, `Garten-Pool` ×2), a momentary device
+  (`alias.0.Keller.AbstellraumLicht.SET`) mis-typed as Light, the unused `energy` hint, `w: 2` for
+  two-value thermometers, and `main.js:34-37` logging literal `${…}`.
+- **Idea worth doing when the palette is next touched:** the dark palette collapses several container
+  greys that are distinct in light (that is exactly what made two hovers invisible). Sweep for other token
+  pairs holding the same dark value.
 
----
+## 6. Key files touched today
 
-## 3. Environment
-
-- Windows, bash. Scratch dir: `C:\Users\franz\AppData\Local\Temp\opencode`.
-- **The user's dev server was NOT running** this session; mine (port 5174) is stopped. Start theirs with
-  `npm run dev`. The app needs the broker host once, **as JSON**:
-  `localStorage["__VISUAL__:hostPort"] = "\"192.168.178.9:8081\""` (a raw string breaks the parser).
-- ioBroker host `192.168.178.9`, admin 8081, `web.0` 8082. The ioBroker MCP was used read-only, plus one
-  delete of a `pageList` my own smoke run had created and one toggle test on `Brunnen` (restored to the
-  state it was found in).
-- Keep `cwd` at the repo root for `svelte-check`/`eslint`: a generated `.svelte-kit/` **inside** `src/`
-  is eslint-ignored only at the root and otherwise throws ~300 phantom lint errors.
-- State of `Brunnen`: left **OFF** (`alias.0.WZ.Brunnen.SET = false`) — it was ON when testing started and
-  my two-press test plus restore left it there; flip it if that matters.
+`src/lib/config/pages-ops.ts` (migration guard, `isPlacement`, `mayWritePages`) ·
+`src/lib/config/layout-ops.ts` (`movePlacement`, `newId`) · `src/lib/config/template-ops.ts`
+(`effectiveSpan`) · `src/lib/config/review-fixes.test.ts` (the 6 regression tests) ·
+`src/lib/utils/ids.ts` (`newId`) · `src/lib/stores/pages.svelte.ts` (write gate, load kind, offline save) ·
+`src/lib/components/layout/LayoutTree.svelte` (the `+`, the icon colours, the hover) ·
+`src/lib/components/layout/LayoutDetails.svelte` (the size fields) ·
+`src/lib/components/display/{Tile,GroupSection,PageView}.svelte` + `src/app.css` (the flow/geometry and
+theme fixes) · `src/routes/{+layout,layout/+page}.svelte` (canonical-device migration, the not-writable
+state, the footer) · `src/lib/localStorage.js` (the JSON guard).
