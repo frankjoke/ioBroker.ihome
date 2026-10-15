@@ -170,18 +170,17 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
 }
 
 // ---------------------------------------------------------------- view state
-// Chips, group collapse flags and the last opened page are *view* state: they
-// belong to this browser, never to the config document, so they live in
-// localStorage (one key) and are read once, at startup.
+// Chips and the last opened page are *view* state: they belong to this browser,
+// never to the config document, so they live in localStorage (one key) and are
+// read once, at startup.
 import type { FilterChips } from "$lib/config/pages-ops";
 
 const VIEW_KEY = "iHome.view";
 
 export const view = $state<{
   chips: FilterChips;
-  collapsed: Record<string, boolean>;
   lastPage: string;
-}>({ chips: {}, collapsed: {}, lastPage: "" });
+}>({ chips: {}, lastPage: "" });
 
 /** Read the persisted view state once, from the layout's onMount. */
 export function loadViewState(): void {
@@ -190,7 +189,6 @@ export function loadViewState(): void {
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<typeof view>;
     view.chips = parsed?.chips ?? {};
-    view.collapsed = parsed?.collapsed ?? {};
     view.lastPage = parsed?.lastPage ?? "";
   } catch {
     // A corrupt blob must not break the display; defaults stay.
@@ -203,7 +201,6 @@ function persistViewState(): void {
       VIEW_KEY,
       JSON.stringify({
         chips: view.chips,
-        collapsed: view.collapsed,
         lastPage: view.lastPage,
       }),
     );
@@ -214,21 +211,6 @@ function persistViewState(): void {
 
 export function setChips(next: FilterChips): void {
   view.chips = next;
-  persistViewState();
-}
-
-/** Collapse keys are `pageId + groupId`, so the same group on another page is separate. */
-export function collapseKey(pageId: string, groupId: string): string {
-  return `${pageId}::${groupId}`;
-}
-
-export function isCollapsed(pageId: string, groupId: string): boolean {
-  return view.collapsed[collapseKey(pageId, groupId)] === true;
-}
-
-export function toggleCollapsed(pageId: string, groupId: string): void {
-  const key = collapseKey(pageId, groupId);
-  view.collapsed = { ...view.collapsed, [key]: !view.collapsed[key] };
   persistViewState();
 }
 

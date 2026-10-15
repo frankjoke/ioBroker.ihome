@@ -1,26 +1,20 @@
 <script lang="ts">
-  import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import { backgroundCss } from "$lib/config/appearance";
   import type { Group, Size } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
   import type { ResolvedTile } from "$lib/config/pages-ops";
-  import { isCollapsed, toggleCollapsed } from "$lib/stores/pages.svelte.js";
+  import type { Breakpoint } from "$lib/config/size-ops";
   import Tile from "./Tile.svelte";
 
   let {
     group,
     tiles,
     bp,
-    pageId,
   }: {
     group: Group;
     tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
     bp: Breakpoint;
-    pageId: string;
   } = $props();
-
-  // Collapsed state is view state, per page+group, remembered in localStorage.
-  const collapsed = $derived(isCollapsed(pageId, group.id));
 </script>
 
 <section
@@ -32,37 +26,23 @@
 >
   {#if group.title}
     <h2 class="group-title">
-      <button
-        type="button"
-        class="title-toggle"
-        aria-expanded={!collapsed}
-        onclick={() => toggleCollapsed(pageId, group.id)}
-      >
-        <span class="material-symbols-outlined" aria-hidden="true"
-          >{collapsed ? "chevron_right" : "expand_more"}</span
-        >
-        {#if group.icon}<span
-            class="material-symbols-outlined"
-            aria-hidden="true">{group.icon}</span
-          >{/if}
-        <span>{group.title}</span>
-        <span class="count">{tiles.length}</span>
-      </button>
+      {#if group.icon}<span class="material-symbols-outlined" aria-hidden="true"
+          >{group.icon}</span
+        >{/if}
+      <span>{group.title}</span>
     </h2>
   {/if}
 
-  {#if !collapsed}
-    <div class="grid">
-      {#each tiles as t (t.placement.id)}
-        <Tile
-          device={t.device}
-          {bp}
-          title={t.placement.title}
-          tile={t.placement.tile}
-        />
-      {/each}
-    </div>
-  {/if}
+  <div class="grid">
+    {#each tiles as t (t.placement.id)}
+      <Tile
+        device={t.device}
+        {bp}
+        title={t.placement.title}
+        tile={t.placement.tile}
+      />
+    {/each}
+  </div>
 </section>
 
 <style>
@@ -70,8 +50,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    /* A flow item: as wide as its tiles need, never wider than the row. */
-    flex: 1 1 auto;
+    /* A flow item: as wide as its tiles need and no wider, so the next section
+       starts right after it. No grow — a section never stretches to fill the
+       space beside it. */
+    flex: 0 1 auto;
     min-width: min(100%, var(--tile-w, 57px));
     max-width: 100%;
   }
@@ -93,30 +75,9 @@
     letter-spacing: 0.01em;
   }
 
-  .title-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 2px 6px 2px 0;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .title-toggle .material-symbols-outlined {
+  .group-title .material-symbols-outlined {
     font-size: 18px;
     color: var(--text-muted);
-  }
-
-  .group-title .count {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    background-color: var(--surface-container);
-    border-radius: var(--border-radius-pill);
-    padding: 1px 8px;
   }
 
   .grid {

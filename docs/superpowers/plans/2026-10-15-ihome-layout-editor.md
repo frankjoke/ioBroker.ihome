@@ -55,7 +55,9 @@ owning task:
 2. **A document that is absent, empty, or garbage**: absent/empty seeds, garbage is never overwritten,
    and migration runs on neither — Task 2 + Task 5.
 3. **Duplicate-page / duplicate-section**: every cloned node needs a fresh id, or the copy shares the
-   original's `collapseKey` (`pageId::groupId`) and its placements — Task 4.
+   original's placements — Task 4. (Sections no longer fold, so there is no collapse key to steal:
+   the user asked for no fold/unfold and no item count on 2026-10-15, and for a section to sit at its
+   natural width instead of stretching.)
 4. **Reordering to an edge**: a drop on itself, the same index, index 0, and index == length must be
    no-ops or land exactly where they say — Task 4.
 5. **Section appearance boundaries**: `border: false` (no border) vs `border` absent (today's border),
