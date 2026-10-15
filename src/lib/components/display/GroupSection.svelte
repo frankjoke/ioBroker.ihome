@@ -1,5 +1,6 @@
 <script lang="ts">
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
+  import { backgroundCss } from "$lib/config/appearance";
   import type { Group, Size } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
   import type { ResolvedTile } from "$lib/config/pages-ops";
@@ -22,7 +23,13 @@
   const collapsed = $derived(isCollapsed(pageId, group.id));
 </script>
 
-<section class="group">
+<section
+  class="group"
+  class:bordered={group.appearance?.border === true}
+  style={group.appearance?.background
+    ? backgroundCss(group.appearance.background)
+    : ""}
+>
   {#if group.title}
     <h2 class="group-title">
       <button
@@ -47,7 +54,12 @@
   {#if !collapsed}
     <div class="grid">
       {#each tiles as t (t.placement.id)}
-        <Tile device={t.device} {bp} />
+        <Tile
+          device={t.device}
+          {bp}
+          title={t.placement.title}
+          tile={t.placement.tile}
+        />
       {/each}
     </div>
   {/if}
@@ -58,6 +70,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    /* A flow item: as wide as its tiles need, never wider than the row. */
+    flex: 1 1 auto;
+    min-width: min(100%, var(--tile-w, 57px));
+    max-width: 100%;
+  }
+
+  /* `appearance.border: true` draws the section's box; absent is today's look. */
+  .group.bordered {
+    padding: 4px 6px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md, 12px);
   }
 
   .group-title {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { devicesEnrichedStore } from "$lib/stores/devices";
+  import { backgroundCss } from "$lib/config/appearance";
   import {
     filterDevices,
     resolvePage,
@@ -14,7 +15,7 @@
     type Breakpoint,
   } from "$lib/config/size-ops";
   import GroupSection from "./GroupSection.svelte";
-  import type { Background, Page } from "$lib/types/display";
+  import type { Page } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
 
   let { page }: { page: Page } = $props();
@@ -50,17 +51,6 @@
   const pageStyle = $derived(
     `--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(page.background)}`,
   );
-
-  function backgroundCss(bg: Background | undefined): string {
-    if (!bg?.value) return "";
-    if (bg.kind === "image") {
-      return `background-image: url("${bg.value}"); background-size: cover; background-attachment: fixed;`;
-    }
-    if (bg.kind === "gradient") {
-      return `background-image: ${bg.value}; background-attachment: fixed;`;
-    }
-    return `background-color: ${bg.value};`;
-  }
 </script>
 
 <div class="page" style={pageStyle}>
@@ -86,11 +76,21 @@
 
 <style>
   .page {
+    /* Sections flow: as many per row as the width allows, the rest wrap. A
+       phone stacks them (base breakpoint — the same 600px size-ops uses). */
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 1.25rem;
     min-height: 100vh;
     padding: 12px;
+  }
+
+  @media (max-width: 599px) {
+    .page {
+      flex-direction: column;
+    }
   }
 
   .empty {

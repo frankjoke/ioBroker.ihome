@@ -26,9 +26,21 @@
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
-  import type { Slot } from "$lib/types/display";
+  import type { Slot, TileConfig } from "$lib/types/display";
 
-  let { device, bp }: { device: EnrichedDevice; bp: Breakpoint } = $props();
+  let {
+    device,
+    bp,
+    title,
+    tile,
+  }: {
+    device: EnrichedDevice;
+    bp: Breakpoint;
+    /** The placement's title wins over the one derived from the device. */
+    title?: string;
+    /** The placement's own config: its size wins over the template's (A9). */
+    tile?: TileConfig;
+  } = $props();
 
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
@@ -38,7 +50,7 @@
   const template = $derived(
     resolveTemplate(device, getTemplateRegistry().templates),
   );
-  const span = $derived(clampSpan(template.size, bp));
+  const span = $derived(clampSpan(tile?.size ?? template.size, bp));
   const primary = $derived(primaryControl(shownControls));
 
   /** The shape a readout hint matches against: role, label, unit. */
@@ -316,7 +328,7 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  <span class="tile-name">{tileTitle(device)}</span>
+  <span class="tile-name">{title ?? tileTitle(device)}</span>
   <div class="tile-body">
     {#each resolved as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
       <SlotRenderer
