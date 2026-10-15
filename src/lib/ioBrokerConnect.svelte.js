@@ -13,6 +13,16 @@ import { createDeferredPromise } from "./utils";
 let socket = null;
 let connectTimeoutId = null;
 
+/**
+ * Who we claim to be. Stamped as `from` on every write and used for the socket
+ * handshake, so a state change can be traced back to this app. (The old default
+ * was `admin.0`, a leftover from the admin client this grew out of — writes
+ * looked like they came from the admin adapter.) Once this ships as the `ihome`
+ * adapter, this should be `system.adapter.ihome.0` — the `system.adapter.<name>
+ * .<instance>` form every adapter stamps on its writes.
+ */
+export const DEFAULT_NAMESPACE = "iHome";
+
 export const ioBroker = $state({
   serviceWorker: navigator.serviceWorker,
   socket,
@@ -24,7 +34,7 @@ export const ioBroker = $state({
   enums,
   // metas,
   language: "en",
-  namespace: "admin.0",
+  namespace: DEFAULT_NAMESPACE,
   adapterConfig: "system.adapter.admin.0",
 
   async waitConnected() {
@@ -222,7 +232,7 @@ async function connectIOBroker(options = {}) {
   ioBroker.connectOptions = Object.assign(
     {},
     {
-      namespace: "admin.0",
+      namespace: DEFAULT_NAMESPACE,
       url: "ws://192.168.178.9:8081/socket.io",
       // adapterConfig,
       rectreateSocket: false,
@@ -265,6 +275,10 @@ async function connectIOBroker(options = {}) {
     // Only *used* states live in the state cache and only they are updated.
     socket.on("stateChange", (stateId, state) => {
       if (!getUsedStateIds().has(stateId)) return;
+      // Debug tracing for the intermittent double-toggle (grep "ihome-dbg").
+      console.log(
+        `[ihome-dbg] change ${stateId} val=${String(state.val)} (${typeof state.val}) ack=${state.ack} from=${state.from} @${Date.now()}`,
+      );
       state.now = Date.now();
       states.update(stateId, state);
     });

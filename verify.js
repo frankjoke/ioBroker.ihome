@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-console.log("Verifying ioBroker Visual Interface Adapter structure...");
+console.log("Verifying iHome adapter structure...");
 
 // Check required files
 const requiredFiles = [

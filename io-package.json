@@ -1,11 +1,11 @@
 {
     "common": {
-        "name": "visual-interface",
+        "name": "ihome",
         "version": "0.0.1",
         "news": {
             "0.0.1": {
-                "en": "Initial release of visual interface adapter",
-                "de": "Erste Veröffentlichung des Visual-Interface-Adapters",
+                "en": "Initial release of the iHome adapter",
+                "de": "Erste Veröffentlichung des iHome-Adapters",
                 "ru": "Первый выпуск визуального интерфейс-адаптера",
                 "pt": "Primeiro lançamento do adaptador de interface visual",
                 "nl": "Eerste release van de visual interface adapter",
@@ -18,21 +18,21 @@
             }
         },
         "titleLang": {
-            "en": "Visual Interface",
-            "de": "Visuelle Schnittstelle",
-            "ru": "Визуальный интерфейс",
-            "pt": "Interface Visual",
-            "nl": "Visuele Interface",
-            "fr": "Interface Visuelle",
-            "it": "Interfaccia Visiva",
-            "es": "Interfaz Visual",
-            "pl": "Interfejs Wizualny",
-            "uk": "Візуальний Інтерфейс",
-            "zh-cn": "可视化界面"
+            "en": "iHome",
+            "de": "iHome",
+            "ru": "iHome",
+            "pt": "iHome",
+            "nl": "iHome",
+            "fr": "iHome",
+            "it": "iHome",
+            "es": "iHome",
+            "pl": "iHome",
+            "uk": "iHome",
+            "zh-cn": "iHome"
         },
         "desc": {
-            "en": "Visual interface adapter for ioBroker home automation with Svelte SPA",
-            "de": "Visuelle Schnittstellen-Adaptation für ioBroker Smart Home mit Svelte SPA",
+            "en": "iHome — dashboard adapter for ioBroker home automation with Svelte SPA",
+            "de": "iHome — Dashboard-Adapter für ioBroker Smart Home mit Svelte SPA",
             "ru": "Адаптер визуального интерфейса для ioBroker умного дома с Svelte SPA",
             "pt": "Adaptador de interface visual para automação residencial ioBroker com Svelte SPA",
             "nl": "Visuele interface-adapter voor ioBroker thuisautomatisering met Svelte SPA",
@@ -44,12 +44,12 @@
             "zh-cn": "用于ioBroker家庭自动化的Svelte SPA可视化界面适配器"
         },
         "authors": [
-            "Commander <commander@example.com>"
+            "Frank Joke <frankjoke@hotmail.com>"
         ],
         "keywords": [
             "ioBroker",
-            "visual",
-            "interface",
+            "ihome",
+            "dashboard",
             "home",
             "automation",
             "SPA",
@@ -63,10 +63,10 @@
             "license": "MIT"
         },
         "platform": "Javascript/Node.js",
-        "icon": "visual-interface.png",
+        "icon": "ihome.png",
         "enabled": true,
-        "extIcon": "https://raw.githubusercontent.com/yourusername/ioBroker.visual-interface/main/admin/visual-interface.png",
-        "readme": "https://github.com/yourusername/ioBroker.visual-interface/blob/main/README.md",
+        "extIcon": "https://raw.githubusercontent.com/frankjoke/ioBroker.ihome/main/admin/ihome.png",
+        "readme": "https://github.com/frankjoke/ioBroker.ihome/blob/main/README.md",
         "loglevel": "info",
         "tier": 3,
         "mode": "daemon",
@@ -79,17 +79,17 @@
         "adminTab": {
             "singleton": true,
             "name": {
-                "en": "Visual Interface",
-                "de": "Visuelle Schnittstelle",
-                "ru": "Визуальный интерфейс",
-                "pt": "Interface Visual",
-                "nl": "Visuele Interface",
-                "fr": "Interface Visuelle",
-                "it": "Interfaccia Visiva",
-                "es": "Interfaz Visual",
-                "pl": "Interfejs Wizualny",
-                "uk": "Візуальний Інтерфейс",
-                "zh-cn": "可视化界面"
+                "en": "iHome",
+                "de": "iHome",
+                "ru": "iHome",
+                "pt": "iHome",
+                "nl": "iHome",
+                "fr": "iHome",
+                "it": "iHome",
+                "es": "iHome",
+                "pl": "iHome",
+                "uk": "iHome",
+                "zh-cn": "iHome"
             },
             "link": ""
         },

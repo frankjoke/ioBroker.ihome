@@ -3,7 +3,10 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import { ioBrokerStart } from "$lib/ioBrokerConnect.svelte.js";
+  import {
+    DEFAULT_NAMESPACE,
+    ioBrokerStart,
+  } from "$lib/ioBrokerConnect.svelte.js";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -28,9 +31,17 @@
 
   const storage = defineStorage(
     ["hostPort", { init: "" }],
-    ["namespace", { init: "admin.0" }],
+    ["namespace", { init: DEFAULT_NAMESPACE }],
     { prefix: "__VISUAL__:" },
   );
+
+  // `admin.0` was the old default and every browser that ever loaded the app has
+  // it persisted (the storage writes its init value on first read); an empty
+  // field means the same thing. Both count as "unset". Read once, at connect.
+  const namespace =
+    !storage.namespace || storage.namespace === "admin.0"
+      ? DEFAULT_NAMESPACE
+      : storage.namespace;
 
   function buildUrl(hostPort) {
     if (hostPort) return `ws://${hostPort}/socket.io`;
@@ -39,7 +50,7 @@
   }
 
   const ioBroker = ioBrokerStart({
-    namespace: storage.namespace || "admin.0",
+    namespace,
     url: buildUrl(storage.hostPort),
   });
 

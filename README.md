@@ -1,6 +1,6 @@
-# ioBroker Visual Interface Adapter
+# iHome — adapter for ioBroker
 
-A modern visual interface adapter for ioBroker home automation built with Svelte. This adapter provides a responsive Single Page Application (SPA) dashboard for monitoring and controlling your smart home devices.
+iHome is a dashboard adapter for ioBroker home automation, built with Svelte: a responsive Single Page Application (SPA, installable as a PWA) for monitoring and controlling your smart home devices.
 
 ## Features
 
@@ -44,8 +44,8 @@ ioBroker-visual-adapter/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/ioBroker.visual-interface.git
-   cd ioBroker.visual-interface
+   git clone https://github.com/frankjoke/ioBroker.ihome.git
+   cd ioBroker.ihome
    ```
 
 2. Install dependencies:
@@ -179,7 +179,7 @@ npm run build
 npm run package
 
 # The package will be available as:
-# iobroker.visual-interface-0.0.1.tgz
+# iobroker.ihome-0.0.1.tgz
 ```
 
 ## License

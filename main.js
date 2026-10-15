@@ -7,14 +7,14 @@ const utils = require("@iobroker/adapter-core");
 // Load your modules here, e.g.:
 // const fs = require('fs');
 
-class VisualInterface extends utils.Adapter {
+class IHome extends utils.Adapter {
   /**
    * @param {Partial<utils.AdapterOptions>} [options] - Adapter options
    */
   constructor(options) {
     super({
       ...options,
-      name: "visual-interface",
+      name: "ihome",
     });
     this.on("ready", this.onReady.bind(this));
     this.on("stateChange", this.onStateChange.bind(this));
@@ -36,7 +36,7 @@ class VisualInterface extends utils.Adapter {
     this.log.info("config backgroundColor: ${this.config.backgroundColor}");
     this.log.info("config refreshInterval: ${this.config.refreshInterval}");
 
-    // Set up states for the visual interface
+    // Set up states for iHome
     await this.setupStates();
 
     // In order to get state updates, you need to subscribe to them
@@ -44,7 +44,7 @@ class VisualInterface extends utils.Adapter {
   }
 
   /**
-   * Sets up the necessary states for the visual interface
+   * Sets up the necessary states for iHome
    */
   async setupStates() {
     // Connection status
@@ -86,7 +86,7 @@ class VisualInterface extends utils.Adapter {
   onUnload(callback) {
     try {
       // Clear any intervals or timeouts here
-      this.log.info("Visual Interface adapter stopped");
+      this.log.info("iHome adapter stopped");
       callback();
     } catch (error) {
       this.log.error(`Error during unloading: ${error.message}`);
@@ -138,8 +138,8 @@ class VisualInterface extends utils.Adapter {
 // If started as allInOne/compact mode, run function to create an instance
 if (require.main !== module) {
   // Export the constructor in compact mode
-  module.exports = (options) => new VisualInterface(options);
+  module.exports = (options) => new IHome(options);
 } else {
   // Otherwise start the instance directly
-  new VisualInterface();
+  new IHome();
 }

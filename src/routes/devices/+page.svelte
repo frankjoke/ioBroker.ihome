@@ -166,7 +166,7 @@
 </script>
 
 <svelte:head>
-  <title>Devices - ioBroker Visual Interface</title>
+  <title>Devices - iHome</title>
 </svelte:head>
 
 <div class="devices-page">

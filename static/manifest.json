@@ -1,7 +1,7 @@
 {
-	"name": "ioBroker Visual Interface",
-	"short_name": "ioBroker VIS",
-	"description": "Visual interface for ioBroker smart home control",
+	"name": "iHome",
+	"short_name": "iHome",
+	"description": "iHome — dashboard for ioBroker smart home control",
 	"start_url": "./",
 	"scope": "./",
 	"display": "standalone",

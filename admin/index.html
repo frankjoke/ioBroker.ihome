@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visual Interface Adapter Settings</title>
+    <title>iHome Adapter Settings</title>
     <link rel="stylesheet" href="/vis.0/css/lib.css">
     <link rel="stylesheet" href="/vis.0/css/materialize.css">
     <link rel="stylesheet" href="/vis.0/css/icons-material.css">
@@ -39,17 +39,17 @@
 </head>
 <body>
     <div class="config-container">
-        <h2>Visual Interface Adapter Configuration</h2>
+        <h2>iHome Adapter Configuration</h2>
         
         <div class="config-row">
-            <label class="config-label" for="visual-interface.port">Port:</label>
-            <input type="number" id="visual-interface.port" class="config-input" min="1" max="65535" value="8082">
-            <span class="input-note">Port for the visual interface web server (default: 8082)</span>
+            <label class="config-label" for="ihome.port">Port:</label>
+            <input type="number" id="ihome.port" class="config-input" min="1" max="65535" value="8082">
+            <span class="input-note">Port for the iHome web server (default: 8082)</span>
         </div>
         
         <div class="config-row">
-            <label class="config-label" for="visual-interface.theme">Theme:</label>
-            <select id="visual-interface.theme" class="config-select">
+            <label class="config-label" for="ihome.theme">Theme:</label>
+            <select id="ihome.theme" class="config-select">
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
             </select>
@@ -57,8 +57,8 @@
         </div>
         
         <div class="config-row">
-            <label class="config-label" for="visual-interface.refreshInterval">Refresh Interval:</label>
-            <input type="number" id="visual-interface.refreshInterval" class="config-input" min="1" max="60" value="5">
+            <label class="config-label" for="ihome.refreshInterval">Refresh Interval:</label>
+            <input type="number" id="ihome.refreshInterval" class="config-input" min="1" max="60" value="5">
             <span class="input-note">Refresh interval in seconds (default: 5)</span>
         </div>
         
@@ -70,15 +70,15 @@
     <script>
         function saveConfig() {
             const config = {
-                port: document.getElementById('visual-interface.port').value,
-                theme: document.getElementById('visual-interface.theme').value,
-                refreshInterval: document.getElementById('visual-interface.refreshInterval').value
+                port: document.getElementById('ihome.port').value,
+                theme: document.getElementById('ihome.theme').value,
+                refreshInterval: document.getElementById('ihome.refreshInterval').value
             };
             
             // Send configuration to adapter
             if (socket && socket.connected) {
                 socket.emit('setObject', {
-                    _id: 'visual-interface.0.config',
+                    _id: 'ihome.0.config',
                     type: 'state',
                     common: {
                         name: 'Adapter configuration',
@@ -98,11 +98,11 @@
         socket.on('connect', () => {
             console.log('Connected to ioBroker');
             // Load current configuration
-            socket.emit('getObject', 'visual-interface.0.config', (err, obj) => {
+            socket.emit('getObject', 'ihome.0.config', (err, obj) => {
                 if (!err && obj && obj.val) {
-                    document.getElementById('visual-interface.port').value = obj.val.port || 8082;
-                    document.getElementById('visual-interface.theme').value = obj.val.theme || 'light';
-                    document.getElementById('visual-interface.refreshInterval').value = obj.val.refreshInterval || 5;
+                    document.getElementById('ihome.port').value = obj.val.port || 8082;
+                    document.getElementById('ihome.theme').value = obj.val.theme || 'light';
+                    document.getElementById('ihome.refreshInterval').value = obj.val.refreshInterval || 5;
                 }
             });
         });

@@ -50,7 +50,7 @@
 </script>
 
 <svelte:head>
-  <title>Settings - ioBroker Visual Interface</title>
+  <title>Settings - iHome</title>
 </svelte:head>
 
 <div class="settings-page">
@@ -86,7 +86,10 @@
           bind:value={storage.namespace}
           disabled={isConnected}
         />
-        <span class="hint text-muted">ioBroker instance, e.g. admin.0</span>
+        <span class="hint text-muted"
+          >Identity stamped as "from" on every write, e.g. iHome. Once this
+          ships as a real adapter, use its io-package name + instance.</span
+        >
       </div>
 
       {#if isConnected}
