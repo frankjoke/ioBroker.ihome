@@ -33,8 +33,15 @@ it("counts how many tile modules fit in a width", () => {
 });
 
 it("places tiles left to right and wraps when the line is full", () => {
-  const placed = layoutSection(section(), [tile("a", 1), tile("b", 2), tile("c", 1)], spanOf, 4);
-  expect(placed.tiles.map((t) => [t.placement.id, t.row, t.column, t.span])).toEqual([
+  const placed = layoutSection(
+    section(),
+    [tile("a", 1), tile("b", 2), tile("c", 1)],
+    spanOf,
+    4,
+  );
+  expect(
+    placed.tiles.map((t) => [t.placement.id, t.row, t.column, t.span]),
+  ).toEqual([
     ["a", 0, 0, 1],
     ["b", 0, 1, 2],
     ["c", 0, 3, 1],
@@ -44,7 +51,12 @@ it("places tiles left to right and wraps when the line is full", () => {
 });
 
 it("starts a new row only when the tile does not fit", () => {
-  const placed = layoutSection(section(), [tile("a", 2), tile("b", 2), tile("c", 2)], spanOf, 3);
+  const placed = layoutSection(
+    section(),
+    [tile("a", 2), tile("b", 2), tile("c", 2)],
+    spanOf,
+    3,
+  );
   expect(placed.tiles.map((t) => [t.placement.id, t.row, t.column])).toEqual([
     ["a", 0, 0],
     ["b", 1, 0],
@@ -55,7 +67,12 @@ it("starts a new row only when the tile does not fit", () => {
 });
 
 it("honours newLine on a tile even when it would still fit", () => {
-  const placed = layoutSection(section(), [tile("a", 1), tile("b", 1, true), tile("c", 1)], spanOf, 4);
+  const placed = layoutSection(
+    section(),
+    [tile("a", 1), tile("b", 1, true), tile("c", 1)],
+    spanOf,
+    4,
+  );
   expect(placed.tiles.map((t) => [t.placement.id, t.row, t.column])).toEqual([
     ["a", 0, 0],
     ["b", 1, 0],
@@ -65,8 +82,15 @@ it("honours newLine on a tile even when it would still fit", () => {
 });
 
 it("clamps a span wider than the page and keeps single tiles on their own row", () => {
-  const placed = layoutSection(section(), [tile("wide", 4), tile("b", 1)], spanOf, 2);
-  expect(placed.tiles.map((t) => [t.placement.id, t.row, t.column, t.span])).toEqual([
+  const placed = layoutSection(
+    section(),
+    [tile("wide", 4), tile("b", 1)],
+    spanOf,
+    2,
+  );
+  expect(
+    placed.tiles.map((t) => [t.placement.id, t.row, t.column, t.span]),
+  ).toEqual([
     ["wide", 0, 0, 2],
     ["b", 1, 0, 1],
   ]);

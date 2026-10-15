@@ -1,4 +1,4 @@
-/* global sessionStorage, location */
+/* global sessionStorage */
 
 import { parsePlacementRef } from "$lib/config/layout-ops";
 

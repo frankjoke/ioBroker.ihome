@@ -89,6 +89,7 @@
       title: string;
       icon: string;
       border: boolean;
+      newLine: boolean;
       background: Background | undefined;
     }>,
   ): void {
@@ -96,6 +97,7 @@
     const next: Partial<Group> = {};
     if ("title" in patch) next.title = patch.title?.trim() || undefined;
     if ("icon" in patch) next.icon = patch.icon?.trim() || undefined;
+    if ("newLine" in patch) next.newLine = patch.newLine ? true : undefined;
     if ("border" in patch || "background" in patch) {
       const appearance = { ...(section.appearance ?? {}) };
       if ("border" in patch) {
@@ -219,6 +221,15 @@
       </div>
     </div>
 
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={section.newLine === true}
+        onchange={(e) => setSection({ newLine: e.currentTarget.checked })}
+      />
+      <span>Start a new line before this section</span>
+    </label>
+
     <div
       class="preview"
       style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px;`}
@@ -250,6 +261,15 @@
         <span class="warn">This device is not in the registry any more.</span>
       {/if}
     </div>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={tile.newLine === true}
+        onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
+      />
+      <span>Start a new line before this tile</span>
+    </label>
+
     <div class="field">
       <span class="label-mono">Size (modules)</span>
       <div class="row">
