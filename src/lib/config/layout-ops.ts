@@ -18,6 +18,22 @@ export interface PlacementMove {
   index: number;
 }
 
+/**
+ * One tile's address inside the tree — the editor's selection, and what the
+ * display hands over when a tile is opened for editing.
+ */
+export interface PlacementAnchor {
+  pageId: string;
+  sectionId: string;
+  placementId: string;
+}
+
+/** What the layout editor has selected. */
+export type LayoutSelection =
+  | { kind: "page"; pageId: string }
+  | { kind: "section"; pageId: string; sectionId: string }
+  | ({ kind: "tile" } & PlacementAnchor);
+
 function withPages(
   reg: PageRegistry,
   fn: (pages: Page[]) => Page[],

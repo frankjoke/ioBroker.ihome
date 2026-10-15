@@ -14,6 +14,12 @@
 /** @type {Page[]} */
 export const pages = [
   { id: "/devices", label: "Devices", icon: "devices", title: "Devices" },
+  {
+    id: "/layout",
+    label: "Layout",
+    icon: "dashboard_customize",
+    title: "Layout",
+  },
 ];
 
 /**
