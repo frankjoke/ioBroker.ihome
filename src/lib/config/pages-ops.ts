@@ -112,30 +112,38 @@ export function resolveByMember<T extends FilterableDevice>(
 }
 
 /**
- * Resolve a page for the display: every section's placements, in order, each with
- * the device it points at.
- *
- * A placement whose device is not in the registry is **skipped** (the section
- * keeps rendering its other tiles), and a section with nothing to show disappears
- * unless it asks for empties. Membership is explicit now (A8), so the same device
- * may appear in more than one section — nothing is claimed.
+ * One section's tiles: its placements in order, each with the device it points
+ * at. A placement whose device is gone is skipped (the section keeps its other
+ * tiles), and a device with nothing to show is skipped unless the section asks
+ * for empties.
+ */
+export function resolveSection<T extends FilterableDevice>(
+  group: Group,
+  devices: T[],
+): ResolvedTile<T>[] {
+  const byId = new Map(devices.map((d) => [d.id, d]));
+  const tiles: ResolvedTile<T>[] = [];
+  for (const placement of group.tiles ?? []) {
+    const device = byId.get(placement.device);
+    if (!device) continue; // dangling: the device is gone from the registry
+    if (device.visibleControls < 1 && group.showEmpty !== true) continue;
+    tiles.push({ placement, device });
+  }
+  return tiles;
+}
+
+/**
+ * Resolve a page for the display: every section's placements, in order.
+ * Membership is explicit now (A8), so the same device may appear in more than
+ * one section — nothing is claimed — and a section with nothing to show
+ * disappears unless it asks for empties.
  */
 export function resolvePage<T extends FilterableDevice>(
   page: Page,
   devices: T[],
 ): ResolvedGroup<T>[] {
-  const byId = new Map(devices.map((d) => [d.id, d]));
   return (page.groups ?? [])
-    .map((group) => {
-      const tiles: ResolvedTile<T>[] = [];
-      for (const placement of group.tiles ?? []) {
-        const device = byId.get(placement.device);
-        if (!device) continue; // dangling: the device is gone from the registry
-        if (device.visibleControls < 1 && group.showEmpty !== true) continue;
-        tiles.push({ placement, device });
-      }
-      return { group, tiles };
-    })
+    .map((group) => ({ group, tiles: resolveSection(group, devices) }))
     .filter((r) => r.tiles.length > 0 || r.group.showEmpty === true);
 }
 

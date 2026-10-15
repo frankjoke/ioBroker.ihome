@@ -157,6 +157,18 @@ export function movePage(
   return withPages(reg, (pages) => moveItem(pages, from, to));
 }
 
+/**
+ * Patch a page's own fields (title, icon, background, …). `undefined` removes a
+ * field, so an emptied one disappears from the document.
+ */
+export function patchPage(
+  reg: PageRegistry,
+  pageId: string,
+  patch: Partial<Page>,
+): PageRegistry {
+  return mapPage(reg, pageId, (page) => ({ ...page, ...patch }));
+}
+
 // ---------------------------------------------------------------- sections
 
 export function addSection(
@@ -207,6 +219,22 @@ export function moveSection(
   return mapPage(reg, pageId, (page) => ({
     ...page,
     groups: moveItem(page.groups ?? [], from, to),
+  }));
+}
+
+/**
+ * Patch a section's own fields (title, icon, appearance, …). A field set to
+ * `undefined` disappears from the document instead of being stored empty.
+ */
+export function patchSection(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  patch: Partial<Group>,
+): PageRegistry {
+  return mapSection(reg, pageId, sectionId, (section) => ({
+    ...section,
+    ...patch,
   }));
 }
 
@@ -263,6 +291,24 @@ export function duplicatePlacement(
       tiles: [...tiles.slice(0, at + 1), copy, ...tiles.slice(at + 1)],
     };
   });
+}
+
+/**
+ * Patch one placement (title, tile, device, …). `undefined` removes a field.
+ */
+export function patchPlacement(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  placementId: string,
+  patch: Partial<Placement>,
+): PageRegistry {
+  return mapSection(reg, pageId, sectionId, (section) => ({
+    ...section,
+    tiles: (section.tiles ?? []).map((tile) =>
+      tile.id === placementId ? { ...tile, ...patch } : tile,
+    ),
+  }));
 }
 
 /**

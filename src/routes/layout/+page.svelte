@@ -1,5 +1,6 @@
 <script lang="ts">
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
   import {
     addPage,
@@ -87,10 +88,12 @@
 
     <aside class="card details-card">
       {#if selection}
-        <p class="label-mono">{selection.kind}</p>
-        <p class="text-muted">
-          The fields for this {selection.kind} come next.
-        </p>
+        <LayoutDetails
+          {registry}
+          {devices}
+          {selection}
+          onChange={commitLayout}
+        />
       {:else}
         <p class="text-muted">Select a page, a section or a tile.</p>
       {/if}
