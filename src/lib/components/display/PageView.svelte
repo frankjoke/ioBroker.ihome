@@ -3,7 +3,7 @@
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import {
     filterDevices,
-    resolvePage,
+    resolveByMember,
     toFilterable,
     type FilterableDevice,
   } from "$lib/config/pages-ops";
@@ -38,9 +38,11 @@
     $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
   );
   // Chips narrow what the groups see; a group that empties out disappears
-  // unless it asks for empties (resolvePage handles that).
+  // unless it asks for empties (resolveByMember handles that).
   const visible = $derived(filterDevices(devices, view.chips));
-  const groups = $derived(resolvePage(page, visible));
+  // Task 3 switches this to the placement-based resolver; until then the display
+  // still resolves by the section's filter (the migration converts it).
+  const groups = $derived(resolveByMember(page, visible));
   const filtered = $derived(
     !!(view.chips.room || view.chips.function || view.chips.favorite),
   );

@@ -5,7 +5,9 @@ import {
   matchesMember,
   loadPages,
   parsePageRegistry,
-  resolvePage,
+  migratePageRegistry,
+  PAGE_REGISTRY_VERSION,
+  resolveByMember,
   seedPages,
   toFilterable,
   type FilterableDevice,
@@ -55,7 +57,7 @@ it("claims explicit ids first, keeps declaration order, never duplicates", () =>
     dev({ id: "a", functions: ["enum.functions.Licht"] }),
     dev({ id: "b", functions: ["enum.functions.Licht"] }),
   ];
-  const res = resolvePage(page, devices);
+  const res = resolveByMember(page, devices);
   expect(res.map((r) => r.group.id)).toEqual(["g1", "g2"]);
   expect(res.map((r) => r.devices.map((d) => d.id))).toEqual([["b"], ["a"]]);
 });
@@ -69,7 +71,9 @@ it("hides device-less groups unless showEmpty", () => {
       { id: "g2", member: { room: "enum.rooms.Bad" }, showEmpty: true },
     ],
   };
-  expect(resolvePage(page, [dev({})]).map((r) => r.group.id)).toEqual(["g2"]);
+  expect(resolveByMember(page, [dev({})]).map((r) => r.group.id)).toEqual([
+    "g2",
+  ]);
 });
 
 it("keeps a hidden-controls device out unless the group asks for empty", () => {
@@ -88,7 +92,7 @@ it("keeps a hidden-controls device out unless the group asks for empty", () => {
     room: "enum.rooms.Bad",
     controls: [{ hidden: true }, { hidden: true }],
   });
-  const res = resolvePage(page, [empty]);
+  const res = resolveByMember(page, [empty]);
   expect(res.map((r) => r.group.id)).toEqual(["g2"]);
   expect(res[0].devices.map((d) => d.id)).toEqual(["x"]);
 });
@@ -114,7 +118,7 @@ it("treats a device with only hidden controls as empty", () => {
 
 it("keeps the enriched device intact", () => {
   const enriched = { ...dev({ id: "a" }), liveValue: 42, controls: [] };
-  const [group] = resolvePage(
+  const [group] = resolveByMember(
     { id: "p", title: "P", groups: [{ id: "g", member: { ids: ["a"] } }] },
     [enriched],
   );
@@ -348,4 +352,63 @@ it("accepts a section with no member and a placement list", () => {
   expect(reg!.pages[0].groups[0].member).toBeUndefined();
   expect(reg!.pages[0].groups[0].tiles?.[0].device).toBe("dev1");
   expect(reg!.pages[0].groups[0].appearance?.border).toBe(false);
+});
+
+// ------------------------------------------------------------- the migration
+// Task 2: a stored document carries member-based sections; the display wants
+// explicit placements. The migration is the one-time bridge between them.
+
+const memberPage = (): Page => ({
+  id: "rooms",
+  title: "Rooms",
+  groups: [
+    {
+      id: "room:enum.rooms.WZ",
+      title: "WZ",
+      member: { room: "enum.rooms.WZ" },
+    },
+  ],
+});
+
+const wzDevices = [
+  dev({ id: "a", room: "enum.rooms.WZ" }),
+  dev({ id: "b", room: "enum.rooms.WZ" }),
+];
+
+it("expands a seeded section into placements, in the resolver's order, keeping the member hint", () => {
+  const reg = { version: 0, updatedAt: 1, pages: [memberPage()] };
+  const { registry, changed } = migratePageRegistry(reg, wzDevices);
+  expect(changed).toBe(true);
+  expect(registry.version).toBe(PAGE_REGISTRY_VERSION);
+  const g = registry.pages[0].groups[0];
+  expect(g.tiles?.map((t) => t.device)).toEqual(["a", "b"]);
+  expect(g.member).toEqual({ room: "enum.rooms.WZ" });
+  expect(g.tiles?.[0].id).toBeTruthy();
+  expect(g.tiles?.[0].id).not.toBe(g.tiles?.[1].id);
+});
+
+it("is idempotent and leaves an already-migrated registry alone", () => {
+  const once = migratePageRegistry(
+    { version: 0, updatedAt: 1, pages: [memberPage()] },
+    wzDevices,
+  ).registry;
+  const twice = migratePageRegistry(once, wzDevices);
+  expect(twice.changed).toBe(false);
+  expect(twice.registry).toEqual(once);
+});
+
+it("migrates an empty section to an empty list and never invents placements", () => {
+  const reg = {
+    version: 0,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [{ id: "g", member: { room: "enum.rooms.Nowhere" } }],
+      },
+    ],
+  };
+  const { registry } = migratePageRegistry(reg, [dev({})]);
+  expect(registry.pages[0].groups[0].tiles).toEqual([]);
 });

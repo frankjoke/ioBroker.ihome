@@ -52,14 +52,18 @@ function claims(group: Group): boolean {
 }
 
 /**
- * Resolve a page: which devices land in which group.
+ * Legacy membership: which devices land in which group, by filter or explicit ids.
+ *
+ * The display no longer resolves a page this way — a section's members are its
+ * placements (A8) — this is what the one-time migration runs so that a document
+ * written before placements keeps rendering.
  *
  * Claiming runs in two passes — explicit-id groups first, then filter groups —
  * so pinning a device into a group wins over any filter. The result is returned
  * in the page's **declaration order**, because that is the visual order the user
  * configured. A device claimed by an earlier group is never claimed again.
  */
-export function resolvePage<T extends FilterableDevice>(
+export function resolveByMember<T extends FilterableDevice>(
   page: Page,
   devices: T[],
 ): ResolvedGroup<T>[] {
@@ -86,6 +90,65 @@ export function resolvePage<T extends FilterableDevice>(
   return groups
     .map((group) => ({ group, devices: byGroup.get(group.id) ?? [] }))
     .filter((r) => r.devices.length > 0 || r.group.showEmpty === true);
+}
+
+/** The page-registry schema version this build writes (A15). */
+export const PAGE_REGISTRY_VERSION = 1;
+
+/**
+ * The one-time bridge from a member-based document to explicit placements: every
+ * section without `tiles` gets the devices its filter resolves to today, in that
+ * order, each as a placement. `member` stays behind as the filter hint.
+ *
+ * Idempotent — a section that already carries `tiles` is untouched — and a
+ * registry already at `PAGE_REGISTRY_VERSION` with every section listed is
+ * returned **as it is** (same object), so a caller can compare or skip a write.
+ * `changed` tells the caller whether the document needs writing.
+ */
+export function migratePageRegistry(
+  reg: PageRegistry,
+  devices: FilterableDevice[],
+): { registry: PageRegistry; changed: boolean } {
+  const pages = reg.pages ?? [];
+  const needsTiles = pages.some((page) =>
+    (page.groups ?? []).some((group) => !Array.isArray(group.tiles)),
+  );
+  const needsVersion = (reg.version ?? 0) < PAGE_REGISTRY_VERSION;
+  if (!needsTiles && !needsVersion) return { registry: reg, changed: false };
+
+  const migrated = pages.map((page) => {
+    if ((page.groups ?? []).every((group) => Array.isArray(group.tiles))) {
+      return page;
+    }
+    // The order the display showed yesterday is the order the placements get.
+    const resolved = new Map(
+      resolveByMember(page, devices).map((r) => [r.group.id, r.devices]),
+    );
+    return {
+      ...page,
+      groups: (page.groups ?? []).map((group) =>
+        Array.isArray(group.tiles)
+          ? group
+          : {
+              ...group,
+              tiles: (resolved.get(group.id) ?? []).map((d) => ({
+                id: crypto.randomUUID(),
+                device: d.id,
+              })),
+            },
+      ),
+    };
+  });
+
+  return {
+    registry: {
+      ...reg,
+      version: PAGE_REGISTRY_VERSION,
+      updatedAt: Date.now(),
+      pages: migrated,
+    },
+    changed: true,
+  };
 }
 
 /** Apply the top-bar chips; only the set chips constrain. */
@@ -183,9 +246,7 @@ function isGroup(v: unknown): v is Group {
   if (typeof g.id !== "string" || !g.id) return false;
   // `member` is a filter hint now (A8) — a section may carry no member at all —
   // but when it is there it must still be an object.
-  return (
-    g.member === undefined || (!!g.member && typeof g.member === "object")
-  );
+  return g.member === undefined || (!!g.member && typeof g.member === "object");
 }
 
 function isPage(v: unknown): v is Page {
