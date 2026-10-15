@@ -188,6 +188,15 @@
             <button
               type="button"
               class="icon-btn"
+              title="Add tile"
+              aria-label="Add tile"
+              onclick={() => onAddTile(page.id, section.id)}
+            >
+              <span class="material-symbols-outlined">add</span>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
               title="Duplicate section"
               aria-label="Duplicate section"
               onclick={() =>
@@ -372,17 +381,10 @@
             </div>
           {/each}
 
-          <!-- A placeholder until the picker dialog (Task 9) replaces it: pick a
-               device that is not in this section yet and add it as a tile. -->
-          <div class="add-tile">
-            <button
-              type="button"
-              class="btn"
-              onclick={() => onAddTile(page.id, section.id)}
-            >
-              Add tile
-            </button>
-            {#if hintMissing(section).length}
+          {#if hintMissing(section).length}
+            <!-- Devices the section's filter hint matches that are not here yet;
+                 the row's 'add' icon adds tiles by hand. -->
+            <div class="add-tile">
               <span class="text-muted hint-missing"
                 >{hintMissing(section).length} matching this section's filter
                 {hintMissing(section).length === 1 ? "is" : "are"} not here</span
@@ -402,8 +404,8 @@
               >
                 Add them
               </button>
-            {/if}
-          </div>
+            </div>
+          {/if}
         {/if}
       {/each}
     {/if}
