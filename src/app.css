@@ -21,6 +21,9 @@
   --surface-container: #f0f2f8;
   --surface-container-high: #e7e9f2;
   --surface-container-highest: #dfe1ec;
+  /* List-row hover: a step *off* the card, in the same direction in both themes
+     (slightly darker than the surface behind it). */
+  --row-hover: var(--surface-container);
 
   /* text */
   --text-color: #1a1c22;
@@ -103,6 +106,9 @@ html.dark {
   --surface-container: #1c2028;
   --surface-container-high: #262a33;
   --surface-container-highest: #31353e;
+  /* The card is --surface-color, and in this palette --surface-container *is*
+     that same #1c2028 — so a hover built on it changed nothing at all. */
+  --row-hover: var(--background-color);
 
   --text-color: #dfe2ee;
   --text-muted: #908fa0;

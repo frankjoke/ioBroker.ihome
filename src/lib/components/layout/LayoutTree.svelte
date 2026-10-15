@@ -433,7 +433,7 @@
   }
 
   .node:hover {
-    background-color: var(--surface-container);
+    background-color: var(--row-hover);
   }
 
   .node.selected {
