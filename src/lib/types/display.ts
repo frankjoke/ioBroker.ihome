@@ -22,12 +22,41 @@ export interface Background {
   value: string;
 }
 
+/** How a section looks: its own background and whether it draws a border. */
+export interface SectionAppearance {
+  border?: boolean;
+  background?: Background;
+}
+
+/**
+ * A tile's own config. Absent → resolved from the device → its template →
+ * the preset; on the first edit it is materialised (complete, not a patch).
+ */
+export interface TileConfig {
+  template?: string;
+  size?: Size;
+  slots?: Slot[];
+  modal?: { slots: Slot[] };
+}
+
+/** One tile on one section: which device, what it is called there, how it looks. */
+export interface Placement {
+  id: string;
+  device: string;
+  title?: string;
+  tile?: TileConfig;
+}
+
 export interface Group {
   id: string;
   title?: string; // absent → header-less section
   icon?: string;
-  member: Member;
+  /** Filter hint only (A8): a section's members are its `tiles`, not this. */
+  member?: Member;
+  appearance?: SectionAppearance;
   showEmpty?: boolean;
+  /** The section's contents, in display order — the truth (A8/A9). */
+  tiles?: Placement[];
 }
 
 export interface Page {
@@ -73,6 +102,8 @@ export interface Rule {
 export interface Slot {
   kind: SlotKind;
   source?: string; // control feature → control id → state id
+  /** Another device's control: a tile may show more than its own device (A11). */
+  from?: string;
   label?: string;
   unit?: string; // overrides the control's unit when set
   options?: Record<string, unknown>; // per-kind knobs (min/max/step/decimals/…)

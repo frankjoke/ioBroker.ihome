@@ -180,11 +180,11 @@ export function seedPages(
 function isGroup(v: unknown): v is Group {
   if (!v || typeof v !== "object") return false;
   const g = v as Record<string, unknown>;
+  if (typeof g.id !== "string" || !g.id) return false;
+  // `member` is a filter hint now (A8) — a section may carry no member at all —
+  // but when it is there it must still be an object.
   return (
-    typeof g.id === "string" &&
-    !!g.id &&
-    !!g.member &&
-    typeof g.member === "object"
+    g.member === undefined || (!!g.member && typeof g.member === "object")
   );
 }
 

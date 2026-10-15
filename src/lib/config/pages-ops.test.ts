@@ -219,7 +219,7 @@ it("rejects documents that would crash the renderer", () => {
   expect(parsePageRegistry({ pages: [{ id: "p" }] })).toBeNull();
   expect(
     parsePageRegistry({
-      pages: [{ id: "p", title: "P", groups: [{ id: "g" }] }],
+      pages: [{ id: "p", title: "P", groups: [{ title: "no id" }] }],
     }),
   ).toBeNull();
   expect(
@@ -323,4 +323,29 @@ it("a thermometer preset declares two readout slots, not one", () => {
     );
     expect(new Set(keys).size).toBe(keys.length);
   }
+});
+
+it("accepts a section with no member and a placement list", () => {
+  const reg = parsePageRegistry({
+    version: 1,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [
+          {
+            id: "g",
+            title: "G",
+            appearance: { border: false },
+            tiles: [{ id: "t1", device: "dev1" }],
+          },
+        ],
+      },
+    ],
+  });
+  expect(reg).not.toBeNull();
+  expect(reg!.pages[0].groups[0].member).toBeUndefined();
+  expect(reg!.pages[0].groups[0].tiles?.[0].device).toBe("dev1");
+  expect(reg!.pages[0].groups[0].appearance?.border).toBe(false);
 });
