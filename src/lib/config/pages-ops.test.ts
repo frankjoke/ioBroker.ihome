@@ -414,6 +414,20 @@ it("migrates an empty section to an empty list and never invents placements", ()
   expect(registry.pages[0].groups[0].tiles).toEqual([]);
 });
 
+it("refuses to touch a registry that was never loaded", () => {
+  // The store's initial value: no pages and no `updatedAt`. Loading can fail
+  // (a disconnect while reading), and migrating *that* would write an empty
+  // document over the user's pages.
+  const notLoaded = { version: 0, updatedAt: 0, pages: [] };
+  const out = migratePageRegistry(notLoaded, wzDevices);
+  expect(out.changed).toBe(false);
+  expect(out.registry).toBe(notLoaded);
+
+  // A stored *empty* document is still authoritative: it carries an updatedAt.
+  const emptied = { version: 0, updatedAt: Date.now(), pages: [] };
+  expect(migratePageRegistry(emptied, wzDevices).changed).toBe(true);
+});
+
 // ------------------------------------------------------- resolving placements
 // Task 3: the display walks a section's placements, not its filter.
 

@@ -157,6 +157,14 @@ export function migratePageRegistry(
   devices: FilterableDevice[],
 ): { registry: PageRegistry; changed: boolean } {
   const pages = reg.pages ?? [];
+  // Never migrate a registry that was never loaded: the store's initial value is
+  // `{ version: 0, updatedAt: 0, pages: [] }`, and a failed read leaves it in
+  // place. Bumping *that* to `PAGE_REGISTRY_VERSION` writes an empty document
+  // over the user's pages. A stored empty document carries an `updatedAt`, so it
+  // still passes (the user may have deleted every page on purpose).
+  if (pages.length === 0 && !reg.updatedAt) {
+    return { registry: reg, changed: false };
+  }
   const needsTiles = pages.some((page) =>
     (page.groups ?? []).some((group) => !Array.isArray(group.tiles)),
   );
