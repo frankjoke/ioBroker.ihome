@@ -92,7 +92,7 @@
     align-items: flex-start;
     gap: 1.25rem;
     min-height: 100vh;
-    padding: 12px;
+    padding: 8px;
   }
 
   /* A `newLine` section is preceded by this: full width, no height, so the
