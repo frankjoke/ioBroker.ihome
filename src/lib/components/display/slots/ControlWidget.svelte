@@ -12,16 +12,10 @@
 
   /** `lock` is for toggles: one press must mean one change of state, never two. */
   function write(value: unknown, lock = false) {
-    const sent = writeControl(ioBroker, control, value, Date.now(), {
+    writeControl(ioBroker, control, value, Date.now(), {
       // The lock is the *value*: released as soon as the broker confirms it.
       lockMs: lock ? 3000 : 0,
     });
-    // Debug tracing (toggles only, so a slider drag stays quiet).
-    if (lock) {
-      console.log(
-        `[ihome-dbg] widget toggle ${control.stateId} to=${value} ${sent ? "sent" : "REFUSED"} @${Date.now()}`,
-      );
-    }
   }
 
   function enumOptions(): { value: string; label: string }[] {

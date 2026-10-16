@@ -1,6 +1,5 @@
 <script lang="ts">
   import { splitValueUnit } from "$lib/config/format";
-  import { logPointer } from "$lib/utils/dbg";
   import type { Slot } from "$lib/types/display";
   import type { SlotControl } from "$lib/types/device";
 
@@ -48,7 +47,6 @@
     title="Toggle"
     onclick={(e) => {
       e.stopPropagation();
-      logPointer("click value", e);
       onPrimary();
     }}
     >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span

@@ -275,10 +275,6 @@ async function connectIOBroker(options = {}) {
     // Only *used* states live in the state cache and only they are updated.
     socket.on("stateChange", (stateId, state) => {
       if (!getUsedStateIds().has(stateId)) return;
-      // Debug tracing for the intermittent double-toggle (grep "ihome-dbg").
-      console.log(
-        `[ihome-dbg] change ${stateId} val=${String(state.val)} (${typeof state.val}) ack=${state.ack} from=${state.from} @${Date.now()}`,
-      );
       state.now = Date.now();
       states.update(stateId, state);
     });
