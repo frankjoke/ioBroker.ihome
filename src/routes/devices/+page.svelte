@@ -22,6 +22,7 @@
   import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
   import { onMount } from "svelte";
   import {
+    peekRequestedLayout,
     requestDeviceConfig,
     takeRequestedDeviceConfig,
   } from "$lib/pages.js";
@@ -140,8 +141,12 @@
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
   // waits for the registry, in case the request arrives before it is loaded.
   let requestedId = $state("");
+  // A tile editor round trip leaves its tile address pending — offer the way
+  // back to that tile (the layout route still takes and clears it).
+  let backToTile = $state(false);
   onMount(() => {
     requestedId = takeRequestedDeviceConfig();
+    backToTile = peekRequestedLayout() !== null;
   });
   $effect(() => {
     if (!requestedId) return;
@@ -176,16 +181,29 @@
       <span class="label-mono">Configuration</span>
       <h1>Devices</h1>
     </div>
-    <button
-      type="button"
-      class="icon-btn primary"
-      title="Add device"
-      aria-label="Add device"
-      disabled={showForm}
-      onclick={addDevice}
-    >
-      <span class="material-symbols-outlined">add</span>
-    </button>
+    <div class="page-actions">
+      {#if backToTile}
+        <button
+          type="button"
+          class="btn btn-outline"
+          title="Back to the tile editor"
+          onclick={() => (location.hash = "#/layout")}
+        >
+          <span class="material-symbols-outlined">arrow_back</span>Back to the
+          tile
+        </button>
+      {/if}
+      <button
+        type="button"
+        class="icon-btn primary"
+        title="Add device"
+        aria-label="Add device"
+        disabled={showForm}
+        onclick={addDevice}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+    </div>
   </div>
 
   {#if showForm}
@@ -340,6 +358,12 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 1rem;
+  }
+
+  .page-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .page-heading {

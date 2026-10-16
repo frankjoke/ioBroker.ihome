@@ -97,3 +97,16 @@ export function takeRequestedLayout() {
     return null;
   }
 }
+
+/**
+ * The pending layout target without taking it. The devices page uses it to
+ * offer the way back to the tile it was opened from; the layout route still
+ * takes (and clears) the value on arrival.
+ */
+export function peekRequestedLayout() {
+  try {
+    return parseLayoutRef(sessionStorage.getItem(CONFIG_PLACEMENT_KEY));
+  } catch {
+    return null;
+  }
+}

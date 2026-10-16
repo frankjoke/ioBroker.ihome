@@ -52,6 +52,7 @@
     isTemplatesWritable,
   } from "$lib/stores/templates.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { requestDeviceConfig, requestLayoutConfig } from "$lib/pages.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -446,6 +447,19 @@
     if (a) onSwapDevice?.(a);
   }
 
+  /**
+   * Edit the tile's device: ask the devices page to open its form, leaving this
+   * tile's address pending so the way back lands here again (the layout route
+   * takes it on arrival).
+   */
+  function openDeviceEditor(): void {
+    const a = anchor();
+    if (!a || !device) return;
+    requestDeviceConfig(device.id);
+    requestLayoutConfig(a);
+    location.hash = "#/devices";
+  }
+
   // ------------------------------------------------------------------- slots
 
   /** What a slot row shows next to its kind: the control it reads, or its hint. */
@@ -660,6 +674,9 @@
           <span class="device-name">{device.name}</span>
           <button type="button" class="btn btn-sm" onclick={requestSwap}
             >Change device…</button
+          >
+          <button type="button" class="btn btn-sm" onclick={openDeviceEditor}
+            >Edit device…</button
           >
         {:else}
           <span class="warn">This device is not in the registry any more.</span>
