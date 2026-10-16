@@ -205,3 +205,5 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
 - **Device actions as icons** (`d4b3b17`): the tile pane's "Change device…" / "Edit device…" buttons
   are icon buttons now — the `select` glyph (dashed selection box) and the pencil (`edit`); titles and
   aria-labels keep the words.
+- **Bold device name** (`5358175`): the tile pane's Device field name is `<strong>` now — the tile's
+  main device reads as the field's value; the Template source line keeps its weight.
