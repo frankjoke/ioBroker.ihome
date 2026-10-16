@@ -138,11 +138,24 @@ function cloneSection(section: Group): Group {
 
 // ------------------------------------------------------------------- pages
 
-export function addPage(reg: PageRegistry, title = "New page"): PageRegistry {
-  return withPages(reg, (pages) => [
-    ...pages,
-    { id: newId(), title, groups: [] },
-  ]);
+/**
+ * A page is a room: it comes with one empty section, so a new room is usable
+ * right away — there is no tile without a section.
+ */
+export function addPage(
+  reg: PageRegistry,
+  title = "New page",
+  at?: number,
+): PageRegistry {
+  return withPages(reg, (pages) => {
+    const next = [...pages];
+    next.splice(at ?? next.length, 0, {
+      id: newId(),
+      title,
+      groups: [{ id: newId(), title: "New section", tiles: [] }],
+    });
+    return next;
+  });
 }
 
 export function deletePage(reg: PageRegistry, pageId: string): PageRegistry {

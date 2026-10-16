@@ -140,11 +140,15 @@ it("deletes and duplicates a single placement", () => {
   );
 });
 
-it("adds a page and a section with a fresh id and an empty list", () => {
+it("adds a page (with one empty section) and a section with a fresh id", () => {
   const withPage = addPage(regWithTiles(), "Chores");
   expect(withPage.pages).toHaveLength(2);
   expect(withPage.pages[1].title).toBe("Chores");
-  expect(withPage.pages[1].groups).toEqual([]);
+  // a room is never without a section
+  expect(withPage.pages[1].groups).toHaveLength(1);
+  expect(withPage.pages[1].groups[0].title).toBe("New section");
+  expect(withPage.pages[1].groups[0].tiles).toEqual([]);
+  expect(withPage.pages[1].groups[0].id).toBeTruthy();
 
   const withSection = addSection(withPage, "p", "New");
   expect(withSection.pages[0].groups).toHaveLength(3);
@@ -152,7 +156,10 @@ it("adds a page and a section with a fresh id and an empty list", () => {
   expect(withSection.pages[0].groups[2].id).toBeTruthy();
 });
 
-it("inserts a section and tiles at a given index", () => {
+it("inserts a page, section and tiles at a given index", () => {
+  const topPage = addPage(regWithTiles(), "First", 0);
+  expect(topPage.pages.map((p) => p.title)).toEqual(["First", "P"]);
+
   const topSection = addSection(regWithTiles(), "p", "New", 0);
   expect(topSection.pages[0].groups.map((g) => g.title)).toEqual([
     "New",

@@ -176,18 +176,20 @@
         >not editable</span
       >
     {/if}
-    <button
-      type="button"
-      class="icon-btn primary"
-      title={writable
-        ? "Add page"
-        : "Not editable: the page document did not load"}
-      aria-label="Add page"
-      disabled={!writable}
-      onclick={() => commitLayout(addPage(registry))}
-    >
-      <span class="material-symbols-outlined">add</span>
-    </button>
+    {#if registry.pages.length === 0}
+      <button
+        type="button"
+        class="icon-btn primary"
+        title={writable
+          ? "Add page"
+          : "Not editable: the page document did not load"}
+        aria-label="Add page"
+        disabled={!writable}
+        onclick={() => commitLayout(addPage(registry))}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+    {/if}
   </div>
 
   <div class="cols">

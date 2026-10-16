@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import {
+    addPage,
     addSection,
     appendDevices,
     deletePlacement,
@@ -139,26 +140,50 @@
         >
           <span class="material-symbols-outlined">content_copy</span>
         </button>
-        <button
-          type="button"
-          class="icon-btn"
-          title="Move up"
-          aria-label="Move up"
-          disabled={pageIndex === 0}
-          onclick={() => onChange(movePage(registry, pageIndex, pageIndex - 1))}
-        >
-          <span class="material-symbols-outlined">arrow_upward</span>
-        </button>
-        <button
-          type="button"
-          class="icon-btn"
-          title="Move down"
-          aria-label="Move down"
-          disabled={pageIndex === registry.pages.length - 1}
-          onclick={() => onChange(movePage(registry, pageIndex, pageIndex + 1))}
-        >
-          <span class="material-symbols-outlined">arrow_downward</span>
-        </button>
+        {#if pageIndex === 0}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Add page above"
+            aria-label="Add page above"
+            onclick={() => onChange(addPage(registry, undefined, 0))}
+          >
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Move up"
+            aria-label="Move up"
+            onclick={() =>
+              onChange(movePage(registry, pageIndex, pageIndex - 1))}
+          >
+            <span class="material-symbols-outlined">arrow_upward</span>
+          </button>
+        {/if}
+        {#if pageIndex === registry.pages.length - 1}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Add page below"
+            aria-label="Add page below"
+            onclick={() => onChange(addPage(registry))}
+          >
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Move down"
+            aria-label="Move down"
+            onclick={() =>
+              onChange(movePage(registry, pageIndex, pageIndex + 1))}
+          >
+            <span class="material-symbols-outlined">arrow_downward</span>
+          </button>
+        {/if}
         <button
           type="button"
           class="icon-btn danger"
