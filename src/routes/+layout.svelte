@@ -211,7 +211,7 @@
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 8px;
   }
 
   .app-shell.display .app-main {
@@ -288,13 +288,5 @@
     min-width: 180px;
     font-family: var(--font-mono);
     font-size: var(--body-sm);
-  }
-
-  /* -------------------------------------------------------- responsive */
-
-  @media (max-width: 768px) {
-    .app-main {
-      padding: 16px;
-    }
   }
 </style>
