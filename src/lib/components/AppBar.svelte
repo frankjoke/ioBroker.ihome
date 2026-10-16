@@ -51,6 +51,14 @@
     }
     setLastPage(id);
   }
+
+  /**
+   * The pencil opens the editor on the page being viewed — the same handoff as
+   * Ctrl/Cmd+click on its tab — so the tree folds every other page around it.
+   */
+  function onPencilClick() {
+    if (currentId) requestLayoutConfig({ pageId: currentId });
+  }
 </script>
 
 <header class="bar">
@@ -73,6 +81,7 @@
         href={`${base}/#/layout`}
         title="Edit the layout"
         aria-label="Edit the layout"
+        onclick={onPencilClick}
       >
         <span class="material-symbols-outlined">edit</span>
       </a>
