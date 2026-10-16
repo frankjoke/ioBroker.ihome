@@ -673,12 +673,26 @@
       <div class="row">
         {#if device}
           <span class="device-name">{device.name}</span>
-          <button type="button" class="btn btn-sm" onclick={requestSwap}
-            >Change device…</button
-          >
-          <button type="button" class="btn btn-sm" onclick={openDeviceEditor}
-            >Edit device…</button
-          >
+          <span class="row-actions">
+            <button
+              type="button"
+              class="icon-btn"
+              title="Change device…"
+              aria-label="Change device"
+              onclick={requestSwap}
+            >
+              <span class="material-symbols-outlined">select</span>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              title="Edit device…"
+              aria-label="Edit device"
+              onclick={openDeviceEditor}
+            >
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+          </span>
         {:else}
           <span class="warn">This device is not in the registry any more.</span>
         {/if}
