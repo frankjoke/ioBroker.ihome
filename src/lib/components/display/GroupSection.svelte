@@ -4,6 +4,8 @@
   import type { EnrichedDevice } from "$lib/types/device";
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
+  import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
+  import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
   let {
@@ -38,6 +40,15 @@
       ? backgroundCss(group.appearance.background)
       : "",
   );
+
+  /** Ctrl/Cmd+click the section header → open this section in the layout editor. */
+  function onTitleClick(event: MouseEvent) {
+    if (!wantsDeviceConfig(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    requestLayoutConfig({ pageId, sectionId: group.id });
+    location.hash = "#/layout";
+  }
 </script>
 
 <section
@@ -47,9 +58,13 @@
   style="{background} {width}"
 >
   {#if group.title}
-    <h2 class="group-title">
-      {#if group.icon}<span class="material-symbols-outlined" aria-hidden="true"
-          >{group.icon}</span
+    <!-- Ctrl/Cmd+click is a power-user shortcut on a heading, not a control; the
+         layout editor stays reachable via the AppBar pencil, so no key handler. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <h2 class="group-title" onclick={onTitleClick}>
+      {#if group.icon}<span class="group-icon"
+          ><Icon value={group.icon} size={18} /></span
         >{/if}
       <span>{group.title}</span>
     </h2>
@@ -104,8 +119,8 @@
     letter-spacing: 0.01em;
   }
 
-  .group-title .material-symbols-outlined {
-    font-size: 18px;
+  .group-icon {
+    display: inline-flex;
     color: var(--text-muted);
   }
 

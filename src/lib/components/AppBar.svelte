@@ -7,7 +7,13 @@
     setLastPage,
     view,
   } from "$lib/stores/pages.svelte.js";
-  import { pages as configPages, pageHref } from "$lib/pages.js";
+  import {
+    pages as configPages,
+    pageHref,
+    requestLayoutConfig,
+    wantsDeviceConfig,
+  } from "$lib/pages.js";
+  import Icon from "$lib/components/common/Icon.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
 
   /**
@@ -20,13 +26,31 @@
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
 
   const treePages = $derived(getPageRegistry().pages ?? []);
-  /** Which tree page the display is showing (a bookmarked id, else the last one). */
-  const currentId = $derived(
-    isDisplay
-      ? (route.params?.id ?? view.lastPage ?? treePages[0]?.id ?? "")
-      : "",
-  );
+  /**
+   * Which tree page the display is showing (a bookmarked id, else the last one).
+   * A stale or empty value — the page it names was deleted meanwhile — falls back
+   * to the first page, so a tab is always highlighted (A29).
+   */
+  const currentId = $derived.by(() => {
+    if (!isDisplay) return "";
+    const wanted = route.params?.id ?? view.lastPage ?? "";
+    return treePages.some((p) => p.id === wanted)
+      ? wanted
+      : (treePages[0]?.id ?? "");
+  });
   const isConnected = $derived(!!ioBroker.connected);
+
+  /** Ctrl/Cmd+click a page tab → open that page in the layout editor. */
+  function onPageClick(event: MouseEvent, id: string) {
+    if (wantsDeviceConfig(event)) {
+      // Also suppresses the browser's open-in-new-tab for this hash link.
+      event.preventDefault();
+      requestLayoutConfig({ pageId: id });
+      location.hash = "#/layout";
+      return;
+    }
+    setLastPage(id);
+  }
 </script>
 
 <header class="bar">
@@ -38,11 +62,9 @@
           class:active={p.id === currentId}
           href={`${base}/#/p/${p.id}`}
           aria-current={p.id === currentId ? "page" : undefined}
-          onclick={() => setLastPage(p.id)}
+          onclick={(e) => onPageClick(e, p.id)}
         >
-          {#if p.icon}<span class="material-symbols-outlined" aria-hidden="true"
-              >{p.icon}</span
-            >{/if}
+          {#if p.icon}<Icon value={p.icon} size={18} />{/if}
           <span class="tab-label">{p.title}</span>
         </a>
       {/each}
