@@ -18,15 +18,23 @@
     emphasis?: "primary" | "secondary";
   } = $props();
 
+  const decimals = $derived(
+    typeof slot.options?.decimals === "number"
+      ? slot.options.decimals
+      : undefined,
+  );
+
   const parts = $derived(
     control
       ? splitValueUnit(
           control.liveValue,
           // `hideUnit` drops the unit to save width; a boolean's unit is its
-          // OFF/ON label and stays either way.
+          // OFF/ON label and stays either way. `decimals` is the precision
+          // knob — the reading rounds to it, trailing zeros drop.
           slot.options?.hideUnit === true
             ? undefined
             : (slot.unit ?? control.unit),
+          decimals,
         )
       : { value: "—", unit: "" },
   );

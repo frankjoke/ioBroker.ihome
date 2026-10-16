@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   contrastColor,
   formatAge,
+  formatNumber,
   formatSlotText,
   formatValue,
   splitValueUnit,
@@ -71,4 +72,19 @@ it("splits a slot's value from its unit so the unit can be styled apart", () => 
   expect(splitValueUnit(null, "°C")).toEqual({ value: "—", unit: "" });
   expect(splitValueUnit(undefined, "°C")).toEqual({ value: "—", unit: "" });
   expect(splitValueUnit("abc", "x")).toEqual({ value: "abc", unit: "x" });
+});
+
+it("rounds a reading to its slot's precision, trailing zeros dropped", () => {
+  expect(formatNumber(54.32, 1)).toBe("54.3");
+  expect(formatNumber(54.36, 1)).toBe("54.4");
+  expect(formatNumber(54.32, 0)).toBe("54");
+  expect(formatNumber(54, 1)).toBe("54");
+  expect(formatNumber(0.30000000000000004, 2)).toBe("0.3");
+  // adapters that store readings as strings round too
+  expect(formatNumber("54.32", 1)).toBe("54.3");
+  // no precision (or junk) leaves the value alone
+  expect(formatNumber(54.32)).toBe("54.32");
+  expect(formatNumber(54.32, -1)).toBe("54.32");
+  expect(formatNumber("abc", 1)).toBe("abc");
+  expect(splitValueUnit(54.32, "%", 1)).toEqual({ value: "54.3", unit: "%" });
 });

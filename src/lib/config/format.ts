@@ -25,8 +25,32 @@ export function nameText(name: unknown): string {
 }
 
 /**
+ * A reading at a set precision: round a number (or a numeric string) to
+ * `decimals` digits and drop trailing zeros — 54.32 with 1 → "54.3", 54 → "54".
+ * Anything else (text, a junk precision) passes through as its display string.
+ */
+export function formatNumber(v: unknown, decimals?: number): string {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  if (
+    !Number.isFinite(n) ||
+    typeof decimals !== "number" ||
+    !Number.isFinite(decimals) ||
+    decimals < 0
+  ) {
+    return String(v);
+  }
+  return String(Number(n.toFixed(Math.min(Math.trunc(decimals), 20))));
+}
+
+/**
  * A slot's value and its unit as separate strings, so a tile can set the unit
- * smaller and un-bold than the number it belongs to.
+ * smaller and un-bold than the number it belongs to. `decimals` is the slot's
+ * precision knob (absent = the value as it comes).
  *
  * A boolean's unit is its false/true pair ("OFF/ON", "Aus/Ein"), so it is
  * consumed as the label and never repeated; a missing value shows "—" with no
@@ -35,13 +59,14 @@ export function nameText(name: unknown): string {
 export function splitValueUnit(
   v: unknown,
   unit?: string,
+  decimals?: number,
 ): { value: string; unit: string } {
   if (v === null || v === undefined) return { value: "—", unit: "" };
   if (typeof v === "boolean") {
     return { value: formatBoolean(v, unit || "Off/On"), unit: "" };
   }
   if (typeof v === "object") return { value: JSON.stringify(v), unit: "" };
-  return { value: String(v), unit: unit ? String(unit) : "" };
+  return { value: formatNumber(v, decimals), unit: unit ? String(unit) : "" };
 }
 
 /**
