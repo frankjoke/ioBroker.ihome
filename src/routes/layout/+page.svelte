@@ -4,6 +4,7 @@
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
+  import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList } from "$lib/config/rooms";
@@ -13,18 +14,27 @@
     deletePage,
     deleteSection,
     type LayoutSelection,
+    type PlacementAnchor,
   } from "$lib/config/layout-ops";
+  import { addSlot, editTile } from "$lib/config/tile-ops";
   import {
     commitLayout,
     getLayoutSaveFailed,
     getPageRegistry,
     isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
+  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
+  import type { EnrichedDevice } from "$lib/types/device";
+  import type { Slot } from "$lib/types/display";
 
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
-  let pickerFor = $state<{ pageId: string; sectionId: string } | null>(null);
+  let pickerFor = $state<
+    | { kind: "device"; pageId: string; sectionId: string }
+    | { kind: "slot"; anchor: PlacementAnchor }
+    | null
+  >(null);
 
   const registry = $derived(getPageRegistry());
   const devices = $derived($devicesEnrichedStore);
@@ -40,6 +50,34 @@
     const requested = takeRequestedLayout();
     if (requested) selection = requested;
   });
+
+  /** The device a tile's placement points at, if it is still in the registry. */
+  function deviceOfAnchor(anchor: PlacementAnchor): EnrichedDevice | undefined {
+    const placement = registry.pages
+      .find((p) => p.id === anchor.pageId)
+      ?.groups.find((g) => g.id === anchor.sectionId)
+      ?.tiles?.find((t) => t.id === anchor.placementId);
+    return placement
+      ? devices.find((d) => d.id === placement.device)
+      : undefined;
+  }
+
+  /** A dangling device is refused: the tree already warns on the row. */
+  function openSlotPicker(anchor: PlacementAnchor): void {
+    if (!deviceOfAnchor(anchor)) return;
+    pickerFor = { kind: "slot", anchor };
+  }
+
+  function addSlotTo(anchor: PlacementAnchor, slot: Slot): void {
+    const device = deviceOfAnchor(anchor);
+    if (!device) return;
+    commitLayout(
+      editTile(registry, anchor, device, getTemplateRegistry().templates, (t) =>
+        addSlot(t, slot),
+      ),
+    );
+    pickerFor = null;
+  }
 
   function confirmDelete(): void {
     const target = pendingDelete;
@@ -111,7 +149,10 @@
         onSelect={(next) => (selection = next)}
         onChange={commitLayout}
         onDelete={(target) => (pendingDelete = target)}
-        onAddTile={(pageId, sectionId) => (pickerFor = { pageId, sectionId })}
+        onAddTile={(pageId, sectionId) =>
+          (pickerFor = { kind: "device", pageId, sectionId })}
+        onAddSlot={(pageId, sectionId, placementId) =>
+          openSlotPicker({ pageId, sectionId, placementId })}
       />
     </div>
 
@@ -132,23 +173,34 @@
 
 {#if pickerFor}
   {@const target = pickerFor}
-  <DevicePicker
-    {devices}
-    {rooms}
-    enums={ioBroker.enums}
-    listed={(
-      registry.pages
-        .find((p) => p.id === target.pageId)
-        ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
-    ).map((t) => t.device)}
-    onAdd={(deviceIds) => {
-      commitLayout(
-        appendDevices(registry, target.pageId, target.sectionId, deviceIds),
-      );
-      pickerFor = null;
-    }}
-    onClose={() => (pickerFor = null)}
-  />
+  {#if target.kind === "device"}
+    <DevicePicker
+      {devices}
+      {rooms}
+      enums={ioBroker.enums}
+      listed={(
+        registry.pages
+          .find((p) => p.id === target.pageId)
+          ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
+      ).map((t) => t.device)}
+      onAdd={(deviceIds) => {
+        commitLayout(
+          appendDevices(registry, target.pageId, target.sectionId, deviceIds),
+        );
+        pickerFor = null;
+      }}
+      onClose={() => (pickerFor = null)}
+    />
+  {:else}
+    {@const device = deviceOfAnchor(target.anchor)}
+    {#if device}
+      <SlotPicker
+        {device}
+        onAdd={(slot) => addSlotTo(target.anchor, slot)}
+        onClose={() => (pickerFor = null)}
+      />
+    {/if}
+  {/if}
 {/if}
 
 {#if pendingDelete}

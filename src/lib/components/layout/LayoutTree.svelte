@@ -27,6 +27,7 @@
     onChange,
     onDelete,
     onAddTile,
+    onAddSlot,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -37,6 +38,8 @@
     onDelete: (selection: LayoutSelection) => void;
     /** Opens the device picker for a section — the route owns the dialog. */
     onAddTile: (pageId: string, sectionId: string) => void;
+    /** Opens the slot picker for a tile — the route owns the dialog. */
+    onAddSlot: (pageId: string, sectionId: string, placementId: string) => void;
   } = $props();
 
   // Folded tree nodes. Local and transient: how the tree looks is a view of the
@@ -298,6 +301,15 @@
                 {/if}
               </button>
               <span class="row-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Add slot"
+                  aria-label="Add slot"
+                  onclick={() => onAddSlot(page.id, section.id, tile.id)}
+                >
+                  <span class="material-symbols-outlined">add</span>
+                </button>
                 <button
                   type="button"
                   class="icon-btn"
