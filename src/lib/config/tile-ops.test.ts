@@ -4,12 +4,15 @@ import type {
   ActiveCondition,
   ActiveOp,
   PageRegistry,
+  Placement,
+  TemplateRegistry,
   TileConfig,
   Template,
 } from "$lib/types/display";
 import {
   addRule,
   addSlot,
+  applyTemplate,
   editTile,
   ensureTile,
   evalActive,
@@ -21,6 +24,8 @@ import {
   removeRule,
   removeSlot,
   resetTile,
+  templateFromTile,
+  upsertTemplate,
 } from "./tile-ops";
 
 const device = (over: Partial<Device> = {}): Device =>
@@ -200,4 +205,65 @@ it("evalActive — text fallback is case-insensitive; junk degrades", () => {
   ); // unknown op
   expect(evalActive({ source: "s", op: "eq", value: "" }, "")).toBe(true); // empty is text, not a number
   expect(evalActive({ source: "s", op: "eq", value: "0" }, "")).toBe(false); // "" must not parse as 0
+});
+
+it("templateFromTile copies, never shares: mutating the tile leaves the template alone", () => {
+  const tile: TileConfig = {
+    size: { w: 2, h: 2 },
+    background: { kind: "solid", value: "#101418" },
+    slots: [{ kind: "value", source: "power", rules: [{ when: "power > 0" }] }],
+  };
+  const t = templateFromTile(tile, device({ type: "Switch" }), [], "  Pumpe  ");
+  expect(t.name).toBe("Pumpe");
+  expect(t.type).toBe("Switch");
+  tile.slots![0].source = "mutated";
+  expect(t.slots[0].source).toBe("power");
+  expect(t.slots[0]).not.toBe(tile.slots![0]);
+});
+
+it("upsertTemplate appends once, then overwrites by name+type keeping the id", () => {
+  const empty: TemplateRegistry = { version: 0, updatedAt: 0, templates: [] };
+  const one = upsertTemplate(empty, userTemplate({ id: "a", name: "Pump" }));
+  expect(one.version).toBe(1);
+  const two = upsertTemplate(
+    one,
+    userTemplate({ id: "b", name: "Pump", slots: [{ kind: "icon" }] }),
+  );
+  expect(two.templates.length).toBe(1);
+  expect(two.templates[0].id).toBe("a");
+  expect(two.templates[0].slots).toEqual([{ kind: "icon" }]);
+  const otherType = upsertTemplate(
+    two,
+    userTemplate({ id: "c", name: "Pump", type: "Light" }),
+  );
+  expect(otherType.templates.length).toBe(2);
+});
+
+it("applyTemplate replaces size, slots and background but keeps the active condition", () => {
+  const placement: Placement = {
+    id: "p",
+    device: "d1",
+    title: "Garten",
+    tile: {
+      size: { w: 1, h: 1 },
+      background: { kind: "solid", value: "#000" },
+      active: { source: "power", op: "truthy" },
+      slots: [{ kind: "value", source: "old" }],
+    },
+  };
+  const next = applyTemplate(
+    placement,
+    userTemplate({
+      id: "t9",
+      background: { kind: "solid", value: "#111" },
+      slots: [{ kind: "value", source: "new" }],
+    }),
+  );
+  expect(next.title).toBe("Garten");
+  expect(next.tile?.template).toBe("t9");
+  expect(next.tile?.slots).toEqual([{ kind: "value", source: "new" }]);
+  expect(next.tile?.background?.value).toBe("#111");
+  expect(next.tile?.active?.source).toBe("power");
+  const bare = applyTemplate(placement, userTemplate({ id: "t9", slots: [] }));
+  expect(bare.tile?.background).toBeUndefined(); // the template has none: the old one drops
 });

@@ -12,6 +12,7 @@ import type {
   Slot,
   TileConfig,
   Template,
+  TemplateRegistry,
 } from "$lib/types/display";
 import { presetForType, resolveTemplate } from "$lib/config/template-ops";
 import {
@@ -21,6 +22,7 @@ import {
 } from "$lib/config/layout-ops";
 import { truthy } from "$lib/config/rule-ops";
 import { deepCopy } from "$lib/utils/json";
+import { newId } from "$lib/utils/ids";
 
 /** The complete config a first edit starts from, deep-copied off the chain. */
 export function materialiseTile(
@@ -187,6 +189,70 @@ export function editTile(
       return { ...ensured, tile: fn(ensured.tile) };
     },
   );
+}
+
+// ---------------------------------------------------------------- templates
+
+/** The tile's layout as a per-type template: size + slots + CSS background; the
+ *  type's features come from the chain, `active` stays on the tile (A19). */
+export function templateFromTile(
+  tile: TileConfig,
+  device: Device,
+  templates: Template[],
+  name: string,
+): Template {
+  const chain = resolveTemplate(device, templates);
+  return {
+    id: newId(),
+    name: name.trim(),
+    type: device.type,
+    size: { ...(tile.size ?? chain.size) },
+    features: deepCopy(chain.features),
+    slots: deepCopy(tile.slots ?? []),
+    ...(tile.background ? { background: deepCopy(tile.background) } : {}),
+  };
+}
+
+/** Append, or replace the template with the same (name, type) keeping its id. */
+export function upsertTemplate(
+  registry: TemplateRegistry,
+  template: Template,
+): TemplateRegistry {
+  const list = registry.templates ?? [];
+  const at = list.findIndex(
+    (t) => t.name === template.name && t.type === template.type,
+  );
+  const next = [...list];
+  if (at < 0) next.push(deepCopy(template));
+  else next[at] = { ...deepCopy(template), id: list[at].id };
+  return {
+    ...registry,
+    version: (registry.version ?? 0) + 1,
+    updatedAt: Date.now(),
+    templates: next,
+  };
+}
+
+/** Replace the placement's size, slots and background with the template's; the
+ *  tile's own active condition survives. */
+export function applyTemplate(
+  placement: Placement,
+  template: Template,
+): Placement {
+  const active = placement.tile?.active;
+  const size = template.size ?? placement.tile?.size;
+  return {
+    ...placement,
+    tile: {
+      template: template.id,
+      ...(size ? { size: { ...size } } : {}),
+      ...(template.background
+        ? { background: deepCopy(template.background) }
+        : {}),
+      ...(active ? { active: deepCopy(active) } : {}),
+      slots: deepCopy(template.slots),
+    },
+  };
 }
 
 // ------------------------------------------------------------------ active
