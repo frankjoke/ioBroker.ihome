@@ -672,7 +672,7 @@
       <span class="label-mono">Device</span>
       <div class="row">
         {#if device}
-          <span class="device-name">{device.name}</span>
+          <strong class="device-name">{device.name}</strong>
           <span class="row-actions">
             <button
               type="button"
