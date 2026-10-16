@@ -200,3 +200,5 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   logs removed. The guarded `writeControl` calls stay; only the logging went.
 - **Tighter app shell** (`a5a4a86`): `.app-main` padding 24px → 8px (the ≤768px override, same value,
   went with it) — every page's content starts 16px higher; the display shell (padding 0) is untouched.
+- **Display page padding 8px** (`fabe19c`): the display's own page wrapper (`PageView` `.page`, 12px
+  around the sections) matches the shell now.
