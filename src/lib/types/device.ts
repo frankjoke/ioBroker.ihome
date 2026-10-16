@@ -145,6 +145,20 @@ export interface EnrichedControl extends Control {
   virtualError?: string;
 }
 
+/**
+ * What a slot renderer reads off a control — also satisfied by the read-only
+ * pseudo-control a raw state id resolves to (A21), so a slot can name any state
+ * without owning a device control.
+ */
+export interface SlotControl {
+  id?: string;
+  stateId?: string;
+  label?: string;
+  unit?: string;
+  liveValue?: unknown;
+  writable?: boolean;
+}
+
 export interface EnrichedDevice extends Device {
   displayRoom?: string;
   controls: EnrichedControl[];

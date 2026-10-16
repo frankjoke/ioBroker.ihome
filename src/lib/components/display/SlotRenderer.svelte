@@ -5,7 +5,11 @@
   import SparklineSlot from "./slots/SparklineSlot.svelte";
   import HistoryListSlot from "./slots/HistoryListSlot.svelte";
   import type { Slot } from "$lib/types/display";
-  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
+  import type {
+    EnrichedControl,
+    EnrichedDevice,
+    SlotControl,
+  } from "$lib/types/device";
 
   let {
     slot,
@@ -17,7 +21,7 @@
   }: {
     slot: Slot;
     device: EnrichedDevice;
-    control?: EnrichedControl;
+    control?: SlotControl;
     style: { icon?: string; color?: string; disabled?: boolean };
     onPrimary?: () => void;
     emphasis?: "primary" | "secondary";
@@ -35,16 +39,22 @@
   const show = $derived(!needsControl || !!control);
 </script>
 
+<!-- The control-bearing kinds below only open up for a control that resolved
+     from the device (a raw-state pseudo-control reaches value/icon kinds only),
+     so the cast to the full enriched shape is safe. -->
 {#if show}
   {#if slot.kind === "icon"}
     <IconSlot {slot} {style} fallback={device.icon} {onPrimary} />
   {:else if slot.kind === "value"}
     <ValueSlot {slot} {control} {onPrimary} {emphasis} />
   {:else if slot.kind === "sparkline" && control}
-    <SparklineSlot {control} />
+    <SparklineSlot control={control as EnrichedControl} />
   {:else if slot.kind === "history-list" && control}
-    <HistoryListSlot {control} count={Number(slot.options?.count ?? 4)} />
+    <HistoryListSlot
+      control={control as EnrichedControl}
+      count={Number(slot.options?.count ?? 4)}
+    />
   {:else if needsControl && control}
-    <ControlWidget {control} />
+    <ControlWidget control={control as EnrichedControl} />
   {/if}
 {/if}

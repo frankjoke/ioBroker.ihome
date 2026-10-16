@@ -3,7 +3,7 @@
   import { writeControl } from "$lib/utils/control-write";
   import { logPointer } from "$lib/utils/dbg";
   import {
-    pickControl,
+    pickSlotControls,
     primaryControl,
     resolveControl,
     resolveTemplate,
@@ -26,12 +26,15 @@
     requestLayoutConfig,
     wantsDeviceConfig,
   } from "$lib/pages.js";
-  import { SvelteSet } from "svelte/reactivity";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
-  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
-  import type { Slot, TileConfig } from "$lib/types/display";
+  import type {
+    EnrichedControl,
+    EnrichedDevice,
+    SlotControl,
+  } from "$lib/types/device";
+  import type { Rule, Slot, TileConfig } from "$lib/types/display";
   import type { PlacementAnchor } from "$lib/config/layout-ops";
 
   let {
@@ -65,16 +68,6 @@
   const span = $derived(clampSpan(tile?.size ?? template.size, bp));
   const primary = $derived(primaryControl(shownControls));
 
-  /** The shape a readout hint matches against: role, label, unit. */
-  function pickable(controls: EnrichedControl[]) {
-    return controls.map((c) => ({
-      id: c.id,
-      role: c.object?.common?.role ?? c.common?.role,
-      unit: c.unit,
-      label: c.label ?? c.feature,
-    }));
-  }
-
   // Spec §4.1 + label fallback: feature → control id → state id → label.
   function controlFor(slot: Slot): EnrichedControl | undefined {
     if (!slot.source) return undefined;
@@ -86,52 +79,54 @@
   const scope = $derived(ruleScope(device.controls ?? [], getVirtualPool()));
 
   /** Slot rules first, the control's own defaults last — the last match wins. */
-  function slotStyle(slot: Slot, control?: EnrichedControl) {
+  function slotStyle(slot: Slot, control?: SlotControl & { rules?: Rule[] }) {
     return resolveStyle(
       [...(slot.rules ?? []), ...(control?.rules ?? [])],
       scope,
     );
   }
 
-  // Slots that render nothing are dropped, so a template can name features a
-  // device does not have without leaving gaps (spec §10), and a rule can hide a
-  // slot by value.
-  /**
-   * Slots and the controls they show, resolved in one pass.
-   *
-   * A slot with no `source` takes the next control no earlier slot has used —
-   * that is how a readout preset says "show two values" without knowing what the
-   * device calls them (`Temperatur`/`Luftfeuchtigkeit` carry no feature the
-   * preset could match).
-   */
-  const resolved = $derived.by(() => {
-    const used = new SvelteSet<string>();
-    const out: { slot: Slot; control?: EnrichedControl }[] = [];
-    for (const slot of template.slots) {
-      if (slot.kind === "badge") continue; // badges live in the corners
-      // A readout hint is matched against the pickable shape, then mapped back
-      // to the control it names; position is only the fallback.
-      const picked = slot.source
-        ? undefined
-        : pickControl(
-            pickable(shownControls),
-            String(slot.options?.pick ?? ""),
-            used,
-          );
-      const control = slot.source
-        ? controlFor(slot)
-        : ((picked
-            ? shownControls.find((c) => c.id === picked.id)
-            : undefined) ?? shownControls.find((c) => !used.has(c.id)));
-      if (control) used.add(control.id);
-      if (slot.kind !== "icon" && !control) continue;
-      if (slotStyle(slot, control).hidden === true) continue;
-      out.push({ slot, control });
-    }
-    return out;
-  });
+  /** The tile's own slots once it was materialised; the chain's until then (A18).
+   *  Slots that render nothing are dropped by the pass below, so a template can
+   *  name features a device does not have without leaving gaps (spec §10). */
+  const slots = $derived(tile?.slots ?? template.slots);
 
-  const slots = $derived(resolved.map((r) => r.slot));
+  /**
+   * A raw state id as a read-only pseudo-control (A21): a slot may name any state
+   * the document carries, not only a control of this device. Only the state's
+   * own object makes it one — a feature name like "power" is not a state.
+   */
+  function rawControl(source: string): SlotControl | undefined {
+    const obj = (ioBroker.objects as Map<string, any>)?.get?.(source);
+    if (!obj) return undefined;
+    const state = (ioBroker.states as Map<string, any>)?.get?.(source);
+    return {
+      id: source,
+      stateId: source,
+      label: obj.common?.name ?? source,
+      unit: obj.common?.unit,
+      liveValue: state?.val,
+      writable: false,
+    };
+  }
+
+  /**
+   * Slots and the controls they show, resolved in one pass (A20/A21): state-
+   * hidden slots drop out first, then `source` (a control, or a raw state via
+   * `rawControl`), then a hint, then the next control no earlier slot used. A
+   * source or hint that matches nothing goes dormant instead of falling back to
+   * position; the slots that actually render are the ones with a reading (an
+   * icon slot keeps its fallback) that no rule hides.
+   */
+  const resolved = $derived(
+    pickSlotControls<SlotControl>(slots, shownControls, {
+      raw: rawControl,
+    }).filter(
+      (r) =>
+        (r.slot.kind === "icon" || r.control) &&
+        slotStyle(r.slot, r.control).hidden !== true,
+    ),
+  );
 
   /** The tile's first reading is the headline; the rest are supporting. */
   const mainValueKey = $derived(
@@ -146,7 +141,7 @@
   // The icon slot carries the type's on/off colour and glow, so it drives the
   // tile's accent; the values reach CSS through custom properties (spec §6).
   const iconSlot = $derived(
-    template.slots.find((s) => s.kind === "icon") ?? { kind: "icon" as const },
+    slots.find((s) => s.kind === "icon") ?? { kind: "icon" as const },
   );
   const tileStyle = $derived(slotStyle(iconSlot, controlFor(iconSlot)));
   const tileVars = $derived(
@@ -193,7 +188,7 @@
 
   // Badges render once, at the end of the tile, wherever the badge slots sit in
   // the template. `ago` and `offline` need no control: they read the device.
-  const badgeSlots = $derived(template.slots.filter((s) => s.kind === "badge"));
+  const badgeSlots = $derived(slots.filter((s) => s.kind === "badge"));
 
   // Badges land in the corner their kind belongs to (spec §6), so the layout of
   // a tile carries meaning instead of being one row at the bottom.

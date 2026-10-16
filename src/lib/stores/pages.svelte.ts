@@ -41,7 +41,30 @@ export function getPageRegistry(): PageRegistry {
 }
 
 export function setPageRegistry(reg: PageRegistry): void {
+  registerSlotStateIds(reg);
   pageRegistry = reg;
+}
+
+/**
+ * Subscribe every raw state a tile names (A21): the tile editor lets a slot —
+ * and a tile's active condition — point at any state id, not only a control of
+ * the tile's own device. A feature name like "power" is not a state id, so only
+ * ids that exist in the object tree are registered.
+ */
+function registerSlotStateIds(reg: PageRegistry): void {
+  for (const page of reg.pages ?? []) {
+    for (const group of page.groups ?? []) {
+      for (const placement of group.tiles ?? []) {
+        const sources = [
+          ...(placement.tile?.slots ?? []).map((slot) => slot.source),
+          placement.tile?.active?.source,
+        ];
+        for (const id of sources) {
+          if (id && ioBroker.objects.get(id)) registerProgramStateId(id);
+        }
+      }
+    }
+  }
 }
 
 let initPromise: Promise<void> | null = null;

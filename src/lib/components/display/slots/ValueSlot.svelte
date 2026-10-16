@@ -2,7 +2,7 @@
   import { splitValueUnit } from "$lib/config/format";
   import { logPointer } from "$lib/utils/dbg";
   import type { Slot } from "$lib/types/display";
-  import type { EnrichedControl } from "$lib/types/device";
+  import type { SlotControl } from "$lib/types/device";
 
   let {
     slot,
@@ -11,7 +11,7 @@
     emphasis = "primary",
   }: {
     slot: Slot;
-    control?: EnrichedControl;
+    control?: SlotControl;
     /** Set when this slot *is* the tile's action — then it is the button. */
     onPrimary?: () => void;
     /** The tile's main reading is bold; the rest are quieter. */
