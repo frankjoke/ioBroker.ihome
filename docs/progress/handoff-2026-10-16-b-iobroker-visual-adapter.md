@@ -105,6 +105,10 @@ Walk the spec's criteria 1–8 against the real broker:
     tone ("battery < 20% → warn") must override the static colour, and a rule colour must override
     both; two badge slots with the same x/y and mutually-exclusive `hidden` rules → each shows in
     that spot.
+13. Device round trip: in a tile's pane, "Edit device…" → the device form opens on that device; add
+    or remove a control and save; "Back to the tile" → the layout editor folds to the same tile and
+    the pane shows the updated device (a slot on a removed control goes dormant). From the display's
+    Ctrl/Cmd+click the button must be absent.
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -138,3 +142,7 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   Precedence: matched rule colour > matched rule tone > slot colour > default tone. A badge rule's
   colour now works (it was resolved but never rendered); the derived ago/offline badges take the slot
   colour over their born tone. Two badges may share an explicit x/y spot (alarm/warning alternatives).
+- **Device round trip** (`ca0dd0b`): the tile pane's "Edit device…" opens the device's form on the
+  devices page and leaves the tile's address pending; the devices page shows "Back to the tile" when
+  that address is pending (peek — the layout route still owns taking it). The editor reopens folded to
+  the same tile with the device as it now is; the Layout tab resumes it too.
