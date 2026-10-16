@@ -109,6 +109,9 @@ Walk the spec's criteria 1–8 against the real broker:
     or remove a control and save; "Back to the tile" → the layout editor folds to the same tile and
     the pane shows the updated device (a slot on a removed control goes dormant). From the display's
     Ctrl/Cmd+click the button must be absent.
+14. Value slots: the `unit` checkbox in the value knobs drops the unit ("21.5" instead of "21.5 °C",
+    booleans keep OFF/ON); the main value must read noticeably bolder than the tile title in both
+    themes, secondary readings stay light.
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -146,3 +149,6 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   devices page and leaves the tile's address pending; the devices page shows "Back to the tile" when
   that address is pending (peek — the layout route still owns taking it). The editor reopens folded to
   the same tile with the device as it now is; the Layout tab resumes it too.
+- **Optional unit + bolder main value** (`91dcc6c`): a value slot's `unit` checkbox drops the unit to
+  save width (booleans keep their OFF/ON label); the main value is now JetBrains Mono 800 — heavier
+  than the 600 title. Value slots only (badges/slider readouts unchanged for now).
