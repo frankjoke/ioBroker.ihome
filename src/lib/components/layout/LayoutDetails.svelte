@@ -970,6 +970,19 @@
                           })}
                       />
                     </label>
+                    <label class="check" title="Hide the unit to save width">
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.hideUnit !== true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            hideUnit: e.currentTarget.checked
+                              ? undefined
+                              : true,
+                          })}
+                      />
+                      <span>unit</span>
+                    </label>
                   {/if}
                 </div>
                 {#if slot.kind === "level"}

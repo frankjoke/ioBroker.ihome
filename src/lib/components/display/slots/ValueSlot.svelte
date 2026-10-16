@@ -20,7 +20,14 @@
 
   const parts = $derived(
     control
-      ? splitValueUnit(control.liveValue, slot.unit ?? control.unit)
+      ? splitValueUnit(
+          control.liveValue,
+          // `hideUnit` drops the unit to save width; a boolean's unit is its
+          // OFF/ON label and stays either way.
+          slot.options?.hideUnit === true
+            ? undefined
+            : (slot.unit ?? control.unit),
+        )
       : { value: "—", unit: "" },
   );
 </script>
@@ -47,11 +54,13 @@
 {/if}
 
 <style>
-  /* The main reading: bold, a notch smaller than it used to be (0.95 → 0.90rem). */
+  /* The main reading: the boldest text on the tile — heavier than the title
+     (600), so the number owns the tile. A notch smaller than it used to be
+     (0.95 → 0.90rem). */
   .value {
     font-family: var(--font-mono);
     font-size: 0.9rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.15;
     max-width: 100%;
     /* Wrap rather than truncate: on a narrow tile the unit drops to the next
