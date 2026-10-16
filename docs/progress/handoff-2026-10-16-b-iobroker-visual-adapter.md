@@ -191,3 +191,7 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   targets carry it through the route. Page rows work the same (`e5c6d1c`): the header + shows only while
   the tree is empty, and `addPage` now brings one empty section with the room — a room is never without
   a section.
+- **Layout label moved into the rooms card** (`7a39e4c`): the page header's "Configuration / Layout"
+  heading is gone; the small mono label now sits at the top of the tree card as "Layout configuration".
+  The header renders only when it has something to show (a save/read badge, or the Add page button while
+  the tree is empty) — otherwise the rooms list is the top of the page.
