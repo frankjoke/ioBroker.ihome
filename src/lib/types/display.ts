@@ -113,6 +113,9 @@ export interface Rule {
   glow?: boolean;
   background?: string;
   hidden?: boolean;
+  /** Show the slot *only* while this rule matches — a visibility gate, not a
+   *  style. With gates present and none matching, the slot (or badge) hides. */
+  only?: boolean;
   /** Render as switched-off: dimmed. The control stays usable. */
   disabled?: boolean;
   tone?: string; // badge tone: info | ok | warn | danger

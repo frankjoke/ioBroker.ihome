@@ -209,11 +209,24 @@ export function evalRule(rule: Rule, scope: Scope): boolean {
   return !error && value === true;
 }
 
-/** Fold the matching rules in order; the last match wins per key. */
+/**
+ * Fold the matching rules in order; the last match wins per key. A rule marked
+ * `only` is a visibility gate instead of a style: while at least one gate is
+ * present and none matches, the slot hides — applied after the fold, so a later
+ * `hidden: false` cannot reopen it. A gate with a broken expression fails
+ * closed; the pane's live result dot is what catches the typo.
+ */
 export function resolveStyle(rules: Rule[], scope: Scope): ResolvedStyle {
   const style: ResolvedStyle = {};
+  let gates = 0;
+  let open = 0;
   for (const rule of rules ?? []) {
-    if (!evalRule(rule, scope)) continue;
+    const hit = evalRule(rule, scope);
+    if (rule.only) {
+      gates++;
+      if (hit) open++;
+    }
+    if (!hit) continue;
     if (rule.icon !== undefined) style.icon = rule.icon;
     if (rule.color !== undefined) style.color = rule.color;
     if (rule.glow !== undefined) style.glow = rule.glow;
@@ -222,6 +235,7 @@ export function resolveStyle(rules: Rule[], scope: Scope): ResolvedStyle {
     if (rule.disabled !== undefined) style.disabled = rule.disabled;
     if (rule.tone !== undefined) style.tone = rule.tone;
   }
+  if (gates > 0 && open === 0) style.hidden = true;
   return style;
 }
 
@@ -309,6 +323,9 @@ function controlBadge(
     [...(slot.rules ?? []), ...(control.rules ?? [])],
     scope,
   );
+  // A hidden slot or control produces no badge — the same fold the tile body
+  // uses for its slots (a rule may hide a badge by value, not just by state).
+  if (style.hidden === true) return undefined;
   // Colour precedence: a matched rule's colour, then a matched rule's tone,
   // then the slot's static colour, then the tone default (`info`).
   const explicitTone = TONES.includes(style.tone as BadgeTone);
@@ -346,6 +363,10 @@ export function resolveBadges(
   const out: ResolvedBadge[] = [];
   for (const slot of slots ?? []) {
     if (slot.kind !== "badge") continue;
+    // A badge hidden by its own rules produces nothing — including the derived
+    // ago/offline badges, which resolve no control and so never reach
+    // `controlBadge`'s own guard.
+    if (resolveStyle(slot.rules ?? [], scope).hidden === true) continue;
     // The derived ago/offline badges have no rules; their slot colour outranks
     // the tone they are born with (a control badge resolves colour itself).
     const color = badgeColor(slot.options?.color);

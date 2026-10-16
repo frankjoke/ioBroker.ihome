@@ -1285,6 +1285,22 @@
                             />
                             <span>hidden</span>
                           </label>
+                          <label
+                            class="check"
+                            title="Show the slot only while this rule matches"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={rule.only === true}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    only: e.currentTarget.checked || undefined,
+                                  }),
+                                )}
+                            />
+                            <span>only</span>
+                          </label>
                           <label class="check">
                             <input
                               type="checkbox"

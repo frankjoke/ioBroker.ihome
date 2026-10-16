@@ -36,6 +36,27 @@ it("does not match a broken expression and keeps the tile renderable", () => {
   expect(resolveStyle([{ when: "power >", color: "red" }], scope)).toEqual({});
 });
 
+it("hides a slot while its only-rule does not match", () => {
+  const gate: Rule = { when: "battery < 30", only: true, tone: "danger" };
+  const low = ruleScope([{ feature: "battery", liveValue: 18 }], []);
+  expect(resolveStyle([gate], low)).toEqual({ tone: "danger" });
+  const fine = ruleScope([{ feature: "battery", liveValue: 88 }], []);
+  expect(resolveStyle([gate], fine)).toEqual({ hidden: true });
+});
+
+it("a later hidden:false cannot reopen a closed only-gate", () => {
+  const fine = ruleScope([{ feature: "battery", liveValue: 88 }], []);
+  expect(
+    resolveStyle(
+      [
+        { when: "battery < 30", only: true },
+        { when: "true", hidden: false },
+      ],
+      fine,
+    ),
+  ).toEqual({ hidden: true });
+});
+
 it("reads raw state ids through the pool helper", () => {
   const scope = ruleScope([], [{ stateId: "alias.0.EG.Relay.SET", value: 1 }]);
   expect(evalRule({ when: "get('alias.0.EG.Relay.SET') > 0" }, scope)).toBe(
@@ -212,6 +233,91 @@ it("skips a hidden control's badge", () => {
     NOW,
   );
   expect(badges).toEqual([]);
+});
+
+it("honours hidden and only rules on a badge slot", () => {
+  const fine = {
+    controls: [
+      { available: true, feature: "battery", liveValue: 88, unit: "%" },
+    ],
+  };
+  const hidden = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: "battery",
+        rules: [{ when: "battery >= 30", hidden: true }],
+      },
+    ],
+    fine,
+    undefined,
+    NOW,
+  );
+  expect(hidden).toEqual([]);
+  // The natural form: one rule shows the badge only while it matches, and its
+  // tone applies then.
+  const gate = [
+    {
+      kind: "badge" as const,
+      source: "battery",
+      rules: [{ when: "battery < 30", only: true, tone: "danger" }],
+    },
+  ];
+  expect(resolveBadges(gate, fine, undefined, NOW)).toEqual([]);
+  const low = {
+    controls: [
+      { available: true, feature: "battery", liveValue: 18, unit: "%" },
+    ],
+  };
+  const shown = resolveBadges(gate, low, undefined, NOW);
+  expect(shown.map((b) => [b.label, b.tone])).toEqual([["18 %", "danger"]]);
+});
+
+it("a control's own hidden rule silences its badge", () => {
+  const badges = resolveBadges(
+    [{ kind: "badge", source: "battery" }],
+    {
+      controls: [
+        {
+          id: "c",
+          feature: "battery",
+          available: true,
+          liveValue: 8,
+          rules: [{ when: "true", hidden: true }],
+        },
+      ],
+    },
+    undefined,
+    NOW,
+  );
+  expect(badges).toEqual([]);
+});
+
+it("a hidden rule silences the derived ago and offline badges too", () => {
+  const online = resolveBadges(
+    [
+      { kind: "badge", source: "ago", rules: [{ when: "true", hidden: true }] },
+      { kind: "badge", source: "ago" },
+    ],
+    { controls: [{ id: "c", available: true, liveValue: 1 }] },
+    NOW - 60_000,
+    NOW,
+  );
+  expect(online.map((b) => b.source)).toEqual(["ago"]);
+  const offline = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: "offline",
+        rules: [{ when: "true", hidden: true }],
+      },
+      { kind: "badge", source: "offline" },
+    ],
+    { controls: [{ id: "c", available: false, liveValue: 1 }] },
+    NOW - 60_000,
+    NOW,
+  );
+  expect(offline.map((b) => b.source)).toEqual(["offline"]);
 });
 
 it("lets an ago badge name the control it watches", () => {
