@@ -207,3 +207,7 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   aria-labels keep the words.
 - **Bold device name** (`5358175`): the tile pane's Device field name is `<strong>` now — the tile's
   main device reads as the field's value; the Template source line keeps its weight.
+- **Chart layer** (`d903fef`): background sparklines stretch to the tile (`preserveAspectRatio="none"`
+  via a `stretch` prop; SlotRenderer sets it for `options.background`) and render *above* the content
+  (`z-index: 1`; badges stay z 2). The drawing used to be letterboxed into an ~11px strip in the
+  middle — hidden behind the icon and values. Spec A32 records it.
