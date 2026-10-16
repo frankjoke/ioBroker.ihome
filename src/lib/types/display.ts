@@ -35,8 +35,23 @@ export interface SectionAppearance {
 export interface TileConfig {
   template?: string;
   size?: Size;
+  /** The tile's CSS background (solid/gradient/image), behind its content. */
+  background?: Background;
+  /** What "active" means for this tile (A30): evaluated live per render. */
+  active?: ActiveCondition;
   slots?: Slot[];
   modal?: { slots: Slot[] };
+}
+
+/** The basic logic an active condition offers. */
+export type ActiveOp = "truthy" | "gt" | "gte" | "lt" | "lte" | "eq" | "ne";
+
+export interface ActiveCondition {
+  /** A device control (feature → id → stateId → label), a placeholder hint, or a raw state id. */
+  source: string;
+  op: ActiveOp;
+  /** The right-hand side; unused by `truthy`. Stored as text, compared loosely. */
+  value?: string;
 }
 
 /** One tile on one section: which device, what it is called there, how it looks. */
@@ -112,6 +127,8 @@ export interface Slot {
   unit?: string; // overrides the control's unit when set
   options?: Record<string, unknown>; // per-kind knobs (min/max/step/decimals/…)
   rules?: Rule[];
+  /** Render only while the tile is active / inactive (A30); absent = both. */
+  showWhen?: "active" | "inactive";
 }
 
 export interface Template {
@@ -121,6 +138,8 @@ export interface Template {
   basedOn?: string; // preset id this was copied from
   type: DeviceType;
   size?: Size;
+  /** The template's CSS background, applied with the tile's (A19). */
+  background?: Background;
   features: FeatureDef[]; // what a device of this type must supply
   slots: Slot[];
 }
