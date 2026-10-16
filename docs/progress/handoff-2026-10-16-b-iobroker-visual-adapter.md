@@ -101,6 +101,10 @@ Walk the spec's criteria 1–8 against the real broker:
     a fourth → bottom-left); set one explicitly to bottom-left → the auto ones skip it; the tile body
     must not shift when badges appear/disappear (A30-hidden one drops out); the badge may hang onto
     the border/glow (tune `--out` in `BadgeRow.svelte` if it should sit further in/out).
+12. Badge colour: pick a theme name (it must follow the dark toggle), then "custom…" → picker; a rule
+    tone ("battery < 20% → warn") must override the static colour, and a rule colour must override
+    both; two badge slots with the same x/y and mutually-exclusive `hidden` rules → each shows in
+    that spot.
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -129,3 +133,8 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   → top-left → bottom-left, skipping corners an explicit position claims, wrapping after four. The old
   kind-driven corners (`options.position`) are gone — nothing live or in presets used them. Anchors
   hang the badge out onto the border/glow (`--out: -8px` in `BadgeRow.svelte`).
+- **Badge colour knob** (`e6ee836`): `options.color` takes a theme name (primary, secondary, text,
+  muted, success, warning, danger — they follow light/dark) or a hex from the pane's picker.
+  Precedence: matched rule colour > matched rule tone > slot colour > default tone. A badge rule's
+  colour now works (it was resolved but never rendered); the derived ago/offline badges take the slot
+  colour over their born tone. Two badges may share an explicit x/y spot (alarm/warning alternatives).
