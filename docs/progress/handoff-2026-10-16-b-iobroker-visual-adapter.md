@@ -117,6 +117,9 @@ Walk the spec's criteria 1–8 against the real broker:
     ☑ hidden with the inverted condition (`battery >= 30`) must vanish too (before this commit it did
     nothing — badges dropped `hidden`). `only` gates any slot kind; the rule's live dot flags a broken
     gate (a broken gate hides the slot).
+16. Precision: a value slot's `decimals` knob (e.g. 1) → humidity 54.32 shows "54.3"; 0 → "54";
+    clearing the field restores the raw reading. Trailing zeros drop ("54", not "54.0"). Badge labels
+    and slider/switch readouts still show full precision (the knob is value-row only).
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -162,3 +165,6 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   fold, and a broken gate expression fails closed (spec A31). Badge slots now honour `hidden`/`only`
   exactly like body slots — their own rules and the control's, the derived ago/offline badges included;
   before, `controlBadge` computed `style.hidden` and dropped it, so no rule could ever hide a badge.
+- **Value precision** (`0a34641`): the `decimals` knob now renders — the value slot rounds to it via
+  `formatNumber` (numbers and numeric strings alike; trailing zeros drop; a cleared or junk knob leaves
+  the reading alone). Badges and slider/switch readouts keep full precision for now.
