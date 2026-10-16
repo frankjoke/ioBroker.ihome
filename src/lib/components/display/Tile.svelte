@@ -445,7 +445,8 @@
   /* A slot marked `options.background` draws the tile's chart (A22) over the
      content — the icon and values sit under it, so the line is never hidden.
      No pointer events; clipped to the tile's rounded box; the badges (z 2)
-     stay on top. */
+     stay on top. The chart is centred at 70% of the tile's height so the
+     badge corners and the name keep their space. */
   .tile-bg {
     position: absolute;
     inset: 0;
@@ -453,6 +454,8 @@
     pointer-events: none;
     border-radius: inherit;
     z-index: 1;
+    display: flex;
+    align-items: center;
   }
 
   /* Stretch the chart across the tile: the sparkline ships a fixed size for the
@@ -460,7 +463,7 @@
   .tile-bg :global(.spark) {
     width: 100%;
     max-width: none;
-    height: 100%;
+    height: 70%;
   }
 
   .tile-bg :global(.spark-placeholder) {
