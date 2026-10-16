@@ -42,7 +42,7 @@
     templateFromTile,
     upsertTemplate,
   } from "$lib/config/tile-ops";
-  import { ruleScope } from "$lib/config/rule-ops";
+  import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -1019,6 +1019,22 @@
                         <option value="lc">change (lc)</option>
                       </select>
                     </label>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() =>
+                        edit((t) => patchSlot(t, i, { source: "ago" }))}
+                      >ago</button
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() =>
+                        edit((t) => patchSlot(t, i, { source: "offline" }))}
+                      >offline</button
+                    >
+                  </div>
+                  <div class="row">
                     <label class="small">
                       <span class="label-mono">x</span>
                       <select
@@ -1057,20 +1073,42 @@
                         <option value="bottom">bottom</option>
                       </select>
                     </label>
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      onclick={() =>
-                        edit((t) => patchSlot(t, i, { source: "ago" }))}
-                      >ago</button
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      onclick={() =>
-                        edit((t) => patchSlot(t, i, { source: "offline" }))}
-                      >offline</button
-                    >
+                    <label class="small">
+                      <span class="label-mono">colour</span>
+                      <select
+                        value={isHexColor(String(slot.options?.color ?? ""))
+                          ? "custom"
+                          : String(slot.options?.color ?? "")}
+                        onchange={(e) => {
+                          const value = e.currentTarget.value;
+                          if (value === "custom") {
+                            if (
+                              !isHexColor(String(slot.options?.color ?? ""))
+                            ) {
+                              patchOptions(i, { color: "#494bd6" });
+                            }
+                            return;
+                          }
+                          patchOptions(i, { color: value || undefined });
+                        }}
+                      >
+                        <option value="">default</option>
+                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
+                          <option value={name}>{name}</option>
+                        {/each}
+                        <option value="custom">custom…</option>
+                      </select>
+                    </label>
+                    {#if isHexColor(String(slot.options?.color ?? ""))}
+                      <input
+                        type="color"
+                        class="color-input"
+                        aria-label="Badge colour"
+                        value={String(slot.options?.color)}
+                        oninput={(e) =>
+                          patchOptions(i, { color: e.currentTarget.value })}
+                      />
+                    {/if}
                   </div>
                 {/if}
                 <div class="slot-rules">

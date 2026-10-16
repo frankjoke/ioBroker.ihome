@@ -12,7 +12,11 @@
 {#if shown.length}
   <div class="badges by-{anchor.y} bx-{anchor.x}">
     {#each shown as b (b.source)}
-      <span class="badge {b.tone}" title={b.title ?? b.label}>
+      <span
+        class="badge {b.tone}"
+        style:color={b.color}
+        title={b.title ?? b.label}
+      >
         <span class="material-symbols-outlined" aria-hidden="true"
           >{b.icon}</span
         ><span class="badge-label">{b.label}</span>

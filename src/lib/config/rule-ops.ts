@@ -1,4 +1,5 @@
 import type { Rule, Slot } from "$lib/types/display";
+import { isHexColor } from "$lib/config/appearance";
 import {
   buildScope,
   newLocalTaken,
@@ -14,6 +15,27 @@ import { pickControl } from "$lib/config/template-ops";
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
 
 const TONES: BadgeTone[] = ["info", "ok", "warn", "danger"];
+
+/**
+ * The standard badge colours, as theme tokens so they follow the light/dark
+ * palette instead of freezing a hex. `options.color` takes one of these names
+ * or a hex (the pane's custom picker); anything else is ignored.
+ */
+export const BADGE_COLORS: Record<string, string> = {
+  primary: "var(--primary-color)",
+  secondary: "var(--secondary-color)",
+  text: "var(--text-color)",
+  muted: "var(--text-muted)",
+  success: "var(--success-color)",
+  warning: "var(--warning-color)",
+  danger: "var(--danger-color)",
+};
+
+function badgeColor(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  if (value in BADGE_COLORS) return BADGE_COLORS[value];
+  return isHexColor(value) ? value : undefined;
+}
 
 /** Where a badge sits: one of nine anchors on the tile's edge. */
 export type BadgeX = "left" | "center" | "right";
@@ -117,6 +139,9 @@ export interface ResolvedBadge {
   tone: BadgeTone;
   label: string;
   title?: string;
+  /** An explicit colour (rule colour, or the slot's named/hex colour) — wins
+   *  over the tone class. */
+  color?: string;
 }
 
 /** The device shape a badge needs — `EnrichedDevice` satisfies it structurally. */
@@ -284,11 +309,17 @@ function controlBadge(
     [...(slot.rules ?? []), ...(control.rules ?? [])],
     scope,
   );
+  // Colour precedence: a matched rule's colour, then a matched rule's tone,
+  // then the slot's static colour, then the tone default (`info`).
+  const explicitTone = TONES.includes(style.tone as BadgeTone);
   return {
     source: String(slot.source),
     icon: style.icon ?? "info",
     tone: toneOf(style),
     label: formatValue(control.liveValue, slot.unit ?? control.unit),
+    color:
+      style.color ??
+      (explicitTone ? undefined : badgeColor(slot.options?.color)),
   };
 }
 
@@ -315,6 +346,9 @@ export function resolveBadges(
   const out: ResolvedBadge[] = [];
   for (const slot of slots ?? []) {
     if (slot.kind !== "badge") continue;
+    // The derived ago/offline badges have no rules; their slot colour outranks
+    // the tone they are born with (a control badge resolves colour itself).
+    const color = badgeColor(slot.options?.color);
     let badge: ResolvedBadge | undefined;
     // An offline device says *that*, not a misleading "how long ago it was".
     if (slot.source === "ago") {
@@ -326,8 +360,9 @@ export function resolveBadges(
         typeof slot.options?.of === "string" ? slot.options.of : undefined;
       const from = slot.options?.from === "lc" ? "lc" : "ts";
       badge = offline ? undefined : agoBadge(clock.at(of, from), now);
+      if (badge && color) badge.color = color;
     } else if (slot.source === "offline") {
-      badge = offline;
+      badge = offline ? { ...offline, ...(color ? { color } : {}) } : undefined;
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).

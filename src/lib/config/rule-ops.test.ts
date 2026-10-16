@@ -9,7 +9,7 @@ import {
   resolveStyle,
   ruleScope,
 } from "$lib/config/rule-ops";
-import type { Slot } from "$lib/types/display";
+import type { Rule, Slot } from "$lib/types/display";
 
 const NOW = 1_700_000_000_000;
 
@@ -309,6 +309,16 @@ it("fills unpositioned badges into the free corners, in order", () => {
   expect(badgePositions([badge({ x: "diagonal" })])).toEqual([
     { x: "right", y: "top" },
   ]);
+  // Two badges may share one explicit spot (alarm/warning alternatives).
+  expect(
+    badgePositions([
+      badge({ x: "right", y: "top" }),
+      badge({ x: "right", y: "top" }),
+    ]),
+  ).toEqual([
+    { x: "right", y: "top" },
+    { x: "right", y: "top" },
+  ]);
   expect(badgePositions([])).toEqual([]);
 });
 
@@ -352,6 +362,48 @@ it("a badge can name what it shows by hint", () => {
   );
   expect(badges[0].label).toBe("1126 W");
   expect(badges[0].tone).toBe("info");
+});
+
+it("badges take a named or custom colour, rules first", () => {
+  const device = {
+    controls: [{ feature: "battery", available: true, liveValue: 12 }],
+  };
+  const slot = (options?: Record<string, unknown>, rules?: Rule[]): Slot => ({
+    kind: "badge",
+    source: "battery",
+    options,
+    rules,
+  });
+  // Named colours resolve to theme tokens; a hex passes through; junk is dropped.
+  const at = (s: Slot) => resolveBadges([s], device, undefined, NOW)[0];
+  expect(at(slot({ color: "danger" })).color).toBe("var(--danger-color)");
+  expect(at(slot({ color: "#123456" })).color).toBe("#123456");
+  expect(at(slot({ color: "chartreuse" })).color).toBeUndefined();
+  // A matched rule colour outranks everything; a matched rule tone outranks the
+  // slot colour (the static base yields to the condition).
+  expect(
+    at(slot({ color: "danger" }, [{ when: "true", color: "#00ff00" }])).color,
+  ).toBe("#00ff00");
+  const toned = at(slot({ color: "danger" }, [{ when: "true", tone: "warn" }]));
+  expect(toned.tone).toBe("warn");
+  expect(toned.color).toBeUndefined();
+  // The derived ago/offline badges take the slot colour over their own tone.
+  expect(
+    resolveBadges(
+      [{ kind: "badge", source: "ago", options: { color: "primary" } }],
+      device,
+      NOW - 1000,
+      NOW,
+    )[0].color,
+  ).toBe("var(--primary-color)");
+  expect(
+    resolveBadges(
+      [{ kind: "badge", source: "offline", options: { color: "primary" } }],
+      { controls: [{ available: false, liveValue: 1 }] },
+      NOW,
+      NOW,
+    )[0].color,
+  ).toBe("var(--primary-color)");
 });
 
 it("resolves a badge from a raw state through the raw resolver", () => {
