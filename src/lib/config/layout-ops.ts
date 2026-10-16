@@ -321,6 +321,25 @@ export function duplicatePlacement(
 }
 
 /**
+ * The one place an address is walked: map the placement `placementId` in the
+ * named section, leaving every sibling (and a stale address) untouched.
+ */
+export function mapPlacement(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  placementId: string,
+  fn: (placement: Placement) => Placement,
+): PageRegistry {
+  return mapSection(reg, pageId, sectionId, (section) => ({
+    ...section,
+    tiles: (section.tiles ?? []).map((tile) =>
+      tile.id === placementId ? fn(tile) : tile,
+    ),
+  }));
+}
+
+/**
  * Patch one placement (title, tile, device, …). `undefined` removes a field.
  */
 export function patchPlacement(
@@ -330,11 +349,9 @@ export function patchPlacement(
   placementId: string,
   patch: Partial<Placement>,
 ): PageRegistry {
-  return mapSection(reg, pageId, sectionId, (section) => ({
-    ...section,
-    tiles: (section.tiles ?? []).map((tile) =>
-      tile.id === placementId ? { ...tile, ...patch } : tile,
-    ),
+  return mapPlacement(reg, pageId, sectionId, placementId, (tile) => ({
+    ...tile,
+    ...patch,
   }));
 }
 

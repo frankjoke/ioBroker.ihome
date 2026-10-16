@@ -1,7 +1,20 @@
 import { it, expect } from "vitest";
 import type { Device } from "$lib/types/device";
-import type { Template } from "$lib/types/display";
-import { ensureTile, materialiseTile, resetTile } from "./tile-ops";
+import type { PageRegistry, TileConfig, Template } from "$lib/types/display";
+import {
+  addRule,
+  addSlot,
+  editTile,
+  ensureTile,
+  materialiseTile,
+  moveRule,
+  moveSlot,
+  patchRule,
+  patchSlot,
+  removeRule,
+  removeSlot,
+  resetTile,
+} from "./tile-ops";
 
 const device = (over: Partial<Device> = {}): Device =>
   ({
@@ -66,4 +79,79 @@ it("ensureTile materialises from nothing and resetTile drops the whole tile", ()
   const ensured = ensureTile(bare, device(), []);
   expect(ensured.tile.slots!.length).toBeGreaterThan(0);
   expect(resetTile(ensured)).toEqual(bare);
+});
+
+it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
+  const tile: TileConfig = { slots: [{ kind: "value", source: "a" }] };
+  const two = addSlot(tile, { kind: "badge", options: { badge: "battery" } });
+  expect(two.slots?.length).toBe(2);
+  expect(tile.slots?.length).toBe(1); // input untouched
+  const reordered = moveSlot(two, 0, 1);
+  expect(reordered.slots?.map((s) => s.source ?? "badge")).toEqual([
+    "badge",
+    "a",
+  ]);
+  expect(moveSlot(two, 0, 9).slots).toEqual(two.slots); // out-of-range: a copy, no throw
+  expect(patchSlot(two, 0, { label: "Leistung" }).slots?.at(0)?.label).toBe(
+    "Leistung",
+  );
+  expect(removeSlot(two, 0).slots?.length).toBe(1);
+});
+
+it("rule ops address slot and rule indexes", () => {
+  const tile: TileConfig = { slots: [{ kind: "value", source: "a" }] };
+  const one = addRule(tile, 0, { when: "power > 0", glow: true });
+  const two = addRule(one, 0, { when: "power > 100", icon: "bolt" });
+  expect(two.slots?.at(0)?.rules?.length).toBe(2);
+  expect(
+    patchRule(two, 0, 1, { icon: "flash_on" }).slots?.at(0)?.rules?.at(1)?.icon,
+  ).toBe("flash_on");
+  expect(moveRule(two, 0, 1, 0).slots?.at(0)?.rules?.at(0)?.icon).toBe("bolt");
+  expect(removeRule(two, 0, 0).slots?.at(0)?.rules?.length).toBe(1);
+  expect(patchRule(two, 3, 0, {}).slots).toEqual(two.slots); // bad slot index: unchanged
+});
+
+it("editTile materialises once, applies the op and leaves siblings alone", () => {
+  const reg = {
+    version: 1,
+    updatedAt: 0,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [
+          {
+            id: "g",
+            title: "G",
+            tiles: [
+              { id: "t1", device: "d1" },
+              { id: "t2", device: "d1" },
+            ],
+          },
+        ],
+      },
+    ],
+  } as PageRegistry;
+  const next = editTile(
+    reg,
+    { pageId: "p", sectionId: "g", placementId: "t1" },
+    device(),
+    [],
+    (t) => addSlot(t, { kind: "value", source: "power" }),
+  );
+  expect(next.updatedAt).toBeGreaterThan(0);
+  const tiles = next.pages[0].groups[0].tiles!;
+  expect(tiles[0].tile?.slots?.some((s) => s.source === "power")).toBe(true);
+  expect(tiles[1].tile).toBeUndefined(); // sibling untouched
+  expect(reg.pages[0].groups[0].tiles![0].tile).toBeUndefined(); // input untouched
+  // A stale address changes nothing (the registry wrapper is new, the pages equal).
+  expect(
+    editTile(
+      reg,
+      { pageId: "nope", sectionId: "g", placementId: "t1" },
+      device(),
+      [],
+      (t) => t,
+    ).pages,
+  ).toEqual(reg.pages);
 });
