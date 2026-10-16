@@ -160,40 +160,40 @@
 </svelte:head>
 
 <div class="layout-page">
-  <div class="page-header">
-    <div class="page-heading">
-      <span class="label-mono">Configuration</span>
-      <h1>Layout</h1>
+  {#if saveFailed || !writable || registry.pages.length === 0}
+    <div class="page-header">
+      {#if saveFailed}
+        <span
+          class="badge badge-danger"
+          title="The last write to pageList failed">not saved</span
+        >
+      {:else if !writable}
+        <span
+          class="badge badge-danger"
+          title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
+          >not editable</span
+        >
+      {/if}
+      {#if registry.pages.length === 0}
+        <button
+          type="button"
+          class="icon-btn primary"
+          title={writable
+            ? "Add page"
+            : "Not editable: the page document did not load"}
+          aria-label="Add page"
+          disabled={!writable}
+          onclick={() => commitLayout(addPage(registry))}
+        >
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      {/if}
     </div>
-    {#if saveFailed}
-      <span class="badge badge-danger" title="The last write to pageList failed"
-        >not saved</span
-      >
-    {:else if !writable}
-      <span
-        class="badge badge-danger"
-        title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
-        >not editable</span
-      >
-    {/if}
-    {#if registry.pages.length === 0}
-      <button
-        type="button"
-        class="icon-btn primary"
-        title={writable
-          ? "Add page"
-          : "Not editable: the page document did not load"}
-        aria-label="Add page"
-        disabled={!writable}
-        onclick={() => commitLayout(addPage(registry))}
-      >
-        <span class="material-symbols-outlined">add</span>
-      </button>
-    {/if}
-  </div>
+  {/if}
 
   <div class="cols">
     <div class="card tree-card">
+      <span class="tree-title label-mono">Layout configuration</span>
       <LayoutTree
         {registry}
         {devices}
@@ -317,8 +317,9 @@
     gap: 0.75rem;
   }
 
-  .page-heading {
-    flex: 1 1 auto;
+  .tree-title {
+    display: block;
+    margin-bottom: 0.5rem;
   }
 
   .cols {
