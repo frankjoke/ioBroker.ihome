@@ -1446,7 +1446,7 @@
 
     {#if device}
       <div
-        class="preview tile-grid"
+        class="preview tile-grid docked"
         style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px;`}
       >
         <Tile {device} {bp} title={tile.title} tile={tile.tile} />
@@ -1800,6 +1800,18 @@
     padding: 0.5rem;
     border: 1px dashed var(--border-color);
     border-radius: var(--border-radius-md, 12px);
+  }
+
+  /* The tile preview docks: while the pane scrolls above its natural spot it
+     floats at the bottom edge of the screen — visible while you edit slots —
+     and settles back into place at the end. The section preview stays put; a
+     whole section is too tall to dock. */
+  .docked {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 1;
+    background-color: var(--surface-color);
+    box-shadow: var(--shadow-normal);
   }
 
   .tile-grid {
