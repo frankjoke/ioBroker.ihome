@@ -120,6 +120,9 @@ Walk the spec's criteria 1–8 against the real broker:
 16. Precision: a value slot's `decimals` knob (e.g. 1) → humidity 54.32 shows "54.3"; 0 → "54";
     clearing the field restores the raw reading. Trailing zeros drop ("54", not "54.0"). Badge labels
     and slider/switch readouts still show full precision (the knob is value-row only).
+17. Preview dock: open a tile's pane and scroll down to the slots → the tile example stays pinned at the
+    bottom edge of the screen (dashed card with shadow); at the very end of the pane it settles into its
+    natural spot. With no device assigned it is absent. The section pane's preview stays static.
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -168,3 +171,7 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
 - **Value precision** (`0a34641`): the `decimals` knob now renders — the value slot rounds to it via
   `formatNumber` (numbers and numeric strings alike; trailing zeros drop; a cleared or junk knob leaves
   the reading alone). Badges and slider/switch readouts keep full precision for now.
+- **Tile preview docks** (`c329143`): the tile pane's preview (its last block, rendered only with a
+  device) is `position: sticky; bottom` — it floats at the bottom screen edge while you scroll anywhere
+  above it, so slot edits stay in view, and settles at its natural spot at the end. The section preview
+  stays static (a whole section is too tall to dock).
