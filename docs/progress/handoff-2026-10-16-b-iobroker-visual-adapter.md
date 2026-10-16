@@ -95,6 +95,12 @@ Walk the spec's criteria 1–8 against the real broker:
    "no active condition set" note appears.
 9. T11/T12/T13 leftovers: Ctrl/Cmd+click section header/page tab folds the tree to that node; delete
    the shown page then reload → first tab highlighted (A29); picker Clear/previews.
+10. Pencil: view a page → click the pencil → the tree folds every other page and shows the viewed
+    page's sections (Ctrl/Cmd+click a tab keeps the same behaviour).
+11. Badges: two badges on one tile with no position → top-right + bottom-right (a third → top-left,
+    a fourth → bottom-left); set one explicitly to bottom-left → the auto ones skip it; the tile body
+    must not shift when badges appear/disappear (A30-hidden one drops out); the badge may hang onto
+    the border/glow (tune `--out` in `BadgeRow.svelte` if it should sit further in/out).
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -107,3 +113,19 @@ the device-form `template` field; section member/showEmpty/width hints; icon upl
 (↑↓ stay); packaging/pushing; the I11 focus trap and tree keyboard contract (M1); the parked ThinkPad
 items (Brunnen double-toggle, `main.js` literal logging, duplicate tile titles, unused
 `house-controller.svg`).
+
+## 6. Follow-ups landed after the handoff (same day, user feedback while adopting)
+
+Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0, build writes `www/`.
+
+- **Pencil folds to the viewed page** (`a5b5aa5`): the pencil was a bare link — the editor kept
+  whatever folding it had. It now hands over the current page (the same `requestLayoutConfig` path
+  Ctrl/Cmd+click on a tab uses), so the editor opens folded to it: other pages folded, that page's
+  section rows visible (sections stay folded; click one for its tiles).
+- **Badges overlay the tile and fill the free corners** (`d9c32d3`): badges no longer reserve a 15px
+  band (`has-top-badge`/`has-bottom-badge` gone) — they sit at `z-index: 2` and may cover a value.
+  Position is now `options.x` (left/center/right) × `options.y` (top/middle/bottom), set with two
+  selects in the pane's badge row; unpositioned badges fill the free corners top-right → bottom-right
+  → top-left → bottom-left, skipping corners an explicit position claims, wrapping after four. The old
+  kind-driven corners (`options.position`) are gone — nothing live or in presets used them. Anchors
+  hang the badge out onto the border/glow (`--out: -8px` in `BadgeRow.svelte`).
