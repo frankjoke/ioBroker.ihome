@@ -7,8 +7,10 @@
     primaryControl,
     resolveControl,
     resolveTemplate,
+    slotVisible,
     tileTitle,
   } from "$lib/config/template-ops";
+  import { evalActive } from "$lib/config/tile-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -16,6 +18,7 @@
     resolveBadges,
     resolveStyle,
     ruleScope,
+    truthy,
     type BadgeCorner,
     type ResolvedBadge,
     type TimeSource,
@@ -76,7 +79,26 @@
 
   // Rule locals are the device's controls (by label, falling back to feature) plus
   // the pool helpers — the same language the formula editor uses.
-  const scope = $derived(ruleScope(device.controls ?? [], getVirtualPool()));
+  const baseScope = $derived(
+    ruleScope(device.controls ?? [], getVirtualPool()),
+  );
+
+  // The tile's active reading (A30): its condition over the live value of the
+  // control or raw state it names; no condition means never active.
+  const activeCond = $derived(tile?.active);
+  const activeControl = $derived(
+    activeCond?.source
+      ? (resolveControl(shownControls, activeCond.source) ??
+          rawControl(activeCond.source))
+      : undefined,
+  );
+  const active = $derived(evalActive(activeCond, activeControl?.liveValue));
+  // The tile's own flag wins the name `active` over a control alias of the same
+  // name, so `when: "active"` always means the tile's state.
+  const scope = $derived({
+    ...baseScope,
+    locals: { ...baseScope.locals, active },
+  });
 
   /** Slot rules first, the control's own defaults last — the last match wins. */
   function slotStyle(slot: Slot, control?: SlotControl & { rules?: Rule[] }) {
@@ -120,12 +142,22 @@
    */
   const resolved = $derived(
     pickSlotControls<SlotControl>(slots, shownControls, {
+      active,
       raw: rawControl,
     }).filter(
       (r) =>
         (r.slot.kind === "icon" || r.control) &&
         slotStyle(r.slot, r.control).hidden !== true,
     ),
+  );
+
+  // A slot marked `options.background` renders behind the content (the history
+  // chart, A22); everything else is the tile's body.
+  const backgroundSlots = $derived(
+    resolved.filter((r) => r.slot.options?.background === true),
+  );
+  const bodySlots = $derived(
+    resolved.filter((r) => r.slot.options?.background !== true),
   );
 
   /** The tile's first reading is the headline; the rest are supporting. */
@@ -188,7 +220,10 @@
 
   // Badges render once, at the end of the tile, wherever the badge slots sit in
   // the template. `ago` and `offline` need no control: they read the device.
-  const badgeSlots = $derived(slots.filter((s) => s.kind === "badge"));
+  // State-hidden badges drop out with the rest (A30).
+  const badgeSlots = $derived(
+    slots.filter((s) => s.kind === "badge" && slotVisible(s, active)),
+  );
 
   // Badges land in the corner their kind belongs to (spec §6), so the layout of
   // a tile carries meaning instead of being one row at the bottom.
@@ -206,16 +241,13 @@
         clock,
         Date.now(),
         getVirtualPool(),
+        rawControl,
       )) {
         byCorner[badgePosition(slot)].push(badge);
       }
     }
     return byCorner;
   });
-
-  function truthy(v: unknown): boolean {
-    return v === true || v === "true" || v === 1 || v === "1";
-  }
 
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
@@ -324,6 +356,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="tile"
+  class:active
   class:glow={tileStyle.glow === true}
   class:disabled={tileStyle.disabled === true}
   class:has-top-badge={corners["top-left"].length > 0 ||
@@ -346,9 +379,22 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
+  {#if backgroundSlots.length}
+    <div class="tile-bg">
+      {#each backgroundSlots as r (`bg:${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+        <SlotRenderer
+          slot={r.slot}
+          {device}
+          control={r.control}
+          style={slotStyle(r.slot, r.control)}
+          emphasis="secondary"
+        />
+      {/each}
+    </div>
+  {/if}
   <span class="tile-name">{title ?? tileTitle(device)}</span>
   <div class="tile-body">
-    {#each resolved as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+    {#each bodySlots as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
       <SlotRenderer
         slot={r.slot}
         {device}
@@ -406,6 +452,33 @@
   .tile.glow {
     box-shadow: 0 0 12px var(--tile-accent);
     border-color: var(--tile-accent, var(--border-color));
+  }
+
+  /* Active (A30): the accent border only — glow stays rule territory. */
+  .tile.active {
+    border-color: var(--tile-accent, var(--primary-color));
+  }
+
+  /* A slot marked `options.background` renders behind everything (the history
+     chart, A22): no pointer events, clipped to the tile's rounded box. */
+  .tile-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Stretch the chart across the tile: the sparkline ships a fixed size for the
+     in-body case, and a scoped style cannot reach into the child. */
+  .tile-bg :global(.spark) {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+  }
+
+  .tile-bg :global(.spark-placeholder) {
+    display: none;
   }
 
   .tile-name {

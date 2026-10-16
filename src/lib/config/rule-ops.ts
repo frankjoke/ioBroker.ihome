@@ -195,7 +195,7 @@ function toneOf(style: ResolvedStyle): BadgeTone {
 }
 
 /** Resolve a badge slot against a device control; no source → no badge. */
-interface BadgeControl {
+export interface BadgeControl {
   id?: string;
   feature?: string;
   available?: boolean;
@@ -232,10 +232,13 @@ function controlBadge(
   slot: Slot,
   device: BadgeDevice,
   scope: Scope,
+  raw?: (source: string) => BadgeControl | undefined,
 ): ResolvedBadge | undefined {
   const pick =
     typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
-  const control = badgeControl(device, slot.source, pick);
+  const control =
+    badgeControl(device, slot.source, pick) ??
+    (slot.source ? raw?.(slot.source) : undefined);
   if (!control) return undefined;
   // Slot rules first, the control's own defaults last (spec §4.1.1).
   const style = resolveStyle(
@@ -262,6 +265,7 @@ export function resolveBadges(
   time: TimeSource | number | undefined,
   now: number,
   pool: PoolEntry[] = [],
+  raw?: (source: string) => BadgeControl | undefined,
 ): ResolvedBadge[] {
   // Accept a bare number too (the device-wide newest `ts`).
   const stamp = typeof time === "number" ? time : undefined;
@@ -286,8 +290,9 @@ export function resolveBadges(
     } else if (slot.source === "offline") {
       badge = offline;
     } else if (slot.source || typeof slot.options?.pick === "string") {
-      // A badge reads a control either by name or by readout hint.
-      badge = controlBadge(slot, device, scope);
+      // A badge reads a control either by name or by readout hint — or, failing
+      // both, a raw state id through the caller's resolver (A21).
+      badge = controlBadge(slot, device, scope, raw);
     }
     if (badge) out.push(badge);
   }

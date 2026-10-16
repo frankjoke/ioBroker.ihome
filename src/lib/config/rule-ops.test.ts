@@ -337,3 +337,32 @@ it("a badge can name what it shows by hint", () => {
   expect(badges[0].label).toBe("1126 W");
   expect(badges[0].tone).toBe("info");
 });
+
+it("resolves a badge from a raw state through the raw resolver", () => {
+  const raw = (source: string) =>
+    source === "0_userdata.0.x"
+      ? { id: source, liveValue: 42, unit: "W", rules: [] }
+      : undefined;
+  const badges = resolveBadges(
+    [
+      { kind: "badge", source: "0_userdata.0.x" },
+      { kind: "badge", source: "nope" },
+    ],
+    { controls: [{ available: true, feature: "power", liveValue: true }] },
+    undefined,
+    NOW,
+    [],
+    raw,
+  );
+  expect(badges.map((b) => b.source)).toEqual(["0_userdata.0.x"]);
+  expect(badges[0].label).toBe("42 W");
+  // without the resolver a raw source yields nothing, exactly as before
+  expect(
+    resolveBadges(
+      [{ kind: "badge", source: "0_userdata.0.x" }],
+      { controls: [] },
+      undefined,
+      NOW,
+    ),
+  ).toEqual([]);
+});
