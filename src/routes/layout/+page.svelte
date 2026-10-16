@@ -29,6 +29,8 @@
   import type { Slot } from "$lib/types/display";
 
   let selection = $state<LayoutSelection | null>(null);
+  /** The handoff target, applied by the tree once (folding); selection stays. */
+  let focus = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
   let pickerFor = $state<
     | { kind: "device"; pageId: string; sectionId: string }
@@ -45,10 +47,14 @@
   const writable = $derived(isLayoutWritable());
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
-  // click): select it so the pane opens on what was clicked.
+  // click): select it — and fold the tree to it — so the pane opens on what was
+  // clicked. Clicking in the tree later changes only `selection`, never folding.
   onMount(() => {
     const requested = takeRequestedLayout();
-    if (requested) selection = requested;
+    if (requested) {
+      selection = requested;
+      focus = requested;
+    }
   });
 
   /** The device a tile's placement points at, if it is still in the registry. */
@@ -146,6 +152,7 @@
         {registry}
         {devices}
         {selection}
+        {focus}
         onSelect={(next) => (selection = next)}
         onChange={commitLayout}
         onDelete={(target) => (pendingDelete = target)}

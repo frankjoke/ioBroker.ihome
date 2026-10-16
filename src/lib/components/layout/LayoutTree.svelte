@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import {
     addSection,
     appendDevices,
@@ -18,11 +19,13 @@
   } from "$lib/config/pages-ops";
   import type { Group, PageRegistry } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
+  import Icon from "$lib/components/common/Icon.svelte";
 
   let {
     registry,
     devices,
     selection,
+    focus = null,
     onSelect,
     onChange,
     onDelete,
@@ -32,6 +35,8 @@
     registry: PageRegistry;
     devices: EnrichedDevice[];
     selection: LayoutSelection | null;
+    /** A handoff target (Ctrl/Cmd+click on the display): fold to it, once. */
+    focus?: LayoutSelection | null;
     onSelect: (selection: LayoutSelection) => void;
     onChange: (next: PageRegistry) => void;
     /** Page and section deletion asks first — the route owns the dialog. */
@@ -45,6 +50,26 @@
   // Folded tree nodes. Local and transient: how the tree looks is a view of the
   // config, never config itself.
   let folded = $state<Record<string, boolean>>({});
+
+  // Applied once per handoff: later manual folding must survive registry updates.
+  let applied: LayoutSelection | null = null;
+  $effect(() => {
+    const f = focus;
+    if (!f || f === applied) return;
+    applied = f;
+    const openSection =
+      f.kind === "section" || f.kind === "tile" ? f.sectionId : undefined;
+    const next: Record<string, boolean> = {};
+    untrack(() => {
+      for (const page of registry.pages) {
+        next[page.id] = page.id !== f.pageId;
+        for (const section of page.groups) {
+          next[section.id] = section.id !== openSection;
+        }
+      }
+    });
+    folded = next;
+  });
 
   const toggleFold = (id: string): void => {
     folded = { ...folded, [id]: !folded[id] };
@@ -90,9 +115,8 @@
         class="label"
         onclick={() => onSelect({ kind: "page", pageId: page.id })}
       >
-        {#if page.icon}<span
-            class="material-symbols-outlined"
-            aria-hidden="true">{page.icon}</span
+        {#if page.icon}<span class="tree-icon"
+            ><Icon value={page.icon} size={17} /></span
           >{/if}
         <span class="title">{page.title || "—"}</span>
       </button>
@@ -178,9 +202,8 @@
                 sectionId: section.id,
               })}
           >
-            {#if section.icon}<span
-                class="material-symbols-outlined"
-                aria-hidden="true">{section.icon}</span
+            {#if section.icon}<span class="tree-icon"
+                ><Icon value={section.icon} size={17} /></span
               >{/if}
             <span class="title">{section.title || "—"}</span>
             {#if (section.tiles ?? []).length === 0}
@@ -262,6 +285,7 @@
 
         {#if !folded[section.id]}
           {#each section.tiles ?? [] as tile, tileIndex (tile.id)}
+            {@const device = deviceOf(tile.device)}
             <div
               class="node tile"
               class:selected={selection?.kind === "tile" &&
@@ -282,17 +306,19 @@
                     placementId: tile.id,
                   })}
               >
-                {#if !deviceOf(tile.device)}
+                {#if !device}
                   <span
                     class="material-symbols-outlined warn"
                     title="This device is not in the registry any more"
                     aria-hidden="true">warning</span
                   >
+                {:else if device.icon}
+                  <span class="tree-icon"
+                    ><Icon value={device.icon} size={17} /></span
+                  >
                 {/if}
                 <span class="title"
-                  >{tile.title ||
-                    deviceOf(tile.device)?.name ||
-                    tile.device}</span
+                  >{tile.title || device?.name || tile.device}</span
                 >
                 {#if tile.tile?.size}
                   <span class="hint-badge text-muted"
@@ -493,6 +519,11 @@
 
   .label .material-symbols-outlined {
     font-size: 17px;
+    color: var(--text-muted);
+  }
+
+  .tree-icon {
+    display: inline-flex;
     color: var(--text-muted);
   }
 
