@@ -24,6 +24,8 @@ hand-edited document. Three concrete problems:
 3. Page and section appearance is half-editable (background has no UI, icons are free text), and the
    display's section header offers no route into the editor — the pencil lands in the tree with
    everything to find by hand.
+4. A tile has no notion of "currently active": the Brunnen's wattage badge, or an icon that changes
+   while the pump runs, can only be shown always or through hand-written per-slot expressions.
 
 Success criteria:
 
@@ -45,6 +47,9 @@ Success criteria:
 7. The live document keeps working: unmaterialised and legacy partial tiles render exactly as today;
    `templateList` is written only when a template is saved, and an unreadable document is never
    overwritten.
+8. A tile can declare an **active condition** (a control or state plus basic logic, e.g. `power > 0`);
+   the tile renders as active, rules can react to it (`when: "active"`), and each slot can be limited
+   to active / inactive / both — e.g. the Brunnen's power badge only while the pump runs.
 
 ## 2. Decisions
 
@@ -62,6 +67,7 @@ Success criteria:
 | A27 | **M2**: `duplicatePlacement`/`cloneSection` and template save/apply **deep-copy** the tile config (slots, rules, options, background, size) — no shared nested references. |
 | A28 | One shared **BackgroundEditor** serves pages and sections (kind select; solid → colour input; gradient → two colours + angle; image → URL); a stored value that does not match the structured shape falls back to a raw text field so hand-written CSS stays editable. The page pane also gains the icon glyph preview sections have. |
 | A29 | **M3** rides along: the display bar resolves a stale/empty `view.lastPage` to the first page, so a tab is always highlighted. The picker focus trap + tree keyboard contract (**I11**) stays its own slice; the new overlays copy the existing pattern and close on Esc. |
+| A30 | A tile carries an **active condition** `TileConfig.active = {source, op, value?}`: a device control, a placeholder, or any state, with basic logic (`truthy`, `gt`, `gte`, `lt`, `lte`, `eq`, `ne`; numeric when both sides read as numbers, else case-insensitive equality). Its live result is the tile's **active** flag: a `.active` class on the tile (default look: the accent border; louder styling is a rule), an `active` local available to every rule on the tile, and `Slot.showWhen` (`"active"`/`"inactive"`; absent = both) for per-slot visibility. Setting a condition is a tile-config edit and materialises; a tile with no condition is never active. |
 
 ## 3. Architecture
 
@@ -90,6 +96,7 @@ interface TileConfig {
   template?: string;        // exists: the chain source at materialisation ("copied from …")
   size?: Size;
   background?: Background;  // new: the CSS background (solid/gradient/image)
+  active?: ActiveCondition; // new: what "active" means for this tile
   slots?: Slot[];           // exists: their presence marks the tile as materialised
   modal?: { slots: Slot[] }; // untouched (P3)
 }
@@ -99,9 +106,26 @@ interface Template {        // existing + one field
   background?: Background;  // new
   slots: Slot[];
 }
+
+export type ActiveOp = "truthy" | "gt" | "gte" | "lt" | "lte" | "eq" | "ne";
+
+interface ActiveCondition {
+  source: string;   // control feature → id → stateId, a placeholder hint, or a raw state id
+  op: ActiveOp;
+  value?: string;   // the right-hand side; unused by `truthy`
+}
 ```
 
-`Slot` and `Rule` are unchanged. The new meanings ride on existing fields:
+`Rule` is unchanged; `Slot` gains one field:
+
+```ts
+interface Slot {
+  /* kind, source, from?, label?, unit?, options?, rules? — unchanged */
+  showWhen?: "active" | "inactive";  // new; absent = both
+}
+```
+
+The other new meanings ride on existing fields:
 
 - `options.pick` = a curated hint (`temperature`, `humidity`, `power`, `energy`, `battery`) **or any
   free text** matched case-insensitively against role, then label, then unit.
@@ -127,6 +151,13 @@ interface Template {        // existing + one field
 8. **Size is never adjusted automatically.** Adding slots does not cap or resize the tile: the grid's
    rows are min-content, so content grows the row anyway, and the size fields sit in the same pane
    when the declared span should grow with it.
+9. **The active condition is evaluated live** on every render: its source resolves like a slot source
+   (control → placeholder → raw state); `truthy` uses the app's on/off reading (`true`/`1`/`"1"`/
+   `"true"`), the comparisons read both sides as numbers when both parse as finite numbers and
+   otherwise compare case-insensitively as strings. A tile with no condition is never active. A
+   raw-state condition is registered as a used state id like a raw slot source.
+10. **`showWhen` filters before the control pass**: a slot hidden by the tile's state is removed
+    before the positional walk, so it never claims "the next free control" and shifts another slot.
 
 ## 5. Renderer
 
@@ -150,7 +181,13 @@ interface Template {        // existing + one field
    look. `AppBar` page tabs: the same with `{pageId}`.
 7. Subscription: when the page registry loads or changes, the pages store registers every slot
    source that exists as a state object and is not a device control via `registerProgramStateId`,
-   so raw-state slots update live (values must arrive, not just render once).
+   so raw-state slots update live (values must arrive, not just render once). A raw-state **active
+   condition** is registered the same way.
+8. **Active state**: the condition is evaluated once per render from its live value into a boolean;
+   `active` is added as a scope local for every rule on the tile (so "change the icon when the pump
+   runs" is a rule with `when: "active"` and nothing else), the tile carries an `.active` class whose
+   default look is the accent border (`var(--tile-accent, var(--primary-color))`, no glow — louder
+   styling is a rule), and `showWhen` removes non-matching slots before the control pass (rule 10).
 
 ## 6. Editor UI
 
@@ -159,9 +196,9 @@ interface Template {        // existing + one field
 | block | contents |
 |---|---|
 | title · device | existing title field; device row + **Change…** (A25, confirm) |
-| general options | size w×h (existing, now materialising) · **Background** (BackgroundEditor + "history chart": adds/binds the background sparkline slot) · new-line (existing) |
-| slots | ordered rows, kind glyph + summary ("value · temperature", "badge · battery"); expanded: kind, source (SlotPicker), label, unit, per-kind knobs (`index`, `pick`/free text, badge `position`, level `min/max/step`, decimals), ↑↓, delete; dormant rows say "not assigned — bind or remove"; header shows "copied from <source>" + **Reset** when materialised |
-| rules | per slot, collapsible: ordered list (last match wins) — `when` (virtual-formula language, live result dot), icon (IconPicker), colour (colour input), glow, background, hidden, disabled, tone; add / remove / reorder |
+| general options | size w×h (existing, now materialising) · **Background** (BackgroundEditor + "history chart": adds/binds the background sparkline slot) · **Active when** (source via SlotPicker, operator, value; cleared = removed) · new-line (existing) |
+| slots | ordered rows, kind glyph + summary ("value · temperature", "badge · battery"); expanded: kind, source (SlotPicker), label, unit, per-kind knobs (`index`, `pick`/free text, badge `position`, level `min/max/step`, decimals), visibility (both / only active / only inactive; shown in the summary), ↑↓, delete; dormant rows say "not assigned — bind or remove"; header shows "copied from <source>" + **Reset** when materialised |
+| rules | per slot, collapsible: ordered list (last match wins) — `when` (virtual-formula language, live result dot), icon (IconPicker), colour (colour input), glow, background, hidden, disabled, tone; add / remove / reorder; the field hint says `active` is available |
 | templates | **Save as template** (name field, default the tile's title) · **Apply template** (select of the device type's templates; confirm — replaces size, slots, background) |
 | move | **Move to section…** (A26) |
 | preview | unchanged — the display's own `Tile` at the real breakpoint |
@@ -197,6 +234,7 @@ tile target it unfolds both the page and the section that hold it, with the tile
 | case | behaviour |
 |---|---|
 | slot source resolves to nothing | dormant; the pane marks it and offers bind/remove |
+| the active condition's source resolves to nothing | the tile is not active; the pane marks the condition |
 | a state id stops existing | slot goes dormant (render checks object/state presence) |
 | apply template on an unmaterialised or foreign tile | confirm first; the document is written only through the store's path |
 | `templateList` unreadable (present but unparsable) | **saving is refused**, a visible note in the pane; the document is never overwritten (same rule as `pageList`) |
@@ -211,8 +249,8 @@ tile target it unfolds both the page and the section that hold it, with the tile
 | file | change |
 |---|---|
 | `src/lib/types/display.ts` | `TileConfig.background`, `Template.background` |
-| `src/lib/config/tile-ops.ts` (new) | `materialiseTile`, `ensureTile`, `resetTile`, `addSlot`/`removeSlot`/`moveSlot`/`patchSlot`, `addRule`/`patchRule`/`removeRule`/`moveRule`, `saveAsTemplate`, `applyTemplate` |
-| `src/lib/config/tile-ops.test.ts` (new) | every op: materialise completeness + no shared refs, ensure-once, reset, slot/rule index ops, template round-trip independence |
+| `src/lib/config/tile-ops.ts` (new) | `materialiseTile`, `ensureTile`, `resetTile`, `addSlot`/`removeSlot`/`moveSlot`/`patchSlot`, `addRule`/`patchRule`/`removeRule`/`moveRule`, `saveAsTemplate`, `applyTemplate`, `evalActive` |
+| `src/lib/config/tile-ops.test.ts` (new) | every op: materialise completeness + no shared refs, ensure-once, reset, slot/rule index ops, template round-trip independence, the `evalActive` matrix (truthy / numeric / string / eq-ne) |
 | `src/lib/config/template-ops.ts` | `pickSlotControls` extraction (+ free-text hint matching); `materialiseTile` uses the same resolution |
 | `src/lib/config/template-ops.test.ts` | the new pass: positional only without a hint, hint fail → dormant, used-set order, raw-state sources |
 | `src/lib/config/layout-ops.ts` | `parseLayoutRef` (generalised `parsePlacementRef`), `movePlacement` reuse, deep copy in `clonePlacement` (A27) |
@@ -230,7 +268,7 @@ tile target it unfolds both the page and the section that hold it, with the tile
 | `src/lib/components/layout/SlotPicker.svelte` (new) | the source picker (3 tabs) |
 | `src/lib/components/layout/LayoutDetails.svelte` | the tile editor (slots, rules, templates, change device, move, reset), page background + icon preview |
 | `src/lib/components/layout/LayoutTree.svelte` | tile-row `+`, `Icon`, fold-on-handoff |
-| `src/lib/components/display/Tile.svelte` | slot list source, dormancy, raw states, chart background, `Icon` |
+| `src/lib/components/display/Tile.svelte` | slot list source, dormancy, raw states, chart background, active evaluation + `.active` class, `Icon` |
 | `src/lib/components/display/GroupSection.svelte`, `AppBar.svelte` | section/tab Ctrl+click handoff, `Icon`, M3 |
 | `src/lib/components/display/slots/*`, `SlotRenderer.svelte` | pseudo-control acceptance, rule-icon `Icon` |
 | `src/routes/layout/+page.svelte` | slot-picker state, generalised handoff (page/section/tile), wiring |
@@ -241,9 +279,11 @@ tile target it unfolds both the page and the section that hold it, with the tile
 
 - **Pure, vitest** (repo style): `tile-ops` (materialise is complete and shares no references with
   the source; `ensureTile` materialises once; reset removes the key; slot/rule ops keep order; save →
-  apply is independent of the template), `pickSlotControls` (positional only without source+hint;
-  failing hint → dormant; used-set prevents double-assign; raw-state pseudo-controls), `iconUrl`/
-  `isImageIcon`, `parseLayoutRef`, the gradient builder and its shape detection.
+  apply is independent of the template; the `evalActive` matrix — truthy, numeric and string
+  comparisons, eq/ne), `pickSlotControls` (positional only without source+hint; failing hint →
+  dormant; `showWhen`-hidden slots are dropped before the walk and never claim a control; used-set
+  prevents double-assign; raw-state pseudo-controls), `iconUrl`/`isImageIcon`, `parseLayoutRef`, the
+  gradient builder and its shape detection.
 - **Live browser pass** (Playwright against the real broker, per repo convention): add a slot with
   `+`, bind a placeholder, add a rule with glow, save a template and apply it to another tile,
   a chart background, a broker image icon on a section, Ctrl/Cmd+click a section header (fold
@@ -270,6 +310,7 @@ tile target it unfolds both the page and the section that hold it, with the tile
 | risk | mitigation |
 |---|---|
 | A failing hint no longer falls back positionally — a live thermometer without humidity loses a row (it used to show the next control, possibly mislabelled) | This is spec §6 read strictly ("a slot with no hint takes the next control") and the behaviour the templates need; the live check compares before/after and the pane shows the dormant slot |
+| A template's `showWhen: "active"` slot applied to a tile with no active condition never shows | The pane marks such slots ("only when active — no active condition set"); adding the condition is one edit |
 | Materialisation enlarges `pageList` (each edited tile carries its slots) | Bounded by the number of edited tiles; the document is one JSON state and stays readable; Reset removes the weight |
 | The first `templateList` write lands on the live broker | The save is an explicit user action; the document is created `version: 1` with only the saved template; unreadable → refused |
 | Broker icon paths resolve to the wrong base URL | `iconUrl` is one small tested rule; the picker renders each candidate image, so a broken one is visible before choosing; the stored value stays raw |
@@ -282,6 +323,8 @@ tile target it unfolds both the page and the section that hold it, with the tile
 - The `/templates` library page, template delete/rename UI, template inheritance/`basedOn` editing,
   and the device-form `template` field — later slices; this slice authors and applies from the tile
   pane only.
+- Active conditions **inside templates**: templates carry size/slots/background; a slot's `showWhen`
+  rides with the slot, and the pane flags active-only slots when the tile has no condition.
 - Section `member`/filter builder, `showEmpty` toggle and per-section width hints — not selected for
   this slice.
 - Icon **upload** / data-URL images in the document.
