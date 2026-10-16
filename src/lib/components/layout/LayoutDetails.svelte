@@ -350,7 +350,7 @@
     edit((t) => ({ ...t, size }));
   }
 
-  /** The chart behind the content (A22): at most one background sparkline. */
+  /** The tile's chart (A22): at most one background sparkline. */
   function setChart(source: string): void {
     edit((t) => {
       const slots = (t.slots ?? []).filter(

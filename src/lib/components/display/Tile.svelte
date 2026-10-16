@@ -151,8 +151,8 @@
     ),
   );
 
-  // A slot marked `options.background` renders behind the content (the history
-  // chart, A22); everything else is the tile's body.
+  // A slot marked `options.background` renders over the content as the tile's
+  // chart layer (A22); everything else is the tile's body.
   const backgroundSlots = $derived(
     resolved.filter((r) => r.slot.options?.background === true),
   );
@@ -442,14 +442,17 @@
     border-color: var(--tile-accent, var(--primary-color));
   }
 
-  /* A slot marked `options.background` renders behind everything (the history
-     chart, A22): no pointer events, clipped to the tile's rounded box. */
+  /* A slot marked `options.background` draws the tile's chart (A22) over the
+     content — the icon and values sit under it, so the line is never hidden.
+     No pointer events; clipped to the tile's rounded box; the badges (z 2)
+     stay on top. */
   .tile-bg {
     position: absolute;
     inset: 0;
     overflow: hidden;
     pointer-events: none;
     border-radius: inherit;
+    z-index: 1;
   }
 
   /* Stretch the chart across the tile: the sparkline ships a fixed size for the

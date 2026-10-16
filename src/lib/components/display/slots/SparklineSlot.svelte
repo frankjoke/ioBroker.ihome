@@ -8,7 +8,14 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import type { EnrichedControl } from "$lib/types/device";
 
-  let { control }: { control: EnrichedControl } = $props();
+  let {
+    control,
+    stretch = false,
+  }: {
+    control: EnrichedControl;
+    /** The tile's chart layer stretches the drawing to fill the box (A22). */
+    stretch?: boolean;
+  } = $props();
 
   const spec = $derived(control.history);
 
@@ -34,7 +41,12 @@
 
 {#if spec && control.stateId}
   {#if points}
-    <svg class="spark" viewBox="0 0 120 28" aria-hidden="true">
+    <svg
+      class="spark"
+      viewBox="0 0 120 28"
+      preserveAspectRatio={stretch ? "none" : "xMidYMid meet"}
+      aria-hidden="true"
+    >
       <polyline {points} fill="none" />
     </svg>
   {:else}

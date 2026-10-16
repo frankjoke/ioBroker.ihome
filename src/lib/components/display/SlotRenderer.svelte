@@ -48,7 +48,10 @@
   {:else if slot.kind === "value"}
     <ValueSlot {slot} {control} {onPrimary} {emphasis} />
   {:else if slot.kind === "sparkline" && control}
-    <SparklineSlot control={control as EnrichedControl} />
+    <SparklineSlot
+      control={control as EnrichedControl}
+      stretch={slot.options?.background === true}
+    />
   {:else if slot.kind === "history-list" && control}
     <HistoryListSlot
       control={control as EnrichedControl}
