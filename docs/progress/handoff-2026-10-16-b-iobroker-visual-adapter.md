@@ -128,6 +128,8 @@ Walk the spec's criteria 1–8 against the real broker:
     devices there) and on the pane's first/last slot row (the slot picker inserts there). Middle rows
     keep their working arrows. A page/section row's own + shows only while its list is empty; the tree
     tile's + (add slot) is gone — the pane's "Slots" label line carries the + instead (appends at the end).
+    Page rows work the same (add a room above/below); the header + shows only while the tree is empty, and
+    a new room arrives with one empty section.
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -186,4 +188,6 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   its list is empty (no rows → no ends); the tree tile's + (add slot) is gone — the pane's "Add slot…"
   button is now a + on the Slots label line, right-aligned above the dustbins, appending at the end.
   `addSection`/`appendDevices` gained an optional insert index (`addSlot` already had one); the picker
-  targets carry it through the route. Pages keep their header + and the page rows' arrows.
+  targets carry it through the route. Page rows work the same (`e5c6d1c`): the header + shows only while
+  the tree is empty, and `addPage` now brings one empty section with the room — a room is never without
+  a section.
