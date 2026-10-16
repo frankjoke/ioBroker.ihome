@@ -23,7 +23,7 @@
   import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
   import {
     requestDeviceConfig,
-    requestPlacementConfig,
+    requestLayoutConfig,
     wantsDeviceConfig,
   } from "$lib/pages.js";
   import { SvelteSet } from "svelte/reactivity";
@@ -253,7 +253,7 @@
    */
   function openEditor() {
     if (anchor) {
-      requestPlacementConfig(anchor);
+      requestLayoutConfig(anchor);
       location.hash = "#/layout";
       return;
     }

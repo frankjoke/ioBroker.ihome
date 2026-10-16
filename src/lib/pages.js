@@ -1,6 +1,6 @@
 /* global sessionStorage */
 
-import { parsePlacementRef } from "$lib/config/layout-ops";
+import { parseLayoutRef } from "$lib/config/layout-ops";
 
 /**
  * Programmatic page registry — the header tab bar is rendered from this
@@ -71,14 +71,15 @@ export function wantsDeviceConfig(event) {
 const CONFIG_PLACEMENT_KEY = "iHome.editLayout";
 
 /**
- * Ask the layout editor to open one tile's placement, then navigate.
+ * Ask the layout editor to open a page, a section or one tile's placement, then
+ * navigate.
  *
  * Same `sessionStorage` reasoning as the device handoff above; the value is JSON
  * so the editor can reject anything a stale tab left behind.
  *
- * @param {{ pageId: string, sectionId: string, placementId: string }} ref
+ * @param {{ pageId: string, sectionId?: string, placementId?: string }} ref
  */
-export function requestPlacementConfig(ref) {
+export function requestLayoutConfig(ref) {
   try {
     sessionStorage.setItem(CONFIG_PLACEMENT_KEY, JSON.stringify(ref));
   } catch {
@@ -86,12 +87,12 @@ export function requestPlacementConfig(ref) {
   }
 }
 
-/** The requested placement, cleared as it is taken, or null. */
-export function takeRequestedPlacement() {
+/** The requested layout target, cleared as it is taken, or null. */
+export function takeRequestedLayout() {
   try {
     const raw = sessionStorage.getItem(CONFIG_PLACEMENT_KEY);
     sessionStorage.removeItem(CONFIG_PLACEMENT_KEY);
-    return parsePlacementRef(raw);
+    return parseLayoutRef(raw);
   } catch {
     return null;
   }

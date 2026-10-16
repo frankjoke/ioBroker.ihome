@@ -1,4 +1,5 @@
 import { newId } from "$lib/utils/ids";
+import { deepCopy } from "$lib/utils/json";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 /**
@@ -34,11 +35,11 @@ export type LayoutSelection =
   | ({ kind: "tile" } & PlacementAnchor);
 
 /**
- * Read a placement handoff back out of storage. Anything a stale tab or an older
- * build could have left there returns null, so a bad value can never select a
- * tile that does not exist.
+ * Read a layout handoff: the deepest node whose ids are all present. Anything a
+ * stale tab or an older build left behind returns null, so a bad value can never
+ * select something that does not exist.
  */
-export function parsePlacementRef(raw: unknown): PlacementAnchor | null {
+export function parseLayoutRef(raw: unknown): LayoutSelection | null {
   if (typeof raw !== "string" || !raw) return null;
   let value: Record<string, unknown>;
   try {
@@ -48,17 +49,16 @@ export function parsePlacementRef(raw: unknown): PlacementAnchor | null {
   }
   if (!value || typeof value !== "object") return null;
   const { pageId, sectionId, placementId } = value;
-  if (
-    typeof pageId === "string" &&
-    pageId &&
-    typeof sectionId === "string" &&
-    sectionId &&
-    typeof placementId === "string" &&
-    placementId
-  ) {
-    return { pageId, sectionId, placementId };
+  if (typeof pageId !== "string" || !pageId) return null;
+  // The deepest node whose ids are all present: a placement without its
+  // section would not be addressable, so it degrades instead of failing.
+  if (typeof sectionId !== "string" || !sectionId) {
+    return { kind: "page", pageId };
   }
-  return null;
+  if (typeof placementId !== "string" || !placementId) {
+    return { kind: "section", pageId, sectionId };
+  }
+  return { kind: "tile", pageId, sectionId, placementId };
 }
 
 function withPages(
@@ -110,24 +110,12 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
 }
 
 /**
- * A placement copy with a fresh id. Nested config is copied one level deep,
- * which is enough because every op replaces objects instead of mutating them.
+ * A placement copy with a fresh id. Deep-copied (M2): a plain spread would leave
+ * the copy sharing the original's slot/rule arrays, so editing the copy would
+ * silently edit the original too.
  */
 function clonePlacement(placement: Placement): Placement {
-  return {
-    ...placement,
-    id: newId(),
-    ...(placement.tile
-      ? {
-          tile: {
-            ...placement.tile,
-            ...(placement.tile.size
-              ? { size: { ...placement.tile.size } }
-              : {}),
-          },
-        }
-      : {}),
-  };
+  return { ...deepCopy(placement), id: newId() };
 }
 
 /** A section copy with a fresh id — and a fresh id for each of its tiles. */

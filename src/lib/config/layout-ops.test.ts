@@ -13,12 +13,12 @@ import {
   movePage,
   movePlacement,
   moveSection,
-  parsePlacementRef,
+  parseLayoutRef,
   patchPage,
   patchPlacement,
   patchSection,
 } from "$lib/config/layout-ops";
-import type { Group, Page, PageRegistry } from "$lib/types/display";
+import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 const reg = (pages: Page[]): PageRegistry => ({
   version: 1,
@@ -216,18 +216,49 @@ it("patches a page (its title) without touching its sections", () => {
   expect(regWithTiles().pages[0].title).toBe("P");
 });
 
-it("reads a placement handoff, and refuses anything a stale tab could hold", () => {
-  const ref = { pageId: "p", sectionId: "g", placementId: "t1" };
-  expect(parsePlacementRef(JSON.stringify(ref))).toEqual(ref);
-  // a value the display never wrote, or one half-written by an older build
-  expect(parsePlacementRef(null)).toBeNull();
-  expect(parsePlacementRef("")).toBeNull();
-  expect(parsePlacementRef("{oops")).toBeNull();
-  expect(parsePlacementRef(JSON.stringify({ pageId: 1 }))).toBeNull();
+it("reads a layout handoff — page, section or tile from one shape", () => {
+  expect(parseLayoutRef(JSON.stringify({ pageId: "p" }))).toEqual({
+    kind: "page",
+    pageId: "p",
+  });
   expect(
-    parsePlacementRef(JSON.stringify({ pageId: "p", sectionId: "g" })),
-  ).toBeNull();
-  expect(parsePlacementRef(JSON.stringify({ ...ref, extra: true }))).toEqual(
-    ref,
+    parseLayoutRef(JSON.stringify({ pageId: "p", sectionId: "g" })),
+  ).toEqual({ kind: "section", pageId: "p", sectionId: "g" });
+  expect(
+    parseLayoutRef(
+      JSON.stringify({ pageId: "p", sectionId: "g", placementId: "t" }),
+    ),
+  ).toEqual({ kind: "tile", pageId: "p", sectionId: "g", placementId: "t" });
+});
+
+it("rejects junk, and degrades a placement without its section to its page", () => {
+  expect(parseLayoutRef(null)).toBeNull();
+  expect(parseLayoutRef("")).toBeNull();
+  expect(parseLayoutRef("{oops")).toBeNull();
+  expect(parseLayoutRef(JSON.stringify({ pageId: 1 }))).toBeNull();
+  expect(parseLayoutRef(JSON.stringify({ sectionId: "g" }))).toBeNull();
+  expect(
+    parseLayoutRef(JSON.stringify({ pageId: "p", placementId: "t" })),
+  ).toEqual({ kind: "page", pageId: "p" });
+});
+
+it("duplicatePlacement deep-copies the tile so the copy cannot mutate the original", () => {
+  const source: Placement = {
+    id: "t1",
+    device: "d",
+    tile: {
+      slots: [
+        { kind: "value", source: "power", rules: [{ when: "power > 0" }] },
+      ],
+    },
+  };
+  const reg0 = reg([
+    { id: "p", title: "P", groups: [{ id: "g", title: "G", tiles: [source] }] },
+  ]);
+  const next = duplicatePlacement(reg0, "p", "g", "t1");
+  const copy = next.pages[0].groups[0].tiles![1];
+  copy.tile!.slots![0].source = "mutated";
+  expect(next.pages[0].groups[0].tiles![0].tile!.slots![0].source).toBe(
+    "power",
   );
 });

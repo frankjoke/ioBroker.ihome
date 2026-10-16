@@ -4,7 +4,7 @@
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
-  import { takeRequestedPlacement } from "$lib/pages.js";
+  import { takeRequestedLayout } from "$lib/pages.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList } from "$lib/config/rooms";
   import {
@@ -34,11 +34,11 @@
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
 
-  // A tile on the display handed us its placement (Ctrl/Cmd+click, or a tap in
-  // edit mode): select it so the pane opens on what was clicked.
+  // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
+  // click): select it so the pane opens on what was clicked.
   onMount(() => {
-    const requested = takeRequestedPlacement();
-    if (requested) selection = { kind: "tile", ...requested };
+    const requested = takeRequestedLayout();
+    if (requested) selection = requested;
   });
 
   function confirmDelete(): void {
