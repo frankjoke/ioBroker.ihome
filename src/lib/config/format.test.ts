@@ -86,5 +86,10 @@ it("rounds a reading to its slot's precision, trailing zeros dropped", () => {
   expect(formatNumber(54.32)).toBe("54.32");
   expect(formatNumber(54.32, -1)).toBe("54.32");
   expect(formatNumber("abc", 1)).toBe("abc");
+  // the parse is strict — the whole string must be numeric, so a German comma
+  // and a baked-in unit stay untouched (parseFloat would read 54 / 54.32 and
+  // mangle them)
+  expect(formatNumber("54,32", 1)).toBe("54,32");
+  expect(formatNumber("54.32 %", 1)).toBe("54.32 %");
   expect(splitValueUnit(54.32, "%", 1)).toEqual({ value: "54.3", unit: "%" });
 });
