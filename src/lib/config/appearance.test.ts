@@ -1,21 +1,24 @@
 import { it, expect } from "vitest";
-import { backgroundCss } from "$lib/config/appearance";
+import { gradientValue, inspectGradient, isHexColor } from "./appearance";
 
-it("maps each background kind to the CSS a section or page needs", () => {
-  expect(backgroundCss({ kind: "solid", value: "#101418" })).toBe(
-    "background-color: #101418;",
+it("writes and reads back the builder's gradient", () => {
+  expect(gradientValue(180, "#101418", "#2a3550")).toBe(
+    "linear-gradient(180deg, #101418, #2a3550)",
   );
-  expect(backgroundCss({ kind: "image", value: "bg.png" })).toBe(
-    'background-image: url("bg.png"); background-size: cover; background-attachment: fixed;',
-  );
-  expect(
-    backgroundCss({ kind: "gradient", value: "linear-gradient(#000, #fff)" }),
-  ).toBe(
-    "background-image: linear-gradient(#000, #fff); background-attachment: fixed;",
-  );
+  expect(inspectGradient(gradientValue(45, "#000", "#fff"))).toEqual({
+    angle: 45,
+    from: "#000",
+    to: "#fff",
+  });
 });
 
-it("says nothing for an unset or empty background", () => {
-  expect(backgroundCss(undefined)).toBe("");
-  expect(backgroundCss({ kind: "solid", value: "" })).toBe("");
+it("refuses what it cannot represent", () => {
+  expect(inspectGradient(undefined)).toBeNull();
+  expect(inspectGradient("#101418")).toBeNull();
+  expect(inspectGradient("url(some.png)")).toBeNull();
+  expect(isHexColor("#101418")).toBe(true);
+  expect(isHexColor("#abc")).toBe(true);
+  expect(isHexColor("#abcdefff")).toBe(true);
+  expect(isHexColor("red")).toBe(false);
+  expect(isHexColor("#12")).toBe(false);
 });
