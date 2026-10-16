@@ -202,3 +202,6 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   went with it) — every page's content starts 16px higher; the display shell (padding 0) is untouched.
 - **Display page padding 8px** (`fabe19c`): the display's own page wrapper (`PageView` `.page`, 12px
   around the sections) matches the shell now.
+- **Device actions as icons** (`d4b3b17`): the tile pane's "Change device…" / "Edit device…" buttons
+  are icon buttons now — the `select` glyph (dashed selection box) and the pencil (`edit`); titles and
+  aria-labels keep the words.
