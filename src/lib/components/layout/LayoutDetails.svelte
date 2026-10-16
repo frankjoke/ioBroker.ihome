@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import { backgroundCss } from "$lib/config/appearance";
+  import { backgroundCss, isHexColor } from "$lib/config/appearance";
   import {
     movePlacement,
     patchPage,
@@ -20,13 +20,31 @@
     breakpointFor,
     type TileSpan,
   } from "$lib/config/size-ops";
-  import { effectiveSpan, resolveControl } from "$lib/config/template-ops";
   import {
+    effectiveSpan,
+    pickable,
+    pickControl,
+    resolveControl,
+    resolveTemplate,
+    slotVisible,
+  } from "$lib/config/template-ops";
+  import {
+    addRule,
     applyTemplate,
     editTile,
+    evalActive,
+    moveRule,
+    moveSlot,
+    patchRule,
+    patchSlot,
+    removeRule,
+    removeSlot,
     templateFromTile,
     upsertTemplate,
   } from "$lib/config/tile-ops";
+  import { ruleScope } from "$lib/config/rule-ops";
+  import { evaluateVirtual } from "$lib/config/virtual-ops";
+  import { getVirtualPool } from "$lib/stores/devices";
   import {
     commitTemplates,
     getTemplateRegistry,
@@ -48,7 +66,10 @@
     Group,
     PageRegistry,
     Placement,
+    Rule,
     Size,
+    Slot,
+    SlotKind,
     TileConfig,
   } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
@@ -60,6 +81,7 @@
     onChange,
     onSelect,
     onSwapDevice,
+    onAddSlot,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -69,6 +91,8 @@
     onSelect?: (selection: LayoutSelection) => void;
     /** Change device: the route owns the picker and the confirm dialog. */
     onSwapDevice?: (anchor: PlacementAnchor) => void;
+    /** Add slot: the route owns the picker (as for the tree's `+`). */
+    onAddSlot?: (anchor: PlacementAnchor) => void;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -90,6 +114,11 @@
   let applyId = $state("");
   let pendingApply = $state(false);
   let pendingReset = $state(false);
+  /** Slot UI: which row is expanded, which rules block is open, pickers. */
+  let expandedSlot = $state<number | null>(null);
+  let openRules = $state<number | null>(null);
+  let sourcePickerFor = $state<number | null>(null);
+  let ruleIconFor = $state<{ slot: number; rule: number } | null>(null);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -134,11 +163,14 @@
       !!activeControl ||
       !!(ioBroker.objects as Map<string, any>)?.get?.(activeCond.source),
   );
-  const readingText = $derived.by(() => {
-    const raw = activeControl
+  const activeValue = $derived(
+    activeControl
       ? activeControl.liveValue
       : (ioBroker.states as Map<string, any>)?.get?.(activeCond?.source ?? "")
-          ?.val;
+          ?.val,
+  );
+  const readingText = $derived.by(() => {
+    const raw = activeValue;
     if (raw === undefined || raw === null) return "—";
     return typeof raw === "object" ? JSON.stringify(raw) : String(raw);
   });
@@ -183,6 +215,32 @@
     { op: "eq", label: "=" },
     { op: "ne", label: "≠" },
   ];
+
+  /** The rows the pane lists: the tile's own slots, else the chain's (A18). */
+  const shownSlots = $derived(
+    tile?.tile?.slots ??
+      (device ? resolveTemplate(device, templates).slots : []),
+  );
+
+  /** The tile's active reading, and the scope the rules' live dots evaluate in. */
+  const tileActive = $derived(evalActive(activeCond, activeValue));
+  const scope = $derived.by(() => {
+    if (!device) return undefined;
+    const base = ruleScope(device.controls ?? [], getVirtualPool());
+    return { ...base, locals: { ...base.locals, active: tileActive } };
+  });
+
+  const KIND_GLYPH: Record<SlotKind, string> = {
+    icon: "emoji_symbols",
+    value: "numbers",
+    level: "tune",
+    color: "palette",
+    enum: "list",
+    button: "smart_button",
+    badge: "label",
+    sparkline: "show_chart",
+    "history-list": "history",
+  };
 
   // The preview resolves through the display's own resolver, so it needs the
   // same device shape the display feeds it.
@@ -386,6 +444,96 @@
   function requestSwap(): void {
     const a = anchor();
     if (a) onSwapDevice?.(a);
+  }
+
+  // ------------------------------------------------------------------- slots
+
+  /** What a slot row shows next to its kind: the control it reads, or its hint. */
+  function slotLabel(slot: Slot): string {
+    if (slot.source) {
+      const control = resolveControl(device?.controls ?? [], slot.source);
+      return control ? control.label || control.feature : slot.source;
+    }
+    const hint = String(slot.options?.pick ?? "");
+    return hint || "auto";
+  }
+
+  /** A source that names a raw state object rather than a control (A21). */
+  function isRawState(source: string): boolean {
+    return !!(ioBroker.objects as Map<string, any>)?.get?.(source);
+  }
+
+  /**
+   * A20: a source or hint that matches nothing is dormant on the display, so the
+   * pane marks it and offers to bind it. `ago`/`offline` are the badge clock's
+   * own sources, not control names.
+   */
+  function slotUnresolved(slot: Slot): boolean {
+    if (
+      slot.kind === "badge" &&
+      (slot.source === "ago" || slot.source === "offline")
+    )
+      return false;
+    if (slot.source) {
+      return (
+        !resolveControl(device?.controls ?? [], slot.source) &&
+        !isRawState(slot.source)
+      );
+    }
+    const hint = String(slot.options?.pick ?? "");
+    if (!hint.trim()) return false;
+    return !pickControl(
+      pickable(device?.controls ?? []),
+      hint,
+      new SvelteSet<string>(),
+    );
+  }
+
+  /** A rule's live dot: green when `when` evaluates to true, red on error. */
+  function ruleDot(when: string): "true" | "error" | "idle" {
+    if (!when.trim() || !scope) return "idle";
+    const result = evaluateVirtual(when, scope);
+    if (result.error) return "error";
+    return result.value === true ? "true" : "idle";
+  }
+
+  /** A number input's reading; an empty field removes the option. */
+  function num(raw: string): number | undefined {
+    const text = raw.trim();
+    if (!text) return undefined;
+    const value = Number(text);
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  function patchOptions(
+    slotIndex: number,
+    patch: Record<string, unknown>,
+  ): void {
+    edit((t) => {
+      const slot = (t.slots ?? [])[slotIndex];
+      if (!slot) return t;
+      const options: Record<string, unknown> = {
+        ...(slot.options ?? {}),
+        ...patch,
+      };
+      for (const key of Object.keys(options)) {
+        if (options[key] === undefined) delete options[key];
+      }
+      return patchSlot(t, slotIndex, {
+        options: Object.keys(options).length ? options : undefined,
+      });
+    });
+  }
+
+  function removeSlotAt(slotIndex: number): void {
+    edit((t) => removeSlot(t, slotIndex));
+    if (expandedSlot === slotIndex) expandedSlot = null;
+    if (openRules === slotIndex) openRules = null;
+  }
+
+  function requestAddSlot(): void {
+    const a = anchor();
+    if (a) onAddSlot?.(a);
   }
 </script>
 
@@ -614,6 +762,497 @@
     </div>
 
     <div class="field">
+      <span class="label-mono">Slots</span>
+      <div class="slot-list">
+        {#each shownSlots as slot, i (i)}
+          <div class="slot-row" class:not-now={!slotVisible(slot, tileActive)}>
+            <div class="slot-line">
+              <button
+                type="button"
+                class="slot-head"
+                aria-expanded={expandedSlot === i}
+                onclick={() => (expandedSlot = expandedSlot === i ? null : i)}
+              >
+                <Icon value={KIND_GLYPH[slot.kind]} size={17} />
+                <span class="slot-summary">{slot.kind} · {slotLabel(slot)}</span
+                >
+                {#if slot.showWhen}
+                  <span class="hint-badge text-muted"
+                    >{slot.showWhen === "active"
+                      ? "active only"
+                      : "inactive only"}</span
+                  >
+                {/if}
+              </button>
+              <span class="row-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Move up"
+                  aria-label="Move slot up"
+                  disabled={i === 0}
+                  onclick={() => edit((t) => moveSlot(t, i, i - 1))}
+                >
+                  <span class="material-symbols-outlined">arrow_upward</span>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Move down"
+                  aria-label="Move slot down"
+                  disabled={i === shownSlots.length - 1}
+                  onclick={() => edit((t) => moveSlot(t, i, i + 1))}
+                >
+                  <span class="material-symbols-outlined">arrow_downward</span>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Remove slot"
+                  aria-label="Remove slot"
+                  onclick={() => removeSlotAt(i)}
+                >
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </span>
+            </div>
+            {#if slotUnresolved(slot)}
+              <div class="slot-line">
+                <span class="warn">not assigned — bind or remove</span>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() => (sourcePickerFor = i)}>Bind…</button
+                >
+              </div>
+            {/if}
+            {#if !activeCond && slot.showWhen}
+              <div class="slot-line">
+                <span class="note text-muted"
+                  >only when {slot.showWhen} — no active condition set</span
+                >
+              </div>
+            {/if}
+            {#if expandedSlot === i}
+              <div class="slot-editor">
+                <div class="row">
+                  <label class="small">
+                    <span class="label-mono">Kind</span>
+                    <select
+                      value={slot.kind}
+                      onchange={(e) =>
+                        edit((t) =>
+                          patchSlot(t, i, {
+                            kind: e.currentTarget.value as SlotKind,
+                          }),
+                        )}
+                    >
+                      {#each Object.keys(KIND_GLYPH) as k (k)}
+                        <option value={k}>{k}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label class="small">
+                    <span class="label-mono">Visibility</span>
+                    <select
+                      value={slot.showWhen ?? ""}
+                      onchange={(e) =>
+                        edit((t) =>
+                          patchSlot(t, i, {
+                            showWhen: (e.currentTarget.value || undefined) as
+                              "active" | "inactive" | undefined,
+                          }),
+                        )}
+                    >
+                      <option value="">both</option>
+                      <option value="active">only active</option>
+                      <option value="inactive">only inactive</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="slot-line">
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() => (sourcePickerFor = i)}
+                  >
+                    {slot.source
+                      ? slot.source
+                      : slot.options?.pick
+                        ? `hint: ${slot.options.pick}`
+                        : "auto (next control)"}
+                  </button>
+                  {#if slot.source && isRawState(slot.source)}
+                    <span class="hint-badge text-muted">read-only</span>
+                  {/if}
+                </div>
+                <div class="row">
+                  <label class="small grow">
+                    <span class="label-mono">Label</span>
+                    <input
+                      type="text"
+                      value={slot.label ?? ""}
+                      oninput={(e) =>
+                        edit((t) =>
+                          patchSlot(t, i, {
+                            label: e.currentTarget.value.trim() || undefined,
+                          }),
+                        )}
+                    />
+                  </label>
+                  <label class="small">
+                    <span class="label-mono">Unit</span>
+                    <input
+                      type="text"
+                      class="unit-input"
+                      value={slot.unit ?? ""}
+                      oninput={(e) =>
+                        edit((t) =>
+                          patchSlot(t, i, {
+                            unit: e.currentTarget.value.trim() || undefined,
+                          }),
+                        )}
+                    />
+                  </label>
+                </div>
+                <div class="row">
+                  <label class="small grow">
+                    <span class="label-mono">pick (hint)</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. temperature"
+                      value={String(slot.options?.pick ?? "")}
+                      oninput={(e) =>
+                        patchOptions(i, {
+                          pick: e.currentTarget.value.trim() || undefined,
+                        })}
+                    />
+                  </label>
+                  {#if slot.kind === "value"}
+                    <label class="small">
+                      <span class="label-mono">index</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.index ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            index: num(e.currentTarget.value),
+                          })}
+                      />
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">decimals</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.decimals ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            decimals: num(e.currentTarget.value),
+                          })}
+                      />
+                    </label>
+                  {/if}
+                </div>
+                {#if slot.kind === "level"}
+                  <div class="row">
+                    <label class="small">
+                      <span class="label-mono">min</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.min ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, { min: num(e.currentTarget.value) })}
+                      />
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">max</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.max ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, { max: num(e.currentTarget.value) })}
+                      />
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">step</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.step ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            step: num(e.currentTarget.value),
+                          })}
+                      />
+                    </label>
+                  </div>
+                {/if}
+                {#if slot.kind === "badge"}
+                  <div class="row">
+                    <label class="small grow">
+                      <span class="label-mono">of</span>
+                      <input
+                        type="text"
+                        placeholder="control the clock reads"
+                        value={String(slot.options?.of ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            of: e.currentTarget.value.trim() || undefined,
+                          })}
+                      />
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">from</span>
+                      <select
+                        value={String(slot.options?.from ?? "ts")}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            from:
+                              e.currentTarget.value === "lc" ? "lc" : undefined,
+                          })}
+                      >
+                        <option value="ts">update (ts)</option>
+                        <option value="lc">change (lc)</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() =>
+                        edit((t) => patchSlot(t, i, { source: "ago" }))}
+                      >ago</button
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() =>
+                        edit((t) => patchSlot(t, i, { source: "offline" }))}
+                      >offline</button
+                    >
+                  </div>
+                {/if}
+                <div class="slot-rules">
+                  <button
+                    type="button"
+                    class="rules-toggle"
+                    onclick={() => (openRules = openRules === i ? null : i)}
+                  >
+                    Rules ({slot.rules?.length ?? 0})
+                  </button>
+                  {#if openRules === i}
+                    <p class="note text-muted">
+                      Last match wins. <code>active</code> (the tile's active
+                      state) is available in <code>when</code>.
+                    </p>
+                    {#each slot.rules ?? [] as rule, ri (ri)}
+                      <div class="rule-row">
+                        <div class="rule-line">
+                          <span
+                            class="dot"
+                            class:true={ruleDot(rule.when) === "true"}
+                            class:error={ruleDot(rule.when) === "error"}
+                            title="Live result of this expression"
+                          ></span>
+                          <input
+                            type="text"
+                            class="when"
+                            placeholder="when… e.g. power == 1"
+                            value={rule.when}
+                            oninput={(e) =>
+                              edit((t) =>
+                                patchRule(t, i, ri, {
+                                  when: e.currentTarget.value,
+                                }),
+                              )}
+                          />
+                          <span class="row-actions">
+                            <button
+                              type="button"
+                              class="icon-btn"
+                              title="Move up"
+                              aria-label="Move rule up"
+                              disabled={ri === 0}
+                              onclick={() =>
+                                edit((t) => moveRule(t, i, ri, ri - 1))}
+                            >
+                              <span class="material-symbols-outlined"
+                                >arrow_upward</span
+                              >
+                            </button>
+                            <button
+                              type="button"
+                              class="icon-btn"
+                              title="Move down"
+                              aria-label="Move rule down"
+                              disabled={ri === (slot.rules?.length ?? 0) - 1}
+                              onclick={() =>
+                                edit((t) => moveRule(t, i, ri, ri + 1))}
+                            >
+                              <span class="material-symbols-outlined"
+                                >arrow_downward</span
+                              >
+                            </button>
+                            <button
+                              type="button"
+                              class="icon-btn"
+                              title="Remove rule"
+                              aria-label="Remove rule"
+                              onclick={() => edit((t) => removeRule(t, i, ri))}
+                            >
+                              <span class="material-symbols-outlined"
+                                >delete</span
+                              >
+                            </button>
+                          </span>
+                        </div>
+                        <div class="rule-line">
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            onclick={() =>
+                              (ruleIconFor = { slot: i, rule: ri })}
+                          >
+                            {rule.icon || "icon…"}
+                          </button>
+                          {#if rule.icon}
+                            <button
+                              type="button"
+                              class="btn btn-sm"
+                              onclick={() =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, { icon: undefined }),
+                                )}>clear</button
+                            >
+                          {/if}
+                          <input
+                            type="color"
+                            class="color-input"
+                            aria-label="Rule colour"
+                            value={isHexColor(rule.color)
+                              ? rule.color
+                              : "#000000"}
+                            oninput={(e) =>
+                              edit((t) =>
+                                patchRule(t, i, ri, {
+                                  color: e.currentTarget.value,
+                                }),
+                              )}
+                          />
+                          {#if rule.color}
+                            <button
+                              type="button"
+                              class="btn btn-sm"
+                              onclick={() =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, { color: undefined }),
+                                )}>clear</button
+                            >
+                          {/if}
+                          <label class="check">
+                            <input
+                              type="checkbox"
+                              checked={rule.glow === true}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    glow: e.currentTarget.checked || undefined,
+                                  }),
+                                )}
+                            />
+                            <span>glow</span>
+                          </label>
+                          <label class="check">
+                            <input
+                              type="checkbox"
+                              checked={rule.hidden === true}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    hidden:
+                                      e.currentTarget.checked || undefined,
+                                  }),
+                                )}
+                            />
+                            <span>hidden</span>
+                          </label>
+                          <label class="check">
+                            <input
+                              type="checkbox"
+                              checked={rule.disabled === true}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    disabled:
+                                      e.currentTarget.checked || undefined,
+                                  }),
+                                )}
+                            />
+                            <span>disabled</span>
+                          </label>
+                        </div>
+                        <div class="rule-line">
+                          <label class="small grow">
+                            <span class="label-mono">background</span>
+                            <input
+                              type="text"
+                              value={rule.background ?? ""}
+                              oninput={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    background:
+                                      e.currentTarget.value.trim() || undefined,
+                                  }),
+                                )}
+                            />
+                          </label>
+                          <label class="small">
+                            <span class="label-mono">tone</span>
+                            <select
+                              value={rule.tone ?? ""}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchRule(t, i, ri, {
+                                    tone: e.currentTarget.value || undefined,
+                                  }),
+                                )}
+                            >
+                              <option value="">—</option>
+                              <option value="info">info</option>
+                              <option value="ok">ok</option>
+                              <option value="warn">warn</option>
+                              <option value="danger">danger</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    {/each}
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() =>
+                        edit((t) => addRule(t, i, { when: "active" }))}
+                      >Add rule</button
+                    >
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      <button
+        type="button"
+        class="btn btn-sm"
+        disabled={!device}
+        onclick={requestAddSlot}>Add slot…</button
+      >
+    </div>
+
+    <div class="field">
       <span class="label-mono">Template</span>
       <span class="device-name">{sourceLine}</span>
       <div class="row">
@@ -712,6 +1351,38 @@
       onAdd={() => {}}
       onSource={setActiveSource}
       onClose={() => (activePicker = false)}
+    />
+  {/if}
+
+  {#if sourcePickerFor !== null && device}
+    <SlotPicker
+      {device}
+      mode="source"
+      onAdd={() => {}}
+      onSource={(source) => {
+        const slotIndex = sourcePickerFor;
+        sourcePickerFor = null;
+        if (slotIndex === null) return;
+        edit((t) => patchSlot(t, slotIndex, { source }));
+      }}
+      onClose={() => (sourcePickerFor = null)}
+    />
+  {/if}
+
+  {#if ruleIconFor}
+    <IconPicker
+      icon={shownSlots[ruleIconFor.slot]?.rules?.[ruleIconFor.rule]?.icon}
+      onPick={(value) => {
+        const target = ruleIconFor;
+        ruleIconFor = null;
+        if (!target) return;
+        edit((t) =>
+          patchRule(t, target.slot, target.rule, {
+            icon: value || undefined,
+          }),
+        );
+      }}
+      onClose={() => (ruleIconFor = null)}
     />
   {/if}
 
@@ -814,6 +1485,185 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .slot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .slot-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 6px);
+    padding: 3px 5px;
+  }
+
+  /* De-emphasis by colour, never opacity (house rule). */
+  .slot-row.not-now .slot-summary {
+    color: var(--text-muted);
+  }
+
+  .slot-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .slot-head {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  .slot-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hint-badge {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill);
+    padding: 0 6px;
+  }
+
+  .row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+  }
+
+  .row-actions .icon-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 2px;
+  }
+
+  .row-actions .icon-btn:hover:not(:disabled) {
+    color: var(--text-color);
+  }
+
+  .row-actions .icon-btn:disabled {
+    color: var(--border-color);
+    cursor: default;
+  }
+
+  .slot-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 2px 0 2px 0.5rem;
+    border-left: 2px solid var(--border-color);
+  }
+
+  .slot-editor .small input,
+  .slot-editor .small select {
+    min-width: 0;
+  }
+
+  .grow {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .grow input {
+    width: 100%;
+  }
+
+  .num-input {
+    width: 4.5rem;
+  }
+
+  .unit-input {
+    width: 3.5rem;
+  }
+
+  .color-input {
+    inline-size: 2rem;
+    block-size: 1.5rem;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+  }
+
+  .slot-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .rules-toggle {
+    align-self: flex-start;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .rules-toggle:hover {
+    color: var(--text-color);
+  }
+
+  .rule-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 3px;
+  }
+
+  .rule-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .rule-line .when {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-color);
+  }
+
+  .dot.true {
+    background: var(--success-color, #2e7d32);
+  }
+
+  .dot.error {
+    background: var(--danger-color, #c0392b);
+  }
+
+  .note {
+    font-size: 0.75rem;
+    margin: 0;
   }
 
   .warn {

@@ -215,6 +215,7 @@
           onChange={commitLayout}
           onSelect={(next) => (selection = next)}
           onSwapDevice={(anchor) => (swapFor = anchor)}
+          onAddSlot={openSlotPicker}
         />
       {:else}
         <p class="text-muted">Select a page, a section or a tile.</p>
