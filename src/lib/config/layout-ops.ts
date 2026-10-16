@@ -190,11 +190,13 @@ export function addSection(
   reg: PageRegistry,
   pageId: string,
   title = "New section",
+  at?: number,
 ): PageRegistry {
-  return mapPage(reg, pageId, (page) => ({
-    ...page,
-    groups: [...(page.groups ?? []), { id: newId(), title, tiles: [] }],
-  }));
+  return mapPage(reg, pageId, (page) => {
+    const groups = [...(page.groups ?? [])];
+    groups.splice(at ?? groups.length, 0, { id: newId(), title, tiles: [] });
+    return { ...page, groups };
+  });
 }
 
 export function deleteSection(
@@ -259,12 +261,14 @@ export function patchSection(
  * Append devices to a section as placements, in the given order. Ids already in
  * the section are skipped, and so are repeats inside `deviceIds` — the picker
  * can hand us a list with duplicates without creating two tiles for one device.
+ * `at` inserts at that index instead of appending (the list-end `+`).
  */
 export function appendDevices(
   reg: PageRegistry,
   pageId: string,
   sectionId: string,
   deviceIds: string[],
+  at?: number,
 ): PageRegistry {
   return mapSection(reg, pageId, sectionId, (section) => {
     const seen = new Set((section.tiles ?? []).map((tile) => tile.device));
@@ -274,7 +278,9 @@ export function appendDevices(
       seen.add(device);
       added.push({ id: newId(), device });
     }
-    return { ...section, tiles: [...(section.tiles ?? []), ...added] };
+    const tiles = [...(section.tiles ?? [])];
+    tiles.splice(at ?? tiles.length, 0, ...added);
+    return { ...section, tiles };
   });
 }
 

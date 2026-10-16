@@ -41,8 +41,8 @@
     oldName: string;
   } | null>(null);
   let pickerFor = $state<
-    | { kind: "device"; pageId: string; sectionId: string }
-    | { kind: "slot"; anchor: PlacementAnchor }
+    | { kind: "device"; pageId: string; sectionId: string; at?: number }
+    | { kind: "slot"; anchor: PlacementAnchor; at?: number }
     | null
   >(null);
 
@@ -81,18 +81,19 @@
       : undefined;
   }
 
-  /** A dangling device is refused: the tree already warns on the row. */
-  function openSlotPicker(anchor: PlacementAnchor): void {
+  /** A dangling device is refused: the tree already warns on the row. `at`
+   * inserts the new slot there instead of appending (the list-end `+`). */
+  function openSlotPicker(anchor: PlacementAnchor, at?: number): void {
     if (!deviceOfAnchor(anchor)) return;
-    pickerFor = { kind: "slot", anchor };
+    pickerFor = { kind: "slot", anchor, at };
   }
 
-  function addSlotTo(anchor: PlacementAnchor, slot: Slot): void {
+  function addSlotTo(anchor: PlacementAnchor, slot: Slot, at?: number): void {
     const device = deviceOfAnchor(anchor);
     if (!device) return;
     commitLayout(
       editTile(registry, anchor, device, getTemplateRegistry().templates, (t) =>
-        addSlot(t, slot),
+        addSlot(t, slot, at),
       ),
     );
     pickerFor = null;
@@ -199,10 +200,8 @@
         onSelect={(next) => (selection = next)}
         onChange={commitLayout}
         onDelete={(target) => (pendingDelete = target)}
-        onAddTile={(pageId, sectionId) =>
-          (pickerFor = { kind: "device", pageId, sectionId })}
-        onAddSlot={(pageId, sectionId, placementId) =>
-          openSlotPicker({ pageId, sectionId, placementId })}
+        onAddTile={(pageId, sectionId, at) =>
+          (pickerFor = { kind: "device", pageId, sectionId, at })}
       />
     </div>
 
@@ -238,7 +237,13 @@
       ).map((t) => t.device)}
       onAdd={(deviceIds) => {
         commitLayout(
-          appendDevices(registry, target.pageId, target.sectionId, deviceIds),
+          appendDevices(
+            registry,
+            target.pageId,
+            target.sectionId,
+            deviceIds,
+            target.at,
+          ),
         );
         pickerFor = null;
       }}
@@ -249,7 +254,7 @@
     {#if device}
       <SlotPicker
         {device}
-        onAdd={(slot) => addSlotTo(target.anchor, slot)}
+        onAdd={(slot) => addSlotTo(target.anchor, slot, target.at)}
         onClose={() => (pickerFor = null)}
       />
     {/if}

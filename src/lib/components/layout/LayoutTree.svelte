@@ -30,7 +30,6 @@
     onChange,
     onDelete,
     onAddTile,
-    onAddSlot,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -41,10 +40,9 @@
     onChange: (next: PageRegistry) => void;
     /** Page and section deletion asks first — the route owns the dialog. */
     onDelete: (selection: LayoutSelection) => void;
-    /** Opens the device picker for a section — the route owns the dialog. */
-    onAddTile: (pageId: string, sectionId: string) => void;
-    /** Opens the slot picker for a tile — the route owns the dialog. */
-    onAddSlot: (pageId: string, sectionId: string, placementId: string) => void;
+    /** Opens the device picker for a section — the route owns the dialog. `at`
+     * inserts the picked devices there instead of appending (the end `+`). */
+    onAddTile: (pageId: string, sectionId: string, at?: number) => void;
   } = $props();
 
   // Folded tree nodes. Local and transient: how the tree looks is a view of the
@@ -121,15 +119,17 @@
         <span class="title">{page.title || "—"}</span>
       </button>
       <span class="row-actions">
-        <button
-          type="button"
-          class="icon-btn"
-          title="Add section"
-          aria-label="Add section"
-          onclick={() => onChange(addSection(registry, page.id))}
-        >
-          <span class="material-symbols-outlined">add</span>
-        </button>
+        {#if page.groups.length === 0}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Add section"
+            aria-label="Add section"
+            onclick={() => onChange(addSection(registry, page.id))}
+          >
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        {/if}
         <button
           type="button"
           class="icon-btn"
@@ -211,15 +211,17 @@
             {/if}
           </button>
           <span class="row-actions">
-            <button
-              type="button"
-              class="icon-btn"
-              title="Add tile"
-              aria-label="Add tile"
-              onclick={() => onAddTile(page.id, section.id)}
-            >
-              <span class="material-symbols-outlined">add</span>
-            </button>
+            {#if (section.tiles ?? []).length === 0}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Add tile"
+                aria-label="Add tile"
+                onclick={() => onAddTile(page.id, section.id)}
+              >
+                <span class="material-symbols-outlined">add</span>
+              </button>
+            {/if}
             <button
               type="button"
               class="icon-btn"
@@ -230,42 +232,65 @@
             >
               <span class="material-symbols-outlined">content_copy</span>
             </button>
-            <button
-              type="button"
-              class="icon-btn"
-              title="Move up"
-              aria-label="Move up"
-              disabled={sectionIndex === 0}
-              onclick={() =>
-                onChange(
-                  moveSection(
-                    registry,
-                    page.id,
-                    sectionIndex,
-                    sectionIndex - 1,
-                  ),
-                )}
-            >
-              <span class="material-symbols-outlined">arrow_upward</span>
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              title="Move down"
-              aria-label="Move down"
-              disabled={sectionIndex === page.groups.length - 1}
-              onclick={() =>
-                onChange(
-                  moveSection(
-                    registry,
-                    page.id,
-                    sectionIndex,
-                    sectionIndex + 1,
-                  ),
-                )}
-            >
-              <span class="material-symbols-outlined">arrow_downward</span>
-            </button>
+            {#if sectionIndex === 0}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Add section above"
+                aria-label="Add section above"
+                onclick={() =>
+                  onChange(addSection(registry, page.id, undefined, 0))}
+              >
+                <span class="material-symbols-outlined">add</span>
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Move up"
+                aria-label="Move up"
+                onclick={() =>
+                  onChange(
+                    moveSection(
+                      registry,
+                      page.id,
+                      sectionIndex,
+                      sectionIndex - 1,
+                    ),
+                  )}
+              >
+                <span class="material-symbols-outlined">arrow_upward</span>
+              </button>
+            {/if}
+            {#if sectionIndex === page.groups.length - 1}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Add section below"
+                aria-label="Add section below"
+                onclick={() => onChange(addSection(registry, page.id))}
+              >
+                <span class="material-symbols-outlined">add</span>
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Move down"
+                aria-label="Move down"
+                onclick={() =>
+                  onChange(
+                    moveSection(
+                      registry,
+                      page.id,
+                      sectionIndex,
+                      sectionIndex + 1,
+                    ),
+                  )}
+              >
+                <span class="material-symbols-outlined">arrow_downward</span>
+              </button>
+            {/if}
             <button
               type="button"
               class="icon-btn danger"
@@ -330,15 +355,6 @@
                 <button
                   type="button"
                   class="icon-btn"
-                  title="Add slot"
-                  aria-label="Add slot"
-                  onclick={() => onAddSlot(page.id, section.id, tile.id)}
-                >
-                  <span class="material-symbols-outlined">add</span>
-                </button>
-                <button
-                  type="button"
-                  class="icon-btn"
                   title="Duplicate tile"
                   aria-label="Duplicate tile"
                   onclick={() =>
@@ -353,56 +369,79 @@
                 >
                   <span class="material-symbols-outlined">content_copy</span>
                 </button>
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Move up"
-                  aria-label="Move up"
-                  disabled={tileIndex === 0}
-                  onclick={() =>
-                    onChange(
-                      movePlacement(
-                        registry,
-                        {
-                          pageId: page.id,
-                          sectionId: section.id,
-                          index: tileIndex,
-                        },
-                        {
-                          pageId: page.id,
-                          sectionId: section.id,
-                          index: tileIndex - 1,
-                        },
-                      ),
-                    )}
-                >
-                  <span class="material-symbols-outlined">arrow_upward</span>
-                </button>
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Move down"
-                  aria-label="Move down"
-                  disabled={tileIndex === (section.tiles ?? []).length - 1}
-                  onclick={() =>
-                    onChange(
-                      movePlacement(
-                        registry,
-                        {
-                          pageId: page.id,
-                          sectionId: section.id,
-                          index: tileIndex,
-                        },
-                        {
-                          pageId: page.id,
-                          sectionId: section.id,
-                          index: tileIndex + 1,
-                        },
-                      ),
-                    )}
-                >
-                  <span class="material-symbols-outlined">arrow_downward</span>
-                </button>
+                {#if tileIndex === 0}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Add tile above"
+                    aria-label="Add tile above"
+                    onclick={() => onAddTile(page.id, section.id, 0)}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                {:else}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Move up"
+                    aria-label="Move up"
+                    onclick={() =>
+                      onChange(
+                        movePlacement(
+                          registry,
+                          {
+                            pageId: page.id,
+                            sectionId: section.id,
+                            index: tileIndex,
+                          },
+                          {
+                            pageId: page.id,
+                            sectionId: section.id,
+                            index: tileIndex - 1,
+                          },
+                        ),
+                      )}
+                  >
+                    <span class="material-symbols-outlined">arrow_upward</span>
+                  </button>
+                {/if}
+                {#if tileIndex === (section.tiles ?? []).length - 1}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Add tile below"
+                    aria-label="Add tile below"
+                    onclick={() => onAddTile(page.id, section.id)}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                {:else}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Move down"
+                    aria-label="Move down"
+                    onclick={() =>
+                      onChange(
+                        movePlacement(
+                          registry,
+                          {
+                            pageId: page.id,
+                            sectionId: section.id,
+                            index: tileIndex,
+                          },
+                          {
+                            pageId: page.id,
+                            sectionId: section.id,
+                            index: tileIndex + 1,
+                          },
+                        ),
+                      )}
+                  >
+                    <span class="material-symbols-outlined">arrow_downward</span
+                    >
+                  </button>
+                {/if}
                 <button
                   type="button"
                   class="icon-btn danger"
@@ -420,8 +459,8 @@
           {/each}
 
           {#if hintMissing(section).length}
-            <!-- Devices the section's filter hint matches that are not here yet;
-                 the row's 'add' icon adds tiles by hand. -->
+            <!-- Devices the section's filter hint matches that are not here
+                 yet; 'Add them' places the whole batch. -->
             <div class="add-tile">
               <span class="text-muted hint-missing"
                 >{hintMissing(section).length} matching this section's filter

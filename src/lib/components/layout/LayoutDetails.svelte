@@ -92,8 +92,9 @@
     onSelect?: (selection: LayoutSelection) => void;
     /** Change device: the route owns the picker and the confirm dialog. */
     onSwapDevice?: (anchor: PlacementAnchor) => void;
-    /** Add slot: the route owns the picker (as for the tree's `+`). */
-    onAddSlot?: (anchor: PlacementAnchor) => void;
+    /** Add slot: the route owns the picker. `at` inserts there instead of
+     * appending (the list-end `+`). */
+    onAddSlot?: (anchor: PlacementAnchor, at?: number) => void;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -545,9 +546,9 @@
     if (openRules === slotIndex) openRules = null;
   }
 
-  function requestAddSlot(): void {
+  function requestAddSlot(at?: number): void {
     const a = anchor();
-    if (a) onAddSlot?.(a);
+    if (a) onAddSlot?.(a, at);
   }
 </script>
 
@@ -779,7 +780,21 @@
     </div>
 
     <div class="field">
-      <span class="label-mono">Slots</span>
+      <div class="row between">
+        <span class="label-mono">Slots</span>
+        <span class="row-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            title="Add slot"
+            aria-label="Add slot"
+            disabled={!device}
+            onclick={() => requestAddSlot()}
+          >
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </span>
+      </div>
       <div class="slot-list">
         {#each shownSlots as slot, i (i)}
           <div class="slot-row" class:not-now={!slotVisible(slot, tileActive)}>
@@ -802,26 +817,49 @@
                 {/if}
               </button>
               <span class="row-actions">
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Move up"
-                  aria-label="Move slot up"
-                  disabled={i === 0}
-                  onclick={() => edit((t) => moveSlot(t, i, i - 1))}
-                >
-                  <span class="material-symbols-outlined">arrow_upward</span>
-                </button>
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Move down"
-                  aria-label="Move slot down"
-                  disabled={i === shownSlots.length - 1}
-                  onclick={() => edit((t) => moveSlot(t, i, i + 1))}
-                >
-                  <span class="material-symbols-outlined">arrow_downward</span>
-                </button>
+                {#if i === 0}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Add slot above"
+                    aria-label="Add slot above"
+                    onclick={() => requestAddSlot(0)}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                {:else}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Move up"
+                    aria-label="Move slot up"
+                    onclick={() => edit((t) => moveSlot(t, i, i - 1))}
+                  >
+                    <span class="material-symbols-outlined">arrow_upward</span>
+                  </button>
+                {/if}
+                {#if i === shownSlots.length - 1}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Add slot below"
+                    aria-label="Add slot below"
+                    onclick={() => requestAddSlot()}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                {:else}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Move down"
+                    aria-label="Move slot down"
+                    onclick={() => edit((t) => moveSlot(t, i, i + 1))}
+                  >
+                    <span class="material-symbols-outlined">arrow_downward</span
+                    >
+                  </button>
+                {/if}
                 <button
                   type="button"
                   class="icon-btn"
@@ -1366,12 +1404,6 @@
           </div>
         {/each}
       </div>
-      <button
-        type="button"
-        class="btn btn-sm"
-        disabled={!device}
-        onclick={requestAddSlot}>Add slot…</button
-      >
     </div>
 
     <div class="field">
@@ -1582,6 +1614,10 @@
   .row input[type="text"] {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .row.between {
+    justify-content: space-between;
   }
 
   .check {

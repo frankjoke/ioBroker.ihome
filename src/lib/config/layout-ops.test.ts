@@ -152,6 +152,21 @@ it("adds a page and a section with a fresh id and an empty list", () => {
   expect(withSection.pages[0].groups[2].id).toBeTruthy();
 });
 
+it("inserts a section and tiles at a given index", () => {
+  const topSection = addSection(regWithTiles(), "p", "New", 0);
+  expect(topSection.pages[0].groups.map((g) => g.title)).toEqual([
+    "New",
+    "G",
+    "G2",
+  ]);
+
+  const topTiles = appendDevices(regWithTiles(), "p", "g", ["x"], 0);
+  expect(topTiles.pages[0].groups[0].tiles?.map((t) => t.device)).toEqual([
+    "x",
+    "t1dev",
+  ]);
+});
+
 it("moves a page and a section by index", () => {
   const twoPages = addPage(regWithTiles(), "Second");
   expect(movePage(twoPages, 1, 0).pages.map((p) => p.title)).toEqual([
