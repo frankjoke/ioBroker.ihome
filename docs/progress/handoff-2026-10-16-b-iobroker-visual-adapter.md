@@ -198,3 +198,5 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
 - **`[ihome-dbg]` tracing removed** (`17ee2af`): the double-toggle instrument is gone — `utils/dbg.ts`
   deleted, its pointer-trace callers (Tile, ValueSlot, IconSlot) and the toggle / stateChange console
   logs removed. The guarded `writeControl` calls stay; only the logging went.
+- **Tighter app shell** (`a5a4a86`): `.app-main` padding 24px → 8px (the ≤768px override, same value,
+  went with it) — every page's content starts 16px higher; the display shell (padding 0) is untouched.
