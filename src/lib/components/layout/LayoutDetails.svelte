@@ -23,6 +23,7 @@
   import Tile from "$lib/components/display/Tile.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
+  import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import type {
     Background,
     Group,
@@ -83,11 +84,18 @@
   );
 
   /** Page fields: an empty value removes the property. */
-  function setPage(patch: Partial<{ title: string; icon: string }>): void {
+  function setPage(
+    patch: Partial<{
+      title: string;
+      icon: string;
+      background: Background | undefined;
+    }>,
+  ): void {
     if (!page) return;
     const next: Record<string, unknown> = {};
     if ("title" in patch) next.title = patch.title?.trim() || undefined;
     if ("icon" in patch) next.icon = patch.icon?.trim() || undefined;
+    if ("background" in patch) next.background = patch.background;
     onChange(patchPage(registry, page.id, next));
   }
 
@@ -187,6 +195,13 @@
           >{/if}
       </div>
     </label>
+    <div class="field">
+      <span class="label-mono">Background</span>
+      <BackgroundEditor
+        background={page.background}
+        onChange={(bg) => setPage({ background: bg })}
+      />
+    </div>
   {:else if selection.kind === "section" && section}
     <h3>{section.title || "Section"}</h3>
     <label class="field">
@@ -227,42 +242,10 @@
     </label>
     <div class="field">
       <span class="label-mono">Background</span>
-      <div class="row">
-        <select
-          aria-label="Background kind"
-          value={section.appearance?.background?.kind ?? ""}
-          onchange={(e) =>
-            setSection({
-              background: e.currentTarget.value
-                ? {
-                    kind: e.currentTarget.value as Background["kind"],
-                    value: section.appearance?.background?.value ?? "",
-                  }
-                : undefined,
-            })}
-        >
-          <option value="">none</option>
-          <option value="solid">solid</option>
-          <option value="gradient">gradient</option>
-          <option value="image">image url</option>
-        </select>
-        {#if section.appearance?.background}
-          <input
-            type="text"
-            value={section.appearance.background.value}
-            placeholder={section.appearance.background.kind === "solid"
-              ? "#101418"
-              : "linear-gradient(…) / url"}
-            oninput={(e) =>
-              setSection({
-                background: {
-                  kind: section.appearance!.background!.kind,
-                  value: e.currentTarget.value,
-                },
-              })}
-          />
-        {/if}
-      </div>
+      <BackgroundEditor
+        background={section.appearance?.background}
+        onChange={(bg) => setSection({ background: bg })}
+      />
     </div>
 
     <label class="check">
