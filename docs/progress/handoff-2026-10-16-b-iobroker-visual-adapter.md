@@ -112,6 +112,11 @@ Walk the spec's criteria 1–8 against the real broker:
 14. Value slots: the `unit` checkbox in the value knobs drops the unit ("21.5" instead of "21.5 °C",
     booleans keep OFF/ON); the main value must read noticeably bolder than the tile title in both
     themes, secondary readings stay light.
+15. Value-driven badge: on the bath badge slot, a rule `when: battery < 30` with ☑ only (and tone
+    danger) → the badge appears only while the battery is low, in danger tone; at ≥ 30 it vanishes.
+    ☑ hidden with the inverted condition (`battery >= 30`) must vanish too (before this commit it did
+    nothing — badges dropped `hidden`). `only` gates any slot kind; the rule's live dot flags a broken
+    gate (a broken gate hides the slot).
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -152,3 +157,8 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
 - **Optional unit + bolder main value** (`91dcc6c`): a value slot's `unit` checkbox drops the unit to
   save width (booleans keep their OFF/ON label); the main value is now JetBrains Mono 800 — heavier
   than the 600 title. Value slots only (badges/slider readouts unchanged for now).
+- **Value-driven slot visibility** (`5ff6178`): a rule's `only` checkbox makes it a visibility gate —
+  the slot (or badge) exists only while it matches; the verdict is applied after the last-match-wins
+  fold, and a broken gate expression fails closed (spec A31). Badge slots now honour `hidden`/`only`
+  exactly like body slots — their own rules and the control's, the derived ago/offline badges included;
+  before, `controlBadge` computed `style.hidden` and dropped it, so no rule could ever hide a badge.

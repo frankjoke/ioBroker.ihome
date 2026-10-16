@@ -32,7 +32,7 @@ Success criteria:
 1. From the running app: `+` on a tile row (or in the pane) adds a slot bound to one of the tile's
    device controls, a **placeholder** (`temperature`, or any free text matched by role → label →
    unit), or **any state id** (read-only); the tile preview and the display show it live.
-2. A slot's rules (`when` expression, icon, colour, glow, background, hidden, disabled, tone) are
+2. A slot's rules (`when` expression, icon, colour, glow, background, hidden, only, disabled, tone) are
    editable per slot, in order.
 3. A tile can be saved as a **per-type template** (size, slots, CSS background) and applied to
    another tile; a template's placeholder slots stay dormant until they resolve — at bind time in the
@@ -68,6 +68,7 @@ Success criteria:
 | A28 | One shared **BackgroundEditor** serves pages and sections (kind select; solid → colour input; gradient → two colours + angle; image → URL); a stored value that does not match the structured shape falls back to a raw text field so hand-written CSS stays editable. The page pane also gains the icon glyph preview sections have. |
 | A29 | **M3** rides along: the display bar resolves a stale/empty `view.lastPage` to the first page, so a tab is always highlighted. The picker focus trap + tree keyboard contract (**I11**) stays its own slice; the new overlays copy the existing pattern and close on Esc. |
 | A30 | A tile carries an **active condition** `TileConfig.active = {source, op, value?}`: a device control, a placeholder, or any state, with basic logic (`truthy`, `gt`, `gte`, `lt`, `lte`, `eq`, `ne`; numeric when both sides read as numbers, else case-insensitive equality). Its live result is the tile's **active** flag: a `.active` class on the tile (default look: the accent border; louder styling is a rule), an `active` local available to every rule on the tile, and `Slot.showWhen` (`"active"`/`"inactive"`; absent = both) for per-slot visibility. Setting a condition is a tile-config edit and materialises; a tile with no condition is never active. |
+| A31 | **Value-driven slot visibility**: a rule may carry **`only: true`** — a visibility gate rather than a style. While at least one gate is present and none matches, the slot hides; the verdict is applied *after* the last-match-wins fold, so a later `hidden: false` cannot reopen it, and a broken gate expression fails closed (the rule's live result dot is the guard). Badge slots honour `hidden`/`only` exactly like body slots — their own rules and the control's — so a warning badge appears precisely while its condition holds (`when: battery < 30` ☑ only + tone `danger`). The pane's rule editor gains the *only* checkbox. |
 
 ## 3. Architecture
 
@@ -198,7 +199,7 @@ The other new meanings ride on existing fields:
 | title · device | existing title field; device row + **Change…** (A25, confirm) |
 | general options | size w×h (existing, now materialising) · **Background** (BackgroundEditor + "history chart": adds/binds the background sparkline slot) · **Active when** (source via SlotPicker, operator, value; cleared = removed) · new-line (existing) |
 | slots | ordered rows, kind glyph + summary ("value · temperature", "badge · battery"); expanded: kind, source (SlotPicker), label, unit, per-kind knobs (`index`, `pick`/free text, badge `position`, level `min/max/step`, decimals), visibility (both / only active / only inactive; shown in the summary), ↑↓, delete; dormant rows say "not assigned — bind or remove"; header shows "copied from <source>" + **Reset** when materialised |
-| rules | per slot, collapsible: ordered list (last match wins) — `when` (virtual-formula language, live result dot), icon (IconPicker), colour (colour input), glow, background, hidden, disabled, tone; add / remove / reorder; the field hint says `active` is available |
+| rules | per slot, collapsible: ordered list (last match wins) — `when` (virtual-formula language, live result dot), icon (IconPicker), colour (colour input), glow, background, hidden, only, disabled, tone; add / remove / reorder; the field hint says `active` is available |
 | templates | **Save as template** (name field, default the tile's title) · **Apply template** (select of the device type's templates; confirm — replaces size, slots, background) |
 | move | **Move to section…** (A26) |
 | preview | unchanged — the display's own `Tile` at the real breakpoint |
