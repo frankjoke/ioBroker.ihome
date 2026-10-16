@@ -123,6 +123,11 @@ Walk the spec's criteria 1–8 against the real broker:
 17. Preview dock: open a tile's pane and scroll down to the slots → the tile example stays pinned at the
     bottom edge of the screen (dashed card with shadow); at the very end of the pane it settles into its
     natural spot. With no device assigned it is absent. The section pane's preview stays static.
+18. List-end +'s: a page's first/last section row shows a + where the greyed arrow used to sit — it adds
+    a section above/below; same on a section's first/last tile row (the device picker inserts the picked
+    devices there) and on the pane's first/last slot row (the slot picker inserts there). Middle rows
+    keep their working arrows. A page/section row's own + shows only while its list is empty; the tree
+    tile's + (add slot) is gone — the pane's "Slots" label line carries the + instead (appends at the end).
 
 Also verify before/after: **A20 changed live behaviour** — a failing hint no longer falls back
 positionally; a slot whose hint does not resolve now goes dormant (nothing renders, rows do not
@@ -175,3 +180,10 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   device) is `position: sticky; bottom` — it floats at the bottom screen edge while you scroll anywhere
   above it, so slot edits stay in view, and settles at its natural spot at the end. The section preview
   stays static (a whole section is too tall to dock).
+- **List-end +'s** (`d51c58c`): the disabled ↑/↓ on a list's top and bottom rows became the list's `+` —
+  it adds above/below right where you clicked (sections per page, tiles per section, slots in the pane);
+  middle rows keep working arrows. The old fixed +'s step back: a page/section row keeps its + only while
+  its list is empty (no rows → no ends); the tree tile's + (add slot) is gone — the pane's "Add slot…"
+  button is now a + on the Slots label line, right-aligned above the dustbins, appending at the end.
+  `addSection`/`appendDevices` gained an optional insert index (`addSlot` already had one); the picker
+  targets carry it through the route. Pages keep their header + and the page rows' arrows.
