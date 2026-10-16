@@ -1,10 +1,8 @@
 <script lang="ts">
-  import type { BadgeCorner, ResolvedBadge } from "$lib/config/rule-ops";
+  import type { BadgeAnchor, ResolvedBadge } from "$lib/config/rule-ops";
 
-  let {
-    badges,
-    corner = "bottom-left",
-  }: { badges: ResolvedBadge[]; corner?: BadgeCorner } = $props();
+  let { badges, anchor }: { badges: ResolvedBadge[]; anchor: BadgeAnchor } =
+    $props();
 
   const MAX = 3;
   const shown = $derived((badges ?? []).slice(0, MAX));
@@ -12,7 +10,7 @@
 </script>
 
 {#if shown.length}
-  <div class="badges {corner}">
+  <div class="badges by-{anchor.y} bx-{anchor.x}">
     {#each shown as b (b.source)}
       <span class="badge {b.tone}" title={b.title ?? b.label}>
         <span class="material-symbols-outlined" aria-hidden="true"
@@ -31,43 +29,56 @@
 {/if}
 
 <style>
-  /* Pinned to a corner so position carries meaning: bottom-left is "how long
-     ago", top-right is "something is wrong", top-left is a reading. */
+  /* Pinned to one of nine anchors on the tile's edge (defaults fill top-right →
+     bottom-right → top-left → bottom-left, see `badgePositions`). Badges sit
+     above the tile's own content and never move it: the tile reserves no band
+     for them, so a badge may cover a value. */
   .badges {
     position: absolute;
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 3px;
     max-width: 92%;
     pointer-events: none;
-    /* Outside the tile so the corner reads as *the* corner — far enough to sit
-       on the border/glow. The offsets are measured from the *padding* box, so the
-       tile's 1px border eats one: -5px lands the badge 4px clear of the edge.
-       The grid gap is 6px, so two facing badges still clear each other. */
-    --corner: -5px;
+    /* Hangs the badge out onto the border/glow instead of into the content.
+       Measured from the padding box; -8px puts the edge 7px past the 1px
+       border, on the glow ring. The grid gap is 6px, so two facing badges
+       still clear each other. */
+    --out: -8px;
   }
 
-  .badges.top-left {
-    top: var(--corner);
-    left: var(--corner);
+  .bx-left {
+    left: var(--out);
   }
 
-  .badges.top-right {
-    top: var(--corner);
-    right: var(--corner);
+  .bx-right {
+    right: var(--out);
     justify-content: flex-end;
   }
 
-  .badges.bottom-left {
-    bottom: var(--corner);
-    left: var(--corner);
+  .bx-center {
+    left: 0;
+    right: 0;
+    width: max-content;
+    margin-inline: auto;
+    justify-content: center;
   }
 
-  .badges.bottom-right {
-    bottom: var(--corner);
-    right: var(--corner);
-    justify-content: flex-end;
+  .by-top {
+    top: var(--out);
+  }
+
+  .by-bottom {
+    bottom: var(--out);
+  }
+
+  .by-middle {
+    top: 0;
+    bottom: 0;
+    height: max-content;
+    margin-block: auto;
   }
 
   .badge {

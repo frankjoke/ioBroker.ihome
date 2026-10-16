@@ -15,39 +15,78 @@ export type BadgeTone = "info" | "ok" | "warn" | "danger";
 
 const TONES: BadgeTone[] = ["info", "ok", "warn", "danger"];
 
-/** Which corner of a tile a badge lives in. */
-export type BadgeCorner =
-  "top-left" | "top-right" | "bottom-left" | "bottom-right";
+/** Where a badge sits: one of nine anchors on the tile's edge. */
+export type BadgeX = "left" | "center" | "right";
+export type BadgeY = "top" | "middle" | "bottom";
 
-const CORNERS: BadgeCorner[] = [
-  "top-left",
-  "top-right",
-  "bottom-left",
-  "bottom-right",
+export interface BadgeAnchor {
+  x: BadgeX;
+  y: BadgeY;
+}
+
+export function anchorKey(anchor: BadgeAnchor): string {
+  return `${anchor.y}-${anchor.x}`;
+}
+
+/** Every anchor, for rendering. */
+export const BADGE_ANCHORS: BadgeAnchor[] = [
+  { x: "left", y: "top" },
+  { x: "center", y: "top" },
+  { x: "right", y: "top" },
+  { x: "left", y: "middle" },
+  { x: "center", y: "middle" },
+  { x: "right", y: "middle" },
+  { x: "left", y: "bottom" },
+  { x: "center", y: "bottom" },
+  { x: "right", y: "bottom" },
 ];
 
 /**
- * Where a badge kind belongs by default, because position carries meaning:
- * how long ago it changed (bottom-left), something wrong (top-right), a reading
- * (top-left). A slot may override it with `options.position`.
+ * The corners unpositioned badges fill, in order: top-right first, then the
+ * right column down, then the left. A corner claimed by an explicit position is
+ * skipped, so empty badges fill the empty slots instead of piling up.
  */
-const BADGE_CORNERS: Record<string, BadgeCorner> = {
-  ago: "bottom-left",
-  battery: "top-right",
-  offline: "top-right",
-  alarm: "top-right",
-  error: "top-right",
-};
+const AUTO_CORNERS: BadgeAnchor[] = [
+  { x: "right", y: "top" },
+  { x: "right", y: "bottom" },
+  { x: "left", y: "top" },
+  { x: "left", y: "bottom" },
+];
 
-export function badgePosition(slot: Slot): BadgeCorner {
-  const explicit = slot.options?.position;
-  if (
-    typeof explicit === "string" &&
-    CORNERS.includes(explicit as BadgeCorner)
-  ) {
-    return explicit as BadgeCorner;
-  }
-  return BADGE_CORNERS[String(slot.source ?? "")] ?? "top-left";
+const XS: BadgeX[] = ["left", "center", "right"];
+const YS: BadgeY[] = ["top", "middle", "bottom"];
+
+function badgeX(value: unknown): BadgeX | undefined {
+  return XS.includes(value as BadgeX) ? (value as BadgeX) : undefined;
+}
+
+function badgeY(value: unknown): BadgeY | undefined {
+  return YS.includes(value as BadgeY) ? (value as BadgeY) : undefined;
+}
+
+/**
+ * Where each badge slot's badges sit. A slot with both `options.x` and
+ * `options.y` keeps that anchor; every other slot takes the next free corner
+ * (wrapping once all are used). A half-set or junk value keeps the axis it
+ * names and takes the other from the fill.
+ */
+export function badgePositions(slots: Slot[]): BadgeAnchor[] {
+  const parts = slots.map((slot) => ({
+    x: badgeX(slot.options?.x),
+    y: badgeY(slot.options?.y),
+  }));
+  const claimed = new Set(
+    parts.filter((p) => p.x && p.y).map((p) => `${p.y}-${p.x}`),
+  );
+  const free = AUTO_CORNERS.filter((c) => !claimed.has(anchorKey(c)));
+  const order = free.length ? free : AUTO_CORNERS;
+  let next = 0;
+  return slots.map((_, i) => {
+    const p = parts[i];
+    if (p.x && p.y) return { x: p.x, y: p.y };
+    const fill = order[next++ % order.length];
+    return { x: p.x ?? fill.x, y: p.y ?? fill.y };
+  });
 }
 
 /** An `ago` badge turns warn once a state is older than this. */

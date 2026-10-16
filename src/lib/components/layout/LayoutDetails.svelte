@@ -1019,6 +1019,44 @@
                         <option value="lc">change (lc)</option>
                       </select>
                     </label>
+                    <label class="small">
+                      <span class="label-mono">x</span>
+                      <select
+                        value={String(slot.options?.x ?? "")}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            x: e.currentTarget.value || undefined,
+                          })}
+                      >
+                        <option
+                          value=""
+                          title="auto: first free of top-right, bottom-right, top-left, bottom-left"
+                          >auto</option
+                        >
+                        <option value="left">left</option>
+                        <option value="center">center</option>
+                        <option value="right">right</option>
+                      </select>
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">y</span>
+                      <select
+                        value={String(slot.options?.y ?? "")}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            y: e.currentTarget.value || undefined,
+                          })}
+                      >
+                        <option
+                          value=""
+                          title="auto: first free of top-right, bottom-right, top-left, bottom-left"
+                          >auto</option
+                        >
+                        <option value="top">top</option>
+                        <option value="middle">middle</option>
+                        <option value="bottom">bottom</option>
+                      </select>
+                    </label>
                     <button
                       type="button"
                       class="btn btn-sm"

@@ -14,12 +14,13 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
-    badgePosition,
+    anchorKey,
+    BADGE_ANCHORS,
+    badgePositions,
     resolveBadges,
     resolveStyle,
     ruleScope,
     truthy,
-    type BadgeCorner,
     type ResolvedBadge,
     type TimeSource,
   } from "$lib/config/rule-ops";
@@ -225,16 +226,12 @@
     slots.filter((s) => s.kind === "badge" && slotVisible(s, active)),
   );
 
-  // Badges land in the corner their kind belongs to (spec §6), so the layout of
-  // a tile carries meaning instead of being one row at the bottom.
-  const corners = $derived.by(() => {
-    const byCorner: Record<BadgeCorner, ResolvedBadge[]> = {
-      "top-left": [],
-      "top-right": [],
-      "bottom-left": [],
-      "bottom-right": [],
-    };
-    for (const slot of badgeSlots) {
+  // Where each visible badge sits: an explicit x/y on the slot, or the next
+  // free corner (top-right first) — see `badgePositions`.
+  const badgeGroups = $derived.by(() => {
+    const anchors = badgePositions(badgeSlots);
+    const byAnchor: Record<string, ResolvedBadge[]> = {};
+    badgeSlots.forEach((slot, i) => {
       for (const badge of resolveBadges(
         [slot],
         device,
@@ -243,10 +240,11 @@
         getVirtualPool(),
         rawControl,
       )) {
-        byCorner[badgePosition(slot)].push(badge);
+        const key = anchorKey(anchors[i]);
+        (byAnchor[key] ??= []).push(badge);
       }
-    }
-    return byCorner;
+    });
+    return byAnchor;
   });
 
   /** The one action a tile can perform: toggle its primary switch. */
@@ -359,10 +357,6 @@
   class:active
   class:glow={tileStyle.glow === true}
   class:disabled={tileStyle.disabled === true}
-  class:has-top-badge={corners["top-left"].length > 0 ||
-    corners["top-right"].length > 0}
-  class:has-bottom-badge={corners["bottom-left"].length > 0 ||
-    corners["bottom-right"].length > 0}
   style="grid-column: {newLine
     ? '1'
     : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
@@ -410,10 +404,9 @@
       />
     {/each}
   </div>
-  <BadgeRow badges={corners["top-left"]} corner="top-left" />
-  <BadgeRow badges={corners["top-right"]} corner="top-right" />
-  <BadgeRow badges={corners["bottom-left"]} corner="bottom-left" />
-  <BadgeRow badges={corners["bottom-right"]} corner="bottom-right" />
+  {#each BADGE_ANCHORS as anchor (anchorKey(anchor))}
+    <BadgeRow badges={badgeGroups[anchorKey(anchor)] ?? []} {anchor} />
+  {/each}
 </div>
 
 {#if modalOpen}
@@ -486,17 +479,6 @@
     font-weight: 600;
     overflow-wrap: anywhere;
     max-width: 100%;
-  }
-
-  /* A badge that pokes into the corner must not sit on a value: reserve the band
-     it occupies, only on tiles that actually have one (a scoped style cannot
-     reach into the BadgeRow child, so the tile tells us itself). */
-  .tile.has-top-badge {
-    padding-top: 15px;
-  }
-
-  .tile.has-bottom-badge {
-    padding-bottom: 15px;
   }
 
   /* A rule can ask for the switched-off look. */

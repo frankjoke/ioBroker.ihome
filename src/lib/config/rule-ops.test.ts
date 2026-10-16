@@ -2,13 +2,14 @@ import { it, expect } from "vitest";
 import {
   AGO_WARN_MS,
   agoBadge,
-  badgePosition,
+  badgePositions,
   evalRule,
   offlineBadge,
   resolveBadges,
   resolveStyle,
   ruleScope,
 } from "$lib/config/rule-ops";
+import type { Slot } from "$lib/types/display";
 
 const NOW = 1_700_000_000_000;
 
@@ -270,30 +271,45 @@ it("carries a disabled flag through the resolved style", () => {
   });
 });
 
-it("gives each badge kind its corner, overridable", () => {
-  expect(badgePosition({ kind: "badge", source: "ago" })).toBe("bottom-left");
-  expect(badgePosition({ kind: "badge", source: "battery" })).toBe("top-right");
-  expect(badgePosition({ kind: "badge", source: "offline" })).toBe("top-right");
-  expect(badgePosition({ kind: "badge", source: "alarm" })).toBe("top-right");
-  // anything else is a value-ish reading
-  expect(badgePosition({ kind: "badge", source: "Brunnen.Leistung" })).toBe(
-    "top-left",
-  );
+it("fills unpositioned badges into the free corners, in order", () => {
+  const badge = (options?: Record<string, unknown>): Slot => ({
+    kind: "badge",
+    source: "reading",
+    options,
+  });
+  // No positions: top-right, bottom-right, top-left, bottom-left.
+  expect(badgePositions([badge(), badge(), badge(), badge()])).toEqual([
+    { x: "right", y: "top" },
+    { x: "right", y: "bottom" },
+    { x: "left", y: "top" },
+    { x: "left", y: "bottom" },
+  ]);
+  // A fifth wraps to the first corner and stacks there.
   expect(
-    badgePosition({
-      kind: "badge",
-      source: "ago",
-      options: { position: "top-right" },
-    }),
-  ).toBe("top-right");
-  // a junk position falls back to the kind's corner
+    badgePositions([badge(), badge(), badge(), badge(), badge()])[4],
+  ).toEqual({ x: "right", y: "top" });
+  // An explicit position claims its corner; the rest fill the others.
   expect(
-    badgePosition({
-      kind: "badge",
-      source: "ago",
-      options: { position: "middle" },
-    }),
-  ).toBe("bottom-left");
+    badgePositions([badge({ x: "right", y: "bottom" }), badge(), badge()]),
+  ).toEqual([
+    { x: "right", y: "bottom" },
+    { x: "right", y: "top" },
+    { x: "left", y: "top" },
+  ]);
+  // A non-corner position claims no corner.
+  expect(
+    badgePositions([badge({ x: "center", y: "middle" }), badge()])[1],
+  ).toEqual({ x: "right", y: "top" });
+  // A half-set position keeps the axis it names and fills the other.
+  expect(badgePositions([badge({ x: "center" }), badge()])).toEqual([
+    { x: "center", y: "top" },
+    { x: "right", y: "bottom" },
+  ]);
+  // Junk values are ignored, the badge fills like an unset one.
+  expect(badgePositions([badge({ x: "diagonal" })])).toEqual([
+    { x: "right", y: "top" },
+  ]);
+  expect(badgePositions([])).toEqual([]);
 });
 
 it("a badge can name what it shows by hint", () => {
