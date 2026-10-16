@@ -13,6 +13,7 @@
     appendDevices,
     deletePage,
     deleteSection,
+    patchPlacement,
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
@@ -32,6 +33,13 @@
   /** The handoff target, applied by the tree once (folding); selection stays. */
   let focus = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
+  /** Change device: the anchor whose device is being swapped, then the confirm. */
+  let swapFor = $state<PlacementAnchor | null>(null);
+  let pendingSwap = $state<{
+    anchor: PlacementAnchor;
+    deviceId: string;
+    oldName: string;
+  } | null>(null);
   let pickerFor = $state<
     | { kind: "device"; pageId: string; sectionId: string }
     | { kind: "slot"; anchor: PlacementAnchor }
@@ -57,12 +65,17 @@
     }
   });
 
-  /** The device a tile's placement points at, if it is still in the registry. */
-  function deviceOfAnchor(anchor: PlacementAnchor): EnrichedDevice | undefined {
-    const placement = registry.pages
+  /** The placement a tree/pane address points at, if it still exists. */
+  function placementOfAnchor(anchor: PlacementAnchor) {
+    return registry.pages
       .find((p) => p.id === anchor.pageId)
       ?.groups.find((g) => g.id === anchor.sectionId)
       ?.tiles?.find((t) => t.id === anchor.placementId);
+  }
+
+  /** The device a tile's placement points at, if it is still in the registry. */
+  function deviceOfAnchor(anchor: PlacementAnchor): EnrichedDevice | undefined {
+    const placement = placementOfAnchor(anchor);
     return placement
       ? devices.find((d) => d.id === placement.device)
       : undefined;
@@ -83,6 +96,36 @@
       ),
     );
     pickerFor = null;
+  }
+
+  /** Change device (A25): a materialised tile asks first — its own config goes. */
+  function pickSwapDevice(deviceId: string): void {
+    const anchor = swapFor;
+    swapFor = null;
+    if (!anchor) return;
+    const placement = placementOfAnchor(anchor);
+    if (!placement) return;
+    if (placement.tile) {
+      const oldName =
+        devices.find((d) => d.id === placement.device)?.name ??
+        placement.device;
+      pendingSwap = { anchor, deviceId, oldName };
+      return;
+    }
+    applySwap(anchor, deviceId);
+  }
+
+  function applySwap(anchor: PlacementAnchor, deviceId: string): void {
+    commitLayout(
+      patchPlacement(
+        registry,
+        anchor.pageId,
+        anchor.sectionId,
+        anchor.placementId,
+        { device: deviceId, tile: undefined },
+      ),
+    );
+    pendingSwap = null;
   }
 
   function confirmDelete(): void {
@@ -170,6 +213,8 @@
           {devices}
           {selection}
           onChange={commitLayout}
+          onSelect={(next) => (selection = next)}
+          onSwapDevice={(anchor) => (swapFor = anchor)}
         />
       {:else}
         <p class="text-muted">Select a page, a section or a tile.</p>
@@ -219,6 +264,35 @@
   >
     The tiles disappear from this page. The devices themselves stay in the
     registry.
+  </ConfirmModal>
+{/if}
+
+{#if swapFor}
+  {@const swapTarget = placementOfAnchor(swapFor)}
+  <DevicePicker
+    {devices}
+    {rooms}
+    enums={ioBroker.enums}
+    listed={swapTarget ? [swapTarget.device] : []}
+    onAdd={(ids) => {
+      if (ids[0]) pickSwapDevice(ids[0]);
+    }}
+    onClose={() => (swapFor = null)}
+  />
+{/if}
+
+{#if pendingSwap}
+  <ConfirmModal
+    title={`Change to “${
+      devices.find((d) => d.id === pendingSwap!.deviceId)?.name ??
+      pendingSwap.deviceId
+    }”?`}
+    confirmLabel="Change"
+    onConfirm={() => applySwap(pendingSwap!.anchor, pendingSwap!.deviceId)}
+    onCancel={() => (pendingSwap = null)}
+  >
+    Its own slots, background and active condition are dropped — they were built
+    for {pendingSwap.oldName}. The title and the position stay.
   </ConfirmModal>
 {/if}
 

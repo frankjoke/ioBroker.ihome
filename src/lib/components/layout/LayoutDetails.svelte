@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import { backgroundCss } from "$lib/config/appearance";
   import {
+    movePlacement,
     patchPage,
     patchPlacement,
     patchSection,
     type LayoutSelection,
+    type PlacementAnchor,
   } from "$lib/config/layout-ops";
   import {
     resolveSection,
@@ -17,19 +20,36 @@
     breakpointFor,
     type TileSpan,
   } from "$lib/config/size-ops";
-  import { effectiveSpan } from "$lib/config/template-ops";
-  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import { effectiveSpan, resolveControl } from "$lib/config/template-ops";
+  import {
+    applyTemplate,
+    editTile,
+    templateFromTile,
+    upsertTemplate,
+  } from "$lib/config/tile-ops";
+  import {
+    commitTemplates,
+    getTemplateRegistry,
+    getTemplateSaveFailed,
+    isTemplatesWritable,
+  } from "$lib/stores/templates.svelte.js";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
   import type {
+    ActiveCondition,
+    ActiveOp,
     Background,
     Group,
     PageRegistry,
     Placement,
     Size,
+    TileConfig,
   } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
 
@@ -38,11 +58,17 @@
     devices,
     selection,
     onChange,
+    onSelect,
+    onSwapDevice,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
     selection: LayoutSelection;
     onChange: (next: PageRegistry) => void;
+    /** Move-to-section hands the pane to the tile's new address. */
+    onSelect?: (selection: LayoutSelection) => void;
+    /** Change device: the route owns the picker and the confirm dialog. */
+    onSwapDevice?: (anchor: PlacementAnchor) => void;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -56,6 +82,14 @@
   });
   /** Which icon field the picker is open for, if any. */
   let iconPicker = $state<null | "page" | "section">(null);
+  /** The source picker for the tile's active condition. */
+  let activePicker = $state(false);
+  /** Template actions in flight. */
+  let templateName = $state("");
+  let pendingReplace = $state<string | null>(null);
+  let applyId = $state("");
+  let pendingApply = $state(false);
+  let pendingReset = $state(false);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -75,6 +109,80 @@
   const device = $derived(
     tile ? devices.find((d) => d.id === tile.device) : undefined,
   );
+
+  const templates = $derived(getTemplateRegistry().templates ?? []);
+  const typeTemplates = $derived(
+    device ? templates.filter((t) => t.type === device.type) : [],
+  );
+
+  /** Where the tile's config came from: a user template, or the device chain. */
+  const sourceLine = $derived.by(() => {
+    const id = tile?.tile?.template;
+    if (!id) return "device chain";
+    const name = templates.find((t) => t.id === id)?.name;
+    return name ? `copied from ${name}` : "device chain";
+  });
+
+  const activeCond = $derived(tile?.tile?.active);
+  const activeControl = $derived(
+    activeCond?.source && device
+      ? resolveControl(device.controls ?? [], activeCond.source)
+      : undefined,
+  );
+  const activeFound = $derived(
+    !activeCond?.source ||
+      !!activeControl ||
+      !!(ioBroker.objects as Map<string, any>)?.get?.(activeCond.source),
+  );
+  const readingText = $derived.by(() => {
+    const raw = activeControl
+      ? activeControl.liveValue
+      : (ioBroker.states as Map<string, any>)?.get?.(activeCond?.source ?? "")
+          ?.val;
+    if (raw === undefined || raw === null) return "—";
+    return typeof raw === "object" ? JSON.stringify(raw) : String(raw);
+  });
+
+  /** "off" + every source a chart is already on + the device's controls. */
+  const chartSources = $derived.by(() => {
+    const out: { value: string; label: string }[] = [];
+    const seen = new SvelteSet<string>();
+    for (const s of tile?.tile?.slots ?? []) {
+      if (
+        s.kind === "sparkline" &&
+        s.options?.background === true &&
+        s.source &&
+        !seen.has(s.source)
+      ) {
+        seen.add(s.source);
+        out.push({ value: s.source, label: s.source });
+      }
+    }
+    for (const c of device?.controls ?? []) {
+      if (c.hidden) continue;
+      const source = c.feature || c.id;
+      if (!seen.has(source)) {
+        seen.add(source);
+        out.push({ value: source, label: c.label || source });
+      }
+    }
+    return out;
+  });
+  const currentChart = $derived(
+    (tile?.tile?.slots ?? []).find(
+      (s) => s.kind === "sparkline" && s.options?.background === true,
+    )?.source ?? "",
+  );
+
+  const OPS: { op: ActiveOp; label: string }[] = [
+    { op: "truthy", label: "on / truthy" },
+    { op: "gt", label: ">" },
+    { op: "gte", label: "≥" },
+    { op: "lt", label: "<" },
+    { op: "lte", label: "≤" },
+    { op: "eq", label: "=" },
+    { op: "ne", label: "≠" },
+  ];
 
   // The preview resolves through the display's own resolver, so it needs the
   // same device shape the display feeds it.
@@ -130,10 +238,30 @@
     onChange(patchSection(registry, page.id, section.id, next));
   }
 
-  /** Tile fields: title, and the placement's own size (its other config is P2). */
+  /** Placement fields that are not the tile's own config (title, newLine). */
   function setTile(patch: Partial<Placement>): void {
     if (!page || !section || !tile) return;
     onChange(patchPlacement(registry, page.id, section.id, tile.id, patch));
+  }
+
+  /** The pane's one way to edit the tile's own config: materialise, then `fn`. */
+  function edit(fn: (tile: TileConfig) => TileConfig): void {
+    if (!page || !section || !tile || !device) return;
+    onChange(
+      editTile(
+        registry,
+        { pageId: page.id, sectionId: section.id, placementId: tile.id },
+        device,
+        getTemplateRegistry().templates,
+        fn,
+      ),
+    );
+  }
+
+  /** This tile's address, or null when the selection drifted (deleted tile). */
+  function anchor(): PlacementAnchor | null {
+    if (!page || !section || !tile) return null;
+    return { pageId: page.id, sectionId: section.id, placementId: tile.id };
   }
 
   /**
@@ -153,14 +281,111 @@
   }
 
   function setSize(axis: "w" | "h", raw: string): void {
-    if (!tile) return;
     const value = Number(raw);
     if (!value) return;
     // `effectiveSpan` clamps to the breakpoint's maximum (never above 4), so the
     // values are a valid Size.
     const size = { ...effectiveTileSpan() } as Size;
     size[axis] = value as 1 | 2 | 3 | 4;
-    setTile({ tile: { ...(tile.tile ?? {}), size } });
+    edit((t) => ({ ...t, size }));
+  }
+
+  /** The chart behind the content (A22): at most one background sparkline. */
+  function setChart(source: string): void {
+    edit((t) => {
+      const slots = (t.slots ?? []).filter(
+        (s) => !(s.kind === "sparkline" && s.options?.background === true),
+      );
+      if (!source) return { ...t, slots };
+      return {
+        ...t,
+        slots: [
+          ...slots,
+          {
+            kind: "sparkline" as const,
+            source,
+            options: { background: true },
+          },
+        ],
+      };
+    });
+  }
+
+  function setActiveSource(source: string): void {
+    activePicker = false;
+    edit((t) => ({
+      ...t,
+      active: { ...(t.active ?? { op: "truthy" as const }), source },
+    }));
+  }
+
+  function setActiveOp(op: ActiveOp): void {
+    edit((t) => {
+      if (!t.active) return t;
+      const active: ActiveCondition = { ...t.active, op };
+      if (op === "truthy") delete active.value;
+      return { ...t, active };
+    });
+  }
+
+  function setActiveValue(value: string): void {
+    edit((t) => (t.active ? { ...t, active: { ...t.active, value } } : t));
+  }
+
+  function clearActive(): void {
+    edit((t) => ({ ...t, active: undefined }));
+  }
+
+  function saveTemplate(): void {
+    const name = templateName.trim();
+    if (!name || !tile || !device) return;
+    if (templates.some((t) => t.name === name && t.type === device.type)) {
+      pendingReplace = name;
+      return;
+    }
+    doSaveTemplate(name);
+  }
+
+  function doSaveTemplate(name: string): void {
+    if (!tile || !device) return;
+    const next = templateFromTile(tile.tile ?? {}, device, templates, name);
+    commitTemplates(upsertTemplate(getTemplateRegistry(), next));
+    pendingReplace = null;
+    templateName = "";
+  }
+
+  function doApply(): void {
+    const chosen = templates.find((t) => t.id === applyId);
+    if (!chosen || !tile) return;
+    setTile({ tile: applyTemplate(tile, chosen).tile });
+    pendingApply = false;
+    applyId = "";
+  }
+
+  /** Appends the placement to the chosen section, then the pane follows it. */
+  function moveTileTo(key: string): void {
+    const a = anchor();
+    if (!a || !section) return;
+    const at = (section.tiles ?? []).findIndex((t) => t.id === a.placementId);
+    if (at < 0) return;
+    const [pageId, sectionId] = key.split("|");
+    const target = registry.pages
+      .find((p) => p.id === pageId)
+      ?.groups.find((g) => g.id === sectionId);
+    if (!target) return;
+    onChange(
+      movePlacement(
+        registry,
+        { pageId: a.pageId, sectionId: a.sectionId, index: at },
+        { pageId, sectionId, index: (target.tiles ?? []).length },
+      ),
+    );
+    onSelect?.({ kind: "tile", pageId, sectionId, placementId: a.placementId });
+  }
+
+  function requestSwap(): void {
+    const a = anchor();
+    if (a) onSwapDevice?.(a);
   }
 </script>
 
@@ -282,11 +507,16 @@
     </label>
     <div class="field">
       <span class="label-mono">Device</span>
-      {#if device}
-        <span class="device-name">{device.name}</span>
-      {:else}
-        <span class="warn">This device is not in the registry any more.</span>
-      {/if}
+      <div class="row">
+        {#if device}
+          <span class="device-name">{device.name}</span>
+          <button type="button" class="btn btn-sm" onclick={requestSwap}
+            >Change device…</button
+          >
+        {:else}
+          <span class="warn">This device is not in the registry any more.</span>
+        {/if}
+      </div>
     </div>
     <label class="check">
       <input
@@ -320,6 +550,139 @@
       </div>
     </div>
 
+    <div class="field">
+      <span class="label-mono">Background</span>
+      <BackgroundEditor
+        background={tile.tile?.background}
+        onChange={(bg) => edit((t) => ({ ...t, background: bg }))}
+      />
+    </div>
+
+    <label class="field">
+      <span class="label-mono">History chart</span>
+      <select
+        value={currentChart}
+        onchange={(e) => setChart(e.currentTarget.value)}
+      >
+        <option value="">off</option>
+        {#each chartSources as c (c.value)}
+          <option value={c.value}>{c.label}</option>
+        {/each}
+      </select>
+    </label>
+
+    <div class="field">
+      <span class="label-mono">Active when</span>
+      <div class="row">
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => (activePicker = true)}
+        >
+          {activeCond?.source || "not set"}
+        </button>
+        {#if activeCond}
+          <button type="button" class="btn btn-sm" onclick={clearActive}
+            >Clear</button
+          >
+        {/if}
+      </div>
+      {#if activeCond}
+        <div class="row">
+          <select
+            aria-label="Active operator"
+            value={activeCond.op}
+            onchange={(e) => setActiveOp(e.currentTarget.value as ActiveOp)}
+          >
+            {#each OPS as o (o.op)}
+              <option value={o.op}>{o.label}</option>
+            {/each}
+          </select>
+          {#if activeCond.op !== "truthy"}
+            <input
+              type="text"
+              placeholder="value"
+              value={activeCond.value ?? ""}
+              oninput={(e) => setActiveValue(e.currentTarget.value)}
+            />
+          {/if}
+          <span class="live text-muted"
+            >{activeFound ? readingText : "source not found"}</span
+          >
+        </div>
+      {/if}
+    </div>
+
+    <div class="field">
+      <span class="label-mono">Template</span>
+      <span class="device-name">{sourceLine}</span>
+      <div class="row">
+        <input
+          type="text"
+          placeholder="template name"
+          bind:value={templateName}
+        />
+        <button
+          type="button"
+          class="btn btn-sm"
+          disabled={!isTemplatesWritable() || !templateName.trim()}
+          onclick={saveTemplate}>Save as template…</button
+        >
+        {#if getTemplateSaveFailed()}
+          <span
+            class="badge badge-danger"
+            title="The last write to templateList failed">not saved</span
+          >
+        {/if}
+      </div>
+      {#if typeTemplates.length}
+        <div class="row">
+          <select bind:value={applyId}>
+            <option value="">apply a template…</option>
+            {#each typeTemplates as t (t.id)}
+              <option value={t.id}>{t.name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="btn btn-sm"
+            disabled={!applyId}
+            onclick={() => (pendingApply = true)}>Apply</button
+          >
+        </div>
+      {/if}
+      {#if tile.tile}
+        <div class="row">
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => (pendingReset = true)}>Reset to chain</button
+          >
+        </div>
+      {/if}
+    </div>
+
+    <label class="field">
+      <span class="label-mono">Move to section</span>
+      <select
+        value={`${page?.id ?? ""}|${section?.id ?? ""}`}
+        onchange={(e) => moveTileTo(e.currentTarget.value)}
+      >
+        {#each registry.pages as p (p.id)}
+          <optgroup label={p.title || p.id}>
+            {#each p.groups as g (g.id)}
+              <option
+                value={`${p.id}|${g.id}`}
+                disabled={p.id === page?.id && g.id === section?.id}
+              >
+                {g.title || g.id}
+              </option>
+            {/each}
+          </optgroup>
+        {/each}
+      </select>
+    </label>
+
     {#if device}
       <div
         class="preview tile-grid"
@@ -340,6 +703,54 @@
       }}
       onClose={() => (iconPicker = null)}
     />
+  {/if}
+
+  {#if activePicker && device}
+    <SlotPicker
+      {device}
+      mode="source"
+      onAdd={() => {}}
+      onSource={setActiveSource}
+      onClose={() => (activePicker = false)}
+    />
+  {/if}
+
+  {#if pendingReplace}
+    <ConfirmModal
+      title={`Replace “${pendingReplace}”?`}
+      confirmLabel="Replace"
+      onConfirm={() => doSaveTemplate(pendingReplace!)}
+      onCancel={() => (pendingReplace = null)}
+    >
+      A template of that name already exists for this device type. Saving
+      replaces it (same id), so every tile that uses it changes too.
+    </ConfirmModal>
+  {/if}
+
+  {#if pendingApply}
+    <ConfirmModal
+      title="Apply this template?"
+      confirmLabel="Apply"
+      onConfirm={doApply}
+      onCancel={() => (pendingApply = false)}
+    >
+      Its size, slots and background replace the tile's. The active condition
+      and the tile's title stay.
+    </ConfirmModal>
+  {/if}
+
+  {#if pendingReset}
+    <ConfirmModal
+      title="Reset this tile?"
+      confirmLabel="Reset"
+      onConfirm={() => {
+        setTile({ tile: undefined });
+        pendingReset = false;
+      }}
+      onCancel={() => (pendingReset = false)}
+    >
+      The tile returns to its device/template chain.
+    </ConfirmModal>
   {/if}
 </div>
 
@@ -395,6 +806,14 @@
 
   .device-name {
     font-size: var(--body-sm);
+  }
+
+  .live {
+    font-size: 0.75rem;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .warn {
