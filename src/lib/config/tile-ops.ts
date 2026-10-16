@@ -5,6 +5,7 @@
 // (input never mutated); the caller commits through the store's write path.
 import type { Device } from "$lib/types/device";
 import type {
+  ActiveCondition,
   PageRegistry,
   Placement,
   Rule,
@@ -18,6 +19,7 @@ import {
   moveItem,
   type PlacementAnchor,
 } from "$lib/config/layout-ops";
+import { truthy } from "$lib/config/rule-ops";
 import { deepCopy } from "$lib/utils/json";
 
 /** The complete config a first edit starts from, deep-copied off the chain. */
@@ -185,4 +187,65 @@ export function editTile(
       return { ...ensured, tile: fn(ensured.tile) };
     },
   );
+}
+
+// ------------------------------------------------------------------ active
+
+/**
+ * The tile's active reading: `truthy` uses the app's on/off reading; the
+ * comparisons go numeric when both sides parse as finite numbers and otherwise
+ * compare case-insensitively as text. No condition, an unknown op or a missing
+ * value is never active.
+ */
+export function evalActive(
+  cond: ActiveCondition | undefined,
+  value: unknown,
+): boolean {
+  if (!cond) return false;
+  if (cond.op === "truthy") return truthy(value);
+  if (cond.value === undefined) return false;
+
+  const left = value === null || value === undefined ? "" : String(value);
+  const right = cond.value;
+  const numeric = left.trim() !== "" && right.trim() !== "";
+  const l = numeric ? Number(left) : NaN;
+  const r = numeric ? Number(right) : NaN;
+
+  if (Number.isFinite(l) && Number.isFinite(r)) {
+    switch (cond.op) {
+      case "gt":
+        return l > r;
+      case "gte":
+        return l >= r;
+      case "lt":
+        return l < r;
+      case "lte":
+        return l <= r;
+      case "eq":
+        return l === r;
+      case "ne":
+        return l !== r;
+      default:
+        return false;
+    }
+  }
+
+  const a = left.toLowerCase();
+  const b = right.toLowerCase();
+  switch (cond.op) {
+    case "gt":
+      return a > b;
+    case "gte":
+      return a >= b;
+    case "lt":
+      return a < b;
+    case "lte":
+      return a <= b;
+    case "eq":
+      return a === b;
+    case "ne":
+      return a !== b;
+    default:
+      return false;
+  }
 }

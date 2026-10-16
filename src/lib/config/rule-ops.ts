@@ -130,7 +130,7 @@ export function ruleScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
 }
 
 /** On/off values as ioBroker stores them: true, 1, "1", "true". */
-function truthy(v: unknown): boolean {
+export function truthy(v: unknown): boolean {
   return v === true || v === 1 || v === "1" || v === "true";
 }
 

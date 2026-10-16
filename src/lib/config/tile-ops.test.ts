@@ -1,11 +1,18 @@
 import { it, expect } from "vitest";
 import type { Device } from "$lib/types/device";
-import type { PageRegistry, TileConfig, Template } from "$lib/types/display";
+import type {
+  ActiveCondition,
+  ActiveOp,
+  PageRegistry,
+  TileConfig,
+  Template,
+} from "$lib/types/display";
 import {
   addRule,
   addSlot,
   editTile,
   ensureTile,
+  evalActive,
   materialiseTile,
   moveRule,
   moveSlot,
@@ -154,4 +161,43 @@ it("editTile materialises once, applies the op and leaves siblings alone", () =>
       (t) => t,
     ).pages,
   ).toEqual(reg.pages);
+});
+
+it("evalActive — truthy is the on/off reading", () => {
+  const c = (op: ActiveOp, value?: string): ActiveCondition => ({
+    source: "s",
+    op,
+    value,
+  });
+  expect(evalActive(c("truthy"), true)).toBe(true);
+  expect(evalActive(c("truthy"), "1")).toBe(true);
+  expect(evalActive(c("truthy"), 0)).toBe(false);
+  expect(evalActive(undefined, true)).toBe(false);
+});
+
+it("evalActive — numeric comparisons when both sides are numbers", () => {
+  expect(evalActive({ source: "s", op: "gt", value: "20" }, 22.5)).toBe(true);
+  expect(evalActive({ source: "s", op: "gt", value: "20" }, "22.5")).toBe(true);
+  expect(evalActive({ source: "s", op: "gte", value: "20" }, "20.0")).toBe(
+    true,
+  );
+  expect(evalActive({ source: "s", op: "lt", value: "20" }, 19)).toBe(true);
+  expect(evalActive({ source: "s", op: "eq", value: "20" }, "20.0")).toBe(true);
+  expect(evalActive({ source: "s", op: "ne", value: "20" }, "20")).toBe(false);
+});
+
+it("evalActive — text fallback is case-insensitive; junk degrades", () => {
+  expect(evalActive({ source: "s", op: "eq", value: "Auto" }, "auto")).toBe(
+    true,
+  );
+  expect(evalActive({ source: "s", op: "eq", value: "auto" }, "manual")).toBe(
+    false,
+  );
+  expect(evalActive({ source: "s", op: "gt", value: "b" }, "c")).toBe(true);
+  expect(evalActive({ source: "s", op: "gt" }, 5)).toBe(false); // no value
+  expect(evalActive({ source: "s", op: "wat" as never, value: "1" }, "1")).toBe(
+    false,
+  ); // unknown op
+  expect(evalActive({ source: "s", op: "eq", value: "" }, "")).toBe(true); // empty is text, not a number
+  expect(evalActive({ source: "s", op: "eq", value: "0" }, "")).toBe(false); // "" must not parse as 0
 });
