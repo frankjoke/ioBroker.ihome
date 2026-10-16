@@ -4,14 +4,16 @@ import {
   mergeSlots,
   parseTemplateRegistry,
   pickControl,
+  pickSlotControls,
   presetForType,
   primaryControl,
   resolveControl,
   resolveTemplate,
+  slotVisible,
   tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
-import type { Template } from "$lib/types/display";
+import type { Slot, Template } from "$lib/types/display";
 
 it("merges slots by kind+source with later winning and rules concatenated", () => {
   const merged = mergeSlots([
@@ -296,4 +298,73 @@ it("matches a hint's unit exactly, so Wh is not a watt", () => {
   expect(
     pickControl([{ id: "c", unit: "°C" }], "temperature", new Set())?.id,
   ).toBe("c");
+});
+
+const ctl = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  ...over,
+});
+
+it("pickSlotControls walks in order and never hands one control to two slots", () => {
+  const slots: Slot[] = [{ kind: "value" }, { kind: "value" }];
+  const out = pickSlotControls(slots, [ctl("a"), ctl("b")]);
+  expect(out.map((r) => r.control?.id)).toEqual(["a", "b"]);
+});
+
+it("a failing hint goes dormant and does not claim a control", () => {
+  const slots: Slot[] = [
+    { kind: "value", options: { pick: "humidity" } },
+    { kind: "value" },
+  ];
+  const out = pickSlotControls(slots, [ctl("a", { unit: "°C" })]);
+  expect(out[0]).toMatchObject({ dormant: true });
+  expect(out[0].control).toBeUndefined();
+  expect(out[1].control?.id).toBe("a"); // positional slot still gets the first control
+});
+
+it("a free-text hint matches role, label or unit", () => {
+  const slots: Slot[] = [
+    { kind: "value", options: { pick: "Luftfeuchtigkeit" } },
+  ];
+  const out = pickSlotControls(slots, [
+    ctl("h", { label: "Luftfeuchtigkeit", unit: "%" }),
+  ]);
+  expect(out[0].control?.id).toBe("h");
+});
+
+it("state-hidden slots drop out before the positional walk", () => {
+  const slots: Slot[] = [
+    { kind: "value", showWhen: "active" },
+    { kind: "value" },
+  ];
+  const out = pickSlotControls(slots, [ctl("a")], { active: false });
+  expect(out.length).toBe(1);
+  expect(out[0].control?.id).toBe("a"); // not consumed by the hidden slot
+});
+
+it("a raw source resolves through the raw callback", () => {
+  const raw = (source: string) =>
+    source === "0_userdata.0.x" ? ctl("raw", { stateId: source }) : undefined;
+  const out = pickSlotControls(
+    [{ kind: "value", source: "0_userdata.0.x" }],
+    [],
+    {
+      raw,
+    },
+  );
+  expect(out[0].control?.id).toBe("raw");
+  const missing = pickSlotControls([{ kind: "value", source: "nope" }], [], {
+    raw,
+  });
+  expect(missing[0]).toMatchObject({ dormant: true });
+});
+
+it("unknown showWhen counts as both and slotVisible keeps icon slots visible", () => {
+  expect(
+    pickSlotControls(
+      [{ kind: "value", showWhen: "garbage" as never }],
+      [ctl("a")],
+    ).length,
+  ).toBe(1);
+  expect(slotVisible({ kind: "icon" }, false)).toBe(true);
 });

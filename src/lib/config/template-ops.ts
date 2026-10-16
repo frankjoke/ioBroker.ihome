@@ -163,16 +163,20 @@ export interface Pickable {
  *
  * The signals are trusted in this order: the ioBroker **role** (your broker
  * carries `value.temperature` / `value.humidity`), then the **label** (which may
- * be German: "Luftfeuchtigkeit"), then the **unit**. Nothing matched means the
- * caller falls back to position, so an odd device still shows something.
+ * be German: "Luftfeuchtigkeit"), then the **unit**. An unknown hint becomes a
+ * free-text search over the same signals ("Temperatur Außen"), so any label the
+ * config carries can be named; nothing matched means the caller decides (a
+ * source/hint slot goes dormant, never positional — A20).
  */
 export function pickControl<T extends Pickable>(
   controls: T[],
   hint: string | undefined,
   used: Set<string>,
 ): T | undefined {
-  const spec = hint ? PICK_HINTS[hint] : undefined;
-  if (!spec) return undefined;
+  const text = hint?.trim();
+  if (!text) return undefined;
+  const key = text.toLowerCase();
+  const spec = PICK_HINTS[key] ?? { roles: [key], words: [key], units: [] };
   const free = (controls ?? []).filter((c) => !used.has(String(c.id ?? "")));
   const has = (haystack: unknown, needles: string[]) => {
     const text = String(haystack ?? "").toLowerCase();
@@ -191,6 +195,87 @@ export function pickControl<T extends Pickable>(
     free.find((c) => has(c.label, spec.words)) ??
     free.find(unitIs)
   );
+}
+
+/** May this slot render, given the tile's state? Unknown values count as both. */
+export function slotVisible(slot: Slot, active: boolean): boolean {
+  if (slot.showWhen === "active") return active;
+  if (slot.showWhen === "inactive") return !active;
+  return true;
+}
+
+/** The shape a hint matches against: role, then label, then unit. */
+export interface PickableControl extends Pickable {
+  feature?: string;
+  object?: { common?: { role?: string } };
+  common?: { role?: string };
+}
+
+export function pickable<T extends PickableControl>(controls: T[]): Pickable[] {
+  return (controls ?? []).map((c) => ({
+    id: c.id,
+    role: c.object?.common?.role ?? c.common?.role,
+    unit: c.unit,
+    label: c.label ?? c.feature,
+  }));
+}
+
+export interface PickedSlot<T> {
+  slot: Slot;
+  control?: T;
+  /** The slot named a source or a hint and nothing matched (A20) — never
+   *  positional, because a wrong reading is worse than a missing one. */
+  dormant?: boolean;
+}
+
+/**
+ * One pass over a tile's slots in order: state-hidden slots drop out first (they
+ * must not claim "the next free control"), then `source`, then a hint, then the
+ * next control no earlier slot used. `options.raw` supplies the pseudo-control
+ * for a source that is a raw state id. Badge slots are skipped — badges live in
+ * the corners.
+ */
+export function pickSlotControls<T extends PickableControl>(
+  slots: Slot[],
+  controls: T[],
+  options?: { active?: boolean; raw?: (source: string) => T | undefined },
+): PickedSlot<T>[] {
+  const list = controls ?? [];
+  const used = new Set<string>();
+  const out: PickedSlot<T>[] = [];
+  for (const slot of slots ?? []) {
+    if (slot.kind === "badge") continue;
+    if (!slotVisible(slot, options?.active === true)) continue;
+
+    if (slot.source) {
+      const control =
+        resolveControl(list, slot.source) ?? options?.raw?.(slot.source);
+      if (!control) {
+        out.push({ slot, dormant: true });
+        continue;
+      }
+      used.add(String(control.id ?? ""));
+      out.push({ slot, control });
+      continue;
+    }
+
+    const hint = String(slot.options?.pick ?? "");
+    let control: T | undefined;
+    if (hint.trim()) {
+      const picked = pickControl(pickable(list), hint, used);
+      control = picked ? list.find((c) => c.id === picked.id) : undefined;
+      // A hint that matched nothing is dormant; position is never its fallback.
+      if (!control) {
+        out.push({ slot, dormant: true });
+        continue;
+      }
+    } else {
+      control = list.find((c) => !used.has(String(c.id ?? "")));
+    }
+    if (control) used.add(String(control.id ?? ""));
+    out.push({ slot, control });
+  }
+  return out;
 }
 
 /**
