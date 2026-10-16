@@ -21,6 +21,8 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
+  import IconPicker from "$lib/components/common/IconPicker.svelte";
   import type {
     Background,
     Group,
@@ -51,6 +53,8 @@
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   });
+  /** Which icon field the picker is open for, if any. */
+  let iconPicker = $state<null | "page" | "section">(null);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -166,12 +170,22 @@
     </label>
     <label class="field">
       <span class="label-mono">Icon</span>
-      <input
-        type="text"
-        value={page.icon ?? ""}
-        placeholder="material symbol, e.g. home"
-        oninput={(e) => setPage({ icon: e.currentTarget.value })}
-      />
+      <div class="row">
+        <input
+          type="text"
+          value={page.icon ?? ""}
+          placeholder="material symbol, e.g. home"
+          oninput={(e) => setPage({ icon: e.currentTarget.value })}
+        />
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => (iconPicker = "page")}>Choose…</button
+        >
+        {#if page.icon}<span class="glyph"
+            ><Icon value={page.icon} size={20} /></span
+          >{/if}
+      </div>
     </label>
   {:else if selection.kind === "section" && section}
     <h3>{section.title || "Section"}</h3>
@@ -186,17 +200,22 @@
     </label>
     <label class="field">
       <span class="label-mono">Icon</span>
-      <input
-        type="text"
-        value={section.icon ?? ""}
-        placeholder="material symbol"
-        oninput={(e) => setSection({ icon: e.currentTarget.value })}
-      />
-      {#if section.icon}
-        <span class="material-symbols-outlined glyph" aria-hidden="true"
-          >{section.icon}</span
+      <div class="row">
+        <input
+          type="text"
+          value={section.icon ?? ""}
+          placeholder="material symbol"
+          oninput={(e) => setSection({ icon: e.currentTarget.value })}
+        />
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => (iconPicker = "section")}>Choose…</button
         >
-      {/if}
+        {#if section.icon}<span class="glyph"
+            ><Icon value={section.icon} size={20} /></span
+          >{/if}
+      </div>
     </label>
     <label class="check">
       <input
@@ -327,6 +346,18 @@
       </div>
     {/if}
   {/if}
+
+  {#if iconPicker}
+    <IconPicker
+      icon={iconPicker === "page" ? page?.icon : section?.icon}
+      onPick={(value) => {
+        if (iconPicker === "page") setPage({ icon: value });
+        else setSection({ icon: value });
+        iconPicker = null;
+      }}
+      onClose={() => (iconPicker = null)}
+    />
+  {/if}
 </div>
 
 <style>
@@ -350,7 +381,7 @@
   }
 
   .field .glyph {
-    font-size: 20px;
+    display: inline-flex;
     color: var(--text-muted);
   }
 
