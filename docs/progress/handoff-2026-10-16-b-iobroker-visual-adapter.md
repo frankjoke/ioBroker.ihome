@@ -140,8 +140,8 @@ shift).
 P3 modal slots + `Slot.from`; a `/templates` library page, template delete/rename, `basedOn` editing,
 the device-form `template` field; section member/showEmpty/width hints; icon upload; drag-and-drop
 (↑↓ stay); packaging/pushing; the I11 focus trap and tree keyboard contract (M1); the parked ThinkPad
-items (Brunnen double-toggle, `main.js` literal logging, duplicate tile titles, unused
-`house-controller.svg`).
+items (Brunnen double-toggle — parked as device-side, its `[ihome-dbg]` tracing is now removed —
+`main.js` literal logging, duplicate tile titles, unused `house-controller.svg`).
 
 ## 6. Follow-ups landed after the handoff (same day, user feedback while adopting)
 
@@ -195,3 +195,6 @@ Both committed; gates re-run over both: 310 tests (27 files), check 0/0, lint 0,
   heading is gone; the small mono label now sits at the top of the tree card as "Layout configuration".
   The header renders only when it has something to show (a save/read badge, or the Add page button while
   the tree is empty) — otherwise the rooms list is the top of the page.
+- **`[ihome-dbg]` tracing removed** (`17ee2af`): the double-toggle instrument is gone — `utils/dbg.ts`
+  deleted, its pointer-trace callers (Tile, ValueSlot, IconSlot) and the toggle / stateChange console
+  logs removed. The guarded `writeControl` calls stay; only the logging went.
