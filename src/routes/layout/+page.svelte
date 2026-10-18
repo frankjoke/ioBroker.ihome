@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import Icon from "$lib/components/common/Icon.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
@@ -33,7 +32,7 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import type { EnrichedDevice } from "$lib/types/device";
-  import type { PageRegistry, Slot } from "$lib/types/display";
+  import type { PageRegistry, Placement, Slot } from "$lib/types/display";
 
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
@@ -79,8 +78,28 @@
   );
   const sectionId = $derived(section?.id ?? "");
   const tiles = $derived(section?.tiles ?? []);
-  /** The tile whose editor is open, if the selection is one. */
-  const tileSelection = $derived(selection?.kind === "tile" ? selection : null);
+  /** The tile the editor is on: the selection's, else the section's first. */
+  const tileId = $derived(
+    (selection?.kind === "tile" ? selection.placementId : undefined) ??
+      tiles[0]?.id ??
+      "",
+  );
+  const tileAnchor = $derived(
+    tileId ? { pageId, sectionId, placementId: tileId } : null,
+  );
+  const tileIndex = $derived(tiles.findIndex((t) => t.id === tileId));
+  const tileSelection = $derived(
+    tileAnchor ? { kind: "tile" as const, ...tileAnchor } : null,
+  );
+
+  /** A tile line's label: what it is called, plus its size when it has one. */
+  function tileLabel(t: Placement): string {
+    const name =
+      t.title ||
+      deviceOfAnchor({ pageId, sectionId, placementId: t.id })?.name ||
+      t.device;
+    return t.tile?.size ? `${name} · ${t.tile.size.w}×${t.tile.size.h}` : name;
+  }
 
   function selectPage(id: string): void {
     selection = { kind: "page", pageId: id };
@@ -88,6 +107,10 @@
 
   function selectSection(id: string): void {
     selection = { kind: "section", pageId, sectionId: id };
+  }
+
+  function selectTile(id: string): void {
+    selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
@@ -378,149 +401,103 @@
       </div>
     {/if}
 
-    <!-- The section's tiles: one line each, and the picked one opens its
-         editor directly under its own line. -->
-    <div class="tiles">
-      {#each tiles as t, i (t.id)}
-        {@const anchor = { pageId, sectionId, placementId: t.id }}
-        {@const tileDevice = deviceOfAnchor(anchor)}
-        <div
-          class="tile-line"
-          class:selected={tileSelection?.placementId === t.id}
-        >
-          <button
-            type="button"
-            class="tile-head"
-            onclick={() => (selection = { kind: "tile", ...anchor })}
-          >
-            {#if tileDevice?.icon}
-              <span class="tree-icon"
-                ><Icon value={tileDevice.icon} size={16} /></span
-              >
-            {/if}
-            <span class="name">{t.title || tileDevice?.name || t.device}</span>
-            {#if t.tile?.size}
-              <span class="hint-badge text-muted"
-                >{t.tile.size.w}×{t.tile.size.h}</span
-              >
-            {/if}
-          </button>
-          <span class="row-actions">
-            {#if i === 0}
-              <button
-                type="button"
-                class="icon-btn"
-                title="Add tile above"
-                aria-label="Add tile above"
-                onclick={() =>
-                  (pickerFor = { kind: "device", pageId, sectionId, at: 0 })}
-              >
-                <span class="material-symbols-outlined">add</span>
-              </button>
-            {:else}
-              <button
-                type="button"
-                class="icon-btn"
-                title="Move up"
-                aria-label="Move up"
-                onclick={() =>
-                  commitLayout(
-                    movePlacement(
-                      registry,
-                      { pageId, sectionId, index: i },
-                      { pageId, sectionId, index: i - 1 },
-                    ),
-                  )}
-              >
-                <span class="material-symbols-outlined">arrow_upward</span>
-              </button>
-            {/if}
-            <button
-              type="button"
-              class="icon-btn"
-              title="Duplicate tile"
-              aria-label="Duplicate tile"
-              onclick={() =>
-                commitLayout(
-                  duplicatePlacement(registry, pageId, sectionId, t.id),
-                )}
-            >
-              <span class="material-symbols-outlined">content_copy</span>
-            </button>
-            {#if i === tiles.length - 1}
-              <button
-                type="button"
-                class="icon-btn"
-                title="Add tile below"
-                aria-label="Add tile below"
-                onclick={() =>
-                  (pickerFor = {
-                    kind: "device",
-                    pageId,
-                    sectionId,
-                    at: i + 1,
-                  })}
-              >
-                <span class="material-symbols-outlined">add</span>
-              </button>
-            {:else}
-              <button
-                type="button"
-                class="icon-btn"
-                title="Move down"
-                aria-label="Move down"
-                onclick={() =>
-                  commitLayout(
-                    movePlacement(
-                      registry,
-                      { pageId, sectionId, index: i },
-                      { pageId, sectionId, index: i + 1 },
-                    ),
-                  )}
-              >
-                <span class="material-symbols-outlined">arrow_downward</span>
-              </button>
-            {/if}
-            <button
-              type="button"
-              class="icon-btn danger"
-              title="Remove tile"
-              aria-label="Remove tile"
-              onclick={() =>
-                commitLayout(
-                  deletePlacement(registry, pageId, sectionId, t.id),
-                )}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          </span>
-        </div>
-        {#if tileSelection?.placementId === t.id}
-          <div class="fold tile-editor">
-            <LayoutDetails
-              {registry}
-              {devices}
-              selection={tileSelection}
-              onChange={commitLayout}
-              onSelect={(next) => (selection = next)}
-              onSwapDevice={(anchor) => (swapFor = anchor)}
-              onAddSlot={openSlotPicker}
-              showPreview={false}
-            />
-          </div>
+    <!-- Tile: the same shape a third time — pick one, and its editor is the
+         sheet's body. No list: the display behind shows the tiles. -->
+    <div class="line">
+      <span class="label-mono">Tile</span>
+      <select
+        value={tileId}
+        aria-label="Tile"
+        onchange={(e) => selectTile(e.currentTarget.value)}
+      >
+        {#if tiles.length === 0}
+          <option value="">no tiles yet</option>
         {/if}
-      {/each}
-
+        {#each tiles as t (t.id)}
+          <option value={t.id}>{tileLabel(t)}</option>
+        {/each}
+      </select>
       <button
         type="button"
-        class="btn add-tile"
-        title="Add a tile to this section"
+        class="icon-btn"
+        title="Add tile"
+        aria-label="Add tile"
         onclick={() => (pickerFor = { kind: "device", pageId, sectionId })}
       >
         <span class="material-symbols-outlined">add</span>
-        Add tile
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Duplicate tile"
+        aria-label="Duplicate tile"
+        disabled={!tileAnchor}
+        onclick={() =>
+          commitLayout(duplicatePlacement(registry, pageId, sectionId, tileId))}
+      >
+        <span class="material-symbols-outlined">content_copy</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move up"
+        aria-label="Move up"
+        disabled={!tileAnchor || tileIndex <= 0}
+        onclick={() =>
+          commitLayout(
+            movePlacement(
+              registry,
+              { pageId, sectionId, index: tileIndex },
+              { pageId, sectionId, index: tileIndex - 1 },
+            ),
+          )}
+      >
+        <span class="material-symbols-outlined">arrow_upward</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move down"
+        aria-label="Move down"
+        disabled={!tileAnchor || tileIndex === tiles.length - 1}
+        onclick={() =>
+          commitLayout(
+            movePlacement(
+              registry,
+              { pageId, sectionId, index: tileIndex },
+              { pageId, sectionId, index: tileIndex + 1 },
+            ),
+          )}
+      >
+        <span class="material-symbols-outlined">arrow_downward</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        title="Remove tile"
+        aria-label="Remove tile"
+        disabled={!tileAnchor}
+        onclick={() =>
+          commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
+      >
+        <span class="material-symbols-outlined">delete</span>
       </button>
     </div>
+
+    {#if tileSelection}
+      <div class="fold tile-editor">
+        <LayoutDetails
+          {registry}
+          {devices}
+          selection={tileSelection}
+          onChange={commitLayout}
+          onSelect={(next) => (selection = next)}
+          onSwapDevice={(anchor) => (swapFor = anchor)}
+          onAddSlot={openSlotPicker}
+          showPreview={false}
+        />
+      </div>
+    {/if}
   </aside>
 </div>
 
@@ -675,45 +652,8 @@
     border-left: 2px solid var(--border-color);
   }
 
-  .tiles {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .tile-line {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    min-width: 0;
-  }
-
-  .tile-line.selected {
-    background-color: var(--surface-container);
-    border-radius: var(--border-radius-sm, 6px);
-  }
-
-  .tile-head {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .tile-head .name {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
   .tile-editor {
     margin-bottom: 0.4rem;
-  }
-
-  .add-tile {
-    align-self: flex-start;
   }
 
   /* The row's controls. `.icon-btn` is per-component in this codebase, and the
@@ -743,17 +683,5 @@
 
   .icon-btn .material-symbols-outlined {
     font-size: 20px;
-  }
-
-  .tree-icon {
-    display: inline-flex;
-    color: var(--text-muted);
-  }
-
-  .hint-badge {
-    font-size: 0.7rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill);
-    padding: 0 6px;
   }
 </style>
