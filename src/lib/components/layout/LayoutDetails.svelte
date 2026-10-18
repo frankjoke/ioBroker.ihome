@@ -887,20 +887,18 @@
                 >
               </button>
               <span class="row-actions">
-                {#if slot.kind !== "badge" && slot.options?.background !== true}
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    class:on={slotWhere(slot) !== "tile"}
-                    title={whereTitle(slot)}
-                    aria-label={whereTitle(slot)}
-                    onclick={() => cycleWhere(i, slot)}
+                <button
+                  type="button"
+                  class="icon-btn"
+                  class:on={slotWhere(slot) !== "tile"}
+                  title={whereTitle(slot)}
+                  aria-label={whereTitle(slot)}
+                  onclick={() => cycleWhere(i, slot)}
+                >
+                  <span class="material-symbols-outlined"
+                    >{WHERE_GLYPH[slotWhere(slot)]}</span
                   >
-                    <span class="material-symbols-outlined"
-                      >{WHERE_GLYPH[slotWhere(slot)]}</span
-                    >
-                  </button>
-                {/if}
+                </button>
                 <button
                   type="button"
                   class="icon-btn"

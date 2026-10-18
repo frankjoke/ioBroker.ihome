@@ -4,9 +4,10 @@
   import { tileTitle } from "$lib/config/template-ops";
   import EnumBadge from "$lib/components/common/EnumBadge.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
+  import BadgeChip from "./BadgeChip.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
   import type { Background, Slot } from "$lib/types/display";
-  import type { ResolvedStyle } from "$lib/config/rule-ops";
+  import type { ResolvedBadge, ResolvedStyle } from "$lib/config/rule-ops";
 
   /**
    * The modal's panel — the dialog's content, and what the tile pane's preview
@@ -18,6 +19,7 @@
     title,
     background,
     rows,
+    badges,
     onClose,
     bodyMaxHeight,
   }: {
@@ -34,6 +36,9 @@
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];
+    /** Badges that live (also) in the modal — read-only chips in sequence under
+     *  the title; their corner anchors are the tile's language (A34). */
+    badges?: ResolvedBadge[];
     /** Given → a close button in the header (the dialog); absent → a preview. */
     onClose?: () => void;
     /** How far the rows may grow before scrolling (the preview leaves less). */
@@ -54,6 +59,19 @@
             enums={ioBroker.enums}
           />{/if}
       </div>
+      {#if badges?.length}
+        <div class="badges">
+          {#each badges as b, i (i)}
+            <BadgeChip
+              icon={b.icon}
+              label={b.label}
+              tone={b.tone}
+              color={b.color}
+              title={b.title}
+            />
+          {/each}
+        </div>
+      {/if}
     </div>
     {#if onClose}
       <button
@@ -68,32 +86,34 @@
     {/if}
   </header>
 
-  <div class="panel-body" style:max-height={bodyMaxHeight}>
-    {#each rows as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
-      <div class="row">
-        <span class="row-label"
-          >{r.slot.label ??
-            r.control?.label ??
-            r.slot.source ??
-            r.slot.kind}</span
-        >
-        <div class="row-control">
-          <SlotRenderer
-            slot={r.slot}
-            {device}
-            control={r.control}
-            style={r.style}
-            onPrimary={r.onPrimary}
-            emphasis="secondary"
-          />
+  {#if rows.length || !badges?.length}
+    <div class="panel-body" style:max-height={bodyMaxHeight}>
+      {#each rows as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+        <div class="row">
+          <span class="row-label"
+            >{r.slot.label ??
+              r.control?.label ??
+              r.slot.source ??
+              r.slot.kind}</span
+          >
+          <div class="row-control">
+            <SlotRenderer
+              slot={r.slot}
+              {device}
+              control={r.control}
+              style={r.style}
+              onPrimary={r.onPrimary}
+              emphasis="secondary"
+            />
+          </div>
         </div>
-      </div>
-    {/each}
+      {/each}
 
-    {#if rows.length === 0}
-      <p class="text-muted">Nothing to show right now.</p>
-    {/if}
-  </div>
+      {#if rows.length === 0}
+        <p class="text-muted">Nothing to show right now.</p>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -126,6 +146,15 @@
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
+  }
+
+  /* The badges that live in the modal (A34) — the tile's chips, in sequence. */
+  .badges {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-wrap: wrap;
+    margin-top: 0.35rem;
   }
 
   .panel-body {

@@ -171,16 +171,21 @@
         r.slot.options?.background !== true && slotWhere(r.slot) !== "modal",
     ),
   );
-  /** The modal's rows (A34) — resolved the same way, so every slot kind works. */
+  /**
+   * The modal's slots (A34) — resolved the same way, so every kind works. The
+   * chart layer comes along as a plain row there; badges take the path below.
+   */
   const modalSlots = $derived(
-    resolved.filter(
-      (r) =>
-        r.slot.options?.background !== true && slotWhere(r.slot) !== "tile",
-    ),
+    resolved.filter((r) => slotWhere(r.slot) !== "tile"),
   );
   const modalRows = $derived(
     modalSlots.map((r) => ({
-      slot: r.slot,
+      // The chart layer loses its stretch in the modal: there it is a plain
+      // sparkline row, not a background.
+      slot:
+        r.slot.options?.background === true
+          ? { ...r.slot, options: { ...r.slot.options, background: undefined } }
+          : r.slot,
       control: r.control,
       style: slotStyle(r.slot, r.control),
       // The slot that *is* the tile's action stays a button in the modal too.
@@ -252,10 +257,41 @@
 
   // Badges render once, at the end of the tile, wherever the badge slots sit in
   // the template. `ago` and `offline` need no control: they read the device.
-  // State-hidden badges drop out with the rest (A30).
+  // State-hidden badges drop out with the rest (A30); one marked "modal" leaves
+  // the tile for the modal's chip strip (A34).
   const badgeSlots = $derived(
-    slots.filter((s) => s.kind === "badge" && slotVisible(s, active)),
+    slots.filter(
+      (s) =>
+        s.kind === "badge" &&
+        slotVisible(s, active) &&
+        slotWhere(s) !== "modal",
+    ),
   );
+
+  /** The modal's badges (A34): the same chips, in sequence under its title —
+   *  a badge's corner anchor is the tile's language, not the modal's. */
+  const modalBadges = $derived(
+    slots
+      .filter(
+        (s) =>
+          s.kind === "badge" &&
+          slotVisible(s, active) &&
+          slotWhere(s) !== "tile",
+      )
+      .flatMap((s) =>
+        resolveBadges(
+          [s],
+          device,
+          clock,
+          Date.now(),
+          getVirtualPool(),
+          rawControl,
+        ),
+      ),
+  );
+
+  /** Something to enlarge into (A34): rows or badges. */
+  const hasModal = $derived(modalRows.length > 0 || modalBadges.length > 0);
 
   // Where each visible badge sits: an explicit x/y on the slot, or the next
   // free corner (top-right first) — see `badgePositions`.
@@ -329,7 +365,7 @@
     // the icon and the On/Off text — so nothing switches by accident. The
     // modal only opens when slots live in it (A34); otherwise a stray tap on a
     // light would be the last thing between you and a switched-on lamp.
-    if (modalSlots.length) modalOpen = true;
+    if (hasModal) modalOpen = true;
   }
 
   let modalOpen = $state(false);
@@ -377,7 +413,7 @@
   style="grid-column: {newLine
     ? '1'
     : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
-  class:interactive={modalSlots.length > 0}
+  class:interactive={hasModal}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
   onclickcapture={onCapture}
@@ -427,13 +463,14 @@
 {#if modalPreview}
   <!-- What a long-press opens, beside the tile — the same panel the dialog
        renders (A34), so shifting a slot is visible on both sides at once. -->
-  {#if modalRows.length}
+  {#if hasModal}
     <div class="modal-preview">
       <ModalPanel
         {device}
         {title}
         background={tile?.background}
         rows={modalRows}
+        badges={modalBadges}
         bodyMaxHeight="30vh"
       />
     </div>
@@ -448,6 +485,7 @@
     {title}
     background={tile?.background}
     rows={modalRows}
+    badges={modalBadges}
     onClose={() => (modalOpen = false)}
   />
 {/if}

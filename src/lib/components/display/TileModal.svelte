@@ -3,13 +3,14 @@
   import ModalPanel from "./ModalPanel.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
   import type { Background, Slot } from "$lib/types/display";
-  import type { ResolvedStyle } from "$lib/config/rule-ops";
+  import type { ResolvedBadge, ResolvedStyle } from "$lib/config/rule-ops";
 
   let {
     device,
     title,
     background,
     rows,
+    badges,
     onClose,
   }: {
     device: EnrichedDevice;
@@ -25,6 +26,8 @@
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];
+    /** The badges that live (also) in the modal (A34). */
+    badges?: ResolvedBadge[];
     onClose: () => void;
   } = $props();
 
@@ -53,6 +56,7 @@
     {title}
     {background}
     {rows}
+    {badges}
     {onClose}
     bodyMaxHeight="70vh"
   />
