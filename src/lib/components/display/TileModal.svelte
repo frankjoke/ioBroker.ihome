@@ -69,6 +69,9 @@
     border: none;
     background: transparent;
     color: var(--text-color);
+    /* The layout sheet renders the display inert so a stray tap cannot switch a
+       lamp — but the modal it opens must stay usable (spike C). */
+    pointer-events: auto;
   }
 
   .modal::backdrop {

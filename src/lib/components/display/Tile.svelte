@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
@@ -50,6 +51,7 @@
     anchor,
     newLine,
     modalPreview,
+    openModal = 0,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -63,6 +65,9 @@
     newLine?: boolean;
     /** The editor's preview also renders the modal's look below the tile (A34). */
     modalPreview?: boolean;
+    /** The layout sheet's "modal view": a token that asks this tile to open its
+     *  own modal (only the tile knows its modal's rows). 0 → never asked. */
+    openModal?: number;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -367,6 +372,14 @@
   }
 
   let modalOpen = $state(false);
+
+  // The sheet's "modal view" (spike C): it asks this tile to open the modal it
+  // owns — the real one, because only the tile resolves its rows. The token
+  // changes on every ask, so a second ask re-opens what a close closed.
+  $effect(() => {
+    if (!openModal) return;
+    untrack(() => (modalOpen = true));
+  });
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let suppressClick = false;
 

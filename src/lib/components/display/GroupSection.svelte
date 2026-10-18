@@ -14,6 +14,7 @@
     modules = 0,
     bp,
     pageId,
+    modal = null,
   }: {
     group: Group;
     tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
@@ -21,6 +22,8 @@
     modules?: number;
     bp: Breakpoint;
     pageId: string;
+    /** See PageView: which tile the sheet asked to show its modal. */
+    modal?: { placementId: string; token: number } | null;
   } = $props();
 
   /**
@@ -84,6 +87,7 @@
         tile={t.placement.tile}
         newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
+        openModal={modal?.placementId === t.placement.id ? modal.token : 0}
       />
     {/each}
   </div>

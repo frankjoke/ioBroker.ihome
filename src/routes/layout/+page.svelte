@@ -22,7 +22,8 @@
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
-  import { addSlot, editTile } from "$lib/config/tile-ops";
+  import { addSlot, editTile, slotWhere } from "$lib/config/tile-ops";
+  import { resolveTemplate } from "$lib/config/template-ops";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -111,6 +112,41 @@
 
   function selectTile(id: string): void {
     selection = { kind: "tile", pageId, sectionId, placementId: id };
+  }
+
+  // The "modal view" (spike C): the display's own tile opens the real modal, so
+  // the sheet only has to name the tile and bump a token — the tile knows its
+  // rows, badges and the frame's full height.
+  let modalAnchor = $state<PlacementAnchor | null>(null);
+  let modalToken = $state(0);
+  const modal = $derived(
+    modalAnchor
+      ? { placementId: modalAnchor.placementId, token: modalToken }
+      : null,
+  );
+
+  /**
+   * Spike shortcut: does anything of this tile live in the modal? The display's
+   * tile answers this properly — it resolves every slot and honours rules — so
+   * here we only look at the chain's `where`, and a rule-hidden modal slot would
+   * still offer the button. The real pass asks the resolver (one helper, used by
+   * both).
+   */
+  function hasModalParts(t: Placement | undefined): boolean {
+    if (!t) return false;
+    const device = deviceOfAnchor({ pageId, sectionId, placementId: t.id });
+    const slots =
+      t.tile?.slots ??
+      (device
+        ? resolveTemplate(device, getTemplateRegistry().templates).slots
+        : []);
+    return slots.some((s) => slotWhere(s) !== "tile");
+  }
+
+  function showModal(anchor: PlacementAnchor | null): void {
+    if (!anchor) return;
+    modalAnchor = anchor;
+    modalToken += 1;
   }
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
@@ -241,7 +277,7 @@
        preview (spike B). Inert, so nothing on the wall switches by accident. -->
   <div class="stage">
     {#if page}
-      <PageView {page} />
+      <PageView {page} {modal} />
     {:else}
       <p class="empty text-muted">
         No pages yet. They are created from your rooms and functions on first
@@ -426,6 +462,17 @@
       >
         <span class="material-symbols-outlined">add</span>
       </button>
+      {#if hasModalParts(tiles.find((t) => t.id === tileId))}
+        <button
+          type="button"
+          class="icon-btn"
+          title="Modal view — what a long-press opens"
+          aria-label="Modal view"
+          onclick={() => showModal(tileAnchor)}
+        >
+          <span class="material-symbols-outlined">open_in_full</span>
+        </button>
+      {/if}
       <button
         type="button"
         class="icon-btn"
