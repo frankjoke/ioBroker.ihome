@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
+  import { backgroundCss } from "$lib/config/appearance";
   import {
     pickSlotControls,
     primaryControl,
@@ -176,8 +177,12 @@
     slots.find((s) => s.kind === "icon") ?? { kind: "icon" as const },
   );
   const tileStyle = $derived(slotStyle(iconSlot, controlFor(iconSlot)));
+  // The tile's own painted background first (A33): a rule's background is
+  // appended after it, so the live condition still wins.
   const tileVars = $derived(
-    `--tile-accent: ${tileStyle.color ?? "transparent"}; --tile-glow: ${
+    `${backgroundCss(tile?.background)} --tile-accent: ${
+      tileStyle.color ?? "transparent"
+    }; --tile-glow: ${
       tileStyle.glow ? 1 : 0
     };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
   );

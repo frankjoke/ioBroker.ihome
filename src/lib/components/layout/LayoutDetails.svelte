@@ -1491,9 +1491,11 @@
     </label>
 
     {#if device}
+      <!-- The docked preview sits on the section's colour so the tile is judged
+           in its section (the page stays out); A33. -->
       <div
         class="preview tile-grid docked"
-        style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px;`}
+        style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(section?.appearance?.background)}`}
       >
         <Tile {device} {bp} title={tile.title} tile={tile.tile} />
       </div>
