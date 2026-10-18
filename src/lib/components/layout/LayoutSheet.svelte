@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import Icon from "$lib/components/common/Icon.svelte";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
@@ -58,7 +57,6 @@
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** Change device: the anchor whose device is being swapped, then the confirm. */
-  let swapFor = $state<PlacementAnchor | null>(null);
   let pendingSwap = $state<{
     anchor: PlacementAnchor;
     deviceId: string;
@@ -155,9 +153,10 @@
     tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
 
-  // The device line: the tile's device, with its own editor (the same form the
-  // devices page renders) instead of a trip to that page.
-  let deviceOpen = $state(false);
+  // The sheet's body is one editor at a time: the tile's layout, or the tile's
+  // device. The Device line switches between them — the tile editor's details
+  // are replaced, not stacked under a second long form.
+  let mode = $state<"tile" | "device">("tile");
   const canonicalDevice = $derived(
     tileDevice
       ? (getCanonicalRegistry().devices.find((d) => d.id === tileDevice.id) ??
@@ -177,7 +176,7 @@
           : [...reg.devices, d],
     });
     saveRegistry();
-    deviceOpen = false;
+    mode = "tile";
   }
 
   // The modal view belongs to the tile it was opened for: move to another tile
@@ -275,13 +274,13 @@
     }
   }
 
-  /** Change device (A25): a materialised tile asks first — its own config goes. */
+  /** Change device (A25): the Device line's selector picks one. A materialised
+   *  tile asks first — its own config goes with the old device. */
   function pickSwapDevice(deviceId: string): void {
-    const anchor = swapFor;
-    swapFor = null;
-    if (!anchor) return;
+    const anchor = tileAnchor;
+    if (!anchor || !deviceId) return;
     const placement = placementOfAnchor(anchor);
-    if (!placement) return;
+    if (!placement || placement.device === deviceId) return;
     if (placement.tile) {
       const oldName =
         devices.find((d) => d.id === placement.device)?.name ??
@@ -573,38 +572,41 @@
     </button>
   </div>
 
-  <!-- Device: the fourth line. Its editor opens below, like the tile's, so
-       editing the device no longer means leaving for the devices page. -->
+  <!-- Device: the fourth line — a selector of devices (changing it is the
+       change-device action) and the switch into the device's own editor. The
+       editor replaces the tile editor below rather than stacking with it. -->
   <div class="line">
     <span class="label-mono">Device</span>
-    <span class="device-line">
-      {#if tileDevice?.icon}
-        <span class="tree-icon"><Icon value={tileDevice.icon} size={16} /></span
-        >
-      {/if}
-      <strong>{tileDevice?.name ?? "no device"}</strong>
-    </span>
-    <button
-      type="button"
-      class="icon-btn"
-      class:on={deviceOpen}
-      title="Device settings"
-      aria-label="Device settings"
-      aria-expanded={deviceOpen}
-      disabled={!canonicalDevice}
-      onclick={() => (deviceOpen = !deviceOpen)}
-    >
-      <span class="material-symbols-outlined">tune</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Change device…"
-      aria-label="Change device"
+    <select
+      value={tileDevice?.id ?? ""}
+      aria-label="Device"
       disabled={!tileAnchor}
-      onclick={() => (swapFor = tileAnchor)}
+      onchange={(e) => pickSwapDevice(e.currentTarget.value)}
     >
-      <span class="material-symbols-outlined">select</span>
+      {#if !tileDevice}
+        <option value="">no device</option>
+      {/if}
+      {#each devices as d (d.id)}
+        <option value={d.id}>{d.name || d.id}</option>
+      {/each}
+    </select>
+    <button
+      type="button"
+      class="icon-btn"
+      class:on={mode === "device"}
+      title={mode === "device"
+        ? "Back to the tile's layout"
+        : "Edit this device"}
+      aria-label={mode === "device"
+        ? "Back to the tile's layout"
+        : "Edit this device"}
+      aria-expanded={mode === "device"}
+      disabled={!canonicalDevice}
+      onclick={() => (mode = mode === "device" ? "tile" : "device")}
+    >
+      <span class="material-symbols-outlined"
+        >{mode === "device" ? "arrow_back" : "tune"}</span
+      >
     </button>
   </div>
 
@@ -624,7 +626,22 @@
     </div>
   {/if}
 
-  {#if tileSelection}
+  <!-- One editor at a time: the tile's layout, or the tile's device. -->
+  {#if mode === "device" && canonicalDevice}
+    <div class="fold device-editor">
+      {#key canonicalDevice.id}
+        <DeviceForm
+          device={canonicalDevice}
+          objects={ioBroker.objects}
+          roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
+          {rooms}
+          devices={getCanonicalRegistry().devices}
+          onSave={saveDevice}
+          onCancel={() => (mode = "tile")}
+        />
+      {/key}
+    </div>
+  {:else if tileSelection}
     {#snippet tileExtras()}
       <label
         class="check"
@@ -652,24 +669,6 @@
         titleExtra={tileExtras}
         showPreview={false}
       />
-    </div>
-  {/if}
-
-  <!-- The device's own editor, the same shape as the tile's: a fold-out under
-       the Device line's editor area. -->
-  {#if deviceOpen && canonicalDevice}
-    <div class="fold device-editor">
-      {#key canonicalDevice.id}
-        <DeviceForm
-          device={canonicalDevice}
-          objects={ioBroker.objects}
-          roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
-          {rooms}
-          devices={getCanonicalRegistry().devices}
-          onSave={saveDevice}
-          onCancel={() => (deviceOpen = false)}
-        />
-      {/key}
     </div>
   {/if}
 </aside>
@@ -713,20 +712,6 @@
     The tiles disappear from this page. The devices themselves stay in the
     registry.
   </ConfirmModal>
-{/if}
-
-{#if swapFor}
-  {@const swapTarget = placementOfAnchor(swapFor)}
-  <DevicePicker
-    {devices}
-    {rooms}
-    enums={ioBroker.enums}
-    listed={swapTarget ? [swapTarget.device] : []}
-    onAdd={(ids) => {
-      if (ids[0]) pickSwapDevice(ids[0]);
-    }}
-    onClose={() => (swapFor = null)}
-  />
 {/if}
 
 {#if pendingSwap}
@@ -811,18 +796,6 @@
      display behind is where the tile itself is judged. */
   .modal-view :global(.tile) {
     display: none;
-  }
-
-  /* The device line shows the tile's device; its editor is a fold-out below. */
-  .device-line {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   /* The non-modal dialog places itself; here it belongs over the display, not
