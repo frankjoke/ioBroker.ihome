@@ -35,6 +35,7 @@
     evalActive,
     moveRule,
     moveSlot,
+    nextSlotWhere,
     patchRule,
     patchSlot,
     removeRule,
@@ -250,6 +251,61 @@
     sparkline: "show_chart",
     "history-list": "history",
   };
+
+  /** The three homes a slot can have (A34), in click order, and their icons. */
+  const WHERE_GLYPH = {
+    tile: "crop_square",
+    both: "splitscreen",
+    modal: "open_in_full",
+  } as const;
+  const WHERE_LABEL = {
+    tile: "tile",
+    both: "tile + modal",
+    modal: "modal only",
+  } as const;
+
+  /** The three visibility states (A30), in click order, and their icons. */
+  const SHOW_GLYPH = {
+    both: "all_inclusive",
+    active: "toggle_on",
+    inactive: "toggle_off",
+  } as const;
+  const SHOW_LABEL = {
+    both: "always",
+    active: "active only",
+    inactive: "inactive only",
+  } as const;
+
+  function nextShow(slot: Slot): "both" | "active" | "inactive" {
+    const cur = slot.showWhen ?? "both";
+    return cur === "both" ? "active" : cur === "active" ? "inactive" : "both";
+  }
+
+  function cycleWhere(i: number, slot: Slot): void {
+    edit((t) => setSlotWhere(t, i, nextSlotWhere(slot, tileVisibleCount)));
+  }
+
+  function cycleShowWhen(i: number, slot: Slot): void {
+    const next = nextShow(slot);
+    edit((t) =>
+      patchSlot(t, i, { showWhen: next === "both" ? undefined : next }),
+    );
+  }
+
+  /** What a click does, said in full — the guard included when it skips modal. */
+  function whereTitle(slot: Slot): string {
+    const cur = slotWhere(slot);
+    const next = nextSlotWhere(slot, tileVisibleCount);
+    const base = `Lives in: ${WHERE_LABEL[cur]} — click for ${WHERE_LABEL[next]}`;
+    return cur === "both" && next === "tile"
+      ? `${base} (one slot must stay on the tile)`
+      : base;
+  }
+
+  function showTitle(slot: Slot): string {
+    const cur = slot.showWhen ?? "both";
+    return `Shown: ${SHOW_LABEL[cur]} — click for ${SHOW_LABEL[nextShow(slot)]}`;
+  }
 
   // The preview resolves through the display's own resolver, so it needs the
   // same device shape the display feeds it.
@@ -829,22 +885,34 @@
                 <Icon value={KIND_GLYPH[slot.kind]} size={17} />
                 <span class="slot-summary">{slot.kind} · {slotLabel(slot)}</span
                 >
-                {#if slot.showWhen}
-                  <span class="hint-badge text-muted"
-                    >{slot.showWhen === "active"
-                      ? "active only"
-                      : "inactive only"}</span
-                  >
-                {/if}
-                {#if slotWhere(slot) !== "tile"}
-                  <span class="hint-badge text-muted"
-                    >{slotWhere(slot) === "modal"
-                      ? "modal only"
-                      : "tile + modal"}</span
-                  >
-                {/if}
               </button>
               <span class="row-actions">
+                {#if slot.kind !== "badge" && slot.options?.background !== true}
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    class:on={slotWhere(slot) !== "tile"}
+                    title={whereTitle(slot)}
+                    aria-label={whereTitle(slot)}
+                    onclick={() => cycleWhere(i, slot)}
+                  >
+                    <span class="material-symbols-outlined"
+                      >{WHERE_GLYPH[slotWhere(slot)]}</span
+                    >
+                  </button>
+                {/if}
+                <button
+                  type="button"
+                  class="icon-btn"
+                  class:on={!!slot.showWhen}
+                  title={showTitle(slot)}
+                  aria-label={showTitle(slot)}
+                  onclick={() => cycleShowWhen(i, slot)}
+                >
+                  <span class="material-symbols-outlined"
+                    >{SHOW_GLYPH[slot.showWhen ?? "both"]}</span
+                  >
+                </button>
                 {#if i === 0}
                   <button
                     type="button"
@@ -935,48 +1003,6 @@
                       {/each}
                     </select>
                   </label>
-                  <label class="small">
-                    <span class="label-mono">Visibility</span>
-                    <select
-                      value={slot.showWhen ?? ""}
-                      onchange={(e) =>
-                        edit((t) =>
-                          patchSlot(t, i, {
-                            showWhen: (e.currentTarget.value || undefined) as
-                              "active" | "inactive" | undefined,
-                          }),
-                        )}
-                    >
-                      <option value="">both</option>
-                      <option value="active">only active</option>
-                      <option value="inactive">only inactive</option>
-                    </select>
-                  </label>
-                  {#if slot.kind !== "badge" && slot.options?.background !== true}
-                    <label class="small">
-                      <span class="label-mono">Lives in</span>
-                      <select
-                        value={slotWhere(slot)}
-                        onchange={(e) =>
-                          edit((t) =>
-                            setSlotWhere(
-                              t,
-                              i,
-                              e.currentTarget.value as
-                                "tile" | "both" | "modal",
-                            ),
-                          )}
-                      >
-                        <option value="tile">tile</option>
-                        <option value="both">tile + modal</option>
-                        <option
-                          value="modal"
-                          disabled={slotWhere(slot) !== "modal" &&
-                            tileVisibleCount <= 1}>modal only</option
-                        >
-                      </select>
-                    </label>
-                  {/if}
                 </div>
                 <div class="slot-line">
                   <button
@@ -1777,6 +1803,11 @@
   .row-actions .icon-btn:disabled {
     color: var(--border-color);
     cursor: default;
+  }
+
+  /* A destination or visibility away from its default (A34) reads at a glance. */
+  .row-actions .icon-btn.on {
+    color: var(--primary-color);
   }
 
   .slot-editor {

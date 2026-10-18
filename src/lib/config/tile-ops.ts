@@ -138,6 +138,20 @@ export function setSlotWhere(
   return withSlots(tile, next);
 }
 
+/**
+ * The next home a click on the slot row's destination button moves to (A34):
+ * tile → both → modal → tile, except that "modal" is skipped while this is the
+ * only slot left on the main tile — so the cycle never lands on a refused move.
+ */
+export function nextSlotWhere(
+  slot: Slot,
+  tileVisible: number,
+): "tile" | "both" | "modal" {
+  const cur = slotWhere(slot);
+  const next = cur === "tile" ? "both" : cur === "both" ? "modal" : "tile";
+  return next === "modal" && tileVisible <= 1 ? "tile" : next;
+}
+
 // ------------------------------------------------------------------- rules
 
 /** Address one slot's rule list; a bad slot index returns a copied tile. */

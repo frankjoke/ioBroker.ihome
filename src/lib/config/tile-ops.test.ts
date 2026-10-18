@@ -19,6 +19,7 @@ import {
   materialiseTile,
   moveRule,
   moveSlot,
+  nextSlotWhere,
   patchRule,
   patchSlot,
   removeRule,
@@ -145,6 +146,12 @@ it("a slot's where picks its home; the last tile slot cannot move to the modal (
   expect(back.slots?.at(0)).toEqual({ kind: "value", source: "power" });
   // A bad index leaves the tile alone.
   expect(setSlotWhere(tile, 9, "modal")).toBe(tile);
+  // The row button's cycle: tile → both → modal → tile, but "modal" is skipped
+  // while this is the only slot on the tile (2 = it plus one more).
+  expect(nextSlotWhere({ kind: "value" }, 2)).toBe("both");
+  expect(nextSlotWhere({ kind: "value", where: "both" }, 2)).toBe("modal");
+  expect(nextSlotWhere({ kind: "value", where: "both" }, 1)).toBe("tile");
+  expect(nextSlotWhere({ kind: "value", where: "modal" }, 1)).toBe("tile");
 });
 
 it("rule ops address slot and rule indexes", () => {
