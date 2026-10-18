@@ -355,6 +355,28 @@ it("accepts a section with no member and a placement list", () => {
   expect(reg!.pages[0].groups[0].appearance?.border).toBe(false);
 });
 
+it('keeps a placement\'s empty title — `""` is a name of its own (A41)', () => {
+  const reg = parsePageRegistry({
+    version: 1,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [
+          {
+            id: "g",
+            title: "G",
+            tiles: [{ id: "t1", device: "dev1", title: "" }],
+          },
+        ],
+      },
+    ],
+  });
+  expect(reg).not.toBeNull();
+  expect(reg!.pages[0].groups[0].tiles?.[0].title).toBe("");
+});
+
 // ------------------------------------------------------------- the migration
 // Task 2: a stored document carries member-based sections; the display wants
 // explicit placements. The migration is the one-time bridge between them.

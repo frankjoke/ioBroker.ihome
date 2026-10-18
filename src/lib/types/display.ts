@@ -60,6 +60,8 @@ export interface ActiveCondition {
 export interface Placement {
   id: string;
   device: string;
+  /** This placement's own name. Absent → the device's name; `""` → no name at
+   * all (the tile shows nothing where its name would be, A41). */
   title?: string;
   /** Start a new line before this tile even if it would still fit. */
   newLine?: boolean;

@@ -747,16 +747,31 @@
     </div>
   {:else if selection.kind === "tile" && tile}
     <h3>{tile.title || device?.name || "Tile"}</h3>
-    <label class="field">
+    <div class="field">
       <span class="label-mono">Tile title</span>
-      <input
-        type="text"
-        value={tile.title ?? ""}
-        placeholder={device?.name ?? "defaults to the device name"}
-        oninput={(e) =>
-          setTile({ title: e.currentTarget.value.trim() || undefined })}
-      />
-    </label>
+      <div class="row">
+        <input
+          type="text"
+          value={tile.title ?? ""}
+          placeholder={device?.name ?? "defaults to the device name"}
+          disabled={tile.title === ""}
+          oninput={(e) =>
+            setTile({ title: e.currentTarget.value.trim() || undefined })}
+        />
+        <label
+          class="check"
+          title="Show no name on the tile — for a tile that is all chart. The tree and the modal still name it."
+        >
+          <input
+            type="checkbox"
+            checked={tile.title === ""}
+            onchange={(e) =>
+              setTile({ title: e.currentTarget.checked ? "" : undefined })}
+          />
+          <span>no name</span>
+        </label>
+      </div>
+    </div>
     <div class="field">
       <span class="label-mono">Device</span>
       <div class="row">

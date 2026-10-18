@@ -74,6 +74,9 @@
     resolveTemplate(device, getTemplateRegistry().templates),
   );
   const span = $derived(clampSpan(tile?.size ?? template.size, bp));
+  // The name the tile shows: its own, else the device's — and nothing at all
+  // when the placement says `""` (A41).
+  const tileName = $derived(title ?? tileTitle(device));
   const primary = $derived(primaryControl(shownControls));
 
   // Spec §4.1 + label fallback: feature → control id → state id → label.
@@ -432,7 +435,7 @@
       {/each}
     </div>
   {/if}
-  <span class="tile-name">{title ?? tileTitle(device)}</span>
+  {#if tileName}<span class="tile-name">{tileName}</span>{/if}
   <div class="tile-body">
     {#each bodySlots as r, i (i)}
       <SlotRenderer
