@@ -31,6 +31,7 @@
     requestLayoutConfig,
     wantsDeviceConfig,
   } from "$lib/pages.js";
+  import { openSheet } from "$lib/stores/sheet.svelte.js";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
@@ -341,7 +342,7 @@
   function openEditor() {
     if (anchor) {
       requestLayoutConfig(anchor);
-      location.hash = "#/layout";
+      openSheet();
       return;
     }
     requestDeviceConfig(device.id);

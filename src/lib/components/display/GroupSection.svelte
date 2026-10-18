@@ -5,6 +5,7 @@
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
+  import { openSheet } from "$lib/stores/sheet.svelte.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -47,7 +48,7 @@
     event.preventDefault();
     event.stopPropagation();
     requestLayoutConfig({ pageId, sectionId: group.id });
-    location.hash = "#/layout";
+    openSheet();
   }
 </script>
 

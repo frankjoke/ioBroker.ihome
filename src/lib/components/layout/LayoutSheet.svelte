@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import PageView from "$lib/components/display/PageView.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
@@ -37,6 +36,17 @@
   import type { EnrichedDevice } from "$lib/types/device";
   import type { PageRegistry, Placement, Slot } from "$lib/types/display";
 
+  let {
+    pageId = "",
+    onPage,
+    onClose,
+  }: {
+    /** The display's page: the sheet's cursor page is the display's page (A45). */
+    pageId?: string;
+    onPage: (id: string) => void;
+    onClose: () => void;
+  } = $props();
+
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** Change device: the anchor whose device is being swapped, then the confirm. */
@@ -66,11 +76,10 @@
   let pageOpen = $state(false);
   let sectionOpen = $state(false);
 
-  /** The page being edited: the selection's, else the first. */
+  /** The page being edited: the display's (the sheet never picks its own). */
   const page = $derived(
-    registry.pages.find((p) => p.id === selection?.pageId) ?? registry.pages[0],
+    registry.pages.find((p) => p.id === pageId) ?? registry.pages[0],
   );
-  const pageId = $derived(page?.id ?? "");
   /** The section a non-page selection points into, if any. */
   const selectedSectionId = $derived(
     selection && selection.kind !== "page" ? selection.sectionId : undefined,
@@ -105,8 +114,16 @@
   }
 
   function selectPage(id: string): void {
-    selection = { kind: "page", pageId: id };
+    onPage(id);
   }
+
+  // A page change (here or in the app bar) moves the cursor with it — but only
+  // when the selection is on another page, so a handoff that set both survives.
+  $effect(() => {
+    if (selection?.pageId !== pageId) {
+      selection = { kind: "page", pageId };
+    }
+  });
 
   function selectSection(id: string): void {
     selection = { kind: "section", pageId, sectionId: id };
@@ -159,7 +176,10 @@
   // click): select it, so the drill-down opens on what was clicked.
   onMount(() => {
     const requested = takeRequestedLayout();
-    if (requested) selection = requested;
+    if (requested) {
+      onPage(requested.pageId);
+      selection = requested;
+    }
     const onResize = () => (previewBp = breakpointFor(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
@@ -278,307 +298,296 @@
   }
 </script>
 
-<svelte:head>
-  <title>Layout - iHome</title>
-</svelte:head>
-
-<div class="layout-page">
-  <!-- The page being edited, rendered by the display itself: it *is* the
-       preview (spike B). Inert, so nothing on the wall switches by accident. -->
-  <div class="stage">
-    {#if page}
-      <PageView {page} />
-    {:else}
-      <p class="empty text-muted">
-        No pages yet. They are created from your rooms and functions on first
-        load.
-      </p>
+<aside class="sheet" aria-label="Layout editor">
+  <header class="sheet-head">
+    <span class="label-mono">Layout</span>
+    {#if saveFailed}
+      <span class="badge badge-danger" title="The last write to pageList failed"
+        >not saved</span
+      >
+    {:else if !writable}
+      <span
+        class="badge badge-danger"
+        title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
+        >not editable</span
+      >
     {/if}
-  </div>
-
-  <aside class="sheet" aria-label="Layout editor">
-    <header class="sheet-head">
-      <span class="label-mono">Layout</span>
-      {#if saveFailed}
-        <span
-          class="badge badge-danger"
-          title="The last write to pageList failed">not saved</span
-        >
-      {:else if !writable}
-        <span
-          class="badge badge-danger"
-          title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
-          >not editable</span
-        >
-      {/if}
-      {#if registry.pages.length === 0}
-        <button
-          type="button"
-          class="icon-btn primary"
-          title={writable
-            ? "Add page"
-            : "Not editable: the page document did not load"}
-          aria-label="Add page"
-          disabled={!writable}
-          onclick={() => commitLayout(addPage(registry))}
-        >
-          <span class="material-symbols-outlined">add</span>
-        </button>
-      {/if}
-    </header>
-
-    <!-- Page: a selector; its own attributes live behind the fold-out. -->
-    <div class="line">
-      <span class="label-mono">Page</span>
-      <select
-        value={pageId}
-        aria-label="Page"
-        onchange={(e) => selectPage(e.currentTarget.value)}
-      >
-        {#each registry.pages as p (p.id)}
-          <option value={p.id}>{p.title || p.id}</option>
-        {/each}
-      </select>
+    <button
+      type="button"
+      class="icon-btn close"
+      title="Close the editor"
+      aria-label="Close the editor"
+      onclick={onClose}
+    >
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    {#if registry.pages.length === 0}
       <button
         type="button"
-        class="icon-btn"
-        class:on={pageOpen}
-        title="Page settings"
-        aria-label="Page settings"
-        aria-expanded={pageOpen}
-        onclick={() => (pageOpen = !pageOpen)}
-      >
-        <span class="material-symbols-outlined">tune</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Add page"
+        class="icon-btn primary"
+        title={writable
+          ? "Add page"
+          : "Not editable: the page document did not load"}
         aria-label="Add page"
+        disabled={!writable}
         onclick={() => commitLayout(addPage(registry))}
       >
         <span class="material-symbols-outlined">add</span>
       </button>
-      <button
-        type="button"
-        class="icon-btn danger"
-        title="Delete page"
-        aria-label="Delete page"
-        onclick={() => (pendingDelete = { kind: "page", pageId })}
-      >
-        <span class="material-symbols-outlined">delete</span>
-      </button>
-    </div>
-    {#if pageOpen && page}
-      <div class="fold">
-        <LayoutDetails
-          {registry}
-          {devices}
-          selection={{ kind: "page", pageId }}
-          onChange={commitLayout}
-          onSelect={(next) => (selection = next)}
-          showPreview={false}
-        />
-      </div>
     {/if}
+  </header>
 
-    <!-- Section: the same, scoped to the page above. -->
-    <div class="line">
-      <span class="label-mono">Section</span>
-      <select
-        value={sectionId}
-        aria-label="Section"
-        onchange={(e) => selectSection(e.currentTarget.value)}
-      >
-        {#each page?.groups ?? [] as g (g.id)}
-          <option value={g.id}>{g.title || g.id}</option>
-        {/each}
-      </select>
-      <button
-        type="button"
-        class="icon-btn"
-        class:on={sectionOpen}
-        title="Section settings"
-        aria-label="Section settings"
-        aria-expanded={sectionOpen}
-        onclick={() => (sectionOpen = !sectionOpen)}
-      >
-        <span class="material-symbols-outlined">tune</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Add section"
-        aria-label="Add section"
-        onclick={() => commitLayout(addSection(registry, pageId))}
-      >
-        <span class="material-symbols-outlined">add</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Duplicate section"
-        aria-label="Duplicate section"
-        onclick={() =>
-          commitLayout(duplicateSection(registry, pageId, sectionId))}
-      >
-        <span class="material-symbols-outlined">content_copy</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn danger"
-        title="Delete section"
-        aria-label="Delete section"
-        onclick={() => (pendingDelete = { kind: "section", pageId, sectionId })}
-      >
-        <span class="material-symbols-outlined">delete</span>
-      </button>
+  <!-- Page: a selector; its own attributes live behind the fold-out. -->
+  <div class="line">
+    <span class="label-mono">Page</span>
+    <select
+      value={pageId}
+      aria-label="Page"
+      onchange={(e) => selectPage(e.currentTarget.value)}
+    >
+      {#each registry.pages as p (p.id)}
+        <option value={p.id}>{p.title || p.id}</option>
+      {/each}
+    </select>
+    <button
+      type="button"
+      class="icon-btn"
+      class:on={pageOpen}
+      title="Page settings"
+      aria-label="Page settings"
+      aria-expanded={pageOpen}
+      onclick={() => (pageOpen = !pageOpen)}
+    >
+      <span class="material-symbols-outlined">tune</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Add page"
+      aria-label="Add page"
+      onclick={() => commitLayout(addPage(registry))}
+    >
+      <span class="material-symbols-outlined">add</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      title="Delete page"
+      aria-label="Delete page"
+      onclick={() => (pendingDelete = { kind: "page", pageId })}
+    >
+      <span class="material-symbols-outlined">delete</span>
+    </button>
+  </div>
+  {#if pageOpen && page}
+    <div class="fold">
+      <LayoutDetails
+        {registry}
+        {devices}
+        selection={{ kind: "page", pageId }}
+        onChange={commitLayout}
+        onSelect={(next) => (selection = next)}
+        showPreview={false}
+      />
     </div>
-    {#if sectionOpen && section}
-      <div class="fold">
-        <LayoutDetails
-          {registry}
-          {devices}
-          selection={{ kind: "section", pageId, sectionId }}
-          onChange={commitLayout}
-          onSelect={(next) => (selection = next)}
-          showPreview={false}
-        />
-      </div>
-    {/if}
+  {/if}
 
-    <!-- Tile: the same shape a third time — pick one, and its editor is the
+  <!-- Section: the same, scoped to the page above. -->
+  <div class="line">
+    <span class="label-mono">Section</span>
+    <select
+      value={sectionId}
+      aria-label="Section"
+      onchange={(e) => selectSection(e.currentTarget.value)}
+    >
+      {#each page?.groups ?? [] as g (g.id)}
+        <option value={g.id}>{g.title || g.id}</option>
+      {/each}
+    </select>
+    <button
+      type="button"
+      class="icon-btn"
+      class:on={sectionOpen}
+      title="Section settings"
+      aria-label="Section settings"
+      aria-expanded={sectionOpen}
+      onclick={() => (sectionOpen = !sectionOpen)}
+    >
+      <span class="material-symbols-outlined">tune</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Add section"
+      aria-label="Add section"
+      onclick={() => commitLayout(addSection(registry, pageId))}
+    >
+      <span class="material-symbols-outlined">add</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Duplicate section"
+      aria-label="Duplicate section"
+      onclick={() =>
+        commitLayout(duplicateSection(registry, pageId, sectionId))}
+    >
+      <span class="material-symbols-outlined">content_copy</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      title="Delete section"
+      aria-label="Delete section"
+      onclick={() => (pendingDelete = { kind: "section", pageId, sectionId })}
+    >
+      <span class="material-symbols-outlined">delete</span>
+    </button>
+  </div>
+  {#if sectionOpen && section}
+    <div class="fold">
+      <LayoutDetails
+        {registry}
+        {devices}
+        selection={{ kind: "section", pageId, sectionId }}
+        onChange={commitLayout}
+        onSelect={(next) => (selection = next)}
+        showPreview={false}
+      />
+    </div>
+  {/if}
+
+  <!-- Tile: the same shape a third time — pick one, and its editor is the
          sheet's body. No list: the display behind shows the tiles. -->
-    <div class="line">
-      <span class="label-mono">Tile</span>
-      <select
-        value={tileId}
-        aria-label="Tile"
-        onchange={(e) => selectTile(e.currentTarget.value)}
-      >
-        {#if tiles.length === 0}
-          <option value="">no tiles yet</option>
-        {/if}
-        {#each tiles as t (t.id)}
-          <option value={t.id}>{tileLabel(t)}</option>
-        {/each}
-      </select>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Add tile"
-        aria-label="Add tile"
-        onclick={() => (pickerFor = { kind: "device", pageId, sectionId })}
-      >
-        <span class="material-symbols-outlined">add</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Duplicate tile"
-        aria-label="Duplicate tile"
-        disabled={!tileAnchor}
-        onclick={() =>
-          commitLayout(duplicatePlacement(registry, pageId, sectionId, tileId))}
-      >
-        <span class="material-symbols-outlined">content_copy</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Move up"
-        aria-label="Move up"
-        disabled={!tileAnchor || tileIndex <= 0}
-        onclick={() =>
-          commitLayout(
-            movePlacement(
-              registry,
-              { pageId, sectionId, index: tileIndex },
-              { pageId, sectionId, index: tileIndex - 1 },
-            ),
-          )}
-      >
-        <span class="material-symbols-outlined">arrow_upward</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Move down"
-        aria-label="Move down"
-        disabled={!tileAnchor || tileIndex === tiles.length - 1}
-        onclick={() =>
-          commitLayout(
-            movePlacement(
-              registry,
-              { pageId, sectionId, index: tileIndex },
-              { pageId, sectionId, index: tileIndex + 1 },
-            ),
-          )}
-      >
-        <span class="material-symbols-outlined">arrow_downward</span>
-      </button>
-      <button
-        type="button"
-        class="icon-btn danger"
-        title="Remove tile"
-        aria-label="Remove tile"
-        disabled={!tileAnchor}
-        onclick={() =>
-          commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
-      >
-        <span class="material-symbols-outlined">delete</span>
-      </button>
-    </div>
+  <div class="line">
+    <span class="label-mono">Tile</span>
+    <select
+      value={tileId}
+      aria-label="Tile"
+      onchange={(e) => selectTile(e.currentTarget.value)}
+    >
+      {#if tiles.length === 0}
+        <option value="">no tiles yet</option>
+      {/if}
+      {#each tiles as t (t.id)}
+        <option value={t.id}>{tileLabel(t)}</option>
+      {/each}
+    </select>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Add tile"
+      aria-label="Add tile"
+      onclick={() => (pickerFor = { kind: "device", pageId, sectionId })}
+    >
+      <span class="material-symbols-outlined">add</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Duplicate tile"
+      aria-label="Duplicate tile"
+      disabled={!tileAnchor}
+      onclick={() =>
+        commitLayout(duplicatePlacement(registry, pageId, sectionId, tileId))}
+    >
+      <span class="material-symbols-outlined">content_copy</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Move up"
+      aria-label="Move up"
+      disabled={!tileAnchor || tileIndex <= 0}
+      onclick={() =>
+        commitLayout(
+          movePlacement(
+            registry,
+            { pageId, sectionId, index: tileIndex },
+            { pageId, sectionId, index: tileIndex - 1 },
+          ),
+        )}
+    >
+      <span class="material-symbols-outlined">arrow_upward</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Move down"
+      aria-label="Move down"
+      disabled={!tileAnchor || tileIndex === tiles.length - 1}
+      onclick={() =>
+        commitLayout(
+          movePlacement(
+            registry,
+            { pageId, sectionId, index: tileIndex },
+            { pageId, sectionId, index: tileIndex + 1 },
+          ),
+        )}
+    >
+      <span class="material-symbols-outlined">arrow_downward</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      title="Remove tile"
+      aria-label="Remove tile"
+      disabled={!tileAnchor}
+      onclick={() =>
+        commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
+    >
+      <span class="material-symbols-outlined">delete</span>
+    </button>
+  </div>
 
-    <!-- The modal view. A Tile of its own, hidden except for the modal it opens
+  <!-- The modal view. A Tile of its own, hidden except for the modal it opens
          (the display behind is where the tile itself is judged): non-modal, so
          it appears over the display and the sheet stays usable. -->
-    {#if modalShown && currentTile && tileDevice}
-      <div class="modal-view">
-        <Tile
-          device={tileDevice}
-          bp={previewBp}
-          title={currentTile.title}
-          tile={currentTile.tile}
-          openModal={modalRequest}
-          onModalClose={() => (modalShown = false)}
-        />
-      </div>
-    {/if}
+  {#if modalShown && currentTile && tileDevice}
+    <div class="modal-view">
+      <Tile
+        device={tileDevice}
+        bp={previewBp}
+        title={currentTile.title}
+        tile={currentTile.tile}
+        openModal={modalRequest}
+        onModalClose={() => (modalShown = false)}
+      />
+    </div>
+  {/if}
 
-    {#if tileSelection}
-      {#snippet tileExtras()}
-        <label
-          class="check"
-          title={hasModalParts(currentTile)
-            ? "Show the detail page — the modal a long-press opens — over the display"
-            : "Nothing of this tile lives in the detail page"}
-        >
-          <span>Detail Page</span>
-          <input
-            type="checkbox"
-            checked={modalShown}
-            disabled={!hasModalParts(currentTile)}
-            onchange={(e) => (modalShown = e.currentTarget.checked)}
-          />
-        </label>
-      {/snippet}
-      <div class="fold tile-editor">
-        <LayoutDetails
-          {registry}
-          {devices}
-          selection={tileSelection}
-          onChange={commitLayout}
-          onSelect={(next) => (selection = next)}
-          onSwapDevice={(anchor) => (swapFor = anchor)}
-          onAddSlot={openSlotPicker}
-          titleExtra={tileExtras}
-          showPreview={false}
+  {#if tileSelection}
+    {#snippet tileExtras()}
+      <label
+        class="check"
+        title={hasModalParts(currentTile)
+          ? "Show the detail page — the modal a long-press opens — over the display"
+          : "Nothing of this tile lives in the detail page"}
+      >
+        <span>Detail Page</span>
+        <input
+          type="checkbox"
+          checked={modalShown}
+          disabled={!hasModalParts(currentTile)}
+          onchange={(e) => (modalShown = e.currentTarget.checked)}
         />
-      </div>
-    {/if}
-  </aside>
-</div>
+      </label>
+    {/snippet}
+    <div class="fold tile-editor">
+      <LayoutDetails
+        {registry}
+        {devices}
+        selection={tileSelection}
+        onChange={commitLayout}
+        onSelect={(next) => (selection = next)}
+        onSwapDevice={(anchor) => (swapFor = anchor)}
+        onAddSlot={openSlotPicker}
+        titleExtra={tileExtras}
+        showPreview={false}
+      />
+    </div>
+  {/if}
+</aside>
 
 {#if pickerFor}
   {@const target = pickerFor}
@@ -651,33 +660,7 @@
 {/if}
 
 <style>
-  /* Spike B: the display fills the view, the editor is a sheet on top of it. */
-  .layout-page {
-    min-height: calc(100vh - 44px);
-  }
-
-  /* The page being edited, at its real size. Inert: this is a preview, and a
-     stray tap must not switch a lamp. */
-  .stage {
-    pointer-events: none;
-  }
-
-  /* Wide: the sheet takes the right-hand strip, the display keeps the rest (it
-     reflows to whatever width it gets). */
-  @media (min-width: 821px) {
-    .stage {
-      padding-right: 440px;
-    }
-  }
-
-  /* Narrow — a tablet in portrait, a phone: no room beside, so the sheet is a
-     bottom sheet and the live preview stays visible above it. */
-  @media (max-width: 820px) {
-    .stage {
-      padding-bottom: 62vh;
-    }
-  }
-
+  /* Spike B: the editor is a sheet over the display, not a page of its own. */
   .sheet {
     position: fixed;
     top: 44px;
@@ -711,6 +694,10 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 1.6rem;
+  }
+
+  .sheet-head .close {
+    margin-left: auto;
   }
 
   .line {

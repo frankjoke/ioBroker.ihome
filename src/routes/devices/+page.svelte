@@ -26,6 +26,7 @@
     requestDeviceConfig,
     takeRequestedDeviceConfig,
   } from "$lib/pages.js";
+  import { openSheet } from "$lib/stores/sheet.svelte.js";
   import type { Device, EnrichedControl } from "$lib/types/device";
 
   let editing = $state<Device | null>(null);
@@ -187,7 +188,10 @@
           type="button"
           class="btn btn-outline"
           title="Back to the tile editor"
-          onclick={() => (location.hash = "#/layout")}
+          onclick={() => {
+            openSheet();
+            location.hash = "#/";
+          }}
         >
           <span class="material-symbols-outlined">arrow_back</span>Back to the
           tile

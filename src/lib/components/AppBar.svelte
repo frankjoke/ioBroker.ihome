@@ -7,6 +7,7 @@
     setLastPage,
     view,
   } from "$lib/stores/pages.svelte.js";
+  import { openSheet } from "$lib/stores/sheet.svelte.js";
   import {
     pages as configPages,
     pageHref,
@@ -40,24 +41,26 @@
   });
   const isConnected = $derived(!!ioBroker.connected);
 
-  /** Ctrl/Cmd+click a page tab → open that page in the layout editor. */
+  /** Ctrl/Cmd+click a page tab → open that page in the layout sheet. */
   function onPageClick(event: MouseEvent, id: string) {
     if (wantsDeviceConfig(event)) {
       // Also suppresses the browser's open-in-new-tab for this hash link.
       event.preventDefault();
       requestLayoutConfig({ pageId: id });
-      location.hash = "#/layout";
+      openSheet();
       return;
     }
     setLastPage(id);
   }
 
   /**
-   * The pencil opens the editor on the page being viewed — the same handoff as
-   * Ctrl/Cmd+click on its tab — so the tree folds every other page around it.
+   * The pencil opens the sheet on the page being viewed — the same handoff as
+   * Ctrl/Cmd+click on its tab. It is a mode of this page, not a place to go, so
+   * nothing navigates.
    */
   function onPencilClick() {
     if (currentId) requestLayoutConfig({ pageId: currentId });
+    openSheet();
   }
 </script>
 
@@ -78,7 +81,7 @@
       {/each}
       <a
         class="tab icon-tab"
-        href={`${base}/#/layout`}
+        href={`${base}/#/`}
         title="Edit the layout"
         aria-label="Edit the layout"
         onclick={onPencilClick}
