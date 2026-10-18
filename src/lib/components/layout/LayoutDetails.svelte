@@ -1026,8 +1026,6 @@
                       {/each}
                     </select>
                   </label>
-                </div>
-                <div class="row">
                   <div class="small grow">
                     <span class="label-mono">Source</span>
                     <button
