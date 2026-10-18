@@ -80,7 +80,11 @@
   </header>
 
   {#if rows.length || !badges?.length}
-    <div class="panel-body" style:max-height={bodyMaxHeight}>
+    <div
+      class="panel-body"
+      style:max-height={bodyMaxHeight}
+      style:--panel-max={bodyMaxHeight}
+    >
       {#each rows as r, i (i)}
         {#if r.slot.kind === "frame"}
           <!-- A page has no name column: it takes the panel's whole width, and
@@ -182,9 +186,13 @@
     gap: 0.75rem;
   }
 
-  /* The frame's row: full width, no label column, tall enough for a chart (A38). */
+  /* The frame's row: full width and no label column. Its height is the panel's
+     own budget (`--panel-max`, the same cap the body gets), so the page uses
+     the room the surface has — 70vh in the dialog, 30vh in the pane preview —
+     instead of a fixed cap (A38). The tile's own size never reaches in here:
+     the modal is the enlargement, not a scaled tile. */
   .row-frame {
-    height: min(55vh, 30rem);
+    height: var(--panel-max, 55vh);
     min-height: 12rem;
   }
 

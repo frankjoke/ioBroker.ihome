@@ -1045,6 +1045,20 @@
                           })}
                       />
                     </label>
+                    <label
+                      class="check"
+                      title="Presses fall through to the tile — its long-press opens the modal, and the page can no longer be clicked or scrolled."
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.inert === true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            inert: e.currentTarget.checked ? true : undefined,
+                          })}
+                      />
+                      <span>ignore pointer</span>
+                    </label>
                   {:else}
                     <div class="small grow">
                       <span class="label-mono">Source</span>

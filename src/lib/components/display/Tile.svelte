@@ -579,9 +579,12 @@
     gap: 0.15rem;
     min-width: 0;
     max-width: 100%;
-    /* Grow into the tile's leftover height so a frame slot can fill it; every
-       other kind keeps its own size and stays where it was (A38). */
+    /* Grow into the tile's leftover height so a frame slot can fill it, and be
+       full width for the same reason: the tile centres its items, so a
+       shrink-to-fit body would leave a frame at the iframe's own 300px default
+       (the tile grew, the page did not). Every other kind keeps its size. */
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
   }
 </style>
