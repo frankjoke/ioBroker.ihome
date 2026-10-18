@@ -55,15 +55,16 @@
 
   /**
    * The pencil opens the sheet on the page being viewed; the eye closes it
-   * again. It is a mode of this page, not a place to go, so nothing navigates —
-   * the icon is the mode indicator.
+   * again. It is a mode of this page, not a place to go, so nothing navigates
+   * and nothing is handed off: the cursor is already where the display is. (It
+   * must not set a handoff either — that would clobber one already in flight,
+   * say the tile the devices page is sending us back to.)
    */
   function onPencilClick() {
     if (sheet.open) {
       closeSheet();
       return;
     }
-    if (currentId) requestLayoutConfig({ pageId: currentId });
     openSheet();
   }
 </script>

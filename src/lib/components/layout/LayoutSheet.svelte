@@ -30,6 +30,7 @@
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
   import { addSlot, editTile, slotWhere } from "$lib/config/tile-ops";
+  import { sheetCursor, swapDecision } from "$lib/config/sheet-cursor";
   import { resolveTemplate } from "$lib/config/template-ops";
   import {
     commitLayout,
@@ -82,30 +83,18 @@
   let pageOpen = $state(false);
   let sectionOpen = $state(false);
 
-  /** The page being edited: the display's (the sheet never picks its own). */
-  const page = $derived(
-    registry.pages.find((p) => p.id === pageId) ?? registry.pages[0],
-  );
-  /** The section a non-page selection points into, if any. */
-  const selectedSectionId = $derived(
-    selection && selection.kind !== "page" ? selection.sectionId : undefined,
-  );
-  /** The section being edited: the selection's, else the page's first. */
-  const section = $derived(
-    page?.groups.find((g) => g.id === selectedSectionId) ?? page?.groups[0],
-  );
-  const sectionId = $derived(section?.id ?? "");
-  const tiles = $derived(section?.tiles ?? []);
-  /** The tile the editor is on: the selection's, else the section's first. */
-  const tileId = $derived(
-    (selection?.kind === "tile" ? selection.placementId : undefined) ??
-      tiles[0]?.id ??
-      "",
-  );
+  // The cursor itself is a pure module (A45): page → section → tile, each with
+  // its fallback, and its page is the display's (the `pageId` prop).
+  const cursor = $derived(sheetCursor(registry, selection, pageId));
+  const page = $derived(cursor.page);
+  const section = $derived(cursor.section);
+  const sectionId = $derived(cursor.sectionId);
+  const tiles = $derived(cursor.tiles);
+  const tileId = $derived(cursor.tileId);
+  const tileIndex = $derived(cursor.tileIndex);
   const tileAnchor = $derived(
     tileId ? { pageId, sectionId, placementId: tileId } : null,
   );
-  const tileIndex = $derived(tiles.findIndex((t) => t.id === tileId));
   const tileSelection = $derived(
     tileAnchor ? { kind: "tile" as const, ...tileAnchor } : null,
   );
@@ -299,17 +288,18 @@
    *  tile asks first — its own config goes with the old device. */
   function pickSwapDevice(deviceId: string): void {
     const anchor = tileAnchor;
-    if (!anchor || !deviceId) return;
+    if (!anchor) return;
     const placement = placementOfAnchor(anchor);
-    if (!placement || placement.device === deviceId) return;
-    if (placement.tile) {
-      const oldName =
-        devices.find((d) => d.id === placement.device)?.name ??
-        placement.device;
-      pendingSwap = { anchor, deviceId, oldName };
+    const decision = swapDecision(placement, deviceId);
+    if (decision === "noop") return;
+    if (decision === "apply" && placement) {
+      applySwap(anchor, deviceId);
       return;
     }
-    applySwap(anchor, deviceId);
+    if (!placement) return;
+    const oldName =
+      devices.find((d) => d.id === placement.device)?.name ?? placement.device;
+    pendingSwap = { anchor, deviceId, oldName };
   }
 
   function applySwap(anchor: PlacementAnchor, deviceId: string): void {
