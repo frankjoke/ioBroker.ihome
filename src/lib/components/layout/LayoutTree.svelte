@@ -47,8 +47,28 @@
   } = $props();
 
   // Folded tree nodes. Local and transient: how the tree looks is a view of the
-  // config, never config itself.
+  // config, never config itself. Sections are the accordion (A42): folded until
+  // something opens them, and opening one folds every other — so the tree shows
+  // one room's tiles at a time instead of the whole document at once.
   let folded = $state<Record<string, boolean>>({});
+
+  const sectionIds = $derived(
+    new Set(registry.pages.flatMap((page) => page.groups.map((g) => g.id))),
+  );
+
+  /** Pages open by default; sections stay closed until something opens them. */
+  const isFolded = (id: string): boolean => folded[id] ?? sectionIds.has(id);
+
+  /** Open one node. A section opens *alone*: every other section folds with it. */
+  function openNode(
+    id: string,
+    base: Record<string, boolean>,
+  ): Record<string, boolean> {
+    const next = { ...base, [id]: false };
+    if (!sectionIds.has(id)) return next;
+    for (const other of sectionIds) if (other !== id) next[other] = true;
+    return next;
+  }
 
   // Applied once per handoff: later manual folding must survive registry updates.
   let applied: LayoutSelection | null = null;
@@ -71,25 +91,22 @@
   });
 
   // A selection can land in a folded node (the tile the picker just made, a
-  // handoff): open the path to it. Opening only — unlike `focus`, nothing folds,
-  // and folding it by hand afterwards stays folded (the effect watches the
-  // selection, not `folded`).
+  // handoff): open the path to it, the section through `openNode` so it takes
+  // the accordion with it. Folding it by hand afterwards stays folded: the
+  // effect watches the selection, never `folded`.
   $effect(() => {
     const s = selection;
     if (!s) return;
     const sectionId = s.kind === "page" ? null : s.sectionId;
     untrack(() => {
-      if (!folded[s.pageId] && !(sectionId && folded[sectionId])) return;
-      folded = {
-        ...folded,
-        [s.pageId]: false,
-        ...(sectionId ? { [sectionId]: false } : {}),
-      };
+      if (!isFolded(s.pageId) && !(sectionId && isFolded(sectionId))) return;
+      const next = openNode(s.pageId, folded);
+      folded = sectionId ? openNode(sectionId, next) : next;
     });
   });
 
   const toggleFold = (id: string): void => {
-    folded = { ...folded, [id]: !folded[id] };
+    folded = isFolded(id) ? openNode(id, folded) : { ...folded, [id]: true };
   };
 
   const deviceOf = (id: string): EnrichedDevice | undefined =>
@@ -120,11 +137,11 @@
       <button
         type="button"
         class="fold"
-        aria-label={folded[page.id] ? "Expand page" : "Fold page"}
+        aria-label={isFolded(page.id) ? "Expand page" : "Fold page"}
         onclick={() => toggleFold(page.id)}
       >
         <span class="material-symbols-outlined" aria-hidden="true"
-          >{folded[page.id] ? "chevron_right" : "expand_more"}</span
+          >{isFolded(page.id) ? "chevron_right" : "expand_more"}</span
         >
       </button>
       <button
@@ -214,7 +231,7 @@
       </span>
     </div>
 
-    {#if !folded[page.id]}
+    {#if !isFolded(page.id)}
       {#each page.groups as section, sectionIndex (section.id)}
         <div
           class="node section"
@@ -228,11 +245,13 @@
           <button
             type="button"
             class="fold"
-            aria-label={folded[section.id] ? "Expand section" : "Fold section"}
+            aria-label={isFolded(section.id)
+              ? "Expand section"
+              : "Fold section"}
             onclick={() => toggleFold(section.id)}
           >
             <span class="material-symbols-outlined" aria-hidden="true"
-              >{folded[section.id] ? "chevron_right" : "expand_more"}</span
+              >{isFolded(section.id) ? "chevron_right" : "expand_more"}</span
             >
           </button>
           <button
@@ -351,7 +370,7 @@
           </span>
         </div>
 
-        {#if !folded[section.id]}
+        {#if !isFolded(section.id)}
           {#each section.tiles ?? [] as tile, tileIndex (tile.id)}
             {@const device = deviceOf(tile.device)}
             <div

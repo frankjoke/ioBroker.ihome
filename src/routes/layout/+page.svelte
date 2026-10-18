@@ -353,4 +353,15 @@
     padding: 0.75rem;
     min-width: 0;
   }
+
+  /* The tree can outgrow the screen (a document with many rooms): it scrolls in
+     place and stays beside the pane instead of pushing it away. 3.25rem = the
+     44px app bar plus the main padding the card already sits at; 3.75rem leaves
+     it a little air at the bottom (A42). */
+  .tree-card {
+    position: sticky;
+    top: 3.25rem;
+    max-height: calc(100vh - 3.75rem);
+    overflow-y: auto;
+  }
 </style>
