@@ -33,6 +33,7 @@
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
+  import ModalPanel from "./ModalPanel.svelte";
   import type {
     EnrichedControl,
     EnrichedDevice,
@@ -48,6 +49,7 @@
     tile,
     anchor,
     newLine,
+    modalPreview,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -59,6 +61,8 @@
     anchor?: PlacementAnchor;
     /** The tree asks for a line break before this tile. */
     newLine?: boolean;
+    /** The editor's preview also renders the modal's look below the tile (A34). */
+    modalPreview?: boolean;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -420,6 +424,24 @@
   {/each}
 </div>
 
+{#if modalPreview}
+  <!-- What a long-press opens, beside the tile — the same panel the dialog
+       renders (A34), so shifting a slot is visible on both sides at once. -->
+  {#if modalRows.length}
+    <div class="modal-preview">
+      <ModalPanel
+        {device}
+        {title}
+        background={tile?.background}
+        rows={modalRows}
+        bodyMaxHeight="30vh"
+      />
+    </div>
+  {:else}
+    <p class="modal-preview text-muted">No slot lives in the modal.</p>
+  {/if}
+{/if}
+
 {#if modalOpen}
   <TileModal
     {device}
@@ -431,6 +453,17 @@
 {/if}
 
 <style>
+  /* The preview's modal panel (A34): it is a grid sibling of the tile, so it
+     spans the tile grid's whole width and sits below. */
+  .modal-preview {
+    grid-column: 1 / -1;
+  }
+
+  p.modal-preview {
+    margin: 0.25rem 0 0;
+    font-size: var(--body-sm);
+  }
+
   .tile {
     position: relative;
     display: flex;

@@ -1536,7 +1536,7 @@
         class="preview tile-grid docked"
         style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(section?.appearance?.background)}`}
       >
-        <Tile {device} {bp} title={tile.title} tile={tile.tile} />
+        <Tile {device} {bp} title={tile.title} tile={tile.tile} modalPreview />
       </div>
     {/if}
   {/if}
