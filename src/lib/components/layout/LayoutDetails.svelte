@@ -40,6 +40,7 @@
     patchSlot,
     removeRule,
     removeSlot,
+    setSlotSource,
     setSlotWhere,
     slotWhere,
     templateFromTile,
@@ -76,7 +77,7 @@
     SlotKind,
     TileConfig,
   } from "$lib/types/display";
-  import type { EnrichedDevice } from "$lib/types/device";
+  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
 
   let {
     registry,
@@ -526,14 +527,37 @@
 
   // ------------------------------------------------------------------- slots
 
-  /** What a slot row shows next to its kind: the control it reads, or its hint. */
+  /**
+   * The control a slot's hint finds right now — on a fresh hand, because the
+   * display walks the slots in order and grows a used-set as it goes (A36).
+   */
+  function hintedControl(slot: Slot): EnrichedControl | undefined {
+    const hint = String(slot.options?.pick ?? "");
+    if (!hint.trim()) return undefined;
+    const picked = pickControl(
+      pickable(device?.controls ?? []),
+      hint,
+      new SvelteSet<string>(),
+    );
+    return picked
+      ? (device?.controls ?? []).find((c) => c.id === picked.id)
+      : undefined;
+  }
+
+  /**
+   * What a slot row shows next to its kind: the control it reads under the
+   * device's own name for it (A36) — a raw state keeps its id, a hint names
+   * the control it finds. The hint's own wording stays in the fold-out editor.
+   */
   function slotLabel(slot: Slot): string {
     if (slot.source) {
       const control = resolveControl(device?.controls ?? [], slot.source);
       return control ? control.label || control.feature : slot.source;
     }
+    const hinted = hintedControl(slot);
+    if (hinted) return hinted.label || hinted.feature;
     const hint = String(slot.options?.pick ?? "");
-    return hint || "auto";
+    return hint.trim() ? hint : "auto";
   }
 
   /** A source that names a raw state object rather than a control (A21). */
@@ -560,11 +584,7 @@
     }
     const hint = String(slot.options?.pick ?? "");
     if (!hint.trim()) return false;
-    return !pickControl(
-      pickable(device?.controls ?? []),
-      hint,
-      new SvelteSet<string>(),
-    );
+    return !hintedControl(slot);
   }
 
   /** A rule's live dot: green when `when` evaluates to true, red on error. */
@@ -883,7 +903,12 @@
                 onclick={() => (expandedSlot = expandedSlot === i ? null : i)}
               >
                 <Icon value={KIND_GLYPH[slot.kind]} size={17} />
-                <span class="slot-summary">{slot.kind} · {slotLabel(slot)}</span
+                <span class="slot-summary"
+                  >{slot.kind} · {slotLabel(
+                    slot,
+                  )}{#if !slot.source && slot.options?.pick}<span
+                      class="hint-mark text-muted">(hint)</span
+                    >{/if}</span
                 >
               </button>
               <span class="row-actions">
@@ -1002,21 +1027,30 @@
                     </select>
                   </label>
                 </div>
-                <div class="slot-line">
-                  <button
-                    type="button"
-                    class="btn btn-sm"
-                    onclick={() => (sourcePickerFor = i)}
-                  >
-                    {slot.source
-                      ? slot.source
-                      : slot.options?.pick
-                        ? `hint: ${slot.options.pick}`
-                        : "auto (next control)"}
-                  </button>
-                  {#if slot.source && isRawState(slot.source)}
-                    <span class="hint-badge text-muted">read-only</span>
-                  {/if}
+                <div class="row">
+                  <div class="small grow">
+                    <span class="label-mono">Source</span>
+                    <button
+                      type="button"
+                      class="btn btn-sm source-pick"
+                      title={slot.source
+                        ? `Change source — now ${slot.source}`
+                        : "Pin one control instead of a hint"}
+                      onclick={() => (sourcePickerFor = i)}
+                    >
+                      <Icon value="edit" size={15} />
+                      <span class="source-name"
+                        >{slot.source
+                          ? slotLabel(slot)
+                          : slot.options?.pick
+                            ? `${slotLabel(slot)} (hint)`
+                            : "auto (next control)"}</span
+                      >
+                    </button>
+                    {#if slot.source && isRawState(slot.source)}
+                      <span class="hint-badge text-muted">read-only</span>
+                    {/if}
+                  </div>
                 </div>
                 <div class="row">
                   <label class="small grow">
@@ -1049,7 +1083,7 @@
                 </div>
                 <div class="row">
                   <label class="small grow">
-                    <span class="label-mono">pick (hint)</span>
+                    <span class="label-mono">Hint</span>
                     <input
                       type="text"
                       placeholder="e.g. temperature"
@@ -1100,6 +1134,12 @@
                     </label>
                   {/if}
                 </div>
+                <p class="note text-muted">
+                  A hint pins no control: the display looks up the control whose
+                  name, role or unit matches while it renders, so one template
+                  fits every device. Picking a Source pins one control and drops
+                  the hint.
+                </p>
                 {#if slot.kind === "level"}
                   <div class="row">
                     <label class="small">
@@ -1596,7 +1636,7 @@
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;
         if (slotIndex === null) return;
-        edit((t) => patchSlot(t, slotIndex, { source }));
+        edit((t) => setSlotSource(t, slotIndex, source));
       }}
       onClose={() => (sourcePickerFor = null)}
     />
@@ -1771,6 +1811,11 @@
     white-space: nowrap;
   }
 
+  /* Its own gap: the svelte compiler trims the space before an inline element. */
+  .hint-mark {
+    margin-left: 0.25rem;
+  }
+
   .hint-badge {
     flex: 0 0 auto;
     font-size: 0.7rem;
@@ -1819,6 +1864,18 @@
   .slot-editor .small input,
   .slot-editor .small select {
     min-width: 0;
+  }
+
+  .source-pick {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .source-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .grow {

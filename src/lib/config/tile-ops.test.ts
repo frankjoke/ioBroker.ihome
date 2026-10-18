@@ -25,6 +25,7 @@ import {
   removeRule,
   removeSlot,
   resetTile,
+  setSlotSource,
   setSlotWhere,
   slotWhere,
   templateFromTile,
@@ -152,6 +153,30 @@ it("a slot's where picks its home; the last tile slot cannot move to the modal (
   expect(nextSlotWhere({ kind: "value", where: "both" }, 2)).toBe("modal");
   expect(nextSlotWhere({ kind: "value", where: "both" }, 1)).toBe("tile");
   expect(nextSlotWhere({ kind: "value", where: "modal" }, 1)).toBe("tile");
+});
+
+it("setSlotSource pins one source and drops the dead hint beside it (A36)", () => {
+  const tile: TileConfig = {
+    slots: [
+      { kind: "value", options: { pick: "temperature", index: 1 } },
+      { kind: "value", source: "a", options: { pick: "humidity" } },
+    ],
+  };
+  const pinned = setSlotSource(tile, 0, "control-1");
+  // The hint is gone, the knobs stay, the sibling object is untouched.
+  expect(pinned.slots?.at(0)).toEqual({
+    kind: "value",
+    source: "control-1",
+    options: { index: 1 },
+  });
+  expect(pinned.slots?.at(1)).toBe(tile.slots?.at(1));
+  // Empty options are dropped, not left as a husk.
+  expect(setSlotSource(tile, 1, "control-2").slots?.at(1)).toEqual({
+    kind: "value",
+    source: "control-2",
+  });
+  // A bad index leaves the tile alone.
+  expect(setSlotSource(tile, 9, "control-3")).toEqual(tile);
 });
 
 it("rule ops address slot and rule indexes", () => {

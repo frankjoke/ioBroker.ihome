@@ -108,6 +108,31 @@ export function patchSlot(
   );
 }
 
+/**
+ * Pin a slot on one explicit source (A36). A hint behind a source is dead
+ * weight — the source always wins — so it goes with the pick, and an options
+ * object left empty goes too, like `setSlotWhere` dropping the default. A bad
+ * index leaves the list — copied — untouched, like `removeSlot`.
+ */
+export function setSlotSource(
+  tile: TileConfig,
+  index: number,
+  source: string,
+): TileConfig {
+  return withSlots(
+    tile,
+    (tile.slots ?? []).map((slot, i) => {
+      if (i !== index) return slot;
+      const options = { ...(slot.options ?? {}) };
+      delete options.pick;
+      const copy: Slot = { ...slot, source };
+      if (Object.keys(options).length) copy.options = options;
+      else delete copy.options;
+      return copy;
+    }),
+  );
+}
+
 /** Where a slot lives (A34): the tile by default, or the modal, or both. */
 export function slotWhere(slot: Slot): "tile" | "both" | "modal" {
   return slot.where ?? "tile";

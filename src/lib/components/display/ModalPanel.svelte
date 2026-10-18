@@ -29,7 +29,9 @@
     /** The slots that live in the modal, resolved and styled by the tile (A34). */
     rows: {
       slot: Slot;
-      control?: SlotControl;
+      /** The resolved control; `feature` names it when the device gave it no
+       *  label — the row label falls back to it. */
+      control?: SlotControl & { feature?: string };
       style: ResolvedStyle;
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
