@@ -236,6 +236,8 @@ export interface PickedSlot<T> {
  * icon and value can name the same feature and the value's hint still gets the
  * control it means (A36). `options.raw` supplies the pseudo-control for a source
  * that is a raw state id. Badge slots are skipped — badges live in the corners.
+ * A frame slot walks through without a control: it reads a page, not a reading
+ * (A38), so it never claims the next free control and is never dormant.
  */
 export function pickSlotControls<T extends PickableControl>(
   slots: Slot[],
@@ -248,6 +250,13 @@ export function pickSlotControls<T extends PickableControl>(
   for (const slot of slots ?? []) {
     if (slot.kind === "badge") continue;
     if (!slotVisible(slot, options?.active === true)) continue;
+
+    // A frame shows a web page (A38): nothing to claim, nothing to consume —
+    // it walks through control-less, so tile, modal and pane all keep it.
+    if (slot.kind === "frame") {
+      out.push({ slot });
+      continue;
+    }
 
     if (slot.source) {
       const control =

@@ -25,7 +25,7 @@
     onClose: () => void;
   } = $props();
 
-  type Tab = "device" | "placeholder" | "state";
+  type Tab = "device" | "placeholder" | "page" | "state";
 
   /** Widget-like kinds only make sense on a real control of this device (A21). */
   const DEVICE_KINDS: SlotKind[] = [
@@ -43,18 +43,23 @@
   let kind = $state<SlotKind>("value");
   let search = $state("");
   let hint = $state("");
+  let url = $state("");
 
-  /** Source mode only chooses a string, so there is no placeholder tab. */
+  /** Source mode only chooses a string, so there is no placeholder or page tab. */
   const TABS: { id: Tab; label: string }[] = [
     { id: "device", label: "This device" },
     { id: "placeholder", label: "Placeholder" },
+    { id: "page", label: "Web page" },
     { id: "state", label: "Any state" },
   ];
   const tabs = $derived(
-    isSource ? TABS.filter((t) => t.id !== "placeholder") : TABS,
+    isSource
+      ? TABS.filter((t) => t.id !== "placeholder" && t.id !== "page")
+      : TABS,
   );
 
   function kindsFor(t: Tab): SlotKind[] {
+    if (t === "page") return ["frame"];
     return t === "device"
       ? ["value", "icon", "badge", ...DEVICE_KINDS]
       : ["value", "icon", "badge"];
@@ -106,6 +111,13 @@
     onAdd({ kind, options: { pick: text } });
   }
 
+  /** A frame slot (A38): the page it shows is its whole content. */
+  function addPage() {
+    const text = url.trim();
+    if (!text) return;
+    onAdd({ kind: "frame", options: { url: text } });
+  }
+
   function onKey(event: KeyboardEvent) {
     if (event.key === "Escape") onClose();
   }
@@ -143,7 +155,7 @@
           onclick={() => setTab(t.id)}>{t.label}</button
         >
       {/each}
-      {#if !isSource}
+      {#if !isSource && tab !== "page"}
         <label class="kind">
           <span class="label-mono">Kind</span>
           <select
@@ -208,6 +220,26 @@
             The hint resolves the control whose name matches it while the
             display renders; a device without one shows nothing here and keeps
             the other rows where they are (A20).
+          </p>
+        </div>
+      {:else if tab === "page"}
+        <div class="placeholder">
+          <div class="row-input">
+            <input
+              type="text"
+              placeholder="http://…/echarts/index.html?preset=…"
+              bind:value={url}
+            />
+            <button
+              type="button"
+              class="btn btn-primary"
+              disabled={!url.trim()}
+              onclick={addPage}>Add page</button
+            >
+          </div>
+          <p class="text-muted hint-note">
+            The page loads in a frame (A38) — the tile's own space, or the
+            modal's wide row, as this slot's destination says.
           </p>
         </div>
       {:else if matches.length === 0}

@@ -312,6 +312,19 @@ it("pickSlotControls walks in order and never hands one control to two slots", (
   expect(out.map((r) => r.control?.id)).toEqual(["a", "b"]);
 });
 
+// A38: a frame shows a web page, it reads no control — it must not claim the
+// next free one, or a bare value below it would slide to the second control.
+it("a frame slot neither claims nor consumes a control (A38)", () => {
+  const slots: Slot[] = [
+    { kind: "value" },
+    { kind: "frame", options: { url: "http://x/echarts/index.html" } },
+    { kind: "value" },
+  ];
+  const out = pickSlotControls(slots, [ctl("a"), ctl("b")]);
+  expect(out.map((r) => r.control?.id)).toEqual(["a", undefined, "b"]);
+  expect(out[1].dormant).toBeFalsy();
+});
+
 it("a failing hint goes dormant and does not claim a control", () => {
   const slots: Slot[] = [
     { kind: "value", options: { pick: "humidity" } },

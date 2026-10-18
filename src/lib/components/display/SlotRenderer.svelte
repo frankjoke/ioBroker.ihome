@@ -4,6 +4,7 @@
   import ValueSlot from "./slots/ValueSlot.svelte";
   import SparklineSlot from "./slots/SparklineSlot.svelte";
   import HistoryListSlot from "./slots/HistoryListSlot.svelte";
+  import FrameSlot from "./slots/FrameSlot.svelte";
   import type { Slot } from "$lib/types/display";
   import type {
     EnrichedControl,
@@ -57,6 +58,8 @@
       control={control as EnrichedControl}
       count={Number(slot.options?.count ?? 4)}
     />
+  {:else if slot.kind === "frame"}
+    <FrameSlot {slot} />
   {:else if needsControl && control}
     <ControlWidget control={control as EnrichedControl} />
   {/if}

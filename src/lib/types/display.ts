@@ -102,7 +102,8 @@ export type SlotKind =
   | "button"
   | "badge"
   | "sparkline"
-  | "history-list";
+  | "history-list"
+  | "frame";
 
 /** A conditional style, evaluated top-to-bottom; the last match wins. */
 export interface Rule {

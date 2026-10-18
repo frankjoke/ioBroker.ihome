@@ -251,6 +251,7 @@
     badge: "label",
     sparkline: "show_chart",
     "history-list": "history",
+    frame: "web_asset",
   };
 
   /** The three homes a slot can have (A34), in click order, and their icons. */
@@ -550,6 +551,10 @@
    * the control it finds. The hint's own wording stays in the fold-out editor.
    */
   function slotLabel(slot: Slot): string {
+    if (slot.kind === "frame") {
+      const url = String(slot.options?.url ?? "");
+      return url || "no page";
+    }
     if (slot.source) {
       const control = resolveControl(device?.controls ?? [], slot.source);
       return control ? control.label || control.feature : slot.source;
@@ -1026,29 +1031,44 @@
                       {/each}
                     </select>
                   </label>
-                  <div class="small grow">
-                    <span class="label-mono">Source</span>
-                    <button
-                      type="button"
-                      class="btn btn-sm source-pick"
-                      title={slot.source
-                        ? `Change source — now ${slot.source}`
-                        : "Pin one control instead of a hint"}
-                      onclick={() => (sourcePickerFor = i)}
-                    >
-                      <Icon value="edit" size={15} />
-                      <span class="source-name"
-                        >{slot.source
-                          ? slotLabel(slot)
-                          : slot.options?.pick
-                            ? `${slotLabel(slot)} (hint)`
-                            : "auto (next control)"}</span
+                  {#if slot.kind === "frame"}
+                    <label class="small grow">
+                      <span class="label-mono">URL</span>
+                      <input
+                        type="text"
+                        placeholder="http://…/echarts/index.html?preset=…"
+                        value={String(slot.options?.url ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            url: e.currentTarget.value.trim() || undefined,
+                          })}
+                      />
+                    </label>
+                  {:else}
+                    <div class="small grow">
+                      <span class="label-mono">Source</span>
+                      <button
+                        type="button"
+                        class="btn btn-sm source-pick"
+                        title={slot.source
+                          ? `Change source — now ${slot.source}`
+                          : "Pin one control instead of a hint"}
+                        onclick={() => (sourcePickerFor = i)}
                       >
-                    </button>
-                    {#if slot.source && isRawState(slot.source)}
-                      <span class="hint-badge text-muted">read-only</span>
-                    {/if}
-                  </div>
+                        <Icon value="edit" size={15} />
+                        <span class="source-name"
+                          >{slot.source
+                            ? slotLabel(slot)
+                            : slot.options?.pick
+                              ? `${slotLabel(slot)} (hint)`
+                              : "auto (next control)"}</span
+                        >
+                      </button>
+                      {#if slot.source && isRawState(slot.source)}
+                        <span class="hint-badge text-muted">read-only</span>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
                 <div class="row">
                   <label class="small grow">
@@ -1079,65 +1099,67 @@
                     />
                   </label>
                 </div>
-                <div class="row">
-                  <label class="small grow">
-                    <span class="label-mono">Hint</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. temperature"
-                      value={String(slot.options?.pick ?? "")}
-                      oninput={(e) =>
-                        patchOptions(i, {
-                          pick: e.currentTarget.value.trim() || undefined,
-                        })}
-                    />
-                  </label>
-                  {#if slot.kind === "value"}
-                    <label class="small">
-                      <span class="label-mono">index</span>
+                {#if slot.kind !== "frame"}
+                  <div class="row">
+                    <label class="small grow">
+                      <span class="label-mono">Hint</span>
                       <input
-                        type="number"
-                        class="num-input"
-                        value={String(slot.options?.index ?? "")}
+                        type="text"
+                        placeholder="e.g. temperature"
+                        value={String(slot.options?.pick ?? "")}
                         oninput={(e) =>
                           patchOptions(i, {
-                            index: num(e.currentTarget.value),
+                            pick: e.currentTarget.value.trim() || undefined,
                           })}
                       />
                     </label>
-                    <label class="small">
-                      <span class="label-mono">decimals</span>
-                      <input
-                        type="number"
-                        class="num-input"
-                        value={String(slot.options?.decimals ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            decimals: num(e.currentTarget.value),
-                          })}
-                      />
-                    </label>
-                    <label class="check" title="Hide the unit to save width">
-                      <input
-                        type="checkbox"
-                        checked={slot.options?.hideUnit !== true}
-                        onchange={(e) =>
-                          patchOptions(i, {
-                            hideUnit: e.currentTarget.checked
-                              ? undefined
-                              : true,
-                          })}
-                      />
-                      <span>unit</span>
-                    </label>
-                  {/if}
-                </div>
-                <p class="note text-muted">
-                  A hint pins no control: the display looks up the control whose
-                  name, role or unit matches while it renders, so one template
-                  fits every device. Picking a Source pins one control and drops
-                  the hint.
-                </p>
+                    {#if slot.kind === "value"}
+                      <label class="small">
+                        <span class="label-mono">index</span>
+                        <input
+                          type="number"
+                          class="num-input"
+                          value={String(slot.options?.index ?? "")}
+                          oninput={(e) =>
+                            patchOptions(i, {
+                              index: num(e.currentTarget.value),
+                            })}
+                        />
+                      </label>
+                      <label class="small">
+                        <span class="label-mono">decimals</span>
+                        <input
+                          type="number"
+                          class="num-input"
+                          value={String(slot.options?.decimals ?? "")}
+                          oninput={(e) =>
+                            patchOptions(i, {
+                              decimals: num(e.currentTarget.value),
+                            })}
+                        />
+                      </label>
+                      <label class="check" title="Hide the unit to save width">
+                        <input
+                          type="checkbox"
+                          checked={slot.options?.hideUnit !== true}
+                          onchange={(e) =>
+                            patchOptions(i, {
+                              hideUnit: e.currentTarget.checked
+                                ? undefined
+                                : true,
+                            })}
+                        />
+                        <span>unit</span>
+                      </label>
+                    {/if}
+                  </div>
+                  <p class="note text-muted">
+                    A hint pins no control: the display looks up the control
+                    whose name, role or unit matches while it renders, so one
+                    template fits every device. Picking a Source pins one
+                    control and drops the hint.
+                  </p>
+                {/if}
                 {#if slot.kind === "level"}
                   <div class="row">
                     <label class="small">

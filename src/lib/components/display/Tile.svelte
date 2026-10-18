@@ -151,7 +151,7 @@
       raw: rawControl,
     }).filter(
       (r) =>
-        (r.slot.kind === "icon" || r.control) &&
+        (r.slot.kind === "icon" || r.slot.kind === "frame" || r.control) &&
         slotStyle(r.slot, r.control).hidden !== true,
     ),
   );
@@ -579,5 +579,9 @@
     gap: 0.15rem;
     min-width: 0;
     max-width: 100%;
+    /* Grow into the tile's leftover height so a frame slot can fill it; every
+       other kind keeps its own size and stays where it was (A38). */
+    flex: 1 1 auto;
+    min-height: 0;
   }
 </style>

@@ -82,25 +82,39 @@
   {#if rows.length || !badges?.length}
     <div class="panel-body" style:max-height={bodyMaxHeight}>
       {#each rows as r, i (i)}
-        <div class="row">
-          <span class="row-label"
-            >{r.slot.label ||
-              r.control?.label ||
-              r.control?.feature ||
-              r.slot.source ||
-              r.slot.kind}</span
-          >
-          <div class="row-control">
+        {#if r.slot.kind === "frame"}
+          <!-- A page has no name column: it takes the panel's whole width, and
+               the row's height is what the tile's frame would not have (A38). -->
+          <div class="row-frame">
             <SlotRenderer
               slot={r.slot}
               {device}
               control={r.control}
               style={r.style}
-              onPrimary={r.onPrimary}
               emphasis="secondary"
             />
           </div>
-        </div>
+        {:else}
+          <div class="row">
+            <span class="row-label"
+              >{r.slot.label ||
+                r.control?.label ||
+                r.control?.feature ||
+                r.slot.source ||
+                r.slot.kind}</span
+            >
+            <div class="row-control">
+              <SlotRenderer
+                slot={r.slot}
+                {device}
+                control={r.control}
+                style={r.style}
+                onPrimary={r.onPrimary}
+                emphasis="secondary"
+              />
+            </div>
+          </div>
+        {/if}
       {/each}
 
       {#if rows.length === 0}
@@ -166,6 +180,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  /* The frame's row: full width, no label column, tall enough for a chart (A38). */
+  .row-frame {
+    height: min(55vh, 30rem);
+    min-height: 12rem;
   }
 
   .row-label {
