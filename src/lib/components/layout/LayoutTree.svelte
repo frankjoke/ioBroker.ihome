@@ -70,6 +70,24 @@
     folded = next;
   });
 
+  // A selection can land in a folded node (the tile the picker just made, a
+  // handoff): open the path to it. Opening only — unlike `focus`, nothing folds,
+  // and folding it by hand afterwards stays folded (the effect watches the
+  // selection, not `folded`).
+  $effect(() => {
+    const s = selection;
+    if (!s) return;
+    const sectionId = s.kind === "page" ? null : s.sectionId;
+    untrack(() => {
+      if (!folded[s.pageId] && !(sectionId && folded[sectionId])) return;
+      folded = {
+        ...folded,
+        [s.pageId]: false,
+        ...(sectionId ? { [sectionId]: false } : {}),
+      };
+    });
+  });
+
   const toggleFold = (id: string): void => {
     folded = { ...folded, [id]: !folded[id] };
   };

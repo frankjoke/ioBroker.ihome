@@ -27,7 +27,7 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import type { EnrichedDevice } from "$lib/types/device";
-  import type { Slot } from "$lib/types/display";
+  import type { PageRegistry, Slot } from "$lib/types/display";
 
   let selection = $state<LayoutSelection | null>(null);
   /** The handoff target, applied by the tree once (folding); selection stays. */
@@ -97,6 +97,28 @@
       ),
     );
     pickerFor = null;
+  }
+
+  /** The device picker's add: place them, then select the first new tile, so the
+   * tree opens its section and the pane shows it ready for its slots (A40). */
+  function addDevicesTo(
+    pageId: string,
+    sectionId: string,
+    deviceIds: string[],
+    at?: number,
+  ): void {
+    const sectionIn = (reg: PageRegistry) =>
+      reg.pages
+        .find((p) => p.id === pageId)
+        ?.groups.find((g) => g.id === sectionId);
+    const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
+    const next = appendDevices(registry, pageId, sectionId, deviceIds, at);
+    commitLayout(next);
+    pickerFor = null;
+    const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
+    if (added) {
+      selection = { kind: "tile", pageId, sectionId, placementId: added.id };
+    }
   }
 
   /** Change device (A25): a materialised tile asks first — its own config goes. */
@@ -238,16 +260,7 @@
           ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
       ).map((t) => t.device)}
       onAdd={(deviceIds) => {
-        commitLayout(
-          appendDevices(
-            registry,
-            target.pageId,
-            target.sectionId,
-            deviceIds,
-            target.at,
-          ),
-        );
-        pickerFor = null;
+        addDevicesTo(target.pageId, target.sectionId, deviceIds, target.at);
       }}
       onClose={() => (pickerFor = null)}
     />
