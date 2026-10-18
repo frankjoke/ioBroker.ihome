@@ -8,7 +8,8 @@
 **Scope:** the *second* slice of real configuration — edit a placement's own tile (general options,
 slots, rules), author and apply per-type templates from a tile, pick icons and backgrounds for pages
 and sections, and route from the display into the editor focused on one page or section. Tile
-enlargement (`modal`) and cross-device slots (`from`) stay P3. Deferred work is listed in "Non-goals".
+enlargement is built as the slots' own `where` (A34); cross-device slots (`from`) stay deferred
+(S2). Deferred work is listed in "Non-goals".
 
 ## 1. Intent
 
@@ -71,6 +72,7 @@ Success criteria:
 | A31 | **Value-driven slot visibility**: a rule may carry **`only: true`** — a visibility gate rather than a style. While at least one gate is present and none matches, the slot hides; the verdict is applied *after* the last-match-wins fold, so a later `hidden: false` cannot reopen it, and a broken gate expression fails closed (the rule's live result dot is the guard). Badge slots honour `hidden`/`only` exactly like body slots — their own rules and the control's — so a warning badge appears precisely while its condition holds (`when: battery < 30` ☑ only + tone `danger`). The pane's rule editor gains the *only* checkbox. |
 | A32 | **The chart layer** (supersedes A22's "drawn behind the content"): a `sparkline` slot with `options.background: true` renders *over* the tile's content at `z-index: 1` (badges keep z 2; `pointer-events: none`), and its drawing **stretches to the tile** (`preserveAspectRatio="none"`): the fixed 120×28 coordinate box used to be letterboxed into the tall tile, leaving an ~11px strip in the middle — hidden behind the icon and values. The chart is centred at **70% of the tile's height** so the badge corners and the name keep their space; the stroke stays 1.5px (`non-scaling-stroke`). In-body sparklines keep the 120:28 aspect. |
 | A33 | **The tile's painted background renders** (spec §5.4 realised — the field was stored, edited and template-copied but never drawn): `Tile.svelte` puts `backgroundCss(tile.background)` on the tile element ahead of a rule's `background`, so the live condition still wins. The tile pane's docked preview paints the **section's** background behind the tile (the page stays out, section border not drawn), so a tile is judged in its section — the bare-tile look of T26 changes deliberately. The section preview was already correct (supersedes T26's bare preview). |
+| A34 | **A slot declares where it lives** (supersedes the reserved `TileConfig.modal`, now deleted): `Slot.where?: "tile" \| "both" \| "modal"` — absent = tile, so existing documents render unchanged. The editor presents exactly the three states per slot: a "Lives in" picker in the expanded slot editor (hidden for badge slots and the chart layer) and a row badge (`tile + modal` / `modal only`). `setSlotWhere` refuses — the tile untouched — to leave no slot on the main tile; the "modal only" option disables itself beforehand, so the tile never empties. The modal renders the slots with `where ≠ "tile"` through the same `SlotRenderer` (full vocabulary, rules and `showWhen` included, the `onPrimary` action kept, secondary emphasis) and opens only when at least one resolves into it — the automatic all-controls enlargement and its `extraControls` reachability end here. It shows the tile's own name and paints the tile's background. Cross-device `Slot.from` stays deferred. |
 
 ## 3. Architecture
 
@@ -101,7 +103,6 @@ interface TileConfig {
   background?: Background;  // new: the CSS background (solid/gradient/image)
   active?: ActiveCondition; // new: what "active" means for this tile
   slots?: Slot[];           // exists: their presence marks the tile as materialised
-  modal?: { slots: Slot[] }; // untouched (P3)
 }
 
 interface Template {        // existing + one field
@@ -322,7 +323,8 @@ tile target it unfolds both the page and the section that hold it, with the tile
 
 ## 13. Non-goals
 
-- The tile **enlargement** (`modal.slots`) and cross-device slots (`Slot.from`) — P3 as planned.
+- The tile **enlargement** is built as the slots' `where` (A34); cross-device slots (`Slot.from`) and
+  per-control write states stay S2.
 - The `/templates` library page, template delete/rename UI, template inheritance/`basedOn` editing,
   and the device-form `template` field — later slices; this slice authors and applies from the tile
   pane only.

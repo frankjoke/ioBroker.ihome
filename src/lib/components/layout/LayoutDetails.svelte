@@ -39,6 +39,8 @@
     patchSlot,
     removeRule,
     removeSlot,
+    setSlotWhere,
+    slotWhere,
     templateFromTile,
     upsertTemplate,
   } from "$lib/config/tile-ops";
@@ -222,6 +224,11 @@
   const shownSlots = $derived(
     tile?.tile?.slots ??
       (device ? resolveTemplate(device, templates).slots : []),
+  );
+
+  /** How many of them still live on the tile — the guard for A34. */
+  const tileVisibleCount = $derived(
+    shownSlots.filter((s) => slotWhere(s) !== "modal").length,
   );
 
   /** The tile's active reading, and the scope the rules' live dots evaluate in. */
@@ -829,6 +836,13 @@
                       : "inactive only"}</span
                   >
                 {/if}
+                {#if slotWhere(slot) !== "tile"}
+                  <span class="hint-badge text-muted"
+                    >{slotWhere(slot) === "modal"
+                      ? "modal only"
+                      : "tile + modal"}</span
+                  >
+                {/if}
               </button>
               <span class="row-actions">
                 {#if i === 0}
@@ -938,6 +952,31 @@
                       <option value="inactive">only inactive</option>
                     </select>
                   </label>
+                  {#if slot.kind !== "badge" && slot.options?.background !== true}
+                    <label class="small">
+                      <span class="label-mono">Lives in</span>
+                      <select
+                        value={slotWhere(slot)}
+                        onchange={(e) =>
+                          edit((t) =>
+                            setSlotWhere(
+                              t,
+                              i,
+                              e.currentTarget.value as
+                                "tile" | "both" | "modal",
+                            ),
+                          )}
+                      >
+                        <option value="tile">tile</option>
+                        <option value="both">tile + modal</option>
+                        <option
+                          value="modal"
+                          disabled={slotWhere(slot) !== "modal" &&
+                            tileVisibleCount <= 1}>modal only</option
+                        >
+                      </select>
+                    </label>
+                  {/if}
                 </div>
                 <div class="slot-line">
                   <button

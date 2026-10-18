@@ -24,6 +24,8 @@ import {
   removeRule,
   removeSlot,
   resetTile,
+  setSlotWhere,
+  slotWhere,
   templateFromTile,
   upsertTemplate,
 } from "./tile-ops";
@@ -108,6 +110,41 @@ it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
     "Leistung",
   );
   expect(removeSlot(two, 0).slots?.length).toBe(1);
+});
+
+it("a slot's where picks its home; the last tile slot cannot move to the modal (A34)", () => {
+  const tile: TileConfig = {
+    slots: [
+      { kind: "value", source: "power" },
+      { kind: "button", source: "boost" },
+    ],
+  };
+  expect(slotWhere({ kind: "value" })).toBe("tile"); // absent = tile
+  const both = setSlotWhere(tile, 0, "both");
+  expect(slotWhere(both.slots!.at(0)!)).toBe("both");
+  expect(slotWhere(both.slots!.at(1)!)).toBe("tile");
+  // The second slot can leave the tile because the first still lives there.
+  const modal = setSlotWhere(both, 1, "modal");
+  expect(slotWhere(modal.slots!.at(1)!)).toBe("modal");
+  // A badge renders on the tile too, so it alone keeps a tile from emptying.
+  const badge = setSlotWhere(
+    { slots: [{ kind: "value", source: "a" }, { kind: "badge" }] },
+    0,
+    "modal",
+  );
+  expect(slotWhere(badge.slots!.at(0)!)).toBe("modal");
+  // The only slot cannot move out: refused, the tile comes back untouched.
+  const lone = setSlotWhere(
+    { slots: [{ kind: "value", source: "power" }] },
+    0,
+    "modal",
+  );
+  expect(lone.slots?.at(0)?.where).toBeUndefined();
+  // Back to the default drops the field instead of storing "tile".
+  const back = setSlotWhere(both, 0, "tile");
+  expect(back.slots?.at(0)).toEqual({ kind: "value", source: "power" });
+  // A bad index leaves the tile alone.
+  expect(setSlotWhere(tile, 9, "modal")).toBe(tile);
 });
 
 it("rule ops address slot and rule indexes", () => {

@@ -10,7 +10,7 @@
     slotVisible,
     tileTitle,
   } from "$lib/config/template-ops";
-  import { evalActive } from "$lib/config/tile-ops";
+  import { evalActive, slotWhere } from "$lib/config/tile-ops";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -153,18 +153,41 @@
   );
 
   // A slot marked `options.background` renders over the content as the tile's
-  // chart layer (A22); everything else is the tile's body.
+  // chart layer (A22); everything else is the tile's body. Where a slot lives
+  // is its own choice (A34): "modal" leaves the tile, "both" stays here too.
   const backgroundSlots = $derived(
-    resolved.filter((r) => r.slot.options?.background === true),
+    resolved.filter(
+      (r) =>
+        r.slot.options?.background === true && slotWhere(r.slot) !== "modal",
+    ),
   );
   const bodySlots = $derived(
-    resolved.filter((r) => r.slot.options?.background !== true),
+    resolved.filter(
+      (r) =>
+        r.slot.options?.background !== true && slotWhere(r.slot) !== "modal",
+    ),
+  );
+  /** The modal's rows (A34) — resolved the same way, so every slot kind works. */
+  const modalSlots = $derived(
+    resolved.filter(
+      (r) =>
+        r.slot.options?.background !== true && slotWhere(r.slot) !== "tile",
+    ),
+  );
+  const modalRows = $derived(
+    modalSlots.map((r) => ({
+      slot: r.slot,
+      control: r.control,
+      style: slotStyle(r.slot, r.control),
+      // The slot that *is* the tile's action stays a button in the modal too.
+      onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
+    })),
   );
 
   /** The tile's first reading is the headline; the rest are supporting. */
   const mainValueKey = $derived(
     (() => {
-      const first = resolved.find((r) => r.slot.kind === "value");
+      const first = bodySlots.find((r) => r.slot.kind === "value");
       return first
         ? `${first.slot.kind}:${first.slot.source ?? ""}:${first.slot.options?.index ?? ""}`
         : "";
@@ -263,15 +286,6 @@
   }
 
   /**
-   * A control the tile does not already show. The enlargement only earns a click
-   * when there is something more to show — otherwise a stray tap on a light
-   * would be the last thing between you and a switched-on lamp.
-   */
-  const extraControls = $derived(
-    shownControls.filter((c) => !resolved.some((r) => r.control === c)),
-  );
-
-  /**
    * Open this tile's placement in the layout editor (A16). A tile rendered
    * without an anchor — an editor preview, say — falls back to the device form;
    * the device shortcut was the stopgap while no tile editor existed.
@@ -308,8 +322,10 @@
       return;
     }
     // Body tap = enlarge (spec §7). The action lives on the control itself —
-    // the icon and the On/Off text — so nothing switches by accident.
-    if (extraControls.length) modalOpen = true;
+    // the icon and the On/Off text — so nothing switches by accident. The
+    // modal only opens when slots live in it (A34); otherwise a stray tap on a
+    // light would be the last thing between you and a switched-on lamp.
+    if (modalSlots.length) modalOpen = true;
   }
 
   let modalOpen = $state(false);
@@ -357,7 +373,7 @@
   style="grid-column: {newLine
     ? '1'
     : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
-  class:interactive={extraControls.length > 0}
+  class:interactive={modalSlots.length > 0}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
   onclickcapture={onCapture}
@@ -405,7 +421,13 @@
 </div>
 
 {#if modalOpen}
-  <TileModal {device} onClose={() => (modalOpen = false)} />
+  <TileModal
+    {device}
+    {title}
+    background={tile?.background}
+    rows={modalRows}
+    onClose={() => (modalOpen = false)}
+  />
 {/if}
 
 <style>

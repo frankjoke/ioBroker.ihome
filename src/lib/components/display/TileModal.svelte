@@ -1,11 +1,35 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import ControlWidget from "./slots/ControlWidget.svelte";
+  import { backgroundCss } from "$lib/config/appearance";
+  import { tileTitle } from "$lib/config/template-ops";
   import EnumBadge from "$lib/components/common/EnumBadge.svelte";
-  import type { EnrichedDevice } from "$lib/types/device";
+  import SlotRenderer from "./SlotRenderer.svelte";
+  import type { EnrichedDevice, SlotControl } from "$lib/types/device";
+  import type { Background, Slot } from "$lib/types/display";
+  import type { ResolvedStyle } from "$lib/config/rule-ops";
 
-  let { device, onClose }: { device: EnrichedDevice; onClose: () => void } =
-    $props();
+  let {
+    device,
+    title,
+    background,
+    rows,
+    onClose,
+  }: {
+    device: EnrichedDevice;
+    /** The tile's title: the modal shows the name the tile shows (A34). */
+    title?: string;
+    /** The tile's painted background; the panel shares it (A34). */
+    background?: Background;
+    /** The slots that live in the modal, resolved and styled by the tile (A34). */
+    rows: {
+      slot: Slot;
+      control?: SlotControl;
+      style: ResolvedStyle;
+      /** Set when the slot is the tile's action — then it stays a button. */
+      onPrimary?: () => void;
+    }[];
+    onClose: () => void;
+  } = $props();
 
   let el = $state<HTMLDialogElement | null>(null);
 
@@ -15,7 +39,7 @@
     el?.showModal();
   });
 
-  const controls = $derived((device.controls ?? []).filter((c) => !c.hidden));
+  const heading = $derived(title || tileTitle(device));
 
   function onBackdrop(e: MouseEvent) {
     if (e.target === el) onClose();
@@ -25,13 +49,14 @@
 <dialog
   bind:this={el}
   class="modal"
-  aria-label={device.name}
+  aria-label={heading}
+  style={backgroundCss(background)}
   onclick={onBackdrop}
   onclose={onClose}
 >
   <header class="modal-head">
     <div class="title">
-      <h2>{device.name}</h2>
+      <h2>{heading}</h2>
       <div class="meta">
         <span class="badge badge-secondary">{device.type}</span>
         {#if device.room}<EnumBadge
@@ -52,17 +77,29 @@
   </header>
 
   <div class="modal-body">
-    {#each controls as control (control.id)}
-      <div class="row" class:unavailable={!control.available}>
-        <span class="row-label">{control.label || control.feature}</span>
+    {#each rows as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+      <div class="row">
+        <span class="row-label"
+          >{r.slot.label ??
+            r.control?.label ??
+            r.slot.source ??
+            r.slot.kind}</span
+        >
         <div class="row-control">
-          <ControlWidget {control} />
+          <SlotRenderer
+            slot={r.slot}
+            {device}
+            control={r.control}
+            style={r.style}
+            onPrimary={r.onPrimary}
+            emphasis="secondary"
+          />
         </div>
       </div>
     {/each}
 
-    {#if controls.length === 0}
-      <p class="text-muted">This device has no controls.</p>
+    {#if rows.length === 0}
+      <p class="text-muted">Nothing to show right now.</p>
     {/if}
   </div>
 </dialog>
@@ -116,10 +153,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-  }
-
-  .row.unavailable {
-    opacity: 0.5;
   }
 
   .row-label {

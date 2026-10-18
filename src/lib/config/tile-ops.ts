@@ -108,6 +108,36 @@ export function patchSlot(
   );
 }
 
+/** Where a slot lives (A34): the tile by default, or the modal, or both. */
+export function slotWhere(slot: Slot): "tile" | "both" | "modal" {
+  return slot.where ?? "tile";
+}
+
+/**
+ * Set where a slot lives (A34). Refused — the tile comes back untouched — when
+ * it would leave no slot on the main tile: the modal is an enlargement, never
+ * a slot's only home. A bad index leaves the list alone, like `moveItem`.
+ */
+export function setSlotWhere(
+  tile: TileConfig,
+  index: number,
+  where: "tile" | "both" | "modal",
+): TileConfig {
+  const slots = tile.slots ?? [];
+  if (index < 0 || index >= slots.length) return tile;
+  const next = slots.map((slot, i) => {
+    if (i !== index) return slot;
+    const copy = { ...slot };
+    // Absent means tile, and an absent field is what the documents carry —
+    // switching back to the default drops it instead of storing "tile".
+    if (where === "tile") delete copy.where;
+    else copy.where = where;
+    return copy;
+  });
+  if (!next.some((slot) => slotWhere(slot) !== "modal")) return tile;
+  return withSlots(tile, next);
+}
+
 // ------------------------------------------------------------------- rules
 
 /** Address one slot's rule list; a bad slot index returns a copied tile. */

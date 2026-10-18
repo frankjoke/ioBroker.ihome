@@ -40,7 +40,6 @@ export interface TileConfig {
   /** What "active" means for this tile (A30): evaluated live per render. */
   active?: ActiveCondition;
   slots?: Slot[];
-  modal?: { slots: Slot[] };
 }
 
 /** The basic logic an active condition offers. */
@@ -132,6 +131,8 @@ export interface Slot {
   rules?: Rule[];
   /** Render only while the tile is active / inactive (A30); absent = both. */
   showWhen?: "active" | "inactive";
+  /** Where the slot lives (A34): the tile (default), the modal, or both. */
+  where?: "tile" | "both" | "modal";
 }
 
 export interface Template {
