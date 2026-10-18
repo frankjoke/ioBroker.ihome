@@ -88,6 +88,7 @@
     onSelect,
     onSwapDevice,
     onAddSlot,
+    showPreview = true,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -100,6 +101,9 @@
     /** Add slot: the route owns the picker. `at` inserts there instead of
      * appending (the list-end `+`). */
     onAddSlot?: (anchor: PlacementAnchor, at?: number) => void;
+    /** Drop the docked preview when the surface behind the editor is already
+     * the live display (the layout sheet). */
+    showPreview?: boolean;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -1643,7 +1647,7 @@
       </select>
     </label>
 
-    {#if device}
+    {#if device && showPreview}
       <!-- The docked preview sits on the section's colour so the tile is judged
            in its section (the page stays out); A33. -->
       <div

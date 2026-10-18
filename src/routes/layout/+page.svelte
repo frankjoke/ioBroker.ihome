@@ -1,18 +1,24 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
+  import PageView from "$lib/components/display/PageView.svelte";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
-  import LayoutTree from "$lib/components/layout/LayoutTree.svelte";
   import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList } from "$lib/config/rooms";
   import {
     addPage,
+    addSection,
     appendDevices,
     deletePage,
+    deletePlacement,
     deleteSection,
+    duplicatePlacement,
+    duplicateSection,
+    movePlacement,
     patchPlacement,
     type LayoutSelection,
     type PlacementAnchor,
@@ -30,8 +36,6 @@
   import type { PageRegistry, Slot } from "$lib/types/display";
 
   let selection = $state<LayoutSelection | null>(null);
-  /** The handoff target, applied by the tree once (folding); selection stays. */
-  let focus = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** Change device: the anchor whose device is being swapped, then the confirm. */
   let swapFor = $state<PlacementAnchor | null>(null);
@@ -54,15 +58,43 @@
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
 
+  // ------------------------------------------------ the drill-down (spike B)
+  // Page → section → the section's tiles. The selection leads: the selectors
+  // follow it and picking in one sets it. No tree and no second pane.
+  let pageOpen = $state(false);
+  let sectionOpen = $state(false);
+
+  /** The page being edited: the selection's, else the first. */
+  const page = $derived(
+    registry.pages.find((p) => p.id === selection?.pageId) ?? registry.pages[0],
+  );
+  const pageId = $derived(page?.id ?? "");
+  /** The section a non-page selection points into, if any. */
+  const selectedSectionId = $derived(
+    selection && selection.kind !== "page" ? selection.sectionId : undefined,
+  );
+  /** The section being edited: the selection's, else the page's first. */
+  const section = $derived(
+    page?.groups.find((g) => g.id === selectedSectionId) ?? page?.groups[0],
+  );
+  const sectionId = $derived(section?.id ?? "");
+  const tiles = $derived(section?.tiles ?? []);
+  /** The tile whose editor is open, if the selection is one. */
+  const tileSelection = $derived(selection?.kind === "tile" ? selection : null);
+
+  function selectPage(id: string): void {
+    selection = { kind: "page", pageId: id };
+  }
+
+  function selectSection(id: string): void {
+    selection = { kind: "section", pageId, sectionId: id };
+  }
+
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
-  // click): select it — and fold the tree to it — so the pane opens on what was
-  // clicked. Clicking in the tree later changes only `selection`, never folding.
+  // click): select it, so the drill-down opens on what was clicked.
   onMount(() => {
     const requested = takeRequestedLayout();
-    if (requested) {
-      selection = requested;
-      focus = requested;
-    }
+    if (requested) selection = requested;
   });
 
   /** The placement a tree/pane address points at, if it still exists. */
@@ -182,8 +214,22 @@
 </svelte:head>
 
 <div class="layout-page">
-  {#if saveFailed || !writable || registry.pages.length === 0}
-    <div class="page-header">
+  <!-- The page being edited, rendered by the display itself: it *is* the
+       preview (spike B). Inert, so nothing on the wall switches by accident. -->
+  <div class="stage">
+    {#if page}
+      <PageView {page} />
+    {:else}
+      <p class="empty text-muted">
+        No pages yet. They are created from your rooms and functions on first
+        load.
+      </p>
+    {/if}
+  </div>
+
+  <aside class="sheet" aria-label="Layout editor">
+    <header class="sheet-head">
+      <span class="label-mono">Layout</span>
       {#if saveFailed}
         <span
           class="badge badge-danger"
@@ -210,41 +256,272 @@
           <span class="material-symbols-outlined">add</span>
         </button>
       {/if}
-    </div>
-  {/if}
+    </header>
 
-  <div class="cols">
-    <div class="card tree-card">
-      <span class="tree-title label-mono">Layout configuration</span>
-      <LayoutTree
-        {registry}
-        {devices}
-        {selection}
-        {focus}
-        onSelect={(next) => (selection = next)}
-        onChange={commitLayout}
-        onDelete={(target) => (pendingDelete = target)}
-        onAddTile={(pageId, sectionId, at) =>
-          (pickerFor = { kind: "device", pageId, sectionId, at })}
-      />
+    <!-- Page: a selector; its own attributes live behind the fold-out. -->
+    <div class="line">
+      <span class="label-mono">Page</span>
+      <select
+        value={pageId}
+        aria-label="Page"
+        onchange={(e) => selectPage(e.currentTarget.value)}
+      >
+        {#each registry.pages as p (p.id)}
+          <option value={p.id}>{p.title || p.id}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="icon-btn"
+        class:on={pageOpen}
+        title="Page settings"
+        aria-label="Page settings"
+        aria-expanded={pageOpen}
+        onclick={() => (pageOpen = !pageOpen)}
+      >
+        <span class="material-symbols-outlined">tune</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Add page"
+        aria-label="Add page"
+        onclick={() => commitLayout(addPage(registry))}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        title="Delete page"
+        aria-label="Delete page"
+        onclick={() => (pendingDelete = { kind: "page", pageId })}
+      >
+        <span class="material-symbols-outlined">delete</span>
+      </button>
     </div>
-
-    <aside class="card details-card">
-      {#if selection}
+    {#if pageOpen && page}
+      <div class="fold">
         <LayoutDetails
           {registry}
           {devices}
-          {selection}
+          selection={{ kind: "page", pageId }}
           onChange={commitLayout}
           onSelect={(next) => (selection = next)}
-          onSwapDevice={(anchor) => (swapFor = anchor)}
-          onAddSlot={openSlotPicker}
+          showPreview={false}
         />
-      {:else}
-        <p class="text-muted">Select a page, a section or a tile.</p>
-      {/if}
-    </aside>
-  </div>
+      </div>
+    {/if}
+
+    <!-- Section: the same, scoped to the page above. -->
+    <div class="line">
+      <span class="label-mono">Section</span>
+      <select
+        value={sectionId}
+        aria-label="Section"
+        onchange={(e) => selectSection(e.currentTarget.value)}
+      >
+        {#each page?.groups ?? [] as g (g.id)}
+          <option value={g.id}>{g.title || g.id}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="icon-btn"
+        class:on={sectionOpen}
+        title="Section settings"
+        aria-label="Section settings"
+        aria-expanded={sectionOpen}
+        onclick={() => (sectionOpen = !sectionOpen)}
+      >
+        <span class="material-symbols-outlined">tune</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Add section"
+        aria-label="Add section"
+        onclick={() => commitLayout(addSection(registry, pageId))}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Duplicate section"
+        aria-label="Duplicate section"
+        onclick={() =>
+          commitLayout(duplicateSection(registry, pageId, sectionId))}
+      >
+        <span class="material-symbols-outlined">content_copy</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        title="Delete section"
+        aria-label="Delete section"
+        onclick={() => (pendingDelete = { kind: "section", pageId, sectionId })}
+      >
+        <span class="material-symbols-outlined">delete</span>
+      </button>
+    </div>
+    {#if sectionOpen && section}
+      <div class="fold">
+        <LayoutDetails
+          {registry}
+          {devices}
+          selection={{ kind: "section", pageId, sectionId }}
+          onChange={commitLayout}
+          onSelect={(next) => (selection = next)}
+          showPreview={false}
+        />
+      </div>
+    {/if}
+
+    <!-- The section's tiles: one line each, and the picked one opens its
+         editor directly under its own line. -->
+    <div class="tiles">
+      {#each tiles as t, i (t.id)}
+        {@const anchor = { pageId, sectionId, placementId: t.id }}
+        {@const tileDevice = deviceOfAnchor(anchor)}
+        <div
+          class="tile-line"
+          class:selected={tileSelection?.placementId === t.id}
+        >
+          <button
+            type="button"
+            class="tile-head"
+            onclick={() => (selection = { kind: "tile", ...anchor })}
+          >
+            {#if tileDevice?.icon}
+              <span class="tree-icon"
+                ><Icon value={tileDevice.icon} size={16} /></span
+              >
+            {/if}
+            <span class="name">{t.title || tileDevice?.name || t.device}</span>
+            {#if t.tile?.size}
+              <span class="hint-badge text-muted"
+                >{t.tile.size.w}×{t.tile.size.h}</span
+              >
+            {/if}
+          </button>
+          <span class="row-actions">
+            {#if i === 0}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Add tile above"
+                aria-label="Add tile above"
+                onclick={() =>
+                  (pickerFor = { kind: "device", pageId, sectionId, at: 0 })}
+              >
+                <span class="material-symbols-outlined">add</span>
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Move up"
+                aria-label="Move up"
+                onclick={() =>
+                  commitLayout(
+                    movePlacement(
+                      registry,
+                      { pageId, sectionId, index: i },
+                      { pageId, sectionId, index: i - 1 },
+                    ),
+                  )}
+              >
+                <span class="material-symbols-outlined">arrow_upward</span>
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="icon-btn"
+              title="Duplicate tile"
+              aria-label="Duplicate tile"
+              onclick={() =>
+                commitLayout(
+                  duplicatePlacement(registry, pageId, sectionId, t.id),
+                )}
+            >
+              <span class="material-symbols-outlined">content_copy</span>
+            </button>
+            {#if i === tiles.length - 1}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Add tile below"
+                aria-label="Add tile below"
+                onclick={() =>
+                  (pickerFor = {
+                    kind: "device",
+                    pageId,
+                    sectionId,
+                    at: i + 1,
+                  })}
+              >
+                <span class="material-symbols-outlined">add</span>
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="icon-btn"
+                title="Move down"
+                aria-label="Move down"
+                onclick={() =>
+                  commitLayout(
+                    movePlacement(
+                      registry,
+                      { pageId, sectionId, index: i },
+                      { pageId, sectionId, index: i + 1 },
+                    ),
+                  )}
+              >
+                <span class="material-symbols-outlined">arrow_downward</span>
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="icon-btn danger"
+              title="Remove tile"
+              aria-label="Remove tile"
+              onclick={() =>
+                commitLayout(
+                  deletePlacement(registry, pageId, sectionId, t.id),
+                )}
+            >
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </span>
+        </div>
+        {#if tileSelection?.placementId === t.id}
+          <div class="fold tile-editor">
+            <LayoutDetails
+              {registry}
+              {devices}
+              selection={tileSelection}
+              onChange={commitLayout}
+              onSelect={(next) => (selection = next)}
+              onSwapDevice={(anchor) => (swapFor = anchor)}
+              onAddSlot={openSlotPicker}
+              showPreview={false}
+            />
+          </div>
+        {/if}
+      {/each}
+
+      <button
+        type="button"
+        class="btn add-tile"
+        title="Add a tile to this section"
+        onclick={() => (pickerFor = { kind: "device", pageId, sectionId })}
+      >
+        <span class="material-symbols-outlined">add</span>
+        Add tile
+      </button>
+    </div>
+  </aside>
 </div>
 
 {#if pickerFor}
@@ -318,50 +595,165 @@
 {/if}
 
 <style>
+  /* Spike B: the display fills the view, the editor is a sheet on top of it. */
   .layout-page {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    min-height: calc(100vh - 44px);
   }
 
-  .page-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+  /* The page being edited, at its real size. Inert: this is a preview, and a
+     stray tap must not switch a lamp. */
+  .stage {
+    pointer-events: none;
   }
 
-  .tree-title {
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
-  .cols {
-    display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(260px, 1fr);
-    gap: 1rem;
-    align-items: start;
-  }
-
-  @media (max-width: 820px) {
-    .cols {
-      grid-template-columns: 1fr;
+  /* Wide: the sheet takes the right-hand strip, the display keeps the rest (it
+     reflows to whatever width it gets). */
+  @media (min-width: 821px) {
+    .stage {
+      padding-right: 440px;
     }
   }
 
-  .tree-card,
-  .details-card {
+  /* Narrow — a tablet in portrait, a phone: no room beside, so the sheet is a
+     bottom sheet and the live preview stays visible above it. */
+  @media (max-width: 820px) {
+    .stage {
+      padding-bottom: 62vh;
+    }
+  }
+
+  .sheet {
+    position: fixed;
+    top: 44px;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: min(440px, 100vw);
     padding: 0.75rem;
+    overflow-y: auto;
+    background-color: var(--surface-container-lowest);
+    border-left: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+
+  /* A phone has no room for a sheet beside the display: it takes the screen. */
+  @media (max-width: 820px) {
+    .sheet {
+      top: auto;
+      width: 100%;
+      height: 62vh;
+      border-top: 1px solid var(--border-color);
+      border-left: 0;
+    }
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.6rem;
+  }
+
+  .line {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
     min-width: 0;
   }
 
-  /* The tree can outgrow the screen (a document with many rooms): it scrolls in
-     place and stays beside the pane instead of pushing it away. 3.25rem = the
-     44px app bar plus the main padding the card already sits at; 3.75rem leaves
-     it a little air at the bottom (A42). */
-  .tree-card {
-    position: sticky;
-    top: 3.25rem;
-    max-height: calc(100vh - 3.75rem);
-    overflow-y: auto;
+  .line select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* A fold-out reads as belonging to the line above it. */
+  .fold {
+    padding-left: 0.6rem;
+    border-left: 2px solid var(--border-color);
+  }
+
+  .tiles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .tile-line {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .tile-line.selected {
+    background-color: var(--surface-container);
+    border-radius: var(--border-radius-sm, 6px);
+  }
+
+  .tile-head {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .tile-head .name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tile-editor {
+    margin-bottom: 0.4rem;
+  }
+
+  .add-tile {
+    align-self: flex-start;
+  }
+
+  /* The row's controls. `.icon-btn` is per-component in this codebase, and the
+     tree (whose rows this sheet replaces) is where these styles lived. */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius-pill);
+    color: var(--text-muted);
+  }
+
+  .icon-btn:hover {
+    background-color: var(--surface-container);
+    color: var(--text-color);
+  }
+
+  .icon-btn.danger:hover {
+    color: var(--error-color, var(--danger-color, #b3261e));
+  }
+
+  .icon-btn.on {
+    color: var(--primary-color);
+  }
+
+  .icon-btn .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .tree-icon {
+    display: inline-flex;
+    color: var(--text-muted);
+  }
+
+  .hint-badge {
+    font-size: 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill);
+    padding: 0 6px;
   }
 </style>

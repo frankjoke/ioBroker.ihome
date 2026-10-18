@@ -22,13 +22,10 @@
 
   let { page }: { page: Page } = $props();
 
+  // The breakpoint follows the *container*, not the window: the display is the
+  // whole window on the wall, but the layout sheet renders it beside/in front of
+  // an editor, and it must reflow into what it actually gets.
   let width = $state(1400);
-  onMount(() => {
-    const onResize = () => (width = window.innerWidth);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  });
 
   const bp = $derived<Breakpoint>(breakpointFor(width));
   const def = $derived(
@@ -61,7 +58,7 @@
   );
 </script>
 
-<div class="page" style={pageStyle}>
+<div class="page" style={pageStyle} bind:clientWidth={width}>
   {#if groups.length === 0}
     <p class="empty text-muted">This page has no devices yet.</p>
   {/if}

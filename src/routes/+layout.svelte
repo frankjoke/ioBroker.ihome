@@ -60,7 +60,11 @@
   const isConnected = $derived(!!ioBroker.connected);
   // The display routes own the whole viewport: no config header, no page
   // padding, no max width (spec §3). Their own slim bar is inside the page.
-  const isDisplay = $derived(current === "/" || current.startsWith("/p/"));
+  // The layout route joins them: the spike renders the display behind its sheet,
+  // so it needs the real width and no padding.
+  const isDisplay = $derived(
+    current === "/" || current.startsWith("/p/") || current === "/layout",
+  );
 
   // Load all device states once the socket is up and the object cache is ready,
   // then again for any state objects that appear later. Pages read the shared
