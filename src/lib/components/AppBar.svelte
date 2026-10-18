@@ -7,7 +7,7 @@
     setLastPage,
     view,
   } from "$lib/stores/pages.svelte.js";
-  import { openSheet } from "$lib/stores/sheet.svelte.js";
+  import { openSheet, closeSheet, sheet } from "$lib/stores/sheet.svelte.js";
   import {
     pages as configPages,
     pageHref,
@@ -54,11 +54,15 @@
   }
 
   /**
-   * The pencil opens the sheet on the page being viewed — the same handoff as
-   * Ctrl/Cmd+click on its tab. It is a mode of this page, not a place to go, so
-   * nothing navigates.
+   * The pencil opens the sheet on the page being viewed; the eye closes it
+   * again. It is a mode of this page, not a place to go, so nothing navigates —
+   * the icon is the mode indicator.
    */
   function onPencilClick() {
+    if (sheet.open) {
+      closeSheet();
+      return;
+    }
     if (currentId) requestLayoutConfig({ pageId: currentId });
     openSheet();
   }
@@ -82,11 +86,13 @@
       <a
         class="tab icon-tab"
         href={`${base}/#/`}
-        title="Edit the layout"
-        aria-label="Edit the layout"
+        title={sheet.open ? "Back to the display" : "Edit the layout"}
+        aria-label={sheet.open ? "Back to the display" : "Edit the layout"}
         onclick={onPencilClick}
       >
-        <span class="material-symbols-outlined">edit</span>
+        <span class="material-symbols-outlined"
+          >{sheet.open ? "visibility" : "edit"}</span
+        >
       </a>
     {:else}
       {#each configPages as p (p.id)}
