@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
+  import Tile from "$lib/components/display/Tile.svelte";
+  import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
@@ -114,15 +116,16 @@
     selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
-  // The "modal view" (spike C): the display's own tile opens the real modal, so
-  // the sheet only has to name the tile and bump a token — the tile knows its
-  // rows, badges and the frame's full height.
-  let modalAnchor = $state<PlacementAnchor | null>(null);
-  let modalToken = $state(0);
-  const modal = $derived(
-    modalAnchor
-      ? { placementId: modalAnchor.placementId, token: modalToken }
-      : null,
+  // The "modal view": a checkbox on the Tile title's line shows what a
+  // long-press opens, docked in the sheet. The display behind cannot show it —
+  // a modal needs a press, and the stage is inert by design.
+  let modalPanel = $state(false);
+  /** The docked panel's Tile call wants a breakpoint; the modal's rows do not
+   *  use it, so the window's is fine (the sheet is not the tile's surface). */
+  let previewBp = $state<Breakpoint>(breakpointFor(1400));
+  const currentTile = $derived(tiles.find((t) => t.id === tileId));
+  const tileDevice = $derived(
+    tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
 
   /**
@@ -143,17 +146,15 @@
     return slots.some((s) => slotWhere(s) !== "tile");
   }
 
-  function showModal(anchor: PlacementAnchor | null): void {
-    if (!anchor) return;
-    modalAnchor = anchor;
-    modalToken += 1;
-  }
-
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
   // click): select it, so the drill-down opens on what was clicked.
   onMount(() => {
     const requested = takeRequestedLayout();
     if (requested) selection = requested;
+    const onResize = () => (previewBp = breakpointFor(window.innerWidth));
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   });
 
   /** The placement a tree/pane address points at, if it still exists. */
@@ -277,7 +278,7 @@
        preview (spike B). Inert, so nothing on the wall switches by accident. -->
   <div class="stage">
     {#if page}
-      <PageView {page} {modal} />
+      <PageView {page} />
     {:else}
       <p class="empty text-muted">
         No pages yet. They are created from your rooms and functions on first
@@ -462,17 +463,6 @@
       >
         <span class="material-symbols-outlined">add</span>
       </button>
-      {#if hasModalParts(tiles.find((t) => t.id === tileId))}
-        <button
-          type="button"
-          class="icon-btn"
-          title="Modal view — what a long-press opens"
-          aria-label="Modal view"
-          onclick={() => showModal(tileAnchor)}
-        >
-          <span class="material-symbols-outlined">open_in_full</span>
-        </button>
-      {/if}
       <button
         type="button"
         class="icon-btn"
@@ -531,7 +521,37 @@
       </button>
     </div>
 
+    <!-- The modal view: what a long-press opens, docked here under the lines so
+         it stays in view while the fields below are edited (the display behind
+         cannot show a modal — there is nothing to press). -->
+    {#if modalPanel && currentTile && tileDevice}
+      <div class="modal-dock">
+        <Tile
+          device={tileDevice}
+          bp={previewBp}
+          title={currentTile.title}
+          tile={currentTile.tile}
+          modalPreview
+        />
+      </div>
+    {/if}
+
     {#if tileSelection}
+      {#snippet tileExtras()}
+        {#if hasModalParts(currentTile)}
+          <label
+            class="check"
+            title="Show what a long-press opens — the modal, docked in the sheet"
+          >
+            <input
+              type="checkbox"
+              checked={modalPanel}
+              onchange={(e) => (modalPanel = e.currentTarget.checked)}
+            />
+            <span>modal</span>
+          </label>
+        {/if}
+      {/snippet}
       <div class="fold tile-editor">
         <LayoutDetails
           {registry}
@@ -541,6 +561,7 @@
           onSelect={(next) => (selection = next)}
           onSwapDevice={(anchor) => (swapFor = anchor)}
           onAddSlot={openSlotPicker}
+          titleExtra={tileExtras}
           showPreview={false}
         />
       </div>
@@ -701,6 +722,16 @@
 
   .tile-editor {
     margin-bottom: 0.4rem;
+  }
+
+  /* The docked modal view: only the panel, the tile in this call is hidden —
+     the display behind is where the tile itself is judged. */
+  .modal-dock :global(.tile) {
+    display: none;
+  }
+
+  .modal-dock :global(.modal-preview) {
+    margin: 0;
   }
 
   /* The row's controls. `.icon-btn` is per-component in this codebase, and the

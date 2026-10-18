@@ -79,6 +79,7 @@
     TileConfig,
   } from "$lib/types/display";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
+  import type { Snippet } from "svelte";
 
   let {
     registry,
@@ -89,6 +90,7 @@
     onSwapDevice,
     onAddSlot,
     showPreview = true,
+    titleExtra,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -104,6 +106,8 @@
     /** Drop the docked preview when the surface behind the editor is already
      * the live display (the layout sheet). */
     showPreview?: boolean;
+    /** The layout sheet puts its own control on the Tile title's line. */
+    titleExtra?: Snippet;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -774,6 +778,7 @@
           />
           <span>no name</span>
         </label>
+        {#if titleExtra}{@render titleExtra()}{/if}
       </div>
     </div>
     <div class="field">
