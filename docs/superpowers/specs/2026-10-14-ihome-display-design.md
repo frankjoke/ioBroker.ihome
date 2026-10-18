@@ -37,7 +37,7 @@ Success criteria:
 | # | Decision |
 |---|---|
 | A1 | Pages and groups are **explicit config**; a group's contents are either explicit device ids or a filter rule (hybrid). |
-| A2 | Size is a **hint** (`w`/`h`, 1–4), clamped per breakpoint — never a pinned coordinate. |
+| A2 | Size is a **hint** (`w`/`h`, 1–10), clamped per breakpoint — never a pinned coordinate. A phone clamp (2×2) is by design; a tablet and a desktop show the whole hint. |
 | A3 | Templates are **JSON over a closed slot vocabulary owned by the renderer** (hybrid): the code owns the slot kinds, the template picks/skins/orders them. |
 | A4 | Built-in presets are **frozen**; editing means "Save as copy", and new templates can be created from scratch. |
 | A5 | Rules attach to **slots**; a control may carry its own default rules; sources resolve control feature → control id → raw state id. |
@@ -103,7 +103,10 @@ a user template with `basedOn: <presetId>`.
 New file `src/lib/types/display.ts`:
 
 ```ts
-export type Size = { w: 1 | 2 | 3 | 4; h: 1 | 2 | 3 | 4 };
+export type Size = {
+  w: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  h: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+};
 
 export interface Member {              // group contents; every field optional, ANDed
   ids?: string[];                      // explicit device ids

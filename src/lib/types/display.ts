@@ -1,8 +1,11 @@
 import type { DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
 
-/** Tile size hint, 1–4 modules per axis. Clamped per breakpoint — never a coordinate. */
-export type Size = { w: 1 | 2 | 3 | 4; h: 1 | 2 | 3 | 4 };
+/** Tile size hint, 1–10 modules per axis. Clamped per breakpoint — never a coordinate. */
+export type Size = {
+  w: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  h: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+};
 
 /**
  * Group contents. Every field is optional and they are ANDed; an empty member

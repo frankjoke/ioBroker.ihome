@@ -102,7 +102,7 @@ interface Placement {
 
 interface TileConfig {
   template?: string;                // default fill; materialised on first edit (A9)
-  size?: Size;                      // exists (1–4, clamped per breakpoint)
+  size?: Size;                      // exists (1–10, clamped per breakpoint)
   slots?: Slot[];                   // the tile surface
   modal?: { slots: Slot[] };        // the enlargement (A10)
 }

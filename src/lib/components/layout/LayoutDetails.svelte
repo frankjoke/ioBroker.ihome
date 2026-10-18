@@ -17,6 +17,7 @@
   } from "$lib/config/pages-ops";
   import {
     BREAKPOINTS,
+    SIZE_MAX,
     breakpointFor,
     type TileSpan,
   } from "$lib/config/size-ops";
@@ -406,12 +407,12 @@
   }
 
   function setSize(axis: "w" | "h", raw: string): void {
-    const value = Number(raw);
-    if (!value) return;
-    // `effectiveSpan` clamps to the breakpoint's maximum (never above 4), so the
-    // values are a valid Size.
+    const value = Math.trunc(Number(raw));
+    if (!Number.isFinite(value) || value < 1) return;
+    // The document keeps the hint as typed, bounded by SIZE_MAX (A2); each
+    // breakpoint clamps it to what it can show while rendering.
     const size = { ...effectiveTileSpan() } as Size;
-    size[axis] = value as 1 | 2 | 3 | 4;
+    size[axis] = Math.min(value, SIZE_MAX) as Size["w"];
     edit((t) => ({ ...t, size }));
   }
 
@@ -801,18 +802,18 @@
         {#each ["w", "h"] as axis (axis)}
           <label class="small">
             <span class="label-mono">{axis}</span>
-            <select
+            <input
+              type="number"
+              class="num-input"
+              min="1"
+              max={SIZE_MAX}
+              step="1"
               aria-label={`Size ${axis}`}
               value={String(
                 axis === "w" ? effectiveTileSpan().w : effectiveTileSpan().h,
               )}
-              onchange={(e) =>
-                setSize(axis as "w" | "h", e.currentTarget.value)}
-            >
-              {#each [1, 2, 3, 4] as n (n)}
-                <option value={String(n)}>{n}</option>
-              {/each}
-            </select>
+              oninput={(e) => setSize(axis as "w" | "h", e.currentTarget.value)}
+            />
           </label>
         {/each}
       </div>
@@ -1997,6 +1998,9 @@
     padding: 0.5rem;
     border: 1px dashed var(--border-color);
     border-radius: var(--border-radius-md, 12px);
+    /* A tile wider than the pane (a big hint, previewed on a narrow column)
+       keeps its real width and scrolls here instead of bleeding out (A2). */
+    overflow-x: auto;
   }
 
   /* The tile preview docks: while the pane scrolls above its natural spot it

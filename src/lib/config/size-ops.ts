@@ -10,6 +10,12 @@ export interface TileSpan {
 
 export const DEFAULT_SPAN: Size = { w: 1, h: 1 };
 
+/**
+ * The largest hint a document may carry (A2). A breakpoint may still clamp to
+ * less than this — the editor writes up to here, the type names it.
+ */
+export const SIZE_MAX = 10;
+
 export interface BreakpointDef {
   name: Breakpoint;
   /** Inclusive lower bound in CSS pixels; `breakpointFor` reads this. */
@@ -29,7 +35,11 @@ export interface BreakpointDef {
    */
   tileW: number;
   tileH: number;
-  /** Column/row span cap — emitted as `--max-w` / `--max-h`. */
+  /**
+   * How far a tile may stretch at this breakpoint. It must stay within what a
+   * page of this breakpoint can show — the tile renders its own span while the
+   * layout pass clamps only the section (see the guard test).
+   */
   maxW: number;
   maxH: number;
 }
@@ -40,8 +50,22 @@ export interface BreakpointDef {
  */
 export const BREAKPOINTS: BreakpointDef[] = [
   { name: "phone", minWidth: 0, tileW: 45, tileH: 90, maxW: 2, maxH: 2 },
-  { name: "tablet", minWidth: 600, tileW: 51, tileH: 102, maxW: 4, maxH: 3 },
-  { name: "desktop", minWidth: 1025, tileW: 57, tileH: 114, maxW: 4, maxH: 4 },
+  {
+    name: "tablet",
+    minWidth: 600,
+    tileW: 51,
+    tileH: 102,
+    maxW: SIZE_MAX,
+    maxH: SIZE_MAX,
+  },
+  {
+    name: "desktop",
+    minWidth: 1025,
+    tileW: 57,
+    tileH: 114,
+    maxW: SIZE_MAX,
+    maxH: SIZE_MAX,
+  },
 ];
 
 /** The breakpoint a viewport width falls in: phone <600, tablet 600–1024, desktop >1024. */
