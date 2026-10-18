@@ -153,10 +153,14 @@
     tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
 
-  // The sheet's body is one editor at a time: the tile's layout, or the tile's
-  // device. The Device line switches between them — the tile editor's details
-  // are replaced, not stacked under a second long form.
+  // The sheet's body is one editor at a time: the tile's layout, or a device.
+  // The Device line switches between them — the tile editor's details are
+  // replaced, not stacked under a second long form. Device mode edits the
+  // tile's device, or a brand-new one when the line's `+` asked for it.
   let mode = $state<"tile" | "device">("tile");
+  let creating = $state(false);
+  /** The device the Device line's delete asks about, once confirmed. */
+  let pendingDeviceDelete = $state<Device | null>(null);
   const canonicalDevice = $derived(
     tileDevice
       ? (getCanonicalRegistry().devices.find((d) => d.id === tileDevice.id) ??
@@ -174,6 +178,23 @@
         idx >= 0
           ? reg.devices.map((x) => (x.id === d.id ? d : x))
           : [...reg.devices, d],
+    });
+    saveRegistry();
+    creating = false;
+    mode = "tile";
+  }
+
+  /** Remove a device from the registry. Tiles that used it dangle — the display
+   *  skips them and the Device line says "no device". */
+  function removeDevice(): void {
+    const d = pendingDeviceDelete;
+    pendingDeviceDelete = null;
+    if (!d) return;
+    const reg = getCanonicalRegistry();
+    setCanonicalRegistry({
+      version: (reg.version ?? 0) + 1,
+      updatedAt: Date.now(),
+      devices: reg.devices.filter((x) => x.id !== d.id),
     });
     saveRegistry();
     mode = "tile";
@@ -602,11 +623,36 @@
         : "Edit this device"}
       aria-expanded={mode === "device"}
       disabled={!canonicalDevice}
-      onclick={() => (mode = mode === "device" ? "tile" : "device")}
+      onclick={() => {
+        creating = false;
+        mode = mode === "device" ? "tile" : "device";
+      }}
     >
       <span class="material-symbols-outlined"
         >{mode === "device" ? "arrow_back" : "tune"}</span
       >
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Add a device"
+      aria-label="Add a device"
+      onclick={() => {
+        creating = true;
+        mode = "device";
+      }}
+    >
+      <span class="material-symbols-outlined">add</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      title="Delete this device"
+      aria-label="Delete this device"
+      disabled={!canonicalDevice}
+      onclick={() => (pendingDeviceDelete = canonicalDevice)}
+    >
+      <span class="material-symbols-outlined">delete</span>
     </button>
   </div>
 
@@ -626,18 +672,22 @@
     </div>
   {/if}
 
-  <!-- One editor at a time: the tile's layout, or the tile's device. -->
-  {#if mode === "device" && canonicalDevice}
+  <!-- One editor at a time: the tile's layout, or a device (the tile's, or a new
+       one). -->
+  {#if mode === "device"}
     <div class="fold device-editor">
-      {#key canonicalDevice.id}
+      {#key creating ? "new" : (canonicalDevice?.id ?? "none")}
         <DeviceForm
-          device={canonicalDevice}
+          device={creating ? null : canonicalDevice}
           objects={ioBroker.objects}
           roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
           {rooms}
           devices={getCanonicalRegistry().devices}
           onSave={saveDevice}
-          onCancel={() => (mode = "tile")}
+          onCancel={() => {
+            creating = false;
+            mode = "tile";
+          }}
         />
       {/key}
     </div>
@@ -711,6 +761,29 @@
   >
     The tiles disappear from this page. The devices themselves stay in the
     registry.
+  </ConfirmModal>
+{/if}
+
+{#if pendingDeviceDelete}
+  <ConfirmModal
+    title="Delete device"
+    confirmLabel="Delete"
+    onConfirm={removeDevice}
+    onCancel={() => (pendingDeviceDelete = null)}
+  >
+    <p>
+      Delete <strong>{pendingDeviceDelete.name}</strong>
+      <span class="text-muted"
+        >— {pendingDeviceDelete.type}, {pendingDeviceDelete.controls?.length ??
+          0} control{pendingDeviceDelete.controls?.length === 1
+          ? ""
+          : "s"}</span
+      >?
+    </p>
+    <p class="text-muted">
+      Tiles that used it keep their place but show nothing until they get
+      another device. This cannot be undone.
+    </p>
   </ConfirmModal>
 {/if}
 
