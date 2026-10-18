@@ -193,15 +193,10 @@
     })),
   );
 
-  /** The tile's first reading is the headline; the rest are supporting. */
-  const mainValueKey = $derived(
-    (() => {
-      const first = bodySlots.find((r) => r.slot.kind === "value");
-      return first
-        ? `${first.slot.kind}:${first.slot.source ?? ""}:${first.slot.options?.index ?? ""}`
-        : "";
-    })(),
-  );
+  /** The tile's first reading is the headline; the rest are supporting. The row
+   *  itself is the identity (A35): two identical slots are legal config and must
+   *  render side by side, only the first of them as the headline. */
+  const mainValueRow = $derived(bodySlots.find((r) => r.slot.kind === "value"));
 
   // The icon slot carries the type's on/off colour and glow, so it drives the
   // tile's accent; the values reach CSS through custom properties (spec §6).
@@ -426,7 +421,7 @@
 >
   {#if backgroundSlots.length}
     <div class="tile-bg">
-      {#each backgroundSlots as r (`bg:${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+      {#each backgroundSlots as r, i (i)}
         <SlotRenderer
           slot={r.slot}
           {device}
@@ -439,7 +434,7 @@
   {/if}
   <span class="tile-name">{title ?? tileTitle(device)}</span>
   <div class="tile-body">
-    {#each bodySlots as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+    {#each bodySlots as r, i (i)}
       <SlotRenderer
         slot={r.slot}
         {device}
@@ -448,10 +443,7 @@
         onPrimary={r.control && r.control === primary
           ? togglePrimary
           : undefined}
-        emphasis={`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}` ===
-        mainValueKey
-          ? "primary"
-          : "secondary"}
+        emphasis={r === mainValueRow ? "primary" : "secondary"}
       />
     {/each}
   </div>

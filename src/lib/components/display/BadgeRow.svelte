@@ -12,7 +12,7 @@
 
 {#if shown.length}
   <div class="badges by-{anchor.y} bx-{anchor.x}">
-    {#each shown as b (b.source)}
+    {#each shown as b, i (i)}
       <BadgeChip
         icon={b.icon}
         label={b.label}

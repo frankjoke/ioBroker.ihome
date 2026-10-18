@@ -103,7 +103,13 @@
     if (!text) return;
     onAdd({ kind, options: { pick: text } });
   }
+
+  function onKey(event: KeyboardEvent) {
+    if (event.key === "Escape") onClose();
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div
   class="modal"

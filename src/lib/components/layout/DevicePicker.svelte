@@ -73,7 +73,13 @@
   function addFiltered(): void {
     if (filtered.length) onAdd(filtered.map((d) => d.id));
   }
+
+  function onKey(event: KeyboardEvent) {
+    if (event.key === "Escape") onClose();
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="modal" role="dialog" aria-modal="true" aria-label="Add devices">
   <div class="modal-content">

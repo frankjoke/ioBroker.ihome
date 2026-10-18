@@ -88,12 +88,12 @@
 
   {#if rows.length || !badges?.length}
     <div class="panel-body" style:max-height={bodyMaxHeight}>
-      {#each rows as r (`${r.slot.kind}:${r.slot.source ?? ""}:${r.slot.options?.index ?? ""}`)}
+      {#each rows as r, i (i)}
         <div class="row">
           <span class="row-label"
-            >{r.slot.label ??
-              r.control?.label ??
-              r.slot.source ??
+            >{r.slot.label ||
+              r.control?.label ||
+              r.slot.source ||
               r.slot.kind}</span
           >
           <div class="row-control">

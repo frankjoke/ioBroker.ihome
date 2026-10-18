@@ -368,3 +368,16 @@ it("unknown showWhen counts as both and slotVisible keeps icon slots visible", (
   ).toBe(1);
   expect(slotVisible({ kind: "icon" }, false)).toBe(true);
 });
+
+// A35: a duplicated slot is legal config — two identical rows render twice and
+// each must be deleted on its own. The resolver must never merge them (the
+// per-row keying in the display is positional for the same reason).
+it("keeps duplicate slots apart instead of merging them", () => {
+  const slots: Slot[] = [
+    { kind: "value", source: "a" },
+    { kind: "value", source: "a" },
+  ];
+  const out = pickSlotControls(slots, [ctl("a")], {});
+  expect(out.length).toBe(2);
+  expect(out[0].slot).not.toBe(out[1].slot);
+});
