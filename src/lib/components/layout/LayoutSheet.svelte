@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
+  import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
   import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
@@ -8,7 +10,12 @@
   import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { roomList } from "$lib/config/rooms";
+  import {
+    getCanonicalRegistry,
+    setCanonicalRegistry,
+  } from "$lib/stores/devices.svelte.js";
+  import { saveRegistry } from "$lib/registry.svelte.js";
+  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import {
     addPage,
     addSection,
@@ -34,6 +41,7 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import type { EnrichedDevice } from "$lib/types/device";
+  import type { Device } from "$lib/types/device";
   import type { PageRegistry, Placement, Slot } from "$lib/types/display";
 
   let {
@@ -146,6 +154,31 @@
   const tileDevice = $derived(
     tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
+
+  // The device line: the tile's device, with its own editor (the same form the
+  // devices page renders) instead of a trip to that page.
+  let deviceOpen = $state(false);
+  const canonicalDevice = $derived(
+    tileDevice
+      ? (getCanonicalRegistry().devices.find((d) => d.id === tileDevice.id) ??
+          null)
+      : null,
+  );
+
+  function saveDevice(d: Device): void {
+    const reg = getCanonicalRegistry();
+    const idx = reg.devices.findIndex((x) => x.id === d.id);
+    setCanonicalRegistry({
+      version: (reg.version ?? 0) + 1,
+      updatedAt: Date.now(),
+      devices:
+        idx >= 0
+          ? reg.devices.map((x) => (x.id === d.id ? d : x))
+          : [...reg.devices, d],
+    });
+    saveRegistry();
+    deviceOpen = false;
+  }
 
   // The modal view belongs to the tile it was opened for: move to another tile
   // and it closes (rather than following along or showing an empty panel).
@@ -540,6 +573,41 @@
     </button>
   </div>
 
+  <!-- Device: the fourth line. Its editor opens below, like the tile's, so
+       editing the device no longer means leaving for the devices page. -->
+  <div class="line">
+    <span class="label-mono">Device</span>
+    <span class="device-line">
+      {#if tileDevice?.icon}
+        <span class="tree-icon"><Icon value={tileDevice.icon} size={16} /></span
+        >
+      {/if}
+      <strong>{tileDevice?.name ?? "no device"}</strong>
+    </span>
+    <button
+      type="button"
+      class="icon-btn"
+      class:on={deviceOpen}
+      title="Device settings"
+      aria-label="Device settings"
+      aria-expanded={deviceOpen}
+      disabled={!canonicalDevice}
+      onclick={() => (deviceOpen = !deviceOpen)}
+    >
+      <span class="material-symbols-outlined">tune</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Change device…"
+      aria-label="Change device"
+      disabled={!tileAnchor}
+      onclick={() => (swapFor = tileAnchor)}
+    >
+      <span class="material-symbols-outlined">select</span>
+    </button>
+  </div>
+
   <!-- The modal view. A Tile of its own, hidden except for the modal it opens
          (the display behind is where the tile itself is judged): non-modal, so
          it appears over the display and the sheet stays usable. -->
@@ -580,11 +648,28 @@
         selection={tileSelection}
         onChange={commitLayout}
         onSelect={(next) => (selection = next)}
-        onSwapDevice={(anchor) => (swapFor = anchor)}
         onAddSlot={openSlotPicker}
         titleExtra={tileExtras}
         showPreview={false}
       />
+    </div>
+  {/if}
+
+  <!-- The device's own editor, the same shape as the tile's: a fold-out under
+       the Device line's editor area. -->
+  {#if deviceOpen && canonicalDevice}
+    <div class="fold device-editor">
+      {#key canonicalDevice.id}
+        <DeviceForm
+          device={canonicalDevice}
+          objects={ioBroker.objects}
+          roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
+          {rooms}
+          devices={getCanonicalRegistry().devices}
+          onSave={saveDevice}
+          onCancel={() => (deviceOpen = false)}
+        />
+      {/key}
     </div>
   {/if}
 </aside>
@@ -726,6 +811,18 @@
      display behind is where the tile itself is judged. */
   .modal-view :global(.tile) {
     display: none;
+  }
+
+  /* The device line shows the tile's device; its editor is a fold-out below. */
+  .device-line {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   /* The non-modal dialog places itself; here it belongs over the display, not
