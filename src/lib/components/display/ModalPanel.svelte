@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { backgroundCss } from "$lib/config/appearance";
   import { tileTitle } from "$lib/config/template-ops";
-  import EnumBadge from "$lib/components/common/EnumBadge.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeChip from "./BadgeChip.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
@@ -50,15 +48,8 @@
 
 <div class="panel" style={backgroundCss(background)}>
   <header class="panel-head">
-    <div class="title">
+    <div class="head-main">
       <h2>{heading}</h2>
-      <div class="meta">
-        <span class="badge badge-secondary">{device.type}</span>
-        {#if device.room}<EnumBadge
-            id={device.room}
-            enums={ioBroker.enums}
-          />{/if}
-      </div>
       {#if badges?.length}
         <div class="badges">
           {#each badges as b, i (i)}
@@ -93,6 +84,7 @@
           <span class="row-label"
             >{r.slot.label ||
               r.control?.label ||
+              r.control?.feature ||
               r.slot.source ||
               r.slot.kind}</span
           >
@@ -129,23 +121,26 @@
 
   .panel-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.85rem 1rem;
     border-bottom: 1px solid var(--border-color);
   }
 
-  .panel-head h2 {
-    margin: 0 0 0.3rem;
-    font-size: 1.05rem;
-  }
-
-  .meta {
+  /* The name and the modal's chips share the title line (A34) — the panel shows
+   * what lives in it, not the device's type and room. */
+  .head-main {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .panel-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
   }
 
   /* The badges that live in the modal (A34) — the tile's chips, in sequence. */
@@ -154,7 +149,6 @@
     align-items: center;
     gap: 3px;
     flex-wrap: wrap;
-    margin-top: 0.35rem;
   }
 
   .panel-body {

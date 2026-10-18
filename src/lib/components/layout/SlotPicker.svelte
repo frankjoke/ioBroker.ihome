@@ -6,6 +6,7 @@
     collectStates,
     type StateRef,
   } from "$lib/config/state-tree";
+  import { sourceForControl } from "$lib/config/template-ops";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
   import type { Slot, SlotKind } from "$lib/types/display";
 
@@ -68,9 +69,10 @@
 
   const controls = $derived((device.controls ?? []).filter((c) => !c.hidden));
 
-  /** The source string convention `resolveControl` prefers: feature, else id. */
+  /** What a picked control writes into the slot (A36): the control's feature
+   *  while that is unambiguous on this device, else the id naming exactly it. */
   function sourceOf(c: EnrichedControl): string {
-    return c.feature || c.id;
+    return sourceForControl(controls, c) || c.id;
   }
 
   const allStates = $derived(

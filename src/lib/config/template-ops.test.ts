@@ -10,6 +10,7 @@ import {
   resolveControl,
   resolveTemplate,
   slotVisible,
+  sourceForControl,
   tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
@@ -320,6 +321,56 @@ it("a failing hint goes dormant and does not claim a control", () => {
   expect(out[0]).toMatchObject({ dormant: true });
   expect(out[0].control).toBeUndefined();
   expect(out[1].control?.id).toBe("a"); // positional slot still gets the first control
+});
+
+// A36: an icon reads a control for its colour; it must not spend that control,
+// or a preset's value hint slides to the next control of the same role — on a
+// bathroom thermometer the "temperature" readout became the dew point.
+it("an icon reads a control without consuming it (A36)", () => {
+  const controls = [
+    ctl("t", { object: { common: { role: "value.temperature" } } }),
+    ctl("dew", { object: { common: { role: "value.temperature" } } }),
+  ];
+  const out = pickSlotControls(
+    [
+      { kind: "icon", source: "t" },
+      { kind: "value", options: { pick: "temperature" } },
+    ],
+    controls,
+  );
+  expect(out[0].control?.id).toBe("t"); // the icon's own source
+  expect(out[1].control?.id).toBe("t"); // the hint still means the first match
+});
+
+it("a bare readout still gets the device's only control after an icon (A36)", () => {
+  const out = pickSlotControls(
+    [{ kind: "icon", source: "v" }, { kind: "value" }],
+    [ctl("v")],
+  );
+  expect(out[1].control?.id).toBe("v");
+});
+
+it("a readout's own source still claims the control for a later bare readout", () => {
+  const out = pickSlotControls(
+    [{ kind: "value", source: "a" }, { kind: "value" }],
+    [ctl("a"), ctl("b")],
+  );
+  expect(out.map((r) => r.control?.id)).toEqual(["a", "b"]);
+});
+
+it("names a control by its feature only while that name is unambiguous (A36)", () => {
+  const unique = [
+    { id: "a", feature: "temperature" },
+    { id: "b", feature: "humidity" },
+  ];
+  expect(sourceForControl(unique, unique[0])).toBe("temperature");
+  const shared = [
+    { id: "a", feature: "temperature" },
+    { id: "b", feature: "temperature" },
+  ];
+  expect(sourceForControl(shared, shared[1])).toBe("b");
+  const bare = [{ id: "c" }];
+  expect(sourceForControl(bare, bare[0])).toBe("c");
 });
 
 it("a free-text hint matches role, label or unit", () => {

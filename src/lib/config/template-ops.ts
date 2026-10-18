@@ -231,9 +231,11 @@ export interface PickedSlot<T> {
 /**
  * One pass over a tile's slots in order: state-hidden slots drop out first (they
  * must not claim "the next free control"), then `source`, then a hint, then the
- * next control no earlier slot used. `options.raw` supplies the pseudo-control
- * for a source that is a raw state id. Badge slots are skipped — badges live in
- * the corners.
+ * next control no earlier slot used. An icon's source is decoration — its colour
+ * and its rules: it resolves the control but consumes no reading, so a preset's
+ * icon and value can name the same feature and the value's hint still gets the
+ * control it means (A36). `options.raw` supplies the pseudo-control for a source
+ * that is a raw state id. Badge slots are skipped — badges live in the corners.
  */
 export function pickSlotControls<T extends PickableControl>(
   slots: Slot[],
@@ -254,7 +256,8 @@ export function pickSlotControls<T extends PickableControl>(
         out.push({ slot, dormant: true });
         continue;
       }
-      used.add(String(control.id ?? ""));
+      // An icon reads for its colour, it does not consume a reading (A36).
+      if (slot.kind !== "icon") used.add(String(control.id ?? ""));
       out.push({ slot, control });
       continue;
     }
@@ -299,6 +302,27 @@ export function resolveControl<
     list.find((c) => c.stateId === source) ??
     list.find(byLabel)
   );
+}
+
+/**
+ * The source string that names exactly `control` on its device (A36) — the write
+ * side of `resolveControl`: its feature while no other control carries it (the
+ * slot then survives the device being rebuilt), otherwise its id, because a
+ * feature that names two controls resolves to whichever comes first in the
+ * device, not the one that was picked.
+ */
+export function sourceForControl<T extends { feature?: string; id?: string }>(
+  controls: T[],
+  control: T,
+): string | undefined {
+  const feature = control.feature;
+  if (
+    feature &&
+    (controls ?? []).filter((c) => c.feature === feature).length === 1
+  ) {
+    return feature;
+  }
+  return control.id;
 }
 
 /**
