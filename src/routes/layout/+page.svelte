@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PageView from "$lib/components/display/PageView.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
@@ -116,10 +116,14 @@
     selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
-  // The "modal view": a checkbox on the Tile title's line shows what a
-  // long-press opens, docked in the sheet. The display behind cannot show it —
-  // a modal needs a press, and the stage is inert by design.
-  let modalPanel = $state(false);
+  // The "modal view": a checkbox on the Tile title's line asks the sheet's own
+  // Tile to open its modal — non-modally, so it appears over the display and
+  // nothing is blocked. The display behind cannot show it by itself: a modal
+  // needs a press, and the stage is inert by design.
+  let modalShown = $state(false);
+  let modalToken = $state(0);
+  let closeToken = $state(0);
+  const modalRequest = $derived({ token: modalToken, inline: true });
   /** The docked panel's Tile call wants a breakpoint; the modal's rows do not
    *  use it, so the window's is fine (the sheet is not the tile's surface). */
   let previewBp = $state<Breakpoint>(breakpointFor(1400));
@@ -127,6 +131,19 @@
   const tileDevice = $derived(
     tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
+
+  function toggleModalView(show: boolean): void {
+    modalShown = show;
+    if (show) modalToken += 1;
+    else closeToken += 1;
+  }
+
+  // The modal view belongs to the tile it was opened for: move to another tile
+  // and it closes (rather than following along or showing an empty panel).
+  $effect(() => {
+    void tileId;
+    untrack(() => (modalShown = false));
+  });
 
   /**
    * Spike shortcut: does anything of this tile live in the modal? The display's
@@ -521,36 +538,39 @@
       </button>
     </div>
 
-    <!-- The modal view: what a long-press opens, docked here under the lines so
-         it stays in view while the fields below are edited (the display behind
-         cannot show a modal — there is nothing to press). -->
-    {#if modalPanel && currentTile && tileDevice}
-      <div class="modal-dock">
+    <!-- The modal view. A Tile of its own, hidden except for the modal it opens
+         (the display behind is where the tile itself is judged): non-modal, so
+         it appears over the display and the sheet stays usable. -->
+    {#if modalShown && currentTile && tileDevice}
+      <div class="modal-view">
         <Tile
           device={tileDevice}
           bp={previewBp}
           title={currentTile.title}
           tile={currentTile.tile}
-          modalPreview
+          openModal={modalRequest}
+          closeModal={closeToken}
+          onModalClose={() => (modalShown = false)}
         />
       </div>
     {/if}
 
     {#if tileSelection}
       {#snippet tileExtras()}
-        {#if hasModalParts(currentTile)}
-          <label
-            class="check"
-            title="Show what a long-press opens — the modal, docked in the sheet"
-          >
-            <input
-              type="checkbox"
-              checked={modalPanel}
-              onchange={(e) => (modalPanel = e.currentTarget.checked)}
-            />
-            <span>modal</span>
-          </label>
-        {/if}
+        <label
+          class="check"
+          title={hasModalParts(currentTile)
+            ? "Show the modal — what a long-press opens — over the display"
+            : "Nothing of this tile lives in the modal"}
+        >
+          <input
+            type="checkbox"
+            checked={modalShown}
+            disabled={!hasModalParts(currentTile)}
+            onchange={(e) => toggleModalView(e.currentTarget.checked)}
+          />
+          <span>modal</span>
+        </label>
       {/snippet}
       <div class="fold tile-editor">
         <LayoutDetails
@@ -724,14 +744,25 @@
     margin-bottom: 0.4rem;
   }
 
-  /* The docked modal view: only the panel, the tile in this call is hidden —
-     the display behind is where the tile itself is judged. */
-  .modal-dock :global(.tile) {
+  /* The modal view: only the dialog, the tile in this call is hidden — the
+     display behind is where the tile itself is judged. */
+  .modal-view :global(.tile) {
     display: none;
   }
 
-  .modal-dock :global(.modal-preview) {
-    margin: 0;
+  /* The non-modal dialog places itself; here it belongs over the display, not
+     over the sheet: the strip the sheet leaves on the left. */
+  .sheet :global(dialog.modal.inline) {
+    right: 440px;
+    top: 44px;
+  }
+
+  @media (max-width: 820px) {
+    .sheet :global(dialog.modal.inline) {
+      right: 0;
+      top: 44px;
+      bottom: 62vh;
+    }
   }
 
   /* The row's controls. `.icon-btn` is per-component in this codebase, and the

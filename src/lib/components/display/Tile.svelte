@@ -51,7 +51,9 @@
     anchor,
     newLine,
     modalPreview,
-    openModal = 0,
+    openModal = null,
+    closeModal = 0,
+    onModalClose,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -66,8 +68,13 @@
     /** The editor's preview also renders the modal's look below the tile (A34). */
     modalPreview?: boolean;
     /** The layout sheet's "modal view": a token that asks this tile to open its
-     *  own modal (only the tile knows its modal's rows). 0 → never asked. */
-    openModal?: number;
+     *  own modal (only the tile knows its modal's rows). `inline` asks for the
+     *  non-blocking form. Absent → never asked. */
+    openModal?: { token: number; inline?: boolean } | null;
+    /** A token that asks this tile to close its modal (the checkbox unticked). */
+    closeModal?: number;
+    /** The modal closed, by its own close button or the sheet's token. */
+    onModalClose?: () => void;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -372,13 +379,23 @@
   }
 
   let modalOpen = $state(false);
+  let modalInline = $state(false);
 
-  // The sheet's "modal view" (spike C): it asks this tile to open the modal it
-  // owns — the real one, because only the tile resolves its rows. The token
-  // changes on every ask, so a second ask re-opens what a close closed.
+  // The sheet's "modal view": it asks this tile to open the modal it owns — the
+  // real one, because only the tile resolves its rows. The token changes on
+  // every ask, so a second ask re-opens what a close closed; `closeModal` is the
+  // other direction (the checkbox unticked).
   $effect(() => {
-    if (!openModal) return;
-    untrack(() => (modalOpen = true));
+    const ask = openModal;
+    if (!ask) return;
+    untrack(() => {
+      modalInline = ask.inline === true;
+      modalOpen = true;
+    });
+  });
+  $effect(() => {
+    if (!closeModal) return;
+    untrack(() => (modalOpen = false));
   });
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let suppressClick = false;
@@ -494,7 +511,11 @@
     background={tile?.background}
     rows={modalRows}
     badges={modalBadges}
-    onClose={() => (modalOpen = false)}
+    inline={modalInline}
+    onClose={() => {
+      modalOpen = false;
+      onModalClose?.();
+    }}
   />
 {/if}
 

@@ -20,15 +20,7 @@
   import type { Page } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
 
-  let {
-    page,
-    modal = null,
-  }: {
-    page: Page;
-    /** The layout sheet's "modal view": which tile should open its own modal,
-     *  and a token so asking twice re-opens what a close just closed. */
-    modal?: { placementId: string; token: number } | null;
-  } = $props();
+  let { page }: { page: Page } = $props();
 
   // The breakpoint follows the *container*, not the window: the display is the
   // whole window on the wall, but the layout sheet renders it beside/in front of
@@ -83,7 +75,6 @@
       modules={s.modules}
       {bp}
       pageId={page.id}
-      {modal}
     />
   {/each}
 </div>

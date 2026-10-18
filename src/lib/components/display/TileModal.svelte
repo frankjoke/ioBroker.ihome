@@ -11,6 +11,7 @@
     background,
     rows,
     badges,
+    inline = false,
     onClose,
   }: {
     device: EnrichedDevice;
@@ -28,6 +29,10 @@
     }[];
     /** The badges that live (also) in the modal (A34). */
     badges?: ResolvedBadge[];
+    /** Shown *non-modally* (`show()`): it does not block the page, which is what
+     *  the layout sheet wants — the modal view is something to look at while
+     *  editing, not something that stops the editing. */
+    inline?: boolean;
     onClose: () => void;
   } = $props();
 
@@ -35,8 +40,11 @@
 
   // Native <dialog>: showModal() gives focus trapping, Esc handling and focus
   // restoration for free — less code and fewer bugs than a hand-rolled trap.
+  // `inline` (the layout sheet's modal view) uses show() instead: the same
+  // dialog, non-modal, so the page behind it stays usable.
   $effect(() => {
-    el?.showModal();
+    if (inline) el?.show();
+    else el?.showModal();
   });
 
   function onBackdrop(e: MouseEvent) {
@@ -47,6 +55,7 @@
 <dialog
   bind:this={el}
   class="modal"
+  class:inline
   aria-label={title || tileTitle(device)}
   onclick={onBackdrop}
   onclose={onClose}
@@ -72,6 +81,16 @@
     /* The layout sheet renders the display inert so a stray tap cannot switch a
        lamp — but the modal it opens must stay usable (spike C). */
     pointer-events: auto;
+  }
+
+  /* Non-modal: no top layer, so it must place itself. Centred in the viewport by
+     default; the layout sheet narrows that to the display area it leaves over. */
+  .modal.inline {
+    position: fixed;
+    inset: 0;
+    height: fit-content;
+    max-height: 90vh;
+    margin: auto;
   }
 
   .modal::backdrop {
