@@ -52,7 +52,6 @@
     newLine,
     modalPreview,
     openModal = null,
-    closeModal = 0,
     onModalClose,
   }: {
     device: EnrichedDevice;
@@ -67,13 +66,12 @@
     newLine?: boolean;
     /** The editor's preview also renders the modal's look below the tile (A34). */
     modalPreview?: boolean;
-    /** The layout sheet's "modal view": a token that asks this tile to open its
-     *  own modal (only the tile knows its modal's rows). `inline` asks for the
-     *  non-blocking form. Absent → never asked. */
-    openModal?: { token: number; inline?: boolean } | null;
-    /** A token that asks this tile to close its modal (the checkbox unticked). */
-    closeModal?: number;
-    /** The modal closed, by its own close button or the sheet's token. */
+    /** The layout sheet's "modal view": asks this tile to open its own modal
+     *  (only the tile knows its modal's rows). `inline` asks for the
+     *  non-blocking form. Absent → never asked. Closing needs no request: the
+     *  asker unmounts this tile, and the modal goes with it. */
+    openModal?: { inline?: boolean } | null;
+    /** The modal closed, by its own close button. */
     onModalClose?: () => void;
   } = $props();
 
@@ -382,9 +380,9 @@
   let modalInline = $state(false);
 
   // The sheet's "modal view": it asks this tile to open the modal it owns — the
-  // real one, because only the tile resolves its rows. The token changes on
-  // every ask, so a second ask re-opens what a close closed; `closeModal` is the
-  // other direction (the checkbox unticked).
+  // real one, because only the tile resolves its rows. Only *opening* is a
+  // request: the asker unmounts this tile to close it, so there is no stale
+  // "close" token to fire on the next mount.
   $effect(() => {
     const ask = openModal;
     if (!ask) return;
@@ -392,10 +390,6 @@
       modalInline = ask.inline === true;
       modalOpen = true;
     });
-  });
-  $effect(() => {
-    if (!closeModal) return;
-    untrack(() => (modalOpen = false));
   });
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let suppressClick = false;

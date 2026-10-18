@@ -121,9 +121,7 @@
   // nothing is blocked. The display behind cannot show it by itself: a modal
   // needs a press, and the stage is inert by design.
   let modalShown = $state(false);
-  let modalToken = $state(0);
-  let closeToken = $state(0);
-  const modalRequest = $derived({ token: modalToken, inline: true });
+  const modalRequest = $derived({ inline: true });
   /** The docked panel's Tile call wants a breakpoint; the modal's rows do not
    *  use it, so the window's is fine (the sheet is not the tile's surface). */
   let previewBp = $state<Breakpoint>(breakpointFor(1400));
@@ -131,12 +129,6 @@
   const tileDevice = $derived(
     tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
   );
-
-  function toggleModalView(show: boolean): void {
-    modalShown = show;
-    if (show) modalToken += 1;
-    else closeToken += 1;
-  }
 
   // The modal view belongs to the tile it was opened for: move to another tile
   // and it closes (rather than following along or showing an empty panel).
@@ -549,7 +541,6 @@
           title={currentTile.title}
           tile={currentTile.tile}
           openModal={modalRequest}
-          closeModal={closeToken}
           onModalClose={() => (modalShown = false)}
         />
       </div>
@@ -560,16 +551,16 @@
         <label
           class="check"
           title={hasModalParts(currentTile)
-            ? "Show the modal — what a long-press opens — over the display"
-            : "Nothing of this tile lives in the modal"}
+            ? "Show the detail page — the modal a long-press opens — over the display"
+            : "Nothing of this tile lives in the detail page"}
         >
+          <span>Detail Page</span>
           <input
             type="checkbox"
             checked={modalShown}
             disabled={!hasModalParts(currentTile)}
-            onchange={(e) => toggleModalView(e.currentTarget.checked)}
+            onchange={(e) => (modalShown = e.currentTarget.checked)}
           />
-          <span>modal</span>
         </label>
       {/snippet}
       <div class="fold tile-editor">

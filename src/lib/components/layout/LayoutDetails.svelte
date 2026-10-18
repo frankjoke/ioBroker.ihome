@@ -754,7 +754,10 @@
       />
     </div>
   {:else if selection.kind === "tile" && tile}
-    <h3>{tile.title || device?.name || "Tile"}</h3>
+    <div class="row between">
+      <h3>{tile.title || device?.name || "Tile"}</h3>
+      {#if titleExtra}{@render titleExtra()}{/if}
+    </div>
     <div class="field">
       <span class="label-mono">Tile title</span>
       <div class="row">
@@ -778,7 +781,6 @@
           />
           <span>no name</span>
         </label>
-        {#if titleExtra}{@render titleExtra()}{/if}
       </div>
     </div>
     <div class="field">
