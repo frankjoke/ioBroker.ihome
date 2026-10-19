@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import { backgroundCss, isHexColor } from "$lib/config/appearance";
+  import { isHexColor } from "$lib/config/appearance";
   import {
     movePlacement,
     patchPage,
@@ -58,7 +58,6 @@
   } from "$lib/stores/templates.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
-  import Tile from "$lib/components/display/Tile.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
@@ -87,7 +86,6 @@
     onChange,
     onSelect,
     onAddSlot,
-    showPreview = true,
     titleExtra,
   }: {
     registry: PageRegistry;
@@ -99,9 +97,6 @@
     /** Add slot: the route owns the picker. `at` inserts there instead of
      * appending (the list-end `+`). */
     onAddSlot?: (anchor: PlacementAnchor, at?: number) => void;
-    /** Drop the docked preview when the surface behind the editor is already
-     * the live display (the layout sheet). */
-    showPreview?: boolean;
     /** The layout sheet puts its own control on the Tile title's line. */
     titleExtra?: Snippet;
   } = $props();
@@ -1601,17 +1596,6 @@
         {/each}
       </select>
     </label>
-
-    {#if device && showPreview}
-      <!-- The docked preview sits on the section's colour so the tile is judged
-           in its section (the page stays out); A33. -->
-      <div
-        class="preview tile-grid docked"
-        style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(section?.appearance?.background)}`}
-      >
-        <Tile {device} {bp} title={tile.title} tile={tile.tile} modalPreview />
-      </div>
-    {/if}
   {/if}
 
   {#if iconPicker}
@@ -1979,8 +1963,8 @@
     font-size: var(--body-sm);
   }
 
-  /* The preview is a real tile grid at the current breakpoint's module size,
-     so a tile shows at the width and height the display will give it. */
+  /* The section preview is a real tile grid at the current breakpoint's module
+     size, so a tile shows at the width and height the display will give it. */
   .preview {
     margin-top: 0.25rem;
     padding: 0.5rem;
@@ -1989,24 +1973,5 @@
     /* A tile wider than the pane (a big hint, previewed on a narrow column)
        keeps its real width and scrolls here instead of bleeding out (A2). */
     overflow-x: auto;
-  }
-
-  /* The tile preview docks: while the pane scrolls above its natural spot it
-     floats at the bottom edge of the screen — visible while you edit slots —
-     and settles back into place at the end. The section preview stays put; a
-     whole section is too tall to dock. */
-  .docked {
-    position: sticky;
-    bottom: 0.75rem;
-    z-index: 1;
-    background-color: var(--surface-color);
-    box-shadow: var(--shadow-normal);
-  }
-
-  .tile-grid {
-    display: grid;
-    gap: 6px;
-    grid-template-columns: repeat(auto-fill, minmax(var(--tile-w, 57px), 1fr));
-    grid-auto-rows: minmax(var(--tile-h, 114px), auto);
   }
 </style>

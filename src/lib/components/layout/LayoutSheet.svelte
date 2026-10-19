@@ -29,9 +29,9 @@
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
-  import { addSlot, editTile, slotWhere } from "$lib/config/tile-ops";
+  import { addSlot, editTile } from "$lib/config/tile-ops";
   import { sheetCursor, swapDecision } from "$lib/config/sheet-cursor";
-  import { resolveTemplate } from "$lib/config/template-ops";
+  import { tileParts } from "$lib/config/tile-parts";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -196,23 +196,18 @@
     untrack(() => (modalShown = false));
   });
 
-  /**
-   * Spike shortcut: does anything of this tile live in the modal? The display's
-   * tile answers this properly — it resolves every slot and honours rules — so
-   * here we only look at the chain's `where`, and a rule-hidden modal slot would
-   * still offer the button. The real pass asks the resolver (one helper, used by
-   * both).
-   */
-  function hasModalParts(t: Placement | undefined): boolean {
-    if (!t) return false;
-    const device = deviceOfAnchor({ pageId, sectionId, placementId: t.id });
-    const slots =
-      t.tile?.slots ??
-      (device
-        ? resolveTemplate(device, getTemplateRegistry().templates).slots
-        : []);
-    return slots.some((s) => slotWhere(s) !== "tile");
-  }
+  /** Does anything of this tile live in the detail page? Asked of the same
+   *  resolution the display's tile uses (A46/A47), so a rule-hidden slot or a
+   *  badge-only modal cannot lie to the checkbox. */
+  const hasDetail = $derived(
+    tileDevice
+      ? tileParts(
+          tileDevice,
+          currentTile?.tile,
+          getTemplateRegistry().templates,
+        ).hasModal
+      : false,
+  );
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
   // click): select it, so the drill-down opens on what was clicked.
@@ -430,7 +425,6 @@
         selection={{ kind: "page", pageId }}
         onChange={commitLayout}
         onSelect={(next) => (selection = next)}
-        showPreview={false}
       />
     </div>
   {/if}
@@ -495,7 +489,6 @@
         selection={{ kind: "section", pageId, sectionId }}
         onChange={commitLayout}
         onSelect={(next) => (selection = next)}
-        showPreview={false}
       />
     </div>
   {/if}
@@ -685,7 +678,7 @@
     {#snippet tileExtras()}
       <label
         class="check"
-        title={hasModalParts(currentTile)
+        title={hasDetail
           ? "Show the detail page — the modal a long-press opens — over the display"
           : "Nothing of this tile lives in the detail page"}
       >
@@ -693,7 +686,7 @@
         <input
           type="checkbox"
           checked={modalShown}
-          disabled={!hasModalParts(currentTile)}
+          disabled={!hasDetail}
           onchange={(e) => (modalShown = e.currentTarget.checked)}
         />
       </label>
@@ -707,7 +700,6 @@
         onSelect={(next) => (selection = next)}
         onAddSlot={openSlotPicker}
         titleExtra={tileExtras}
-        showPreview={false}
       />
     </div>
   {/if}

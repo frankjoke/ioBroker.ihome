@@ -4,14 +4,13 @@
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
   import {
-    pickSlotControls,
     primaryControl,
     resolveControl,
     resolveTemplate,
-    slotVisible,
     tileTitle,
   } from "$lib/config/template-ops";
-  import { evalActive, slotWhere } from "$lib/config/tile-ops";
+  import { evalActive } from "$lib/config/tile-ops";
+  import { tileParts } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -151,67 +150,6 @@
     };
   }
 
-  /**
-   * Slots and the controls they show, resolved in one pass (A20/A21): state-
-   * hidden slots drop out first, then `source` (a control, or a raw state via
-   * `rawControl`), then a hint, then the next control no earlier slot used. A
-   * source or hint that matches nothing goes dormant instead of falling back to
-   * position; the slots that actually render are the ones with a reading (an
-   * icon slot keeps its fallback) that no rule hides.
-   */
-  const resolved = $derived(
-    pickSlotControls<SlotControl>(slots, shownControls, {
-      active,
-      raw: rawControl,
-    }).filter(
-      (r) =>
-        (r.slot.kind === "icon" || r.slot.kind === "frame" || r.control) &&
-        slotStyle(r.slot, r.control).hidden !== true,
-    ),
-  );
-
-  // A slot marked `options.background` renders over the content as the tile's
-  // chart layer (A22); everything else is the tile's body. Where a slot lives
-  // is its own choice (A34): "modal" leaves the tile, "both" stays here too.
-  const backgroundSlots = $derived(
-    resolved.filter(
-      (r) =>
-        r.slot.options?.background === true && slotWhere(r.slot) !== "modal",
-    ),
-  );
-  const bodySlots = $derived(
-    resolved.filter(
-      (r) =>
-        r.slot.options?.background !== true && slotWhere(r.slot) !== "modal",
-    ),
-  );
-  /**
-   * The modal's slots (A34) — resolved the same way, so every kind works. The
-   * chart layer comes along as a plain row there; badges take the path below.
-   */
-  const modalSlots = $derived(
-    resolved.filter((r) => slotWhere(r.slot) !== "tile"),
-  );
-  const modalRows = $derived(
-    modalSlots.map((r) => ({
-      // The chart layer loses its stretch in the modal: there it is a plain
-      // sparkline row, not a background.
-      slot:
-        r.slot.options?.background === true
-          ? { ...r.slot, options: { ...r.slot.options, background: undefined } }
-          : r.slot,
-      control: r.control,
-      style: slotStyle(r.slot, r.control),
-      // The slot that *is* the tile's action stays a button in the modal too.
-      onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
-    })),
-  );
-
-  /** The tile's first reading is the headline; the rest are supporting. The row
-   *  itself is the identity (A35): two identical slots are legal config and must
-   *  render side by side, only the first of them as the headline. */
-  const mainValueRow = $derived(bodySlots.find((r) => r.slot.kind === "value"));
-
   // The icon slot carries the type's on/off colour and glow, so it drives the
   // tile's accent; the values reach CSS through custom properties (spec §6).
   const iconSlot = $derived(
@@ -264,43 +202,46 @@
     return (device.controls ?? []).filter((c) => !c.hidden);
   }
 
-  // Badges render once, at the end of the tile, wherever the badge slots sit in
-  // the template. `ago` and `offline` need no control: they read the device.
-  // State-hidden badges drop out with the rest (A30); one marked "modal" leaves
-  // the tile for the modal's chip strip (A34).
-  const badgeSlots = $derived(
-    slots.filter(
-      (s) =>
-        s.kind === "badge" &&
-        slotVisible(s, active) &&
-        slotWhere(s) !== "modal",
-    ),
+  /**
+   * Everything the tile resolves, in one call (A46/A47): the body, the chart
+   * layer, the modal's rows and badges, and whether the modal exists at all.
+   * The sheet asks the same helper, so "does this tile have a detail page?"
+   * cannot drift from what the tile actually shows.
+   */
+  const parts = $derived(
+    tileParts(device, tile, getTemplateRegistry().templates, {
+      active,
+      raw: rawControl,
+      pool: getVirtualPool(),
+      time: clock,
+    }),
   );
+  const backgroundSlots = $derived(parts.background);
+  const bodySlots = $derived(parts.body);
 
-  /** The modal's badges (A34): the same chips, in sequence under its title —
-   *  a badge's corner anchor is the tile's language, not the modal's. */
-  const modalBadges = $derived(
-    slots
-      .filter(
-        (s) =>
-          s.kind === "badge" &&
-          slotVisible(s, active) &&
-          slotWhere(s) !== "tile",
-      )
-      .flatMap((s) =>
-        resolveBadges(
-          [s],
-          device,
-          clock,
-          Date.now(),
-          getVirtualPool(),
-          rawControl,
-        ),
-      ),
+  /** The tile's first reading is the headline; the rest are supporting. The row
+   *  itself is the identity (A35): two identical slots are legal config and must
+   *  render side by side, only the first of them as the headline. */
+  const mainValueRow = $derived(bodySlots.find((r) => r.slot.kind === "value"));
+  const badgeSlots = $derived(parts.badgeSlots);
+  const modalBadges = $derived(parts.modalBadges);
+  const modalRows = $derived(
+    parts.modal.map((r) => ({
+      // The chart layer loses its stretch in the modal: there it is a plain
+      // sparkline row, not a background.
+      slot:
+        r.slot.options?.background === true
+          ? { ...r.slot, options: { ...r.slot.options, background: undefined } }
+          : r.slot,
+      control: r.control,
+      style: r.style,
+      // The slot that *is* the tile's action stays a button in the modal too.
+      onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
+    })),
   );
 
   /** Something to enlarge into (A34): rows or badges. */
-  const hasModal = $derived(modalRows.length > 0 || modalBadges.length > 0);
+  const hasModal = $derived(parts.hasModal);
 
   // Where each visible badge sits: an explicit x/y on the slot, or the next
   // free corner (top-right first) — see `badgePositions`.
