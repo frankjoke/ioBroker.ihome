@@ -5,6 +5,7 @@ import type {
   ActiveOp,
   PageRegistry,
   Placement,
+  Slot,
   TemplateRegistry,
   TileConfig,
   Template,
@@ -16,10 +17,13 @@ import {
   editTile,
   ensureTile,
   evalActive,
+  foldIconSlot,
+  iconSlotTarget,
   materialiseTile,
   moveRule,
   moveSlot,
   nextSlotWhere,
+  patchIcon,
   patchRule,
   patchSlot,
   removeRule,
@@ -335,4 +339,133 @@ it("applyTemplate replaces size, slots and background but keeps the active condi
   expect(next.tile?.active?.source).toBe("power");
   const bare = applyTemplate(placement, userTemplate({ id: "t9", slots: [] }));
   expect(bare.tile?.background).toBeUndefined(); // the template has none: the old one drops
+});
+
+it("patches one icon field and never leaves {} behind", () => {
+  const tile: TileConfig = {
+    slots: [
+      { kind: "value", source: "power" },
+      { kind: "value", source: "humidity" },
+    ],
+  };
+  const glyphed = patchIcon(tile, 0, { glyph: "x" });
+  expect(glyphed.slots?.at(0)?.icon).toEqual({ glyph: "x" });
+  expect(tile.slots?.at(0)?.icon).toBeUndefined(); // input untouched
+  expect(glyphed.slots?.at(1)).toBe(tile.slots?.at(1)); // other slots untouched
+
+  // Off keeps the glyph; clearing the glyph drops the empty descriptor.
+  expect(patchIcon(glyphed, 0, { enabled: false }).slots?.at(0)?.icon).toEqual({
+    glyph: "x",
+    enabled: false,
+  });
+  expect(
+    patchIcon(glyphed, 0, { glyph: undefined }).slots?.at(0)?.icon,
+  ).toBeUndefined();
+
+  // A bad index leaves the list — copied — untouched.
+  expect(patchIcon(tile, 9, { glyph: "x" }).slots).toEqual(tile.slots);
+});
+
+it("finds the slot a legacy icon folds onto", () => {
+  const at = (slots: Slot[], i: number) => iconSlotTarget({ slots }, i);
+
+  // The first other slot with the same source wins.
+  expect(
+    at(
+      [
+        { kind: "icon", source: "power", options: { icon: "bolt" } },
+        { kind: "value", source: "humidity" },
+        { kind: "value", source: "power" },
+      ],
+      0,
+    ),
+  ).toBe(2);
+
+  // No source match: the first value slot; no value: the first non-icon slot.
+  expect(
+    at(
+      [
+        { kind: "icon", source: "unknown" },
+        { kind: "level", source: "brightness" },
+        { kind: "value" },
+      ],
+      0,
+    ),
+  ).toBe(2);
+  expect(at([{ kind: "icon" }, { kind: "level", source: "position" }], 0)).toBe(
+    1,
+  );
+
+  // Alone, a non-icon index or a bad index: nothing to fold onto.
+  expect(at([{ kind: "icon" }], 0)).toBeNull();
+  expect(at([{ kind: "value" }, { kind: "level" }], 0)).toBeNull();
+  expect(at([], 0)).toBeNull();
+});
+
+it("folds glyph, where and rules onto the target", () => {
+  const tile: TileConfig = {
+    slots: [
+      {
+        kind: "icon",
+        source: "power",
+        options: { icon: "bolt" },
+        where: "modal",
+        rules: [{ when: "truthy(power)", icon: "bolt" }],
+      },
+      {
+        kind: "value",
+        source: "power",
+        rules: [{ when: "true", color: "var(--warning-color)" }],
+      },
+      { kind: "value", source: "humidity" },
+    ],
+  };
+  const folded = foldIconSlot(tile, 0);
+  expect(folded.slots?.length).toBe(2);
+  const target = folded.slots?.at(0);
+  expect(target?.kind).toBe("value");
+  expect(target?.icon).toEqual({ glyph: "bolt", where: "modal" });
+  // The icon slot's rules come after the target's — the last match wins (A56).
+  expect(target?.rules?.map((r) => r.when)).toEqual(["true", "truthy(power)"]);
+  expect(folded.slots?.at(1)?.source).toBe("humidity");
+  // The input is never touched.
+  expect(tile.slots?.length).toBe(3);
+  expect(tile.slots?.at(1)?.icon).toBeUndefined();
+});
+
+it("handles a rules-only icon slot and keeps a target's icon when nothing carries", () => {
+  // A rule with `icon` is something to carry: a glyphless descriptor results
+  // (the rule supplies the glyph at render time).
+  const ruled = foldIconSlot(
+    {
+      slots: [
+        {
+          kind: "icon",
+          source: "power",
+          rules: [{ when: "truthy(power)", icon: "bolt" }],
+        },
+        { kind: "value", source: "power" },
+      ],
+    },
+    0,
+  );
+  expect(ruled.slots?.at(0)?.icon).toEqual({});
+
+  // Nothing carried (no glyph, no where, no icon-bearing rule): the target's
+  // own icon stays untouched.
+  const kept = foldIconSlot(
+    {
+      slots: [
+        { kind: "icon", source: "power" },
+        { kind: "value", source: "power", icon: { glyph: "keep" } },
+      ],
+    },
+    0,
+  );
+  expect(kept.slots?.at(0)?.icon).toEqual({ glyph: "keep" });
+});
+
+it("refuses quietly when there is no target", () => {
+  const alone: TileConfig = { slots: [{ kind: "icon", source: "power" }] };
+  expect(foldIconSlot(alone, 0)).toBe(alone);
 });
