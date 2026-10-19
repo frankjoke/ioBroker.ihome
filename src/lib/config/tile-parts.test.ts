@@ -168,6 +168,22 @@ it("falls back to the template's own slots when the placement has none", () => {
   expect(parts.body.length).toBeGreaterThan(0);
 });
 
+it("exposes the very slots its rows carry, chain or materialised (A46/A52)", () => {
+  // The headline pick and the row icons compare slot references, so the
+  // resolution must hand out the same objects its rows carry — a second
+  // `resolveTemplate` call would be a different array.
+  const chain = tileParts(device(), undefined, none);
+  expect(chain.slots.length).toBeGreaterThan(0);
+  expect(chain.body[0]?.slot).toBe(chain.slots[0]);
+
+  const mine = tile([
+    { kind: "value", source: "temperature" },
+    { kind: "value", source: "humidity" },
+  ]);
+  const materialised = tileParts(device(), mine, none);
+  expect(materialised.slots).toBe(mine.slots);
+});
+
 it("picks the headline: the first value slot, else the first non-icon slot", () => {
   // A value anywhere wins, even when it lives only in the modal (A52).
   const value: Slot = {

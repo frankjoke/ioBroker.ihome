@@ -56,7 +56,7 @@
   ): { glyph: string; color?: string; disabled?: boolean } | undefined;
   ```
 
-- [ ] **Step 1: Write the failing tests** — add to `tile-parts.test.ts` (the file already builds `device()`/`tile()` fixtures):
+- [x] **Step 1: Write the failing tests** — add to `tile-parts.test.ts` (the file already builds `device()`/`tile()` fixtures):
 
 ```ts
 it("picks the headline: value first, else the first non-icon slot", …)
@@ -76,8 +76,8 @@ it("honours enabled and the icon's own homes", …)
 it("carries the style's colour and dim", …)
   // a matching rule with color/disabled → the returned object has them
 ```
-- [ ] **Step 2: Run them** — `npx vitest run src/lib/config/tile-parts.test.ts` → FAIL.
-- [ ] **Step 3: Implement** — the types as above; in `tile-parts.ts`:
+- [x] **Step 2: Run them** — `npx vitest run src/lib/config/tile-parts.test.ts` → FAIL.
+- [x] **Step 3: Implement** — the types as above; in `tile-parts.ts`:
 
 ```ts
 /** The tile's face (A52): the first value slot, else the first non-icon slot —
@@ -104,10 +104,10 @@ export function rowIcon(
     : undefined;
 }
 ```
-- [ ] **Step 4: Run them** → PASS.
-- [ ] **Step 5: The picker's Document tab sees slot icons** — in `collectDocumentIcons`, the walker currently collects string values under the key `"icon"`; the new descriptor stores its glyph under `"glyph"`, so extend the key test to `(key === "icon" || key === "glyph")`. Extend the existing test's registry with a slot `{ kind:"value", icon:{ glyph:"probe" } }` and expect `"probe"` in the result.
-- [ ] **Step 6: Gates** — `npm test`, `npm run check`, `npm run lint`, `npm run build`.
-- [ ] **Step 7: Commit** — `feat(display): a slot's icon is its own property (A51)`
+- [x] **Step 4: Run them** → PASS.
+- [x] **Step 5: The picker's Document tab sees slot icons** — in `collectDocumentIcons`, the walker currently collects string values under the key `"icon"`; the new descriptor stores its glyph under `"glyph"`, so extend the key test to `(key === "icon" || key === "glyph")`. Extend the existing test's registry with a slot `{ kind:"value", icon:{ glyph:"probe" } }` and expect `"probe"` in the result.
+- [x] **Step 6: Gates** — `npm test`, `npm run check`, `npm run lint`, `npm run build`.
+- [x] **Step 7: Commit** — `feat(display): a slot's icon is its own property (A51)`
 
 ---
 
@@ -136,7 +136,7 @@ export function rowIcon(
   export function foldIconSlot(tile: TileConfig, index: number): TileConfig;
   ```
 
-- [ ] **Step 1: Write the failing tests** — `tile-ops.test.ts`:
+- [x] **Step 1: Write the failing tests** — `tile-ops.test.ts`:
 
 ```ts
 it("patches one icon field and never leaves {} behind", …)
@@ -157,8 +157,8 @@ it("handles a rules-only icon slot", …)
   // bearing rule) → the target's own icon, if any, stays untouched
 it("refuses quietly when there is no target", …)  // toBe(tile)
 ```
-- [ ] **Step 2: Run them** — `npx vitest run src/lib/config/tile-ops.test.ts` → FAIL.
-- [ ] **Step 3: Implement** — all three in the module's house style (pure, new objects, `withSlots`; see `setSlotWhere` for the delete-the-default pattern):
+- [x] **Step 2: Run them** — `npx vitest run src/lib/config/tile-ops.test.ts` → FAIL.
+- [x] **Step 3: Implement** — all three in the module's house style (pure, new objects, `withSlots`; see `setSlotWhere` for the delete-the-default pattern):
   ```ts
   export function iconSlotTarget(tile: TileConfig, index: number): number | null {
     const slots = tile.slots ?? [];
@@ -176,9 +176,9 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   ```
   `foldIconSlot`: resolve the target; build the descriptor `{ glyph?, where? }` from `options.icon` (non-empty string) and `slot.where`; `carries` = glyph | where | a rule with `icon`; map the slots once — target gets `rules: [...(target.rules ?? []), ...(iconSlot.rules ?? [])]` and, when `carries`, `icon: descriptor` — then drop the icon slot. No target → `return tile`.
   `patchIcon`: merge `{...slot.icon, ...patch}`, delete `undefined` keys, set `icon` or delete it; other slots untouched.
-- [ ] **Step 4: Run them** → PASS.
-- [ ] **Step 5: Gates.**
-- [ ] **Step 6: Commit** — `feat(config): folding an icon slot onto its slot (A56)`
+- [x] **Step 4: Run them** → PASS.
+- [x] **Step 5: Gates.**
+- [x] **Step 6: Commit** — `feat(config): folding an icon slot onto its slot (A56)`
 
 ---
 
@@ -190,7 +190,7 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
 
 **Interfaces:** consumes `SlotIcon` (Task 1). No new exports.
 
-- [ ] **Step 1: Re-author the presets** — drop the `icon()` helper and its header comment; each preset's `icon(source, glyph, rules?)` entry folds onto the slot carrying the same source (or the headline for hint-based ones), with the icon slot's entry removed:
+- [x] **Step 1: Re-author the presets** — drop the `icon()` helper and its header comment; each preset's `icon(source, glyph, rules?)` entry folds onto the slot carrying the same source (or the headline for hint-based ones), with the icon slot's entry removed:
 
   | preset | target (index after the fold) | glyph |
   |---|---|---|
@@ -207,11 +207,11 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   | Custom | `value value` (0) | `widgets` |
 
   Shape: `{ kind: "value", source: "power", icon: { glyph: "lightbulb" }, rules: […] }` — rules unchanged, only moved.
-- [ ] **Step 2: Update the existing preset tests** — `template-ops.test.ts`'s "dims an idle motion sensor" and "gives the light its on/off icon rules" now read the folded slot (`slots.find((s) => s.source === "motion")`, `s.source === "power"`); expectations on `rules.map(r => r.when)` and `disabled` stay.
-- [ ] **Step 3: Add the integrity test** — in `template-ops.test.ts`, one test over a table of `[type, index, glyph]` per the table above: exactly one slot in each preset carries an `icon` descriptor, at that index, with that glyph; and no preset slot has `kind: "icon"` any more.
-- [ ] **Step 4: Run the tests** → PASS. (`npx vitest run src/lib/config/template-ops.test.ts`)
-- [ ] **Step 5: Gates.** No browser check here — the folded descriptors render only after Task 4 (this task is test-only).
-- [ ] **Step 6: Commit** — `feat(config): the presets carry their icon on the slot (A55)`
+- [x] **Step 2: Update the existing preset tests** — `template-ops.test.ts`'s "dims an idle motion sensor" and "gives the light its on/off icon rules" now read the folded slot (`slots.find((s) => s.source === "motion")`, `s.source === "power"`); expectations on `rules.map(r => r.when)` and `disabled` stay.
+- [x] **Step 3: Add the integrity test** — in `template-ops.test.ts`, one test over a table of `[type, index, glyph]` per the table above: exactly one slot in each preset carries an `icon` descriptor, at that index, with that glyph; and no preset slot has `kind: "icon"` any more.
+- [x] **Step 4: Run the tests** → PASS. (`npx vitest run src/lib/config/template-ops.test.ts`)
+- [x] **Step 5: Gates.** No browser check here — the folded descriptors render only after Task 4 (this task is test-only).
+- [x] **Step 6: Commit** — `feat(config): the presets carry their icon on the slot (A55)`
 
 ---
 
@@ -236,7 +236,7 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   icon?: { glyph: string; color?: string; disabled?: boolean };
   ```
 
-- [ ] **Step 1: `SlotRenderer.svelte`** — move the rendering branches into a `{#snippet content()}`, then:
+- [x] **Step 1: `SlotRenderer.svelte`** — move the rendering branches into a `{#snippet content()}`, then:
   ```svelte
   {#if show}
     {#if icon}
@@ -252,7 +252,7 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   {/if}
   ```
   CSS: `.slot-cluster { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:0.3rem; min-width:0; max-width:100% }`; `.slot-cluster.stack { flex-direction: column; gap: 0.1rem }`; `.slot-icon { display:inline-flex; align-items:center }`. Without an `icon` prop the markup is exactly as today.
-- [ ] **Step 2: `Tile.svelte`** —
+- [x] **Step 2: `Tile.svelte`** —
   - import `headlineSlot`, `rowIcon` from `$lib/config/tile-parts`; `type SlotRow`.
   - `const headline = $derived(headlineSlot(slots));` (after the `slots` derived).
   - the accent (A52): replace `iconSlot` with
@@ -281,8 +281,8 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   - body loop: `icon={bodyIcon(r)} stack={r.slot === headline && span.w < 2}`.
   - `modalRows` mapping: add `icon: rowIcon(r, "modal")` per row.
   - `<TileModal … headIcon={headIcon} />`.
-- [ ] **Step 3: `TileModal.svelte`** — add the `headIcon` prop (type above) and pass it to `ModalPanel`; the `rows` type gains `icon?`.
-- [ ] **Step 4: `ModalPanel.svelte`** — import `Icon`; header renders the icon first inside `.head-main`:
+- [x] **Step 3: `TileModal.svelte`** — add the `headIcon` prop (type above) and pass it to `ModalPanel`; the `rows` type gains `icon?`.
+- [x] **Step 4: `ModalPanel.svelte`** — import `Icon`; header renders the icon first inside `.head-main`:
   ```svelte
   {#if headIcon}
     <span class="head-icon" style:color={headIcon.color}>
@@ -307,9 +307,9 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
   <div class="row-frame">…</div>
   ```
   CSS: `.head-icon, .row-icon { display:inline-flex; align-items:center; color: var(--text-muted) }`; `.frame-cap { justify-content: center }`. Sizes: header 26, rows 18 (A53's note: settled against the preview).
-- [ ] **Step 5: Gates.**
-- [ ] **Step 6: Browser check (read-only)** — on the dev server against the live document: every materialised legacy tile is visually unchanged on the display and in its detail page (accent, glow, dim, no extra icons); if any tile in the document is unmaterialised, its icon now renders with the reading (1-wide stacks, 2-wide like Thermostat/Blind sits beside). No writes — the live document has no slot icons yet, so the new look's fuller pass is the user's interactive one (Task 6).
-- [ ] **Step 7: Commit** — `feat(display): the icon renders with its reading (A52–A54)`
+- [x] **Step 5: Gates.**
+- [x] **Step 6: Browser check (read-only)** — on the dev server against the live document: every materialised legacy tile is visually unchanged on the display and in its detail page (accent, glow, dim, no extra icons); if any tile in the document is unmaterialised, its icon now renders with the reading (1-wide stacks, 2-wide like Thermostat/Blind sits beside). No writes — the live document has no slot icons yet, so the new look's fuller pass is the user's interactive one (Task 6).
+- [x] **Step 7: Commit** — `feat(display): the icon renders with its reading (A52–A54)`
 
 ---
 

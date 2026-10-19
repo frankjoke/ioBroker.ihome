@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from "$lib/components/common/Icon.svelte";
   import ControlWidget from "./slots/ControlWidget.svelte";
   import IconSlot from "./slots/IconSlot.svelte";
   import ValueSlot from "./slots/ValueSlot.svelte";
@@ -19,6 +20,8 @@
     style,
     onPrimary,
     emphasis,
+    icon,
+    stack = false,
   }: {
     slot: Slot;
     device: EnrichedDevice;
@@ -26,6 +29,11 @@
     style: { icon?: string; color?: string; disabled?: boolean };
     onPrimary?: () => void;
     emphasis?: "primary" | "secondary";
+    /** The slot's own icon (A51/A53), resolved by the tile: glyph, dressed
+     *  colour, dim — and the size the emphasis asks for. */
+    icon?: { glyph: string; color?: string; disabled?: boolean; size?: number };
+    /** The primary cluster at a 1-wide span: icon above the value (A53). */
+    stack?: boolean;
   } = $props();
 
   // Kinds with a control are useless without one; icon/value fall back.
@@ -40,10 +48,10 @@
   const show = $derived(!needsControl || !!control);
 </script>
 
-<!-- The control-bearing kinds below only open up for a control that resolved
-     from the device (a raw-state pseudo-control reaches value/icon kinds only),
-     so the cast to the full enriched shape is safe. -->
-{#if show}
+{#snippet content()}
+  <!-- The control-bearing kinds below only open up for a control that resolved
+       from the device (a raw-state pseudo-control reaches value/icon kinds only),
+       so the cast to the full enriched shape is safe. -->
   {#if slot.kind === "icon"}
     <IconSlot {slot} {style} fallback={device.icon} {onPrimary} />
   {:else if slot.kind === "value"}
@@ -63,4 +71,42 @@
   {:else if needsControl && control}
     <ControlWidget control={control as EnrichedControl} />
   {/if}
+{/snippet}
+
+{#if show}
+  {#if icon}
+    <!-- The slot's icon and its reading, one cluster (A53): side by side when
+         the line fits; the headline stacks at a 1-wide span so a 1×1 tile puts
+         the icon above the value. -->
+    <div class="slot-cluster" class:stack>
+      <span class="slot-icon" style:color={icon.color}>
+        <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
+      </span>
+      {@render content()}
+    </div>
+  {:else}
+    {@render content()}
+  {/if}
 {/if}
+
+<style>
+  .slot-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .slot-cluster.stack {
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .slot-icon {
+    display: inline-flex;
+    align-items: center;
+  }
+</style>

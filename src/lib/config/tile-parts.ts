@@ -25,6 +25,10 @@ export interface SlotRow {
 }
 
 export interface TileParts {
+  /** The slots the resolution ran on (A18): the tile's own once materialised,
+   *  the chain's until then — the very objects every row carries, so a
+   *  headline pick (A52) is a reference, not a second resolution. */
+  slots: Slot[];
   /** The tile's visible body, in slot order. */
   body: SlotRow[];
   /** The chart layer (A22): `options.background` slots, drawn over the body. */
@@ -131,6 +135,7 @@ export function tileParts(
     : [];
 
   return {
+    slots,
     body,
     background,
     modal,

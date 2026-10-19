@@ -11,6 +11,7 @@
     background,
     rows,
     badges,
+    headIcon,
     inline = false,
     onClose,
   }: {
@@ -24,11 +25,15 @@
       slot: Slot;
       control?: SlotControl;
       style: ResolvedStyle;
+      /** The row's own icon (A54), resolved by the tile. */
+      icon?: { glyph: string; color?: string; disabled?: boolean };
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];
     /** The badges that live (also) in the modal (A34). */
     badges?: ResolvedBadge[];
+    /** The headline slot's icon (A54): the detail page greets the name with it. */
+    headIcon?: { glyph: string; color?: string; disabled?: boolean };
     /** Shown *non-modally* (`show()`): it does not block the page, which is what
      *  the layout sheet wants — the modal view is something to look at while
      *  editing, not something that stops the editing. */
@@ -66,6 +71,7 @@
     {background}
     {rows}
     {badges}
+    {headIcon}
     {onClose}
     bodyMaxHeight="70vh"
   />

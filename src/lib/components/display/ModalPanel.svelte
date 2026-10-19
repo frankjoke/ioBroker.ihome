@@ -1,6 +1,7 @@
 <script lang="ts">
   import { backgroundCss } from "$lib/config/appearance";
   import { tileTitle } from "$lib/config/template-ops";
+  import Icon from "$lib/components/common/Icon.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeChip from "./BadgeChip.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
@@ -18,6 +19,7 @@
     background,
     rows,
     badges,
+    headIcon,
     onClose,
     bodyMaxHeight,
   }: {
@@ -33,12 +35,16 @@
        *  label — the row label falls back to it. */
       control?: SlotControl & { feature?: string };
       style: ResolvedStyle;
+      /** The row's own icon (A54), resolved by the tile. */
+      icon?: { glyph: string; color?: string; disabled?: boolean };
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];
     /** Badges that live (also) in the modal — read-only chips in sequence under
      *  the title; their corner anchors are the tile's language (A34). */
     badges?: ResolvedBadge[];
+    /** The headline slot's icon (A54): the detail page greets the name with it. */
+    headIcon?: { glyph: string; color?: string; disabled?: boolean };
     /** Given → a close button in the header (the dialog); absent → a preview. */
     onClose?: () => void;
     /** How far the rows may grow before scrolling (the preview leaves less). */
@@ -51,6 +57,11 @@
 <div class="panel" style={backgroundCss(background)}>
   <header class="panel-head">
     <div class="head-main">
+      {#if headIcon}
+        <span class="head-icon" style:color={headIcon.color}>
+          <Icon value={headIcon.glyph} size={26} dim={headIcon.disabled} />
+        </span>
+      {/if}
       <h2>{heading}</h2>
       {#if badges?.length}
         <div class="badges">
@@ -87,6 +98,13 @@
     >
       {#each rows as r, i (i)}
         {#if r.slot.kind === "frame"}
+          {#if r.icon}
+            <div class="row frame-cap">
+              <span class="row-icon" style:color={r.icon.color}>
+                <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+              </span>
+            </div>
+          {/if}
           <!-- A page has no name column: it takes the panel's whole width, and
                the row's height is what the tile's frame would not have (A38). -->
           <div class="row-frame">
@@ -100,6 +118,11 @@
           </div>
         {:else}
           <div class="row">
+            {#if r.icon}
+              <span class="row-icon" style:color={r.icon.color}>
+                <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+              </span>
+            {/if}
             <span class="row-label"
               >{r.slot.label ||
                 r.control?.label ||
@@ -161,6 +184,21 @@
   .panel-head h2 {
     margin: 0;
     font-size: 1.05rem;
+  }
+
+  /* The detail page's face (A54): the headline's icon greets the name; the
+   * rows wear their slot's icon before the label. Rule colours win over the
+   * muted default. */
+  .head-icon,
+  .row-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+    flex: 0 0 auto;
+  }
+
+  .frame-cap {
+    justify-content: center;
   }
 
   /* The badges that live in the modal (A34) — the tile's chips, in sequence. */

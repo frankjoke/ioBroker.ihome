@@ -10,7 +10,12 @@
     tileTitle,
   } from "$lib/config/template-ops";
   import { evalActive } from "$lib/config/tile-ops";
-  import { tileParts } from "$lib/config/tile-parts";
+  import {
+    headlineSlot,
+    rowIcon,
+    tileParts,
+    type SlotRow,
+  } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -125,11 +130,6 @@
     );
   }
 
-  /** The tile's own slots once it was materialised; the chain's until then (A18).
-   *  Slots that render nothing are dropped by the pass below, so a template can
-   *  name features a device does not have without leaving gaps (spec §10). */
-  const slots = $derived(tile?.slots ?? template.slots);
-
   /**
    * A raw state id as a read-only pseudo-control (A21): a slot may name any state
    * the document carries, not only a control of this device. Only the state's
@@ -148,22 +148,6 @@
       writable: false,
     };
   }
-
-  // The icon slot carries the type's on/off colour and glow, so it drives the
-  // tile's accent; the values reach CSS through custom properties (spec §6).
-  const iconSlot = $derived(
-    slots.find((s) => s.kind === "icon") ?? { kind: "icon" as const },
-  );
-  const tileStyle = $derived(slotStyle(iconSlot, controlFor(iconSlot)));
-  // The tile's own painted background first (A33): a rule's background is
-  // appended after it, so the live condition still wins.
-  const tileVars = $derived(
-    `${backgroundCss(tile?.background)} --tile-accent: ${
-      tileStyle.color ?? "transparent"
-    }; --tile-glow: ${
-      tileStyle.glow ? 1 : 0
-    };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
-  );
 
   /**
    * Badge clock. `at()` answers "when did this control last report/change?";
@@ -215,8 +199,50 @@
       time: clock,
     }),
   );
+
+  // The slots the resolution ran on (A18/A46): the tile's own once materialised,
+  // the chain's until then — and the very objects the rows carry, so the
+  // headline pick (A52) is a reference.
+  const slots = $derived(parts.slots);
+
+  // The accent the tile wears (A52): a legacy icon slot keeps driving it while
+  // one exists — exactly today's behaviour — else the headline slot's resolved
+  // style. The *style* carries, so "glow when on" keeps working with the icon
+  // disabled; the values reach CSS through custom properties (spec §6).
+  const headline = $derived(headlineSlot(slots));
+  const accentSlot = $derived(
+    slots.find((s) => s.kind === "icon") ??
+      headline ?? { kind: "icon" as const },
+  );
+  const tileStyle = $derived(slotStyle(accentSlot, controlFor(accentSlot)));
+  // The tile's own painted background first (A33): a rule's background is
+  // appended after it, so the live condition still wins.
+  const tileVars = $derived(
+    `${backgroundCss(tile?.background)} --tile-accent: ${
+      tileStyle.color ?? "transparent"
+    }; --tile-glow: ${
+      tileStyle.glow ? 1 : 0
+    };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
+  );
+
   const backgroundSlots = $derived(parts.background);
   const bodySlots = $derived(parts.body);
+
+  /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small. */
+  function bodyIcon(r: SlotRow) {
+    const icon = rowIcon(r, "tile");
+    return icon ? { ...icon, size: r.slot === headline ? 34 : 17 } : undefined;
+  }
+
+  // The detail page's face (A54): the headline's icon, wherever its slot lives.
+  const headlineRow = $derived(
+    [...parts.body, ...parts.background, ...parts.modal].find(
+      (r) => r.slot === headline,
+    ),
+  );
+  const headIcon = $derived(
+    headlineRow ? rowIcon(headlineRow, "modal") : undefined,
+  );
 
   // What the sheet's Detail Page checkbox asks about (A47): the tile's own
   // resolution, not a second guess at the slots.
@@ -240,6 +266,7 @@
           : r.slot,
       control: r.control,
       style: r.style,
+      icon: rowIcon(r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
       onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
     })),
@@ -423,6 +450,8 @@
         {device}
         control={r.control}
         style={slotStyle(r.slot, r.control)}
+        icon={bodyIcon(r)}
+        stack={r.slot === headline && span.w < 2}
         onPrimary={r.control && r.control === primary
           ? togglePrimary
           : undefined}
@@ -442,6 +471,7 @@
     background={tile?.background}
     rows={modalRows}
     badges={modalBadges}
+    {headIcon}
     inline={modalInline}
     onClose={() => {
       modalOpen = false;
