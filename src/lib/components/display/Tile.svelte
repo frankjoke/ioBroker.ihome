@@ -11,6 +11,7 @@
   } from "$lib/config/template-ops";
   import { evalActive } from "$lib/config/tile-ops";
   import {
+    accentSlot,
     headlineSlot,
     rowIcon,
     tileParts,
@@ -210,11 +211,8 @@
   // style. The *style* carries, so "glow when on" keeps working with the icon
   // disabled; the values reach CSS through custom properties (spec §6).
   const headline = $derived(headlineSlot(slots));
-  const accentSlot = $derived(
-    slots.find((s) => s.kind === "icon") ??
-      headline ?? { kind: "icon" as const },
-  );
-  const tileStyle = $derived(slotStyle(accentSlot, controlFor(accentSlot)));
+  const accent = $derived(accentSlot(slots) ?? { kind: "icon" as const });
+  const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
   // The tile's own painted background first (A33): a rule's background is
   // appended after it, so the live condition still wins.
   const tileVars = $derived(
@@ -234,14 +232,19 @@
     return icon ? { ...icon, size: r.slot === headline ? 34 : 17 } : undefined;
   }
 
-  // The detail page's face (A54): the headline's icon, wherever its slot lives.
-  const headlineRow = $derived(
-    [...parts.body, ...parts.background, ...parts.modal].find(
-      (r) => r.slot === headline,
-    ),
-  );
+  // The detail page's face (A54): the headline's icon follows its own
+  // descriptor and homes. The header deliberately does not consult the row's
+  // visibility — a conditionally hidden headline still greets its own page.
   const headIcon = $derived(
-    headlineRow ? rowIcon(headlineRow, "modal") : undefined,
+    headline
+      ? rowIcon(
+          {
+            slot: headline,
+            style: slotStyle(headline, controlFor(headline)),
+          },
+          "modal",
+        )
+      : undefined,
   );
 
   // What the sheet's Detail Page checkbox asks about (A47): the tile's own

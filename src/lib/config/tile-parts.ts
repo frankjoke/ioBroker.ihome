@@ -156,6 +156,12 @@ export function headlineSlot(slots: Slot[]): Slot | undefined {
   );
 }
 
+/** The slot whose resolved style the tile wears (A52): the legacy icon slot
+ *  while one exists — exactly the pre-slot-icon behaviour — else the headline. */
+export function accentSlot(slots: Slot[]): Slot | undefined {
+  return slots.find((s) => s.kind === "icon") ?? headlineSlot(slots);
+}
+
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
  *  there — the last matching rule's glyph beats the descriptor's. */
 export function rowIcon(
