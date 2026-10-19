@@ -48,11 +48,14 @@
     pageId = "",
     onPage,
     onClose,
+    picked,
   }: {
     /** The display's page: the sheet's cursor page is the display's page (A45). */
     pageId?: string;
     onPage: (id: string) => void;
     onClose: () => void;
+    /** The tile a click in the display landed on (A48). */
+    picked?: PlacementAnchor | null;
   } = $props();
 
   let selection = $state<LayoutSelection | null>(null);
@@ -118,6 +121,16 @@
     if (selection?.pageId !== pageId) {
       selection = { kind: "page", pageId };
     }
+  });
+
+  // A click in the display points the cursor at its tile (A48). The page moves
+  // with it: the cursor's page is the display's page (A45), and the app bar's
+  // tab follows the same state.
+  $effect(() => {
+    const hit = picked;
+    if (!hit) return;
+    onPage(hit.pageId);
+    selection = { kind: "tile", ...hit };
   });
 
   function selectSection(id: string): void {

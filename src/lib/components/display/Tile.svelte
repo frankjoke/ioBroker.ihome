@@ -374,6 +374,9 @@
   class:active
   class:glow={tileStyle.glow === true}
   class:disabled={tileStyle.disabled === true}
+  data-page-id={anchor?.pageId}
+  data-section-id={anchor?.sectionId}
+  data-placement-id={anchor?.placementId}
   style="grid-column: {newLine
     ? '1'
     : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
