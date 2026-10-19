@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display`, head `0c6c85f` — clean. The spec and the plan for this slice are committed there. |
-| **Slot-icons work** | Worktree `…\worktree\c399be\slot-icons`, branch `feature/slot-icons` (from `0c6c85f`). Six task commits + this handoff. **Not merged** — merging into `feature/ihome-display` is the user's call. |
-| **Ledger** | `.superpowers/sdd/2026-10-19-ihome-slot-icons/progress.md` in the worktree (five task lines, two rulings, pre-flight scan). |
+| **Slot-icons work** | Worktree `…\worktree\c399be\slot-icons`, branch `feature/slot-icons` (from `0c6c85f`), head `258a115` — six task commits, the finishing-review fix and this handoff. **Not merged** — merging into `feature/ihome-display` is the user's call. |
+| **Ledger** | `.superpowers/sdd/2026-10-19-ihome-slot-icons/progress.md`, copied into the main checkout at finishing (the worktree's copy dies with it): every task line, the two interim rulings, and the review's fix/minor/ruling lines. |
 | **Dev server** | The user's runs on :5173; the checks here ran on a second one at :5174. Either needs Host:Port `192.168.178.9:8081` and Namespace `0_userdata.0.Test.AiHome` set once in the footer. |
 
 Design record: `docs/superpowers/specs/2026-10-19-ihome-slot-icons-design.md` (**A51–A58**); plan:
@@ -65,10 +65,19 @@ enabled with target `value · Brunnen`, add-slot picker without `icon`. Console:
 frame's third-party `energiefluss` noise, Sentry timeouts and the known `templateList` warning. No
 writes: nothing was toggled or confirmed on a live tile.
 
+## The finishing review, and what it changed (`258a115`)
+
+A subagent reviewed `0c6c85f..9a123d5` against A51–A58 — no Critical, two Important, five Minor, ten declined lines (each ruled in the ledger):
+
+- **Important — the header icon was gated by the headline *slot's* row visibility** (a hidden or dormant headline showed no icon), while A54 says the header follows the icon's own `enabled`/`where` only. Fixed: the header resolves from the headline slot's descriptor directly — still `rowIcon`, still one resolution.
+- **Important — the accent pick lived untested inside the component** although the spec assigns it to `tile-parts` and names the test. Fixed: `accentSlot(slots)` is pure, with a test pinning "legacy icon slot wins while one exists, else the headline".
+- **Minors deferred** (ledgered, your call): the cluster icon has no muted colour default; the fold's source match can pick a contrived legacy/badge target; a glyph-less icon slot folds silently; the fold doesn't clear the pane's expanded/rules state; `where: modal` is offered where it cannot render.
+
+Both Important fixes went test-first; the fix commit re-ran the gates.
+
 ## Gates
 
-`npm test` (362, 30 files) · `npm run check` (0/0) · `npm run lint` (0) · `npm run build` — all green at
-`1d69344` (the full-suite run after the final fix pass is with the closing commits of this slice).
+`npm test` (363, 30 files) · `npm run check` (0/0) · `npm run lint` (0) · `npm run build` — all green at `258a115`.
 
 ## The user's interactive checklist
 
