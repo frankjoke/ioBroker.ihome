@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { backgroundCss } from "$lib/config/appearance";
   import {
