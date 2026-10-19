@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { tileParts } from "$lib/config/tile-parts";
+import { headlineSlot, rowIcon, tileParts } from "$lib/config/tile-parts";
 import type {
   EnrichedControl,
   EnrichedDevice,
@@ -166,4 +166,117 @@ it("an active-gated modal row counts only while the tile is not active", () => {
 it("falls back to the template's own slots when the placement has none", () => {
   const parts = tileParts(device(), undefined, none);
   expect(parts.body.length).toBeGreaterThan(0);
+});
+
+it("picks the headline: the first value slot, else the first non-icon slot", () => {
+  // A value anywhere wins, even when it lives only in the modal (A52).
+  const value: Slot = {
+    kind: "value",
+    source: "humidity",
+    where: "modal",
+  };
+  expect(headlineSlot([{ kind: "icon" }, { kind: "button" }, value])).toBe(
+    value,
+  );
+
+  // Without one, the first slot that is not a legacy icon slot.
+  const button: Slot = { kind: "button" };
+  expect(headlineSlot([{ kind: "icon" }, button])).toBe(button);
+  expect(headlineSlot([])).toBeUndefined();
+});
+
+it("reads a row's icon from the descriptor, the rule icon winning", () => {
+  const parts = tileParts(
+    device(),
+    tile([{ kind: "value", source: "temperature", icon: { glyph: "x" } }]),
+    none,
+  );
+  expect(rowIcon(parts.body[0], "tile")?.glyph).toBe("x");
+
+  const ruled = tileParts(
+    device(),
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        icon: { glyph: "x" },
+        rules: [{ when: "true", icon: "y" }],
+      },
+    ]),
+    none,
+  );
+  expect(rowIcon(ruled.body[0], "tile")?.glyph).toBe("y");
+
+  const bare = tileParts(
+    device(),
+    tile([{ kind: "value", source: "temperature" }]),
+    none,
+  );
+  expect(rowIcon(bare.body[0], "tile")).toBeUndefined();
+});
+
+it("honours enabled and the icon's own homes", () => {
+  const row = (slot: Slot) => tileParts(device(), tile([slot]), none).body[0];
+
+  const off = row({
+    kind: "value",
+    source: "temperature",
+    icon: { glyph: "x", enabled: false },
+  });
+  expect(rowIcon(off, "tile")).toBeUndefined();
+  expect(rowIcon(off, "modal")).toBeUndefined();
+
+  const tileOnly = row({
+    kind: "value",
+    source: "temperature",
+    icon: { glyph: "x", where: "tile" },
+  });
+  expect(rowIcon(tileOnly, "tile")?.glyph).toBe("x");
+  expect(rowIcon(tileOnly, "modal")).toBeUndefined();
+
+  const modalOnly = row({
+    kind: "value",
+    source: "temperature",
+    icon: { glyph: "x", where: "modal" },
+  });
+  expect(rowIcon(modalOnly, "modal")?.glyph).toBe("x");
+  expect(rowIcon(modalOnly, "tile")).toBeUndefined();
+
+  // Absent `where` is "both": the icon shows wherever its slot lives.
+  const both = row({
+    kind: "value",
+    source: "temperature",
+    icon: { glyph: "x" },
+  });
+  expect(rowIcon(both, "tile")?.glyph).toBe("x");
+  expect(rowIcon(both, "modal")?.glyph).toBe("x");
+
+  const empty = row({
+    kind: "value",
+    source: "temperature",
+    icon: {},
+  });
+  expect(rowIcon(empty, "tile")).toBeUndefined();
+});
+
+it("carries the style's colour and dim into the icon", () => {
+  const parts = tileParts(
+    device(),
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        icon: { glyph: "x" },
+        rules: [
+          { when: "true", color: "var(--warning-color)", disabled: true },
+        ],
+      },
+    ]),
+    none,
+  );
+  expect(rowIcon(parts.body[0], "tile")).toEqual({
+    glyph: "x",
+    color: "var(--warning-color)",
+    disabled: true,
+  });
 });

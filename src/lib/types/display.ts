@@ -126,6 +126,19 @@ export interface Rule {
   tone?: string; // badge tone: info | ok | warn | danger
 }
 
+/** One slot's icon (A51): presence gates rendering, `false` keeps it defined but
+ *  invisible, and the slot's own rules dress it (a rule's `icon` swaps the glyph).
+ *  The legacy `kind: "icon"` slot is separate and stays valid. */
+export interface SlotIcon {
+  /** One raw string (A23): a material-symbols name, image URL, data: URL or
+   *  broker-relative path. */
+  glyph?: string;
+  /** Absent = enabled while the descriptor exists. */
+  enabled?: boolean;
+  /** The icon's own homes; absent = both. Narrowed by the slot's own `where`. */
+  where?: "tile" | "both" | "modal";
+}
+
 export interface Slot {
   kind: SlotKind;
   source?: string; // control feature → control id → state id
@@ -139,6 +152,8 @@ export interface Slot {
   showWhen?: "active" | "inactive";
   /** Where the slot lives (A34): the tile (default), the modal, or both. */
   where?: "tile" | "both" | "modal";
+  /** The slot's own icon (A51); absent = no icon. */
+  icon?: SlotIcon;
 }
 
 export interface Template {

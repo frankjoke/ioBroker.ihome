@@ -141,3 +141,28 @@ export function tileParts(
       (raw ? modalBadges.length > 0 : modalBadgeSlots.length > 0),
   };
 }
+
+/** The tile's face (A52): the first value slot, else the first non-icon slot —
+ *  a legacy Button tile's face is its button, not its old icon slot. */
+export function headlineSlot(slots: Slot[]): Slot | undefined {
+  return (
+    slots.find((s) => s.kind === "value") ??
+    slots.find((s) => s.kind !== "icon")
+  );
+}
+
+/** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
+ *  there — the last matching rule's glyph beats the descriptor's. */
+export function rowIcon(
+  row: SlotRow,
+  home: "tile" | "modal",
+): { glyph: string; color?: string; disabled?: boolean } | undefined {
+  const icon = row.slot.icon;
+  if (!icon || icon.enabled === false) return undefined;
+  const where = icon.where ?? "both";
+  if (where !== "both" && where !== home) return undefined;
+  const glyph = row.style.icon ?? icon.glyph;
+  return glyph
+    ? { glyph, color: row.style.color, disabled: row.style.disabled }
+    : undefined;
+}

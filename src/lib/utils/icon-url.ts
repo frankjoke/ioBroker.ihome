@@ -37,7 +37,13 @@ export function collectDocumentIcons(
     }
     if (!value || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {
-      if (key === "icon" && typeof child === "string" && child.trim()) {
+      // `icon` covers pages, sections, icon slots and rule icons (A23); `glyph`
+      // is the slot icon's own field (A51).
+      if (
+        (key === "icon" || key === "glyph") &&
+        typeof child === "string" &&
+        child.trim()
+      ) {
         found.add(child.trim());
       }
       walk(child);

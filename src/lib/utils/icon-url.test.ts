@@ -47,6 +47,7 @@ it("collectDocumentIcons gathers every icon field, deduped", () => {
                       options: { icon: "bolt" },
                       rules: [{ icon: "flash_on" }],
                     },
+                    { kind: "value", icon: { glyph: "probe" } },
                   ],
                 },
               },
@@ -68,5 +69,10 @@ it("collectDocumentIcons gathers every icon field, deduped", () => {
       },
     ],
   } as unknown as TemplateRegistry;
-  expect(collectDocumentIcons(reg, tpl)).toEqual(["bolt", "flash_on", "home"]);
+  expect(collectDocumentIcons(reg, tpl)).toEqual([
+    "bolt",
+    "flash_on",
+    "home",
+    "probe",
+  ]);
 });
