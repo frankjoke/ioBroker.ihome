@@ -1399,23 +1399,20 @@
                       <span>Icon</span>
                     </label>
                     {#if slot.icon}
-                      <label class="small grow">
-                        <span class="label-mono">Glyph</span>
-                        <input
-                          type="text"
-                          placeholder="material symbol or image"
-                          value={slot.icon.glyph ?? ""}
-                          oninput={(e) =>
-                            setIcon(i, {
-                              glyph: e.currentTarget.value.trim() || undefined,
-                            })}
-                        />
-                      </label>
                       <button
                         type="button"
-                        class="btn btn-sm"
-                        onclick={() => (iconPickerFor = i)}>Choose…</button
+                        class="btn btn-sm glyph-pick"
+                        title={slot.icon.glyph
+                          ? `Glyph: ${slot.icon.glyph} — click to change`
+                          : "Choose a glyph"}
+                        onclick={() => (iconPickerFor = i)}
                       >
+                        {#if slot.icon.glyph}
+                          <Icon value={slot.icon.glyph} size={18} />
+                        {:else}
+                          Choose glyph…
+                        {/if}
+                      </button>
                       <button
                         type="button"
                         class="icon-btn"
@@ -1440,7 +1437,7 @@
                   </div>
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
                     <p class="note text-muted">
-                      No glyph yet — pick one, or let a rule supply it.
+                      No glyph yet — choose one, or let a rule supply it.
                     </p>
                   {/if}
                 {/if}
