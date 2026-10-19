@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display` — clean. The slice landed here as a fast-forward (`0c6c85f..e47aad8`, plus this handoff commit); the gates were re-run green on the merged result. |
+| **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display` — clean, head `12af4d0`. The slice landed as a fast-forward (`0c6c85f..e47aad8`); the post-merge handoff (`ad74bd5`) and the glyph-control follow-up (`12af4d0`) sit on top. Gates re-run green on the merged result and for the follow-up. |
 | **Slot-icons work** | Merged and cleaned up: branch `feature/slot-icons` deleted, worktree registration removed. The leftover directory `…\worktree\c399be\slot-icons` itself could not be deleted (file locks) — inert scratch, the host may clear it on restart. |
 | **Ledger** | `.superpowers/sdd/2026-10-19-ihome-slot-icons/progress.md` in this checkout: every task line, the interim rulings, and the review's fix/minor/ruling lines. |
 | **Dev server** | The user's runs on :5173; the checks here ran on a second one at :5174. Either needs Host:Port `192.168.178.9:8081` and Namespace `0_userdata.0.Test.AiHome` set once in the footer. |
@@ -29,9 +29,11 @@ The icon stopped being a slot of its own and became **a property of the slot it 
   page's labelled row. The tile editor marks them **legacy** and offers **Move into its slot** (a
   confirm; glyph, rules and home move onto the named slot, rules appended last; the icon slot is
   removed). Nothing is rewritten silently; Reset remains the blunt path.
-- Editor: every data-bearing slot (value/level/color/enum/button) gets an **Icon** block — toggle, glyph
-  field + Choose…, the where cycle; the collapsed row shows a glyph preview, and the headline slot wears
-  a **headline** tag. Legacy rows show the fold button, disabled with a tooltip when there is no target.
+- Editor: every data-bearing slot (value/level/color/enum/button) gets an **Icon** block — toggle, a
+  **glyph control** that shows the current glyph (or “Choose glyph…”) and opens the picker on a click
+  (no text field), plus the where cycle; the collapsed row shows a glyph preview, and the headline slot
+  wears a **headline** tag. Legacy rows show the fold button, disabled with a tooltip when there is no
+  target.
 
 ## Bug found and fixed live
 
@@ -75,23 +77,44 @@ A subagent reviewed `0c6c85f..9a123d5` against A51–A58 — no Critical, two Im
 
 Both Important fixes went test-first; the fix commit re-ran the gates.
 
+## After the merge — live findings and the glyph control (`ad74bd5`, `12af4d0`)
+
+The first live pass found two things, addressed or queued:
+
+- **The empty Glyph field read as “cannot select”.** The picker itself worked — verified read-only (opens,
+  120 symbols, a pick sets the glyph; done with the socket write stubbed, the document stayed untouched) —
+  but a text field invites typing at a name you don’t care about. By your call the field is gone: the
+  control **shows the glyph**, or “Choose glyph…” when none is set, and clicking it opens the picker
+  (`12af4d0`, A57 amended). Live-verified: the headline shows `device_thermostat`, the empty state shows
+  the label + reworded hint, the picker opens; your own `add_location` pick shows on the button.
+- **The where trap hit in the wild** (review Minor #7): an icon whose home is *modal only* on a
+  tile-only, non-headline slot renders nowhere. Your humidity icon still has `where: "modal"` — flip the
+  square button to tile / tile + modal. Hardening the cycle (skip choices that can never render) is
+  offered and awaiting your word.
+- A stale-HMR page mimicked a broken picker for a moment (the merge arrived through HMR); a hard reload
+  clears it. Worth remembering when something in the editor “does nothing”.
+
 ## Gates
 
-`npm test` (363, 30 files) · `npm run check` (0/0) · `npm run lint` (0) · `npm run build` — all green at `258a115`.
+`npm test` (363, 30 files) · `npm run check` (0/0) · `npm run lint` (0) · `npm run build` — all green at `258a115` and re-run for `12af4d0`.
 
 ## The user's interactive checklist
 
 These write to the live document, so they are yours:
 
 1. **Reset** a materialised tile (e.g. Garten/Terrasse) to see the new preset look up close.
-2. Add an icon to a **secondary slot** (dew point, humidity…) — pick a glyph, watch the cluster.
+2. ✅ started — the Umwelt thermometer's humidity slot carries an icon with the glyph `add_location`;
+   its home is still *modal only*, so flip the square button or it renders nowhere.
 3. Flip a headline icon **off** (glyph and rules stay), then on again.
-4. Set an icon **detail-only** (`where: modal`) — the tile stays clean, the header and its row carry it.
+4. Set an icon **detail-only** — remember: the header carries only the *headline's* icon, and a row only
+   exists for a slot that (also) lives in the modal.
 5. **Move a legacy icon slot** into its slot on one tile and check the confirm's wording.
 
 ## Open items
 
 - **`kind: "icon"` retirement** — scheduled for whenever the live document no longer carries one.
+- **The icon where cycle** still offers homes that can never render (your humidity tile found it).
+  Hardening — skip impossible choices — offered, awaiting your word.
 - **Wide (w ≥ 2) beside-layout** was not observable read-only (no wide chain-resolved tile in the live
   document); the mechanism is the un-stacked default of the same cluster — the first wide tile you reset
   shows it.
