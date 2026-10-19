@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display`, head `0c6c85f` — clean. The spec and the plan for this slice are committed there. |
-| **Slot-icons work** | Worktree `…\worktree\c399be\slot-icons`, branch `feature/slot-icons` (from `0c6c85f`), head `258a115` — six task commits, the finishing-review fix and this handoff. **Not merged** — merging into `feature/ihome-display` is the user's call. |
-| **Ledger** | `.superpowers/sdd/2026-10-19-ihome-slot-icons/progress.md`, copied into the main checkout at finishing (the worktree's copy dies with it): every task line, the two interim rulings, and the review's fix/minor/ruling lines. |
+| **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display` — clean. The slice landed here as a fast-forward (`0c6c85f..e47aad8`, plus this handoff commit); the gates were re-run green on the merged result. |
+| **Slot-icons work** | Merged and cleaned up: branch `feature/slot-icons` deleted, worktree registration removed. The leftover directory `…\worktree\c399be\slot-icons` itself could not be deleted (file locks) — inert scratch, the host may clear it on restart. |
+| **Ledger** | `.superpowers/sdd/2026-10-19-ihome-slot-icons/progress.md` in this checkout: every task line, the interim rulings, and the review's fix/minor/ruling lines. |
 | **Dev server** | The user's runs on :5173; the checks here ran on a second one at :5174. Either needs Host:Port `192.168.178.9:8081` and Namespace `0_userdata.0.Test.AiHome` set once in the footer. |
 
 Design record: `docs/superpowers/specs/2026-10-19-ihome-slot-icons-design.md` (**A51–A58**); plan:
