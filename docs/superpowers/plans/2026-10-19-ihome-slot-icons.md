@@ -392,10 +392,10 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
 **Files:**
 - Modify: `docs/progress/handoff-2026-10-19-iobroker-visual-adapter.md` (the day's handoff: this slice's state)
 
-- [ ] **Step 1: Read-only pass** on the live setup (dev server against `192.168.178.9:8081`): legacy materialised tiles unchanged on the display and their detail pages; the editor's icon block, headline tag, legacy marker visible; no new console errors (the known Sentry/`templateList` noise excepted).
-- [ ] **Step 2: The interactive pass is the user's** — resetting a tile to adopt the new preset look, adding a secondary icon, flipping the icon off, setting it detail-only, and folding a legacy icon slot all write to the live document; list them in the handoff as the user's checklist rather than performing them.
-- [ ] **Step 3: Update the handoff** — what shipped (A51–A58), the new look for unmaterialised tiles, the fold, the controls, and the user's checklist; keep the naming scheme.
-- [ ] **Step 4: Commit** — `docs: the slot icons, verified against the live display`
+- [x] **Step 1: Read-only pass** on the live setup (dev server against `192.168.178.9:8081`): legacy materialised tiles unchanged on the display and their detail pages; the editor's icon block, headline tag, legacy marker visible; no new console errors (the known Sentry/`templateList` noise excepted).
+- [x] **Step 2: The interactive pass is the user's** — resetting a tile to adopt the new preset look, adding a secondary icon, flipping the icon off, setting it detail-only, and folding a legacy icon slot all write to the live document; list them in the handoff as the user's checklist rather than performing them.
+- [x] **Step 3: Update the handoff** — what shipped (A51–A58), the new look for unmaterialised tiles, the fold, the controls, and the user's checklist; keep the naming scheme.
+- [x] **Step 4: Commit** — `docs: the slot icons, verified against the live display`
 
 ---
 
