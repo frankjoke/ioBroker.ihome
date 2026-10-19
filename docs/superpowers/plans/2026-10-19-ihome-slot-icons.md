@@ -321,8 +321,8 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
 
 **Interfaces:** consumes `headlineSlot` (Task 1), `patchIcon`, `iconSlotTarget`, `foldIconSlot` (Task 2), `IconPicker`, `ConfirmModal` (exist).
 
-- [ ] **Step 1: `SlotPicker.svelte`** — `kindsFor` drops `"icon"` from both lists (`["value", "badge", ...DEVICE_KINDS]` / `["value", "badge"]`); confirm `DEVICE_KINDS` contains no `"icon"`.
-- [ ] **Step 2: `LayoutDetails.svelte`** —
+- [x] **Step 1: `SlotPicker.svelte`** — `kindsFor` drops `"icon"` from both lists (`["value", "badge", ...DEVICE_KINDS]` / `["value", "badge"]`); confirm `DEVICE_KINDS` contains no `"icon"`.
+- [x] **Step 2: `LayoutDetails.svelte`** —
   - imports: `foldIconSlot`, `iconSlotTarget`, `patchIcon` (tile-ops); `headlineSlot` (tile-parts); `type SlotIcon` (types/display).
   - consts/state: `const ICON_KINDS: SlotKind[] = ["value", "level", "color", "enum", "button"];`, `let iconPickerFor = $state<number | null>(null);`, `let pendingFold = $state<number | null>(null);`.
   - helpers (near `patchOptions`):
@@ -381,9 +381,9 @@ it("refuses quietly when there is no target", …)  // toBe(tile)
     {/if}
     ```
     Confirm text (A56): the glyph, rules and display home move onto `{foldTargetLabel(pendingFold)}`; an icon already there is overwritten; visibility the icon slot had is not kept — the icon follows that slot from now on.
-- [ ] **Step 3: Gates.**
-- [ ] **Step 4: Browser check (read-only)** — open the sheet on a tile: the icon block shows on a value slot (toggle, glyph field, Choose…, where button), the collapsed row shows the headline tag on its headline slot, a legacy icon slot shows its marker and the fold button is enabled/disabled sensibly; opening the picker and cancelling writes nothing.
-- [ ] **Step 5: Commit** — `feat(editor): the icon block and the legacy fold (A57)`
+- [x] **Step 3: Gates.**
+- [x] **Step 4: Browser check (read-only)** — open the sheet on a tile: the icon block shows on a value slot (toggle, glyph field, Choose…, where button), the collapsed row shows the headline tag on its headline slot, a legacy icon slot shows its marker and the fold button is enabled/disabled sensibly; opening the picker and cancelling writes nothing.
+- [x] **Step 5: Commit** — `feat(editor): the icon block and the legacy fold (A57)`
 
 ---
 

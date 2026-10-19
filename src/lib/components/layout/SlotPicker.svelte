@@ -60,9 +60,11 @@
 
   function kindsFor(t: Tab): SlotKind[] {
     if (t === "page") return ["frame"];
+    // No "icon" any more (A56/A57): a legacy icon slot still edits, but new
+    // slots never create one.
     return t === "device"
-      ? ["value", "icon", "badge", ...DEVICE_KINDS]
-      : ["value", "icon", "badge"];
+      ? ["value", "badge", ...DEVICE_KINDS]
+      : ["value", "badge"];
   }
 
   const kinds = $derived(kindsFor(tab));
