@@ -148,17 +148,19 @@ it("carries the preset sizes", () => {
 });
 
 it("dims an idle motion sensor", () => {
-  const icon = PRESETS.Motion.slots.find((s) => s.kind === "icon");
-  expect(icon?.rules?.map((r) => r.when)).toEqual([
+  const motion = PRESETS.Motion.slots.find((s) => s.source === "motion");
+  expect(motion?.icon?.glyph).toBe("sensors");
+  expect(motion?.rules?.map((r) => r.when)).toEqual([
     "truthy(motion)",
     "!truthy(motion)",
   ]);
-  expect(icon?.rules?.[1].disabled).toBe(true);
+  expect(motion?.rules?.[1].disabled).toBe(true);
 });
 
 it("gives the light its on/off icon rules and the thermometer its battery badge", () => {
-  const icon = PRESETS.Light.slots.find((s) => s.kind === "icon");
-  expect(icon?.rules?.map((r) => r.when)).toEqual([
+  const light = PRESETS.Light.slots.find((s) => s.source === "power");
+  expect(light?.icon?.glyph).toBe("lightbulb");
+  expect(light?.rules?.map((r) => r.when)).toEqual([
     "truthy(power)",
     "!truthy(power)",
   ]);
@@ -167,6 +169,35 @@ it("gives the light its on/off icon rules and the thermometer its battery badge"
       .filter((s) => s.kind === "badge")
       .map((s) => s.source),
   ).toEqual(["ago", "offline", "battery"]);
+});
+
+it("carries every preset's icon on the slot its source named (A55)", () => {
+  const expected: { type: keyof typeof PRESETS; at: number; glyph: string }[] =
+    [
+      { type: "Switch", at: 0, glyph: "power_settings_new" },
+      { type: "Button", at: 0, glyph: "touch_app" },
+      { type: "Light", at: 0, glyph: "lightbulb" },
+      { type: "Thermostat", at: 0, glyph: "thermostat" },
+      { type: "Thermometer", at: 0, glyph: "device_thermostat" },
+      { type: "Blind", at: 0, glyph: "blinds" },
+      { type: "Window", at: 0, glyph: "window" },
+      { type: "Motion", at: 0, glyph: "sensors" },
+      { type: "AC", at: 3, glyph: "ac_unit" },
+      { type: "Value", at: 0, glyph: "speed" },
+      { type: "Custom", at: 0, glyph: "widgets" },
+    ];
+  for (const { type, at, glyph } of expected) {
+    const slots = PRESETS[type].slots;
+    expect(
+      slots
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => s.icon)
+        .map(({ i }) => i),
+    ).toEqual([at]);
+    expect(slots[at].icon?.glyph).toBe(glyph);
+    // No preset creates a legacy icon slot any more (A55).
+    expect(slots.some((s) => s.kind === "icon")).toBe(false);
+  }
 });
 
 it("parses a template registry and rejects junk", () => {
