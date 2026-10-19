@@ -30,8 +30,11 @@
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
   import { addSlot, editTile } from "$lib/config/tile-ops";
-  import { sheetCursor, swapDecision } from "$lib/config/sheet-cursor";
-  import { tileParts } from "$lib/config/tile-parts";
+  import {
+    sheetCursor,
+    swapDecision,
+    tileLabel,
+  } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -42,7 +45,7 @@
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import type { EnrichedDevice } from "$lib/types/device";
   import type { Device } from "$lib/types/device";
-  import type { PageRegistry, Placement, Slot } from "$lib/types/display";
+  import type { PageRegistry, Slot } from "$lib/types/display";
 
   let {
     pageId = "",
@@ -66,6 +69,8 @@
     deviceId: string;
     oldName: string;
   } | null>(null);
+  /** The Device selector, to put its own value back when a swap is cancelled. */
+  let deviceSelect = $state<HTMLSelectElement | undefined>(undefined);
   let pickerFor = $state<
     | { kind: "device"; pageId: string; sectionId: string; at?: number }
     | { kind: "slot"; anchor: PlacementAnchor; at?: number }
@@ -102,15 +107,6 @@
     tileAnchor ? { kind: "tile" as const, ...tileAnchor } : null,
   );
 
-  /** A tile line's label: what it is called, plus its size when it has one. */
-  function tileLabel(t: Placement): string {
-    const name =
-      t.title ||
-      deviceOfAnchor({ pageId, sectionId, placementId: t.id })?.name ||
-      t.device;
-    return t.tile?.size ? `${name} · ${t.tile.size.w}×${t.tile.size.h}` : name;
-  }
-
   function selectPage(id: string): void {
     onPage(id);
   }
@@ -124,12 +120,12 @@
   });
 
   // A click in the display points the cursor at its tile (A48). The page moves
-  // with it: the cursor's page is the display's page (A45), and the app bar's
-  // tab follows the same state.
+  // with it, but that already happened at the click (+page.svelte): calling
+  // back into the display's page state from here would track it, and every
+  // later page change would drag the cursor back to this tile.
   $effect(() => {
     const hit = picked;
     if (!hit) return;
-    onPage(hit.pageId);
     selection = { kind: "tile", ...hit };
   });
 
@@ -202,25 +198,27 @@
     mode = "tile";
   }
 
-  // The modal view belongs to the tile it was opened for: move to another tile
-  // and it closes (rather than following along or showing an empty panel).
+  // The modal view, the device editor and a new-device draft all belong to the
+  // tile they were opened for (A50): move to another tile — by the sheet, a
+  // pick, a page fallback or a handoff — and everything closes, rather than
+  // editing the new tile's device under the old screen.
   $effect(() => {
     void tileId;
-    untrack(() => (modalShown = false));
+    untrack(() => {
+      modalShown = false;
+      mode = "tile";
+      creating = false;
+    });
   });
 
-  /** Does anything of this tile live in the detail page? Asked of the same
-   *  resolution the display's tile uses (A46/A47), so a rule-hidden slot or a
-   *  badge-only modal cannot lie to the checkbox. */
-  const hasDetail = $derived(
-    tileDevice
-      ? tileParts(
-          tileDevice,
-          currentTile?.tile,
-          getTemplateRegistry().templates,
-        ).hasModal
-      : false,
-  );
+  /** Whether anything of this tile lives in the detail page. The hidden Tile
+   *  below reports its own resolution (A47), so the checkbox cannot lie about
+   *  raw slots, active rules or badge chips. */
+  let hasDetail = $state(false);
+  function noteDetail(has: boolean): void {
+    hasDetail = has;
+    if (!has) modalShown = false;
+  }
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
   // click): select it, so the drill-down opens on what was clicked.
@@ -321,6 +319,13 @@
       ),
     );
     pendingSwap = null;
+  }
+
+  /** Cancelled swap: the select already shows the rejected device (its value
+   *  expression did not change), so put the tile's own back by hand. */
+  function cancelSwap(): void {
+    pendingSwap = null;
+    if (deviceSelect) deviceSelect.value = tileDevice?.id ?? "";
   }
 
   function confirmDelete(): void {
@@ -519,7 +524,12 @@
         <option value="">no tiles yet</option>
       {/if}
       {#each tiles as t (t.id)}
-        <option value={t.id}>{tileLabel(t)}</option>
+        <option value={t.id}
+          >{tileLabel(
+            t,
+            deviceOfAnchor({ pageId, sectionId, placementId: t.id })?.name,
+          )}</option
+        >
       {/each}
     </select>
     <button
@@ -595,6 +605,7 @@
   <div class="line">
     <span class="label-mono">Device</span>
     <select
+      bind:this={deviceSelect}
       value={tileDevice?.id ?? ""}
       aria-label="Device"
       disabled={!tileAnchor}
@@ -652,18 +663,20 @@
     </button>
   </div>
 
-  <!-- The modal view. A Tile of its own, hidden except for the modal it opens
-         (the display behind is where the tile itself is judged): non-modal, so
-         it appears over the display and the sheet stays usable. -->
-  {#if modalShown && currentTile && tileDevice}
+  <!-- The sheet's own hidden Tile: it answers whether there is a detail page
+         (A47, via `noteDetail`) and opens that modal for real when the box is
+         ticked — only the tile resolves its rows. Non-modal, so it appears over
+         the display and the sheet stays usable. -->
+  {#if currentTile && tileDevice}
     <div class="modal-view">
       <Tile
         device={tileDevice}
         bp={previewBp}
         title={currentTile.title}
         tile={currentTile.tile}
-        openModal={modalRequest}
+        openModal={modalShown ? modalRequest : null}
         onModalClose={() => (modalShown = false)}
+        onDetail={noteDetail}
       />
     </div>
   {/if}
@@ -790,7 +803,7 @@
     }”?`}
     confirmLabel="Change"
     onConfirm={() => applySwap(pendingSwap!.anchor, pendingSwap!.deviceId)}
-    onCancel={() => (pendingSwap = null)}
+    onCancel={cancelSwap}
   >
     Its own slots, background and active condition are dropped — they were built
     for {pendingSwap.oldName}. The title and the position stay.

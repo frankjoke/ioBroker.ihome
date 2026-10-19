@@ -744,7 +744,7 @@
         />
         <label
           class="check"
-          title="Show no name on the tile — for a tile that is all chart. The tree and the modal still name it."
+          title="Show no name on the tile — for a tile that is all chart. The sheet and the modal still name it."
         >
           <input
             type="checkbox"

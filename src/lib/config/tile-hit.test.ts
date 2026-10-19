@@ -1,8 +1,18 @@
 import { it, expect } from "vitest";
-import { placementAt, type HitElement } from "$lib/config/tile-hit";
+import {
+  placementAt,
+  placementUnder,
+  type HitElement,
+} from "$lib/config/tile-hit";
 
-const el = (attrs: Record<string, string>): HitElement => ({
+const box = { left: 0, top: 0, right: 10, bottom: 10 };
+
+const el = (
+  attrs: Record<string, string>,
+  rect: typeof box = box,
+): HitElement => ({
   getAttribute: (name: string) => attrs[name] ?? null,
+  getBoundingClientRect: () => rect,
 });
 
 it("takes the innermost element that carries a placement", () => {
@@ -57,4 +67,27 @@ it("ignores an element whose placement id is empty", () => {
     }),
   ];
   expect(placementAt(stack)?.placementId).toBe("t1");
+});
+
+it("finds the tile whose box holds the point — the later one on overlap", () => {
+  const left = el(
+    {
+      "data-placement-id": "left",
+      "data-page-id": "rooms",
+      "data-section-id": "bad",
+    },
+    { left: 0, top: 0, right: 10, bottom: 10 },
+  );
+  const right = el(
+    {
+      "data-placement-id": "right",
+      "data-page-id": "rooms",
+      "data-section-id": "bad",
+    },
+    { left: 8, top: 0, right: 18, bottom: 10 },
+  );
+  expect(placementUnder([left, right], 5, 5)?.placementId).toBe("left");
+  expect(placementUnder([left, right], 9, 5)?.placementId).toBe("right");
+  expect(placementUnder([left, right], 25, 5)).toBeNull();
+  expect(placementUnder([], 5, 5)).toBeNull();
 });

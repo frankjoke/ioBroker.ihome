@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { sheetCursor, swapDecision } from "$lib/config/sheet-cursor";
+import { sheetCursor, swapDecision, tileLabel } from "$lib/config/sheet-cursor";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 const placement = (id: string, device = "d1"): Placement => ({
@@ -82,6 +82,17 @@ it("keeps a tile that is still there", () => {
   expect(c.tile?.device).toBe("d1");
 });
 
+it("falls back to the section's first tile when the selected one is gone", () => {
+  const c = sheetCursor(twoPages(), {
+    kind: "tile",
+    pageId: "rooms",
+    sectionId: "bad",
+    placementId: "deleted-tile",
+  });
+  expect(c.tileId).toBe("t1");
+  expect(c.tileIndex).toBe(0);
+});
+
 it("survives a document with no pages at all", () => {
   const c = sheetCursor(reg([]), null);
   expect(c.pageId).toBe("");
@@ -105,4 +116,18 @@ it("decides what changing a tile's device means", () => {
   expect(swapDecision(placement("t1", "d1"), "d2")).toBe("apply");
   const own = { ...placement("t1", "d1"), tile: { slots: [] } };
   expect(swapDecision(own, "d2")).toBe("confirm");
+});
+
+it("labels a tile name · w×h, degrading one step at a time", () => {
+  const sized: Placement = {
+    ...placement("t1", "d1"),
+    tile: { size: { w: 6, h: 4 } },
+  };
+  expect(tileLabel(sized, "Heizung")).toBe("Heizung · 6×4");
+  expect(tileLabel({ ...sized, title: "Warmwasser" }, "Heizung")).toBe(
+    "Warmwasser · 6×4",
+  );
+  // No device left (deleted), no title: the id it still points at.
+  expect(tileLabel(placement("t1", "e59a"))).toBe("e59a");
+  expect(tileLabel({ ...placement("t1"), title: "" }, "Garten")).toBe("Garten");
 });

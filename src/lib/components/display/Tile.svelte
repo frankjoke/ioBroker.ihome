@@ -34,7 +34,6 @@
   import SlotRenderer from "./SlotRenderer.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
-  import ModalPanel from "./ModalPanel.svelte";
   import type {
     EnrichedControl,
     EnrichedDevice,
@@ -50,9 +49,9 @@
     tile,
     anchor,
     newLine,
-    modalPreview,
     openModal = null,
     onModalClose,
+    onDetail,
   }: {
     device: EnrichedDevice;
     bp: Breakpoint;
@@ -64,15 +63,15 @@
     anchor?: PlacementAnchor;
     /** The tree asks for a line break before this tile. */
     newLine?: boolean;
-    /** The editor's preview also renders the modal's look below the tile (A34). */
-    modalPreview?: boolean;
     /** The layout sheet's "modal view": asks this tile to open its own modal
      *  (only the tile knows its modal's rows). `inline` asks for the
-     *  non-blocking form. Absent → never asked. Closing needs no request: the
-     *  asker unmounts this tile, and the modal goes with it. */
+     *  non-blocking form. Absent → never asked; withdrawn → it closes. */
     openModal?: { inline?: boolean } | null;
     /** The modal closed, by its own close button. */
     onModalClose?: () => void;
+    /** Whether anything lives in the detail page — the resolution above, handed
+     *  out so the sheet's Detail Page checkbox asks the tile's own answer (A47). */
+    onDetail?: (hasModal: boolean) => void;
   } = $props();
 
   /** Hidden controls are not part of the tile at all. */
@@ -219,6 +218,12 @@
   const backgroundSlots = $derived(parts.background);
   const bodySlots = $derived(parts.body);
 
+  // What the sheet's Detail Page checkbox asks about (A47): the tile's own
+  // resolution, not a second guess at the slots.
+  $effect(() => {
+    onDetail?.(parts.hasModal);
+  });
+
   /** The tile's first reading is the headline; the rest are supporting. The row
    *  itself is the identity (A35): two identical slots are legal config and must
    *  render side by side, only the first of them as the headline. */
@@ -322,13 +327,19 @@
   let modalInline = $state(false);
 
   // The sheet's "modal view": it asks this tile to open the modal it owns — the
-  // real one, because only the tile resolves its rows. Only *opening* is a
-  // request: the asker unmounts this tile to close it, so there is no stale
-  // "close" token to fire on the next mount.
+  // real one, because only the tile resolves its rows. Withdrawing the ask
+  // closes it again, so the sheet can keep this tile mounted and still untick
+  // its box.
   $effect(() => {
     const ask = openModal;
-    if (!ask) return;
     untrack(() => {
+      if (!ask) {
+        if (modalInline) {
+          modalOpen = false;
+          modalInline = false;
+        }
+        return;
+      }
       modalInline = ask.inline === true;
       modalOpen = true;
     });
@@ -424,25 +435,6 @@
   {/each}
 </div>
 
-{#if modalPreview}
-  <!-- What a long-press opens, beside the tile — the same panel the dialog
-       renders (A34), so shifting a slot is visible on both sides at once. -->
-  {#if hasModal}
-    <div class="modal-preview">
-      <ModalPanel
-        {device}
-        {title}
-        background={tile?.background}
-        rows={modalRows}
-        badges={modalBadges}
-        bodyMaxHeight="30vh"
-      />
-    </div>
-  {:else}
-    <p class="modal-preview text-muted">No slot lives in the modal.</p>
-  {/if}
-{/if}
-
 {#if modalOpen}
   <TileModal
     {device}
@@ -459,17 +451,6 @@
 {/if}
 
 <style>
-  /* The preview's modal panel (A34): it is a grid sibling of the tile, so it
-     spans the tile grid's whole width and sits below. */
-  .modal-preview {
-    grid-column: 1 / -1;
-  }
-
-  p.modal-preview {
-    margin: 0.25rem 0 0;
-    font-size: var(--body-sm);
-  }
-
   .tile {
     position: relative;
     display: flex;

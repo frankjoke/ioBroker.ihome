@@ -41,7 +41,10 @@
   });
   const isConnected = $derived(!!ioBroker.connected);
 
-  /** Ctrl/Cmd+click a page tab → open that page in the layout sheet. */
+  /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
+   *  Capture phase: SvelteKit's router listens earlier than a delegated
+   *  `onclick`, so a plain click would already have pushed the hash before a
+   *  bubble handler could say no. */
   function onPageClick(event: MouseEvent, id: string) {
     if (wantsDeviceConfig(event)) {
       // Also suppresses the browser's open-in-new-tab for this hash link.
@@ -50,6 +53,10 @@
       openSheet();
       return;
     }
+    // In the editor the tabs move the sheet, not the route (A43): the display
+    // and the sheet share one page, so nothing navigates and nothing is left
+    // pointing at a page the editor is not showing.
+    if (sheet.open) event.preventDefault();
     setLastPage(id);
   }
 
@@ -78,7 +85,7 @@
           class:active={p.id === currentId}
           href={`${base}/#/p/${p.id}`}
           aria-current={p.id === currentId ? "page" : undefined}
-          onclick={(e) => onPageClick(e, p.id)}
+          onclickcapture={(e) => onPageClick(e, p.id)}
         >
           {#if p.icon}<Icon value={p.icon} size={18} />{/if}
           <span class="tab-label">{p.title}</span>

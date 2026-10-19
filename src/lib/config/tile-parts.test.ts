@@ -137,6 +137,32 @@ it("a badge only in the modal is modal content, resolved or not", () => {
   expect(resolved.hasModal).toBe(true);
 });
 
+it("a raw-state modal row counts only when the resolver knows it", () => {
+  // The sheet has no resolver of its own; asking it must land on the tile's
+  // answer (A47), so the helper is explicit about needing one.
+  const t = tile([{ kind: "value", source: "0_userdata.0.x", where: "modal" }]);
+  expect(tileParts(device(), t, none).hasModal).toBe(false);
+
+  const raw = (source: string): SlotControl | undefined =>
+    source === "0_userdata.0.x"
+      ? ({ id: source, stateId: source, label: source } as SlotControl)
+      : undefined;
+  expect(tileParts(device(), t, none, { raw }).hasModal).toBe(true);
+});
+
+it("an active-gated modal row counts only while the tile is not active", () => {
+  const t = tile([
+    {
+      kind: "value",
+      source: "humidity",
+      where: "modal",
+      rules: [{ when: "active", hidden: true }],
+    },
+  ]);
+  expect(tileParts(device(), t, none).hasModal).toBe(true);
+  expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(false);
+});
+
 it("falls back to the template's own slots when the placement has none", () => {
   const parts = tileParts(device(), undefined, none);
   expect(parts.body.length).toBeGreaterThan(0);

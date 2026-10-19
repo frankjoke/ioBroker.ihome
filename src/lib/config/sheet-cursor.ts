@@ -43,10 +43,13 @@ export function sheetCursor(
   const sectionId = section?.id ?? "";
 
   const tiles = section?.tiles ?? [];
+  // A tile that was deleted (or a stale handoff) falls back to the section's
+  // first, like every other step — the sheet never points at a tile that is not
+  // there (A45).
+  const wantedTile =
+    selection?.kind === "tile" ? selection.placementId : undefined;
   const tileId =
-    (selection?.kind === "tile" ? selection.placementId : undefined) ??
-    tiles[0]?.id ??
-    "";
+    tiles.find((t) => t.id === wantedTile)?.id ?? tiles[0]?.id ?? "";
   const tileIndex = tiles.findIndex((t) => t.id === tileId);
 
   return {
@@ -73,4 +76,15 @@ export function swapDecision(
 ): "noop" | "confirm" | "apply" {
   if (!placement || !deviceId || placement.device === deviceId) return "noop";
   return placement.tile ? "confirm" : "apply";
+}
+
+/**
+ * A tile line's label (A44): what the placement is called, plus its size when it
+ * has one — `name · w×h`. The name is the placement's own title, else the
+ * device's, else the id it still points at (a device that was deleted).
+ */
+export function tileLabel(placement: Placement, deviceName?: string): string {
+  const name = placement.title || deviceName || placement.device;
+  const size = placement.tile?.size;
+  return size ? `${name} · ${size.w}×${size.h}` : name;
 }
