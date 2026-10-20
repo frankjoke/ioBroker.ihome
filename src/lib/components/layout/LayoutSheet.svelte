@@ -636,7 +636,7 @@
       }}
     >
       <span class="material-symbols-outlined"
-        >{mode === "device" ? "arrow_back" : "tune"}</span
+        >{mode === "device" ? "arrow_back" : "edit"}</span
       >
     </button>
     <button
