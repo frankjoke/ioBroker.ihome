@@ -123,9 +123,27 @@
         {:else}
           <div class="row">
             {#if r.icon}
-              <span class="row-icon" style:color={r.icon.color}>
-                <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
-              </span>
+              {#if r.onPrimary}
+                <!-- The row's icon is its value's action in the detail view
+                     too (A54): it toggles like the reading. -->
+                <button
+                  type="button"
+                  class="row-icon action"
+                  title="Toggle"
+                  aria-label="Toggle"
+                  style:color={r.icon.color}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    r.onPrimary?.();
+                  }}
+                >
+                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                </button>
+              {:else}
+                <span class="row-icon" style:color={r.icon.color}>
+                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                </span>
+              {/if}
             {/if}
             <span class="row-label"
               >{r.slot.label ||
@@ -202,6 +220,20 @@
     align-items: center;
     color: var(--text-muted);
     flex: 0 0 auto;
+  }
+
+  /* A row icon that is its value's action: same box, pointer and focus ring. */
+  .row-icon.action {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--border-radius-pill);
+  }
+
+  .row-icon.action:hover,
+  .row-icon.action:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-color);
   }
 
   .frame-cap {

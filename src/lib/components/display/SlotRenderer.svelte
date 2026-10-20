@@ -69,9 +69,27 @@
          the line fits; the headline stacks at a 1-wide span so a 1×1 tile puts
          the icon above the value. -->
     <div class="slot-cluster" class:stack>
-      <span class="slot-icon" style:color={icon.color}>
-        <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
-      </span>
+      {#if onPrimary}
+        <!-- The slot's own action (A51/A53): the icon toggles with the value,
+             as the retired IconSlot's button did. -->
+        <button
+          type="button"
+          class="slot-icon action"
+          title="Toggle"
+          aria-label="Toggle"
+          style:color={icon.color}
+          onclick={(e) => {
+            e.stopPropagation();
+            onPrimary();
+          }}
+        >
+          <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
+        </button>
+      {:else}
+        <span class="slot-icon" style:color={icon.color}>
+          <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
+        </span>
+      {/if}
       {@render content()}
     </div>
   {:else}
@@ -98,5 +116,21 @@
   .slot-icon {
     display: inline-flex;
     align-items: center;
+  }
+
+  /* The icon as the slot's action keeps the glyph's box: only the pointer and
+     the focus ring tell it apart from a decorative icon. */
+  .slot-icon.action {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    border-radius: var(--border-radius-pill);
+  }
+
+  .slot-icon.action:hover,
+  .slot-icon.action:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-color);
   }
 </style>
