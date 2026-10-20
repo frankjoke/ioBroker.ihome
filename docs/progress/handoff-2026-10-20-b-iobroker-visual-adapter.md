@@ -6,7 +6,7 @@
 |---|---|
 | **Main checkout** | `C:\Users\franz\OneDrive\MyProgs\KI\iobroker-visual-adapter`, branch `feature/ihome-display`. Retirements `9d58876` (icon slot) then the sparkline slice `074c6d4`, `e37d75b`, `fe5930a`. |
 | **Spec** | `docs/superpowers/specs/2026-10-20-ihome-slot-sparklines-design.md` (A59–A64). Plan: `docs/superpowers/plans/2026-10-20-ihome-slot-sparklines.md`. |
-| **Live document** | `0_userdata.0.Test.AiHome.pageList`, `updatedAt` 1792530663703: **3** `spark` descriptors, **0** `kind:"sparkline"`, no other slot changed. |
+| **Live document** | `0_userdata.0.Test.AiHome.pageList`, `updatedAt` 1792531384823: **3** `spark` descriptors, **0** `kind:"sparkline"`, no other slot changed. |
 | **Dev server** | The user's on :5173 (Host `192.168.178.9:8081`, namespace `0_userdata.0.Test.AiHome`). **Vite's watcher lagged on this OneDrive path** during the session: several pages served a stale module until the file was `touch`ed. If something looks impossible, `touch` the file and reload hard. |
 
 ## What the sparklines are (A59–A64)
