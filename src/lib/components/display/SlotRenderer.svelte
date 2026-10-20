@@ -118,8 +118,8 @@
     align-items: center;
   }
 
-  /* The icon as the slot's action keeps the glyph's box: only the pointer and
-     the focus ring tell it apart from a decorative icon. */
+  /* The icon as the slot's action keeps the glyph's box exactly: no chrome,
+     only the pointer and a keyboard focus ring. */
   .slot-icon.action {
     padding: 0;
     border: none;
@@ -129,7 +129,6 @@
     border-radius: var(--border-radius-pill);
   }
 
-  .slot-icon.action:hover,
   .slot-icon.action:focus-visible {
     box-shadow: 0 0 0 2px var(--primary-color);
   }

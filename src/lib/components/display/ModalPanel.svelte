@@ -222,7 +222,8 @@
     flex: 0 0 auto;
   }
 
-  /* A row icon that is its value's action: same box, pointer and focus ring. */
+  /* A row icon that is its value's action: same box, no chrome, keyboard ring
+     only. */
   .row-icon.action {
     padding: 0;
     border: none;
@@ -231,7 +232,6 @@
     border-radius: var(--border-radius-pill);
   }
 
-  .row-icon.action:hover,
   .row-icon.action:focus-visible {
     box-shadow: 0 0 0 2px var(--primary-color);
   }
