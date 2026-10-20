@@ -22,6 +22,8 @@ export interface SlotRow {
   slot: Slot;
   control?: SlotControl;
   style: ResolvedStyle;
+  /** The slot's glyph is the template's own, not a choice (A67). */
+  iconIsTemplate?: boolean;
 }
 
 export interface TileParts {
@@ -73,7 +75,22 @@ export function tileParts(
   const shownControls = (device.controls ?? []).filter((c) => !c.hidden);
   const pool = opts?.pool ?? [];
   // The tile's own slots once it was materialised; the chain's until then (A18).
-  const slots = tile?.slots ?? resolveTemplate(device, templates).slots;
+  const chain = resolveTemplate(device, templates);
+  const slots = tile?.slots ?? chain.slots;
+
+  /** Does this slot carry the glyph the template gives it (A67)? Such a glyph is
+   *  a type default, not a choice, so the device's found icon may stand in for
+   *  it. Compared by position and kind against the chain's own slots. */
+  const templateGlyph = (slot: Slot): boolean => {
+    const at = slots.indexOf(slot);
+    const via = at < 0 ? undefined : chain.slots[at];
+    return (
+      !!slot.icon?.glyph &&
+      !!via &&
+      via.kind === slot.kind &&
+      via.icon?.glyph === slot.icon?.glyph
+    );
+  };
 
   // Rule locals are the device's controls plus the pool helpers, and the tile's
   // own `active` flag wins the name over a control alias of the same name (A30).
@@ -103,6 +120,7 @@ export function tileParts(
       slot: r.slot,
       control: r.control,
       style: styleOf(r.slot, r.control),
+      iconIsTemplate: templateGlyph(r.slot),
     }));
 
   // The body is every row that lives on the tile (A59: nothing draws as a
@@ -152,16 +170,20 @@ export function headlineSlot(slots: Slot[]): Slot | undefined {
 }
 
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
- *  there — the last matching rule's glyph beats the descriptor's. */
+ *  there — the last matching rule's glyph beats the descriptor's, and a glyph the
+ *  template gave gives way to the device's own icon (A67). */
 export function rowIcon(
   row: SlotRow,
   home: "tile" | "modal",
+  deviceIcon?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
   const icon = row.slot.icon;
   if (!icon || icon.enabled === false) return undefined;
   const where = icon.where ?? "both";
   if (where !== "both" && where !== home) return undefined;
-  const glyph = row.style.icon ?? icon.glyph;
+  const glyph =
+    row.style.icon ??
+    (row.iconIsTemplate ? (deviceIcon ?? icon.glyph) : icon.glyph);
   return glyph
     ? { glyph, color: row.style.color, disabled: row.style.disabled }
     : undefined;

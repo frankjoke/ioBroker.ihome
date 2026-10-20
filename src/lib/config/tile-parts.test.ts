@@ -305,6 +305,53 @@ it("carries the style's colour and dim into the icon", () => {
   });
 });
 
+it("a found device icon stands in for a template's glyph (A67)", () => {
+  // The chain's own slots: their glyph is the template's, so the device's
+  // found icon takes over…
+  const chain = tileParts(
+    device({ controls: [control("c1", "temperature")] }),
+    undefined,
+    none,
+  );
+  const head = chain.rows.find(
+    (r) => r.slot.icon?.glyph === "device_thermostat",
+  );
+  expect(head?.iconIsTemplate).toBe(true);
+  expect(rowIcon(head!, "tile", "https://x/dev.png")?.glyph).toBe(
+    "https://x/dev.png",
+  );
+  // …a glyph of the user's own keeps standing…
+  const own = tileParts(
+    device({ controls: [control("c1", "temperature")] }),
+    tile([
+      { kind: "value", source: "temperature", icon: { glyph: "water_drop" } },
+    ]),
+    none,
+  );
+  expect(own.rows[0].iconIsTemplate).toBe(false);
+  expect(rowIcon(own.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
+    "water_drop",
+  );
+  // …and a rule's icon still wins (A51/A58).
+  const ruled = tileParts(
+    device({ controls: [control("c1", "temperature")] }),
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        icon: { glyph: "device_thermostat" },
+        rules: [{ when: "true", icon: "bolt" }],
+      },
+    ]),
+    none,
+  );
+  expect(rowIcon(ruled.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
+    "bolt",
+  );
+  // With no found icon, the template's own glyph stays.
+  expect(rowIcon(head!, "tile")?.glyph).toBe("device_thermostat");
+});
+
 const withHistory = (id: string, feature: string) =>
   ({
     ...control(id, feature),

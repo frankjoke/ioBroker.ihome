@@ -40,7 +40,6 @@
   import { openSheet } from "$lib/stores/sheet.svelte.js";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
-  import Icon from "$lib/components/common/Icon.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
   import type {
@@ -230,7 +229,7 @@
 
   /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small. */
   function bodyIcon(r: SlotRow) {
-    const icon = rowIcon(r, "tile");
+    const icon = rowIcon(r, "tile", device.objectIcon);
     return icon ? { ...icon, size: r.slot === headline ? 34 : 17 } : undefined;
   }
 
@@ -246,6 +245,7 @@
             style: slotStyle(headline, controlFor(headline)),
           },
           "modal",
+          device.objectIcon,
         )
       : undefined;
     if (own) return own;
@@ -270,7 +270,7 @@
       slot: r.slot,
       control: r.control,
       style: r.style,
-      icon: rowIcon(r, "modal"),
+      icon: rowIcon(r, "modal", device.objectIcon),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
@@ -440,12 +440,7 @@
       <TileChart series={chart} />
     </div>
   {/if}
-  {#if tileName}<span class="tile-name"
-      >{#if device.objectIcon}<Icon
-          value={device.objectIcon}
-          size={15}
-        />{/if}{tileName}</span
-    >{/if}
+  {#if tileName}<span class="tile-name">{tileName}</span>{/if}
   <div class="tile-body">
     {#each bodySlots as r, i (i)}
       <SlotRenderer
@@ -547,20 +542,10 @@
   }
 
   .tile-name {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
     font-size: var(--body-sm);
     font-weight: 600;
     overflow-wrap: anywhere;
     max-width: 100%;
-  }
-
-  /* The device's face on the name line (A67): the glyph keeps its size while
-     the name takes the room. */
-  .tile-name :global(img),
-  .tile-name :global(.material-symbols-outlined) {
-    flex: 0 0 auto;
   }
 
   /* A rule can ask for the switched-off look. */

@@ -63,3 +63,7 @@ twelve devices-page rows (all loaded). URL forms verified against the broker:
   spark whose control lost history can't be cleared from the pane; `TileChart`'s dead default sizing;
   the older 2026-10-14/16 specs still describe `options.background`; a legacy registry would render an
   empty row).
+
+## Follow-up (same day)
+
+The device icon is the tile's **main** icon, not a name-line badge: the broker icon stands in for a glyph the *template* gives (compared by slot position and kind against the chain), while a rule's `icon` and a glyph you chose keep standing. Verified live on the newly created tile `b3acbc1d` (New page/Lights): the headline shows the channel's inline SVG instead of the preset's `device_thermostat`, and the name line carries no icon. Spec A65/A67/§5 amended.
