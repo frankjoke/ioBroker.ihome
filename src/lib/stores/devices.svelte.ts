@@ -7,6 +7,8 @@ import type {
 import { applyRead } from "$lib/utils/transform";
 import { widgetFor } from "$lib/config/features";
 import { computeVirtual, type PoolEntry } from "$lib/config/virtual-ops";
+import { deviceObjectIcon } from "$lib/config/icon-ops";
+import { iconSrc } from "$lib/utils/icon-url";
 import { readable } from "svelte/store";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -172,10 +174,22 @@ function _devicesEnriched(): EnrichedDevice[] {
     }
     const deviceDisplayRoom =
       device.room ?? controls.find((c) => c.displayRoom)?.displayRoom;
+    // The device's face (A65/A68): the document's own icon, else the icon its
+    // objects carry — resolved once, here, into a URL the display can render.
+    const iconHit = objectSource
+      ? deviceObjectIcon(
+          objectSource,
+          controls.map((c) => c.stateId),
+        )
+      : undefined;
+    const objectIcon =
+      device.icon ??
+      (iconHit ? iconSrc(iconHit.value, iconHit.from) : undefined);
     return {
       ...device,
       controls,
       displayRoom: deviceDisplayRoom,
+      objectIcon,
     };
   });
   return result as EnrichedDevice[];

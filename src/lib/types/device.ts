@@ -165,4 +165,8 @@ export interface SlotControl {
 export interface EnrichedDevice extends Device {
   displayRoom?: string;
   controls: EnrichedControl[];
+  /** The device's own face (A65/A68): the document's `icon` when set, else the
+   *  icon its ioBroker objects carry — already resolved to a URL. Absent when
+   *  neither the document nor the broker knows one. */
+  objectIcon?: string;
 }

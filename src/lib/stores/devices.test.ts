@@ -1,12 +1,15 @@
 import { it, expect, beforeEach } from "vitest";
 import {
+  getDevicesEnriched,
   getUsedStateIds,
   setCanonicalRegistry,
+  setObjectSource,
 } from "$lib/stores/devices.svelte";
 
 beforeEach(() => {
   // A fresh registry object invalidates the module's cache identity check.
   setCanonicalRegistry({ version: 0, updatedAt: 0, devices: [] });
+  setObjectSource(null);
 });
 
 it("includes watch and rule-referenced state ids", () => {
@@ -49,4 +52,70 @@ it("keeps the rule ids out of an empty registry", () => {
   expect([...getUsedStateIds()].some((id) => id.startsWith("alias."))).toBe(
     false,
   );
+});
+
+it("resolves the device icon from the broker hierarchy (A65)", () => {
+  setObjectSource(
+    new Map([
+      ["alias.0.Ch", { common: { icon: "data:image/svg+xml;base64,AA" } }],
+      ["system.adapter.b.0", { common: { extIcon: "https://x/b.png" } }],
+    ]) as any,
+  );
+  setCanonicalRegistry({
+    version: 0,
+    updatedAt: 0,
+    devices: [
+      {
+        id: "d1",
+        name: "D1",
+        type: "Value",
+        controls: [
+          {
+            id: "c1",
+            feature: "v",
+            writable: false,
+            stateId: "alias.0.Ch.X",
+          },
+        ],
+      },
+      {
+        id: "d2",
+        name: "D2",
+        type: "Value",
+        controls: [
+          { id: "c2", feature: "v", writable: false, stateId: "b.0.Other.Y" },
+        ],
+      },
+      {
+        id: "d3",
+        name: "D3",
+        type: "Value",
+        icon: "widgets",
+        controls: [
+          {
+            id: "c3",
+            feature: "v",
+            writable: false,
+            stateId: "alias.0.Ch.X",
+          },
+        ],
+      },
+      {
+        id: "d4",
+        name: "D4",
+        type: "Value",
+        controls: [
+          { id: "c4", feature: "v", writable: false, stateId: "nothing.here" },
+        ],
+      },
+    ],
+  });
+
+  const devices = getDevicesEnriched();
+  expect(devices[0].objectIcon).toBe("data:image/svg+xml;base64,AA");
+  expect(devices[1].objectIcon).toBe("https://x/b.png");
+  // The document's own icon still wins.
+  expect(devices[2].objectIcon).toBe("widgets");
+  // Nothing resolves: no icon at all, not an empty string.
+  expect(devices[3].objectIcon).toBeUndefined();
 });
