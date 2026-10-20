@@ -44,6 +44,8 @@ Two lessons, both ledgered:
 
 ## Open items
 
+- **The slot icon is a toggle again** (`48c32c4`): folding the icon onto the value slot had left the glyph outside the action, so a switch could no longer be flipped by its icon. The cluster icon — and the detail row's icon — is the action's button whenever its slot *is* the tile's action; a sensor's icon stays decoration. Verified in both views (no device switched).
+- **Backlog — state-dependent icons:** an icon that follows the tile's state (active/inactive) beyond what a rule's `icon` already does. Your call, not started.
 - **Only three values chart** on the live document; the Brunnen tiles wait on history for their watts control (above).
 - The icon `where` cycle still offers homes that can never render (carried over, awaiting your word).
 - Wide (w ≥ 2) beside-layout and the size constants (headline 34 / secondary 17 / header 26 / rows 18) remain one-line tunables.
