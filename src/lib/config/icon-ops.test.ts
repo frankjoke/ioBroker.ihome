@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  brokerIconPath,
   deviceObjectIcon,
   objectIconValue,
   ownerOf,
@@ -102,6 +103,26 @@ it("falls back to the adapter, the instance first (A65)", () => {
   expect(resolveIcon(objects([]), "a.0.C.X")).toBeUndefined();
   // An id with nothing to walk to terminates instead of looping.
   expect(resolveIcon(objects([]), "single")).toBeUndefined();
+});
+
+it("keeps a broker icon portable for a document (A66)", () => {
+  expect(
+    brokerIconPath("energiefluss.png", "system.adapter.energiefluss.0"),
+  ).toBe("adapter/energiefluss/energiefluss.png");
+  expect(brokerIconPath("icons/echo_dot.png", "alexa2.0.Dev.1")).toBe(
+    "adapter/alexa2/icons/echo_dot.png",
+  );
+  // Already portable, absolute, inline or a symbol: untouched.
+  expect(
+    brokerIconPath("adapter/admin/admin.svg", "system.adapter.admin"),
+  ).toBe("adapter/admin/admin.svg");
+  expect(brokerIconPath("data:image/svg+xml;base64,AA", "a.0.b")).toBe(
+    "data:image/svg+xml;base64,AA",
+  );
+  expect(brokerIconPath("https://x/y.png", "a.0.b")).toBe("https://x/y.png");
+  expect(brokerIconPath("lightbulb", "a.0.b")).toBe("lightbulb");
+  expect(brokerIconPath("/icons/a.png", "a.0.b")).toBe("/icons/a.png");
+  expect(brokerIconPath("", "a.0.b")).toBe("");
 });
 
 it("takes the device's first control that resolves (A65)", () => {

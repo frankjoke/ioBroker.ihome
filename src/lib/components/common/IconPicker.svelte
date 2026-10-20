@@ -3,7 +3,8 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
-  import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
+  import { collectDocumentIcons } from "$lib/utils/icon-url";
+  import { brokerIconPath, isImageIcon } from "$lib/config/icon-ops";
   import Icon from "$lib/components/common/Icon.svelte";
   import symbolNames from "$lib/assets/material-symbol-names.json";
 
@@ -150,9 +151,9 @@
                   type="button"
                   class="row-btn"
                   class:current={entry.value === icon}
-                  onclick={() => onPick(entry.value)}
+                  onclick={() => onPick(brokerIconPath(entry.value, entry.id))}
                 >
-                  <Icon value={entry.value} size={22} />
+                  <Icon value={entry.value} owner={entry.id} size={22} />
                   <span class="value">{entry.value}</span>
                   <span class="meta text-muted">{entry.id}</span>
                 </button>

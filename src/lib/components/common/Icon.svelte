@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { iconSrc, isImageIcon } from "$lib/utils/icon-url";
+  import { iconSrc } from "$lib/utils/icon-url";
+  import { isImageIcon } from "$lib/config/icon-ops";
 
   let {
     value,
@@ -17,9 +18,17 @@
      *  relative filename (A66). */
     owner?: string;
   } = $props();
+
+  /** An icon that does not load renders nothing (A69): a broken-image glyph
+   *  would be worse than the gap it replaces. */
+  let failed = $state(false);
+  $effect(() => {
+    void value;
+    failed = false;
+  });
 </script>
 
-{#if value && isImageIcon(value)}
+{#if value && isImageIcon(value) && !failed}
   <img
     class="icon-img"
     class:dim
@@ -27,8 +36,9 @@
     alt=""
     style:width="{size}px"
     style:height="{size}px"
+    onerror={() => (failed = true)}
   />
-{:else if value}
+{:else if value && !isImageIcon(value)}
   <span
     class="material-symbols-outlined"
     class:dim

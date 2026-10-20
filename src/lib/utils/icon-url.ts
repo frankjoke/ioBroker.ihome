@@ -2,17 +2,7 @@
 // ("lightbulb") or an image — an absolute URL/data URI, a root-relative path, or
 // a broker-relative path ("adapter/name.png", served by the ioBroker web server).
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
-import { ownerOf } from "$lib/config/icon-ops";
-
-/** Is this icon value an image (URL, root-relative path, broker-relative path
- *  like `adapter/name.png`) rather than a material-symbols name? */
-export function isImageIcon(raw: string | undefined): boolean {
-  const value = String(raw ?? "").trim();
-  if (!value) return false;
-  // A symbol name is snake_case and never contains a path separator.
-  if (value.includes("/")) return true;
-  return /\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)([?#].*)?$/i.test(value);
-}
+import { isImageIcon, ownerOf } from "$lib/config/icon-ops";
 
 /** The footer's host setting, where the app keeps the broker it talks to. */
 const HOST_KEY = "__VISUAL__:hostPort";

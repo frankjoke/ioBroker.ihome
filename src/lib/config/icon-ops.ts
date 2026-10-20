@@ -7,6 +7,16 @@ export interface IconOwner {
   instance?: string;
 }
 
+/** Is this icon value an image (URL, root-relative path, broker-relative path
+ *  like `adapter/name.png`) rather than a material-symbols name? (A23) */
+export function isImageIcon(raw: string | undefined): boolean {
+  const value = String(raw ?? "").trim();
+  if (!value) return false;
+  // A symbol name is snake_case and never contains a path separator.
+  if (value.includes("/")) return true;
+  return /\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)([?#].*)?$/i.test(value);
+}
+
 /** The adapter (and instance) an object id belongs to (A65). */
 export function ownerOf(id: string): IconOwner {
   const parts = String(id ?? "").split(".");
@@ -73,4 +83,23 @@ export function deviceObjectIcon(
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * The **portable** form of a broker icon for a document (A66): a bare filename
+ * gains the adapter that owns it (`adapter/<adapter>/<file>`), which is the
+ * ioBroker-root-relative path `iconSrc` later resolves against whatever host is
+ * configured. Absolutes, data URIs, symbols and already-prefixed paths are left
+ * alone; so is a leading `/` (a root path with nothing to prefix).
+ */
+export function brokerIconPath(value: string, ownerId: string): string {
+  const icon = String(value ?? "").trim();
+  if (!icon) return "";
+  // A symbol name is not a path; absolutes, data URIs and already-prefixed
+  // paths have nothing to prefix.
+  if (!isImageIcon(icon)) return icon;
+  if (/^(https?:)?\/\//i.test(icon) || /^data:/i.test(icon)) return icon;
+  if (icon.startsWith("adapter/") || icon.startsWith("/")) return icon;
+  const adapter = ownerOf(ownerId).adapter;
+  return adapter ? `adapter/${adapter}/${icon}` : icon;
 }

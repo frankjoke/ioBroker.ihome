@@ -1,11 +1,7 @@
 import { it, expect } from "vitest";
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
-import {
-  collectDocumentIcons,
-  iconBase,
-  iconSrc,
-  isImageIcon,
-} from "./icon-url";
+import { collectDocumentIcons, iconBase, iconSrc } from "./icon-url";
+import { isImageIcon } from "$lib/config/icon-ops";
 
 it("classifies symbols vs images", () => {
   expect(isImageIcon("lightbulb")).toBe(false);
@@ -81,6 +77,41 @@ it("iconBase reads the footer host, else this origin (A66)", () => {
     // A corrupt setting falls back to the origin instead of throwing.
     g.localStorage = { getItem: () => "{not json" };
     expect(iconBase()).toBe("https://broker");
+  } finally {
+    if (hadLs) g.localStorage = savedLs;
+    else delete g.localStorage;
+    if (hadLoc) g.location = savedLoc;
+    else delete g.location;
+  }
+});
+
+it("iconSrc with no base argument uses the configured host, and absolutes bypass it (A66)", () => {
+  const g = globalThis as any;
+  const hadLs = "localStorage" in g;
+  const hadLoc = "location" in g;
+  const savedLs = g.localStorage;
+  const savedLoc = g.location;
+  try {
+    g.location = { origin: "http://localhost:5173", protocol: "http:" };
+    g.localStorage = {
+      getItem: (key: string) =>
+        key === "__VISUAL__:hostPort"
+          ? JSON.stringify("192.168.178.9:8081")
+          : null,
+    };
+    // The production path: no explicit base, so the footer's host is used.
+    expect(iconSrc("energiefluss.png", "system.adapter.energiefluss.0")).toBe(
+      "http://192.168.178.9:8081/adapter/energiefluss/energiefluss.png",
+    );
+    expect(iconSrc("icons/echo_dot.png", "alexa2.0.Dev.1")).toBe(
+      "http://192.168.178.9:8081/adapter/alexa2/icons/echo_dot.png",
+    );
+    // Absolutes and symbols never consult the base at all.
+    expect(iconSrc("https://x/y.png")).toBe("https://x/y.png");
+    expect(iconSrc("data:image/svg+xml;base64,AA")).toBe(
+      "data:image/svg+xml;base64,AA",
+    );
+    expect(iconSrc("lightbulb")).toBe("lightbulb");
   } finally {
     if (hadLs) g.localStorage = savedLs;
     else delete g.localStorage;
