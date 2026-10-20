@@ -2,7 +2,6 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import ControlWidget from "./slots/ControlWidget.svelte";
   import ValueSlot from "./slots/ValueSlot.svelte";
-  import SparklineSlot from "./slots/SparklineSlot.svelte";
   import HistoryListSlot from "./slots/HistoryListSlot.svelte";
   import FrameSlot from "./slots/FrameSlot.svelte";
   import type { Slot } from "$lib/types/display";
@@ -41,7 +40,6 @@
       slot.kind === "color" ||
       slot.kind === "enum" ||
       slot.kind === "button" ||
-      slot.kind === "sparkline" ||
       slot.kind === "history-list",
   );
   const show = $derived(!needsControl || !!control);
@@ -53,11 +51,6 @@
        so the cast to the full enriched shape is safe. -->
   {#if slot.kind === "value"}
     <ValueSlot {slot} {control} {onPrimary} {emphasis} />
-  {:else if slot.kind === "sparkline" && control}
-    <SparklineSlot
-      control={control as EnrichedControl}
-      stretch={slot.options?.background === true}
-    />
   {:else if slot.kind === "history-list" && control}
     <HistoryListSlot
       control={control as EnrichedControl}

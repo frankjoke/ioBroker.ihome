@@ -13,7 +13,9 @@
   import {
     headlineSlot,
     rowIcon,
+    rowSpark,
     tileParts,
+    tileSeries,
     type SlotRow,
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
@@ -37,6 +39,7 @@
   } from "$lib/pages.js";
   import { openSheet } from "$lib/stores/sheet.svelte.js";
   import SlotRenderer from "./SlotRenderer.svelte";
+  import TileChart from "./TileChart.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
   import type {
@@ -221,7 +224,7 @@
     };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
   );
 
-  const backgroundSlots = $derived(parts.background);
+  const chart = $derived(tileSeries(parts.rows));
   const bodySlots = $derived(parts.body);
 
   /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small. */
@@ -259,15 +262,12 @@
   const modalBadges = $derived(parts.modalBadges);
   const modalRows = $derived(
     parts.modal.map((r) => ({
-      // The chart layer loses its stretch in the modal: there it is a plain
-      // sparkline row, not a background.
-      slot:
-        r.slot.options?.background === true
-          ? { ...r.slot, options: { ...r.slot.options, background: undefined } }
-          : r.slot,
+      slot: r.slot,
       control: r.control,
       style: r.style,
       icon: rowIcon(r, "modal"),
+      // The row's own chart (A62): part of the row, so it follows the row.
+      spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
       onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
     })),
@@ -430,17 +430,9 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  {#if backgroundSlots.length}
+  {#if chart.length}
     <div class="tile-bg">
-      {#each backgroundSlots as r, i (i)}
-        <SlotRenderer
-          slot={r.slot}
-          {device}
-          control={r.control}
-          style={slotStyle(r.slot, r.control)}
-          emphasis="secondary"
-        />
-      {/each}
+      <TileChart series={chart} />
     </div>
   {/if}
   {#if tileName}<span class="tile-name">{tileName}</span>{/if}
@@ -520,10 +512,10 @@
     border-color: var(--tile-accent, var(--primary-color));
   }
 
-  /* A slot marked `options.background` draws the tile's chart (A22) over the
-     content — the icon and values sit under it, so the line is never hidden.
-     No pointer events; clipped to the tile's rounded box; the badges (z 2)
-     stay on top. The chart is centred at 70% of the tile's height so the
+  /* The tile's chart (A61): the series of every value that charts here, drawn
+     over the content — the icon and values sit under it, so the line is never
+     hidden. No pointer events; clipped to the tile's rounded box; the badges
+     (z 2) stay on top. The chart is centred at 70% of the tile's height so the
      badge corners and the name keep their space. */
   .tile-bg {
     position: absolute;
@@ -536,16 +528,12 @@
     align-items: center;
   }
 
-  /* Stretch the chart across the tile: the sparkline ships a fixed size for the
+  /* Stretch the chart across the tile: the chart ships a fixed size for the
      in-body case, and a scoped style cannot reach into the child. */
-  .tile-bg :global(.spark) {
+  .tile-bg :global(.chart) {
     width: 100%;
     max-width: none;
     height: 70%;
-  }
-
-  .tile-bg :global(.spark-placeholder) {
-    display: none;
   }
 
   .tile-name {

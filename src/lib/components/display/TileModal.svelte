@@ -4,6 +4,7 @@
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
   import type { Background, Slot } from "$lib/types/display";
   import type { ResolvedBadge, ResolvedStyle } from "$lib/config/rule-ops";
+  import type { ChartSeries } from "$lib/config/tile-parts";
 
   let {
     device,
@@ -27,6 +28,8 @@
       style: ResolvedStyle;
       /** The row's own icon (A54), resolved by the tile. */
       icon?: { glyph: string; color?: string; disabled?: boolean };
+      /** The row's own chart (A62), resolved by the tile. */
+      spark?: ChartSeries;
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];

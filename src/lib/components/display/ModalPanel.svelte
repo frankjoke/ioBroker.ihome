@@ -3,6 +3,8 @@
   import { tileTitle } from "$lib/config/template-ops";
   import Icon from "$lib/components/common/Icon.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
+  import TileChart from "./TileChart.svelte";
+  import type { ChartSeries } from "$lib/config/tile-parts";
   import BadgeChip from "./BadgeChip.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
   import type { Background, Slot } from "$lib/types/display";
@@ -37,6 +39,8 @@
       style: ResolvedStyle;
       /** The row's own icon (A54), resolved by the tile. */
       icon?: { glyph: string; color?: string; disabled?: boolean };
+      /** The row's own chart (A62), resolved by the tile. */
+      spark?: ChartSeries;
       /** Set when the slot is the tile's action — then it stays a button. */
       onPrimary?: () => void;
     }[];
@@ -130,6 +134,9 @@
                 r.slot.source ||
                 r.slot.kind}</span
             >
+            {#if r.spark}
+              <div class="row-chart"><TileChart series={[r.spark]} /></div>
+            {/if}
             <div class="row-control">
               <SlotRenderer
                 slot={r.slot}
@@ -245,6 +252,22 @@
     min-width: 0;
     display: flex;
     justify-content: flex-end;
+  }
+
+  /* The chart sits between the label and the value (A62): it takes the free
+     middle, and the value stops growing while it is there. */
+  .row-chart {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .row-chart + .row-control {
+    flex: 0 1 auto;
+  }
+
+  .row-chart :global(.chart) {
+    max-width: none;
+    height: 24px;
   }
 
   .icon-btn {

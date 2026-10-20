@@ -34,9 +34,7 @@ export interface TileParts {
   rows: SlotRow[];
   /** The tile's visible body, in slot order. */
   body: SlotRow[];
-  /** The chart layer (A22): `options.background` slots, drawn over the body. */
-  background: SlotRow[];
-  /** The detail page's rows (A34) — every kind, the chart layer as a plain row. */
+  /** The detail page's rows (A34): every kind, whatever its home. */
   modal: SlotRow[];
   /** The corner badges (A34), in slot order. */
   badgeSlots: Slot[];
@@ -107,12 +105,9 @@ export function tileParts(
       style: styleOf(r.slot, r.control),
     }));
 
-  const background = rows.filter(
-    (r) => r.slot.options?.background === true && slotWhere(r.slot) !== "modal",
-  );
-  const body = rows.filter(
-    (r) => r.slot.options?.background !== true && slotWhere(r.slot) !== "modal",
-  );
+  // The body is every row that lives on the tile (A59: nothing draws as a
+  // layer of its own any more — the chart comes from the rows).
+  const body = rows.filter((r) => slotWhere(r.slot) !== "modal");
   const modal = rows.filter((r) => slotWhere(r.slot) !== "tile");
 
   const badgeSlots = slots.filter(
@@ -141,7 +136,6 @@ export function tileParts(
     slots,
     rows,
     body,
-    background,
     modal,
     badgeSlots,
     modalBadges,
