@@ -33,7 +33,6 @@
     "color",
     "enum",
     "button",
-    "sparkline",
     "history-list",
   ];
 

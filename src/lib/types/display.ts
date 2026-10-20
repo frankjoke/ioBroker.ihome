@@ -105,7 +105,6 @@ export type SlotKind =
   | "enum"
   | "button"
   | "badge"
-  | "sparkline"
   | "history-list"
   | "frame";
 

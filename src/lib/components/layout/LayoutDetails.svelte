@@ -25,6 +25,7 @@
     effectiveSpan,
     pickable,
     pickControl,
+    pickSlotControls,
     resolveControl,
     resolveTemplate,
     slotVisible,
@@ -40,6 +41,7 @@
     patchIcon,
     patchRule,
     patchSlot,
+    patchSpark,
     removeRule,
     removeSlot,
     setSlotSource,
@@ -48,7 +50,7 @@
     templateFromTile,
     upsertTemplate,
   } from "$lib/config/tile-ops";
-  import { headlineSlot } from "$lib/config/tile-parts";
+  import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
   import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
@@ -77,6 +79,7 @@
     Slot,
     SlotIcon,
     SlotKind,
+    SlotSpark,
     TileConfig,
   } from "$lib/types/display";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
@@ -186,37 +189,6 @@
     return typeof raw === "object" ? JSON.stringify(raw) : String(raw);
   });
 
-  /** "off" + every source a chart is already on + the device's controls. */
-  const chartSources = $derived.by(() => {
-    const out: { value: string; label: string }[] = [];
-    const seen = new SvelteSet<string>();
-    for (const s of tile?.tile?.slots ?? []) {
-      if (
-        s.kind === "sparkline" &&
-        s.options?.background === true &&
-        s.source &&
-        !seen.has(s.source)
-      ) {
-        seen.add(s.source);
-        out.push({ value: s.source, label: s.source });
-      }
-    }
-    for (const c of device?.controls ?? []) {
-      if (c.hidden) continue;
-      const source = c.feature || c.id;
-      if (!seen.has(source)) {
-        seen.add(source);
-        out.push({ value: source, label: c.label || source });
-      }
-    }
-    return out;
-  });
-  const currentChart = $derived(
-    (tile?.tile?.slots ?? []).find(
-      (s) => s.kind === "sparkline" && s.options?.background === true,
-    )?.source ?? "",
-  );
-
   const OPS: { op: ActiveOp; label: string }[] = [
     { op: "truthy", label: "on / truthy" },
     { op: "gt", label: ">" },
@@ -246,6 +218,15 @@
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
 
+  /** The pane's own resolution of the slots, for the Sparkline hint (A63). */
+  const pickedRows = $derived(
+    device
+      ? pickSlotControls(shownSlots, device.controls ?? [], {
+          active: tileActive,
+        })
+      : [],
+  );
+
   const KIND_GLYPH: Record<SlotKind, string> = {
     value: "numbers",
     level: "tune",
@@ -253,7 +234,6 @@
     enum: "list",
     button: "smart_button",
     badge: "label",
-    sparkline: "show_chart",
     "history-list": "history",
     frame: "web_asset",
   };
@@ -422,27 +402,6 @@
     const size = { ...effectiveTileSpan() } as Size;
     size[axis] = Math.min(value, SIZE_MAX) as Size["w"];
     edit((t) => ({ ...t, size }));
-  }
-
-  /** The tile's chart (A22): at most one background sparkline. */
-  function setChart(source: string): void {
-    edit((t) => {
-      const slots = (t.slots ?? []).filter(
-        (s) => !(s.kind === "sparkline" && s.options?.background === true),
-      );
-      if (!source) return { ...t, slots };
-      return {
-        ...t,
-        slots: [
-          ...slots,
-          {
-            kind: "sparkline" as const,
-            source,
-            options: { background: true },
-          },
-        ],
-      };
-    });
   }
 
   function setActiveSource(source: string): void {
@@ -621,6 +580,38 @@
 
   function setIcon(i: number, patch: Partial<SlotIcon>): void {
     edit((t) => patchIcon(t, i, patch));
+  }
+
+  function setSpark(i: number, patch: Partial<SlotSpark>): void {
+    edit((t) => patchSpark(t, i, patch));
+  }
+
+  /** The chart's homes cycle both → tile → modal → both (A59). Its own home is
+   *  independent of the slot's (A60), so no choice is ever skipped. */
+  function nextSparkWhere(i: number): "tile" | "both" | "modal" {
+    const cur = shownSlots[i]?.spark?.where ?? "both";
+    return cur === "both" ? "tile" : cur === "tile" ? "modal" : "both";
+  }
+
+  function sparkWhereTitle(i: number): string {
+    const cur = shownSlots[i]?.spark?.where ?? "both";
+    return `Chart shows: ${WHERE_LABEL[cur]} — click for ${
+      WHERE_LABEL[nextSparkWhere(i)]
+    }`;
+  }
+
+  /** Does this slot's reading carry history (A63)? Drives the hint and the
+   *  disabled toggle. */
+  function sparkReady(i: number): boolean {
+    const slot = shownSlots[i];
+    return hasHistory(pickedRows.find((r) => r.slot === slot)?.control);
+  }
+
+  /** The colour select's value: "" (auto), a palette token, or "custom". */
+  function sparkColorValue(slot: Slot): string {
+    const color = slot.spark?.color;
+    if (!color) return "";
+    return Object.values(BADGE_COLORS).includes(color) ? color : "custom";
   }
 
   /** The icon's homes cycle both → tile → modal → both (A57); a modal-only
@@ -827,19 +818,6 @@
       />
     </div>
 
-    <label class="field">
-      <span class="label-mono">History chart</span>
-      <select
-        value={currentChart}
-        onchange={(e) => setChart(e.currentTarget.value)}
-      >
-        <option value="">off</option>
-        {#each chartSources as c (c.value)}
-          <option value={c.value}>{c.label}</option>
-        {/each}
-      </select>
-    </label>
-
     <div class="field">
       <span class="label-mono">Active when</span>
       <div class="row">
@@ -911,6 +889,9 @@
                 <Icon value={KIND_GLYPH[slot.kind]} size={17} />
                 {#if slot.icon && slot.icon.enabled !== false && slot.icon.glyph}
                   <Icon value={slot.icon.glyph} size={15} />
+                {/if}
+                {#if slot.spark && slot.spark.enabled !== false}
+                  <Icon value="show_chart" size={15} />
                 {/if}
                 <span class="slot-summary"
                   >{slot.kind} · {slotLabel(
@@ -1403,6 +1384,91 @@
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
                     <p class="note text-muted">
                       No glyph yet — choose one, or let a rule supply it.
+                    </p>
+                  {/if}
+                {/if}
+                {#if slot.kind === "value"}
+                  <div class="row">
+                    <label
+                      class="check"
+                      title="Off keeps the colour and its homes but draws nothing"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.spark !== undefined &&
+                          slot.spark.enabled !== false}
+                        disabled={!sparkReady(i)}
+                        onchange={(e) =>
+                          e.currentTarget.checked
+                            ? setSpark(
+                                i,
+                                slot.spark
+                                  ? { enabled: undefined }
+                                  : { enabled: true },
+                              )
+                            : setSpark(i, { enabled: false })}
+                      />
+                      <span>Sparkline</span>
+                    </label>
+                    {#if slot.spark}
+                      <label class="small">
+                        <span class="label-mono">colour</span>
+                        <select
+                          value={sparkColorValue(slot)}
+                          onchange={(e) => {
+                            const value = e.currentTarget.value;
+                            if (value === "custom") {
+                              if (!isHexColor(slot.spark?.color ?? "")) {
+                                setSpark(i, { color: "#494bd6" });
+                              }
+                              return;
+                            }
+                            setSpark(i, { color: value || undefined });
+                          }}
+                        >
+                          <option value="">auto</option>
+                          {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
+                            <option value={token}>{name}</option>
+                          {/each}
+                          <option value="custom">custom…</option>
+                        </select>
+                      </label>
+                      {#if isHexColor(slot.spark.color ?? "")}
+                        <input
+                          type="color"
+                          class="color-input"
+                          aria-label="Chart colour"
+                          value={slot.spark.color}
+                          oninput={(e) =>
+                            setSpark(i, { color: e.currentTarget.value })}
+                        />
+                      {/if}
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        class:on={slot.spark.where !== undefined}
+                        title={sparkWhereTitle(i)}
+                        aria-label={sparkWhereTitle(i)}
+                        onclick={() =>
+                          edit((t) =>
+                            patchSpark(t, i, {
+                              where:
+                                nextSparkWhere(i) === "both"
+                                  ? undefined
+                                  : nextSparkWhere(i),
+                            }),
+                          )}
+                      >
+                        <span class="material-symbols-outlined"
+                          >{WHERE_GLYPH[slot.spark.where ?? "both"]}</span
+                        >
+                      </button>
+                    {/if}
+                  </div>
+                  {#if !sparkReady(i)}
+                    <p class="note text-muted">
+                      No history for this control — configure it in the device
+                      editor.
                     </p>
                   {/if}
                 {/if}
