@@ -415,4 +415,35 @@ it("never charts a row that resolved no control (A63)", () => {
   );
   expect(parts.rows).toEqual([]);
   expect(tileSeries(parts.rows)).toEqual([]);
+  // A control with history but no state cannot chart either (A63).
+  expect(
+    hasHistory({
+      history: { duration: 1, durationUnit: "hours" },
+    } as SlotControl),
+  ).toBe(false);
+});
+
+it("charts only the rows the tile resolves (A60): a hidden row takes its chart with it", () => {
+  const dev = device({ controls: [withHistory("c1", "temperature")] });
+  const parts = tileParts(
+    dev,
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        spark: {},
+        rules: [{ when: "true", hidden: true }],
+      },
+    ]),
+    none,
+  );
+  expect(parts.rows.length).toBe(0);
+  expect(tileSeries(parts.rows)).toEqual([]);
+
+  const shown = tileParts(
+    dev,
+    tile([{ kind: "value", source: "temperature", spark: {} }]),
+    none,
+  );
+  expect(tileSeries(shown.rows).length).toBe(1);
 });

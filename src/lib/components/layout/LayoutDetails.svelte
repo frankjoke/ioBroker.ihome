@@ -1334,12 +1334,7 @@
                           slot.icon.enabled !== false}
                         onchange={(e) =>
                           e.currentTarget.checked
-                            ? setIcon(
-                                i,
-                                slot.icon
-                                  ? { enabled: undefined }
-                                  : { enabled: true },
-                              )
+                            ? setIcon(i, { enabled: true })
                             : setIcon(i, { enabled: false })}
                       />
                       <span>Icon</span>
@@ -1400,12 +1395,7 @@
                         disabled={!sparkReady(i)}
                         onchange={(e) =>
                           e.currentTarget.checked
-                            ? setSpark(
-                                i,
-                                slot.spark
-                                  ? { enabled: undefined }
-                                  : { enabled: true },
-                              )
+                            ? setSpark(i, { enabled: true })
                             : setSpark(i, { enabled: false })}
                       />
                       <span>Sparkline</span>

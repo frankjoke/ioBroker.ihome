@@ -323,6 +323,16 @@ describe("seriesPoints (A61)", () => {
         opts,
       ),
     ).toBe("0,20 100,0");
+    // …on either side: a sample past `to` stops at the right edge.
+    expect(
+      seriesPoints(
+        [
+          { ts: 0, val: 0 },
+          { ts: 1500, val: 10 },
+        ],
+        opts,
+      ),
+    ).toBe("0,20 100,0");
   });
   it("draws the flat centre line for one point or a constant series", () => {
     expect(seriesPoints([{ ts: 1, val: 5 }], opts)).toBe("0,10 100,10");

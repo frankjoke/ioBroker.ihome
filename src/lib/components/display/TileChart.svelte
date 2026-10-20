@@ -29,7 +29,9 @@
   /** The polylines, each on the shared window (A61): x by time across the
    *  widest of the series' own windows, so a shorter history sits at the right
    *  and differently sampled series line up. A series with nothing yet draws
-   *  nothing — the others still do. */
+   *  nothing — the others still do. The window ends at the newest sample (not
+   *  at `Date.now()`): a stale series then has no dead right margin — do not
+   *  "fix" it back to now. */
   const drawn = $derived.by(() => {
     const loaded = series.map((s) => {
       const spec = s.control.history;
