@@ -40,6 +40,7 @@
   import { openSheet } from "$lib/stores/sheet.svelte.js";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
   import type {
@@ -236,8 +237,9 @@
   // The detail page's face (A54): the headline's icon follows its own
   // descriptor and homes. The header deliberately does not consult the row's
   // visibility — a conditionally hidden headline still greets its own page.
-  const headIcon = $derived(
-    headline
+  const headIcon = $derived.by(() => {
+    // A54: the headline's own icon greets the name…
+    const own = headline
       ? rowIcon(
           {
             slot: headline,
@@ -245,8 +247,11 @@
           },
           "modal",
         )
-      : undefined,
-  );
+      : undefined;
+    if (own) return own;
+    // …else the device's own face (A67): the icon its objects carry.
+    return device.objectIcon ? { glyph: device.objectIcon } : undefined;
+  });
 
   // What the sheet's Detail Page checkbox asks about (A47): the tile's own
   // resolution, not a second guess at the slots.
@@ -435,7 +440,12 @@
       <TileChart series={chart} />
     </div>
   {/if}
-  {#if tileName}<span class="tile-name">{tileName}</span>{/if}
+  {#if tileName}<span class="tile-name"
+      >{#if device.objectIcon}<Icon
+          value={device.objectIcon}
+          size={15}
+        />{/if}{tileName}</span
+    >{/if}
   <div class="tile-body">
     {#each bodySlots as r, i (i)}
       <SlotRenderer
@@ -537,10 +547,20 @@
   }
 
   .tile-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: var(--body-sm);
     font-weight: 600;
     overflow-wrap: anywhere;
     max-width: 100%;
+  }
+
+  /* The device's face on the name line (A67): the glyph keeps its size while
+     the name takes the room. */
+  .tile-name :global(img),
+  .tile-name :global(.material-symbols-outlined) {
+    flex: 0 0 auto;
   }
 
   /* A rule can ask for the switched-off look. */

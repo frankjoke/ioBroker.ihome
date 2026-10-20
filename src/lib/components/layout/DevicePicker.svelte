@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { enumLabel } from "$lib/config/rooms";
   import type { EnrichedDevice } from "$lib/types/device";
@@ -131,6 +132,9 @@
                   checked={selected.has(device.id)}
                   onchange={() => toggle(device.id)}
                 />
+                {#if device.objectIcon}
+                  <Icon value={device.objectIcon} size={15} />
+                {/if}
                 <span class="name">{device.name}</span>
                 <span class="meta text-muted"
                   >{device.type}{device.room ? ` · ${device.room}` : ""}</span
@@ -241,6 +245,13 @@
     gap: 0.5rem;
     padding: 2px 4px;
     cursor: pointer;
+  }
+
+  /* The device's own face (A67): the glyph keeps its size, the name takes the
+     room. */
+  .row :global(img),
+  .row :global(.material-symbols-outlined) {
+    flex: 0 0 auto;
   }
 
   .row:hover {

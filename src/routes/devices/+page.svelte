@@ -11,6 +11,7 @@
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import HistorySummary from "$lib/components/config/HistorySummary.svelte";
   import EnumBadge from "$lib/components/common/EnumBadge.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import {
@@ -273,9 +274,15 @@
     <div class="device-list">
       {#each sortedDevices as d (d.id)}
         {@const seen = lastUpdate(d)}
+        {@const icon = enrichedById.get(d.id)?.objectIcon}
         <div class="card device-row">
           <div class="device-main">
-            <span class="device-name">{d.name}</span>
+            <span class="device-title">
+              {#if icon}
+                <Icon value={icon} size={18} />
+              {/if}
+              <span class="device-name">{d.name}</span>
+            </span>
             <span class="device-meta text-muted">
               <span class="badge badge-secondary">{d.type}</span>
               {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
@@ -441,6 +448,19 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
+  }
+
+  .device-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  /* The device's own face (A67): the glyph keeps its size. */
+  .device-title :global(img),
+  .device-title :global(.material-symbols-outlined) {
+    flex: 0 0 auto;
   }
 
   .device-name {
