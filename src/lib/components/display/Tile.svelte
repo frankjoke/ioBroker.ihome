@@ -11,7 +11,6 @@
   } from "$lib/config/template-ops";
   import { evalActive } from "$lib/config/tile-ops";
   import {
-    accentSlot,
     headlineSlot,
     rowIcon,
     tileParts,
@@ -206,12 +205,11 @@
   // headline pick (A52) is a reference.
   const slots = $derived(parts.slots);
 
-  // The accent the tile wears (A52): a legacy icon slot keeps driving it while
-  // one exists — exactly today's behaviour — else the headline slot's resolved
-  // style. The *style* carries, so "glow when on" keeps working with the icon
-  // disabled; the values reach CSS through custom properties (spec §6).
+  // The accent the tile wears (A52): the headline slot's resolved style. The
+  // *style* carries, so "glow when on" keeps working with the icon disabled;
+  // the values reach CSS through custom properties (spec §6).
   const headline = $derived(headlineSlot(slots));
-  const accent = $derived(accentSlot(slots) ?? { kind: "icon" as const });
+  const accent = $derived(headline ?? { kind: "value" as const });
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
   // The tile's own painted background first (A33): a rule's background is
   // appended after it, so the live condition still wins.

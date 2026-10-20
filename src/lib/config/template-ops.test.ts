@@ -20,7 +20,7 @@ it("merges slots by kind+source with later winning and rules concatenated", () =
   const merged = mergeSlots([
     [
       {
-        kind: "icon",
+        kind: "value",
         source: "power",
         label: "old",
         rules: [{ when: "!power", color: "grey" }],
@@ -28,7 +28,7 @@ it("merges slots by kind+source with later winning and rules concatenated", () =
     ],
     [
       {
-        kind: "icon",
+        kind: "value",
         source: "power",
         label: "new",
         rules: [{ when: "power", color: "amber" }],
@@ -75,9 +75,7 @@ it("falls back to the type preset when basedOn names a missing preset", () => {
     basedOn: "NoSuchPreset",
     type: "Light",
     features: [],
-    slots: [
-      { kind: "icon", source: "power", options: { icon: "emoji_objects" } },
-    ],
+    slots: [{ kind: "value", source: "power" }],
   };
   const r = resolveTemplate(
     { id: "d", name: "L", type: "Light", template: "u1", controls: [] },
@@ -95,9 +93,7 @@ it("layers preset, user template and device overrides", () => {
     type: "Light",
     size: { w: 2, h: 1 },
     features: [],
-    slots: [
-      { kind: "icon", source: "power", options: { icon: "emoji_objects" } },
-    ],
+    slots: [{ kind: "button", label: "Boost" }],
   };
   const r = resolveTemplate(
     {
@@ -111,8 +107,8 @@ it("layers preset, user template and device overrides", () => {
     [user],
   );
   expect(r.size).toEqual({ w: 2, h: 1 });
-  expect(r.slots.find((s) => s.kind === "icon")?.options?.icon).toBe(
-    "emoji_objects",
+  expect(r.slots.some((s) => s.kind === "button" && s.label === "Boost")).toBe(
+    true,
   );
   expect(r.slots.some((s) => s.kind === "value" && s.label === "W")).toBe(true);
 });
@@ -195,8 +191,6 @@ it("carries every preset's icon on the slot its source named (A55)", () => {
         .map(({ i }) => i),
     ).toEqual([at]);
     expect(slots[at].icon?.glyph).toBe(glyph);
-    // No preset creates a legacy icon slot any more (A55).
-    expect(slots.some((s) => s.kind === "icon")).toBe(false);
   }
 });
 
@@ -367,33 +361,6 @@ it("a failing hint goes dormant and does not claim a control", () => {
   expect(out[1].control?.id).toBe("a"); // positional slot still gets the first control
 });
 
-// A36: an icon reads a control for its colour; it must not spend that control,
-// or a preset's value hint slides to the next control of the same role — on a
-// bathroom thermometer the "temperature" readout became the dew point.
-it("an icon reads a control without consuming it (A36)", () => {
-  const controls = [
-    ctl("t", { object: { common: { role: "value.temperature" } } }),
-    ctl("dew", { object: { common: { role: "value.temperature" } } }),
-  ];
-  const out = pickSlotControls(
-    [
-      { kind: "icon", source: "t" },
-      { kind: "value", options: { pick: "temperature" } },
-    ],
-    controls,
-  );
-  expect(out[0].control?.id).toBe("t"); // the icon's own source
-  expect(out[1].control?.id).toBe("t"); // the hint still means the first match
-});
-
-it("a bare readout still gets the device's only control after an icon (A36)", () => {
-  const out = pickSlotControls(
-    [{ kind: "icon", source: "v" }, { kind: "value" }],
-    [ctl("v")],
-  );
-  expect(out[1].control?.id).toBe("v");
-});
-
 it("a readout's own source still claims the control for a later bare readout", () => {
   const out = pickSlotControls(
     [{ kind: "value", source: "a" }, { kind: "value" }],
@@ -454,14 +421,14 @@ it("a raw source resolves through the raw callback", () => {
   expect(missing[0]).toMatchObject({ dormant: true });
 });
 
-it("unknown showWhen counts as both and slotVisible keeps icon slots visible", () => {
+it("unknown showWhen counts as both", () => {
   expect(
     pickSlotControls(
       [{ kind: "value", showWhen: "garbage" as never }],
       [ctl("a")],
     ).length,
   ).toBe(1);
-  expect(slotVisible({ kind: "icon" }, false)).toBe(true);
+  expect(slotVisible({ kind: "value" }, false)).toBe(true);
 });
 
 // A35: a duplicated slot is legal config — two identical rows render twice and

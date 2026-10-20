@@ -112,7 +112,7 @@ it("projects the display fields of a device", () => {
     watch: ["alias.0.EG.Relay.SET"],
     slots: [
       {
-        kind: "icon",
+        kind: "value",
         source: "power",
         rules: [{ when: "power", icon: "lightbulb" }],
       },

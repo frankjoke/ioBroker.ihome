@@ -60,8 +60,7 @@
 
   function kindsFor(t: Tab): SlotKind[] {
     if (t === "page") return ["frame"];
-    // No "icon" any more (A56/A57): a legacy icon slot still edits, but new
-    // slots never create one.
+    // No "icon" any more (A56/A57): the icon is a property of the slot it decorates.
     return t === "device"
       ? ["value", "badge", ...DEVICE_KINDS]
       : ["value", "badge"];

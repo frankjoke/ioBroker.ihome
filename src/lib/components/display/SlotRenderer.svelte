@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
   import ControlWidget from "./slots/ControlWidget.svelte";
-  import IconSlot from "./slots/IconSlot.svelte";
   import ValueSlot from "./slots/ValueSlot.svelte";
   import SparklineSlot from "./slots/SparklineSlot.svelte";
   import HistoryListSlot from "./slots/HistoryListSlot.svelte";
@@ -36,7 +35,7 @@
     stack?: boolean;
   } = $props();
 
-  // Kinds with a control are useless without one; icon/value fall back.
+  // Kinds with a control are useless without one; value falls back.
   const needsControl = $derived(
     slot.kind === "level" ||
       slot.kind === "color" ||
@@ -50,11 +49,9 @@
 
 {#snippet content()}
   <!-- The control-bearing kinds below only open up for a control that resolved
-       from the device (a raw-state pseudo-control reaches value/icon kinds only),
+       from the device (a raw-state pseudo-control reaches the value kind only),
        so the cast to the full enriched shape is safe. -->
-  {#if slot.kind === "icon"}
-    <IconSlot {slot} {style} fallback={device.icon} {onPrimary} />
-  {:else if slot.kind === "value"}
+  {#if slot.kind === "value"}
     <ValueSlot {slot} {control} {onPrimary} {emphasis} />
   {:else if slot.kind === "sparkline" && control}
     <SparklineSlot

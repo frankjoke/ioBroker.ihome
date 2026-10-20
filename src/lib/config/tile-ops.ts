@@ -204,65 +204,6 @@ export function patchIcon(
   );
 }
 
-/**
- * Where a legacy icon slot folds to (A56): the first other slot with the same
- * source, else the first value slot, else the first non-icon slot — null when
- * the index is not a legacy icon slot or there is nowhere to move it.
- */
-export function iconSlotTarget(tile: TileConfig, index: number): number | null {
-  const slots = tile.slots ?? [];
-  const slot = slots[index];
-  if (!slot || slot.kind !== "icon") return null;
-  const others = slots.map((s, i) => ({ s, i })).filter(({ i }) => i !== index);
-  const at = (pick: (s: Slot) => boolean): number | null =>
-    others.find(({ s }) => pick(s))?.i ?? null;
-  return (
-    (slot.source ? at((s) => s.source === slot.source) : null) ??
-    at((s) => s.kind === "value") ??
-    at((s) => s.kind !== "icon")
-  );
-}
-
-/**
- * Fold a legacy icon slot onto its slot (A56): the glyph, the display home and
- * the rules move (the icon slot's rules come after the target's — the last
- * match wins), then the icon slot disappears. A descriptor is written only
- * when there is something to carry (a glyph, a `where`, or a rule icon) —
- * otherwise the target keeps the icon it had. No target: untouched.
- */
-export function foldIconSlot(tile: TileConfig, index: number): TileConfig {
-  const slots = tile.slots ?? [];
-  const target = iconSlotTarget(tile, index);
-  if (target === null) return tile;
-  const iconSlot = slots[index];
-  const rawGlyph = iconSlot.options?.icon;
-  const glyph =
-    typeof rawGlyph === "string" && rawGlyph.trim() ? rawGlyph : undefined;
-  const rules = iconSlot.rules ?? [];
-  const carries =
-    glyph !== undefined ||
-    iconSlot.where !== undefined ||
-    rules.some((r) => r.icon);
-
-  return withSlots(
-    tile,
-    slots
-      .map((slot, i) => {
-        if (i !== target) return slot;
-        const copy: Slot = { ...slot };
-        if (rules.length) copy.rules = [...(slot.rules ?? []), ...rules];
-        if (carries) {
-          copy.icon = {
-            ...(glyph !== undefined ? { glyph } : {}),
-            ...(iconSlot.where !== undefined ? { where: iconSlot.where } : {}),
-          };
-        }
-        return copy;
-      })
-      .filter((_, i) => i !== index),
-  );
-}
-
 // ------------------------------------------------------------------- rules
 
 /** Address one slot's rule list; a bad slot index returns a copied tile. */

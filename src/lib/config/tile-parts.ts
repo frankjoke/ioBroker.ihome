@@ -87,15 +87,15 @@ export function tileParts(
     resolveStyle([...(slot.rules ?? []), ...(control?.rules ?? [])], scope);
 
   // A source or hint that matches nothing goes dormant (A20); the slots that
-  // actually render are the ones with a reading (an icon keeps its fallback, a
-  // frame needs none) that no rule hides.
+  // actually render are the ones with a reading (a frame needs none) that no
+  // rule hides.
   const rows: SlotRow[] = pickSlotControls<SlotControl>(slots, shownControls, {
     active,
     raw,
   })
     .filter(
       (r) =>
-        (r.slot.kind === "icon" || r.slot.kind === "frame" || r.control) &&
+        (r.slot.kind === "frame" || r.control) &&
         styleOf(r.slot, r.control).hidden !== true,
     )
     .map((r) => ({
@@ -147,19 +147,10 @@ export function tileParts(
   };
 }
 
-/** The tile's face (A52): the first value slot, else the first non-icon slot —
- *  a legacy Button tile's face is its button, not its old icon slot. */
+/** The tile's face (A52): the first value slot, else the first slot — a legacy
+ *  Button tile's face is its button. */
 export function headlineSlot(slots: Slot[]): Slot | undefined {
-  return (
-    slots.find((s) => s.kind === "value") ??
-    slots.find((s) => s.kind !== "icon")
-  );
-}
-
-/** The slot whose resolved style the tile wears (A52): the legacy icon slot
- *  while one exists — exactly the pre-slot-icon behaviour — else the headline. */
-export function accentSlot(slots: Slot[]): Slot | undefined {
-  return slots.find((s) => s.kind === "icon") ?? headlineSlot(slots);
+  return slots.find((s) => s.kind === "value") ?? slots[0];
 }
 
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed

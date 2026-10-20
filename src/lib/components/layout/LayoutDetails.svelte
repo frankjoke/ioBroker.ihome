@@ -34,8 +34,6 @@
     applyTemplate,
     editTile,
     evalActive,
-    foldIconSlot,
-    iconSlotTarget,
     moveRule,
     moveSlot,
     nextSlotWhere,
@@ -130,9 +128,8 @@
   let openRules = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   let ruleIconFor = $state<{ slot: number; rule: number } | null>(null);
-  /** The slot icon's own picker and the legacy fold's confirm (A57). */
+  /** The slot icon's own picker (A57). */
   let iconPickerFor = $state<number | null>(null);
-  let pendingFold = $state<number | null>(null);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -250,7 +247,6 @@
   });
 
   const KIND_GLYPH: Record<SlotKind, string> = {
-    icon: "emoji_symbols",
     value: "numbers",
     level: "tune",
     color: "palette",
@@ -645,12 +641,6 @@
     }`;
   }
 
-  function foldTargetLabel(i: number): string {
-    const at = iconSlotTarget({ slots: shownSlots }, i);
-    const slot = at === null ? undefined : shownSlots[at];
-    return slot ? `${slot.kind} · ${slotLabel(slot)}` : "its slot";
-  }
-
   function removeSlotAt(slotIndex: number): void {
     edit((t) => removeSlot(t, slotIndex));
     if (expandedSlot === slotIndex) expandedSlot = null;
@@ -936,9 +926,6 @@
                     >headline</span
                   >
                 {/if}
-                {#if slot.kind === "icon"}
-                  <span class="hint-badge text-muted">legacy</span>
-                {/if}
               </button>
               <span class="row-actions">
                 <button
@@ -1038,28 +1025,6 @@
             {/if}
             {#if expandedSlot === i}
               <div class="slot-editor">
-                {#if slot.kind === "icon"}
-                  <div class="row">
-                    <span class="note text-muted"
-                      >A legacy icon slot: the icon lives on a slot of its own
-                      here. New tiles carry the icon on the slot it belongs to.</span
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      disabled={iconSlotTarget({ slots: shownSlots }, i) ===
-                        null}
-                      title={iconSlotTarget({ slots: shownSlots }, i) === null
-                        ? "Nothing on this tile to move the icon onto"
-                        : `Move the glyph, its rules and its display home onto ${foldTargetLabel(
-                            i,
-                          )}`}
-                      onclick={() => (pendingFold = i)}
-                    >
-                      Move into its slot
-                    </button>
-                  </div>
-                {/if}
                 <div class="row">
                   <label class="small">
                     <span class="label-mono">Kind</span>
@@ -1072,7 +1037,7 @@
                           }),
                         )}
                     >
-                      {#each Object.keys(KIND_GLYPH).filter((k) => k !== "icon" || slot.kind === "icon") as k (k)}
+                      {#each Object.keys(KIND_GLYPH) as k (k)}
                         <option value={k}>{k}</option>
                       {/each}
                     </select>
@@ -1452,10 +1417,9 @@
                   {#if openRules === i}
                     <p class="note text-muted">
                       Last match wins. <code>active</code> (the tile's active
-                      state) is available in
-                      <code>when</code>.{#if slot.kind !== "icon"}
-                        A rule's <code>icon</code> swaps the slot icon's glyph (only
-                        while the icon is enabled).{/if}
+                      state) is available in <code>when</code>. A rule's
+                      <code>icon</code> swaps the slot icon's glyph (only while the
+                      icon is enabled).
                     </p>
                     {#each slot.rules ?? [] as rule, ri (ri)}
                       <div class="rule-row">
@@ -1844,26 +1808,6 @@
       onCancel={() => (pendingReset = false)}
     >
       The tile returns to its device/template chain.
-    </ConfirmModal>
-  {/if}
-
-  {#if pendingFold !== null}
-    <ConfirmModal
-      title="Move this icon into its slot?"
-      confirmLabel="Move"
-      onConfirm={() => {
-        const target = pendingFold;
-        pendingFold = null;
-        if (target === null) return;
-        edit((t) => foldIconSlot(t, target));
-      }}
-      onCancel={() => (pendingFold = null)}
-    >
-      The glyph, its rules and its display home move onto {foldTargetLabel(
-        pendingFold,
-      )} — the icon then shows with that slot (and in the detail header when that
-      slot is the tile's headline). An icon already there is overwritten; visibility
-      the icon slot had is not kept — the icon follows that slot from now on.
     </ConfirmModal>
   {/if}
 </div>

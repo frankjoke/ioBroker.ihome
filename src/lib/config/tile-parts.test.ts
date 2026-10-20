@@ -1,10 +1,5 @@
 import { it, expect } from "vitest";
-import {
-  accentSlot,
-  headlineSlot,
-  rowIcon,
-  tileParts,
-} from "$lib/config/tile-parts";
+import { headlineSlot, rowIcon, tileParts } from "$lib/config/tile-parts";
 import type {
   EnrichedControl,
   EnrichedDevice,
@@ -189,33 +184,21 @@ it("exposes the very slots its rows carry, chain or materialised (A46/A52)", () 
   expect(materialised.slots).toBe(mine.slots);
 });
 
-it("picks the headline: the first value slot, else the first non-icon slot", () => {
+it("picks the headline: the first value slot, else the first slot", () => {
   // A value anywhere wins, even when it lives only in the modal (A52).
   const value: Slot = {
     kind: "value",
     source: "humidity",
     where: "modal",
   };
-  expect(headlineSlot([{ kind: "icon" }, { kind: "button" }, value])).toBe(
+  expect(headlineSlot([{ kind: "badge" }, { kind: "button" }, value])).toBe(
     value,
   );
 
-  // Without one, the first slot that is not a legacy icon slot.
-  const button: Slot = { kind: "button" };
-  expect(headlineSlot([{ kind: "icon" }, button])).toBe(button);
+  // Without one, the first slot is the face.
+  const badge: Slot = { kind: "badge" };
+  expect(headlineSlot([badge, { kind: "button" }])).toBe(badge);
   expect(headlineSlot([])).toBeUndefined();
-});
-
-it("wears the legacy icon slot's style while one exists, else the headline's (A52)", () => {
-  const legacy: Slot = { kind: "icon", source: "power" };
-  const value: Slot = { kind: "value", source: "power", icon: { glyph: "x" } };
-  // The legacy pair keeps today's accent exactly: the icon slot wins.
-  expect(accentSlot([legacy, value])).toBe(legacy);
-  // Once none remains the headline slot wears it.
-  expect(accentSlot([value])).toBe(value);
-  // A badge first does not become the face while a value slot exists.
-  expect(accentSlot([{ kind: "badge" }, value])).toBe(value);
-  expect(accentSlot([])).toBeUndefined();
 });
 
 it("reads a row's icon from the descriptor, the rule icon winning", () => {

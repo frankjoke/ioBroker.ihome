@@ -99,7 +99,6 @@ export interface PageRegistry {
 
 /** The closed vocabulary the renderer knows how to draw (spec §6). */
 export type SlotKind =
-  | "icon"
   | "value"
   | "level"
   | "color"
@@ -127,8 +126,7 @@ export interface Rule {
 }
 
 /** One slot's icon (A51): presence gates rendering, `false` keeps it defined but
- *  invisible, and the slot's own rules dress it (a rule's `icon` swaps the glyph).
- *  The legacy `kind: "icon"` slot is separate and stays valid. */
+ *  invisible, and the slot's own rules dress it (a rule's `icon` swaps the glyph). */
 export interface SlotIcon {
   /** One raw string (A23): a material-symbols name, image URL, data: URL or
    *  broker-relative path. */

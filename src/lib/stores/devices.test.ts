@@ -21,7 +21,7 @@ it("includes watch and rule-referenced state ids", () => {
         watch: ["alias.0.EG.Relay.SET"],
         slots: [
           {
-            kind: "icon",
+            kind: "value",
             rules: [{ when: 'get("alias.0.EG.Slot") > 1' }],
           },
         ],

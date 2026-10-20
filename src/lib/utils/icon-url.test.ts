@@ -42,11 +42,7 @@ it("collectDocumentIcons gathers every icon field, deduped", () => {
                 device: "d",
                 tile: {
                   slots: [
-                    {
-                      kind: "icon",
-                      options: { icon: "bolt" },
-                      rules: [{ icon: "flash_on" }],
-                    },
+                    { kind: "value", rules: [{ icon: "flash_on" }] },
                     { kind: "value", icon: { glyph: "probe" } },
                   ],
                 },
@@ -65,7 +61,7 @@ it("collectDocumentIcons gathers every icon field, deduped", () => {
         id: "t1",
         name: "T",
         type: "Switch" as const,
-        slots: [{ kind: "icon", options: { icon: "bolt" } }],
+        slots: [{ kind: "value", icon: { glyph: "bolt" } }],
       },
     ],
   } as unknown as TemplateRegistry;

@@ -265,8 +265,7 @@ export function pickSlotControls<T extends PickableControl>(
         out.push({ slot, dormant: true });
         continue;
       }
-      // An icon reads for its colour, it does not consume a reading (A36).
-      if (slot.kind !== "icon") used.add(String(control.id ?? ""));
+      used.add(String(control.id ?? ""));
       out.push({ slot, control });
       continue;
     }
