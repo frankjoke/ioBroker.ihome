@@ -9,7 +9,9 @@
 `2026-10-18-ihome-layout-sheet-design.md` (A43–A50, the sheet)
 **Scope:** one icon per slot, dressed by the slot's own rules; the **headline slot's** icon is the
 tile's face (tile accent, detail header); a slot icon gets its own display home (tile / both /
-detail). The legacy `kind: "icon"` slot was retired on 2026-10-20 (A56). No icon-specific rules UI,
+detail). The legacy `kind: "icon"` slot was retired on 2026-10-20 (A56); the chart slot
+(`kind: "sparkline"`) followed the same per-slot-descriptor pattern in the sparklines spec
+(`2026-10-20-ihome-slot-sparklines-design.md`, A59–A64). No icon-specific rules UI,
 no icons on badges/frames through the editor, no per-icon animation, no cross-device icons, no
 uploads.
 
