@@ -1,6 +1,7 @@
 <script lang="ts">
   import { findEnum, enumShortId } from "$lib/config/rooms";
   import { localizeName, contrastColor } from "$lib/config/format";
+  import Icon from "$lib/components/common/Icon.svelte";
 
   let { id, enums }: { id: string; enums: any } = $props();
 
@@ -10,10 +11,6 @@
   );
   const icon = $derived(e?.common?.icon as string | undefined);
   const color = $derived(e?.common?.color as string | undefined);
-
-  function isUrl(icon?: string): boolean {
-    return !!icon && (/^https?:/.test(icon) || icon.includes("/"));
-  }
 </script>
 
 {#if id}
@@ -23,10 +20,8 @@
     style:--enum-color={color ?? undefined}
     style:color={color ? contrastColor(color) : undefined}
   >
-    {#if isUrl(icon)}
-      <img src={icon} alt="" />
-    {:else if icon}
-      <span class="material-symbols-outlined">{icon}</span>
+    {#if icon}
+      <Icon value={icon} owner={id} size={15} />
     {/if}
     <span class="enum-label">{label}</span>
   </span>
@@ -49,16 +44,6 @@
 
   .enum-badge.colored {
     background: var(--enum-color);
-  }
-
-  .enum-badge img {
-    width: 1em;
-    height: 1em;
-    object-fit: contain;
-  }
-
-  .enum-badge .material-symbols-outlined {
-    font-size: 15px;
   }
 
   .enum-label {

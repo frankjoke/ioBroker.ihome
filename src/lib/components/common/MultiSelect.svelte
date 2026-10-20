@@ -1,5 +1,6 @@
 <script lang="ts">
   import EnumBadge from "./EnumBadge.svelte";
+  import Icon from "./Icon.svelte";
 
   export interface MultiOption {
     value: string;
@@ -57,10 +58,6 @@
     return options.find((o) => o.value === value);
   }
 
-  function isUrl(icon?: string): boolean {
-    return !!icon && (/^https?:/.test(icon) || icon.includes("/"));
-  }
-
   function onWindowClick(event: MouseEvent) {
     if (open && root && !root.contains(event.target as Node)) open = false;
   }
@@ -75,10 +72,8 @@
         {#if enums}
           <EnumBadge id={value} {enums} />
         {:else}
-          {#if isUrl(option(value)?.icon)}
-            <img src={option(value)?.icon} alt="" />
-          {:else if option(value)?.icon}
-            <span class="material-symbols-outlined">{option(value)?.icon}</span>
+          {#if option(value)?.icon}
+            <Icon value={option(value)?.icon} owner={value} size={15} />
           {/if}
           <span class="chip-label">{option(value)?.label ?? value}</span>
         {/if}
@@ -118,10 +113,8 @@
             {#if enums}
               <EnumBadge id={o.value} {enums} />
             {:else}
-              {#if isUrl(o.icon)}
-                <img src={o.icon} alt="" />
-              {:else if o.icon}
-                <span class="material-symbols-outlined">{o.icon}</span>
+              {#if o.icon}
+                <Icon value={o.icon} owner={o.value} size={15} />
               {/if}
               <span class="ms-option-label">{o.label}</span>
             {/if}
@@ -173,18 +166,6 @@
     color: var(--on-primary-container);
     border-radius: var(--border-radius-pill, 999px);
     font-size: 0.75rem;
-  }
-
-  .chip img,
-  .ms-option img {
-    width: 1em;
-    height: 1em;
-    object-fit: contain;
-  }
-
-  .chip .material-symbols-outlined,
-  .ms-option .material-symbols-outlined {
-    font-size: 15px;
   }
 
   .chip-remove {
@@ -256,6 +237,9 @@
 
   .ms-check {
     color: var(--primary);
+    /* The checkmark is a symbol glyph: it kept its size from the removed
+       descendant rule, so it carries its own now. */
+    font-size: 15px;
   }
 
   .ms-empty {
