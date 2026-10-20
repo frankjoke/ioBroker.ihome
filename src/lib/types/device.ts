@@ -157,6 +157,9 @@ export interface SlotControl {
   unit?: string;
   liveValue?: unknown;
   writable?: boolean;
+  /** The control's history config (A59): what a chart reads. A raw-state
+   *  pseudo-control (A21) carries none, so it cannot chart. */
+  history?: HistorySpec;
 }
 
 export interface EnrichedDevice extends Device {

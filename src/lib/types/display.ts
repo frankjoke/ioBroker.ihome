@@ -137,6 +137,17 @@ export interface SlotIcon {
   where?: "tile" | "both" | "modal";
 }
 
+/** A slot's chart (A59): presence gates drawing, `false` keeps it defined but
+ *  off, and its own home is independent of the slot's (A60). */
+export interface SlotSpark {
+  /** Absent = enabled while the descriptor exists. */
+  enabled?: boolean;
+  /** The chart's own homes; absent = both, independent of the slot's `where`. */
+  where?: "tile" | "both" | "modal";
+  /** One raw colour; the palette at the slot's index when absent. */
+  color?: string;
+}
+
 export interface Slot {
   kind: SlotKind;
   source?: string; // control feature → control id → state id
@@ -152,6 +163,8 @@ export interface Slot {
   where?: "tile" | "both" | "modal";
   /** The slot's own icon (A51); absent = no icon. */
   icon?: SlotIcon;
+  /** The slot's chart (A59); absent = no chart. */
+  spark?: SlotSpark;
 }
 
 export interface Template {

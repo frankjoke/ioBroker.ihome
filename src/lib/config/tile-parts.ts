@@ -29,6 +29,9 @@ export interface TileParts {
    *  the chain's until then — the very objects every row carries, so a
    *  headline pick (A52) is a reference, not a second resolution. */
   slots: Slot[];
+  /** Every resolved, visible row, in slot order — each exactly once, whatever
+   *  its home (A59: the tile's chart reads this, so a modal-only value charts). */
+  rows: SlotRow[];
   /** The tile's visible body, in slot order. */
   body: SlotRow[];
   /** The chart layer (A22): `options.background` slots, drawn over the body. */
@@ -136,6 +139,7 @@ export function tileParts(
 
   return {
     slots,
+    rows,
     body,
     background,
     modal,
@@ -167,4 +171,81 @@ export function rowIcon(
   return glyph
     ? { glyph, color: row.style.color, disabled: row.style.disabled }
     : undefined;
+}
+
+// ------------------------------------------------------------------ charts
+
+/** The series colours, in assignment order (A61): theme tokens, so the chart
+ *  follows the theme like everything else. */
+export const CHART_PALETTE = [
+  "var(--primary-color)",
+  "var(--success-color)",
+  "var(--warning-color)",
+  "var(--danger-color)",
+  "var(--secondary-color)",
+];
+
+/** One value's charted line (A59/A61): what to draw, and in which colour. */
+export interface ChartSeries {
+  slot: Slot;
+  control: SlotControl;
+  color: string;
+}
+
+/** Can this control chart at all (A63): history configured *and* a state. */
+export function hasHistory(control?: SlotControl): boolean {
+  return !!control?.stateId && !!control.history;
+}
+
+/** Is the slot's chart defined and not switched off? */
+function sparkOn(slot: Slot): boolean {
+  return !!slot.spark && slot.spark.enabled !== false;
+}
+
+/** Does the chart draw in `home`? Its own `where` alone decides (A60). */
+function sparkIn(slot: Slot, home: "tile" | "modal"): boolean {
+  const where = slot.spark?.where ?? "both";
+  return where === "both" || where === home;
+}
+
+/**
+ * A slot's colour (A61): its own, else the palette colour of its place among
+ * the tile's chart-enabled values — every row with an enabled spark whose
+ * control has history, whatever its home — so the colour holds between the
+ * tile and the detail row.
+ */
+function seriesColor(rows: SlotRow[], slot: Slot): string {
+  const own = slot.spark?.color;
+  if (own) return own;
+  const charting = rows.filter((r) => sparkOn(r.slot) && hasHistory(r.control));
+  const at = charting.findIndex((r) => r.slot === slot);
+  return CHART_PALETTE[Math.max(0, at) % CHART_PALETTE.length];
+}
+
+/** The tile's chart (A61): every value that charts on the tile and can, in slot
+ *  order — the row itself need not render there (A60). */
+export function tileSeries(rows: SlotRow[]): ChartSeries[] {
+  return rows
+    .filter((r) => sparkIn(r.slot, "tile") && sparkOn(r.slot) && r.control)
+    .filter((r) => hasHistory(r.control))
+    .map((r) => ({
+      slot: r.slot,
+      control: r.control as SlotControl,
+      color: seriesColor(rows, r.slot),
+    }));
+}
+
+/** The chart one row draws in `home` (A62), or none. */
+export function rowSpark(
+  rows: SlotRow[],
+  row: SlotRow,
+  home: "tile" | "modal",
+): ChartSeries | undefined {
+  if (!row.control || !hasHistory(row.control)) return undefined;
+  if (!sparkOn(row.slot) || !sparkIn(row.slot, home)) return undefined;
+  return {
+    slot: row.slot,
+    control: row.control,
+    color: seriesColor(rows, row.slot),
+  };
 }

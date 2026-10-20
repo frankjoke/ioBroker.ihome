@@ -1,5 +1,13 @@
 import { it, expect } from "vitest";
-import { headlineSlot, rowIcon, tileParts } from "$lib/config/tile-parts";
+import {
+  CHART_PALETTE,
+  hasHistory,
+  headlineSlot,
+  rowIcon,
+  rowSpark,
+  tileParts,
+  tileSeries,
+} from "$lib/config/tile-parts";
 import type {
   EnrichedControl,
   EnrichedDevice,
@@ -295,4 +303,116 @@ it("carries the style's colour and dim into the icon", () => {
     color: "var(--warning-color)",
     disabled: true,
   });
+});
+
+const withHistory = (id: string, feature: string) =>
+  ({
+    ...control(id, feature),
+    history: { duration: 24, durationUnit: "hours" },
+  }) as EnrichedControl;
+
+it("lists every resolved row exactly once, whatever its home", () => {
+  const parts = tileParts(
+    device(),
+    tile([
+      { kind: "value", source: "temperature" },
+      { kind: "value", source: "humidity", where: "both" },
+      { kind: "value", source: "temperature", where: "modal" },
+    ]),
+    none,
+  );
+  expect(parts.rows.length).toBe(3);
+  expect(parts.body.length).toBe(2);
+  expect(parts.modal.length).toBe(2);
+});
+
+it("charts only a value whose control has history, in slot order (A61)", () => {
+  const dev = device({
+    controls: [withHistory("c1", "temperature"), control("c2", "humidity")],
+  });
+  const parts = tileParts(
+    dev,
+    tile([
+      { kind: "value", source: "temperature", spark: {} },
+      { kind: "value", source: "humidity", spark: {} },
+    ]),
+    none,
+  );
+  expect(parts.rows.length).toBe(2);
+  expect(hasHistory(parts.rows[0].control)).toBe(true);
+  expect(hasHistory(parts.rows[1].control)).toBe(false);
+  expect(hasHistory(undefined)).toBe(false);
+
+  const series = tileSeries(parts.rows);
+  expect(series.map((s) => s.control.id)).toEqual(["c1"]);
+  expect(series[0].slot.source).toBe("temperature");
+  expect(series[0].color).toBe(CHART_PALETTE[0]);
+});
+
+it("honours the soft off, an own colour and the chart's own home (A59/A60)", () => {
+  const dev = device({ controls: [withHistory("c1", "temperature")] });
+  const modalRow = tileParts(
+    dev,
+    tile([{ kind: "value", source: "temperature", where: "modal", spark: {} }]),
+    none,
+  );
+  // A60: a modal-only row still charts the tile.
+  expect(tileSeries(modalRow.rows).map((s) => s.control.id)).toEqual(["c1"]);
+  expect(rowSpark(modalRow.rows, modalRow.rows[0], "modal")?.control.id).toBe(
+    "c1",
+  );
+
+  const off = tileParts(
+    dev,
+    tile([{ kind: "value", source: "temperature", spark: { enabled: false } }]),
+    none,
+  );
+  expect(tileSeries(off.rows)).toEqual([]);
+  expect(rowSpark(off.rows, off.rows[0], "modal")).toBeUndefined();
+
+  const own = tileParts(
+    dev,
+    tile([
+      { kind: "value", source: "temperature", spark: { color: "#123456" } },
+    ]),
+    none,
+  );
+  expect(tileSeries(own.rows)[0].color).toBe("#123456");
+
+  const tileOnly = tileParts(
+    dev,
+    tile([{ kind: "value", source: "temperature", spark: { where: "tile" } }]),
+    none,
+  );
+  expect(tileSeries(tileOnly.rows).length).toBe(1);
+  expect(rowSpark(tileOnly.rows, tileOnly.rows[0], "modal")).toBeUndefined();
+});
+
+it("gives a series the palette colour of its place among the charting values (A61)", () => {
+  const dev = device({
+    controls: [withHistory("c1", "temperature"), withHistory("c2", "humidity")],
+  });
+  const parts = tileParts(
+    dev,
+    tile([
+      { kind: "value", source: "temperature", spark: { where: "modal" } },
+      { kind: "value", source: "humidity", spark: {} },
+    ]),
+    none,
+  );
+  // The modal-only value keeps palette[0]; the tile series takes palette[1].
+  expect(rowSpark(parts.rows, parts.rows[0], "modal")?.color).toBe(
+    CHART_PALETTE[0],
+  );
+  expect(tileSeries(parts.rows)[0].color).toBe(CHART_PALETTE[1]);
+});
+
+it("never charts a row that resolved no control (A63)", () => {
+  const parts = tileParts(
+    device(),
+    tile([{ kind: "value", source: "nowhere", spark: {} }]),
+    none,
+  );
+  expect(parts.rows).toEqual([]);
+  expect(tileSeries(parts.rows)).toEqual([]);
 });

@@ -163,6 +163,43 @@ export function sparklinePoints(
     .join(" ");
 }
 
+/**
+ * SVG polyline `points` for a series placed on a **shared time window** (A61):
+ * x by timestamp so differently sampled series line up, y per series (its own
+ * min/max — two units cannot share a scale). A constant or one-point series is
+ * the flat centre line; a degenerate window falls back to index spacing.
+ */
+export function seriesPoints(
+  series: HistoryPoint[],
+  opts: {
+    from: number;
+    to: number;
+    width: number;
+    height: number;
+    pad?: number;
+  },
+): string {
+  const { width, height, pad = 0 } = opts;
+  if (!series.length) return "";
+  const flat = `${pad},${height / 2} ${width - pad},${height / 2}`;
+  const min = Math.min(...series.map((p) => p.val));
+  const max = Math.max(...series.map((p) => p.val));
+  if (series.length === 1 || max === min) return flat;
+  const span = max - min;
+  const time = opts.to > opts.from;
+  const n = series.length;
+  return series
+    .map((p, i) => {
+      const t = time
+        ? Math.min(1, Math.max(0, (p.ts - opts.from) / (opts.to - opts.from)))
+        : i / (n - 1);
+      const x = pad + t * (width - 2 * pad);
+      const y = height - pad - ((p.val - min) / span) * (height - 2 * pad);
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
 /** "last 24h" / "last 7d". */
 export function durationLabel(spec: HistorySpec): string {
   return `last ${spec.duration}${spec.durationUnit === "days" ? "d" : "h"}`;

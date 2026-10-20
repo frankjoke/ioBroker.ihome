@@ -21,6 +21,7 @@ import {
   moveSlot,
   nextSlotWhere,
   patchIcon,
+  patchSpark,
   patchRule,
   patchSlot,
   removeRule,
@@ -289,6 +290,26 @@ it("templateFromTile copies, never shares: mutating the tile leaves the template
   tile.slots![0].source = "mutated";
   expect(t.slots[0].source).toBe("power");
   expect(t.slots[0]).not.toBe(tile.slots![0]);
+});
+
+it("patches one spark field and never leaves {} behind", () => {
+  const t: TileConfig = { slots: [{ kind: "value", source: "power" }] };
+  expect(patchSpark(t, 0, { enabled: true }).slots?.[0].spark).toEqual({
+    enabled: true,
+  });
+  expect(
+    patchSpark(patchSpark(t, 0, { enabled: true }), 0, {
+      color: "#f00",
+    }).slots?.at(0)?.spark,
+  ).toEqual({ enabled: true, color: "#f00" });
+  expect(
+    patchSpark(patchSpark(t, 0, { enabled: true }), 0, {
+      enabled: undefined,
+    }).slots?.at(0)?.spark,
+  ).toBeUndefined();
+
+  // A bad index leaves the list — copied — untouched.
+  expect(patchSpark(t, 9, { color: "#f00" }).slots).toEqual(t.slots);
 });
 
 it("upsertTemplate appends once, then overwrites by name+type keeping the id", () => {

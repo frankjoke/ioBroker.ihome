@@ -10,6 +10,7 @@ import {
   trimSeries,
   appendLive,
   sparklinePoints,
+  seriesPoints,
   durationLabel,
   granularityLabel,
 } from "$lib/config/history-ops";
@@ -283,6 +284,67 @@ describe("sparklinePoints", () => {
         100,
         20,
         0,
+      ),
+    ).toBe("0,20 100,0");
+  });
+});
+
+describe("seriesPoints (A61)", () => {
+  const opts = { from: 0, to: 1000, width: 100, height: 20 };
+  it("places points by timestamp across a shared window", () => {
+    expect(
+      seriesPoints(
+        [
+          { ts: 0, val: 0 },
+          { ts: 1000, val: 10 },
+        ],
+        opts,
+      ),
+    ).toBe("0,20 100,0");
+  });
+  it("keeps a shorter series in the right-hand part of the window", () => {
+    expect(
+      seriesPoints(
+        [
+          { ts: 500, val: 0 },
+          { ts: 1000, val: 10 },
+        ],
+        opts,
+      ),
+    ).toBe("50,20 100,0");
+  });
+  it("clamps an out-of-window sample to the edge", () => {
+    expect(
+      seriesPoints(
+        [
+          { ts: -500, val: 0 },
+          { ts: 1000, val: 10 },
+        ],
+        opts,
+      ),
+    ).toBe("0,20 100,0");
+  });
+  it("draws the flat centre line for one point or a constant series", () => {
+    expect(seriesPoints([{ ts: 1, val: 5 }], opts)).toBe("0,10 100,10");
+    expect(
+      seriesPoints(
+        [
+          { ts: 0, val: 5 },
+          { ts: 1000, val: 5 },
+        ],
+        opts,
+      ),
+    ).toBe("0,10 100,10");
+  });
+  it("is empty for no points and falls back to index spacing on a degenerate window", () => {
+    expect(seriesPoints([], opts)).toBe("");
+    expect(
+      seriesPoints(
+        [
+          { ts: 5, val: 0 },
+          { ts: 5, val: 10 },
+        ],
+        { ...opts, from: 5, to: 5 },
       ),
     ).toBe("0,20 100,0");
   });

@@ -11,6 +11,7 @@ import type {
   Rule,
   Slot,
   SlotIcon,
+  SlotSpark,
   TileConfig,
   Template,
   TemplateRegistry,
@@ -199,6 +200,32 @@ export function patchIcon(
       const copy: Slot = { ...slot };
       if (Object.keys(next).length) copy.icon = next;
       else delete copy.icon;
+      return copy;
+    }),
+  );
+}
+
+// ------------------------------------------------------------------- charts
+
+/** Set or clear one spark field (A59): the `patchIcon` shape — `undefined`
+ *  removes the key, a descriptor left without keys disappears, and a bad index
+ *  leaves the list untouched. */
+export function patchSpark(
+  tile: TileConfig,
+  index: number,
+  patch: Partial<SlotSpark>,
+): TileConfig {
+  return withSlots(
+    tile,
+    (tile.slots ?? []).map((slot, i) => {
+      if (i !== index) return slot;
+      const next: SlotSpark = { ...(slot.spark ?? {}), ...patch };
+      for (const key of Object.keys(next) as (keyof SlotSpark)[]) {
+        if (next[key] === undefined) delete next[key];
+      }
+      const copy: Slot = { ...slot };
+      if (Object.keys(next).length) copy.spark = next;
+      else delete copy.spark;
       return copy;
     }),
   );
