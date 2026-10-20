@@ -2,6 +2,7 @@
 // ("lightbulb") or an image — an absolute URL/data URI, a root-relative path, or
 // a broker-relative path ("adapter/name.png", served by the ioBroker web server).
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
+import { ownerOf } from "$lib/config/icon-ops";
 
 /** Is this icon value an image (URL, root-relative path, broker-relative path
  *  like `adapter/name.png`) rather than a material-symbols name? */
@@ -13,14 +14,48 @@ export function isImageIcon(raw: string | undefined): boolean {
   return /\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)([?#].*)?$/i.test(value);
 }
 
-/** The `src` for an image icon (root-relative values get the leading slash). */
-export function iconUrl(raw: string | undefined): string {
+/** The footer's host setting, where the app keeps the broker it talks to. */
+const HOST_KEY = "__VISUAL__:hostPort";
+
+/** The ioBroker base an icon path hangs off (A66): the configured Host:Port,
+ *  else this origin — in production the app is served from `/adapter/ihome/…`,
+ *  where root-relative already means the broker. */
+export function iconBase(): string {
+  const g = globalThis as {
+    localStorage?: { getItem(key: string): string | null };
+    location?: { origin: string; protocol: string };
+  };
+  let hostPort = "";
+  try {
+    const raw = g.localStorage?.getItem(HOST_KEY);
+    if (raw) hostPort = String(JSON.parse(raw) ?? "").trim();
+  } catch {
+    hostPort = "";
+  }
+  if (!hostPort) return g.location?.origin ?? "";
+  return `${g.location?.protocol === "https:" ? "https:" : "http:"}//${hostPort}`;
+}
+
+/** The `src` for an image icon (A66): absolutes and data URIs pass through, a
+ *  broker path gets the ioBroker base, and a bare filename the file's adapter.
+ *  A symbol name is returned untouched — it is not a path. */
+export function iconSrc(
+  raw: string | undefined,
+  owner?: string,
+  base?: string,
+): string {
   const value = String(raw ?? "").trim();
   if (!value) return "";
-  if (/^(https?:)?\/\//i.test(value)) return value;
   if (/^data:/i.test(value)) return value;
-  if (value.startsWith("/")) return value;
-  return `/${value}`;
+  if (/^(https?:)?\/\//i.test(value)) return value;
+  if (!isImageIcon(value)) return value;
+  const root = base ?? iconBase();
+  // A leading slash is broker-root-relative for a broker value; a document
+  // value keeps meaning the app's own origin.
+  if (value.startsWith("/")) return owner ? root + value : value;
+  if (value.startsWith("adapter/")) return `${root}/${value}`;
+  const adapter = owner ? ownerOf(owner).adapter : "";
+  return `${root}/${adapter ? `adapter/${adapter}/` : ""}${value}`;
 }
 
 /** Every `icon` string anywhere in the two documents, deduped and sorted — the

@@ -1,6 +1,11 @@
 import { it, expect } from "vitest";
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
-import { collectDocumentIcons, iconUrl, isImageIcon } from "./icon-url";
+import {
+  collectDocumentIcons,
+  iconBase,
+  iconSrc,
+  isImageIcon,
+} from "./icon-url";
 
 it("classifies symbols vs images", () => {
   expect(isImageIcon("lightbulb")).toBe(false);
@@ -16,10 +21,72 @@ it("classifies symbols vs images", () => {
   expect(isImageIcon("two words")).toBe(false); // not a path, not a symbol - rendered as text
 });
 
-it("iconUrl leaves absolutes alone and roots the rest", () => {
-  expect(iconUrl("https://x/y.png")).toBe("https://x/y.png");
-  expect(iconUrl("/icons/a.png")).toBe("/icons/a.png");
-  expect(iconUrl("adapter/thing.png")).toBe("/adapter/thing.png");
+it("iconSrc resolves against the ioBroker base (A66)", () => {
+  const b = "http://192.168.178.9:8081";
+  // A symbol name is never a path.
+  expect(iconSrc("lightbulb", "alias.0.x", b)).toBe("lightbulb");
+  // Absolutes and data URIs pass through.
+  expect(iconSrc("https://x/y.png", undefined, b)).toBe("https://x/y.png");
+  expect(iconSrc("//x/y.png", undefined, b)).toBe("//x/y.png");
+  expect(iconSrc("data:image/svg+xml;base64,AA", "x.0.y", b)).toBe(
+    "data:image/svg+xml;base64,AA",
+  );
+  // A broker filename belongs to the adapter that owns the object.
+  expect(iconSrc("energiefluss.png", "system.adapter.energiefluss.0", b)).toBe(
+    b + "/adapter/energiefluss/energiefluss.png",
+  );
+  expect(iconSrc("icons/echo_dot.png", "alexa2.0.Dev.1", b)).toBe(
+    b + "/adapter/alexa2/icons/echo_dot.png",
+  );
+  // An already root-relative broker path is not doubled.
+  expect(iconSrc("adapter/admin/admin.svg", "system.adapter.admin", b)).toBe(
+    b + "/adapter/admin/admin.svg",
+  );
+  // No owner: the broker root.
+  expect(iconSrc("energiefluss.png", undefined, b)).toBe(
+    b + "/energiefluss.png",
+  );
+  // A leading slash is broker-root-relative for a broker value, app-relative
+  // for a document value.
+  expect(iconSrc("/icons/a.png", undefined, b)).toBe("/icons/a.png");
+  expect(iconSrc("/icons/a.png", "a.0.b", b)).toBe(b + "/icons/a.png");
+  // Nothing, and no base (a bare test environment) are both safe.
+  expect(iconSrc("")).toBe("");
+  expect(iconSrc(undefined)).toBe("");
+  expect(iconSrc("x.png", "a.0.b", "")).toBe("/adapter/a/x.png");
+});
+
+it("iconBase reads the footer host, else this origin (A66)", () => {
+  const g = globalThis as any;
+  const hadLs = "localStorage" in g;
+  const hadLoc = "location" in g;
+  const savedLs = g.localStorage;
+  const savedLoc = g.location;
+  try {
+    delete g.localStorage;
+    delete g.location;
+    // No DOM at all: still a string, never undefined.
+    expect(iconBase()).toBe("");
+    g.location = { origin: "http://localhost:5173", protocol: "http:" };
+    expect(iconBase()).toBe("http://localhost:5173");
+    g.localStorage = {
+      getItem: (key: string) =>
+        key === "__VISUAL__:hostPort"
+          ? JSON.stringify("192.168.178.9:8081")
+          : null,
+    };
+    expect(iconBase()).toBe("http://192.168.178.9:8081");
+    g.location = { origin: "https://broker", protocol: "https:" };
+    expect(iconBase()).toBe("https://192.168.178.9:8081");
+    // A corrupt setting falls back to the origin instead of throwing.
+    g.localStorage = { getItem: () => "{not json" };
+    expect(iconBase()).toBe("https://broker");
+  } finally {
+    if (hadLs) g.localStorage = savedLs;
+    else delete g.localStorage;
+    if (hadLoc) g.location = savedLoc;
+    else delete g.location;
+  }
 });
 
 it("collectDocumentIcons gathers every icon field, deduped", () => {

@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { iconUrl, isImageIcon } from "$lib/utils/icon-url";
+  import { iconSrc, isImageIcon } from "$lib/utils/icon-url";
 
   let {
     value,
     size = 24,
     dim = false,
+    owner,
   }: {
     /** A material-symbols name or an image path/URL (A23). */
     value?: string;
@@ -12,6 +13,9 @@
     size?: number;
     /** The "disabled" look a rule can ask for: dimmed, still usable. */
     dim?: boolean;
+    /** The broker object a value came from, when it did — its adapter owns a
+     *  relative filename (A66). */
+    owner?: string;
   } = $props();
 </script>
 
@@ -19,7 +23,7 @@
   <img
     class="icon-img"
     class:dim
-    src={iconUrl(value)}
+    src={iconSrc(value, owner)}
     alt=""
     style:width="{size}px"
     style:height="{size}px"
