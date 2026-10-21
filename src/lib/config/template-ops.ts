@@ -82,6 +82,30 @@ export function presetForType(type: string | undefined): Template {
 }
 
 /**
+ * A template's badge reaches the tile only when the device can feed it (spec §6):
+ * `ago` reads the device clock, so it always can; every other badge names a
+ * control — by `pick`, feature or id — and one whose control the device does not
+ * have is dropped instead of sitting in the pane and never drawing. `offline`
+ * names no control (it reads the controls' availability), so it is dropped too;
+ * the pane's `offline` button adds it to a tile by hand.
+ */
+function badgeFits(slot: Slot, device: Device): boolean {
+  if (slot.kind !== "badge" || slot.source === "ago") return true;
+  const controls = (device.controls ?? []).filter((c) => !c.hidden);
+  const pick =
+    typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
+  if (pick) return !!pickControl(controls, pick, new Set());
+  return controls.some(
+    (c) => c.feature === slot.source || c.id === slot.source,
+  );
+}
+
+/** A template layer as the device can actually use it. */
+function feedable(layer: Slot[] | undefined, device: Device): Slot[] {
+  return (layer ?? []).filter((slot) => badgeFits(slot, device));
+}
+
+/**
  * What a device renders as: the type preset, the device's user template on top,
  * then the device's own slot overrides.
  */
@@ -98,7 +122,12 @@ export function resolveTemplate(
     type: device.type,
     size: device.size ?? user?.size ?? base.size ?? DEFAULT_SPAN,
     features: user?.features?.length ? user.features : base.features,
-    slots: mergeSlots([base.slots, user?.slots ?? [], device.slots ?? []]),
+    // The device's own slots are deliberate: they are never pruned.
+    slots: mergeSlots([
+      feedable(base.slots, device),
+      feedable(user?.slots, device),
+      device.slots ?? [],
+    ]),
   };
 }
 

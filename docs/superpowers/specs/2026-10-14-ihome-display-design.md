@@ -293,6 +293,11 @@ backgrounds.
   (`battery`, `error`) plus two the renderer derives without any control: `ago` (newest
   `ts` across state-backed controls) and `offline` (`available`/`exists` false). Unavailable
   devices still render, carrying the `offline` badge, so a dead sensor stays visible.
+  A template's badge is only carried onto a device that can feed it (2026-10-21): `ago`
+  always applies; `offline` and every control-source badge need a matching control
+  (`pick`, feature or id) and are dropped from the preset/template layer otherwise — the
+  device's own slots are never pruned, and a materialised tile keeps whatever it was
+  given. The pane's `offline`/`ago` buttons add either back by hand.
 - An `ago` badge **names the control it watches** — `{ source: "ago", options: { of: "motion",
   from: "lc" } }` — because "newest timestamp on the device" is the wrong question for a motion
   detector (a battery report would keep a dead sensor looking fresh). `of` is a feature, control

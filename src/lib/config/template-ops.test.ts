@@ -65,7 +65,10 @@ it("falls back to the type preset when the template id is unknown", () => {
     [],
   );
   expect(r.type).toBe("Light");
-  expect(r.slots).toEqual(PRESETS.Light.slots);
+  // …minus the badges a control-less device cannot feed (spec §6): only `ago`.
+  expect(r.slots).toEqual(
+    PRESETS.Light.slots.filter((s) => s.kind !== "badge" || s.source === "ago"),
+  );
 });
 
 it("falls back to the type preset when basedOn names a missing preset", () => {
@@ -111,6 +114,54 @@ it("layers preset, user template and device overrides", () => {
     true,
   );
   expect(r.slots.some((s) => s.kind === "value" && s.label === "W")).toBe(true);
+});
+
+it("keeps a template badge only when the device can feed it (spec §6)", () => {
+  const motion = resolveTemplate(
+    {
+      id: "d",
+      name: "Bad.Motion",
+      type: "Motion",
+      controls: [{ id: "m", feature: "motion", writable: false }],
+    },
+    [],
+  );
+  expect(
+    motion.slots.filter((s) => s.kind === "badge").map((s) => s.source),
+  ).toEqual(["ago"]);
+
+  // Feature and `pick` both count; a device with neither keeps only `ago`.
+  const switchBadges = resolveTemplate(
+    {
+      id: "s",
+      name: "S",
+      type: "Switch",
+      controls: [
+        { id: "p", feature: "value", writable: false, label: "Leistung" },
+      ],
+    },
+    [],
+  ).slots.filter((s) => s.kind === "badge");
+  expect(switchBadges.map((s) => s.options?.pick ?? s.source)).toEqual([
+    "power",
+    "ago",
+  ]);
+});
+
+it("never prunes the device's own badge slots", () => {
+  const r = resolveTemplate(
+    {
+      id: "d",
+      name: "V",
+      type: "Value",
+      controls: [{ id: "v", feature: "value", writable: false }],
+      slots: [{ kind: "badge", source: "offline" }],
+    },
+    [],
+  );
+  expect(
+    r.slots.filter((s) => s.kind === "badge").map((s) => s.source),
+  ).toEqual(["ago", "offline"]);
 });
 
 it("picks a writable switch as the tile's primary control", () => {
@@ -218,7 +269,12 @@ it("resolves an explicit built-in preset id", () => {
     },
     [],
   );
-  expect(r.slots).toEqual(PRESETS.Thermostat.slots);
+  // Control-less: the badges drop (spec §6), the slots and size still resolve.
+  expect(r.slots).toEqual(
+    PRESETS.Thermostat.slots.filter(
+      (s) => s.kind !== "badge" || s.source === "ago",
+    ),
+  );
   expect(r.size).toEqual(PRESETS.Thermostat.size);
 });
 
