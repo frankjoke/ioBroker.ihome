@@ -7,17 +7,41 @@
 import { base, build, files, prerendered, version } from "$service-worker";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 
-const precache_list = [base + "/", ...build, ...files, ...prerendered].map(
-  (s) => ({
-    url: s,
-    revision: version,
-  }),
-);
+// Everything hashed may be precached; the shell (index.html) may not: a
+// precached shell kept serving the previous build after an adapter update,
+// until every tab of this origin had been closed — so every deploy needed a
+// browser dance before it was visible.
+const shell = base + "/";
+const precache_list = [shell, ...build, ...files, ...prerendered]
+  .filter((url) => url !== shell)
+  .map((s) => ({ url: s, revision: version }));
 
 precacheAndRoute(precache_list);
 cleanupOutdatedCaches();
 
-console.log("ServiceWorker", self);
+// A new worker takes over at once, so the next reload already serves the build
+// that was just deployed.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) =>
+  event.waitUntil(self.clients.claim()),
+);
+
+// Navigations come from the network — the cache is only the offline fallback.
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode !== "navigate") return;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        void caches
+          .open("ihome-shell")
+          .then((cache) => cache.put(shell, copy))
+          .catch(() => {});
+        return response;
+      })
+      .catch(async () => (await caches.match(shell)) || Response.error()),
+  );
+});
 
 async function getClientfromEvent(event) {
   const source = event?.source;

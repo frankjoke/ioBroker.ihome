@@ -147,7 +147,7 @@ export default [
     // Service worker global scopes
     files: ["src/service-worker.js"],
     languageOptions: {
-      globals: { self: "readonly", clients: "readonly" },
+      globals: { self: "readonly", clients: "readonly", caches: "readonly" },
     },
   },
 ];
