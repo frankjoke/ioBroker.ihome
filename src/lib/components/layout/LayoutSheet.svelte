@@ -854,8 +854,14 @@
   .line {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 2px;
     min-width: 0;
+  }
+
+  /* Keep the label off the select while the icons sit 2px apart, like the
+     slot rows' action buttons. */
+  .line > .label-mono {
+    margin-right: 2.8px;
   }
 
   .line select {
