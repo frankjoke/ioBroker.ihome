@@ -12,7 +12,7 @@ import { iconSrc } from "$lib/utils/icon-url";
 import { readable } from "svelte/store";
 import { SvelteSet } from "svelte/reactivity";
 
-export const DEVICE_LIST_ID = "0_userdata.0.Test.AiHome.deviceList";
+export const DEVICE_LIST_ID = "ihome.0.deviceList";
 
 const defaultRegistry: DeviceRegistry = {
   version: 0,

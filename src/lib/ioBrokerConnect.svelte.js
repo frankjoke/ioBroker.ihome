@@ -14,14 +14,11 @@ let socket = null;
 let connectTimeoutId = null;
 
 /**
- * Who we claim to be. Stamped as `from` on every write and used for the socket
- * handshake, so a state change can be traced back to this app. (The old default
- * was `admin.0`, a leftover from the admin client this grew out of — writes
- * looked like they came from the admin adapter.) Once this ships as the `ihome`
- * adapter, this should be `system.adapter.ihome.0` — the `system.adapter.<name>
- * .<instance>` form every adapter stamps on its writes.
+ * The adapter instance whose data this UI edits. Also the socket handshake
+ * name; writes are stamped `system.adapter.<namespace>` so they trace back to
+ * the ihome adapter.
  */
-export const DEFAULT_NAMESPACE = "iHome";
+export const DEFAULT_NAMESPACE = "ihome.0";
 
 export const ioBroker = $state({
   serviceWorker: navigator.serviceWorker,
@@ -233,7 +230,12 @@ async function connectIOBroker(options = {}) {
     {},
     {
       namespace: DEFAULT_NAMESPACE,
-      url: "ws://192.168.178.9:8081/socket.io",
+      // Same host as the page (the web adapter serves /ihome/), socket.io on 8081.
+      // Overrides: VITE_SOCKET_URL (dev) and ?socket=… for reverse-proxy setups.
+      url:
+        import.meta.env.VITE_SOCKET_URL ||
+        new URLSearchParams(location.search).get("socket") ||
+        `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8081/socket.io`,
       // adapterConfig,
       rectreateSocket: false,
     },
@@ -512,7 +514,11 @@ export async function getObject(id, update = false) {
 export async function setState(id, val) {
   if (typeof id !== "string") throw new Error(`State ID is required! ${id}`);
   if (typeof val !== "object" || ("val" in val && "from" in val)) {
-    val = { val, ts: Date.now(), from: ioBroker.namespace };
+    val = {
+      val,
+      ts: Date.now(),
+      from: `system.adapter.${ioBroker.namespace}`,
+    };
   }
   return emitAsync("setState", id, val);
 }

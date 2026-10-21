@@ -7,7 +7,7 @@ import { parseTemplateRegistry } from "$lib/config/template-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import type { TemplateRegistry } from "$lib/types/display";
 
-export const TEMPLATE_LIST_ID = "0_userdata.0.Test.AiHome.templateList";
+export const TEMPLATE_LIST_ID = "ihome.0.templateList";
 
 const emptyRegistry: TemplateRegistry = {
   version: 0,

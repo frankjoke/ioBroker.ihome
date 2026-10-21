@@ -30,7 +30,7 @@ export async function waitForEnumCache(ms = 8000): Promise<void> {
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import type { PageRegistry } from "$lib/types/display";
 
-export const PAGE_LIST_ID = "0_userdata.0.Test.AiHome.pageList";
+export const PAGE_LIST_ID = "ihome.0.pageList";
 
 const emptyRegistry: PageRegistry = { version: 0, updatedAt: 0, pages: [] };
 

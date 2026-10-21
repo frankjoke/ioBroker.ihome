@@ -69,29 +69,33 @@
         "readme": "https://github.com/frankjoke/ioBroker.ihome/blob/main/README.md",
         "loglevel": "info",
         "tier": 3,
-        "mode": "daemon",
+        "mode": "once",
         "type": "general",
         "compact": true,
+        "singleton": true,
         "adminUI": {
-            "config": "json",
-            "tab": "materialize"
+            "config": "none"
         },
-        "adminTab": {
-            "singleton": true,
-            "name": {
-                "en": "iHome",
-                "de": "iHome",
-                "ru": "iHome",
-                "pt": "iHome",
-                "nl": "iHome",
-                "fr": "iHome",
-                "it": "iHome",
-                "es": "iHome",
-                "pl": "iHome",
-                "uk": "iHome",
-                "zh-cn": "iHome"
-            },
-            "link": ""
+        "localLinks": {
+            "ihome": {
+                "link": "%web_protocol%://%ip%:%web_port%/ihome/index.html",
+                "name": {
+                    "en": "iHome dashboard",
+                    "de": "iHome Dashboard",
+                    "ru": "iHome",
+                    "pt": "Painel iHome",
+                    "nl": "iHome dashboard",
+                    "fr": "Tableau de bord iHome",
+                    "it": "Dashboard iHome",
+                    "es": "Panel iHome",
+                    "pl": "Panel iHome",
+                    "uk": "Панель iHome",
+                    "zh-cn": "iHome 面板"
+                },
+                "icon": "ihome/icon-192.png",
+                "color": "#1e88e5",
+                "order": 0
+            }
         },
         "supportCustoms": true,
         "dependencies": [
@@ -105,12 +109,7 @@
             }
         ]
     },
-    "native": {
-        "width": 800,
-        "height": 600,
-        "backgroundColor": "#ffffff",
-        "refreshInterval": 5
-    },
+    "native": {},
     "objects": [],
     "instanceObjects": []
 }
