@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.7",
+        "version": "0.0.8",
         "news": {
+            "0.0.8": {
+                "en": "Edit-mode bar colour works on older browsers too (plain theme colour instead of color-mix)",
+                "de": "Farbe der Bearbeitungsleiste funktioniert auch in älteren Browsern (einfache Themenfarbe statt color-mix)"
+            },
             "0.0.7": {
                 "en": "The edit pencil no longer reloads the dashboard; new worker versions are picked up immediately",
                 "de": "Der Bearbeitungsstift lädt das Dashboard nicht mehr neu; neue Worker-Versionen werden sofort übernommen"

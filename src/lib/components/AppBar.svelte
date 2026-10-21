@@ -178,11 +178,7 @@
   /* Editing the layout is a different mode than viewing it — the bar tints
      red in both themes, so "am I editing?" is answerable at a glance. */
   .bar.editing {
-    background-color: color-mix(
-      in srgb,
-      var(--danger-color) 12%,
-      var(--surface-container-low)
-    );
+    background-color: var(--edit-mode-bar);
   }
 
   .tabs {
