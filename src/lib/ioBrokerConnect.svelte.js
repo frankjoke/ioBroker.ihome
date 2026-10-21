@@ -1,6 +1,7 @@
 // @ts-nocheck
 // import socketio from 'socket.io-client/dist/socket.io.js'
 import { createSocketClient } from "./iobroker.socket.io.js";
+import { defaultSocketUrl } from "./socket-url";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
 import { getVisibility, typeOfP } from "./tools.svelte";
 import { setContext, getContext } from "svelte";
@@ -230,12 +231,7 @@ async function connectIOBroker(options = {}) {
     {},
     {
       namespace: DEFAULT_NAMESPACE,
-      // Same host as the page (the web adapter serves /ihome/), socket.io on 8081.
-      // Overrides: VITE_SOCKET_URL (dev) and ?socket=… for reverse-proxy setups.
-      url:
-        import.meta.env.VITE_SOCKET_URL ||
-        new URLSearchParams(location.search).get("socket") ||
-        `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8081/socket.io`,
+      url: defaultSocketUrl(),
       // adapterConfig,
       rectreateSocket: false,
     },

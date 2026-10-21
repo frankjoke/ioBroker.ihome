@@ -137,8 +137,8 @@ export default [
     },
   },
   {
-    // Browser storage helpers (busy with node globals from the generic block)
-    files: ["src/lib/localStorage.js"],
+    // Browser-only helpers (busy with node globals from the generic block)
+    files: ["src/lib/localStorage.js", "src/lib/socket-url.ts"],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },

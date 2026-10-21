@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.1",
+        "version": "0.0.2",
         "news": {
+            "0.0.2": {
+                "en": "Fix the dashboard's default socket connection and the adapter icon",
+                "de": "Standard-Socket-Verbindung des Dashboards und das Adapter-Icon korrigiert"
+            },
             "0.0.1": {
                 "en": "Initial release of the iHome adapter",
                 "de": "Erste Veröffentlichung des iHome-Adapters",
@@ -92,7 +96,7 @@
                     "uk": "Панель iHome",
                     "zh-cn": "iHome 面板"
                 },
-                "icon": "ihome/icon-192.png",
+                "icon": "adapter/ihome/ihome.png",
                 "color": "#1e88e5",
                 "order": 0
             }

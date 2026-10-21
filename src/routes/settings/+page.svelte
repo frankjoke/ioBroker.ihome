@@ -76,7 +76,8 @@
           disabled={isConnected}
         />
         <span class="hint text-muted"
-          >Leave empty to use the host serving this page.</span
+          >Leave empty to use the host serving this page (socket.io on port
+          8081).</span
         >
       </div>
       <div class="field">
@@ -88,8 +89,8 @@
           disabled={isConnected}
         />
         <span class="hint text-muted"
-          >Identity stamped as "from" on every write, e.g. iHome. Once this
-          ships as a real adapter, use its io-package name + instance.</span
+          >Identity stamped as "from" on every write, e.g. ihome.0 — the
+          adapter's io-package name plus instance.</span
         >
       </div>
 

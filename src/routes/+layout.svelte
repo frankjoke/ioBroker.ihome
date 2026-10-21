@@ -7,6 +7,7 @@
     DEFAULT_NAMESPACE,
     ioBrokerStart,
   } from "$lib/ioBrokerConnect.svelte.js";
+  import { defaultSocketUrl } from "$lib/socket-url";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -37,18 +38,18 @@
     { prefix: "__VISUAL__:" },
   );
 
-  // `admin.0` was the old default and every browser that ever loaded the app has
-  // it persisted (the storage writes its init value on first read); an empty
-  // field means the same thing. Both count as "unset". Read once, at connect.
+  // Earlier builds persisted their own default (`iHome`, before that `admin.0`);
+  // those values are not a real namespace, so they count as "unset" — otherwise
+  // writes keep the old identity instead of the adapter's. Read once, at connect.
+  const LEGACY_NAMESPACES = ["admin.0", "iHome"];
   const namespace =
-    !storage.namespace || storage.namespace === "admin.0"
+    !storage.namespace || LEGACY_NAMESPACES.includes(storage.namespace)
       ? DEFAULT_NAMESPACE
       : storage.namespace;
 
   function buildUrl(hostPort) {
     if (hostPort) return `ws://${hostPort}/socket.io`;
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
-    return `${protocol}://${location.host}/socket.io`;
+    return defaultSocketUrl();
   }
 
   const ioBroker = ioBrokerStart({
