@@ -24,7 +24,7 @@
     { id: "symbols", label: "Symbols" },
     { id: "document", label: "Document" },
     { id: "broker", label: "Broker" },
-    { id: "url", label: "URL" },
+    { id: "url", label: "URL/SVG" },
   ] as const;
 
   let tab = $state<(typeof TABS)[number]["id"]>("symbols");
@@ -165,7 +165,7 @@
         <div class="url-row">
           <input
             type="text"
-            placeholder="https://… or adapter/name.png"
+            placeholder="https://…, adapter/name.png or data:image/svg+xml,…"
             bind:value={url}
           />
           <span class="preview" aria-hidden="true">
