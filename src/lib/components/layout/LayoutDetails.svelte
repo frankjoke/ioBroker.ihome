@@ -880,13 +880,6 @@
           {activeCond?.source || "not set"}
         </button>
         {#if activeCond}
-          <button type="button" class="btn btn-sm" onclick={clearActive}
-            >Clear</button
-          >
-        {/if}
-      </div>
-      {#if activeCond}
-        <div class="row">
           <select
             aria-label="Active operator"
             value={activeCond.op}
@@ -907,8 +900,17 @@
           <span class="live text-muted"
             >{activeFound ? readingText : "source not found"}</span
           >
-        </div>
-      {/if}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Clear the active condition"
+            aria-label="Clear the active condition"
+            onclick={clearActive}
+          >
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        {/if}
+      </div>
     </div>
 
     <div class="field">
