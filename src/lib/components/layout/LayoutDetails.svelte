@@ -33,6 +33,7 @@
   import {
     addRule,
     applyTemplate,
+    clearRuleIcons,
     editTile,
     evalActive,
     moveRule,
@@ -1380,6 +1381,12 @@
                     <p class="note text-muted">
                       No glyph yet — choose one, or let a rule supply it.
                     </p>
+                  {:else if (slot.rules ?? []).some((r) => r.icon)}
+                    <p class="note text-muted">
+                      A rule's glyph wins while it matches, so the tile may show
+                      that one instead of this. Picking a glyph here drops the
+                      rules' glyphs (their colours and states stay) — see Rules.
+                    </p>
                   {/if}
                 {/if}
                 {#if slot.kind === "value"}
@@ -1823,7 +1830,13 @@
         const target = iconPickerFor;
         iconPickerFor = null;
         if (target === null) return;
-        edit((t) => patchIcon(t, target, { glyph: value.trim() || undefined }));
+        const glyph = value.trim();
+        edit((t) => {
+          const next = patchIcon(t, target, { glyph: glyph || undefined });
+          // A chosen glyph is the face the user wants; a rule's glyph would hide
+          // it, so the rules lose theirs (colours and `disabled` stay).
+          return glyph ? clearRuleIcons(next, target) : next;
+        });
       }}
       onClose={() => (iconPickerFor = null)}
     />

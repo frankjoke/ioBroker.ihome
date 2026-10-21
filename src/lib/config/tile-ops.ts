@@ -282,6 +282,24 @@ export function removeRule(
   );
 }
 
+/**
+ * A glyph picked in the pane is the slot's face (A51): the slot's own rules stop
+ * swapping it, or the choice would never show. Their colour, tone, `disabled` and
+ * `hidden` stay — only the glyph is dropped (A70).
+ */
+export function clearRuleIcons(
+  tile: TileConfig,
+  slotIndex: number,
+): TileConfig {
+  const rules = (tile.slots ?? [])[slotIndex]?.rules ?? [];
+  if (!rules.some((rule) => rule.icon !== undefined)) return tile;
+  return withRules(tile, slotIndex, (list) =>
+    list.map((rule) =>
+      rule.icon === undefined ? rule : { ...rule, icon: undefined },
+    ),
+  );
+}
+
 export function moveRule(
   tile: TileConfig,
   slotIndex: number,

@@ -13,6 +13,7 @@ import {
   addRule,
   addSlot,
   applyTemplate,
+  clearRuleIcons,
   editTile,
   ensureTile,
   evalActive,
@@ -357,6 +358,34 @@ it("applyTemplate replaces size, slots and background but keeps the active condi
   expect(next.tile?.active?.source).toBe("power");
   const bare = applyTemplate(placement, userTemplate({ id: "t9", slots: [] }));
   expect(bare.tile?.background).toBeUndefined(); // the template has none: the old one drops
+});
+
+it("drops a slot's rule glyphs when a glyph is chosen (A70)", () => {
+  const tile: TileConfig = {
+    slots: [
+      {
+        kind: "value",
+        source: "motion",
+        icon: { glyph: "sensors" },
+        rules: [
+          { when: "truthy(motion)", icon: "directions_run", color: "red" },
+          { when: "!truthy(motion)", icon: "directions_walk", disabled: true },
+        ],
+      },
+      { kind: "value", source: "humidity" },
+    ],
+  };
+  const cleared = clearRuleIcons(tile, 0);
+  // The glyph is gone, the colour and the state stay.
+  expect(cleared.slots?.at(0)?.rules).toEqual([
+    { when: "truthy(motion)", icon: undefined, color: "red" },
+    { when: "!truthy(motion)", icon: undefined, disabled: true },
+  ]);
+  expect(cleared.slots?.at(0)?.icon).toEqual({ glyph: "sensors" });
+  expect(tile.slots?.at(0)?.rules?.[0].icon).toBe("directions_run"); // input untouched
+  // Nothing to drop → the very same tile.
+  expect(clearRuleIcons(cleared, 0)).toBe(cleared);
+  expect(clearRuleIcons(tile, 9)).toBe(tile);
 });
 
 it("patches one icon field and never leaves {} behind", () => {
