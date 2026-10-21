@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.8",
+        "version": "0.0.9",
         "news": {
+            "0.0.9": {
+                "en": "Edit-mode bar: more red in the light theme, clearly red in the dark one",
+                "de": "Bearbeitungsleiste: roter im hellen Theme, deutlich rot im dunklen"
+            },
             "0.0.8": {
                 "en": "Edit-mode bar colour works on older browsers too (plain theme colour instead of color-mix)",
                 "de": "Farbe der Bearbeitungsleiste funktioniert auch in älteren Browsern (einfache Themenfarbe statt color-mix)"
