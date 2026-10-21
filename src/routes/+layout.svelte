@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { page } from "$app/state";
+  import { building, dev } from "$app/environment";
   import {
     DEFAULT_NAMESPACE,
     ioBrokerStart,
@@ -125,6 +126,16 @@
     initFormulas();
     initTemplates();
     loadViewState();
+    // Registered here rather than by SvelteKit: its own call uses
+    // `updateViaCache: 'imports'`, and the ioBroker web adapter serves
+    // service-worker.js with `Cache-Control: max-age=6000` — so the update
+    // check could sit on a cached copy for 100 minutes and a deployed build
+    // looked like it never arrived. `none` re-fetches the worker every time.
+    if (!dev && !building && "serviceWorker" in navigator) {
+      void navigator.serviceWorker.register(`${base}/service-worker.js`, {
+        updateViaCache: "none",
+      });
+    }
     // Seed the display pages from the broker's own enums, once (spec §9).
     initPages(seedDisplayPages);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

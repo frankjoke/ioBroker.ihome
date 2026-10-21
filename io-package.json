@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.6",
+        "version": "0.0.7",
         "news": {
+            "0.0.7": {
+                "en": "The edit pencil no longer reloads the dashboard; new worker versions are picked up immediately",
+                "de": "Der Bearbeitungsstift lädt das Dashboard nicht mehr neu; neue Worker-Versionen werden sofort übernommen"
+            },
             "0.0.6": {
                 "en": "Deployed updates show up on the next reload (the service worker no longer serves a cached shell)",
                 "de": "Ausgelieferte Updates erscheinen beim nächsten Neuladen (der Service-Worker liefert keine gecachte Shell mehr)"

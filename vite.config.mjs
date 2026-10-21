@@ -22,6 +22,10 @@ export default defineConfig({
       router: {
         type: "hash",
       },
+      serviceWorker: {
+        // registered in +layout.svelte, with updateViaCache: "none"
+        register: false,
+      },
       version: {
         pollInterval: 0,
       },

@@ -66,8 +66,13 @@
    * and nothing is handed off: the cursor is already where the display is. (It
    * must not set a handoff either — that would clobber one already in flight,
    * say the tile the devices page is sending us back to.)
+   *
+   * The plain click is swallowed: from the installed URL (/ihome/index.html)
+   * the anchor's href (/ihome/) is a different document, and that full reload
+   * dropped the sheet that had just been opened.
    */
-  function onPencilClick() {
+  function onPencilClick(event: MouseEvent) {
+    event.preventDefault();
     if (sheet.open) {
       closeSheet();
       return;
