@@ -894,34 +894,32 @@
     }
   }
 
-  /* The row's controls. `.icon-btn` is per-component in this codebase, and the
-     tree (whose rows this sheet replaces) is where these styles lived. */
+  /* The row's controls, matching the slot rows' bare icons (A71's editor). */
   .icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
     border: none;
     background: transparent;
-    border-radius: var(--border-radius-pill);
     color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 2px;
   }
 
-  .icon-btn:hover {
-    background-color: var(--surface-container);
+  .icon-btn:hover:not(:disabled) {
     color: var(--text-color);
   }
 
-  .icon-btn.danger:hover {
+  .icon-btn:disabled {
+    color: var(--border-color);
+    cursor: default;
+  }
+
+  .icon-btn.danger:hover:not(:disabled) {
     color: var(--error-color, var(--danger-color, #b3261e));
   }
 
   .icon-btn.on {
     color: var(--primary-color);
-  }
-
-  .icon-btn .material-symbols-outlined {
-    font-size: 20px;
   }
 </style>
