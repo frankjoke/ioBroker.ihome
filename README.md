@@ -25,14 +25,14 @@ The dashboard stores its documents in the adapter's own namespace, as JSON state
 
 | State | Content |
 |-------|---------|
-| `ihome.0.pageList` | pages and tile layout |
-| `ihome.0.deviceList` | known devices |
-| `ihome.0.templateList` | tile templates |
-| `ihome.0.formulaList` | formula definitions |
+| `ihome.0.config.pageList` | pages and tile layout |
+| `ihome.0.config.deviceList` | known devices |
+| `ihome.0.config.templateList` | tile templates |
+| `ihome.0.config.formulaList` | formula definitions |
 
-On first start the adapter copies existing values from the old test namespace
-`0_userdata.0.Test.AiHome.*` into these states (once, and only when the new state is empty).
-The old states are left untouched.
+On first start the adapter fills an empty `ihome.0.config.*` from the old test namespace
+`0_userdata.0.Test.AiHome.*` (and from the early `ihome.0.*` root states, which are removed
+afterwards). The old test states are left untouched.
 
 The UI connects to socket.io on port `8081` of the host that served the page. For reverse-proxy or
 non-standard setups, open the dashboard as `…/ihome/index.html?socket=wss://host/path/socket.io`.

@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.2",
+        "version": "0.0.3",
         "news": {
+            "0.0.3": {
+                "en": "Dashboard documents moved to the config folder (ihome.0.config.*)",
+                "de": "Dashboard-Dokumente in den config-Ordner verschoben (ihome.0.config.*)"
+            },
             "0.0.2": {
                 "en": "Fix the dashboard's default socket connection and the adapter icon",
                 "de": "Standard-Socket-Verbindung des Dashboards und das Adapter-Icon korrigiert"
