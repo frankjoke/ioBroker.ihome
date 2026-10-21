@@ -955,10 +955,19 @@
                 (v) => patchLook(state, { color: v }),
               )}
             </div>
-            <BackgroundEditor
-              background={lk.background ?? tile?.tile?.background}
-              onChange={(bg) => patchLook(state, { background: bg })}
-            />
+            <div
+              class="look-bg"
+              title="Tile Background"
+              aria-label="Tile Background"
+            >
+              <span class="label-mono">BG</span>
+              <div class="look-bg-body">
+                <BackgroundEditor
+                  background={lk.background ?? tile?.tile?.background}
+                  onChange={(bg) => patchLook(state, { background: bg })}
+                />
+              </div>
+            </div>
           </div>
         {/each}
       </div>
@@ -2281,6 +2290,18 @@
   .look-block + .look-block {
     padding-top: 0.45rem;
     border-top: 1px solid var(--border-color);
+  }
+
+  .look-bg {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .look-bg-body {
+    display: flex;
+    flex: 1;
+    min-width: 0;
   }
 
   .look-state {
