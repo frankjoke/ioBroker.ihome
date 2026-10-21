@@ -38,6 +38,15 @@ export default defineConfig({
     headers: {
       "Access-Control-Allow-Origin": "*",
     },
+    // The project lives under OneDrive, whose file events get swallowed: Vite
+    // missed edits and kept serving the previous module until the dev server
+    // was restarted. Polling is the documented remedy for sync/network folders
+    // (it costs a little CPU in exchange for never being stale).
+    watch: {
+      usePolling: true,
+      interval: 300,
+      awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+    },
   },
   test: {
     environment: "node",
