@@ -131,9 +131,11 @@
         oninput={(e) => setValue(e.currentTarget.value)}
       />
     {/if}
-  </div>
 
-  <div class="preview" style={backgroundCss(background)}></div>
+    {#if background?.value}
+      <div class="preview" style={backgroundCss(background)}></div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -171,7 +173,8 @@
   }
 
   .preview {
-    height: 28px;
+    flex: 0 0 34px;
+    height: 26px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
   }

@@ -170,12 +170,14 @@ export function headlineSlot(slots: Slot[]): Slot | undefined {
 }
 
 /** The look of the tile's current state (A71). A tile with no active condition
- *  never reads it — its look stays exactly what the rules resolved. */
+ *  never becomes active, so its one state is the inactive one — the pane edits
+ *  those values as the tile's default look. */
 export function stateLook(
   tile: TileConfig | undefined,
   active: boolean,
 ): StateLook {
-  if (!tile?.active) return {};
+  if (!tile) return {};
+  if (!tile.active) return tile.look?.inactive ?? {};
   return tile.look?.[active ? "active" : "inactive"] ?? {};
 }
 

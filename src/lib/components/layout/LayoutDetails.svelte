@@ -204,14 +204,20 @@
     { op: "ne", label: "≠" },
   ];
 
-  /** The two states the active look configures (A71). */
-  const LOOK_STATES = ["active", "inactive"] as const;
-
   /** The rows the pane lists: the tile's own slots, else the chain's (A18). */
   const shownSlots = $derived(
     tile?.tile?.slots ??
       (device ? resolveTemplate(device, templates).slots : []),
   );
+
+  /** The states the look block edits (A71): the inactive one is also the
+   *  tile's default, so a tile with no active condition edits just that. */
+  const lookStates = $derived(
+    activeCond ? (["active", "inactive"] as const) : (["inactive"] as const),
+  );
+
+  /** What the headline icon shows while the look sets no glyph (A67). */
+  const defaultGlyph = $derived(headlineSlot(shownSlots)?.icon?.glyph);
 
   /** How many of them still live on the tile — the guard for A34. */
   const tileVisibleCount = $derived(
@@ -864,14 +870,6 @@
     </div>
 
     <div class="field">
-      <span class="label-mono">Background</span>
-      <BackgroundEditor
-        background={tile.tile?.background}
-        onChange={(bg) => edit((t) => ({ ...t, background: bg }))}
-      />
-    </div>
-
-    <div class="field">
       <span class="label-mono">Active when</span>
       <div class="row">
         <button
@@ -910,51 +908,69 @@
             >{activeFound ? readingText : "source not found"}</span
           >
         </div>
-
-        <div class="look">
-          {#each LOOK_STATES as state (state)}
-            {@const lk = tile?.tile?.look?.[state] ?? {}}
-            <div class="look-state">
-              <span class="label-mono">{state}</span>
-              <button
-                type="button"
-                class="btn btn-sm glyph-pick"
-                title={lk.glyph
-                  ? `Glyph: ${lk.glyph} — click to change`
-                  : "Choose a glyph"}
-                onclick={() => (lookIconFor = state)}
-              >
-                {#if lk.glyph}
-                  <Icon value={lk.glyph} size={16} />
-                {:else}
-                  icon…
-                {/if}
-              </button>
-            </div>
-            <div class="look-fields">
-              {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
-                patchLook(state, { glow: v }),
-              )}
-              {@render lookColor(
-                "icon",
-                lk.color,
-                `${state} icon colour`,
-                (v) => patchLook(state, { color: v }),
-              )}
-              {@render lookColor(
-                "bg",
-                lk.background,
-                `${state} background colour`,
-                (v) => patchLook(state, { background: v }),
-              )}
-            </div>
-          {/each}
-          <p class="note text-muted">
-            A field set here wins over the rules for that state;
-            <em>default</em> keeps the rules. Dimming still comes from the rules.
-          </p>
-        </div>
       {/if}
+    </div>
+
+    <div class="field">
+      <span class="label-mono">Background</span>
+      <BackgroundEditor
+        background={tile.tile?.background}
+        onChange={(bg) => edit((t) => ({ ...t, background: bg }))}
+      />
+    </div>
+
+    <div class="field">
+      <span class="label-mono">Look</span>
+      {#if !activeCond}
+        <p class="note text-muted">
+          This tile's own values — with an active condition, these become its
+          inactive state.
+        </p>
+      {/if}
+      <div class="look">
+        {#each lookStates as state (state)}
+          {@const lk = tile?.tile?.look?.[state] ?? {}}
+          <div class="look-state">
+            <span class="look-name">{activeCond ? state : "default"}</span>
+            <button
+              type="button"
+              class="btn btn-sm glyph-pick"
+              title={lk.glyph
+                ? `Glyph: ${lk.glyph} — click to change`
+                : defaultGlyph
+                  ? `Default glyph: ${defaultGlyph} — click to change`
+                  : "Choose a glyph"}
+              onclick={() => (lookIconFor = state)}
+            >
+              {#if lk.glyph}
+                <Icon value={lk.glyph} size={16} />
+              {:else if defaultGlyph}
+                <span class="glyph-default"
+                  ><Icon value={defaultGlyph} size={16} /></span
+                >
+              {:else}
+                icon…
+              {/if}
+            </button>
+            {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
+              patchLook(state, { glow: v }),
+            )}
+            {@render lookColor("icon", lk.color, `${state} icon colour`, (v) =>
+              patchLook(state, { color: v }),
+            )}
+            {@render lookColor(
+              "bg",
+              lk.background,
+              `${state} background colour`,
+              (v) => patchLook(state, { background: v }),
+            )}
+          </div>
+        {/each}
+      </div>
+      <p class="note text-muted">
+        A value set here wins over the rules for that state;
+        <em>default</em> keeps the rules. Dimming still comes from the rules.
+      </p>
     </div>
 
     <div class="field">
@@ -2264,14 +2280,18 @@
   .look-state {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.4rem;
     margin-top: 0.15rem;
   }
 
-  .look-fields {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 0.6rem;
+  .look-name {
+    min-width: 4.2rem;
+  }
+
+  .glyph-default {
+    display: inline-flex;
+    opacity: 0.5;
   }
 
   .note {
