@@ -72,6 +72,7 @@
   "scripts": {
     "dev": "vite dev --open",
     "build": "vite build",
+    "pack": "npm run build && npm pack",
     "preview": "vite preview",
     "test": "npm run test:unit && npm run test:package && npm run test:integration",
     "test:unit": "vitest run",

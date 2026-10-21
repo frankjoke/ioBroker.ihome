@@ -15,6 +15,9 @@ graphify-out/
 *.log
 npm-debug.log*
 
+# Adapter tarballs (npm pack → picked up in the admin install dialog)
+*.tgz
+
 # Env
 .env
 .env.*
