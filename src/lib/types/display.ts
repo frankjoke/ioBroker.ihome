@@ -42,7 +42,27 @@ export interface TileConfig {
   background?: Background;
   /** What "active" means for this tile (A30): evaluated live per render. */
   active?: ActiveCondition;
+  /** How the tile looks in each active state (A71): read only while `active`
+   *  is set, and each field wins over what the rules resolved. */
+  look?: TileLook;
   slots?: Slot[];
+}
+
+/** One state's overrides (A71): absent fields keep the rules' values. */
+export interface StateLook {
+  /** A CSS colour; set → the state glows, in this colour. */
+  glow?: string;
+  /** The headline icon's colour. */
+  color?: string;
+  /** The headline icon's glyph. */
+  glyph?: string;
+  /** A CSS colour, painted over the tile's own and the rules' background. */
+  background?: string;
+}
+
+export interface TileLook {
+  active?: StateLook;
+  inactive?: StateLook;
 }
 
 /** The basic logic an active condition offers. */

@@ -45,6 +45,7 @@
     patchSpark,
     removeRule,
     removeSlot,
+    setLook,
     setSlotSource,
     setSlotWhere,
     slotWhere,
@@ -81,6 +82,7 @@
     SlotIcon,
     SlotKind,
     SlotSpark,
+    StateLook,
     TileConfig,
   } from "$lib/types/display";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
@@ -134,6 +136,8 @@
   let ruleIconFor = $state<{ slot: number; rule: number } | null>(null);
   /** The slot icon's own picker (A57). */
   let iconPickerFor = $state<number | null>(null);
+  /** The active look's glyph picker (A71). */
+  let lookIconFor = $state<"active" | "inactive" | null>(null);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -199,6 +203,9 @@
     { op: "eq", label: "=" },
     { op: "ne", label: "≠" },
   ];
+
+  /** The two states the active look configures (A71). */
+  const LOOK_STATES = ["active", "inactive"] as const;
 
   /** The rows the pane lists: the tile's own slots, else the chain's (A18). */
   const shownSlots = $derived(
@@ -430,6 +437,14 @@
     edit((t) => ({ ...t, active: undefined }));
   }
 
+  /** One state's look field (A71): `undefined` clears it. */
+  function patchLook(
+    state: "active" | "inactive",
+    patch: Partial<StateLook>,
+  ): void {
+    edit((t) => setLook(t, state, patch));
+  }
+
   function saveTemplate(): void {
     const name = templateName.trim();
     if (!name || !tile || !device) return;
@@ -645,6 +660,43 @@
   }
 </script>
 
+{#snippet lookColor(
+  label: string,
+  value: string | undefined,
+  aria: string,
+  set: (v: string | undefined) => void,
+)}
+  <label class="small">
+    <span class="label-mono">{label}</span>
+    <select
+      value={isHexColor(value ?? "") ? "custom" : (value ?? "")}
+      onchange={(e) => {
+        const next = e.currentTarget.value;
+        if (next === "custom") {
+          if (!isHexColor(value ?? "")) set("#494bd6");
+          return;
+        }
+        set(next || undefined);
+      }}
+    >
+      <option value="">default</option>
+      {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
+        <option value={token}>{name}</option>
+      {/each}
+      <option value="custom">custom…</option>
+    </select>
+    {#if isHexColor(value ?? "")}
+      <input
+        type="color"
+        class="color-input"
+        aria-label={aria}
+        value={value ?? ""}
+        oninput={(e) => set(e.currentTarget.value)}
+      />
+    {/if}
+  </label>
+{/snippet}
+
 <div class="details">
   {#if page && selection.kind === "page"}
     <h3>{page.title || "Page"}</h3>
@@ -857,6 +909,50 @@
           <span class="live text-muted"
             >{activeFound ? readingText : "source not found"}</span
           >
+        </div>
+
+        <div class="look">
+          {#each LOOK_STATES as state (state)}
+            {@const lk = tile?.tile?.look?.[state] ?? {}}
+            <div class="look-state">
+              <span class="label-mono">{state}</span>
+              <button
+                type="button"
+                class="btn btn-sm glyph-pick"
+                title={lk.glyph
+                  ? `Glyph: ${lk.glyph} — click to change`
+                  : "Choose a glyph"}
+                onclick={() => (lookIconFor = state)}
+              >
+                {#if lk.glyph}
+                  <Icon value={lk.glyph} size={16} />
+                {:else}
+                  icon…
+                {/if}
+              </button>
+            </div>
+            <div class="look-fields">
+              {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
+                patchLook(state, { glow: v }),
+              )}
+              {@render lookColor(
+                "icon",
+                lk.color,
+                `${state} icon colour`,
+                (v) => patchLook(state, { color: v }),
+              )}
+              {@render lookColor(
+                "bg",
+                lk.background,
+                `${state} background colour`,
+                (v) => patchLook(state, { background: v }),
+              )}
+            </div>
+          {/each}
+          <p class="note text-muted">
+            A field set here wins over the rules for that state;
+            <em>default</em> keeps the rules. Dimming still comes from the rules.
+          </p>
         </div>
       {/if}
     </div>
@@ -1842,6 +1938,19 @@
     />
   {/if}
 
+  {#if lookIconFor !== null}
+    <IconPicker
+      icon={tile?.tile?.look?.[lookIconFor]?.glyph}
+      onPick={(value) => {
+        const target = lookIconFor;
+        lookIconFor = null;
+        if (target === null) return;
+        patchLook(target, { glyph: value.trim() || undefined });
+      }}
+      onClose={() => (lookIconFor = null)}
+    />
+  {/if}
+
   {#if pendingReplace}
     <ConfirmModal
       title={`Replace “${pendingReplace}”?`}
@@ -2141,6 +2250,28 @@
 
   .dot.error {
     background: var(--danger-color, #c0392b);
+  }
+
+  /* The active look (A71): one glyph line and one colour line per state. */
+  .look {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.1rem 0 0 0.5rem;
+    border-left: 2px solid var(--border-color);
+  }
+
+  .look-state {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+  }
+
+  .look-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
   }
 
   .note {

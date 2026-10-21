@@ -12,6 +12,7 @@ import type {
   Slot,
   SlotIcon,
   SlotSpark,
+  StateLook,
   TileConfig,
   Template,
   TemplateRegistry,
@@ -203,6 +204,29 @@ export function patchIcon(
       return copy;
     }),
   );
+}
+
+// -------------------------------------------------------------------- look
+
+/** Set or clear one state's look fields (A71). `undefined` removes the key and
+ *  a state left without keys disappears, then the `look` itself — editing never
+ *  leaves `look: { active: {} }` behind. Other tile fields are untouched. */
+export function setLook(
+  tile: TileConfig,
+  state: "active" | "inactive",
+  patch: Partial<StateLook>,
+): TileConfig {
+  const look = { ...(tile.look ?? {}) };
+  const entry: StateLook = { ...(look[state] ?? {}), ...patch };
+  for (const key of Object.keys(entry) as (keyof StateLook)[]) {
+    if (entry[key] === undefined) delete entry[key];
+  }
+  if (Object.keys(entry).length) look[state] = entry;
+  else delete look[state];
+  return {
+    ...tile,
+    look: Object.keys(look).length ? look : undefined,
+  };
 }
 
 // ------------------------------------------------------------------- charts

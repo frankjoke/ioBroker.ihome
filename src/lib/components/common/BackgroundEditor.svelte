@@ -71,10 +71,8 @@
       <option value="gradient">gradient</option>
       <option value="image">image url</option>
     </select>
-  </div>
 
-  {#if background?.kind === "solid"}
-    <div class="row">
+    {#if background?.kind === "solid"}
       <input
         type="color"
         aria-label="Background colour"
@@ -87,10 +85,8 @@
         placeholder="#101418"
         oninput={(e) => setValue(e.currentTarget.value)}
       />
-    </div>
-  {:else if background?.kind === "gradient"}
-    {#if builder}
-      <div class="row">
+    {:else if background?.kind === "gradient"}
+      {#if builder}
         <input
           type="color"
           aria-label="Gradient from"
@@ -119,23 +115,23 @@
               builder.to,
             )}
         />
-      </div>
-    {:else}
+      {:else}
+        <input
+          type="text"
+          {value}
+          placeholder="linear-gradient(180deg, #101418, #2a3550)"
+          oninput={(e) => setValue(e.currentTarget.value)}
+        />
+      {/if}
+    {:else if background?.kind === "image"}
       <input
         type="text"
         {value}
-        placeholder="linear-gradient(180deg, #101418, #2a3550)"
+        placeholder="https://… or adapter/name.png"
         oninput={(e) => setValue(e.currentTarget.value)}
       />
     {/if}
-  {:else if background?.kind === "image"}
-    <input
-      type="text"
-      {value}
-      placeholder="https://… or adapter/name.png"
-      oninput={(e) => setValue(e.currentTarget.value)}
-    />
-  {/if}
+  </div>
 
   <div class="preview" style={backgroundCss(background)}></div>
 </div>
@@ -153,6 +149,7 @@
     align-items: center;
     gap: 0.4rem;
     min-width: 0;
+    flex-wrap: wrap;
   }
 
   .row input[type="text"] {

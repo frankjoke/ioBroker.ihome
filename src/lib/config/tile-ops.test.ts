@@ -28,6 +28,7 @@ import {
   removeRule,
   removeSlot,
   resetTile,
+  setLook,
   setSlotSource,
   setSlotWhere,
   slotWhere,
@@ -411,4 +412,34 @@ it("patches one icon field and never leaves {} behind", () => {
 
   // A bad index leaves the list — copied — untouched.
   expect(patchIcon(tile, 9, { glyph: "x" }).slots).toEqual(tile.slots);
+});
+
+it("sets and clears one state's look without touching the other (A71)", () => {
+  const tile: TileConfig = {
+    slots: [],
+    active: { source: "power", op: "truthy" },
+    look: { inactive: { glow: "var(--text-muted)" } },
+  };
+  const set = setLook(tile, "active", { glyph: "bolt", color: "#fff" });
+  expect(set.look).toEqual({
+    active: { glyph: "bolt", color: "#fff" },
+    inactive: { glow: "var(--text-muted)" },
+  });
+  expect(tile.look).toEqual({ inactive: { glow: "var(--text-muted)" } }); // input untouched
+
+  // Clearing one field keeps the state's others.
+  expect(setLook(set, "active", { glyph: undefined }).look).toEqual({
+    active: { color: "#fff" },
+    inactive: { glow: "var(--text-muted)" },
+  });
+
+  // Clearing a state's last field drops the state and, with it, the look.
+  const bare = setLook(
+    setLook(tile, "inactive", { glow: undefined }),
+    "inactive",
+    {},
+  );
+  expect(bare).toEqual({ ...tile, look: undefined });
+  // A patch that clears nothing makes no empty state.
+  expect(setLook(tile, "active", { glyph: undefined }).look).toEqual(tile.look);
 });

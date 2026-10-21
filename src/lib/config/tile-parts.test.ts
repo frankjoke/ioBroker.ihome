@@ -5,6 +5,7 @@ import {
   headlineSlot,
   rowIcon,
   rowSpark,
+  stateLook,
   tileParts,
   tileSeries,
 } from "$lib/config/tile-parts";
@@ -493,4 +494,24 @@ it("charts only the rows the tile resolves (A60): a hidden row takes its chart w
     none,
   );
   expect(tileSeries(shown.rows).length).toBe(1);
+});
+
+it("reads a tile's state look only while it has an active condition (A71)", () => {
+  const look = {
+    active: { glow: "var(--success-color)", color: "#ff0", glyph: "bolt" },
+    inactive: { background: "#111" },
+  };
+  const on = (extra: Partial<TileConfig> = {}): TileConfig => ({
+    slots: [],
+    active: { source: "power", op: "truthy" },
+    look,
+    ...extra,
+  });
+  expect(stateLook(on(), true)).toEqual(look.active);
+  expect(stateLook(on(), false)).toEqual(look.inactive);
+  // No condition → the tile behaves as before, whatever the look carries.
+  expect(stateLook({ slots: [], look }, true)).toEqual({});
+  expect(stateLook(undefined, true)).toEqual({});
+  // The state without its own entry keeps the rules.
+  expect(stateLook(on({ look: { active: look.active } }), false)).toEqual({});
 });

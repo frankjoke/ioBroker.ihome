@@ -14,6 +14,7 @@
     headlineSlot,
     rowIcon,
     rowSpark,
+    stateLook,
     tileParts,
     tileSeries,
     type SlotRow,
@@ -214,14 +215,24 @@
   const headline = $derived(headlineSlot(slots));
   const accent = $derived(headline ?? { kind: "value" as const });
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
+  // What the tile's own active state says (A71). A field set here wins over the
+  // rules for that state; an absent field keeps what the rules resolved.
+  const look = $derived(stateLook(tile, active));
+  const accentColor = $derived(look.color ?? tileStyle.color);
+  // A glow colour of its own turns the glow on, whatever the rules said (A71).
+  const glowing = $derived(look.glow !== undefined || tileStyle.glow === true);
   // The tile's own painted background first (A33): a rule's background is
-  // appended after it, so the live condition still wins.
+  // appended after it, so the live condition still wins; the state look last.
   const tileVars = $derived(
     `${backgroundCss(tile?.background)} --tile-accent: ${
-      tileStyle.color ?? "transparent"
-    }; --tile-glow: ${
-      tileStyle.glow ? 1 : 0
-    };${tileStyle.background ? ` background-color: ${tileStyle.background};` : ""}`,
+      accentColor ?? "transparent"
+    }; --tile-glow-color: ${
+      look.glow ?? accentColor ?? "transparent"
+    }; --tile-glow: ${glowing ? 1 : 0};${
+      (look.background ?? tileStyle.background)
+        ? ` background-color: ${look.background ?? tileStyle.background};`
+        : ""
+    }`,
   );
 
   const chart = $derived(tileSeries(parts.rows));
@@ -229,15 +240,24 @@
 
   /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small.
    *  A tile that draws a chart blends its big glyph out whatever the state says
-   *  (a reading with history is usually not a switch), so the line reads over it. */
+   *  (a reading with history is usually not a switch), so the line reads over it.
+   *  The active state's look (A71) speaks over the rules, field by field. */
   function bodyIcon(r: SlotRow) {
-    const icon = rowIcon(r, "tile", device.objectIcon);
-    if (!icon) return undefined;
     const main = r.slot === headline;
+    const lk = main ? look : {};
+    // A look glyph may stand where the descriptor had none, but an icon turned
+    // off — or homed away from the tile — stays off.
+    if (r.slot.icon?.enabled === false) return undefined;
+    const where = r.slot.icon?.where ?? "both";
+    if (where !== "both" && where !== "tile") return undefined;
+    const icon = rowIcon(r, "tile", device.objectIcon);
+    const glyph = lk.glyph ?? icon?.glyph;
+    if (!glyph) return undefined;
     return {
-      ...icon,
+      glyph,
+      color: lk.color ?? icon?.color,
       size: main ? 34 : 17,
-      disabled: icon.disabled || (main && chart.length > 0),
+      disabled: icon?.disabled === true || (main && chart.length > 0),
     };
   }
 
@@ -464,7 +484,7 @@
 <div
   class="tile"
   class:active
-  class:glow={tileStyle.glow === true}
+  class:glow={glowing}
   class:disabled={tileStyle.disabled === true}
   data-page-id={anchor?.pageId}
   data-section-id={anchor?.sectionId}
@@ -562,7 +582,7 @@
   /* One shared glow rule: a static shadow, no animation (a wall tablet should
      not burn CPU animating tiles). */
   .tile.glow {
-    box-shadow: 0 0 12px var(--tile-accent);
+    box-shadow: 0 0 12px var(--tile-glow-color, var(--tile-accent));
     border-color: var(--tile-accent, var(--border-color));
   }
 

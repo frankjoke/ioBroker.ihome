@@ -1,6 +1,6 @@
 import type { EnrichedDevice, SlotControl } from "$lib/types/device";
 import type { Slot, Template, TileConfig } from "$lib/types/display";
-import type { Rule } from "$lib/types/display";
+import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
   resolveTemplate,
@@ -167,6 +167,16 @@ export function tileParts(
  *  Button tile's face is its button. */
 export function headlineSlot(slots: Slot[]): Slot | undefined {
   return slots.find((s) => s.kind === "value") ?? slots[0];
+}
+
+/** The look of the tile's current state (A71). A tile with no active condition
+ *  never reads it — its look stays exactly what the rules resolved. */
+export function stateLook(
+  tile: TileConfig | undefined,
+  active: boolean,
+): StateLook {
+  if (!tile?.active) return {};
+  return tile.look?.[active ? "active" : "inactive"] ?? {};
 }
 
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
