@@ -27,10 +27,14 @@ self.addEventListener("activate", (event) =>
 );
 
 // Navigations come from the network — the cache is only the offline fallback.
+// `cache: "no-cache"` revalidates with the server (304 while unchanged): the
+// ioBroker web adapter serves index.html with a max-age of its own, and without
+// this the HTTP cache handed back the previous build even though the worker
+// asked the network.
 self.addEventListener("fetch", (event) => {
   if (event.request.mode !== "navigate") return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-cache" })
       .then((response) => {
         const copy = response.clone();
         void caches

@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.9",
+        "version": "0.0.10",
         "news": {
+            "0.0.10": {
+                "en": "The dashboard shell always revalidates with the server, so the web adapter's cache headers cannot serve a stale build",
+                "de": "Die Dashboard-Shell fragt immer beim Server nach, damit die Cache-Header des Web-Adapters keine alte Version liefern können"
+            },
             "0.0.9": {
                 "en": "Edit-mode bar: more red in the light theme, clearly red in the dark one",
                 "de": "Bearbeitungsleiste: roter im hellen Theme, deutlich rot im dunklen"
