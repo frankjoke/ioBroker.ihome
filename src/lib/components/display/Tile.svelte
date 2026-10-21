@@ -227,11 +227,59 @@
   const chart = $derived(tileSeries(parts.rows));
   const bodySlots = $derived(parts.body);
 
-  /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small. */
+  /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small.
+   *  A tile that draws a chart blends its big glyph out whatever the state says
+   *  (a reading with history is usually not a switch), so the line reads over it. */
   function bodyIcon(r: SlotRow) {
     const icon = rowIcon(r, "tile", device.objectIcon);
-    return icon ? { ...icon, size: r.slot === headline ? 34 : 17 } : undefined;
+    if (!icon) return undefined;
+    const main = r.slot === headline;
+    return {
+      ...icon,
+      size: main ? 34 : 17,
+      disabled: icon.disabled || (main && chart.length > 0),
+    };
   }
+
+  /** The band the chart occupies: the big glyph's box plus 2 px each way, so the
+   *  line sits on the icon rather than in a strip of its own. Measured, because
+   *  the name line and the rows above it move the glyph; falls back to the tile's
+   *  middle 70% when the headline shows no icon. */
+  // shortcut: re-measures only when the tile or the glyph resizes; a name that
+  // wraps without resizing the tile leaves the band a line off until then.
+  let tileEl = $state<HTMLElement>();
+  let band = $state<{ top: number; height: number }>();
+
+  $effect(() => {
+    const el = tileEl;
+    if (!el || !chart.length) {
+      band = undefined;
+      return;
+    }
+    let watched: HTMLElement | null = null;
+    const measure = () => {
+      const glyph = el.querySelector<HTMLElement>(
+        "[data-chart-anchor] .slot-icon",
+      );
+      if (glyph && glyph !== watched) {
+        watched = glyph;
+        ro.observe(glyph);
+      }
+      if (!glyph) {
+        band = undefined;
+        return;
+      }
+      const t = el.getBoundingClientRect();
+      const g = glyph.getBoundingClientRect();
+      // `top` is measured from the padding box, so the tile's border comes off.
+      const border = parseFloat(getComputedStyle(el).borderTopWidth) || 0;
+      band = { top: g.top - t.top - border - 2, height: g.height + 4 };
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  });
 
   // The detail page's face (A54): the headline's icon follows its own
   // descriptor and homes. The header deliberately does not consult the row's
@@ -425,6 +473,7 @@
     ? '1'
     : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
   class:interactive={hasModal}
+  bind:this={tileEl}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
   tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
   onclickcapture={onCapture}
@@ -436,7 +485,11 @@
   onpointerleave={cancelPress}
 >
   {#if chart.length}
-    <div class="tile-bg">
+    <div
+      class="tile-bg"
+      style:--chart-top={band ? `${band.top}px` : undefined}
+      style:--chart-height={band ? `${band.height}px` : undefined}
+    >
       <TileChart series={chart} />
     </div>
   {/if}
@@ -449,6 +502,7 @@
         control={r.control}
         style={slotStyle(r.slot, r.control)}
         icon={bodyIcon(r)}
+        anchor={r.slot === headline}
         stack={r.slot === headline && span.w < 2}
         onPrimary={r.control && r.control === primary
           ? togglePrimary
@@ -518,13 +572,17 @@
   }
 
   /* The tile's chart (A61): the series of every value that charts here, drawn
-     over the content — the icon and values sit under it, so the line is never
-     hidden. No pointer events; clipped to the tile's rounded box; the badges
-     (z 2) stay on top. The chart is centred at 70% of the tile's height so the
-     badge corners and the name keep their space. */
+     over the content — the icon (blended out while a chart draws) and values
+     sit under it, so the line is never hidden. No pointer events; clipped to
+     the tile's rounded box; the badges (z 2) stay on top. The band follows the
+     headline glyph — its box plus 2 px each way — and falls back to the tile's
+     middle 70% when no glyph anchors it. */
   .tile-bg {
     position: absolute;
-    inset: 0;
+    left: 0;
+    right: 0;
+    top: var(--chart-top, 15%);
+    height: var(--chart-height, 70%);
     overflow: hidden;
     pointer-events: none;
     border-radius: inherit;
@@ -533,12 +591,12 @@
     align-items: center;
   }
 
-  /* Stretch the chart across the tile: the chart ships a fixed size for the
+  /* Stretch the chart across the band: the chart ships a fixed size for the
      in-body case, and a scoped style cannot reach into the child. */
   .tile-bg :global(.chart) {
     width: 100%;
     max-width: none;
-    height: 70%;
+    height: 100%;
   }
 
   .tile-name {

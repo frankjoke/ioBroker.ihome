@@ -70,7 +70,9 @@
     preserveAspectRatio="none"
     aria-hidden="true"
   >
-    {#each drawn as l, i (i)}
+    <!-- Reversed: the first series is the tile's main line, so it paints last
+         and stays visible on top of the others. -->
+    {#each [...drawn].reverse() as l, i (i)}
       <polyline points={l.points} style:stroke={l.color} />
     {/each}
   </svg>

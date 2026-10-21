@@ -20,6 +20,7 @@
     emphasis,
     icon,
     stack = false,
+    anchor = false,
   }: {
     slot: Slot;
     device: EnrichedDevice;
@@ -32,6 +33,8 @@
     icon?: { glyph: string; color?: string; disabled?: boolean; size?: number };
     /** The primary cluster at a 1-wide span: icon above the value (A53). */
     stack?: boolean;
+    /** The headline row: the tile measures its glyph for the chart band. */
+    anchor?: boolean;
   } = $props();
 
   // Kinds with a control are useless without one; value falls back.
@@ -68,7 +71,11 @@
     <!-- The slot's icon and its reading, one cluster (A53): side by side when
          the line fits; the headline stacks at a 1-wide span so a 1×1 tile puts
          the icon above the value. -->
-    <div class="slot-cluster" class:stack>
+    <div
+      class="slot-cluster"
+      class:stack
+      data-chart-anchor={anchor ? "" : undefined}
+    >
       {#if onPrimary}
         <!-- The slot's own action (A51/A53): the icon toggles with the value,
              as the retired IconSlot's button did. -->
