@@ -41,7 +41,7 @@
   // Earlier builds persisted their own default (`iHome`, before that `admin.0`);
   // those values are not a real namespace, so they count as "unset" — otherwise
   // writes keep the old identity instead of the adapter's. Read once, at connect.
-  const LEGACY_NAMESPACES = ["admin.0", "iHome"];
+  const LEGACY_NAMESPACES = ["admin.0", "iHome", "0_userdata.0.Test.AiHome"];
   const namespace =
     !storage.namespace || LEGACY_NAMESPACES.includes(storage.namespace)
       ? DEFAULT_NAMESPACE

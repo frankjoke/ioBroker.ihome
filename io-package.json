@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.4",
+        "version": "0.0.5",
         "news": {
+            "0.0.5": {
+                "en": "The top bar tints red while the layout editor is open",
+                "de": "Die obere Leiste färbt sich rot, solange der Layout-Editor offen ist"
+            },
             "0.0.4": {
                 "en": "Change a control's state in the device editor; state ids keep their end visible; the dashboard no longer saves an untouched seed",
                 "de": "State eines Controls im Geräteeditor ändern; State-IDs zeigen ihr Ende; das Dashboard speichert keinen unberührten Seed mehr"
