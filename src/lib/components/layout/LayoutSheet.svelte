@@ -414,7 +414,7 @@
       aria-expanded={pageOpen}
       onclick={() => (pageOpen = !pageOpen)}
     >
-      <span class="material-symbols-outlined">tune</span>
+      <span class="material-symbols-outlined">edit</span>
     </button>
     <button
       type="button"
@@ -468,7 +468,7 @@
       aria-expanded={sectionOpen}
       onclick={() => (sectionOpen = !sectionOpen)}
     >
-      <span class="material-symbols-outlined">tune</span>
+      <span class="material-symbols-outlined">edit</span>
     </button>
     <button
       type="button"
@@ -902,6 +902,8 @@
     justify-content: center;
     width: 32px;
     height: 32px;
+    border: none;
+    background: transparent;
     border-radius: var(--border-radius-pill);
     color: var(--text-muted);
   }

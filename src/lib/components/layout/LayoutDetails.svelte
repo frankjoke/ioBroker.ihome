@@ -900,7 +900,7 @@
           <span class="live text-muted"
             >{activeFound ? readingText : "source not found"}</span
           >
-          <span class="row-actions">
+          <span class="row-actions end">
             <button
               type="button"
               class="icon-btn"
@@ -2145,6 +2145,10 @@
     align-items: center;
     gap: 2px;
     flex: 0 0 auto;
+  }
+
+  .row-actions.end {
+    margin-left: auto;
   }
 
   .row-actions .icon-btn {
