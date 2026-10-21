@@ -229,10 +229,8 @@
     }; --tile-glow-color: ${
       look.glow ?? accentColor ?? "transparent"
     }; --tile-glow: ${glowing ? 1 : 0};${
-      (look.background ?? tileStyle.background)
-        ? ` background-color: ${look.background ?? tileStyle.background};`
-        : ""
-    }`,
+      tileStyle.background ? ` background-color: ${tileStyle.background};` : ""
+    }${look.background ? ` ${backgroundCss(look.background)}` : ""}`,
   );
 
   const chart = $derived(tileSeries(parts.rows));

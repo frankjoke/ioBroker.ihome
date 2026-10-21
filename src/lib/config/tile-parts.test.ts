@@ -14,7 +14,7 @@ import type {
   EnrichedDevice,
   SlotControl,
 } from "$lib/types/device";
-import type { Slot, Template, TileConfig } from "$lib/types/display";
+import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 
 const control = (
   id: string,
@@ -497,9 +497,9 @@ it("charts only the rows the tile resolves (A60): a hidden row takes its chart w
 });
 
 it("reads a tile's state look, the inactive one as its default (A71)", () => {
-  const look = {
+  const look: TileLook = {
     active: { glow: "var(--success-color)", color: "#ff0", glyph: "bolt" },
-    inactive: { background: "#111" },
+    inactive: { background: { kind: "solid", value: "#111" } },
   };
   const on = (extra: Partial<TileConfig> = {}): TileConfig => ({
     slots: [],

@@ -912,14 +912,6 @@
     </div>
 
     <div class="field">
-      <span class="label-mono">Background</span>
-      <BackgroundEditor
-        background={tile.tile?.background}
-        onChange={(bg) => edit((t) => ({ ...t, background: bg }))}
-      />
-    </div>
-
-    <div class="field">
       <span class="label-mono">Look</span>
       {#if !activeCond}
         <p class="note text-muted">
@@ -930,40 +922,43 @@
       <div class="look">
         {#each lookStates as state (state)}
           {@const lk = tile?.tile?.look?.[state] ?? {}}
-          <div class="look-state">
-            <span class="look-name">{activeCond ? state : "default"}</span>
-            <button
-              type="button"
-              class="btn btn-sm glyph-pick"
-              title={lk.glyph
-                ? `Glyph: ${lk.glyph} — click to change`
-                : defaultGlyph
-                  ? `Default glyph: ${defaultGlyph} — click to change`
-                  : "Choose a glyph"}
-              onclick={() => (lookIconFor = state)}
-            >
-              {#if lk.glyph}
-                <Icon value={lk.glyph} size={16} />
-              {:else if defaultGlyph}
-                <span class="glyph-default"
-                  ><Icon value={defaultGlyph} size={16} /></span
-                >
-              {:else}
-                icon…
-              {/if}
-            </button>
-            {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
-              patchLook(state, { glow: v }),
-            )}
-            {@render lookColor("icon", lk.color, `${state} icon colour`, (v) =>
-              patchLook(state, { color: v }),
-            )}
-            {@render lookColor(
-              "bg",
-              lk.background,
-              `${state} background colour`,
-              (v) => patchLook(state, { background: v }),
-            )}
+          <div class="look-block">
+            <div class="look-state">
+              <span class="look-name">{activeCond ? state : "default"}</span>
+              <button
+                type="button"
+                class="btn btn-sm glyph-pick"
+                title={lk.glyph
+                  ? `Glyph: ${lk.glyph} — click to change`
+                  : defaultGlyph
+                    ? `Default glyph: ${defaultGlyph} — click to change`
+                    : "Choose a glyph"}
+                onclick={() => (lookIconFor = state)}
+              >
+                {#if lk.glyph}
+                  <Icon value={lk.glyph} size={16} />
+                {:else if defaultGlyph}
+                  <span class="glyph-default"
+                    ><Icon value={defaultGlyph} size={16} /></span
+                  >
+                {:else}
+                  icon…
+                {/if}
+              </button>
+              {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
+                patchLook(state, { glow: v }),
+              )}
+              {@render lookColor(
+                "icon",
+                lk.color,
+                `${state} icon colour`,
+                (v) => patchLook(state, { color: v }),
+              )}
+            </div>
+            <BackgroundEditor
+              background={lk.background ?? tile?.tile?.background}
+              onChange={(bg) => patchLook(state, { background: bg })}
+            />
           </div>
         {/each}
       </div>
@@ -2268,13 +2263,24 @@
     background: var(--danger-color, #c0392b);
   }
 
-  /* The active look (A71): one glyph line and one colour line per state. */
+  /* The active look (A71): glyph, colours and background per state. */
   .look {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.45rem;
     padding: 0.1rem 0 0 0.5rem;
     border-left: 2px solid var(--border-color);
+  }
+
+  .look-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .look-block + .look-block {
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--border-color);
   }
 
   .look-state {

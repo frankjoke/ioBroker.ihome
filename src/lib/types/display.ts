@@ -56,8 +56,8 @@ export interface StateLook {
   color?: string;
   /** The headline icon's glyph. */
   glyph?: string;
-  /** A CSS colour, painted over the tile's own and the rules' background. */
-  background?: string;
+  /** The tile's painted background in this state, over its own and the rules'. */
+  background?: Background;
 }
 
 export interface TileLook {
