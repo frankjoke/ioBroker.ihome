@@ -202,9 +202,9 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       const loaded = loadPages(st?.value, seed);
       pagesLoadKind = loaded.kind;
       if (loaded.registry) setPageRegistry(loaded.registry);
-      // Persist only a seed this run created — a stored document is never
-      // rewritten (C1: a failed read must not overwrite config).
-      if (loaded.kind === "seeded") savePages();
+      // A seed stays in memory until the user actually does something: writing
+      // it here is what overwrote a document the adapter had not migrated yet
+      // (an empty read means "nothing there yet", not "the user wants this").
       if (loaded.kind === "invalid") {
         console.error(
           "pageList is unreadable — leaving it untouched rather than overwriting it",

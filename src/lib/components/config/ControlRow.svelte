@@ -17,12 +17,14 @@
     siblings = [],
     autoOpen = false,
     onChange,
+    onChangeState,
     onRemove,
   }: {
     control: Control;
     siblings?: Control[];
     autoOpen?: boolean;
     onChange: (c: Control) => void;
+    onChangeState: () => void;
     onRemove: () => void;
   } = $props();
 
@@ -77,6 +79,16 @@
     if (!expr) return "(empty formula)";
     return expr.length > 60 ? expr.slice(0, 60) + "…" : expr;
   }
+
+  // Long ids lose their middle, not their end: the adapter stays visible at the
+  // start and the state at the end (bambulab.0.0309…BedTemp).
+  const stateParts = $derived.by(() => {
+    const id = control.stateId ?? "";
+    const cut = id.lastIndexOf(".");
+    return cut > 0
+      ? { head: id.slice(0, cut + 1), tail: id.slice(cut + 1) }
+      : { head: id, tail: "" };
+  });
 </script>
 
 <div class="control-row">
@@ -107,9 +119,23 @@
       </button>
     {:else}
       <div class="state">
-        <span class="state-id mono">{control.stateId}</span>
+        <span class="state-id mono" title={control.stateId ?? ""}
+          ><span class="sid-head">{stateParts.head}</span><span class="sid-tail"
+            >{stateParts.tail}</span
+          ></span
+        >
         <span class="state-val">{valueLabel}</span>
       </div>
+
+      <button
+        type="button"
+        class="icon-btn"
+        title="Change state"
+        aria-label="Change state"
+        onclick={onChangeState}
+      >
+        <span class="material-symbols-outlined">edit</span>
+      </button>
 
       <label class="check"
         ><input
@@ -242,12 +268,20 @@
   }
 
   .state-id {
-    display: block;
+    display: flex;
     font-size: 0.75rem;
     max-width: 40ch;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .sid-head {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sid-tail {
+    flex: 0 0 auto;
   }
 
   .state-val {

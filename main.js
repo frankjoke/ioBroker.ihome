@@ -11,6 +11,26 @@ const DOCS = ["pageList", "deviceList", "templateList", "formulaList"];
 // Data of the pre-adapter test namespace; copied once, then left untouched.
 const LEGACY_PREFIX = "0_userdata.0.Test.AiHome.";
 
+/**
+ * The SPA seeds an empty page document when it cannot read one yet (e.g. the
+ * dashboard was opened before this migration ran, or a browser still holds the
+ * old bundle). Such a placeholder counts as empty here — otherwise the real
+ * documents could never come across. A document with any tile is never touched.
+ *
+ * @param {unknown} val - state value
+ */
+function isPlaceholder(val) {
+  try {
+    const doc = typeof val === "string" ? JSON.parse(val) : val;
+    if (!doc || doc.seeded !== true || !Array.isArray(doc.pages)) return false;
+    return !doc.pages.some((p) =>
+      (p.groups || []).some((g) => (g.tiles || []).length),
+    );
+  } catch {
+    return false;
+  }
+}
+
 class IHome extends utils.Adapter {
   /**
    * @param {Partial<utils.AdapterOptions>} [options] - Adapter options
@@ -30,7 +50,8 @@ class IHome extends utils.Adapter {
         native: {},
       });
 
-      if ((await this.getStateAsync(target))?.val == null) {
+      const current = await this.getStateAsync(target);
+      if (current?.val == null || isPlaceholder(current.val)) {
         // oldest first: the test namespace, then the plain state in the root
         const fromLegacy = await this.getForeignStateAsync(
           LEGACY_PREFIX + name,

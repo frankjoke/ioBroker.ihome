@@ -6,12 +6,15 @@
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { projectDevice } from "$lib/config/project";
+  import { ancestorObjects, parentName } from "$lib/config/state-tree";
+  import { applyPickedState } from "$lib/config/control-ops";
   import {
+    roleLabel,
     suggestDeviceType,
     suggestDeviceName,
     DEVICE_TYPES,
   } from "$lib/config/features";
-  import { ancestorObjects, parentName } from "$lib/config/state-tree";
+  import { defaultUnit } from "$lib/config/units";
   import { roomForState, roomName, enumLabel } from "$lib/config/rooms";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
@@ -110,6 +113,23 @@
   }
 
   let autoOpenId = $state<string | null>(null);
+  // index of the row whose state is being changed; null while adding new ones
+  let replaceIndex = $state<number | null>(null);
+
+  function replaceState(picked: Control | undefined) {
+    if (replaceIndex === null || !picked) return;
+    const i = replaceIndex;
+    const row = controls[i];
+    const previous = objects.get(row.stateId ?? "");
+    replaceIndex = null;
+    updateControl(
+      i,
+      applyPickedState(row, picked, {
+        label: roleLabel(previous),
+        unit: defaultUnit(previous),
+      }),
+    );
+  }
 
   function addVirtual() {
     const id = newId();
@@ -241,6 +261,7 @@
         siblings={controls}
         autoOpen={control.id === autoOpenId}
         onChange={(c) => updateControl(i, c)}
+        onChangeState={() => (replaceIndex = i)}
         onRemove={() => removeControl(i)}
       />
     {/each}
@@ -252,16 +273,25 @@
   </div>
 </div>
 
-{#if showPicker}
+{#if showPicker || replaceIndex !== null}
   <StatePicker
     deviceType={type}
     {objects}
     {roomsOf}
     {rooms}
     enums={ioBroker.enums}
-    initialSearch={device ? "" : name}
-    onAdd={addStates}
-    onClose={() => (showPicker = false)}
+    mode={replaceIndex !== null ? "replace" : "add"}
+    initialSearch={replaceIndex !== null
+      ? (controls[replaceIndex]?.stateId ?? "")
+      : device
+        ? ""
+        : name}
+    onAdd={(picked) =>
+      replaceIndex !== null ? replaceState(picked[0]) : addStates(picked)}
+    onClose={() => {
+      showPicker = false;
+      replaceIndex = null;
+    }}
   />
 {/if}
 

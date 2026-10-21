@@ -24,6 +24,7 @@
     rooms,
     enums = undefined,
     initialSearch = "",
+    mode = "add",
     onAdd,
     onClose,
   }: {
@@ -33,6 +34,8 @@
     rooms: { id: string; label: string; icon?: string }[];
     enums?: any;
     initialSearch?: string;
+    /** "replace" points an existing control at another state — one pick only */
+    mode?: "add" | "replace";
     onAdd: (controls: Control[]) => void;
     onClose: () => void;
   } = $props();
@@ -83,8 +86,14 @@
   });
 
   function toggle(id: string) {
-    if (selection.has(id)) selection.delete(id);
-    else selection.add(id);
+    if (mode === "replace") {
+      selection.clear();
+      selection.add(id);
+    } else if (selection.has(id)) {
+      selection.delete(id);
+    } else {
+      selection.add(id);
+    }
   }
 
   function add() {
@@ -106,7 +115,7 @@
 <div class="modal" role="dialog" aria-modal="true" aria-label="Add states">
   <div class="modal-content">
     <div class="modal-head">
-      <h3>Add states</h3>
+      <h3>{mode === "replace" ? "Change state" : "Add states"}</h3>
       <button
         type="button"
         class="icon-btn"
@@ -168,8 +177,12 @@
           disabled={selection.size === 0}
           onclick={add}
         >
-          Add {selection.size || ""}
-          {selection.size === 1 ? "control" : "controls"}
+          {#if mode === "replace"}
+            Use state
+          {:else}
+            Add {selection.size || ""}
+            {selection.size === 1 ? "control" : "controls"}
+          {/if}
         </button>
       </div>
     </div>
