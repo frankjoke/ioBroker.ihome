@@ -900,15 +900,17 @@
           <span class="live text-muted"
             >{activeFound ? readingText : "source not found"}</span
           >
-          <button
-            type="button"
-            class="icon-btn"
-            title="Clear the active condition"
-            aria-label="Clear the active condition"
-            onclick={clearActive}
-          >
-            <span class="material-symbols-outlined">delete</span>
-          </button>
+          <span class="row-actions">
+            <button
+              type="button"
+              class="icon-btn"
+              title="Clear the active condition"
+              aria-label="Clear the active condition"
+              onclick={clearActive}
+            >
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </span>
         {/if}
       </div>
     </div>
