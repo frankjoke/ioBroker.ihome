@@ -837,15 +837,6 @@
         </label>
       </div>
     </div>
-    <label class="check">
-      <input
-        type="checkbox"
-        checked={tile.newLine === true}
-        onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
-      />
-      <span>Start a new line before this tile</span>
-    </label>
-
     <div class="field">
       <span class="label-mono">Size (modules)</span>
       <div class="row">
@@ -866,6 +857,14 @@
             />
           </label>
         {/each}
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={tile.newLine === true}
+            onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
+          />
+          <span>New line start</span>
+        </label>
       </div>
     </div>
 
