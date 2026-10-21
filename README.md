@@ -48,6 +48,13 @@ npm run check    # svelte-check
 npm run lint     # eslint
 ```
 
+For a quick UI-only deploy into a running broker (no adapter install; the files
+land in its file storage and the web adapter serves them):
+
+```bash
+IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
+```
+
 `www/` is tracked on purpose: ioBroker installs from GitHub without building the frontend, so run
 `npm run build` before committing UI changes.
 
