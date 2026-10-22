@@ -39,6 +39,7 @@
   let showForm = $state(false);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let askingPin = $state(false);
+  let changingPin = $state(false);
 
   const formulas = $derived(getFormulas());
   /** True while the shipped default (or a missing/malformed value) is in force. */
@@ -148,6 +149,23 @@
           override it — your choice is remembered on this device.
         </p>
         <ThemeToggle />
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-header">
+        <span class="material-symbols-outlined">lock</span>
+        <h2 class="card-title">PIN</h2>
+      </div>
+      <div class="card-body settings-card-body">
+        <p class="text-muted hint">
+          {pinIsDefault
+            ? "The shipped default PIN is still in use — change it to your own. It guards this page on this device only, and it is a convenience lock, not a security boundary."
+            : "A PIN guards this page on this device only. It is a convenience lock, not a security boundary."}
+        </p>
+        <button class="btn" onclick={() => (changingPin = true)}
+          >Change PIN</button
+        >
       </div>
     </section>
 
@@ -280,6 +298,19 @@
           applyAndReload();
         }}
         onCancel={() => (askingPin = false)}
+      />
+    {/if}
+
+    {#if changingPin}
+      <PinModal
+        title="Change PIN"
+        hint="Digits only, 4 to 6 characters. It guards the settings on this device."
+        confirmLabel="Save PIN"
+        onSubmit={(pin) => {
+          storage.pin = pin;
+          changingPin = false;
+        }}
+        onCancel={() => (changingPin = false)}
       />
     {/if}
 

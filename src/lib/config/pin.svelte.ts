@@ -10,9 +10,9 @@
 // curious tap on the wall display away from the broker address and the formula
 // templates; it protects nothing on the broker.
 //
-// Removing "__VISUAL__:pin" is the recovery and change recipe in one: the
-// default returns, so "4321" opens the page again and the next connection save
-// re-arms the forced change. There is no in-app reset UI.
+// Removing "__VISUAL__:pin" is still the recovery recipe: the default returns,
+// so "4321" opens the page again and the next connection save re-arms the forced
+// change. The in-app change UI is the PIN card in Settings.
 //
 // Per-tile detail PINs and a "pencil needs a PIN" flag are out of scope: no
 // schema field and no migration were added for them.
