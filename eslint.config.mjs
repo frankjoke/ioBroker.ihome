@@ -129,14 +129,6 @@ export default [
     },
   },
   {
-    // Vendored socket.io client library — legacy globals/idioms
-    files: ["src/lib/iobroker.socket.io.js"],
-    rules: {
-      "no-unused-vars": "off",
-      "no-empty": "off",
-    },
-  },
-  {
     // Browser-only helpers (busy with node globals from the generic block)
     files: ["src/lib/localStorage.js", "src/lib/socket-url.ts"],
     languageOptions: {

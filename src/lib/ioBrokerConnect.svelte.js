@@ -1,6 +1,6 @@
 // @ts-nocheck
 // import socketio from 'socket.io-client/dist/socket.io.js'
-import { createSocketClient } from "./iobroker.socket.io.js";
+import "@iobroker/ws";
 import { defaultSocketUrl } from "./socket-url";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
 import { getVisibility, typeOfP } from "./tools.svelte";
@@ -10,7 +10,7 @@ import { createDeferredPromise } from "./utils";
 // import { toasts } from "$lib/ToastsClass.svelte.js";
 // import { setContext } from 'svelte';
 
-/** @type {import('$lib/iobroker.socket.io.js').SocketClient | null} */
+/** @type {import("@iobroker/ws").SocketClient | null} */
 let socket = null;
 let connectTimeoutId = null;
 
@@ -259,8 +259,14 @@ async function connectIOBroker(options = {}) {
         typeof prev.destroy === "function" ? prev.destroy() : prev.disconnect();
       }
       states.clear();
-      ioBroker.socket = socket = createSocketClient(url, roptions);
+      // The client starts connecting right here, so the handlers registered in
+      // this same tick still precede any server event. A synchronous
+      // construction error is swallowed inside the client, which is why the
+      // 10 s waitconn timeout plus ioBroker.connected = 0 stays the signal.
+      ioBroker.socket = socket = globalThis.io.connect(url, roptions);
       ioBroker.connected = 0;
+    } else {
+      socket.connect(url, roptions);
     }
     const waitconn = new createDeferredPromise();
 
@@ -323,7 +329,6 @@ async function connectIOBroker(options = {}) {
     });
 
     //   console.log("Connected to Socket.IO server");
-    socket.connect(url, { path: "/socket.io", query: { sid: Date.now() } });
     setTimeout(() => waitconn.reject(), 10000);
 
     await waitconn;
