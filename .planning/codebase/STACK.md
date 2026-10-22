@@ -9,7 +9,7 @@ last_mapped_at: 2026-10-22
 ## Languages
 
 **Primary:**
-- JavaScript (CommonJS) — ioBroker adapter process: `main.js`; also vendored WebSocket client `src/lib/iobroker.socket.io.js`
+- JavaScript (CommonJS) — ioBroker adapter process: `main.js`
 - TypeScript 5.9 — pure logic modules in `src/lib/config/**`, `src/lib/utils/**`, `src/lib/stores/*.svelte.ts`, `src/lib/types/**`
 - Svelte 5 (runes: `$state`, `$derived`, `$effect`, `$props`) — all UI in `src/routes/**` and `src/lib/components/**`
 
@@ -52,7 +52,7 @@ last_mapped_at: 2026-10-22
 
 **Critical:**
 - `@iobroker/adapter-core` 3.4.3 — the only production dependency; owns `ihome.0.config.*` states and the one-shot migration in `main.js`
-- Vendored ioBroker WebSocket client v3.0.4 — `src/lib/iobroker.socket.io.js` (MIT, bluefox). Not an npm dependency; implements the raw WebSocket protocol against `…/socket.io`, so do not replace it with `socket.io-client`.
+- `@iobroker/ws` 3.1.3 — devDependency, bundled into `www/`; the ioBroker WebSocket protocol client (MIT, bluefox), upstream of the copy that used to be vendored as `src/lib/iobroker.socket.io.js`. It drives the raw WebSocket protocol against `…/socket.io`, so do not replace it with `socket.io-client`.
 - `workbox-precaching` 7.4.1 — service-worker precache of hashed assets in `src/service-worker.js`
 
 **Infrastructure:**
@@ -62,14 +62,14 @@ last_mapped_at: 2026-10-22
 ## Configuration
 
 **Environment:**
-- `VITE_SOCKET_URL` — overrides the ioBroker socket URL in dev; read in `src/lib/socket-url.ts`.
+- `VITE_SOCKET_URL` — overrides the ioBroker socket URL in dev; read in `src/lib/socket-url.ts`, first in the order `VITE_SOCKET_URL` → `?socket=` → the configured fallback `FALLBACK_BROKER` (`src/lib/broker-config.ts`, empty by default) → the page host.
 - `IOBROKER_MCP` — base URL of the broker's MCP endpoint used by `scripts/deploy-www.mjs` (default `http://localhost:8082/mcp/`).
 - `.env.development.local` is present locally and gitignored (`.gitignore` covers `.env` and `.env.*`); it holds the dev broker override. Do not read or commit its values.
 - `?socket=wss://host/path/socket.io` — per-page runtime override for reverse proxies (`src/lib/socket-url.ts`).
 
 **Build:**
 - `vite.config.mjs` — holds the SvelteKit config (there is no `svelte.config.js`; the package is CommonJS, so Node cannot import an ESM config). Production `paths.base` is `/ihome`, router type is `hash`, SvelteKit service-worker registration is disabled in favor of manual registration in `src/routes/+layout.svelte`, output bundle strategy is `"inline"`, dev watcher uses polling (`watch.usePolling`, 300 ms) for OneDrive.
-- `eslint.config.mjs` — flat config with per-directory overrides (CommonJS allow-listed, `any` allowed in TS, vendored socket client relaxed).
+- `eslint.config.mjs` — flat config with per-directory overrides (CommonJS allow-listed, `any` allowed in TS).
 - `tsconfig.json` — `strict: false`, `skipLibCheck: true`, `resolveJsonModule: true`.
 - `package.json` `files` — ships `admin/`, `www/`, `io-package.json`, `LICENSE`, `README.md`, `main.js`.
 

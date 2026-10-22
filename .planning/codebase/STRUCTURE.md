@@ -29,7 +29,7 @@ iobroker-visual-adapter/
 │   │   ├── types/              # device.ts, display.ts
 │   │   ├── utils/              # debounce, ids, json, transform, icon-url, control-write
 │   │   ├── ioBrokerConnect.svelte.js   # Socket + cache hydration + RPC
-│   │   ├── iobroker.socket.io.js       # Vendored WS protocol client v3.0.4
+│   │   ├── broker-config.ts            # Configured broker fallback (host:port)
 │   │   ├── StateClass.svelte.js        # ObjectMap/StateMap/EnumMap/CustomMap/StateClass
 │   │   ├── registry.svelte.js          # deviceList load/save
 │   │   ├── formulas.svelte.js          # formulaList load/save

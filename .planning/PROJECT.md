@@ -134,7 +134,7 @@ plus the plain "Decisions" lists) lives in `.planning/intel/constraints.md`.
 | The display only ever moves on the broker's word (`setState`, then `stateChange`) | One write path; no component writes the live cache | ✓ Good |
 | Virtual states are client-side over the device-state pool, with no dependency resolution (v1) | Avoids cycles and a server-side compute layer | ⚠️ Revisit — ordered evaluation + cycle detection is deferred to v2 |
 | `www/` is committed and shipped in the package | GitHub installs do not run a frontend build | ⚠️ Revisit — it can silently drift from `src/` (Phase 1 adds the guard) |
-| Vendored WebSocket client (v3.0.4) instead of `socket.io-client` | It speaks the raw ioBroker protocol against `…/socket.io` | ⚠️ Revisit — no upgrade path and invisible to `npm audit` (Phase 2 records version + re-vendor procedure) |
+| WebSocket client `@iobroker/ws` (published) instead of `socket.io-client` | It speaks the raw ioBroker protocol against `…/socket.io` | ✅ Replaced — the hand-vendored v3.0.4 copy became the published upstream `@iobroker/ws` on 2026-10-22 (quick task `261022-up1`); the transport conclusion (raw ioBroker protocol, not `socket.io-client`) still holds |
 
 ---
 *Last updated: 2026-10-22 after ingesting the 22-doc design record and mapping the codebase*

@@ -10,11 +10,11 @@ last_mapped_at: 2026-10-22
 
 ## Tech Debt
 
-**Vendored WebSocket client:**
-- Issue: `src/lib/iobroker.socket.io.js` is a hand-vendored copy of the ioBroker WebSockets client v3.0.4, marked `// @ts-nocheck`, not tracked as an npm dependency.
-- Files: `src/lib/iobroker.socket.io.js` (413 lines)
-- Impact: no automated upgrade path; upstream protocol fixes must be re-vendored by hand, and the file is invisible to `npm audit` and to type checking.
-- Fix approach: pin it as a dependency (or an `overrides`/subtree note) and record the upstream version + a re-vendor procedure in a comment or `docs/`.
+**Vendored WebSocket client — resolved 2026-10-22:**
+- Issue (historical): `src/lib/iobroker.socket.io.js` was a hand-vendored copy of the ioBroker WebSockets client v3.0.4, marked `// @ts-nocheck`, not tracked as an npm dependency.
+- Resolved: quick task `261022-up1` replaced it with the published upstream `@iobroker/ws` 3.1.3 (devDependency, bundled into `www/`); the file and its ESLint block are gone and `src/lib/socket-client.test.ts` pins the package's entry-point contract.
+- Impact (was): no automated upgrade path; upstream protocol fixes had to be re-vendored by hand, and the file was invisible to `npm audit` and to type checking.
+- Fix approach (now): upgrade with npm; the version is pinned in `package-lock.json`.
 
 **Type-suppression clusters:**
 - Issue: 15 `@ts-ignore` / `@ts-expect-error` / `eslint-disable` sites, concentrated rather than incidental.
@@ -116,7 +116,7 @@ No open bug list is tracked in-repo. Session-level findings live in `docs/progre
 - Impact: a major bump changes lifecycle hooks used by `main.js`.
 - Migration plan: `test/integration.js` (mocha, real js-controller) is the guard; run it before bumping.
 
-**Vendored socket client (see Tech Debt):** cannot be upgraded by `npm update`.
+**Socket client upgrade path (see Tech Debt):** resolved 2026-10-22 by quick task `261022-up1` — the client is now the published `@iobroker/ws`, upgraded with `npm update`.
 
 ## Missing Critical Features
 

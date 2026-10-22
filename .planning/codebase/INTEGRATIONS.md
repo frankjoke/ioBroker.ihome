@@ -10,8 +10,8 @@ last_mapped_at: 2026-10-22
 
 **ioBroker broker (socket):**
 - The SPA is a pure client of the ioBroker WebSocket API — the single most important integration.
-- SDK/Client: vendored ioBroker WebSocket client v3.0.4 at `src/lib/iobroker.socket.io.js` (raw `WebSocket`, not the npm `socket.io-client`); wrapped by `src/lib/ioBrokerConnect.svelte.js`.
-- Endpoint resolution: `src/lib/socket-url.ts` — `VITE_SOCKET_URL` → `?socket=` query param → `ws(s)://<page-host>:8081/socket.io`. The layout can override with the persisted `Host:Port` (`__VISUAL__:hostPort` in localStorage, `src/routes/+layout.svelte`).
+- SDK/Client: `@iobroker/ws` 3.1.3 (devDependency, bundled into `www/`; raw `WebSocket`, not the npm `socket.io-client`) — the published upstream of the copy that used to be vendored at `src/lib/iobroker.socket.io.js`; wrapped by `src/lib/ioBrokerConnect.svelte.js`.
+- Endpoint resolution: `src/lib/socket-url.ts` — `VITE_SOCKET_URL` → `?socket=` query param → the configured fallback (`FALLBACK_BROKER` in `src/lib/broker-config.ts`, empty by default) → `ws(s)://<page-host>:8081/socket.io`. The layout can override with the persisted `Host:Port` (`__VISUAL__:hostPort` in localStorage, `src/routes/+layout.svelte`).
 - Handshake: connects with `?sid=<timestamp>` and emits `name` with the namespace (`DEFAULT_NAMESPACE = "ihome.0"`); optional `token`/`name` query params are supported by the client but not set by the app.
 - RPC calls used (`src/lib/ioBrokerConnect.svelte.js`):
   - `getAllObjects` — full object cache at connect
@@ -77,7 +77,7 @@ last_mapped_at: 2026-10-22
 **Auth Provider:**
 - None in the app. Authentication and permissions are enforced by ioBroker (the WebSocket handshake carries the broker's session; `permissionError` events are logged in `src/lib/ioBrokerConnect.svelte.js`).
 - The SPA writes as `system.adapter.ihome.0` (`setState` in `src/lib/ioBrokerConnect.svelte.js`), so the broker's ACL for that namespace applies.
-- No login screen, OAuth, JWT, or token storage. The vendored client supports a `token` query parameter, unused here.
+- No login screen, OAuth, JWT, or token storage. The adopted `@iobroker/ws` client supports a `token` query parameter, unused here.
 
 ## Monitoring & Observability
 

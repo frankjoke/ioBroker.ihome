@@ -289,7 +289,7 @@ expect((ioBroker as any).getState).not.toHaveBeenCalled();
 ## Coverage Gaps
 
 **Untested source modules (no adjacent test file):**
-- Broker/socket layer: `src/lib/ioBrokerConnect.svelte.js`, `src/lib/StateClass.svelte.js`, `src/lib/iobroker.socket.io.js` (vendored), `src/lib/localStorage.js`, `src/lib/serviceWorkerComm.js`, `src/lib/pages.js`.
+- Broker/socket layer: `src/lib/ioBrokerConnect.svelte.js`, `src/lib/StateClass.svelte.js`, `src/lib/socket-client.test.ts` (adopted `@iobroker/ws` contract), `src/lib/localStorage.js`, `src/lib/serviceWorkerComm.js`, `src/lib/pages.js`.
 - Stores: `src/lib/stores/pages.svelte.ts`, `src/lib/stores/templates.svelte.ts`, `src/lib/stores/formulas.svelte.ts`, `src/lib/stores/sheet.svelte.ts`.
 - Helpers: `src/lib/theme.svelte.js`, `src/lib/time.svelte.js`, `src/lib/tools.svelte.js`, `src/lib/registry.svelte.js`, `src/lib/formulas.svelte.js`, `src/lib/states.svelte.js`, `src/lib/picker-state.svelte.js`, `src/lib/utils.ts`, `src/lib/utils/ids.ts`, `src/lib/utils/json.ts`, `src/lib/config/doc-parse.ts`, `src/lib/config/presets.ts`.
 - Adapter: `main.js` is covered only indirectly by the integration test; its migration/placeholder logic has no unit test.

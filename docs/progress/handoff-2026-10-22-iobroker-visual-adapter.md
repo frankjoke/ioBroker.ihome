@@ -72,3 +72,13 @@ IOBROKER_MCP=http://192.168.178.9:8082/mcp/ npm run deploy:www   # live UI deplo
 # install: Admin → Adapters → install dialog → pick the .tgz (uploads + uploads www)
 # then: Instances → ihome.0 → start (runs the migration once, then exits)
 ```
+
+## Quick task 261022-up1 — published WebSocket client + a configured broker fallback
+
+*Branch `quick/261022-up1-websocket-client`, based on `dafa71e`. Code commits `614c5ad`, `e7103dd`, bundle+record commit last.*
+
+- **UP1-R1 — the vendored client is gone.** `src/lib/iobroker.socket.io.js` (hand-vendored "ioBroker WebSockets" v3.0.4) is replaced by its published upstream **`@iobroker/ws` 3.1.3** as a **devDependency** (bundled into `www/`, so installers still get one runtime dependency). Not `@iobroker/socket-client`: that package is the admin/vis `Connection` API driven through a server-served global `io` script — adopting it would mean rebuilding the whole transport, and its exported `SocketClient` is a type only. `@iobroker/ws` publishes **no ES exports** (its build ends with `globalThis.io = { connect }`), so `ioBrokerConnect.svelte.js` imports it for its side effect and creates the client with `globalThis.io.connect(url, options)` — which connects immediately; the reused-client path reconnects through `socket.connect(...)`. `src/lib/socket-client.test.ts` pins the entry point and surface (nothing else guards the transport).
+- **UP1-R2 — one configured broker address.** New `src/lib/broker-config.ts` holds `FALLBACK_BROKER` as `host:port` — **committed empty** (a pinned private address in a published `www/` would point every other installation at someone's LAN). It sits in one tested order in `src/lib/socket-url.ts`: `VITE_SOCKET_URL` → `?socket=` → `FALLBACK_BROKER` → `ws(s)://<page-host>:8081/socket.io`. `+layout.svelte` derives its URL from `socketUrlFromHostPort` (one home for the rule) and `icon-url.ts` reads the same broker for icons. Both settings descriptions of an empty Host:Port now name the fallback first.
+- **`www/` rebuilt and committed** — carrying the adopted client (`callbackTimeout` marker) and **zero** matches for the private address.
+- **Human check pending:** H1 (locally started PWA from `npm run preview`, fallback pinned to `192.168.178.9:8081`) and H2 (broker-served origin `http://192.168.178.9:8082/ihome/index.html`) against the live broker were **not run** by the executing agent — no browser. Run H1/H2 before merging; the automatable gates are green (399 unit tests, 46 package tests, check, lint, build).
+- **Revert recipe:** nothing outside this branch was touched — `git switch main && git branch -D quick/261022-up1-websocket-client` restores the previous state.

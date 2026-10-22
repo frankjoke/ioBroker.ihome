@@ -25,7 +25,7 @@ iHome is a two-part system: a **one-shot ioBroker adapter** (`main.js`) that own
 │  SPA (browser) — served by web adapter at /ihome/index.html           │
 │                                                                       │
 │  Transport      ioBrokerConnect.svelte.js                             │
-│                 iobroker.socket.io.js (vendored WS client)            │
+│                 @iobroker/ws (published WS client)                   │
 │                 StateClass.svelte.js (objects/states/enums/customs)   │
 │                                                                       │
 │  State stores   stores/pages · templates · devices · formulas         │
@@ -59,7 +59,7 @@ iHome is a two-part system: a **one-shot ioBroker adapter** (`main.js`) that own
 | Settings route | Connection (host/namespace), theme, formula library | `src/routes/settings/+page.svelte` |
 | Legacy redirect | `/config/devices` → `/#/devices` | `src/routes/config/devices/+page.ts` |
 | Socket integration | Connect/reconnect, RPC timeouts, cache hydration, inbound event fan-out, `setState` stamping | `src/lib/ioBrokerConnect.svelte.js` |
-| WebSocket client | Vendored ioBroker WebSocket protocol client v3.0.4 (reconnect, ping, callbacks) | `src/lib/iobroker.socket.io.js` |
+| WebSocket client | Published ioBroker WebSocket protocol client `@iobroker/ws` v3.1.3 (reconnect, ping, callbacks) | devDependency, bundled into `www/` |
 | Reactive caches | `ObjectMap`, `StateMap`, `EnumMap`, `CustomMap` built on `SvelteMap`; `StateClass` wraps one state's value + object | `src/lib/StateClass.svelte.js` |
 | Page document store | Load/parse/seed `pageList`, view state, debounced writes, migration to placements | `src/lib/stores/pages.svelte.ts` |
 | Template document store | Load/parse `templateList`, guarded commit + debounced write | `src/lib/stores/templates.svelte.ts` |
@@ -103,9 +103,9 @@ iHome is a two-part system: a **one-shot ioBroker adapter** (`main.js`) that own
 
 **Transport / Integration:**
 - Purpose: one socket, one set of caches, one RPC surface.
-- Location: `src/lib/ioBrokerConnect.svelte.js`, `src/lib/iobroker.socket.io.js`, `src/lib/StateClass.svelte.js`, `src/lib/socket-url.ts`, `src/lib/states.svelte.js`.
+- Location: `src/lib/ioBrokerConnect.svelte.js`, `src/lib/broker-config.ts`, `src/lib/StateClass.svelte.js`, `src/lib/socket-url.ts`, `src/lib/states.svelte.js`.
 - Contains: `ioBroker` rune object, `connectIOBroker`, `emitAsync`, `emitOnly`, `getState`, `getObject`, `setState`, cache classes, used-state loader.
-- Depends on: vendored WS client, `stores/devices` (only for `getUsedStateIds`).
+- Depends on: the published `@iobroker/ws` client, `stores/devices` (only for `getUsedStateIds`).
 - Used by: every store and component that reads/writes broker data.
 
 **State Stores (application state):**
@@ -294,7 +294,7 @@ iHome is a two-part system: a **one-shot ioBroker adapter** (`main.js`) that own
 - **HMR duplication:** Vite can instantiate one module twice. Do not store the socket client in a module-global of a pure/store module; import the shared `ioBroker` module directly (documented in `src/lib/stores/pages.svelte.ts` lines 5-8) or pass a client interface. Cross-navigation handoffs use sessionStorage (`src/lib/pages.js`).
 - **Import cycle avoidance:** `ioBrokerConnect.svelte.js` imports `getUsedStateIds` from `stores/devices.svelte.js` at the bottom of the file; the device store must not import the socket. This is why the store receives `setStateSource`/`setObjectSource` from the layout.
 - **Browser APIs at module scope:** `ioBrokerConnect.svelte.js` touches `navigator`, `document`, and `location` at import time, so it is browser-only and not SSR-safe. The app is not server-rendered.
-- **Type strictness:** `tsconfig.json` has `strict: false`; several legacy modules are `// @ts-nocheck` (`ioBrokerConnect.svelte.js`, `StateClass.svelte.js`, `registry.svelte.js`, `formulas.svelte.js`, `tools.svelte.js`, `picker-values.svelte.js`, `iobroker.socket.io.js`). New domain code is typed.
+- **Type strictness:** `tsconfig.json` has `strict: false`; several legacy modules are `// @ts-nocheck` (`ioBrokerConnect.svelte.js`, `StateClass.svelte.js`, `registry.svelte.js`, `formulas.svelte.js`, `tools.svelte.js`, `picker-values.svelte.js`). New domain code is typed.
 - **New-code layering:** `src/lib/config/**` must not import stores, components, or the socket (current import scan is clean). Keep it that way; it is what makes the 30+ test files possible.
 - **Document compatibility:** documents are versioned (`PageRegistry.version`, `PAGE_REGISTRY_VERSION = 1`) and migrated idempotently on connect; parsing is shape-validated and invalid documents are never overwritten.
 - **Offline/PWA:** service worker only exists in secure contexts; plain-HTTP LAN installs behave as a normal SPA.

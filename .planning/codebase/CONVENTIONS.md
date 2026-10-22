@@ -14,7 +14,7 @@ last_mapped_at: 2026-10-22
 - Runes modules use the `.svelte.ts` / `.svelte.js` suffix: `src/lib/stores/pages.svelte.ts`, `src/lib/theme.svelte.js`, `src/lib/StateClass.svelte.js`.
 - Pure config-operation modules end in `-ops`: `src/lib/config/pages-ops.ts`, `layout-ops.ts`, `rule-ops.ts`, `tile-ops.ts`, `history-ops.ts`, `transform-ops.ts`, `virtual-ops.ts`, `template-ops.ts`, `size-ops.ts`, `sort.ts` (exception).
 - Tests are co-located and named `<module>.test.ts`: `src/lib/config/format.test.ts`, `src/lib/utils/debounce.test.ts`.
-- Legacy/vendored browser clients keep their original dotted names: `src/lib/iobroker.socket.io.js`, `src/lib/ioBrokerConnect.svelte.js`.
+- Legacy/vendored browser clients keep their original dotted names: `src/lib/ioBrokerConnect.svelte.js`.
 
 **Functions:**
 - camelCase, always starting with a verb that states intent:

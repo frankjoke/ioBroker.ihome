@@ -42,6 +42,7 @@ describe has landed and is listed as Validated in `PROJECT.md`.
   Node 22.x and 24.x
 - [ ] **INSTALL-06**: `engines.node` matches the actual toolchain floor (Vite 7 / Vitest 4), and the
   vendored WebSocket client records its upstream version plus a re-vendor procedure
+  - superseded 2026-10-22 by quick task `261022-up1`: the client is now the published `@iobroker/ws`, versioned in `package-lock.json` and upgraded with npm (the `engines.node` clause still stands)
 
 ### History and charts
 
