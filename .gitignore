@@ -28,3 +28,8 @@ Thumbs.db
 
 # Serena MCP local state
 .serena/
+
+# GSD planning state — local only, never published
+# (GSD's own doc-commits are disabled via .planning/config.json commit_docs:false)
+.planning/
+.gsd/
