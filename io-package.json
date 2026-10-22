@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.11",
+        "version": "0.0.12",
         "news": {
+            "0.0.12": {
+                "en": "The connection settings stay editable while connected: save and the dashboard reconnects with the new broker address or namespace",
+                "de": "Die Verbindungseinstellungen bleiben auch im verbundenen Zustand bearbeitbar: Speichern verbindet das Dashboard mit der neuen Broker-Adresse bzw. dem Namespace neu"
+            },
             "0.0.11": {
                 "en": "Uses the published ioBroker WebSocket client, and a locally started PWA can be pointed at a broker address configured in the app",
                 "de": "Nutzt den veröffentlichten ioBroker-WebSocket-Client; eine lokal gestartete PWA kann über eine in der App konfigurierte Broker-Adresse verbunden werden"
