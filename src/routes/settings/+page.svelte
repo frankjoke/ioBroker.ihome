@@ -1,6 +1,5 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { FALLBACK_BROKER } from "$lib/broker-config";
   import { newId } from "$lib/utils/ids";
   import { getStorage } from "$lib/tools.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
@@ -16,6 +15,14 @@
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
+
+  /**
+   * The broker the live socket is actually on. The fields above may hold an
+   * edit that has not been applied yet, so they must not be shown as "in use".
+   */
+  function activeBrokerUrl(): string {
+    return ioBroker.connectOptions?.url ?? "";
+  }
 
   function applyAndReload() {
     location.reload();
@@ -74,21 +81,16 @@
           type="text"
           bind:value={storage.hostPort}
           placeholder="e.g. 192.168.1.10:8081"
-          disabled={isConnected}
         />
         <span class="hint text-muted"
           >Leave empty to use the configured broker fallback, or the host
-          serving this page when no fallback is set (socket.io on port 8081).</span
+          serving this page when no fallback is set (socket.io on port 8081).
+          Editing this while connected is fine — saving reconnects.</span
         >
       </div>
       <div class="field">
         <label class="label-mono" for="settings-ns">Namespace</label>
-        <input
-          id="settings-ns"
-          type="text"
-          bind:value={storage.namespace}
-          disabled={isConnected}
-        />
+        <input id="settings-ns" type="text" bind:value={storage.namespace} />
         <span class="hint text-muted"
           >Identity stamped as "from" on every write, e.g. ihome.0 — the
           adapter's io-package name plus instance.</span
@@ -99,16 +101,13 @@
         <p class="conn-note">
           <span class="badge badge-success">connected</span>
           <span class="text-muted"
-            >{ioBroker.namespace} via {storage.hostPort ||
-              FALLBACK_BROKER ||
-              "this host"}</span
+            >{ioBroker.namespace} via {activeBrokerUrl()}</span
           >
         </p>
-      {:else}
-        <button class="btn btn-primary" onclick={applyAndReload}>
-          Apply & Reload
-        </button>
       {/if}
+      <button class="btn btn-primary" onclick={applyAndReload}>
+        {isConnected ? "Save & reconnect" : "Apply & reload"}
+      </button>
     </div>
   </section>
 
