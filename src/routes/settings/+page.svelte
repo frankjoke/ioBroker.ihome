@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { FALLBACK_BROKER } from "$lib/broker-config";
   import { newId } from "$lib/utils/ids";
   import { getStorage } from "$lib/tools.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
@@ -76,8 +77,8 @@
           disabled={isConnected}
         />
         <span class="hint text-muted"
-          >Leave empty to use the host serving this page (socket.io on port
-          8081).</span
+          >Leave empty to use the configured broker fallback, or the host
+          serving this page when no fallback is set (socket.io on port 8081).</span
         >
       </div>
       <div class="field">
@@ -98,7 +99,9 @@
         <p class="conn-note">
           <span class="badge badge-success">connected</span>
           <span class="text-muted"
-            >{ioBroker.namespace} via {storage.hostPort || "this host"}</span
+            >{ioBroker.namespace} via {storage.hostPort ||
+              FALLBACK_BROKER ||
+              "this host"}</span
           >
         </p>
       {:else}

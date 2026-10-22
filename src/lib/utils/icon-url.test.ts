@@ -1,4 +1,4 @@
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
 import { collectDocumentIcons, iconBase, iconSrc } from "./icon-url";
 import { isImageIcon } from "$lib/config/icon-ops";
@@ -113,6 +113,31 @@ it("iconSrc with no base argument uses the configured host, and absolutes bypass
     );
     expect(iconSrc("lightbulb")).toBe("lightbulb");
   } finally {
+    if (hadLs) g.localStorage = savedLs;
+    else delete g.localStorage;
+    if (hadLoc) g.location = savedLoc;
+    else delete g.location;
+  }
+});
+
+it("iconBase uses the configured broker fallback when nothing is stored", async () => {
+  const g = globalThis as any;
+  const hadLs = "localStorage" in g;
+  const hadLoc = "location" in g;
+  const savedLs = g.localStorage;
+  const savedLoc = g.location;
+  try {
+    g.location = { origin: "http://localhost:5173", protocol: "http:" };
+    g.localStorage = { getItem: () => null };
+    vi.resetModules();
+    vi.doMock("$lib/broker-config", () => ({
+      FALLBACK_BROKER: "192.168.178.9:8082",
+    }));
+    const mod = await import("./icon-url");
+    expect(mod.iconBase()).toBe("http://192.168.178.9:8082");
+    vi.doUnmock("$lib/broker-config");
+  } finally {
+    vi.resetModules();
     if (hadLs) g.localStorage = savedLs;
     else delete g.localStorage;
     if (hadLoc) g.location = savedLoc;

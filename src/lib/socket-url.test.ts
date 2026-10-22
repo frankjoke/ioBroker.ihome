@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultSocketUrl } from "./socket-url";
+import {
+  defaultSocketUrl,
+  resolveSocketUrl,
+  socketUrlFromHostPort,
+} from "./socket-url";
 
 function setLocation(href: string): void {
   const url = new URL(href);
@@ -39,5 +43,60 @@ describe("defaultSocketUrl", () => {
     setLocation("http://localhost:5173/");
     vi.stubEnv("VITE_SOCKET_URL", "ws://192.168.178.9:8081/socket.io");
     expect(defaultSocketUrl()).toBe("ws://192.168.178.9:8081/socket.io");
+  });
+});
+
+describe("socketUrlFromHostPort", () => {
+  it("builds the socket.io URL of a host:port", () => {
+    expect(socketUrlFromHostPort("192.168.178.9:8081")).toBe(
+      "ws://192.168.178.9:8081/socket.io",
+    );
+  });
+
+  it("has no URL for an empty value", () => {
+    expect(socketUrlFromHostPort("")).toBe("");
+  });
+});
+
+describe("resolveSocketUrl", () => {
+  const page = { protocol: "http:", hostname: "localhost" };
+
+  it("uses the configured fallback when nothing else is given", () => {
+    expect(
+      resolveSocketUrl({ ...page, configured: "192.168.178.9:8081" }),
+    ).toBe("ws://192.168.178.9:8081/socket.io");
+  });
+
+  it("?socket= wins over the configured fallback", () => {
+    expect(
+      resolveSocketUrl({
+        ...page,
+        query: "wss://proxy/socket.io",
+        configured: "192.168.178.9:8081",
+      }),
+    ).toBe("wss://proxy/socket.io");
+  });
+
+  it("VITE_SOCKET_URL wins over the configured fallback", () => {
+    expect(
+      resolveSocketUrl({
+        ...page,
+        env: "ws://env-host:8081/socket.io",
+        configured: "192.168.178.9:8081",
+      }),
+    ).toBe("ws://env-host:8081/socket.io");
+  });
+
+  it("falls back to the page host when nothing is configured", () => {
+    expect(resolveSocketUrl({ ...page, configured: "" })).toBe(
+      "ws://localhost:8081/socket.io",
+    );
+    expect(
+      resolveSocketUrl({
+        protocol: "https:",
+        hostname: "iobroker.example.com",
+        configured: "",
+      }),
+    ).toBe("wss://iobroker.example.com:8081/socket.io");
   });
 });

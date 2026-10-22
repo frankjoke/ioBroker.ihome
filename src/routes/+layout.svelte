@@ -8,7 +8,7 @@
     DEFAULT_NAMESPACE,
     ioBrokerStart,
   } from "$lib/ioBrokerConnect.svelte.js";
-  import { defaultSocketUrl } from "$lib/socket-url";
+  import { defaultSocketUrl, socketUrlFromHostPort } from "$lib/socket-url";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -49,8 +49,7 @@
       : storage.namespace;
 
   function buildUrl(hostPort) {
-    if (hostPort) return `ws://${hostPort}/socket.io`;
-    return defaultSocketUrl();
+    return socketUrlFromHostPort(hostPort) || defaultSocketUrl();
   }
 
   const ioBroker = ioBrokerStart({

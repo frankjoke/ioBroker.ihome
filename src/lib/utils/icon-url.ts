@@ -3,13 +3,15 @@
 // a broker-relative path ("adapter/name.png", served by the ioBroker web server).
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
 import { isImageIcon, ownerOf } from "$lib/config/icon-ops";
+import { FALLBACK_BROKER } from "$lib/broker-config";
 
 /** The footer's host setting, where the app keeps the broker it talks to. */
 const HOST_KEY = "__VISUAL__:hostPort";
 
 /** The ioBroker base an icon path hangs off (A66): the configured Host:Port,
- *  else this origin — in production the app is served from `/adapter/ihome/…`,
- *  where root-relative already means the broker. */
+ *  else the configured broker fallback, else this origin — in production the
+ *  app is served from `/adapter/ihome/…`, where root-relative already means the
+ *  broker. */
 export function iconBase(): string {
   const g = globalThis as {
     localStorage?: { getItem(key: string): string | null };
@@ -22,6 +24,7 @@ export function iconBase(): string {
   } catch {
     hostPort = "";
   }
+  if (!hostPort) hostPort = FALLBACK_BROKER;
   if (!hostPort) return g.location?.origin ?? "";
   return `${g.location?.protocol === "https:" ? "https:" : "http:"}//${hostPort}`;
 }
