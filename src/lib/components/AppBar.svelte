@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { goto } from "$app/navigation";
   import { page as route } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
@@ -205,7 +206,10 @@
     onSubmit={() => {
       unlock();
       askingSettingsPin = false;
-      location.hash = "#/settings";
+      // `goto`, not `location.hash = …`: SvelteKit's hash router reloads the
+      // page on a direct hash edit, and that reload dropped the unlock just
+      // granted (the settings came back locked).
+      void goto("#/settings");
     }}
     onCancel={() => (askingSettingsPin = false)}
   />

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import {
     getCanonicalRegistry,
     setCanonicalRegistry,
@@ -191,7 +192,10 @@
           title="Back to the tile editor"
           onclick={() => {
             openSheet();
-            location.hash = "#/";
+            // `goto`, not `location.hash = …`: a direct hash edit makes the
+            // hash router reload, and the sheet opened just above — module
+            // state — would not survive it.
+            void goto("#/");
           }}
         >
           <span class="material-symbols-outlined">arrow_back</span>Back to the

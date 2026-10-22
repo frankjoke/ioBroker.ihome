@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { goto } from "$app/navigation";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
@@ -397,7 +398,7 @@
       return;
     }
     requestDeviceConfig(device.id);
-    location.hash = "#/devices";
+    void goto("#/devices");
   }
 
   function onCapture(event: MouseEvent) {
