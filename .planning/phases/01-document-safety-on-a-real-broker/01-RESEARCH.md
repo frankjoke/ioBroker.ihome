@@ -837,7 +837,10 @@ confirmed before the other test files are written on top of the same fake.
 | A5 | Test files under `src/**` are not part of the bundle, so excluding `**/*.test.ts` from the build fingerprint is correct | Pattern 3, Anti-Patterns | If a test file did enter the bundle, the fingerprint would miss a real build change. Verified indirectly: the current build's only JS is inlined from `src/routes`, and adding a unit test has never altered `www/`. |
 | A6 | The store tests can rely on `$lib/stores/devices.svelte.ts` being import-safe under the mocked socket (it takes its caches by injection and imports no socket module) | Pattern 1 | If wrong, `pages.svelte.ts`'s import of `registerProgramStateId` would pull a second socket consumer into the test. The probe imported `pages.svelte.ts` (which imports it) successfully, so this held. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All four questions below are RESOLVED: each carries an inline `**RESOLVED**` line naming the plan task that
+> settles it. None blocks execution.
 
 1. **Does PERSIST-01's "an absent or unparsable document" cover all four documents, or `pageList` only?**
    - What we know: success criterion 1 names `ihome.0.config.pageList`; PERSIST-01's wording says "a
@@ -851,6 +854,9 @@ confirmed before the other test files are written on top of the same fake.
      recorded follow-up** — that is a proof, not a silent acceptance. If the user wants the guard
      extended, it is a small change (a load-kind flag mirroring `templatesLoadKind`) and should be its
      own task.
+   - **RESOLVED — plan 01-03 Task 3 + plan 01-05 Task 1:** the asymmetry is proven rather than fixed —
+     01-03 Task 3 asserts the current `formulaList` seed-and-write-back and names it a gap, and 01-05
+     Task 1 records the durable PROJECT.md follow-up. The guard is not extended in this phase.
 
 2. **What is PERSIST-03's `sheet` write path?**
    - What we know: `src/lib/stores/sheet.svelte.ts` is 16 lines of open/close UI state with no
@@ -862,6 +868,9 @@ confirmed before the other test files are written on top of the same fake.
    - Recommendation: treat "sheet" as the sheet→`commitLayout` path; add one test that calls
      `commitLayout` the way the sheet does (a refusal case through the sheet's entry point is already
      the `pages` refusal test) and note the interpretation in the plan.
+   - **RESOLVED — plan 01-01 Task 3 (d):** "sheet" is the sheet→`commitLayout` write path; that task
+     drives `commitLayout` the way `LayoutSheet.svelte` does and records the interpretation in a comment,
+     alongside `sheet.svelte.ts` having no persistence of its own. No fifth document exists.
 
 3. **Does the failed edit get queued, or re-sent from live state on reconnect?**
    - What we know: `savePages` serialises the **whole** registry on every flush
@@ -874,6 +883,9 @@ confirmed before the other test files are written on top of the same fake.
      exported `flushPendingSave()` called from the `$effect` that already watches
      `ioBroker.connected` in `+layout.svelte:74-102` — is also viable but moves a store concern into a
      component.
+   - **RESOLVED — plan 01-01 Task 2:** the self-contained retry in the store (`flushPages()`, `RETRY_MS =
+     2000`, an unbounded re-arm while `saveFailed` holds), re-serialising the live registry at flush time;
+     no component coupling, and the "not saved" surface stays the editor's existing flag.
 
 4. **Where exactly should the fingerprint function live?**
    - What we know: `vite.config.mjs` must compute it (to become `version.name`) and
@@ -881,6 +893,9 @@ confirmed before the other test files are written on top of the same fake.
    - Recommendation: one module, e.g. `scripts/build-fingerprint.mjs`, imported by both. Note that
      `vite.config.mjs` is ESM (`.mjs`) and so is the script, so the import is clean — but it must not
      live under `src/`, or `svelte-check` will type-check a build script as app code.
+   - **RESOLVED — plan 01-04 Task 1:** one module `scripts/build-fingerprint.mjs` (outside `src/`, ESM,
+     stdlib-only) exporting `buildFingerprint()` and `walk()`, imported by both `vite.config.mjs` (as
+     `version.name`) and `scripts/www-drift.mjs` (as the check), so the hash is computed one way only.
 
 ## Validation Architecture
 
