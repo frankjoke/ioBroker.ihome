@@ -39,6 +39,8 @@
   let showForm = $state(false);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let askingPin = $state(false);
+  /** The lock banner's prompt: the page renders without it, the PIN is asked. */
+  let askingUnlock = $state(false);
   /** The change flow: current PIN first, then the new one. */
   let pinStep = $state<"off" | "verify" | "new">("off");
 
@@ -89,13 +91,25 @@
   <title>Settings - iHome</title>
 </svelte:head>
 
-{#if isUnlocked()}
-  <div class="settings-page">
-    <div class="page-header">
-      <span class="label-mono">Configuration</span>
-      <h1>Settings</h1>
-    </div>
+<div class="settings-page">
+  <div class="page-header">
+    <span class="label-mono">Configuration</span>
+    <h1>Settings</h1>
+  </div>
 
+  {#if !isUnlocked()}
+    <p class="lock-note">
+      <span class="material-symbols-outlined">lock</span>
+      <span class="text-muted"
+        >Locked — enter the PIN to change these settings.</span
+      >
+      <button class="btn btn-primary" onclick={() => (askingUnlock = true)}
+        >Unlock</button
+      >
+    </p>
+  {/if}
+
+  <fieldset class="lock-zone" disabled={!isUnlocked()}>
     <section class="card settings-card">
       <div class="card-header">
         <span class="material-symbols-outlined">lan</span>
@@ -340,16 +354,24 @@
         >
       </div>
     </section>
-  </div>
-{:else}
-  <PinModal
-    title="Settings locked"
-    hint="Enter your PIN to open the settings."
-    expected={storedPin}
-    onSubmit={unlock}
-    onCancel={() => (location.hash = "#/")}
-  />
-{/if}
+  </fieldset>
+
+  <!-- Every modal above opens only from a control inside the fieldset, so a
+         locked page can never hold one open in a disabled state; the unlock
+         prompt is the one that must work while locked, hence outside. -->
+  {#if askingUnlock}
+    <PinModal
+      title="Enter your PIN"
+      hint="The settings are protected."
+      expected={storedPin}
+      onSubmit={() => {
+        unlock();
+        askingUnlock = false;
+      }}
+      onCancel={() => (askingUnlock = false)}
+    />
+  {/if}
+</div>
 
 <style>
   .settings-page {
@@ -357,6 +379,27 @@
     flex-direction: column;
     gap: 1.5rem;
     max-width: 640px;
+  }
+
+  .lock-note {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    font-size: var(--body-sm);
+  }
+
+  /* The cards, as one all-or-nothing group: `disabled` on the fieldset reaches
+     every input and button inside it, so a locked page cannot be typed into —
+     which matters, because the fields write straight to localStorage. */
+  .lock-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-inline-size: 0;
   }
 
   .page-header {

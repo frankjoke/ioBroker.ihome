@@ -16,6 +16,9 @@
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
+  import PinModal from "$lib/components/common/PinModal.svelte";
+  import { getStorage } from "$lib/tools.svelte";
+  import { effectivePin, isUnlocked, unlock } from "$lib/config/pin.svelte";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -40,6 +43,24 @@
       : (treePages[0]?.id ?? "");
   });
   const isConnected = $derived(!!ioBroker.connected);
+
+  const storage = getStorage();
+  const storedPin = $derived(effectivePin(storage.pin));
+  let askingSettingsPin = $state(false);
+
+  /**
+   * The settings ask for the PIN here — on the way in — instead of the settings
+   * page asking on load. A reload (or a dev-server reload) must never throw a
+   * modal at the operator; only a deliberate press of the cog does.
+   *
+   * Capture phase: SvelteKit's router listens before a delegated `onclick`, so
+   * only a capture handler can still say no (same reason as `onPageClick`).
+   */
+  function onSettingsClick(event: MouseEvent) {
+    if (isUnlocked()) return;
+    event.preventDefault();
+    askingSettingsPin = true;
+  }
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
    *  Capture phase: SvelteKit's router listens earlier than a delegated
@@ -139,6 +160,7 @@
       class="icon-btn status-btn"
       class:connected={isConnected}
       href={`${base}/#/settings`}
+      onclickcapture={onSettingsClick}
       title={isConnected
         ? "Connected — open the connection settings"
         : "Not connected — open the connection settings"}
@@ -152,6 +174,7 @@
     <a
       class="icon-btn"
       href={`${base}/#/settings`}
+      onclickcapture={onSettingsClick}
       title="System settings"
       aria-label="System settings"
     >
@@ -159,6 +182,20 @@
     </a>
   </div>
 </header>
+
+{#if askingSettingsPin}
+  <PinModal
+    title="Enter your PIN"
+    hint="The settings are protected."
+    expected={storedPin}
+    onSubmit={() => {
+      unlock();
+      askingSettingsPin = false;
+      location.hash = "#/settings";
+    }}
+    onCancel={() => (askingSettingsPin = false)}
+  />
+{/if}
 
 <style>
   .bar {
