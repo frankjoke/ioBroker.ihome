@@ -39,7 +39,8 @@
   let showForm = $state(false);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let askingPin = $state(false);
-  let changingPin = $state(false);
+  /** The change flow: current PIN first, then the new one. */
+  let pinStep = $state<"off" | "verify" | "new">("off");
 
   const formulas = $derived(getFormulas());
   /** True while the shipped default (or a missing/malformed value) is in force. */
@@ -163,7 +164,7 @@
             ? "The shipped default PIN is still in use — change it to your own. It guards this page on this device only, and it is a convenience lock, not a security boundary."
             : "A PIN guards this page on this device only. It is a convenience lock, not a security boundary."}
         </p>
-        <button class="btn" onclick={() => (changingPin = true)}
+        <button class="btn" onclick={() => (pinStep = "verify")}
           >Change PIN</button
         >
       </div>
@@ -301,16 +302,27 @@
       />
     {/if}
 
-    {#if changingPin}
+    {#if pinStep === "verify"}
       <PinModal
         title="Change PIN"
+        hint="Enter your current PIN first."
+        confirmLabel="Continue"
+        expected={storedPin}
+        onSubmit={() => (pinStep = "new")}
+        onCancel={() => (pinStep = "off")}
+      />
+    {/if}
+
+    {#if pinStep === "new"}
+      <PinModal
+        title="Choose a new PIN"
         hint="Digits only, 4 to 6 characters. It guards the settings on this device."
         confirmLabel="Save PIN"
         onSubmit={(pin) => {
           storage.pin = pin;
-          changingPin = false;
+          pinStep = "off";
         }}
-        onCancel={() => (changingPin = false)}
+        onCancel={() => (pinStep = "off")}
       />
     {/if}
 
