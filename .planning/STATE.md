@@ -6,10 +6,10 @@ current_phase: 1
 current_phase_name: Document safety on a real broker
 status: planning
 stopped_at: Phase 1 context gathered
-last_updated: "2026-10-22T19:24:10.466Z"
+last_updated: "2026-10-22T20:28:34.571Z"
 last_activity: 2026-10-22
 last_activity_desc: ingested the 22-doc design record, mapped the codebase, wrote PROJECT/REQUIREMENTS/ROADMAP
-state_head: b70daab2e92c322095be68d89170b1d2be272b87
+state_head: 30e31361773b3a1e71a647c917f0421768ff79b9
 progress:
   total_phases: 5
   completed_phases: 0
@@ -75,6 +75,13 @@ None yet.
 - Phase 2: CI workflow is committed but its first run is unverified; the installed adapter object is 0.0.9 while the shipped package is 0.0.10
 - Phase 5: `ioBroker.repositories` acceptance is an external manual review — not fully under our control
 - All phases: `www/` is committed and can silently lag `src/` (Phase 1 adds the drift guard)
+- Quick task 261022-up1 is on branch `quick/261022-up1-websocket-client`, unmerged: the real-broker handshake through `@iobroker/ws` is unproven until H1/H2 run. Merge it only after both pass; otherwise delete the branch.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 261022-up1 | Replace the vendored ioBroker WebSocket client with the published @iobroker/ws client, keeping the configurable broker-address fallback | 2026-10-22 | 30e3136 | Needs Review | [261022-up1-replace-the-vendored-iobroker-websocket-](./quick/261022-up1-replace-the-vendored-iobroker-websocket-/) |
 
 ## Deferred Items
 
@@ -87,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-10-22T19:24:10.446Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-document-safety-on-a-real-broker/01-CONTEXT.md
+Last session: 2026-10-22
+Stopped at: Quick task 261022-up1 planned, executed and verified (human_needed — real-broker H1/H2 pending) on branch `quick/261022-up1-websocket-client`
+Resume file: .planning/quick/261022-up1-replace-the-vendored-iobroker-websocket-/261022-up1-SUMMARY.md
