@@ -5,7 +5,12 @@
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
-  import { effectivePin, isUnlocked, unlock } from "$lib/config/pin.svelte";
+  import {
+    effectivePin,
+    isDefaultPin,
+    isUnlocked,
+    unlock,
+  } from "$lib/config/pin.svelte";
   import {
     getFormulas,
     upsertFormula,
@@ -33,8 +38,26 @@
   let editing = $state<FormulaTemplate | null>(null);
   let showForm = $state(false);
   let pendingDelete = $state<FormulaTemplate | null>(null);
+  let askingPin = $state(false);
 
   const formulas = $derived(getFormulas());
+  /** True while the shipped default (or a missing/malformed value) is in force. */
+  const pinIsDefault = $derived(isDefaultPin(storage.pin));
+  /** What the prompt compares an entry against. */
+  const storedPin = $derived(effectivePin(storage.pin));
+
+  /**
+   * The connection save. While the default PIN is still in force it does not
+   * proceed: the change prompt opens instead, and the reload happens from there
+   * once a real PIN is stored (D-04).
+   */
+  function saveConnection() {
+    if (pinIsDefault) {
+      askingPin = true;
+      return;
+    }
+    applyAndReload();
+  }
 
   function startAdd() {
     editing = { id: newId(), name: "", expr: "" };
@@ -108,7 +131,7 @@
             >
           </p>
         {/if}
-        <button class="btn btn-primary" onclick={applyAndReload}>
+        <button class="btn btn-primary" onclick={saveConnection}>
           {isConnected ? "Save & reconnect" : "Apply & reload"}
         </button>
       </div>
@@ -246,6 +269,20 @@
       </ConfirmModal>
     {/if}
 
+    {#if askingPin}
+      <PinModal
+        title="Choose a new PIN"
+        hint="The shipped default PIN is still in use — set your own before the connection can be saved."
+        confirmLabel="Save PIN"
+        onSubmit={(pin) => {
+          storage.pin = pin;
+          askingPin = false;
+          applyAndReload();
+        }}
+        onCancel={() => (askingPin = false)}
+      />
+    {/if}
+
     <section class="card settings-card">
       <div class="card-header">
         <span class="material-symbols-outlined">info</span>
@@ -265,7 +302,7 @@
   <PinModal
     title="Settings locked"
     hint="Enter your PIN to open the settings."
-    expected={effectivePin(storage.pin)}
+    expected={storedPin}
     onSubmit={unlock}
     onCancel={() => (location.hash = "#/")}
   />
