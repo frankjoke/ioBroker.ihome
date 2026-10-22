@@ -42,7 +42,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Starting `ihome.0` against a broker holding only legacy `0_userdata.0.Test.AiHome.*` documents copies the real documents into `config.*` and leaves the legacy states intact
   4. A regression in a guarded write path or in the migration helper fails `npm test` instead of reaching the broker
   5. A build/pack run reports it when the committed `www/` no longer matches a fresh build of `src/`
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Prove the pageList guard end to end and make a dropped edit survive reconnect (PERSIST-01, PERSIST-02, PERSIST-03)
+- [ ] 01-02-PLAN.md — Extract the adapter's placeholder/legacy-copy decision into a tested pure helper and ship it (PERSIST-04)
+- [ ] 01-03-PLAN.md — Prove propagation and the write path for templateList, deviceList and formulaList (PERSIST-03)
+- [ ] 01-04-PLAN.md — Add the `www/` build-drift guard behind a deterministic `version.name` (PERSIST-05)
+- [ ] 01-05-PLAN.md — Record the accepted concurrency limit and observe the three broker criteria (D-03)
 
 ### Phase 2: Clean-broker install and lifecycle
 **Goal**: An operator can install the packaged adapter on a broker that has never seen iHome, start the instance once, and open a dashboard that renders the broker's devices.
@@ -98,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Document safety on a real broker | TBD | Not started | - |
+| 1. Document safety on a real broker | 0/5 | Planned | - |
 | 2. Clean-broker install and lifecycle | TBD | Not started | - |
 | 3. History and charts at operator scale | TBD | Not started | - |
 | 4. The editor's deferred capabilities | TBD | Not started | - |
