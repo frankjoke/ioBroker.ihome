@@ -8,3 +8,6 @@
   previous session did.
 - **When writing a new handoff:** save it into `docs/progress/` following the same
   `handoff-YYYY-MM-DD-iobroker-visual-adapter.md` naming.
+- **`docs/` is local-only** (gitignored): handoffs and the design record are never
+  committed or pushed — write them, don't `git add` them (an ignored path makes the
+  commit fail).

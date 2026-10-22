@@ -33,3 +33,6 @@ Thumbs.db
 # (GSD's own doc-commits are disabled via .planning/config.json commit_docs:false)
 .planning/
 .gsd/
+
+# Session handoffs and the design record — local only, never published
+docs/
