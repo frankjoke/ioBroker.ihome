@@ -36,6 +36,7 @@
   const storage = defineStorage(
     ["hostPort", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
+    ["pin", { init: "" }],
     { prefix: "__VISUAL__:" },
   );
 
@@ -194,6 +195,9 @@
             />
           </div>
           {#if !isConnected}
+            <!-- The other, un-gated path to hostPort: the settings route asks
+                 for a PIN, this footer (disconnected only) does not. PIN-gating
+                 it was scoped out of the PIN task. -->
             <button class="btn btn-primary" onclick={connect}
               >Apply & Reload</button
             >

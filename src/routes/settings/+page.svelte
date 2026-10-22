@@ -4,6 +4,8 @@
   import { getStorage } from "$lib/tools.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import PinModal from "$lib/components/common/PinModal.svelte";
+  import { effectivePin, isUnlocked, unlock } from "$lib/config/pin.svelte";
   import {
     getFormulas,
     upsertFormula,
@@ -62,202 +64,212 @@
   <title>Settings - iHome</title>
 </svelte:head>
 
-<div class="settings-page">
-  <div class="page-header">
-    <span class="label-mono">Configuration</span>
-    <h1>Settings</h1>
-  </div>
-
-  <section class="card settings-card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">lan</span>
-      <h2 class="card-title">Connection</h2>
+{#if isUnlocked()}
+  <div class="settings-page">
+    <div class="page-header">
+      <span class="label-mono">Configuration</span>
+      <h1>Settings</h1>
     </div>
-    <div class="card-body settings-card-body">
-      <div class="field">
-        <label class="label-mono" for="settings-host">Host:Port</label>
-        <input
-          id="settings-host"
-          type="text"
-          bind:value={storage.hostPort}
-          placeholder="e.g. 192.168.1.10:8081"
-        />
-        <span class="hint text-muted"
-          >Leave empty to use the configured broker fallback, or the host
-          serving this page when no fallback is set (socket.io on port 8081).
-          Editing this while connected is fine — saving reconnects.</span
-        >
-      </div>
-      <div class="field">
-        <label class="label-mono" for="settings-ns">Namespace</label>
-        <input id="settings-ns" type="text" bind:value={storage.namespace} />
-        <span class="hint text-muted"
-          >Identity stamped as "from" on every write, e.g. ihome.0 — the
-          adapter's io-package name plus instance.</span
-        >
-      </div>
 
-      {#if isConnected}
-        <p class="conn-note">
-          <span class="badge badge-success">connected</span>
-          <span class="text-muted"
-            >{ioBroker.namespace} via {activeBrokerUrl()}</span
+    <section class="card settings-card">
+      <div class="card-header">
+        <span class="material-symbols-outlined">lan</span>
+        <h2 class="card-title">Connection</h2>
+      </div>
+      <div class="card-body settings-card-body">
+        <div class="field">
+          <label class="label-mono" for="settings-host">Host:Port</label>
+          <input
+            id="settings-host"
+            type="text"
+            bind:value={storage.hostPort}
+            placeholder="e.g. 192.168.1.10:8081"
+          />
+          <span class="hint text-muted"
+            >Leave empty to use the configured broker fallback, or the host
+            serving this page when no fallback is set (socket.io on port 8081).
+            Editing this while connected is fine — saving reconnects.</span
           >
+        </div>
+        <div class="field">
+          <label class="label-mono" for="settings-ns">Namespace</label>
+          <input id="settings-ns" type="text" bind:value={storage.namespace} />
+          <span class="hint text-muted"
+            >Identity stamped as "from" on every write, e.g. ihome.0 — the
+            adapter's io-package name plus instance.</span
+          >
+        </div>
+
+        {#if isConnected}
+          <p class="conn-note">
+            <span class="badge badge-success">connected</span>
+            <span class="text-muted"
+              >{ioBroker.namespace} via {activeBrokerUrl()}</span
+            >
+          </p>
+        {/if}
+        <button class="btn btn-primary" onclick={applyAndReload}>
+          {isConnected ? "Save & reconnect" : "Apply & reload"}
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-header">
+        <span class="material-symbols-outlined">palette</span>
+        <h2 class="card-title">Appearance</h2>
+      </div>
+      <div class="card-body settings-card-body">
+        <p class="text-muted hint">
+          Theme follows the system setting by default. Choose Light or Dark to
+          override it — your choice is remembered on this device.
         </p>
-      {/if}
-      <button class="btn btn-primary" onclick={applyAndReload}>
-        {isConnected ? "Save & reconnect" : "Apply & reload"}
-      </button>
-    </div>
-  </section>
+        <ThemeToggle />
+      </div>
+    </section>
 
-  <section class="card settings-card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">palette</span>
-      <h2 class="card-title">Appearance</h2>
-    </div>
-    <div class="card-body settings-card-body">
-      <p class="text-muted hint">
-        Theme follows the system setting by default. Choose Light or Dark to
-        override it — your choice is remembered on this device.
-      </p>
-      <ThemeToggle />
-    </div>
-  </section>
+    <section class="card settings-card">
+      <div class="card-header">
+        <span class="material-symbols-outlined">functions</span>
+        <h2 class="card-title">Formula templates</h2>
+      </div>
+      <div class="card-body settings-card-body">
+        {#if formulas.length === 0}
+          <p class="text-muted hint">No templates yet.</p>
+        {/if}
+        <ul class="formula-list">
+          {#each formulas as t (t.id)}
+            <li class="formula-row">
+              <div class="formula-main">
+                <span class="formula-name">{t.name}</span>
+                <code class="formula-expr">{t.expr}</code>
+                {#if t.unit}<span class="text-muted">{t.unit}</span>{/if}
+              </div>
+              <div class="formula-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Edit"
+                  aria-label="Edit"
+                  onclick={() => startEdit(t)}
+                >
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Delete"
+                  aria-label="Delete"
+                  onclick={() => (pendingDelete = t)}
+                >
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </div>
+            </li>
+          {/each}
+        </ul>
+        <button type="button" class="btn btn-primary" onclick={startAdd}
+          >Add template</button
+        >
+      </div>
+    </section>
 
-  <section class="card settings-card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">functions</span>
-      <h2 class="card-title">Formula templates</h2>
-    </div>
-    <div class="card-body settings-card-body">
-      {#if formulas.length === 0}
-        <p class="text-muted hint">No templates yet.</p>
-      {/if}
-      <ul class="formula-list">
-        {#each formulas as t (t.id)}
-          <li class="formula-row">
-            <div class="formula-main">
-              <span class="formula-name">{t.name}</span>
-              <code class="formula-expr">{t.expr}</code>
-              {#if t.unit}<span class="text-muted">{t.unit}</span>{/if}
-            </div>
-            <div class="formula-actions">
-              <button
-                type="button"
-                class="icon-btn"
-                title="Edit"
-                aria-label="Edit"
-                onclick={() => startEdit(t)}
-              >
-                <span class="material-symbols-outlined">edit</span>
-              </button>
-              <button
-                type="button"
-                class="icon-btn"
-                title="Delete"
-                aria-label="Delete"
-                onclick={() => (pendingDelete = t)}
-              >
-                <span class="material-symbols-outlined">delete</span>
-              </button>
-            </div>
-          </li>
-        {/each}
-      </ul>
-      <button type="button" class="btn btn-primary" onclick={startAdd}
-        >Add template</button
+    {#if showForm && editing}
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Formula template"
       >
-    </div>
-  </section>
-
-  {#if showForm && editing}
-    <div
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Formula template"
-    >
-      <div class="modal-card card">
-        <h3>{editing.name ? "Edit template" : "New template"}</h3>
-        <label class="field"
-          ><span class="label-mono">Name</span>
-          <input type="text" bind:value={editing.name} /></label
-        >
-        <label class="field"
-          ><span class="label-mono">Expression</span>
-          <textarea rows="3" class="mono" bind:value={editing.expr}
-          ></textarea></label
-        >
-        <div class="form-grid">
+        <div class="modal-card card">
+          <h3>{editing.name ? "Edit template" : "New template"}</h3>
           <label class="field"
-            ><span class="label-mono">Unit</span>
-            <input type="text" bind:value={editing.unit} /></label
+            ><span class="label-mono">Name</span>
+            <input type="text" bind:value={editing.name} /></label
           >
           <label class="field"
-            ><span class="label-mono">Precision</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={editing.precision ?? ""}
-              oninput={(e) =>
-                (editing.precision =
-                  e.currentTarget.value === ""
-                    ? undefined
-                    : Number(e.currentTarget.value))}
-            /></label
+            ><span class="label-mono">Expression</span>
+            <textarea rows="3" class="mono" bind:value={editing.expr}
+            ></textarea></label
           >
-        </div>
-        <label class="field"
-          ><span class="label-mono">Notes</span>
-          <input type="text" bind:value={editing.notes} /></label
-        >
-        <div class="actions">
-          <button
-            type="button"
-            class="btn"
-            onclick={() => {
-              showForm = false;
-              editing = null;
-            }}>Cancel</button
+          <div class="form-grid">
+            <label class="field"
+              ><span class="label-mono">Unit</span>
+              <input type="text" bind:value={editing.unit} /></label
+            >
+            <label class="field"
+              ><span class="label-mono">Precision</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={editing.precision ?? ""}
+                oninput={(e) =>
+                  (editing.precision =
+                    e.currentTarget.value === ""
+                      ? undefined
+                      : Number(e.currentTarget.value))}
+              /></label
+            >
+          </div>
+          <label class="field"
+            ><span class="label-mono">Notes</span>
+            <input type="text" bind:value={editing.notes} /></label
           >
-          <button type="button" class="btn btn-primary" onclick={save}
-            >Save</button
-          >
+          <div class="actions">
+            <button
+              type="button"
+              class="btn"
+              onclick={() => {
+                showForm = false;
+                editing = null;
+              }}>Cancel</button
+            >
+            <button type="button" class="btn btn-primary" onclick={save}
+              >Save</button
+            >
+          </div>
         </div>
       </div>
-    </div>
-  {/if}
+    {/if}
 
-  {#if pendingDelete}
-    <ConfirmModal
-      title="Delete template"
-      confirmLabel="Delete"
-      onConfirm={confirmDelete}
-      onCancel={() => (pendingDelete = null)}
-    >
-      <p>
-        Delete <strong>{pendingDelete.name}</strong>? Devices keep their copy.
-      </p>
-    </ConfirmModal>
-  {/if}
+    {#if pendingDelete}
+      <ConfirmModal
+        title="Delete template"
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => (pendingDelete = null)}
+      >
+        <p>
+          Delete <strong>{pendingDelete.name}</strong>? Devices keep their copy.
+        </p>
+      </ConfirmModal>
+    {/if}
 
-  <section class="card settings-card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">info</span>
-      <h2 class="card-title">About</h2>
-    </div>
-    <div class="card-body about-body">
-      <span class="text-muted"
-        >Visual interface for ioBroker smart home control</span
-      >
-      <span class="about-version mono"
-        >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
-      >
-    </div>
-  </section>
-</div>
+    <section class="card settings-card">
+      <div class="card-header">
+        <span class="material-symbols-outlined">info</span>
+        <h2 class="card-title">About</h2>
+      </div>
+      <div class="card-body about-body">
+        <span class="text-muted"
+          >Visual interface for ioBroker smart home control</span
+        >
+        <span class="about-version mono"
+          >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
+        >
+      </div>
+    </section>
+  </div>
+{:else}
+  <PinModal
+    title="Settings locked"
+    hint="Enter your PIN to open the settings."
+    expected={effectivePin(storage.pin)}
+    onSubmit={unlock}
+    onCancel={() => (location.hash = "#/")}
+  />
+{/if}
 
 <style>
   .settings-page {
