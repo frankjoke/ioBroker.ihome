@@ -75,13 +75,14 @@ None yet.
 - Phase 2: CI workflow is committed but its first run is unverified; the installed adapter object is 0.0.9 while the shipped package is 0.0.10
 - Phase 5: `ioBroker.repositories` acceptance is an external manual review — not fully under our control
 - All phases: `www/` is committed and can silently lag `src/` (Phase 1 adds the drift guard)
-- Quick task 261022-up1 is on branch `quick/261022-up1-websocket-client`, unmerged: the real-broker handshake through `@iobroker/ws` is unproven until H1/H2 run. Merge it only after both pass; otherwise delete the branch.
+- Quick task 261022-up1 merged to `main` (`a2e4dda`, fast-forward) and confirmed working on the real broker (ioBroker-served load at `192.168.178.9:8082/ihome/`); the branch was deleted. Still unexercised: the `FALLBACK_BROKER` path for a locally started PWA (`npm run preview`, H1) — do that before advertising local start.
+- Quick task 261022-up1 shipped a version bump: `package.json` and `io-package.json` are now `0.0.11` from a manual test build, not from `npm run release` — no tag, no changelog beyond the `news` block. Phase 5 must expect `0.0.11` as the already-shipped version.
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
-| 261022-up1 | Replace the vendored ioBroker WebSocket client with the published @iobroker/ws client, keeping the configurable broker-address fallback | 2026-10-22 | 30e3136 | Needs Review | [261022-up1-replace-the-vendored-iobroker-websocket-](./quick/261022-up1-replace-the-vendored-iobroker-websocket-/) |
+| 261022-up1 | Replace the vendored ioBroker WebSocket client with the published @iobroker/ws client, keeping the configurable broker-address fallback | 2026-10-22 | 30e3136 | Verified on broker | [261022-up1-replace-the-vendored-iobroker-websocket-](./quick/261022-up1-replace-the-vendored-iobroker-websocket-/) |
 
 ## Deferred Items
 
@@ -95,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-10-22
-Stopped at: Quick task 261022-up1 planned, executed and verified (human_needed — real-broker H1/H2 pending) on branch `quick/261022-up1-websocket-client`
+Stopped at: Quick task 261022-up1 merged to main (a2e4dda) and confirmed on the real broker; suite green (unit 399, package 46, integration 1)
 Resume file: .planning/quick/261022-up1-replace-the-vendored-iobroker-websocket-/261022-up1-SUMMARY.md
