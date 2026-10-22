@@ -1,12 +1,14 @@
 import { it, expect, vi } from "vitest";
 import {
   DEFAULT_PIN,
+  LOCK_PENCIL_STORAGE_KEY,
   PIN_STORAGE_KEY,
   effectivePin,
   isDefaultPin,
   isUnlocked,
   isValidPin,
   lock,
+  pencilNeedsPin,
   unlock,
 } from "$lib/config/pin.svelte";
 
@@ -41,10 +43,20 @@ it("effectivePin falls back to the default, never to a lockout", () => {
   expect(effectivePin("not-a-pin")).toBe("4321");
 });
 
+it("pencilNeedsPin asks only with the flag on and the session still locked", () => {
+  expect(pencilNeedsPin(true, false)).toBe(true);
+  expect(pencilNeedsPin(true, true)).toBe(false); // one unlock covers the session
+  expect(pencilNeedsPin(false, false)).toBe(false); // the flag ships off
+  expect(pencilNeedsPin(undefined, false)).toBe(false); // missing → stays open
+  expect(pencilNeedsPin("yes", false)).toBe(false); // junk is not a lock
+});
+
 it("the shipped default and the storage key are the constants", () => {
   expect(DEFAULT_PIN).toBe("4321");
   // The layout's defineStorage composes "__VISUAL__:pin" from this name.
   expect(PIN_STORAGE_KEY).toBe("pin");
+  // ... and "__VISUAL__:lockPencil" from this one.
+  expect(LOCK_PENCIL_STORAGE_KEY).toBe("lockPencil");
 });
 
 it("the unlock flag lives in memory only", () => {

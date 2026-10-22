@@ -7,8 +7,15 @@
     setLastPage,
     view,
   } from "$lib/stores/pages.svelte.js";
-  import { openSheet, closeSheet, sheet } from "$lib/stores/sheet.svelte.js";
   import {
+    closeSheet,
+    isPinAsked,
+    openSheetGated,
+    resolvePinAsk,
+    sheet,
+  } from "$lib/stores/sheet.svelte.js";
+  import {
+    clearRequestedLayout,
     pages as configPages,
     pageHref,
     requestLayoutConfig,
@@ -18,7 +25,12 @@
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { getStorage } from "$lib/tools.svelte";
-  import { effectivePin, isUnlocked, unlock } from "$lib/config/pin.svelte";
+  import {
+    effectivePin,
+    isUnlocked,
+    pencilNeedsPin,
+    unlock,
+  } from "$lib/config/pin.svelte";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -71,7 +83,7 @@
       // Also suppresses the browser's open-in-new-tab for this hash link.
       event.preventDefault();
       requestLayoutConfig({ pageId: id });
-      openSheet();
+      openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
       return;
     }
     // In the editor the tabs move the sheet, not the route (A43): the display
@@ -83,10 +95,12 @@
 
   /**
    * The pencil opens the sheet on the page being viewed; the eye closes it
-   * again. It is a mode of this page, not a place to go, so nothing navigates
-   * and nothing is handed off: the cursor is already where the display is. (It
-   * must not set a handoff either — that would clobber one already in flight,
-   * say the tile the devices page is sending us back to.)
+   * again. With the pencil lock on, a fresh open asks for the PIN first
+   * (`openSheetGated`) — closing is never gated. It is a mode of this page,
+   * not a place to go, so nothing navigates and nothing is handed off: the
+   * cursor is already where the display is. (It must not set a handoff either
+   * — that would clobber one already in flight, say the tile the devices page
+   * is sending us back to.)
    *
    * The plain click is swallowed: from the installed URL (/ihome/index.html)
    * the anchor's href (/ihome/) is a different document, and that full reload
@@ -98,7 +112,7 @@
       closeSheet();
       return;
     }
-    openSheet();
+    openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
   }
 </script>
 
@@ -194,6 +208,24 @@
       location.hash = "#/settings";
     }}
     onCancel={() => (askingSettingsPin = false)}
+  />
+{/if}
+
+{#if isPinAsked()}
+  <PinModal
+    title="Enter your PIN"
+    hint="The layout editor is protected."
+    expected={storedPin}
+    onSubmit={() => {
+      unlock();
+      resolvePinAsk(true);
+    }}
+    onCancel={() => {
+      // The entrance already handed its target over; a cancelled ask drops it,
+      // so nothing stale can sit in the sheet or look like a way back in.
+      clearRequestedLayout();
+      resolvePinAsk(false);
+    }}
   />
 {/if}
 

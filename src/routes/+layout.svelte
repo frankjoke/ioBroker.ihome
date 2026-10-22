@@ -37,6 +37,9 @@
     ["hostPort", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
     ["pin", { init: "" }],
+    // The layout editor's own lock (pin.svelte.ts): off, the pencil works as
+    // it always did; on, every fresh entrance asks for the PIN first.
+    ["lockPencil", { init: false }],
     { prefix: "__VISUAL__:" },
   );
 

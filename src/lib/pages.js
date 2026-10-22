@@ -92,6 +92,15 @@ export function takeRequestedLayout() {
   }
 }
 
+/** Drop a pending layout target: a gated entrance whose PIN ask was cancelled. */
+export function clearRequestedLayout() {
+  try {
+    sessionStorage.removeItem(CONFIG_PLACEMENT_KEY);
+  } catch {
+    /* private mode: nothing was stored */
+  }
+}
+
 /**
  * The pending layout target without taking it. The devices page uses it to
  * offer the way back to the tile it was opened from; the layout route still

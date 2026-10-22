@@ -5,7 +5,9 @@
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
-  import { openSheet } from "$lib/stores/sheet.svelte.js";
+  import { openSheetGated } from "$lib/stores/sheet.svelte.js";
+  import { getStorage } from "$lib/tools.svelte";
+  import { isUnlocked, pencilNeedsPin } from "$lib/config/pin.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -23,6 +25,8 @@
     bp: Breakpoint;
     pageId: string;
   } = $props();
+
+  const storage = getStorage();
 
   /**
    * The section is exactly as wide as its tiles need (the pass decided), plus
@@ -42,13 +46,14 @@
       : "",
   );
 
-  /** Ctrl/Cmd+click the section header → open this section in the layout editor. */
+  /** Ctrl/Cmd+click the section header → open this section in the layout
+   *  editor. A gated entrance: the pencil lock asks for the PIN first. */
   function onTitleClick(event: MouseEvent) {
     if (!wantsDeviceConfig(event)) return;
     event.preventDefault();
     event.stopPropagation();
     requestLayoutConfig({ pageId, sectionId: group.id });
-    openSheet();
+    openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
   }
 </script>
 

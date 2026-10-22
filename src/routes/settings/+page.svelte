@@ -170,15 +170,21 @@
     <section class="card settings-card">
       <div class="card-header">
         <span class="material-symbols-outlined">lock</span>
-        <h2 class="card-title">PIN</h2>
+        <h2 class="card-title">Security</h2>
       </div>
       <div class="card-body settings-card-body">
         <p class="text-muted hint">
           {pinIsDefault
-            ? "The shipped default PIN is still in use — change it to your own. It guards this page on this device only, and it is a convenience lock, not a security boundary."
-            : "A PIN guards this page on this device only. It is a convenience lock, not a security boundary."}
+            ? "The shipped default PIN is still in use — change it to your own. It guards the settings on this device only, and it is a convenience lock, not a security boundary."
+            : "A PIN guards the settings on this device only. It is a convenience lock, not a security boundary."}
         </p>
-        <button class="btn" onclick={() => (pinStep = "verify")}
+        <label class="check">
+          <input type="checkbox" bind:checked={storage.lockPencil} />
+          <span
+            >Ask for the PIN before the layout editor (the pencil) opens</span
+          >
+        </label>
+        <button class="btn btn-primary" onclick={() => (pinStep = "verify")}
           >Change PIN</button
         >
       </div>
@@ -445,6 +451,14 @@
 
   .hint {
     font-size: var(--body-sm);
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--body-sm);
+    cursor: pointer;
   }
 
   .conn-note {

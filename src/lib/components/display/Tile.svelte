@@ -38,7 +38,9 @@
     requestLayoutConfig,
     wantsDeviceConfig,
   } from "$lib/pages.js";
-  import { openSheet } from "$lib/stores/sheet.svelte.js";
+  import { openSheetGated } from "$lib/stores/sheet.svelte.js";
+  import { getStorage } from "$lib/tools.svelte";
+  import { isUnlocked, pencilNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
   import BadgeRow from "./BadgeRow.svelte";
@@ -82,6 +84,8 @@
      *  out so the sheet's Detail Page checkbox asks the tile's own answer (A47). */
     onDetail?: (hasModal: boolean) => void;
   } = $props();
+
+  const storage = getStorage();
 
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
@@ -380,14 +384,16 @@
   }
 
   /**
-   * Open this tile's placement in the layout editor (A16). A tile rendered
-   * without an anchor — an editor preview, say — falls back to the device form;
-   * the device shortcut was the stopgap while no tile editor existed.
+   * Open this tile's placement in the layout editor (A16). A gated entrance:
+   * with the pencil lock on it asks for the PIN first. A tile rendered
+   * without an anchor — an editor preview, say — falls back to the device
+   * form (the devices page, the config side); the device shortcut was the
+   * stopgap while no tile editor existed.
    */
   function openEditor() {
     if (anchor) {
       requestLayoutConfig(anchor);
-      openSheet();
+      openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
       return;
     }
     requestDeviceConfig(device.id);
