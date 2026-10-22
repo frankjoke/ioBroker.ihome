@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.12",
+        "version": "0.0.13",
         "news": {
+            "0.0.13": {
+                "en": "Settings can be locked with a PIN (change it under Security); the layout editor can be locked too, and navigating no longer reloads the dashboard",
+                "de": "Einstellungen lassen sich mit einer PIN sperren (änderbar unter Security); der Layout-Editor kann ebenfalls gesperrt werden, und Navigation lädt das Dashboard nicht mehr neu"
+            },
             "0.0.12": {
                 "en": "The connection settings stay editable while connected: save and the dashboard reconnects with the new broker address or namespace",
                 "de": "Die Verbindungseinstellungen bleiben auch im verbundenen Zustand bearbeitbar: Speichern verbindet das Dashboard mit der neuen Broker-Adresse bzw. dem Namespace neu"
