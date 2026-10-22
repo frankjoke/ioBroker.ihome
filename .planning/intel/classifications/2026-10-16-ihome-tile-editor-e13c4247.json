@@ -1,0 +1,24 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-16-ihome-tile-editor.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "iHome Tile Editor (P2) Implementation Plan",
+  "summary": "Task-by-task implementation plan for in-place tile editing: slots, rules, active conditions, size/background, per-type templates, and display-to-editor routing.",
+  "scope": [
+    "tile editor",
+    "TileConfig",
+    "templates",
+    "slot rules",
+    "active condition",
+    "icon picker",
+    "background editor",
+    "layout editor"
+  ],
+  "cross_refs": [
+    "docs/superpowers/specs/2026-10-16-ihome-tile-editor-design.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

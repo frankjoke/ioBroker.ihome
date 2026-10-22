@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-21-ihome-device-icons.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Device Icons Implementation Plan",
+  "summary": "Task-by-task implementation plan for resolving device icons from ioBroker objects and making icon URLs base-aware.",
+  "scope": ["device icons", "icon-ops.ts", "icon-url.ts", "Icon.svelte", "EnrichedDevice.objectIcon", "ioBroker object icon resolution"],
+  "cross_refs": ["docs/superpowers/specs/2026-10-21-ihome-device-icons-design.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

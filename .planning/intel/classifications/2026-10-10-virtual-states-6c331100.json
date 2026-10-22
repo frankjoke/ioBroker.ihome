@@ -1,0 +1,24 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-10-virtual-states.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Virtual States Implementation Plan",
+  "summary": "Task-by-task implementation plan for read-only computed virtual state controls, evaluated via editable JavaScript expressions over device states.",
+  "scope": [
+    "virtual states",
+    "Control kind discriminant",
+    "virtual-ops engine",
+    "scope builder and helper API",
+    "devices store enrichment",
+    "VirtualEditor component",
+    "ControlRow and DeviceForm",
+    "dashboard rendering"
+  ],
+  "cross_refs": [
+    "docs/superpowers/specs/2026-10-10-virtual-states-design.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

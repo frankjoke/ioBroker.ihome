@@ -1,0 +1,29 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-19-ihome-slot-icons.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "The slot icons — Implementation Plan",
+  "summary": "Task-by-task implementation plan for making the slot icon its own property (A51–A58), covering descriptor, mutations, presets, renderer, editor, and live verification.",
+  "scope": [
+    "slot icons",
+    "SlotIcon descriptor (glyph/enabled/where)",
+    "tile-parts",
+    "tile-ops",
+    "presets",
+    "SlotRenderer",
+    "Tile",
+    "TileModal",
+    "ModalPanel",
+    "LayoutDetails",
+    "SlotPicker",
+    "legacy kind:\"icon\" slot fold"
+  ],
+  "cross_refs": [
+    "docs/superpowers/specs/2026-10-19-ihome-slot-icons-design.md",
+    "docs/progress/handoff-2026-10-19-iobroker-visual-adapter.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

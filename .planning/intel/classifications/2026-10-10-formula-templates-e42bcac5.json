@@ -1,0 +1,18 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-10-formula-templates.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Formula Templates Implementation Plan",
+  "summary": "Task-by-task implementation plan for a reusable formula template library: pure helpers, ioBroker persistence, Settings CRUD, and a virtual-state editor modal with template picker.",
+  "scope": ["formula templates", "virtual states", "Settings management UI", "ioBroker persistence", "Svelte 5 runes", "Vitest tests"],
+  "cross_refs": [
+    "docs/superpowers/specs/2026-10-10-formula-templates-design.md",
+    "src/lib/registry.svelte.js",
+    "StatePicker.svelte",
+    "ConfirmModal.svelte"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

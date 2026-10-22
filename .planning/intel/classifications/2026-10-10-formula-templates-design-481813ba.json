@@ -1,0 +1,26 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/specs/2026-10-10-formula-templates-design.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Formula Templates — Design Spec",
+  "summary": "Design spec for a named, reusable library of virtual-state formula templates, stored in a setup state, managed in Settings, and applied copy-on-select from the virtual-state editor.",
+  "scope": ["formula templates", "virtual-state formulas", "formula library", "Settings page", "virtual-state editor modal", "setup state persistence"],
+  "cross_refs": [
+    "src/lib/types/device.ts",
+    "src/lib/config/project.ts",
+    "src/lib/components/config/ControlRow.svelte",
+    "src/lib/components/config/VirtualEditor.svelte",
+    "src/lib/components/config/DeviceForm.svelte",
+    "src/routes/settings/+page.svelte",
+    "src/routes/+layout.svelte",
+    "src/lib/formulas.svelte.js",
+    "src/lib/stores/formulas.svelte.ts",
+    "src/lib/config/formulas.ts",
+    "src/lib/config/formulas.test.ts",
+    "registry.svelte.js"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

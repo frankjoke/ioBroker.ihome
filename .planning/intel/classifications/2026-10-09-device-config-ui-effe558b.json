@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-09-device-config-ui.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Device Configuration UI Implementation Plan",
+  "summary": "Task-by-task implementation plan for a device configuration UI: transform engine, feature table, state-tree picker, and Svelte components.",
+  "scope": ["device configuration UI", "transform engine", "device feature table", "state tree", "state picker", "Svelte 5 components", "device registry migration", "Devices page widgets"],
+  "cross_refs": ["docs/superpowers/specs/2026-10-09-device-config-ui-design.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

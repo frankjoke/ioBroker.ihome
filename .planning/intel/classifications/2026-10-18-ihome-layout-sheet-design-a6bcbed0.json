@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/specs/2026-10-18-ihome-layout-sheet-design.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "iHome — the layout sheet (design)",
+  "summary": "Design for reworking the iHome layout editor into a sheet over the live display, with three selector lines and the tile's editor.",
+  "scope": ["iHome layout editor", "layout sheet", "live display preview", "tile editor", "cursor state", "detail page dialog", "device line"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

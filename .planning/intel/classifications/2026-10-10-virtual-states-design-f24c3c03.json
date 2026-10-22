@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/specs/2026-10-10-virtual-states-design.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Virtual States — Design Spec",
+  "summary": "Design spec for read-only virtual states: controls computed from other device states via an editable JavaScript expression and a helper aggregation API.",
+  "scope": ["virtual states", "computed controls", "ioBroker device states", "JavaScript expression engine", "helper aggregation API", "VirtualEditor", "dashboard rendering"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

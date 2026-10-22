@@ -1,0 +1,45 @@
+docs:
+  - path: docs/superpowers/specs/2026-10-09-device-config-ui-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-10-formula-templates-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-10-virtual-states-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-13-history-controls-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-14-ihome-display-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-15-ihome-layout-editor-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-16-ihome-tile-editor-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-18-ihome-layout-sheet-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-19-ihome-slot-icons-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-20-ihome-slot-sparklines-design.md
+    type: SPEC
+  - path: docs/superpowers/specs/2026-10-21-ihome-device-icons-design.md
+    type: SPEC
+  - path: docs/superpowers/plans/2026-10-09-device-config-ui.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-10-formula-templates.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-10-virtual-states.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-13-history-controls.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-14-ihome-display.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-15-ihome-layout-editor.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-16-ihome-tile-editor.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-19-ihome-layout-sheet.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-19-ihome-slot-icons.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-20-ihome-slot-sparklines.md
+    type: DOC
+  - path: docs/superpowers/plans/2026-10-21-ihome-device-icons.md
+    type: DOC

@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/franz/OneDrive/MyProgs/KI/iobroker-visual-adapter/docs/superpowers/plans/2026-10-13-history-controls.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "History Controls Implementation Plan",
+  "summary": "Task-by-task implementation plan adding optional ioBroker history (duration, granularity, sparkline summaries) to state-backed device controls.",
+  "scope": ["ioBroker history", "device controls", "history-ops", "history store", "HistoryEditor modal", "HistorySummary", "sparkline", "devices page"],
+  "cross_refs": ["docs/superpowers/specs/2026-10-13-history-controls-design.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

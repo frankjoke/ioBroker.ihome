@@ -1,0 +1,84 @@
+---
+gsd_state_version: '1.0'
+status: planning
+progress:
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-10-22)
+
+**Core value:** An operator's dashboard on a real broker — tiles render live state, edits persist, a document is never lost.
+**Current focus:** Phase 1 — Document safety on a real broker
+
+## Current Position
+
+Phase: 1 of 5 (Document safety on a real broker)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-10-22 — ingested the 22-doc design record, mapped the codebase, wrote PROJECT/REQUIREMENTS/ROADMAP
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: —
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: —
+- Trend: —
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table (design contracts from the SPEC series; no ADR locks exist).
+Recent decisions affecting current work:
+
+- Roadmap derived from what remains, not from the docs: the 11 specs have landed (codebase map, commit 7af86a1)
+- Doc status lines ("Status: proposed", unchecked plan boxes) are historical — `.planning/codebase/` is ground truth
+- The adapter-logic stream ("what the adapter does beyond owning documents") is deferred to v2 — still unspecified
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- Phase 1: `stores/pages.svelte.ts` / `stores/templates.svelte.ts` write paths and `main.js` migration logic have no unit tests (highest-risk untested paths — they write user config)
+- Phase 2: CI workflow is committed but its first run is unverified; the installed adapter object is 0.0.9 while the shipped package is 0.0.10
+- Phase 5: `ioBroker.repositories` acceptance is an external manual review — not fully under our control
+- All phases: `www/` is committed and can silently lag `src/` (Phase 1 adds the drift guard)
+
+## Deferred Items
+
+| Category | Item | Status | Deferred At | Milestone |
+|----------|------|--------|-------------|-----------|
+| Model | Virtual controls referencing other virtual controls (ordered eval + cycle detection) | Deferred | 2026-10-22 | v2 |
+| Performance | Subscription scoping / on-demand object loading for large installations | Deferred | 2026-10-22 | v2 |
+| Quality | Component/E2E test layer, coverage tooling, typed port of `tools.svelte.js` | Deferred | 2026-10-22 | v2 |
+| Scope | The adapter-logic stream (unspecified next feature work) | Deferred | 2026-10-22 | v2 |
+
+## Session Continuity
+
+Last session: 2026-10-22
+Stopped at: Roadmap created — PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md written
+Resume file: None
