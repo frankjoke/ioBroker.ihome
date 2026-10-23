@@ -1,5 +1,10 @@
 import { it, expect } from "vitest";
-import { parseSocketInfo, resolveTransport } from "$lib/transport";
+import {
+  cloudPageUrl,
+  parseSocketInfo,
+  resolveTransport,
+  shouldJumpToCloud,
+} from "$lib/transport";
 
 // The real file the web adapter serves (verified 2026-10-23).
 const LOCAL_INFO =
@@ -108,4 +113,32 @@ it("without a served info file it keeps today's ws default", () => {
     transport: "ws",
     url: "wss://ihome.local:8081/socket.io",
   });
+});
+
+it("builds the cloud page from host and path", () => {
+  expect(cloudPageUrl("iobroker.pro", "/ihome/index.html")).toBe(
+    "https://iobroker.pro/ihome/index.html",
+  );
+  expect(cloudPageUrl("https://iobroker.pro/", "/ihome/")).toBe(
+    "https://iobroker.pro/ihome/",
+  );
+  expect(cloudPageUrl("", "/ihome/")).toBe(null);
+});
+
+it("jumps only when it is enabled, configured and not pinned", () => {
+  const base = {
+    enabled: true,
+    cloudHost: "iobroker.pro",
+    pageHost: "192.168.178.9:8082",
+  };
+  expect(shouldJumpToCloud(base)).toBe(true);
+  expect(shouldJumpToCloud({ ...base, enabled: false })).toBe(false); // ships off
+  expect(shouldJumpToCloud({ ...base, cloudHost: "" })).toBe(false); // nothing configured
+  expect(
+    shouldJumpToCloud({ ...base, explicit: "ws://x:8081/socket.io" }),
+  ).toBe(false);
+  expect(shouldJumpToCloud({ ...base, hostPort: "192.168.178.9:8081" })).toBe(
+    false,
+  );
+  expect(shouldJumpToCloud({ ...base, pageHost: "iobroker.pro" })).toBe(false);
 });

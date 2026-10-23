@@ -89,6 +89,50 @@ export function resolveTransport(sources: Sources): {
   };
 }
 
+/** A host as something to compare: scheme and path stripped, lower-cased. */
+function hostOnly(value: string): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/.*$/, "")
+    .toLowerCase();
+}
+
+/**
+ * The cloud page for this app: the configured host plus the path the app is
+ * already served under, so the jump lands on the same app (`/ihome/`). The
+ * host may be given with a scheme; a trailing slash is tolerated. Null when
+ * nothing is configured.
+ */
+export function cloudPageUrl(host: string, pathname: string): string | null {
+  const trimmed = String(host ?? "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!trimmed) return null;
+  const base = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return `${base}${pathname || "/"}`;
+}
+
+/**
+ * Whether a failed local connect should hand over to the cloud page. Only
+ * when the operator enabled it, named a host, pinned no address of their own
+ * (`?socket=` or the stored `host:port` — those are answers, not failures),
+ * and is not already looking at the cloud (which would loop).
+ */
+export function shouldJumpToCloud(sources: {
+  enabled: boolean;
+  cloudHost: string;
+  explicit?: string;
+  hostPort?: string;
+  pageHost: string;
+}): boolean {
+  if (!sources.enabled) return false;
+  if (sources.explicit || sources.hostPort) return false;
+  const target = cloudPageUrl(sources.cloudHost, "/");
+  if (!target) return false;
+  return hostOnly(target) !== hostOnly(sources.pageHost);
+}
+
 /**
  * The same table with the info file fetched. Any answer counts as "served" —
  * the cloud's redirect stub has no values but still proves a web instance is
