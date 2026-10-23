@@ -24,6 +24,7 @@
     roomsOf,
     rooms,
     devices = [],
+    showHead = true,
     onSave,
     onCancel,
   }: {
@@ -32,6 +33,7 @@
     roomsOf: (id: string) => string[];
     rooms: { id: string; label: string; icon?: string }[];
     devices?: Device[];
+    showHead?: boolean;
     onSave: (d: Device) => void;
     onCancel: () => void;
   } = $props();
@@ -181,18 +183,20 @@
 </script>
 
 <div class="device-form">
-  <div class="form-head">
-    <h3>{device ? "Edit device" : "Add device"}</h3>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Cancel"
-      aria-label="Cancel"
-      onclick={onCancel}
-    >
-      <span class="material-symbols-outlined">close</span>
-    </button>
-  </div>
+  {#if showHead}
+    <div class="form-head">
+      <h3>{device ? "Edit device" : "Add device"}</h3>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Cancel"
+        aria-label="Cancel"
+        onclick={onCancel}
+      >
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+  {/if}
 
   <div class="fields">
     <label class="field"
@@ -337,7 +341,7 @@
 
   .fields {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
   }
 
@@ -368,11 +372,5 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
-  }
-
-  @media (max-width: 640px) {
-    .fields {
-      grid-template-columns: 1fr 1fr;
-    }
   }
 </style>

@@ -367,8 +367,7 @@
          prompt is the one that must work while locked, hence outside. -->
   {#if askingUnlock}
     <PinModal
-      title="Enter your PIN"
-      hint="The settings are protected."
+      title="Enter PIN for Settings"
       expected={storedPin}
       onSubmit={() => {
         unlock();

@@ -45,6 +45,10 @@ export interface TileConfig {
   /** How the tile looks in each active state (A71): read only while `active`
    *  is set, and each field wins over what the rules resolved. */
   look?: TileLook;
+  /** The tile's own PIN (digits, 4-6): every open of its detail page asks for
+   *  it. Absent, empty or malformed → the page opens freely, and a tile with no
+   *  detail page ignores it entirely (`tileNeedsPin`). Not part of a template. */
+  pin?: string;
   slots?: Slot[];
 }
 

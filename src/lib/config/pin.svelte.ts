@@ -14,8 +14,13 @@
 // so "4321" opens the page again and the next connection save re-arms the forced
 // change. The in-app change UI is the Security card in Settings.
 //
-// Per-tile detail PINs are still out of scope: no schema field and no
-// migration for them. The pencil flag, however, is here: "__VISUAL__:lockPencil"
+// Per-tile detail PINs live on the tile itself (TileConfig.pin): a tile that
+// has one asks for it on every open of its detail page, and only there — see
+// tileNeedsPin below. They are the tile's own config, so they travel with the
+// pages document, not with localStorage, and they never reach the settings:
+// this PIN opens a detail page, not the app.
+//
+// The pencil flag, however, is here: "__VISUAL__:lockPencil"
 // (default off) puts the same lock in front of the layout editor — with it on,
 // every fresh entrance asks for the PIN unless this session is already
 // unlocked. The cog keeps guarding the settings; that split is what a future
@@ -58,6 +63,14 @@ export function pencilNeedsPin(
   unlocked: boolean,
 ): boolean {
   return lockPencil === true && !unlocked;
+}
+
+/** A tile's own PIN guards its detail page, and only there: with no detail
+ *  page there is nothing to open, and anything but a valid PIN (empty, a
+ *  half-typed draft, junk) leaves the tile as open as it always was. Unlike the
+ *  pencil flag this is not a session unlock — every open asks again. */
+export function tileNeedsPin(pin: unknown, hasDetail: boolean): boolean {
+  return hasDetail && isValidPin(pin);
 }
 
 let unlocked = $state(false);

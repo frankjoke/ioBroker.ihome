@@ -7,28 +7,53 @@
     { id: "dark", label: "Dark", icon: "dark_mode" },
   ];
 
+  /**
+   * `group` is the three buttons (the settings card, where the options are the
+   * point); `cycle` is one button that walks them in order — the bar's shape,
+   * where three buttons were crowding the action icons.
+   *
+   * @type {{ variant?: "group" | "cycle" }}
+   */
+  let { variant = "group" } = $props();
+
   const mode = $derived(
     themeStorage.theme === "light" || themeStorage.theme === "dark"
       ? themeStorage.theme
       : "auto",
   );
+
+  const current = $derived(modes.find((m) => m.id === mode) ?? modes[0]);
+  const next = $derived(modes[(modes.indexOf(current) + 1) % modes.length]);
 </script>
 
-<div class="theme-toggle" role="group" aria-label="Color theme">
-  {#each modes as m (m.id)}
-    <button
-      type="button"
-      class="theme-option"
-      class:active={mode === m.id}
-      aria-pressed={mode === m.id}
-      title={`${m.label} theme`}
-      onclick={() => setTheme(/** @type {any} */ (m.id))}
-    >
-      <span class="material-symbols-outlined">{m.icon}</span>
-      <span class="theme-option-label">{m.label}</span>
-    </button>
-  {/each}
-</div>
+{#if variant === "cycle"}
+  <button
+    type="button"
+    class="theme-toggle theme-cycle"
+    title={`Theme: ${current.label} — next: ${next.label}`}
+    aria-label={`Theme: ${current.label}. Switch to ${next.label}`}
+    onclick={() => setTheme(/** @type {any} */ (next.id))}
+  >
+    <span class="material-symbols-outlined">{current.icon}</span>
+    <span class="theme-option-label">{current.label}</span>
+  </button>
+{:else}
+  <div class="theme-toggle" role="group" aria-label="Color theme">
+    {#each modes as m (m.id)}
+      <button
+        type="button"
+        class="theme-option"
+        class:active={mode === m.id}
+        aria-pressed={mode === m.id}
+        title={`${m.label} theme`}
+        onclick={() => setTheme(/** @type {any} */ (m.id))}
+      >
+        <span class="material-symbols-outlined">{m.icon}</span>
+        <span class="theme-option-label">{m.label}</span>
+      </button>
+    {/each}
+  </div>
+{/if}
 
 <style>
   .theme-toggle {
@@ -66,6 +91,23 @@
 
   .theme-option .material-symbols-outlined {
     font-size: 16px;
+  }
+
+  /* The cycling form: one pill, one button, the modes in one order. */
+  .theme-cycle {
+    padding: 3px 10px 3px 7px;
+    gap: 5px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .theme-cycle:hover {
+    color: var(--text-color);
+  }
+
+  .theme-cycle .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .theme-option-label {

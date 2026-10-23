@@ -54,6 +54,7 @@
   } from "$lib/config/tile-ops";
   import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
   import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
+  import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
   import {
@@ -95,7 +96,9 @@
     onChange,
     onSelect,
     onAddSlot,
-    titleExtra,
+    hasDetail = false,
+    detailShown = false,
+    onDetailToggle,
   }: {
     registry: PageRegistry;
     devices: EnrichedDevice[];
@@ -106,8 +109,12 @@
     /** Add slot: the route owns the picker. `at` inserts there instead of
      * appending (the list-end `+`). */
     onAddSlot?: (anchor: PlacementAnchor, at?: number) => void;
-    /** The layout sheet puts its own control on the Tile title's line. */
-    titleExtra?: Snippet;
+    /** The sheet's detail-page preview: whether this tile has one (A47), and
+     *  whether it is shown over the display right now. The sheet owns the
+     *  preview tile — this pane only draws the line's controls. */
+    hasDetail?: boolean;
+    detailShown?: boolean;
+    onDetailToggle?: (shown: boolean) => void;
   } = $props();
 
   // The preview renders at the real breakpoint, so what you see is what the
@@ -390,6 +397,30 @@
   function anchor(): PlacementAnchor | null {
     if (!page || !section || !tile) return null;
     return { pageId: page.id, sectionId: section.id, placementId: tile.id };
+  }
+
+  /** The detail page's PIN: the field shows a draft, and only an empty or
+   *  valid draft is written — a half-typed PIN must not disarm the lock, and
+   *  must not be committed to the document either. */
+  let pinDraft = $state("");
+  let pinShown = $state(false);
+  let pinDraftFor: string | null = null;
+  // The draft belongs to one tile: selecting another re-seeds it from that
+  // tile's stored PIN. Commits do not (they land on the same value).
+  $effect(() => {
+    const id = selection.kind === "tile" ? selection.placementId : null;
+    if (id === pinDraftFor) return;
+    pinDraftFor = id;
+    pinShown = false;
+    pinDraft = tile?.tile?.pin ?? "";
+  });
+
+  const pinInvalid = $derived(pinDraft !== "" && !isValidPin(pinDraft));
+
+  function setPin(raw: string): void {
+    pinDraft = raw;
+    if (raw === "") edit((t) => ({ ...t, pin: undefined }));
+    else if (isValidPin(raw)) edit((t) => ({ ...t, pin: raw }));
   }
 
   /**
@@ -808,10 +839,7 @@
       />
     </div>
   {:else if selection.kind === "tile" && tile}
-    <div class="row between">
-      <h3>{tile.title || device?.name || "Tile"}</h3>
-      {#if titleExtra}{@render titleExtra()}{/if}
-    </div>
+    <h3>{tile.title || device?.name || "Tile"}</h3>
     <div class="field">
       <span class="label-mono">Tile title</span>
       <div class="row">
@@ -978,6 +1006,76 @@
         A value set here wins over the rules for that state;
         <em>default</em> keeps the rules. Dimming still comes from the rules.
       </p>
+    </div>
+
+    <!-- The detail page's own line (A47): the eye shows the page itself over
+         the display — the editor never asks for the PIN — and the field sets
+         the PIN that guards it in view mode. Both are the detail page's own
+         business, so both dim while the tile has none. -->
+    <div class="field">
+      <div class="row">
+        <span class="label-mono">Detail page</span>
+        <span class="row-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            class:on={detailShown}
+            title={hasDetail
+              ? detailShown
+                ? "Hide the detail page"
+                : "Show the detail page over the display"
+              : "Nothing of this tile lives in the detail page"}
+            aria-label={detailShown
+              ? "Hide the detail page"
+              : "Show the detail page"}
+            aria-pressed={detailShown}
+            disabled={!hasDetail}
+            onclick={() => onDetailToggle?.(!detailShown)}
+          >
+            <span class="material-symbols-outlined">visibility</span>
+          </button>
+        </span>
+        <span class="label-mono pin-label">PIN</span>
+        <input
+          class="pin-input"
+          type={pinShown ? "text" : "password"}
+          inputmode="numeric"
+          autocomplete="off"
+          value={pinDraft}
+          placeholder="no PIN"
+          aria-label="Detail page PIN"
+          title="Ask for this PIN before the detail page opens (view mode). Empty = no lock."
+          disabled={!hasDetail}
+          oninput={(e) => setPin(e.currentTarget.value)}
+        />
+        <span class="row-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            title={pinShown ? "Hide the PIN" : "Show the PIN"}
+            aria-label={pinShown ? "Hide the PIN" : "Show the PIN"}
+            disabled={!hasDetail || pinDraft === ""}
+            onclick={() => (pinShown = !pinShown)}
+          >
+            <span class="material-symbols-outlined"
+              >{pinShown ? "visibility" : "visibility_off"}</span
+            >
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
+            title="Clear the PIN — the detail page opens freely again"
+            aria-label="Clear the PIN"
+            disabled={!hasDetail || pinDraft === ""}
+            onclick={() => setPin("")}
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </span>
+      </div>
+      {#if pinInvalid}
+        <p class="note text-muted">4-6 digits, numbers only.</p>
+      {/if}
     </div>
 
     <div class="field">
@@ -2052,6 +2150,18 @@
 
   .row.between {
     justify-content: space-between;
+  }
+
+  /* The detail page's line: the PIN group sits at the far end, and the field
+     is only as wide as its six digits. */
+  .pin-label {
+    margin-left: auto;
+  }
+
+  .row input.pin-input {
+    flex: 0 0 auto;
+    width: 8ch;
+    text-align: center;
   }
 
   .check {

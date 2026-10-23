@@ -41,11 +41,16 @@
   } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
-  import { isUnlocked, pencilNeedsPin } from "$lib/config/pin.svelte";
+  import {
+    isUnlocked,
+    pencilNeedsPin,
+    tileNeedsPin,
+  } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
   import BadgeRow from "./BadgeRow.svelte";
   import TileModal from "./TileModal.svelte";
+  import PinModal from "$lib/components/common/PinModal.svelte";
   import type {
     EnrichedControl,
     EnrichedDevice,
@@ -410,6 +415,14 @@
     openEditor();
   }
 
+  /** Open the detail page, or ask for the tile's own PIN first. View mode only:
+   *  a protected tile asks on every open — no session unlock — while the
+   *  sheet's preview (the `openModal` prop below) never comes through here. */
+  function openDetail(): void {
+    if (tileNeedsPin(tile?.pin, hasModal)) askPin = true;
+    else modalOpen = true;
+  }
+
   function onActivate(event?: MouseEvent) {
     // Ctrl/Cmd+click is the shortcut to the editor — the one place a tile cannot
     // reach on its own.
@@ -426,11 +439,13 @@
     // the icon and the On/Off text — so nothing switches by accident. The
     // modal only opens when slots live in it (A34); otherwise a stray tap on a
     // light would be the last thing between you and a switched-on lamp.
-    if (hasModal) modalOpen = true;
+    if (hasModal) openDetail();
   }
 
   let modalOpen = $state(false);
   let modalInline = $state(false);
+  /** The tile's own PIN is being asked for (see `openDetail`). */
+  let askPin = $state(false);
 
   // The sheet's "modal view": it asks this tile to open the modal it owns — the
   // real one, because only the tile resolves its rows. Withdrawing the ask
@@ -459,7 +474,7 @@
     pressTimer = setTimeout(() => {
       pressTimer = null;
       suppressClick = true;
-      modalOpen = true;
+      openDetail();
     }, 500);
   }
 
@@ -554,6 +569,20 @@
       modalOpen = false;
       onModalClose?.();
     }}
+  />
+{/if}
+
+<!-- The tile's own lock (see `openDetail`): every open of a protected detail
+     page asks again. -->
+{#if askPin}
+  <PinModal
+    title={`Enter PIN for ${tileName}`}
+    expected={tile?.pin}
+    onSubmit={() => {
+      askPin = false;
+      modalOpen = true;
+    }}
+    onCancel={() => (askPin = false)}
   />
 {/if}
 
