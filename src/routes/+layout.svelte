@@ -9,6 +9,7 @@
     ioBrokerStart,
   } from "$lib/ioBrokerConnect.svelte.js";
   import { FALLBACK_BROKER } from "$lib/broker-config";
+  import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -63,19 +64,56 @@
   // it (transport.ts) — an explicit address, the stored host:port, the web
   // adapter's own socket when one serves this page, or the admin port. The
   // info file has to be fetched for that, and connectIOBroker is async.
+  const explicit =
+    import.meta.env.VITE_SOCKET_URL ||
+    new URLSearchParams(location.search).get("socket") ||
+    "";
+  const hostPort = storage.hostPort || FALLBACK_BROKER;
   const ioBroker = ioBrokerStart({
     namespace,
-    explicit:
-      import.meta.env.VITE_SOCKET_URL ||
-      new URLSearchParams(location.search).get("socket") ||
-      "",
-    hostPort: storage.hostPort || FALLBACK_BROKER,
+    explicit,
+    hostPort,
     fetchInfo: () =>
       // The web adapter writes it inside the app's own directory (iqontrol
       // loads `_socket/info.js`), not next to it.
       fetch(new URL("_socket/info.js", document.baseURI).href)
         .then((r) => (r.ok ? r.text() : null))
         .catch(() => null),
+  });
+
+  /**
+   * The cloud hand-over. On a phone or an installed PWA that is used at home
+   * and away, a local ioBroker that cannot be reached means "try the cloud
+   * page" — where the browser's iobroker.pro session is the login. Off by
+   * default and never with an address the operator pinned (transport.ts
+   * decides); a wall display stays on its own page and shows offline. The
+   * notice is on screen for a moment before the jump, so the move is not a
+   * mystery.
+   */
+  let cloudNotice = $state(false);
+  let cloudJumped = false;
+  const cloudTarget = $derived(
+    shouldJumpToCloud({
+      enabled: storage.cloudFallback === true,
+      cloudHost: storage.cloudHost,
+      explicit,
+      hostPort,
+      pageHost: location.host,
+    }),
+  );
+  $effect(() => {
+    if (cloudJumped || ioBroker.connected || !cloudTarget) return;
+    // The connect gives up after 10 s; leave it a little room, then hand over.
+    const timer = setTimeout(() => {
+      if (cloudJumped || ioBroker.connected) return;
+      cloudJumped = true;
+      cloudNotice = true;
+      setTimeout(() => {
+        const url = cloudPageUrl(storage.cloudHost, location.pathname);
+        if (url) window.location.href = url;
+      }, 2000);
+    }, 12000);
+    return () => clearTimeout(timer);
   });
 
   const current = $derived(page.route?.id ?? "/");
@@ -177,6 +215,12 @@
 </svelte:head>
 
 <div class="app-shell" class:display={isDisplay}>
+  {#if cloudNotice}
+    <p class="cloud-notice" role="status">
+      <span class="material-symbols-outlined">cloud_sync</span>
+      Local ioBroker not reachable — trying {storage.cloudHost}…
+    </p>
+  {/if}
   <AppBar />
 
   <main class="app-main">
@@ -326,6 +370,23 @@
   .field input {
     min-width: 180px;
     font-family: var(--font-mono);
+    font-size: var(--body-sm);
+  }
+
+  /* The moment before the cloud hand-over: on screen, above everything, and
+     gone with the navigation it announces. */
+  .cloud-notice {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.6rem 1rem;
+    background-color: var(--warning-color);
+    color: #101418;
     font-size: var(--body-sm);
   }
 </style>
