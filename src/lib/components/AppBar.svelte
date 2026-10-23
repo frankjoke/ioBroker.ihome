@@ -25,6 +25,8 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
+  import { contrastColor } from "$lib/config/format";
+  import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { getStorage } from "$lib/tools.svelte";
   import {
     effectivePin,
@@ -56,6 +58,32 @@
       : (treePages[0]?.id ?? "");
   });
   const isConnected = $derived(!!ioBroker.connected);
+
+  /**
+   * A tab is a folder tab for its own page: it wears the page's solid
+   * background, so the strip reads as the folder the display is open in, and
+   * its label takes the colour that reads on that background — a cream page in
+   * the dark theme stays legible. A page without one (or with a gradient/image
+   * — too loud at tab size) wears the display's own background and keeps the
+   * ambient text colour.
+   */
+  function tabTint(page: { background?: { kind?: string; value?: string } }) {
+    const bg = page.background;
+    // A solid page wears that colour; a gradient wears the colour it starts
+    // with — which is what sits at the top of the page, right under the bar.
+    const solid =
+      bg?.kind === "solid" && isHexColor(bg.value) ? bg.value : undefined;
+    const from =
+      bg?.kind === "gradient" ? inspectGradient(bg.value)?.from : undefined;
+    const colour = solid ?? (from && isHexColor(from) ? from : undefined);
+    // What sits below the bar: the page's own colour, else the app background.
+    const page_ = colour ?? "var(--background-color)";
+    // A closed folder is invisible without a colour of its own — only the open
+    // one wears the page, so the strip is folders and not a row of chips.
+    const fill = colour ?? "transparent";
+    const fg = colour ? `; --tab-fg: ${contrastColor(colour)}` : "";
+    return `--tab-page: ${page_}; --tab-bg: ${fill}${fg};`;
+  }
 
   const storage = getStorage();
   const storedPin = $derived(effectivePin(storage.pin));
@@ -125,6 +153,7 @@
           class="tab"
           class:active={p.id === currentId}
           href={`${base}/#/p/${p.id}`}
+          style={tabTint(p)}
           aria-current={p.id === currentId ? "page" : undefined}
           onclickcapture={(e) => onPageClick(e, p.id)}
         >
@@ -132,17 +161,6 @@
           <span class="tab-label">{p.title}</span>
         </a>
       {/each}
-      <a
-        class="tab icon-tab"
-        href={`${base}/#/`}
-        title={sheet.open ? "Back to the display" : "Edit the layout"}
-        aria-label={sheet.open ? "Back to the display" : "Edit the layout"}
-        onclick={onPencilClick}
-      >
-        <span class="material-symbols-outlined"
-          >{sheet.open ? "visibility" : "edit"}</span
-        >
-      </a>
     {:else}
       {#each configPages as p (p.id)}
         <a
@@ -169,7 +187,24 @@
   </nav>
 
   <div class="actions">
-    <ThemeToggle />
+    <!-- The editor's mode switch: it sits with the other action icons, not in
+         the tab row, so the tabs stay pages and nothing else. The eye is the
+         same switch, read the other way. -->
+    {#if isDisplay}
+      <a
+        class="icon-btn"
+        href={`${base}/#/`}
+        title={sheet.open ? "Back to the display" : "Edit the layout"}
+        aria-label={sheet.open ? "Back to the display" : "Edit the layout"}
+        onclick={onPencilClick}
+      >
+        <span class="material-symbols-outlined"
+          >{sheet.open ? "visibility" : "edit"}</span
+        >
+      </a>
+    {/if}
+
+    <ThemeToggle variant="cycle" />
 
     <a
       class="icon-btn status-btn"
@@ -200,8 +235,7 @@
 
 {#if askingSettingsPin}
   <PinModal
-    title="Enter your PIN"
-    hint="The settings are protected."
+    title="Enter PIN for Settings"
     expected={storedPin}
     onSubmit={() => {
       unlock();
@@ -217,8 +251,7 @@
 
 {#if isPinAsked()}
   <PinModal
-    title="Enter your PIN"
-    hint="The layout editor is protected."
+    title="Enter PIN for the layout editor"
     expected={storedPin}
     onSubmit={() => {
       unlock();
@@ -254,14 +287,21 @@
     background-color: var(--edit-mode-bar);
   }
 
+  /* The strip is the folders' edge: tabs stand on the bar's own border line,
+     and the strip reaches 1px past it so the open folder's bottom edge can
+     paint the line away (see .tab.active). */
   .tabs {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 2px;
     flex: 1 1 auto;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
+    align-self: stretch;
+    /* Reaches past the bar's own padding and its 1px border, so the open
+       folder's bottom edge can paint that line away (.tab.active). */
+    margin-bottom: calc(-0.3rem - 1px);
   }
 
   .tabs::-webkit-scrollbar {
@@ -272,31 +312,41 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: var(--border-radius-pill);
-    color: var(--text-muted);
+    padding: 7px 14px 5px;
+    /* Folder tab: square at the bottom, framed, wearing its page's colour. */
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 11px 11px 0 0;
+    background-color: var(--tab-bg, transparent);
+    color: var(--tab-fg, var(--text-muted));
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
+    /* Keeps the bar's border visible under the folders that are not open. */
+    margin-bottom: 1px;
   }
 
   .tab:hover {
     text-decoration: none;
-    background-color: var(--surface-container);
-    color: var(--text-color);
+    border-color: var(--border-color);
+    color: var(--tab-fg, var(--text-color));
   }
 
+  /* The open folder: it wears the page's own colour — which is what sits below
+     the bar — and that colour, on its bottom edge, paints the bar's border
+     away. So the line opens into the page. */
   .tab.active {
-    background-color: var(--primary-container);
-    color: var(--on-primary-container);
+    border-color: var(--border-color);
+    background-color: var(--tab-page, var(--background-color));
+    border-bottom: 1px solid var(--tab-page, var(--background-color));
+    margin-bottom: 0;
+    color: var(--tab-fg, var(--text-color));
   }
-
   .tab .material-symbols-outlined {
     font-size: 18px;
   }
 
-  /* The pencil (display) and the eye (editor) sit in the tab row as the last
-     entry, so both states read as one bar. */
+  /* The config bar's "Back to the display" link keeps the tab row's shape. */
   .icon-tab {
     padding: 6px 10px;
   }

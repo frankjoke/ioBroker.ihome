@@ -8,7 +8,8 @@
     DEFAULT_NAMESPACE,
     ioBrokerStart,
   } from "$lib/ioBrokerConnect.svelte.js";
-  import { defaultSocketUrl, socketUrlFromHostPort } from "$lib/socket-url";
+  import { FALLBACK_BROKER } from "$lib/broker-config";
+  import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -16,6 +17,7 @@
     setObjectSource,
     getCanonicalRegistry,
     devicesEnrichedStore,
+    getUsedStateIds,
   } from "$lib/stores/devices.svelte.js";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
@@ -40,6 +42,13 @@
     // The layout editor's own lock (pin.svelte.ts): off, the pencil works as
     // it always did; on, every fresh entrance asks for the PIN first.
     ["lockPencil", { init: false }],
+    // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
+    // unreachable, the app navigates to its own page on the cloud host, where
+    // the browser's portal session takes over. Off by default — a wall display
+    // must stay on its own page (showing offline) when the LAN hiccups, and
+    // the phone/PWA is where this makes sense.
+    ["cloudFallback", { init: false }],
+    ["cloudHost", { init: "iobroker.pro" }],
     { prefix: "__VISUAL__:" },
   );
 
@@ -52,13 +61,71 @@
       ? DEFAULT_NAMESPACE
       : storage.namespace;
 
-  function buildUrl(hostPort) {
-    return socketUrlFromHostPort(hostPort) || defaultSocketUrl();
-  }
-
+  // Where the app talks to ioBroker is not decided here: the connect resolves
+  // it (transport.ts) — an explicit address, the stored host:port, the web
+  // adapter's own socket when one serves this page, or the admin port. The
+  // info file has to be fetched for that, and connectIOBroker is async.
+  const explicit =
+    import.meta.env.VITE_SOCKET_URL ||
+    new URLSearchParams(location.search).get("socket") ||
+    "";
+  const hostPort = storage.hostPort || FALLBACK_BROKER;
   const ioBroker = ioBrokerStart({
     namespace,
-    url: buildUrl(storage.hostPort),
+    explicit,
+    hostPort,
+    fetchInfo: () =>
+      // The web adapter writes it inside the app's own directory (iqontrol
+      // loads `_socket/info.js`), not next to it. The timeout matters: a broker
+      // host that is down while the network is up must not leave the app
+      // socket-less forever — after 2 s the rule table's fallback takes over.
+      fetch(new URL("_socket/info.js", document.baseURI).href, {
+        signal: AbortSignal.timeout(2000),
+      })
+        .then((r) => (r.ok ? r.text() : null))
+        .catch(() => null),
+  });
+
+  /**
+   * The cloud hand-over. On a phone or an installed PWA that is used at home
+   * and away, a local ioBroker that cannot be reached means "try the cloud
+   * page" — where the browser's iobroker.pro session is the login. Off by
+   * default and never with an address the operator pinned (transport.ts
+   * decides); a wall display stays on its own page and shows offline. Only a
+   * page load that *never* connected jumps: a hiccup in a running session is
+   * the client's own job to ride out, not a reason to change address. The
+   * notice is on screen for a moment, so the move is not a mystery.
+   */
+  let cloudNotice = $state(false);
+  let cloudJumped = false;
+  let everConnected = false;
+  $effect(() => {
+    if (ioBroker.connected) everConnected = true;
+  });
+  const cloudTarget = $derived(
+    shouldJumpToCloud({
+      enabled: storage.cloudFallback === true,
+      cloudHost: storage.cloudHost,
+      explicit,
+      hostPort,
+      pageHost: location.host,
+    }),
+  );
+  $effect(() => {
+    if (cloudJumped || ioBroker.connected || !cloudTarget) return;
+    // The connect gives up after 10 s; leave it a little room, then hand over.
+    const timer = setTimeout(() => {
+      if (cloudJumped || ioBroker.connected || everConnected) return;
+      cloudJumped = true;
+      cloudNotice = true;
+      setTimeout(() => {
+        // The connection may have come up while the notice was read.
+        if (ioBroker.connected) return;
+        const url = cloudPageUrl(storage.cloudHost, location.pathname);
+        if (url) window.location.href = url;
+      }, 2000);
+    }, 12000);
+    return () => clearTimeout(timer);
   });
 
   const current = $derived(page.route?.id ?? "/");
@@ -71,6 +138,16 @@
     current === "/" || current.startsWith("/p/") || current === "/layout",
   );
 
+  // The used set grows while the app loads (the registry and the pages arrive
+  // after the first connect): subscribe again whenever it does, so no device
+  // tile is left without live values. The connect itself subscribes once; this
+  // covers everything after it, and a reconnect re-arms the same set.
+  $effect(() => {
+    getUsedStateIds(); // tracked: the $state version and the id sets
+    if (!ioBroker.connected) return;
+    ioBroker.syncSubscriptions();
+  });
+
   // Load all device states once the socket is up and the object cache is ready,
   // then again for any state objects that appear later. Pages read the shared
   // reactive ioBroker.states map directly.
@@ -80,8 +157,7 @@
     setStateSource(ioBroker.states);
     setObjectSource(ioBroker.objects);
     void ioBroker.objects.size;
-    void reloadUsedStates();
-    // Fill any device whose functions/favorites are empty from the broker's own
+    void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).
     void (async () => {
       // both gates: the registry must be loaded and the enum cache populated
@@ -160,6 +236,12 @@
 </svelte:head>
 
 <div class="app-shell" class:display={isDisplay}>
+  {#if cloudNotice}
+    <p class="cloud-notice" role="status">
+      <span class="material-symbols-outlined">cloud_sync</span>
+      Local ioBroker not reachable — trying {storage.cloudHost}…
+    </p>
+  {/if}
   <AppBar />
 
   <main class="app-main">
@@ -309,6 +391,23 @@
   .field input {
     min-width: 180px;
     font-family: var(--font-mono);
+    font-size: var(--body-sm);
+  }
+
+  /* The moment before the cloud hand-over: on screen, above everything, and
+     gone with the navigation it announces. */
+  .cloud-notice {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.6rem 1rem;
+    background-color: var(--warning-color);
+    color: #101418;
     font-size: var(--body-sm);
   }
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page as route } from "$app/state";
-  import PageView from "$lib/components/display/PageView.svelte";
+  import DisplayPage from "$lib/components/display/DisplayPage.svelte";
   import { getPageRegistry, setLastPage } from "$lib/stores/pages.svelte.js";
 
   const pages = $derived(getPageRegistry().pages ?? []);
@@ -10,6 +10,8 @@
     pages.find((p) => p.id === route.params?.id) ?? pages[0],
   );
 
+  // The root route ("/") shows the page the wall was last on, so a direct
+  // visit here is what "last" means from now on.
   $effect(() => {
     if (current) setLastPage(current.id);
   });
@@ -19,25 +21,4 @@
   <title>{current ? `${current.title} - iHome` : "iHome"}</title>
 </svelte:head>
 
-<div class="display">
-  {#if current}
-    {#key current.id}
-      <PageView page={current} />
-    {/key}
-  {:else}
-    <p class="empty text-muted">No pages yet.</p>
-  {/if}
-</div>
-
-<style>
-  .display {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .empty {
-    padding: 2rem;
-    text-align: center;
-  }
-</style>
+<DisplayPage page={current} />

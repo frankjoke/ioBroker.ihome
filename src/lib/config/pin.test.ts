@@ -9,6 +9,7 @@ import {
   isValidPin,
   lock,
   pencilNeedsPin,
+  tileNeedsPin,
   unlock,
 } from "$lib/config/pin.svelte";
 
@@ -49,6 +50,17 @@ it("pencilNeedsPin asks only with the flag on and the session still locked", () 
   expect(pencilNeedsPin(false, false)).toBe(false); // the flag ships off
   expect(pencilNeedsPin(undefined, false)).toBe(false); // missing → stays open
   expect(pencilNeedsPin("yes", false)).toBe(false); // junk is not a lock
+});
+
+it("tileNeedsPin asks only for a valid pin on a tile that has a detail page", () => {
+  expect(tileNeedsPin("1234", true)).toBe(true);
+  expect(tileNeedsPin("123456", true)).toBe(true);
+  expect(tileNeedsPin("", true)).toBe(false); // empty means no lock
+  expect(tileNeedsPin(undefined, true)).toBe(false); // the field ships empty
+  expect(tileNeedsPin("12", true)).toBe(false); // a half-typed draft is not a lock
+  expect(tileNeedsPin("12a4", true)).toBe(false);
+  expect(tileNeedsPin(4321, true)).toBe(false); // a number is not a PIN
+  expect(tileNeedsPin("1234", false)).toBe(false); // nothing to protect
 });
 
 it("the shipped default and the storage key are the constants", () => {

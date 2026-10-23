@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.13",
+        "version": "0.0.14",
         "news": {
+            "0.0.14": {
+                "en": "A tile can guard its detail page with its own PIN (asked on a number pad, every time); the layout editor opens from any page, and the page tabs wear their page's colour",
+                "de": "Ein Tile kann seine Detailseite mit einer eigenen PIN schützen (Eingabe über eine Zifferntastatur, bei jedem Öffnen); der Layout-Editor öffnet von jeder Seite, und die Seiten-Reiter tragen die Farbe ihrer Seite"
+            },
             "0.0.13": {
                 "en": "Settings can be locked with a PIN (change it under Security); the layout editor can be locked too, and navigating no longer reloads the dashboard",
                 "de": "Einstellungen lassen sich mit einer PIN sperren (änderbar unter Security); der Layout-Editor kann ebenfalls gesperrt werden, und Navigation lädt das Dashboard nicht mehr neu"

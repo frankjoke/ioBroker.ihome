@@ -1,38 +1,60 @@
-import { expect, it } from "vitest";
-// `@iobroker/ws` publishes no ES exports: importing it assigns
-// `globalThis.io = { connect }` as a side effect. This pins that entry point
-// and the surface the SPA drives — nothing else guards the transport.
-import "@iobroker/ws";
+import { it, expect } from "vitest";
+import { connectPlan, loadIo2Client } from "$lib/socket-client";
 
-/** Do-nothing WebSocket, passed through the client's own option: without it
- *  the test would open a real socket (and leak a reconnect timer). */
-class Stub {
-  close(): void {}
-  send(): void {}
-}
-
-const io = (
-  globalThis as unknown as {
-    io?: { connect(url: string, options?: unknown): any };
-  }
-).io;
-
-it("the package's entry point provides the client the SPA drives", () => {
-  expect(typeof io?.connect).toBe("function");
-  const socket = io?.connect("ws://127.0.0.1:1/socket.io", {
-    WebSocket: Stub,
+it("the io2 transport connects with the session key and reconnection on", () => {
+  expect(
+    connectPlan({
+      transport: "io2",
+      url: "https://iobroker.pro",
+      query: "key=nokey",
+    }),
+  ).toEqual({
+    client: "io2",
+    url: "https://iobroker.pro",
+    options: { query: "key=nokey", reconnection: true },
   });
-  expect(socket).toBeDefined();
-  for (const method of [
-    "emit",
-    "on",
-    "off",
-    "close",
-    "disconnect",
-    "destroy",
-  ]) {
-    expect(typeof socket[method]).toBe("function");
+});
+
+it("a missing session key still becomes 'nokey'", () => {
+  expect(
+    connectPlan({ transport: "io2", url: "http://192.168.178.9:8082" }).options,
+  ).toEqual({ query: "key=nokey", reconnection: true });
+});
+
+it("the ws transport keeps today's call untouched", () => {
+  expect(
+    connectPlan({ transport: "ws", url: "ws://192.168.178.9:8081/socket.io" }),
+  ).toEqual({
+    client: "ws",
+    url: "ws://192.168.178.9:8081/socket.io",
+    options: {},
+  });
+});
+
+it("loads the page's client and hands the ws global back (needs a DOM)", async () => {
+  // `@iobroker/ws` installs `globalThis.io` at import; the socket.io bundle
+  // claims the same name. The restore is load-bearing for the ws path, so it
+  // is pinned here with a minimal document stand-in.
+  const wsClient = { connect: () => "ws" };
+  const io2Client = { connect: () => "io2" };
+  const g = globalThis as Record<string, unknown>;
+  g.io = wsClient;
+  g.document = {
+    baseURI: "http://host/ihome/index.html",
+    createElement: () => ({ src: "", onload: null, onerror: null }),
+    head: {
+      append(script: { onload: (() => void) | null }) {
+        g.io = io2Client;
+        script.onload?.();
+      },
+    },
+  };
+  try {
+    const loaded = await loadIo2Client();
+    expect(loaded).toBe(io2Client);
+    expect(g.io).toBe(wsClient);
+  } finally {
+    delete g.io;
+    delete g.document;
   }
-  expect(socket.connected).toBe(false);
-  socket.destroy();
 });

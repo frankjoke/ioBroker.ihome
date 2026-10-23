@@ -32,6 +32,9 @@ export async function loadUsedStates() {
   }
   loading = true;
   try {
+    // Arm the subscriptions first: whatever changed between the last
+    // subscribe and this read would otherwise never reach the cache.
+    ioBroker.syncSubscriptions?.();
     const pending = [...getUsedStateIds()].filter((id) => !loaded.has(id));
     for (const id of pending) loaded.add(id);
     for (let i = 0; i < pending.length; i += 20) {

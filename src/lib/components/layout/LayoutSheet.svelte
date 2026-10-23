@@ -355,43 +355,36 @@
 </script>
 
 <aside class="sheet" aria-label="Layout editor">
-  <header class="sheet-head">
-    <span class="label-mono">Layout</span>
-    {#if saveFailed}
-      <span class="badge badge-danger" title="The last write to pageList failed"
-        >not saved</span
-      >
-    {:else if !writable}
-      <span
-        class="badge badge-danger"
-        title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
-        >not editable</span
-      >
-    {/if}
-    <button
-      type="button"
-      class="icon-btn close"
-      title="Close the editor"
-      aria-label="Close the editor"
-      onclick={onClose}
-    >
-      <span class="material-symbols-outlined">close</span>
-    </button>
-    {#if registry.pages.length === 0}
-      <button
-        type="button"
-        class="icon-btn primary"
-        title={writable
-          ? "Add page"
-          : "Not editable: the page document did not load"}
-        aria-label="Add page"
-        disabled={!writable}
-        onclick={() => commitLayout(addPage(registry))}
-      >
-        <span class="material-symbols-outlined">add</span>
-      </button>
-    {/if}
-  </header>
+  {#if saveFailed || !writable || registry.pages.length === 0}
+    <header class="sheet-head">
+      {#if saveFailed}
+        <span
+          class="badge badge-danger"
+          title="The last write to pageList failed">not saved</span
+        >
+      {:else if !writable}
+        <span
+          class="badge badge-danger"
+          title="The page document could not be read from the broker, so nothing is written back. Check the connection, then reload."
+          >not editable</span
+        >
+      {/if}
+      {#if registry.pages.length === 0}
+        <button
+          type="button"
+          class="icon-btn primary"
+          title={writable
+            ? "Add page"
+            : "Not editable: the page document did not load"}
+          aria-label="Add page"
+          disabled={!writable}
+          onclick={() => commitLayout(addPage(registry))}
+        >
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      {/if}
+    </header>
+  {/if}
 
   <!-- Page: a selector; its own attributes live behind the fold-out. -->
   <div class="line">
@@ -663,6 +656,17 @@
     </button>
   </div>
 
+  <!-- Which editor the body below is: the tile's layout, or a device's form. -->
+  {#if mode === "device" || tileSelection}
+    <span class="label-mono editor-mode"
+      >{mode === "device"
+        ? creating
+          ? "ADD DEVICE"
+          : "EDIT DEVICE"
+        : "EDIT TILE"}</span
+    >
+  {/if}
+
   <!-- The sheet's own hidden Tile: it answers whether there is a detail page
          (A47, via `noteDetail`) and opens that modal for real when the box is
          ticked — only the tile resolves its rows. Non-modal, so it appears over
@@ -692,6 +696,7 @@
           roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
           {rooms}
           devices={getCanonicalRegistry().devices}
+          showHead={false}
           onSave={saveDevice}
           onCancel={() => {
             creating = false;
@@ -701,22 +706,6 @@
       {/key}
     </div>
   {:else if tileSelection}
-    {#snippet tileExtras()}
-      <label
-        class="check"
-        title={hasDetail
-          ? "Show the detail page — the modal a long-press opens — over the display"
-          : "Nothing of this tile lives in the detail page"}
-      >
-        <span>Detail Page</span>
-        <input
-          type="checkbox"
-          checked={modalShown}
-          disabled={!hasDetail}
-          onchange={(e) => (modalShown = e.currentTarget.checked)}
-        />
-      </label>
-    {/snippet}
     <div class="fold tile-editor">
       <LayoutDetails
         {registry}
@@ -725,7 +714,9 @@
         onChange={commitLayout}
         onSelect={(next) => (selection = next)}
         onAddSlot={openSlotPicker}
-        titleExtra={tileExtras}
+        {hasDetail}
+        detailShown={modalShown}
+        onDetailToggle={(shown) => (modalShown = shown)}
       />
     </div>
   {/if}
@@ -847,8 +838,9 @@
     min-height: 1.6rem;
   }
 
-  .sheet-head .close {
-    margin-left: auto;
+  /* The mode label sits over the body it names, not in the line rhythm. */
+  .editor-mode {
+    margin-top: 0.2rem;
   }
 
   .line {
