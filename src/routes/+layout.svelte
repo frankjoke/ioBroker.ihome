@@ -75,8 +75,12 @@
     hostPort,
     fetchInfo: () =>
       // The web adapter writes it inside the app's own directory (iqontrol
-      // loads `_socket/info.js`), not next to it.
-      fetch(new URL("_socket/info.js", document.baseURI).href)
+      // loads `_socket/info.js`), not next to it. The timeout matters: a broker
+      // host that is down while the network is up must not leave the app
+      // socket-less forever — after 2 s the rule table's fallback takes over.
+      fetch(new URL("_socket/info.js", document.baseURI).href, {
+        signal: AbortSignal.timeout(2000),
+      })
         .then((r) => (r.ok ? r.text() : null))
         .catch(() => null),
   });
@@ -86,12 +90,17 @@
    * and away, a local ioBroker that cannot be reached means "try the cloud
    * page" — where the browser's iobroker.pro session is the login. Off by
    * default and never with an address the operator pinned (transport.ts
-   * decides); a wall display stays on its own page and shows offline. The
-   * notice is on screen for a moment before the jump, so the move is not a
-   * mystery.
+   * decides); a wall display stays on its own page and shows offline. Only a
+   * page load that *never* connected jumps: a hiccup in a running session is
+   * the client's own job to ride out, not a reason to change address. The
+   * notice is on screen for a moment, so the move is not a mystery.
    */
   let cloudNotice = $state(false);
   let cloudJumped = false;
+  let everConnected = false;
+  $effect(() => {
+    if (ioBroker.connected) everConnected = true;
+  });
   const cloudTarget = $derived(
     shouldJumpToCloud({
       enabled: storage.cloudFallback === true,
@@ -105,10 +114,12 @@
     if (cloudJumped || ioBroker.connected || !cloudTarget) return;
     // The connect gives up after 10 s; leave it a little room, then hand over.
     const timer = setTimeout(() => {
-      if (cloudJumped || ioBroker.connected) return;
+      if (cloudJumped || ioBroker.connected || everConnected) return;
       cloudJumped = true;
       cloudNotice = true;
       setTimeout(() => {
+        // The connection may have come up while the notice was read.
+        if (ioBroker.connected) return;
         const url = cloudPageUrl(storage.cloudHost, location.pathname);
         if (url) window.location.href = url;
       }, 2000);

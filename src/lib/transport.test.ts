@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   cloudPageUrl,
   parseSocketInfo,
+  resolveConnection,
   resolveTransport,
   shouldJumpToCloud,
 } from "$lib/transport";
@@ -141,4 +142,45 @@ it("jumps only when it is enabled, configured and not pinned", () => {
     false,
   );
   expect(shouldJumpToCloud({ ...base, pageHost: "iobroker.pro" })).toBe(false);
+});
+
+// --- the fix pass (review findings 2 and 3) -------------------------------
+
+it("only an info file or the cloud's stub counts as 'a web instance served this page'", async () => {
+  const base = {
+    origin: "http://host:8082",
+    host: "host:8082",
+    protocol: "http:",
+  };
+  const spaHtml = "<!DOCTYPE html><html><body><div id=app></div></body></html>";
+  // A catch-all static host answers every unknown path with the SPA, 200 — that
+  // is not a web instance, and must keep today's ws default (rule 4).
+  expect(
+    await resolveConnection({ ...base, fetchInfo: async () => spaHtml }),
+  ).toEqual({ transport: "ws", url: "ws://host:8081/socket.io" });
+  // The cloud's stub says nothing, but it *is* a web instance answering.
+  expect(
+    await resolveConnection({ ...base, fetchInfo: async () => CLOUD_STUB }),
+  ).toEqual({ transport: "io2", url: "http://host:8082", query: "key=nokey" });
+  // A real file: its values are used.
+  expect(
+    await resolveConnection({ ...base, fetchInfo: async () => LOCAL_INFO }),
+  ).toEqual({ transport: "io2", url: "http://host:8082", query: "key=nokey" });
+});
+
+it("a fetch that fails or hangs falls back to the ws default, not to a stall", async () => {
+  const base = {
+    origin: "http://host:8082",
+    host: "host:8082",
+    protocol: "http:",
+  };
+  expect(
+    await resolveConnection({ ...base, fetchInfo: async () => null }),
+  ).toEqual({ transport: "ws", url: "ws://host:8081/socket.io" });
+  expect(
+    await resolveConnection({
+      ...base,
+      fetchInfo: () => Promise.reject(new Error("boom")),
+    }),
+  ).toEqual({ transport: "ws", url: "ws://host:8081/socket.io" });
 });

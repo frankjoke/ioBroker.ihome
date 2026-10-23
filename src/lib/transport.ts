@@ -134,17 +134,37 @@ export function shouldJumpToCloud(sources: {
 }
 
 /**
- * The same table with the info file fetched. Any answer counts as "served" —
- * the cloud's redirect stub has no values but still proves a web instance is
- * serving the page — and any failure, timeout or garbage means "not served".
+ * The cloud's redirect stub. It declares no values, but it *is* a web instance
+ * answering — what it says is only "you are not logged in". Kept narrow on
+ * purpose: a catch-all static host answers every unknown path with its SPA and
+ * a 200, and that must not be mistaken for a web instance (the app would talk
+ * to a socket.io server that is not there and stay offline).
+ */
+function isSocketInfoStub(text: string): boolean {
+  return (
+    /window\.location\.href\s*=/.test(text) &&
+    /\/www\/login|#redirect=/.test(text)
+  );
+}
+
+/**
+ * The same table with the info file fetched. Only two answers count as "a web
+ * instance is serving this page": a file that declares the values, or the
+ * cloud's login stub. A failed, hung or unrecognisable answer means "not
+ * served", i.e. today's ws default — never a stall and never a silent move to
+ * the admin port.
  */
 export async function resolveConnection(
-  sources: Sources & { fetchInfo: () => Promise<string | null> },
+  sources: Omit<Sources, "info"> & { fetchInfo: () => Promise<string | null> },
 ): Promise<ReturnType<typeof resolveTransport>> {
   let info: Info = null;
   try {
     const text = await sources.fetchInfo();
-    if (text !== null) info = parseSocketInfo(text) ?? {};
+    if (text !== null) {
+      const parsed = parseSocketInfo(text);
+      if (parsed) info = parsed;
+      else if (isSocketInfoStub(text)) info = {};
+    }
   } catch {
     info = null;
   }

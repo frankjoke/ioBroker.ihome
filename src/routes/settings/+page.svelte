@@ -28,7 +28,10 @@
    * edit that has not been applied yet, so they must not be shown as "in use".
    */
   function activeBrokerUrl(): string {
-    return ioBroker.connectOptions?.url ?? "";
+    // What the connect actually resolved (ioBrokerConnect sets it per
+    // connect): the ws default uses connectOptions.url, the io2 origin and an
+    // explicit address land in brokerUrl.
+    return ioBroker.brokerUrl ?? ioBroker.connectOptions?.url ?? "";
   }
 
   function applyAndReload() {

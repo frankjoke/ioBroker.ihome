@@ -33,6 +33,8 @@ export const ioBroker = $state({
   /** Which client is live: "io2" (the web adapter's socket.io) or "ws" (the
    *  admin's ws-server). Shown in the settings; set on every connect. */
   transport: null,
+  /** The address the connect resolved, for the settings' "via <url>". */
+  brokerUrl: null,
   visibilityState: getVisibility(),
   states,
   customs,
@@ -269,9 +271,10 @@ async function connectIOBroker(options = {}) {
         fetchInfo: fetchInfo ?? (async () => null),
       });
   ioBroker.transport = connection.transport;
-  // The UI reads the address back (the settings' "via <url>"), and it is what
-  // a later `ioBroker.connect()` call would reuse.
-  ioBroker.connectOptions.url = connection.url;
+  // The address the UI shows ("via <url>"). Deliberately *not* in
+  // connectOptions.url: a non-empty url there means "an explicit address ⇒ the
+  // ws client" (the check above), and this one is a resolved io2 origin.
+  ioBroker.brokerUrl = connection.url;
   const plan = connectPlan(connection);
   ioBroker.connectedPromise = createDeferredPromise();
   // clear the timeout of a previous connect attempt, otherwise it rejects
@@ -350,6 +353,12 @@ async function connectIOBroker(options = {}) {
       console.debug("[Socket] reconnect");
       ++ioBroker.connected;
       socket.emit("name", namespace);
+      // The subscription died with the old connection: without re-arming it
+      // (`subscribe("*")` for values, `subscribeObjects("*")` for objects), the
+      // dashboard would freeze on the values it last saw — and a tile toggle,
+      // which is relative to the live value, would look like it did nothing.
+      emitOnly("subscribe", "*");
+      emitOnly("subscribeObjects", "*");
       //Connected -> Starting point
       // if(!reconnectedShortly){
       // 	console.log('Socket connected - getStarted');
