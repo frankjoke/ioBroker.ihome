@@ -63,6 +63,15 @@
     applyAndReload();
   }
 
+  /** What the app is actually talking to, in the operator's words — the
+   *  answer to "why is it offline?" (ioBroker.transport, set per connect). */
+  function transportLabel(): string {
+    if (ioBroker.transport === "io2")
+      return "the web adapter's socket on this page's server";
+    if (ioBroker.transport === "ws") return "the admin socket (ws-server)";
+    return "nothing yet";
+  }
+
   function startAdd() {
     editing = { id: newId(), name: "", expr: "" };
     showForm = true;
@@ -139,11 +148,35 @@
           >
         </div>
 
+        <div class="field">
+          <label class="check">
+            <input type="checkbox" bind:checked={storage.cloudFallback} />
+            <span
+              >Jump to iobroker.pro when the local ioBroker is unreachable</span
+            >
+          </label>
+          <span class="hint text-muted"
+            >For a phone or a PWA that is used at home and away: after a failed
+            local attempt the app opens its own page on the cloud, where the
+            browser's iobroker.pro session is the login. Nothing is stored here
+            — off by default, so a wall display stays put and shows offline.</span
+          >
+        </div>
+        <div class="field">
+          <label class="label-mono" for="settings-cloud">Cloud address</label>
+          <input
+            id="settings-cloud"
+            type="text"
+            bind:value={storage.cloudHost}
+            placeholder="iobroker.pro"
+          />
+        </div>
+
         {#if isConnected}
           <p class="conn-note">
             <span class="badge badge-success">connected</span>
             <span class="text-muted"
-              >{ioBroker.namespace} via {activeBrokerUrl()}</span
+              >{ioBroker.namespace} via {activeBrokerUrl()} ({transportLabel()})</span
             >
           </p>
         {/if}

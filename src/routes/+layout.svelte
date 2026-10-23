@@ -40,6 +40,13 @@
     // The layout editor's own lock (pin.svelte.ts): off, the pencil works as
     // it always did; on, every fresh entrance asks for the PIN first.
     ["lockPencil", { init: false }],
+    // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
+    // unreachable, the app navigates to its own page on the cloud host, where
+    // the browser's portal session takes over. Off by default — a wall display
+    // must stay on its own page (showing offline) when the LAN hiccups, and
+    // the phone/PWA is where this makes sense.
+    ["cloudFallback", { init: false }],
+    ["cloudHost", { init: "iobroker.pro" }],
     { prefix: "__VISUAL__:" },
   );
 

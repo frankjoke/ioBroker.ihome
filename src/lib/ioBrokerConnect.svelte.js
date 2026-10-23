@@ -269,6 +269,9 @@ async function connectIOBroker(options = {}) {
         fetchInfo: fetchInfo ?? (async () => null),
       });
   ioBroker.transport = connection.transport;
+  // The UI reads the address back (the settings' "via <url>"), and it is what
+  // a later `ioBroker.connect()` call would reuse.
+  ioBroker.connectOptions.url = connection.url;
   const plan = connectPlan(connection);
   ioBroker.connectedPromise = createDeferredPromise();
   // clear the timeout of a previous connect attempt, otherwise it rejects
