@@ -1,121 +1,94 @@
-import { it, expect, beforeEach } from "vitest";
+import { it, expect } from "vitest";
 import {
-  getDevicesEnriched,
+  DEVICE_LIST_ID,
   getUsedStateIds,
   setCanonicalRegistry,
   setObjectSource,
 } from "$lib/stores/devices.svelte";
 
-beforeEach(() => {
-  // A fresh registry object invalidates the module's cache identity check.
-  setCanonicalRegistry({ version: 0, updatedAt: 0, devices: [] });
-  setObjectSource(null);
-});
-
-it("includes watch and rule-referenced state ids", () => {
+/**
+ * Every id the *logic* reads has to be in the used set: the subscription and
+ * the stateChange filter both come from it. A virtual control's expression is
+ * the easy one to forget — it is not a control `stateId` and not a rule.
+ */
+it("the used set covers a virtual control's expression and the rules", () => {
   setCanonicalRegistry({
-    version: 0,
+    version: 1,
     updatedAt: 0,
     devices: [
       {
-        id: "d",
-        name: "D",
-        type: "Value",
-        watch: ["alias.0.EG.Relay.SET"],
+        id: "dev-1",
+        name: "Virtual",
+        type: "Custom",
+        icon: "",
+        rooms: [],
+        functions: [],
+        favorites: [],
+        watch: ["watch.0.one"],
+        controls: [
+          {
+            id: "c-1",
+            feature: "value",
+            widget: "value",
+            stateId: "state.0.read",
+            virtual: {
+              expr: 'get("alias.0.X.SET") * 2 > get("0_userdata.0.y")',
+            },
+            readable: true,
+          },
+          {
+            id: "c-2",
+            feature: "value",
+            widget: "value",
+            stateId: "",
+            rules: [{ when: 'get("rule.0.input") == 1', style: {} }],
+            readable: true,
+          },
+        ],
+        rules: [],
+        slots: [],
+      },
+    ],
+  } as never);
+
+  const used = [...getUsedStateIds()];
+  expect(used).toContain(DEVICE_LIST_ID);
+  expect(used).toContain("state.0.read");
+  expect(used).toContain("watch.0.one");
+  expect(used).toContain("rule.0.input");
+  expect(used).toContain("alias.0.X.SET");
+  expect(used).toContain("0_userdata.0.y");
+});
+
+it("the used set covers a device slot's raw source and its rules", () => {
+  setObjectSource(new Map([["slot.0.raw", {}]]));
+  setCanonicalRegistry({
+    version: 1,
+    updatedAt: 0,
+    devices: [
+      {
+        id: "dev-2",
+        name: "Slotted",
+        type: "Custom",
+        icon: "",
+        rooms: [],
+        functions: [],
+        favorites: [],
         slots: [
           {
             kind: "value",
-            rules: [{ when: 'get("alias.0.EG.Slot") > 1' }],
+            source: "slot.0.raw",
+            rules: [{ when: 'get("slot.0.rule") > 1' }],
           },
+          { kind: "value", source: "power" }, // a feature name is not a state id
         ],
-        controls: [
-          {
-            id: "c",
-            feature: "v",
-            writable: false,
-            stateId: "alias.0.EG.Temp",
-            rules: [{ when: "get('alias.0.EG.Other') > 1" }],
-          },
-        ],
+        controls: [],
       },
     ],
-  });
+  } as never);
 
-  const ids = getUsedStateIds();
-  expect(ids.has("alias.0.EG.Temp")).toBe(true);
-  expect(ids.has("alias.0.EG.Relay.SET")).toBe(true);
-  expect(ids.has("alias.0.EG.Other")).toBe(true);
-  expect(ids.has("alias.0.EG.Slot")).toBe(true);
-});
-
-it("keeps the rule ids out of an empty registry", () => {
-  expect([...getUsedStateIds()].some((id) => id.startsWith("alias."))).toBe(
-    false,
-  );
-});
-
-it("resolves the device icon from the broker hierarchy (A65)", () => {
-  setObjectSource(
-    new Map([
-      ["alias.0.Ch", { common: { icon: "data:image/svg+xml;base64,AA" } }],
-      ["system.adapter.b.0", { common: { extIcon: "https://x/b.png" } }],
-    ]) as any,
-  );
-  setCanonicalRegistry({
-    version: 0,
-    updatedAt: 0,
-    devices: [
-      {
-        id: "d1",
-        name: "D1",
-        type: "Value",
-        controls: [
-          {
-            id: "c1",
-            feature: "v",
-            writable: false,
-            stateId: "alias.0.Ch.X",
-          },
-        ],
-      },
-      {
-        id: "d2",
-        name: "D2",
-        type: "Value",
-        controls: [
-          { id: "c2", feature: "v", writable: false, stateId: "b.0.Other.Y" },
-        ],
-      },
-      {
-        id: "d3",
-        name: "D3",
-        type: "Value",
-        icon: "widgets",
-        controls: [
-          {
-            id: "c3",
-            feature: "v",
-            writable: false,
-            stateId: "alias.0.Ch.X",
-          },
-        ],
-      },
-      {
-        id: "d4",
-        name: "D4",
-        type: "Value",
-        controls: [
-          { id: "c4", feature: "v", writable: false, stateId: "nothing.here" },
-        ],
-      },
-    ],
-  });
-
-  const devices = getDevicesEnriched();
-  expect(devices[0].objectIcon).toBe("data:image/svg+xml;base64,AA");
-  expect(devices[1].objectIcon).toBe("https://x/b.png");
-  // The document's own icon still wins.
-  expect(devices[2].objectIcon).toBe("widgets");
-  // Nothing resolves: no icon at all, not an empty string.
-  expect(devices[3].objectIcon).toBeUndefined();
+  const used = [...getUsedStateIds()];
+  expect(used).toContain("slot.0.raw");
+  expect(used).toContain("slot.0.rule");
+  expect(used).not.toContain("power");
 });

@@ -28,6 +28,7 @@ export async function waitForEnumCache(ms = 8000): Promise<void> {
   }
 }
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { stateIdsInExpression } from "$lib/config/rule-ops";
 import type { PageRegistry } from "$lib/types/display";
 
 export const PAGE_LIST_ID = "ihome.0.config.pageList";
@@ -61,6 +62,16 @@ function registerSlotStateIds(reg: PageRegistry): void {
         ];
         for (const id of sources) {
           if (id && ioBroker.objects.get(id)) registerProgramStateId(id);
+        }
+        // The tile's *own* slots carry rules of their own (the editor writes
+        // them), and those rules' `get("…")` ids need the same treatment as
+        // the device chain's.
+        for (const slot of placement.tile?.slots ?? []) {
+          for (const rule of slot.rules ?? []) {
+            for (const id of stateIdsInExpression(rule?.when ?? "")) {
+              registerProgramStateId(id);
+            }
+          }
         }
       }
     }

@@ -5,6 +5,7 @@ import type {
   Control,
 } from "$lib/types/device";
 import { applyRead } from "$lib/utils/transform";
+import { stateIdsInExpression } from "$lib/config/rule-ops";
 import { widgetFor } from "$lib/config/features";
 import { computeVirtual, type PoolEntry } from "$lib/config/virtual-ops";
 import { deviceObjectIcon } from "$lib/config/icon-ops";
@@ -69,24 +70,22 @@ let usedStateCache: {
   ids: new SvelteSet(),
 };
 
-// Raw state ids a rule reads with the pool helper, e.g. get("alias.0.X.SET").
-// Targeted extraction for *registration only* — the expression itself is still
-// evaluated by `evaluateVirtual`; this exists so a raw id is subscribed before
-// it is read. An id the pattern misses degrades to "that rule never matches"
-// (spec §14), never to a crash.
-const GET_STATE_RE = /\bget\(\s*['"]([^'"]+)['"]\s*\)/g;
+// Raw state ids an expression reads with the pool helper (`get("id")`) have to
+// be subscribed before they are read — the scanner lives in rule-ops (shared
+// with the pages and formula stores) and an id it misses degrades to "that rule
+// never matches" (spec §14), never to a crash.
+function addExpressionStateIds(
+  expr: string | undefined,
+  into: Set<string>,
+): void {
+  for (const id of stateIdsInExpression(expr ?? "")) into.add(id);
+}
 
 function addRuleStateIds(
   rules: { when?: string }[] | undefined,
   into: Set<string>,
 ): void {
-  for (const rule of rules ?? []) {
-    const expr = rule?.when;
-    if (!expr) continue;
-    GET_STATE_RE.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = GET_STATE_RE.exec(expr))) into.add(match[1]);
-  }
+  for (const rule of rules ?? []) addExpressionStateIds(rule?.when, into);
 }
 
 export function getUsedStateIds(): Set<string> {
@@ -99,9 +98,25 @@ export function getUsedStateIds(): Set<string> {
   const ids = new SvelteSet<string>(PROGRAM_STATE_IDS);
   for (const device of canonicalRegistry.devices ?? []) {
     for (const id of device.watch ?? []) ids.add(id);
-    for (const slot of device.slots ?? []) addRuleStateIds(slot.rules, ids);
+    for (const slot of device.slots ?? []) {
+      // A slot's raw `source` (the device editor lets a slot point at any
+      // state, not only a control of this device) and its rules'
+      // `get("…")` ids both need subscribing. Only ids that exist in the
+      // object tree are registered — a feature name is not a state id.
+      const source = slot?.source;
+      if (typeof source === "string" && source && objectSource?.get(source)) {
+        ids.add(source);
+      }
+      addRuleStateIds(slot?.rules, ids);
+    }
     for (const control of device.controls ?? []) {
       if (control.stateId) ids.add(control.stateId);
+      // A virtual control reads its inputs through `get("…")` in
+      // `virtual.expr` — never a `stateId`, so it needs this scan or its inputs
+      // would be read once and never updated. A control that uses a formula
+      // template instead is covered by the formulas store, which registers
+      // every template's expression ids.
+      addExpressionStateIds(control.virtual?.expr, ids);
       addRuleStateIds(control.rules, ids);
     }
   }

@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.14",
+        "version": "0.0.15",
         "news": {
+            "0.0.15": {
+                "en": "iHome connects the ioBroker way: the web adapter's own socket locally and through iobroker.pro (opt-in hand-over when the local instance stays unreachable), and it subscribes only to the states its tiles and rules actually read — a chatty installation no longer trips the cloud adapter's event limit",
+                "de": "iHome verbindet sich nach ioBroker-Art: der eigene Socket des Web-Adapters lokal und über iobroker.pro (optionaler Wechsel, wenn die lokale Instanz nicht erreichbar bleibt), und es abonniert nur die States, die seine Kacheln und Regeln wirklich lesen — eine lebhafte Installation reizt das Event-Limit des Cloud-Adapters nicht mehr aus"
+            },
             "0.0.14": {
                 "en": "A tile can guard its detail page with its own PIN (asked on a number pad, every time); the layout editor opens from any page, and the page tabs wear their page's colour",
                 "de": "Ein Tile kann seine Detailseite mit einer eigenen PIN schützen (Eingabe über eine Zifferntastatur, bei jedem Öffnen); der Layout-Editor öffnet von jeder Seite, und die Seiten-Reiter tragen die Farbe ihrer Seite"

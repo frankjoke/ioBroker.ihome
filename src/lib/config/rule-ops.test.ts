@@ -7,6 +7,7 @@ import {
   offlineBadge,
   resolveBadges,
   resolveStyle,
+  stateIdsInExpression,
   ruleScope,
 } from "$lib/config/rule-ops";
 import type { Rule, Slot } from "$lib/types/display";
@@ -539,4 +540,21 @@ it("resolves a badge from a raw state through the raw resolver", () => {
       NOW,
     ),
   ).toEqual([]);
+});
+
+it('stateIdsInExpression finds every get("…") id, once each', () => {
+  expect(
+    stateIdsInExpression(
+      "get(\"alias.0.X.SET\") > 0 && get('0_userdata.0.y') < 5",
+    ),
+  ).toEqual(["alias.0.X.SET", "0_userdata.0.y"]);
+  expect(stateIdsInExpression('get("a.b") + get("a.b")')).toEqual(["a.b"]);
+});
+
+it("stateIdsInExpression ignores anything that is not a get(...) id", () => {
+  expect(stateIdsInExpression("")).toEqual([]);
+  expect(stateIdsInExpression("true")).toEqual([]);
+  expect(stateIdsInExpression("get(x)")).toEqual([]); // unquoted
+  expect(stateIdsInExpression('forget("a.b")')).toEqual([]); // not the helper
+  expect(stateIdsInExpression("get('')")).toEqual([]); // empty id
 });

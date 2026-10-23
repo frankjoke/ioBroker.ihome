@@ -9,6 +9,23 @@ import {
   setFormulaLibrary,
 } from "$lib/stores/formulas.svelte.ts";
 import { migrateLibrary, seedLibrary } from "$lib/config/formulas";
+import { stateIdsInExpression } from "$lib/config/rule-ops";
+import { registerProgramStateId } from "$lib/stores/devices.svelte";
+
+/**
+ * The formula document and every id its expressions read: a formula is
+ * evaluated with the used-state pool, so the document itself (live edits from
+ * another device) and its inputs both belong in the used set. Called whenever
+ * the library changes — `registerProgramStateId` only bumps for new ids.
+ */
+function registerFormulaStateIds() {
+  registerProgramStateId(FORMULA_LIST_ID);
+  for (const template of getFormulaLibrary().templates ?? []) {
+    for (const id of stateIdsInExpression(template.expr ?? "")) {
+      registerProgramStateId(id);
+    }
+  }
+}
 
 let initPromise = null;
 let saveTimer = null;
@@ -32,6 +49,7 @@ async function ensureFormulaObject() {
 }
 
 export function saveFormulas() {
+  registerFormulaStateIds();
   clearTimeout(saveTimer);
   const snapshot = JSON.stringify(getFormulaLibrary());
   saveTimer = setTimeout(() => {
@@ -54,6 +72,7 @@ export function initFormulas() {
       } catch (e) {
         console.error("initFormulas ensureFormulaObject:", e);
       }
+      registerFormulaStateIds();
       const st = await ioBroker.getState(FORMULA_LIST_ID);
       if (st) {
         st.onUpdate = (_cl, state) => {

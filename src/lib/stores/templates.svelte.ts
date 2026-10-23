@@ -4,6 +4,7 @@
 // no-module-global-client rule as `pages.svelte.ts`.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { parseTemplateRegistry } from "$lib/config/template-ops";
+import { stateIdsInExpression } from "$lib/config/rule-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import type { TemplateRegistry } from "$lib/types/display";
 
@@ -23,6 +24,10 @@ export function getTemplateRegistry(): TemplateRegistry {
 
 export function setTemplateRegistry(reg: TemplateRegistry): void {
   templateRegistry = reg;
+  // Both the load and every save pass through here, so the ids a template
+  // names are (re)registered in one place; `registerProgramStateId` bumps for
+  // new ids only, which is what re-subscribes the connection.
+  registerTemplateStateIds();
 }
 
 let initPromise: Promise<void> | null = null;
@@ -105,9 +110,36 @@ export function commitTemplates(next: TemplateRegistry): boolean {
   return true;
 }
 
+/**
+ * The template document, plus every raw state and rule id its templates name:
+ * a device that has no slots of its own renders the chain's, so the chain's
+ * sources and rules must be in the used set too (the device store scans the
+ * device's own slots only).
+ */
+function registerTemplateStateIds(): void {
+  registerProgramStateId(TEMPLATE_LIST_ID);
+  for (const template of getTemplateRegistry().templates ?? []) {
+    for (const slot of template?.slots ?? []) {
+      const source = slot?.source;
+      if (
+        typeof source === "string" &&
+        source &&
+        ioBroker.objects.get(source)
+      ) {
+        registerProgramStateId(source);
+      }
+      for (const rule of slot?.rules ?? []) {
+        for (const id of stateIdsInExpression(rule?.when ?? "")) {
+          registerProgramStateId(id);
+        }
+      }
+    }
+  }
+}
+
 /** Load the user templates; an absent document simply means "none yet". */
 export function initTemplates(): Promise<void> {
-  registerProgramStateId(TEMPLATE_LIST_ID);
+  registerTemplateStateIds();
   if (!initPromise) {
     initPromise = (async () => {
       const until = Date.now() + 10_000;

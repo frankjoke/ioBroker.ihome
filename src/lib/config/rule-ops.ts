@@ -393,3 +393,26 @@ export function resolveBadges(
   }
   return out;
 }
+
+/**
+ * Every raw state id an expression reads through the pool helper — `get("id")`.
+ * For *registration only*: the ids a rule, a virtual or a formula reads have to
+ * be subscribed before they are read (the expression itself is still evaluated
+ * by `evaluateVirtual`). An id the pattern misses degrades to "that rule never
+ * matches" (spec §14), never to a crash.
+ */
+export function stateIdsInExpression(expr: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  // A fresh regex per call: the shared one's `lastIndex` would leak between
+  // calls, and a shared `g` regex is a classic source of missed matches.
+  const re = /\bget\(\s*['"]([^'"]+)['"]\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(String(expr ?? "")))) {
+    const id = match[1];
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
