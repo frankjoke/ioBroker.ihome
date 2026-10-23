@@ -3,6 +3,7 @@
 import "@iobroker/ws";
 import { connectPlan, loadIo2Client } from "./socket-client";
 import { resolveConnection } from "./transport";
+import { subscriptionPlan } from "./subscriptions";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
 import { getVisibility, typeOfP } from "./tools.svelte";
 import { setContext, getContext } from "svelte";
@@ -92,6 +93,21 @@ export const ioBroker = $state({
 
   emitOnly(...args) {
     return emitOnly(...args);
+  },
+
+  /**
+   * (Re)arm the subscriptions: what the app uses, plus the adapter's own
+   * namespace. Not `subscribe("*")` — the cloud adapter forwards every
+   * subscribed change into the tunnel and blocks the account when the rate is
+   * too high (subscriptions.ts has the whole story). Called on connect, on
+   * reconnect and whenever the registry adds ids (states.svelte.js).
+   */
+  syncSubscriptions() {
+    const live = ioBroker.socket;
+    if (!live?.emit) return;
+    const plan = subscriptionPlan(getUsedStateIds(), ioBroker.namespace);
+    live.emit("subscribe", plan.states);
+    live.emit("subscribeObjects", plan.objects);
   },
 
   async sendTo(instance, command, data, timeout = 30000) {
@@ -353,12 +369,11 @@ async function connectIOBroker(options = {}) {
       console.debug("[Socket] reconnect");
       ++ioBroker.connected;
       socket.emit("name", namespace);
-      // The subscription died with the old connection: without re-arming it
-      // (`subscribe("*")` for values, `subscribeObjects("*")` for objects), the
-      // dashboard would freeze on the values it last saw — and a tile toggle,
-      // which is relative to the live value, would look like it did nothing.
-      emitOnly("subscribe", "*");
-      emitOnly("subscribeObjects", "*");
+      // The subscription died with the old connection: without re-arming it,
+      // the dashboard would freeze on the values it last saw — and a tile
+      // toggle, which is relative to the live value, would look like it did
+      // nothing. The same used set as on connect, so a reconnect stays cheap.
+      ioBroker.syncSubscriptions();
       //Connected -> Starting point
       // if(!reconnectedShortly){
       // 	console.log('Socket connected - getStarted');
@@ -404,8 +419,8 @@ async function connectIOBroker(options = {}) {
     await ioBroker.wait(10);
     ioBroker.adapterConfig = objects.getObject(ioBroker.adapterConfigName);
     ioBroker.language = ioBroker.systemConfig?.common?.language || "en";
-    emitOnly("subscribe", "*");
-    emitOnly("subscribeObjects", "*");
+    // Same rule as on reconnect: only what the app uses, plus ihome.0.*.
+    ioBroker.syncSubscriptions();
     await ioBroker.wait(10);
     clearTimeout(timeout);
     ioBroker.connectedPromise.resolve(ioBroker.systemConfig);

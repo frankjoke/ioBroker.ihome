@@ -48,7 +48,11 @@ export function setObjectSource(src: Map<string, any> | null) {
 // registered at runtime (the device list itself). Only these are loaded into the
 // StateClass cache and updated on stateChange.
 const PROGRAM_STATE_IDS = new SvelteSet<string>([DEVICE_LIST_ID]);
-let programVersion = 0;
+/** Bumped whenever the program (the layouts' rules and virtuals) changed, so
+ *  `getUsedStateIds` recomputes. `$state` on purpose: the connection layer
+ *  watches the used set to (re)subscribe — without a reactive version counter
+ *  a page load after connect would leave the device tiles unsubscribed. */
+let programVersion = $state(0);
 export function registerProgramStateId(id: string) {
   if (!id || PROGRAM_STATE_IDS.has(id)) return;
   PROGRAM_STATE_IDS.add(id);

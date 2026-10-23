@@ -17,6 +17,7 @@
     setObjectSource,
     getCanonicalRegistry,
     devicesEnrichedStore,
+    getUsedStateIds,
   } from "$lib/stores/devices.svelte.js";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
@@ -137,6 +138,16 @@
     current === "/" || current.startsWith("/p/") || current === "/layout",
   );
 
+  // The used set grows while the app loads (the registry and the pages arrive
+  // after the first connect): subscribe again whenever it does, so no device
+  // tile is left without live values. The connect itself subscribes once; this
+  // covers everything after it, and a reconnect re-arms the same set.
+  $effect(() => {
+    getUsedStateIds(); // tracked: the $state version and the id sets
+    if (!ioBroker.connected) return;
+    ioBroker.syncSubscriptions();
+  });
+
   // Load all device states once the socket is up and the object cache is ready,
   // then again for any state objects that appear later. Pages read the shared
   // reactive ioBroker.states map directly.
@@ -146,8 +157,7 @@
     setStateSource(ioBroker.states);
     setObjectSource(ioBroker.objects);
     void ioBroker.objects.size;
-    void reloadUsedStates();
-    // Fill any device whose functions/favorites are empty from the broker's own
+    void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).
     void (async () => {
       // both gates: the registry must be loaded and the enum cache populated
