@@ -1,7 +1,9 @@
 <script lang="ts">
   import PageView from "$lib/components/display/PageView.svelte";
   import LayoutSheet from "$lib/components/layout/LayoutSheet.svelte";
-  import { setLastPage } from "$lib/stores/pages.svelte.js";
+  import { getPagesLoadKind, setLastPage } from "$lib/stores/pages.svelte.js";
+  import { pagePlaceholder } from "$lib/config/pages-ops";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { sheet } from "$lib/stores/sheet.svelte.js";
   import { goto } from "$app/navigation";
   import { placementUnder } from "$lib/config/tile-hit";
@@ -12,6 +14,13 @@
    *  and at "/p/<id>" alike, so the editor is a mode of both and not just of
    *  the root route. The page itself is the route's business. */
   let { page }: { page?: Page } = $props();
+
+  // Why there is no page to draw: still connecting (the document arrives a
+  // moment after the socket, so a page-less first paint is not yet a verdict),
+  // a read that came back empty-handed, or really no pages.
+  const placeholder = $derived(
+    pagePlaceholder(ioBroker.connected, getPagesLoadKind()),
+  );
 
   /** The tile the last click in the display landed on (A48). */
   let picked = $state<PlacementAnchor | null>(null);
@@ -61,6 +70,15 @@
         <PageView {page} />
       {/key}
     </div>
+  {:else if placeholder === "connecting"}
+    <p class="empty text-muted">
+      <span class="spinner material-symbols-outlined">progress_activity</span>
+      Trying to connect…
+    </p>
+  {:else if placeholder === "unreadable"}
+    <p class="empty text-muted">
+      The page list could not be read — check the connection, then reload.
+    </p>
   {:else}
     <p class="empty text-muted">
       No pages yet. They are created from your rooms and functions on first
@@ -134,5 +152,20 @@
   .empty {
     padding: 2rem;
     text-align: center;
+  }
+
+  /* The connecting notice: a turning glyph, so a slow broker reads as "working
+     on it" rather than as an empty app. */
+  .spinner {
+    display: inline-block;
+    vertical-align: -4px;
+    margin-right: 0.4rem;
+    animation: spin 1.2s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

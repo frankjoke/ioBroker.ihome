@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { pagePlaceholder } from "$lib/config/pages-ops";
 import {
   backfillEnumFields,
   filterDevices,
@@ -496,4 +497,17 @@ it("keeps an empty placement list invisible unless showEmpty", () => {
   };
   const res = resolvePage(page, [dev({})]);
   expect(res.map((r) => r.group.id)).toEqual(["g2"]);
+});
+
+it("the display's placeholder distinguishes connecting, unreadable and empty", () => {
+  // not connected yet, or connected but the document is still on its way
+  expect(pagePlaceholder(false, null)).toBe("connecting");
+  expect(pagePlaceholder(false, "invalid")).toBe("connecting");
+  expect(pagePlaceholder(true, null)).toBe("connecting");
+  // the read came back empty-handed: that is not "no pages", it is not read
+  expect(pagePlaceholder(true, "absent")).toBe("unreadable");
+  expect(pagePlaceholder(true, "invalid")).toBe("unreadable");
+  // really no pages: the document loaded (or was seeded) and holds none
+  expect(pagePlaceholder(true, "loaded")).toBe("none");
+  expect(pagePlaceholder(true, "seeded")).toBe("none");
 });

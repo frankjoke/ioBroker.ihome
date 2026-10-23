@@ -86,6 +86,12 @@ let saveFailed = $state(false);
  *  actually succeeded (`loaded`) or this run seeded it (`seeded`). */
 let pagesLoadKind = $state<LoadedPages["kind"] | null>(null);
 
+/** How the last document read went — `null` while nothing has been read yet.
+ *  The display uses it to tell "still loading" from "really no pages". */
+export function getPagesLoadKind(): LoadedPages["kind"] | null {
+  return pagesLoadKind;
+}
+
 /**
  * True while the last document write failed, so the editor can say "not saved"
  * instead of pretending the change landed.

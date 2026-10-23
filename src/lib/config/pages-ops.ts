@@ -453,3 +453,22 @@ export function backfillEnumFields(
   });
   return { devices: out, changed };
 }
+
+/** What the display shows while no page can be rendered yet. */
+export type PlaceholderReason = "connecting" | "unreadable" | "none";
+
+/**
+ * Which notice the display deserves while it has no page to draw. "No pages
+ * yet" is the *last* of the three: on a fresh start the document arrives a
+ * moment after the socket, and a page-less first paint is a promise the app
+ * has not kept yet. `absent`/`invalid` mean the read came back empty-handed —
+ * that is "could not be read", never "there are no pages".
+ */
+export function pagePlaceholder(
+  connected: boolean,
+  kind: LoadedPages["kind"] | null,
+): PlaceholderReason {
+  if (!connected || kind === null) return "connecting";
+  if (kind === "absent" || kind === "invalid") return "unreadable";
+  return "none";
+}
