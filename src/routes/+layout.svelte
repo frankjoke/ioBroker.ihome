@@ -8,7 +8,7 @@
     DEFAULT_NAMESPACE,
     ioBrokerStart,
   } from "$lib/ioBrokerConnect.svelte.js";
-  import { defaultSocketUrl, socketUrlFromHostPort } from "$lib/socket-url";
+  import { FALLBACK_BROKER } from "$lib/broker-config";
   import { defineStorage } from "$lib/tools.svelte";
   import { reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -52,13 +52,23 @@
       ? DEFAULT_NAMESPACE
       : storage.namespace;
 
-  function buildUrl(hostPort) {
-    return socketUrlFromHostPort(hostPort) || defaultSocketUrl();
-  }
-
+  // Where the app talks to ioBroker is not decided here: the connect resolves
+  // it (transport.ts) — an explicit address, the stored host:port, the web
+  // adapter's own socket when one serves this page, or the admin port. The
+  // info file has to be fetched for that, and connectIOBroker is async.
   const ioBroker = ioBrokerStart({
     namespace,
-    url: buildUrl(storage.hostPort),
+    explicit:
+      import.meta.env.VITE_SOCKET_URL ||
+      new URLSearchParams(location.search).get("socket") ||
+      "",
+    hostPort: storage.hostPort || FALLBACK_BROKER,
+    fetchInfo: () =>
+      // The web adapter writes it inside the app's own directory (iqontrol
+      // loads `_socket/info.js`), not next to it.
+      fetch(new URL("_socket/info.js", document.baseURI).href)
+        .then((r) => (r.ok ? r.text() : null))
+        .catch(() => null),
   });
 
   const current = $derived(page.route?.id ?? "/");

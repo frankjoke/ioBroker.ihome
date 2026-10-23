@@ -1,7 +1,8 @@
 // @ts-nocheck
 // import socketio from 'socket.io-client/dist/socket.io.js'
 import "@iobroker/ws";
-import { defaultSocketUrl } from "./socket-url";
+import { connectPlan, loadIo2Client } from "./socket-client";
+import { resolveConnection } from "./transport";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
 import { getVisibility, typeOfP } from "./tools.svelte";
 import { setContext, getContext } from "svelte";
@@ -9,6 +10,10 @@ import { createDeferredPromise } from "./utils";
 
 // import { toasts } from "$lib/ToastsClass.svelte.js";
 // import { setContext } from 'svelte';
+
+/** The client the live socket was created with (`io2` or `ws`), so a switch
+ *  of transport recreates the socket instead of calling `connect` on it. */
+let connectedClient = null;
 
 /** @type {import("@iobroker/ws").SocketClient | null} */
 let socket = null;
@@ -25,6 +30,9 @@ export const ioBroker = $state({
   serviceWorker: navigator.serviceWorker,
   socket,
   connected: 0,
+  /** Which client is live: "io2" (the web adapter's socket.io) or "ws" (the
+   *  admin's ws-server). Shown in the settings; set on every connect. */
+  transport: null,
   visibilityState: getVisibility(),
   states,
   customs,
@@ -231,15 +239,37 @@ async function connectIOBroker(options = {}) {
     {},
     {
       namespace: DEFAULT_NAMESPACE,
-      url: defaultSocketUrl(),
+      url: "",
       // adapterConfig,
       rectreateSocket: false,
     },
     options,
   );
-  let { namespace, url, rectreateSocket, ...roptions } =
-    ioBroker.connectOptions;
+  let {
+    namespace,
+    url,
+    rectreateSocket,
+    explicit,
+    hostPort,
+    fetchInfo,
+    ...roptions
+  } = ioBroker.connectOptions;
   ioBroker.namespace = namespace;
+  // Which client, at which address. An explicit url keeps the ws client; the
+  // sources go through the rule table (transport.ts), whose third rule needs
+  // the web adapter's info file — hence the await here and not in the caller.
+  const connection = url
+    ? { transport: "ws", url }
+    : await resolveConnection({
+        explicit: explicit || undefined,
+        hostPort: hostPort || undefined,
+        origin: location.origin,
+        host: location.host,
+        protocol: location.protocol,
+        fetchInfo: fetchInfo ?? (async () => null),
+      });
+  ioBroker.transport = connection.transport;
+  const plan = connectPlan(connection);
   ioBroker.connectedPromise = createDeferredPromise();
   // clear the timeout of a previous connect attempt, otherwise it rejects
   // the promise of this attempt while it is still pending
@@ -251,7 +281,8 @@ async function connectIOBroker(options = {}) {
   console.log("connectIOBroker", ioBroker.connectOptions);
   // ioBroker.adapterConfigName = adapterConfig ?? `system.adapter.${namespace}`;
   try {
-    if (!socket || rectreateSocket) {
+    const transportChanged = plan.client !== connectedClient;
+    if (!socket || rectreateSocket || transportChanged) {
       const prev = socket || ioBroker.socket;
       if (prev) {
         // destroy() also cancels the auto-reconnect timer of the old client,
@@ -259,14 +290,28 @@ async function connectIOBroker(options = {}) {
         typeof prev.destroy === "function" ? prev.destroy() : prev.disconnect();
       }
       states.clear();
+      // The io2 client comes from the server that served this page; without
+      // it (a dev server, a bare PWA) there is nothing to connect with.
+      const client =
+        plan.client === "io2" ? await loadIo2Client() : globalThis.io;
+      if (!client) {
+        console.warn(
+          "[Socket] the web adapter's socket.io client is not available — staying disconnected",
+        );
+        ioBroker.connected = 0;
+        return;
+      }
       // The client starts connecting right here, so the handlers registered in
       // this same tick still precede any server event. A synchronous
       // construction error is swallowed inside the client, which is why the
       // 10 s waitconn timeout plus ioBroker.connected = 0 stays the signal.
-      ioBroker.socket = socket = globalThis.io.connect(url, roptions);
+      ioBroker.socket = socket = client.connect(plan.url, plan.options);
+      connectedClient = plan.client;
       ioBroker.connected = 0;
     } else {
-      socket.connect(url, roptions);
+      // The reuse path is the ws client's (`connect(url, options)`); the io2
+      // socket cannot switch address and is always recreated above.
+      socket.connect(plan.url, plan.options);
     }
     const waitconn = new createDeferredPromise();
 
