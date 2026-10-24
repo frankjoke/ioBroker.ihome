@@ -181,7 +181,6 @@
 <div class="devices-page">
   <div class="page-header">
     <div class="page-heading">
-      <span class="label-mono">Configuration</span>
       <h1>Devices</h1>
     </div>
     <div class="page-actions">

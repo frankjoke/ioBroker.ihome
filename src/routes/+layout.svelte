@@ -21,6 +21,7 @@
   } from "$lib/stores/devices.svelte.js";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
+  import { initVariables } from "$lib/variables.svelte.js";
   import {
     initPages,
     loadViewState,
@@ -203,6 +204,7 @@
   onMount(() => {
     initRegistry();
     initFormulas();
+    initVariables();
     initTemplates();
     loadViewState();
     // Registered here rather than by SvelteKit: its own call uses
@@ -235,7 +237,7 @@
   <title>iHome</title>
 </svelte:head>
 
-<div class="app-shell" class:display={isDisplay}>
+<div class="app-shell" class:display={isDisplay} class:config={!isDisplay}>
   {#if cloudNotice}
     <p class="cloud-notice" role="status">
       <span class="material-symbols-outlined">cloud_sync</span>
@@ -306,6 +308,13 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+  }
+
+  /* The config mode: the page wears the soft blue the way the editor's bar
+     wears red — one plain colour, no color-mix (see app.css). Every
+     non-display route, so the bar tint and the page are the same mode. */
+  .app-shell.config {
+    background-color: var(--config-bg);
   }
 
   /* ------------------------------------------------------------ main */

@@ -18,6 +18,24 @@ import { parseLayoutRef } from "$lib/config/layout-ops";
 /** @type {Page[]} */
 export const pages = [
   { id: "/devices", label: "Devices", icon: "devices", title: "Devices" },
+  {
+    id: "/variables",
+    label: "Global Variables",
+    icon: "data_object",
+    title: "Global Variables",
+  },
+  {
+    id: "/formulas",
+    label: "Formula Templates",
+    icon: "functions",
+    title: "Formula Templates",
+  },
+  {
+    id: "/server",
+    label: "Server & Security",
+    icon: "admin_panel_settings",
+    title: "Server & Security",
+  },
 ];
 
 /**

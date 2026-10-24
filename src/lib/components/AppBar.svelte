@@ -87,20 +87,20 @@
 
   const storage = getStorage();
   const storedPin = $derived(effectivePin(storage.pin));
-  let askingSettingsPin = $state(false);
+  let askingServerPin = $state(false);
 
   /**
-   * The settings ask for the PIN here — on the way in — instead of the settings
-   * page asking on load. A reload (or a dev-server reload) must never throw a
-   * modal at the operator; only a deliberate press of the cog does.
+   * The server page asks for the PIN here — on the way in — instead of the page
+   * asking on load. A reload (or a dev-server reload) must never throw a modal
+   * at the operator; only a deliberate press of the wifi button does.
    *
    * Capture phase: SvelteKit's router listens before a delegated `onclick`, so
    * only a capture handler can still say no (same reason as `onPageClick`).
    */
-  function onSettingsClick(event: MouseEvent) {
+  function onServerClick(event: MouseEvent) {
     if (isUnlocked()) return;
     event.preventDefault();
-    askingSettingsPin = true;
+    askingServerPin = true;
   }
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
@@ -145,7 +145,11 @@
   }
 </script>
 
-<header class="bar" class:editing={isDisplay && sheet.open}>
+<header
+  class="bar"
+  class:editing={isDisplay && sheet.open}
+  class:config={!isDisplay}
+>
   <nav class="tabs" aria-label={isDisplay ? "Pages" : "Configuration"}>
     {#if isDisplay}
       {#each treePages as p (p.id)}
@@ -175,14 +179,6 @@
           <span class="tab-label">{p.label}</span>
         </a>
       {/each}
-      <a
-        class="tab icon-tab"
-        href={`${base}/#/`}
-        title="Back to the display"
-        aria-label="Back to the display"
-      >
-        <span class="material-symbols-outlined">visibility</span>
-      </a>
     {/if}
   </nav>
 
@@ -204,16 +200,27 @@
       </a>
     {/if}
 
+    {#if !isDisplay}
+      <a
+        class="icon-btn"
+        href={`${base}/#/`}
+        title="Back to the display"
+        aria-label="Back to the display"
+      >
+        <span class="material-symbols-outlined">visibility</span>
+      </a>
+    {/if}
+
     <ThemeToggle variant="cycle" />
 
     <a
       class="icon-btn status-btn"
       class:connected={isConnected}
-      href={`${base}/#/settings`}
-      onclickcapture={onSettingsClick}
+      href={`${base}/#/server`}
+      onclickcapture={onServerClick}
       title={isConnected
-        ? "Connected — open the connection settings"
-        : "Not connected — open the connection settings"}
+        ? "Connected — open Server & Security"
+        : "Not connected — open Server & Security"}
       aria-label={isConnected ? "Connected" : "Not connected"}
     >
       <span class="material-symbols-outlined"
@@ -223,29 +230,28 @@
 
     <a
       class="icon-btn"
-      href={`${base}/#/settings`}
-      onclickcapture={onSettingsClick}
-      title="System settings"
-      aria-label="System settings"
+      href={`${base}/#/variables`}
+      title="Global variables"
+      aria-label="Global variables"
     >
       <span class="material-symbols-outlined">settings</span>
     </a>
   </div>
 </header>
 
-{#if askingSettingsPin}
+{#if askingServerPin}
   <PinModal
-    title="Enter PIN for Settings"
+    title="Enter PIN for Server & Security"
     expected={storedPin}
     onSubmit={() => {
       unlock();
-      askingSettingsPin = false;
+      askingServerPin = false;
       // `goto`, not `location.hash = …`: SvelteKit's hash router reloads the
       // page on a direct hash edit, and that reload dropped the unlock just
-      // granted (the settings came back locked).
-      void goto("#/settings");
+      // granted (the server page came back locked).
+      void goto("#/server");
     }}
-    onCancel={() => (askingSettingsPin = false)}
+    onCancel={() => (askingServerPin = false)}
   />
 {/if}
 
@@ -285,6 +291,14 @@
      red in both themes, so "am I editing?" is answerable at a glance. */
   .bar.editing {
     background-color: var(--edit-mode-bar);
+  }
+
+  /* Config pages are their own mode too: the bar wears a stronger blue and
+     the open tab the page's own colour, so it is the folder that opens into
+     the page — the display's tab style, on the config tint. */
+  .bar.config {
+    background-color: var(--config-bar);
+    --tab-page: var(--config-bg);
   }
 
   /* The strip is the folders' edge: tabs stand on the bar's own border line,
@@ -344,11 +358,6 @@
   }
   .tab .material-symbols-outlined {
     font-size: 18px;
-  }
-
-  /* The config bar's "Back to the display" link keeps the tab row's shape. */
-  .icon-tab {
-    padding: 6px 10px;
   }
 
   .actions {

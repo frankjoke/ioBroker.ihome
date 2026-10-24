@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.15",
+        "version": "0.0.16",
         "news": {
+            "0.0.16": {
+                "en": "Configuration is split into tabs — Devices, Global Variables, Formula Templates, Server & Security — behind a blue config bar whose open tab is the folder that opens into the page. Global Variables manages iHome-internal constants (kept in memory by the dashboard and the adapter, never broker states) and named references to ioBroker states, picked from the tree or created on save at a namespace you choose; iHome's own states are pinned to ihome.<n>.Variables so no adapter object can be overwritten",
+                "de": "Die Konfiguration ist in Reiter aufgeteilt — Devices, Global Variables, Formula Templates, Server & Security — hinter einer blauen Konfigurationsleiste, deren offener Reiter der Ordner ist, der sich in die Seite öffnet. Global Variables verwaltet iHome-interne Konstanten (nur im Speicher von Dashboard und Adapter, niemals Broker-States) und benannte Verweise auf ioBroker-States — aus dem Baum gewählt oder beim Speichern in einem gewählten Namespace angelegt; iHome-eigene States liegen fest unter ihome.<n>.Variables, damit kein Adapter-Objekt überschrieben werden kann"
+            },
             "0.0.15": {
                 "en": "iHome connects the ioBroker way: the web adapter's own socket locally and through iobroker.pro (opt-in hand-over when the local instance stays unreachable), and it subscribes only to the states its tiles and rules actually read — a chatty installation no longer trips the cloud adapter's event limit",
                 "de": "iHome verbindet sich nach ioBroker-Art: der eigene Socket des Web-Adapters lokal und über iobroker.pro (optionaler Wechsel, wenn die lokale Instanz nicht erreichbar bleibt), und es abonniert nur die States, die seine Kacheln und Regeln wirklich lesen — eine lebhafte Installation reizt das Event-Limit des Cloud-Adapters nicht mehr aus"
