@@ -11,16 +11,26 @@
     buildStateId,
     convertValue,
     isIhomeNamespace,
+    nameTaken,
     namespaceOptions,
     relativeIdFor,
+    reservedName,
+    restrictName,
     splitStateId,
+    validName,
     validStateId,
     type GlobalVariable,
   } from "$lib/config/variables";
   import { formatValue } from "$lib/config/format";
+  import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
-  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
+  import {
+    enumLabelFromObject,
+    roomList,
+    roomsOf as roomsOfEnum,
+  } from "$lib/config/rooms";
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const variables = $derived(getVariables());
@@ -60,6 +70,65 @@
   const rooms = $derived(roomList(ioBroker.enums));
   function roomsOf(id: string): string[] {
     return roomsOfEnum(ioBroker.enums, id);
+  }
+
+  /** Role suggestions: what the broker already carries, plus the usual ones. */
+  const ROLE_SEED = [
+    "value",
+    "value.temperature",
+    "value.humidity",
+    "value.power",
+    "switch",
+    "level.dimmer",
+    "indicator",
+    "text",
+  ];
+  const roleOptions = $derived(
+    [
+      ...new Set([
+        ...ROLE_SEED,
+        ...collectStates(objects)
+          .map((s) => String(s.obj?.common?.role ?? ""))
+          .filter(Boolean),
+      ]),
+    ].sort(),
+  );
+
+  const roomOptions = $derived(
+    rooms.map((r) => ({ value: r.id, label: r.label, icon: r.icon })),
+  );
+  const functionOptions = $derived(
+    (((ioBroker.enums as any)?.getList("functions") as any[]) ?? []).map(
+      (e: any) => ({ value: e._id, label: enumLabelFromObject(e) }),
+    ),
+  );
+
+  const enumRooms = $derived(
+    (editing?.enums ?? []).filter((e) => e.startsWith("enum.rooms.")),
+  );
+  const enumFunctions = $derived(
+    (editing?.enums ?? []).filter((e) => e.startsWith("enum.functions.")),
+  );
+
+  /** The name is the reference, so it is kept id-safe while it is typed. */
+  function setEditingName(raw: string) {
+    if (!editing) return;
+    editing.name = restrictName(raw);
+    formError = "";
+  }
+
+  /** One MultiSelect's pick replaces only its own enum kind. */
+  function setEnumPart(kind: "rooms" | "functions", ids: string[]) {
+    if (!editing) return;
+    const keep = (editing.enums ?? []).filter(
+      (e) => !e.startsWith(`enum.${kind}.`),
+    );
+    editing.enums = [...keep, ...ids];
+  }
+
+  /** Input text as a number; empty stays "not set". */
+  function numberOrUndefined(value: string): number | undefined {
+    return value.trim() === "" ? undefined : Number(value);
   }
 
   /** iHome's own instance: the state must go to its Variables folder, so no
@@ -157,8 +226,16 @@
   async function save() {
     if (!editing) return;
     const v: GlobalVariable = { ...editing, name: editing.name.trim() };
-    if (!v.name) {
-      formError = "Give the variable a name.";
+    if (!validName(v.name)) {
+      formError = "Give the variable a name (letters, digits, underscore).";
+      return;
+    }
+    if (reservedName(v.name)) {
+      formError = `"${v.name}" belongs to the expression engine — pick another name.`;
+      return;
+    }
+    if (nameTaken(getVariables(), v.name, editing.id)) {
+      formError = `Another variable is already called "${v.name}".`;
       return;
     }
     if (v.kind === "constant") {
@@ -321,8 +398,17 @@
 
         <label class="field"
           ><span class="label-mono">Name</span>
-          <input type="text" bind:value={editing.name} /></label
+          <input
+            type="text"
+            value={editing.name}
+            oninput={(e) => setEditingName(e.currentTarget.value)}
+          /></label
         >
+        <p class="hint text-muted">
+          No dots or spaces — the name <em>is</em> the reference, e.g. in a
+          formula. <code>sum</code>, <code>get</code> and <code>active</code> are
+          taken.
+        </p>
 
         <label class="field"
           ><span class="label-mono">Type</span>
@@ -436,6 +522,77 @@
                 <option value="boolean">True / false</option>
               </select></label
             >
+
+            <label class="field"
+              ><span class="label-mono">Role</span>
+              <input
+                type="text"
+                list="ihome-state-roles"
+                bind:value={editing.role}
+                placeholder="value"
+              /></label
+            >
+            <datalist id="ihome-state-roles">
+              {#each roleOptions as r (r)}
+                <option value={r}></option>
+              {/each}
+            </datalist>
+
+            {#if editing.type === "number"}
+              <div class="form-grid three">
+                <label class="field"
+                  ><span class="label-mono">Min</span>
+                  <input
+                    type="number"
+                    value={editing.min ?? ""}
+                    oninput={(e) =>
+                      (editing.min = numberOrUndefined(e.currentTarget.value))}
+                  /></label
+                >
+                <label class="field"
+                  ><span class="label-mono">Max</span>
+                  <input
+                    type="number"
+                    value={editing.max ?? ""}
+                    oninput={(e) =>
+                      (editing.max = numberOrUndefined(e.currentTarget.value))}
+                  /></label
+                >
+                <label class="field"
+                  ><span class="label-mono">Step</span>
+                  <input
+                    type="number"
+                    value={editing.step ?? ""}
+                    oninput={(e) =>
+                      (editing.step = numberOrUndefined(e.currentTarget.value))}
+                  /></label
+                >
+              </div>
+            {/if}
+
+            <div class="form-grid">
+              <label class="field"
+                ><span class="label-mono">Rooms</span>
+                <MultiSelect
+                  options={roomOptions}
+                  selected={enumRooms}
+                  enums={ioBroker.enums}
+                  placeholder="No room"
+                  onChange={(ids) => setEnumPart("rooms", ids)}
+                /></label
+              >
+              <label class="field"
+                ><span class="label-mono">Functions</span>
+                <MultiSelect
+                  options={functionOptions}
+                  selected={enumFunctions}
+                  enums={ioBroker.enums}
+                  placeholder="No function"
+                  onChange={(ids) => setEnumPart("functions", ids)}
+                /></label
+              >
+            </div>
+
             <p class="hint text-muted">
               {#if previewExists}
                 <code>{previewId}</code> already exists — it is used as it is.
@@ -776,6 +933,10 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+  }
+
+  .form-grid.three {
+    grid-template-columns: 1fr 1fr 1fr;
   }
 
   .actions {

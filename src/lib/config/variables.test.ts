@@ -6,10 +6,16 @@ import {
   initialValue,
   isIhomeNamespace,
   migrateVariables,
+  nameTaken,
   namespaceOptions,
   relativeIdFor,
+  reservedName,
+  resolveVariable,
+  restrictName,
   splitStateId,
+  validName,
   validStateId,
+  variableLocals,
 } from "$lib/config/variables";
 
 describe("buildStateId", () => {
@@ -104,12 +110,136 @@ describe("relativeIdFor", () => {
   });
 });
 
+describe("restrictName / validName", () => {
+  it("replaces dots and spaces, collapsing runs", () => {
+    expect(restrictName("Outside temp")).toBe("Outside_temp");
+    expect(restrictName("my.value")).toBe("my_value");
+    // Live typing must keep a trailing underscore, so the function does not
+    // trim — the migration trims a *persisted* name instead.
+    expect(restrictName("  Außentemperatur  ")).toBe("_Au_entemperatur_");
+    expect(restrictName("a   b")).toBe("a_b");
+  });
+  it("prefixes a leading digit so the name is an identifier", () => {
+    expect(restrictName("1st")).toBe("v_1st");
+    expect(restrictName("2")).toBe("v_2");
+  });
+  it("accepts only names with a letter or digit", () => {
+    expect(validName("Outside_temp")).toBe(true);
+    expect(validName("_")).toBe(false);
+    expect(validName("")).toBe(false);
+  });
+});
+
+describe("reservedName", () => {
+  it("refuses the expression helpers, keywords and the tile's active", () => {
+    expect(reservedName("sum")).toBe(true);
+    expect(reservedName("Get")).toBe(true);
+    expect(reservedName("active")).toBe(true);
+    expect(reservedName("return")).toBe(true);
+    expect(reservedName("gas_price")).toBe(false);
+  });
+});
+
+describe("nameTaken", () => {
+  const list = [
+    {
+      id: "a",
+      name: "Outside_temp",
+      kind: "constant" as const,
+      type: "number",
+    },
+    { id: "b", name: "mode", kind: "constant" as const, type: "string" },
+  ];
+  it("is case-insensitive and skips the entry being edited", () => {
+    expect(nameTaken(list, "outside_TEMP")).toBe(true);
+    expect(nameTaken(list, "outside_temp", "a")).toBe(false);
+    expect(nameTaken(list, "fresh_name")).toBe(false);
+  });
+});
+
+describe("resolveVariable", () => {
+  const list = [
+    {
+      id: "a",
+      name: "Outside_temp",
+      kind: "state" as const,
+      type: "number",
+      stateId: "ihome.0.Variables.outsideTemp",
+    },
+    {
+      id: "b",
+      name: "gas_price",
+      kind: "constant" as const,
+      type: "number",
+      value: "0.35",
+    },
+    {
+      id: "c",
+      name: "broken",
+      kind: "constant" as const,
+      type: "number",
+      value: "abc",
+    },
+    { id: "d", name: "no_state", kind: "state" as const, type: "mixed" },
+  ];
+  it("resolves a bare name to the state behind it", () => {
+    expect(resolveVariable("Outside_temp", list)).toEqual({
+      kind: "state",
+      stateId: "ihome.0.Variables.outsideTemp",
+    });
+  });
+  it("resolves a constant to its typed value", () => {
+    expect(resolveVariable("gas_price", list)).toEqual({
+      kind: "constant",
+      value: 0.35,
+    });
+  });
+  it("never treats a dotted id as a variable", () => {
+    expect(resolveVariable("ihome.0.Variables.outsideTemp", list)).toBeNull();
+    expect(resolveVariable("Outside_temp", list)).not.toBeNull();
+  });
+  it("returns null for unknown, stateless and malformed entries", () => {
+    expect(resolveVariable("nothing", list)).toBeNull();
+    expect(resolveVariable("no_state", list)).toBeNull();
+    expect(resolveVariable("broken", list)).toBeNull();
+    expect(resolveVariable("", list)).toBeNull();
+  });
+});
+
+describe("variableLocals", () => {
+  it("gives constants their value and state variables their live value", () => {
+    const locals = variableLocals(
+      [
+        {
+          id: "a",
+          name: "gas_price",
+          kind: "constant",
+          type: "number",
+          value: "0.35",
+        },
+        {
+          id: "b",
+          name: "Outside_temp",
+          kind: "state",
+          type: "number",
+          stateId: "ihome.0.Variables.outsideTemp",
+        },
+      ],
+      (id) => (id === "ihome.0.Variables.outsideTemp" ? 21.5 : undefined),
+    );
+    expect(locals).toEqual([
+      { key: "gas_price", value: 0.35 },
+      { key: "Outside_temp", value: 21.5 },
+    ]);
+  });
+});
+
 describe("constantValues", () => {
   it("materialises constants as typed values, states only named", () => {
     const values = constantValues([
       {
         id: "a",
-        name: "Gas price",
+        name: "gas_price",
         kind: "constant",
         type: "number",
         value: "0.35",
@@ -117,7 +247,7 @@ describe("constantValues", () => {
       },
       {
         id: "b",
-        name: "House mode",
+        name: "House_mode",
         kind: "constant",
         type: "string",
         value: "home",
@@ -131,7 +261,7 @@ describe("constantValues", () => {
       },
       {
         id: "d",
-        name: "Outside temp",
+        name: "Outside_temp",
         kind: "state",
         type: "number",
         stateId: "ihome.0.Variables.outsideTemp",
@@ -146,14 +276,6 @@ describe("constantValues", () => {
     });
     expect(values[1].value).toBe("home");
     expect(values[2].value).toBe(false);
-  });
-  it("keeps reference keys unique and out of the helpers' way", () => {
-    const values = constantValues([
-      { id: "a", name: "Sum", kind: "constant", type: "number", value: "1" },
-      { id: "b", name: "sum", kind: "constant", type: "number", value: "2" },
-      { id: "c", name: "1st", kind: "constant", type: "string", value: "x" },
-    ]);
-    expect(values.map((v) => v.key)).toEqual(["sum2", "sum3", "v_1st"]);
   });
   it("drops a value that cannot be read as its type", () => {
     const values = constantValues([
@@ -215,5 +337,31 @@ describe("migrateVariables", () => {
   it("survives junk", () => {
     expect(migrateVariables("not json").variables).toEqual([]);
     expect(migrateVariables(null).variables).toEqual([]);
+  });
+  it("cleans an older name into a reference and keeps the object settings", () => {
+    const lib = migrateVariables({
+      variables: [
+        {
+          id: "a",
+          name: " Outside temp ",
+          kind: "state",
+          type: "number",
+          stateId: "ihome.0.Variables.outsideTemp",
+          role: "value.temperature",
+          enums: ["enum.rooms.Küche", 7],
+          min: 0,
+          max: 50,
+          step: 0.5,
+        },
+      ],
+    });
+    expect(lib.variables[0]).toMatchObject({
+      name: "Outside_temp",
+      role: "value.temperature",
+      enums: ["enum.rooms.Küche"],
+      min: 0,
+      max: 50,
+      step: 0.5,
+    });
   });
 });

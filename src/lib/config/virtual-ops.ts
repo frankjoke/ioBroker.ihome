@@ -172,7 +172,12 @@ function matches(e: PoolEntry, f: Filter): boolean {
 }
 
 /** Build the helper API over the device-state pool. */
-function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
+function makeHelpers(
+  pool: PoolEntry[],
+  resolveId?: (ref: string) => string | undefined,
+): Scope["helpers"] {
+  // `get("…")` may name a variable: resolve it to the state behind it first.
+  const resolve = (ref: string) => resolveId?.(ref) ?? ref;
   const values = (f: Filter = {}) =>
     pool.filter((e) => matches(e, f)).map((e) => e.value);
   const numbers = (f: Filter = {}) =>
@@ -207,7 +212,7 @@ function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
     },
     get: (ref: string | { device?: string; label?: string }) => {
       if (typeof ref === "string") {
-        return pool.find((e) => e.stateId === ref)?.value;
+        return pool.find((e) => e.stateId === resolve(ref))?.value;
       }
       const hit = pool.find(
         (e) =>
@@ -228,15 +233,33 @@ function makeHelpers(pool: PoolEntry[]): Scope["helpers"] {
   };
 }
 
+/** Extras a scope carries beyond the device's own controls: the variables. */
+export interface ScopeExtras {
+  /** Variable names with their current values. */
+  locals?: { key: string; value: unknown }[];
+  /** A variable name as the state id behind it, for `get("…")`. */
+  resolveId?: (ref: string) => string | undefined;
+}
+
 /** Locals from the device's state controls + helpers over the pool. */
-export function buildScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
+export function buildScope(
+  controls: LocalControl[],
+  pool: PoolEntry[],
+  extras: ScopeExtras = {},
+): Scope {
   const taken = newLocalTaken();
   const locals: Record<string, unknown> = {};
+  // Variables come first: the global name is the predictable one, so a
+  // control whose label collides is the one that gets a suffix.
+  for (const v of extras.locals ?? []) {
+    locals[v.key] = v.value;
+    taken.add(v.key);
+  }
   for (const c of controls) {
     if (c.kind === "virtual") continue;
     locals[sanitizeLabel(c.label || c.feature, taken)] = c.liveValue;
   }
-  return { locals, helpers: makeHelpers(pool) };
+  return { locals, helpers: makeHelpers(pool, extras.resolveId) };
 }
 
 /** Compute a virtual control's value (rounding applied); never throws. */
@@ -244,10 +267,11 @@ export function computeVirtual(
   control: { virtual?: VirtualSpec },
   siblings: LocalControl[],
   pool: PoolEntry[],
+  extras: ScopeExtras = {},
 ): VirtualResult {
   const { value, error } = evaluateVirtual(
     control.virtual?.expr ?? "",
-    buildScope(siblings, pool),
+    buildScope(siblings, pool, extras),
   );
   if (error) return { value: undefined, error };
   return { value: roundValue(value, control.virtual?.precision) };

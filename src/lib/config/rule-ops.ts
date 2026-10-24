@@ -8,6 +8,7 @@ import {
   type LocalControl,
   type PoolEntry,
   type Scope,
+  type ScopeExtras,
 } from "$lib/config/virtual-ops";
 import { formatAge, formatValue } from "$lib/config/format";
 import { pickControl } from "$lib/config/template-ops";
@@ -167,8 +168,12 @@ export interface BadgeDevice {
  * against a label keeps working, and the pool helpers (`get`, `values`, …) come
  * along as in the virtual-formula editor. One language, one skill.
  */
-export function ruleScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
-  const base = buildScope(controls, pool);
+export function ruleScope(
+  controls: LocalControl[],
+  pool: PoolEntry[],
+  extras: ScopeExtras = {},
+): Scope {
+  const base = buildScope(controls, pool, extras);
   const taken = newLocalTaken();
   const locals: Record<string, unknown> = {};
   // Features (virtual readings included) are reserved first, so a preset rule
@@ -185,7 +190,13 @@ export function ruleScope(controls: LocalControl[], pool: PoolEntry[]): Scope {
       if (!(raw in locals)) locals[raw] = c.liveValue;
     }
   }
-  // Labels come second and take a suffix on collision, so a formula written
+  // Variables next: a global name beats a control *label*, never a feature.
+  for (const v of extras.locals ?? []) {
+    if (taken.has(v.key)) continue;
+    locals[v.key] = v.value;
+    taken.add(v.key);
+  }
+  // Labels come last and take a suffix on collision, so a formula written
   // against a label keeps working without stealing a feature name.
   for (const c of controls ?? []) {
     locals[sanitizeLabel(c.label, taken)] = c.liveValue;

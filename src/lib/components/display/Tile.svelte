@@ -22,6 +22,12 @@
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getVirtualPool } from "$lib/stores/devices";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import {
+    stateIdFor,
+    variableScope,
+    type VariableScope,
+  } from "$lib/config/variables";
   import {
     anchorKey,
     BADGE_ANCHORS,
@@ -114,10 +120,25 @@
   }
 
   // Rule locals are the device's controls (by label, falling back to feature) plus
-  // the pool helpers — the same language the formula editor uses.
+  // the pool helpers — the same language the formula editor uses. The config's
+  // variables join in: constants by value, state variables by live value.
   const baseScope = $derived(
-    ruleScope(device.controls ?? [], getVirtualPool()),
+    ruleScope(device.controls ?? [], getVirtualPool(), variableExtras()),
   );
+
+  /** Variables as scope extras for this tile's rules. */
+  function variableExtras(): VariableScope {
+    return variableScope(
+      getVariables(),
+      (id) => (ioBroker.states as Map<string, any>)?.get?.(id)?.val,
+    );
+  }
+
+  /** A stored source as the id the broker carries: a variable name resolves
+   *  to the state behind it, anything else passes through. */
+  function sourceId(source: string): string {
+    return stateIdFor(source, getVariables());
+  }
 
   // The tile's active reading (A30): its condition over the live value of the
   // control or raw state it names; no condition means never active.
@@ -150,13 +171,14 @@
    * own object makes it one — a feature name like "power" is not a state.
    */
   function rawControl(source: string): SlotControl | undefined {
-    const obj = (ioBroker.objects as Map<string, any>)?.get?.(source);
+    const id = sourceId(source);
+    const obj = (ioBroker.objects as Map<string, any>)?.get?.(id);
     if (!obj) return undefined;
-    const state = (ioBroker.states as Map<string, any>)?.get?.(source);
+    const state = (ioBroker.states as Map<string, any>)?.get?.(id);
     return {
-      id: source,
-      stateId: source,
-      label: obj.common?.name ?? source,
+      id,
+      stateId: id,
+      label: obj.common?.name ?? id,
       unit: obj.common?.unit,
       liveValue: state?.val,
       writable: false,
@@ -182,7 +204,7 @@
       if (source) {
         const control = resolveControl(shownControls, source);
         if (control) return pick(control.stateId);
-        return pick(source); // a raw state id
+        return pick(sourceId(source)); // a raw state id, or a variable
       }
       let latest: number | undefined;
       for (const c of controls0()) {

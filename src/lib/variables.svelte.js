@@ -76,16 +76,20 @@ async function createVariableState(v) {
   const type = ["string", "number", "boolean"].includes(v.type)
     ? v.type
     : "string";
+  const numeric = type === "number";
   const obj = {
     _id: v.stateId,
     type: "state",
     common: {
       name: v.name || v.stateId,
       type,
-      role: "value",
+      role: String(v.role ?? "").trim() || "value",
       read: true,
       write: true,
       ...(v.unit ? { unit: v.unit } : {}),
+      ...(numeric && typeof v.min === "number" ? { min: v.min } : {}),
+      ...(numeric && typeof v.max === "number" ? { max: v.max } : {}),
+      ...(numeric && typeof v.step === "number" ? { step: v.step } : {}),
     },
     native: {},
   };
@@ -95,11 +99,35 @@ async function createVariableState(v) {
   // "missing" until a reload.
   ioBroker.objects.update(v.stateId, obj);
   await ioBroker.setState(v.stateId, initialValue(type));
+  await addToEnums(v.stateId, v.enums);
   // The created state is not in the local cache yet; reading it is the only way
   // to show a value — but the broker can need a moment before it serves the
   // state it just learned about (an immediate read logs "not found").
   await ioBroker.wait(300);
   void ioBroker.getState(v.stateId);
+}
+
+/**
+ * Put the new state into the enum objects it was assigned to. Membership is
+ * only ever *added*: nothing is removed here, and deleting the variable leaves
+ * the membership alone.
+ */
+async function addToEnums(stateId, enumIds) {
+  for (const enumId of enumIds ?? []) {
+    try {
+      const obj = await ioBroker.getObject(enumId);
+      const members = Array.isArray(obj?.common?.members)
+        ? obj.common.members
+        : null;
+      if (!obj || !members || members.includes(stateId)) continue;
+      await ioBroker.emitAsync("setObject", enumId, {
+        ...obj,
+        common: { ...obj.common, members: [...members, stateId] },
+      });
+    } catch (e) {
+      console.error("variable enum membership:", e);
+    }
+  }
 }
 
 /**

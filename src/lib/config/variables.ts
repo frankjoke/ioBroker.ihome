@@ -1,4 +1,4 @@
-import { newLocalTaken, sanitizeLabel } from "$lib/config/virtual-ops";
+import { newLocalTaken } from "$lib/config/virtual-ops";
 
 /** A global variable: either a constant kept inside iHome, or a named
  *  reference to an ioBroker state (inside ihome.0 or anywhere else). */
@@ -15,6 +15,14 @@ export interface GlobalVariable {
   stateId?: string;
   unit?: string;
   notes?: string;
+  /** The created state's object settings — read only when the state is created
+   *  (an existing state keeps its own; nothing is ever overwritten). */
+  role?: string;
+  /** Enum ids (`enum.rooms.*`, `enum.functions.*`) the created state joins. */
+  enums?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 export interface VariableLibrary {
@@ -59,6 +67,134 @@ export function validStateId(id: string): boolean {
 /** An iHome instance namespace (`ihome.0`, `ihome.1`, …). */
 export function isIhomeNamespace(namespace: string): boolean {
   return /^ihome\.\d+$/.test(String(namespace ?? "").trim());
+}
+
+/**
+ * A variable's name is its reference: dots are state paths and spaces are
+ * noise, so both become `_` — the name can never be mistaken for a state id.
+ * A leading digit gets a `v_` prefix, so the name is always a valid identifier.
+ */
+export function restrictName(raw: string): string {
+  const cleaned = String(raw ?? "").replace(/[^A-Za-z0-9_]+/g, "_");
+  if (!cleaned) return "";
+  return /^[0-9]/.test(cleaned) ? `v_${cleaned}` : cleaned;
+}
+
+/** A name that can be saved: at least one letter or digit. */
+export function validName(name: string): boolean {
+  return /[A-Za-z0-9]/.test(String(name ?? ""));
+}
+
+/**
+ * Names an expression already uses: the scope helpers (`sum`, `get`, …), the
+ * JS keywords, and the tile's own `active`. A variable of that name would
+ * shadow or crash the expression, so the form refuses it.
+ */
+export function reservedName(name: string): boolean {
+  const key = String(name ?? "")
+    .trim()
+    .toLowerCase();
+  return key === "active" || newLocalTaken().has(key);
+}
+
+/** Reference names are unique (case-insensitive) — the name *is* the handle. */
+export function nameTaken(
+  variables: GlobalVariable[],
+  name: string,
+  exceptId?: string,
+): boolean {
+  const key = String(name ?? "")
+    .trim()
+    .toLowerCase();
+  if (!key) return false;
+  return variables.some(
+    (v) =>
+      v.id !== exceptId &&
+      String(v.name ?? "")
+        .trim()
+        .toLowerCase() === key,
+  );
+}
+
+/** What a reference points at, once resolved. */
+export interface VariableTarget {
+  kind: "constant" | "state";
+  /** state kind: the real ioBroker id. */
+  stateId?: string;
+  /** constant: the typed value. */
+  value?: unknown;
+}
+
+/**
+ * What a stored reference means. A dotted string is a state id (never a
+ * variable); a bare name is looked up in the list. Unknown names, a state
+ * variable without a state and a malformed constant resolve to `null`.
+ */
+export function resolveVariable(
+  ref: string,
+  variables: GlobalVariable[],
+): VariableTarget | null {
+  const name = String(ref ?? "").trim();
+  if (!name || name.includes(".")) return null;
+  const v = variables.find((x) => x.name === name);
+  if (!v) return null;
+  if (v.kind === "state")
+    return v.stateId ? { kind: "state", stateId: v.stateId } : null;
+  const parsed = convertValue(v.value ?? "", v.type);
+  return parsed.error ? null : { kind: "constant", value: parsed.value };
+}
+
+/**
+ * The locals a variable list contributes to an expression: constants as their
+ * fixed value, state variables as the live value of the state behind them.
+ */
+export function variableLocals(
+  variables: GlobalVariable[],
+  stateValue: (stateId: string) => unknown,
+): { key: string; value: unknown }[] {
+  const out: { key: string; value: unknown }[] = [];
+  for (const v of variables ?? []) {
+    if (!v.name) continue;
+    if (v.kind === "constant") {
+      const parsed = convertValue(v.value ?? "", v.type);
+      out.push({ key: v.name, value: parsed.error ? undefined : parsed.value });
+    } else if (v.stateId) {
+      out.push({ key: v.name, value: stateValue(v.stateId) });
+    }
+  }
+  return out;
+}
+
+/** Extras an expression scope needs to know about the variables. */
+export interface VariableScope {
+  /** The names, with their current values. */
+  locals: { key: string; value: unknown }[];
+  /** A variable name as the state id behind it (for `get("name")`). */
+  resolveId: (ref: string) => string | undefined;
+}
+
+/** Build the scope extras once, for both the rule engine and the formulas. */
+export function variableScope(
+  variables: GlobalVariable[],
+  stateValue: (stateId: string) => unknown,
+): VariableScope {
+  return {
+    locals: variableLocals(variables, stateValue),
+    resolveId: (ref: string) => {
+      const target = resolveVariable(ref, variables);
+      return target?.kind === "state" ? target.stateId : undefined;
+    },
+  };
+}
+
+/**
+ * The id the broker side works with for a stored reference: a variable name
+ * gives the state behind it, everything else (an id, a feature name, a
+ * constant) passes through unchanged.
+ */
+export function stateIdFor(ref: string, variables: GlobalVariable[]): string {
+  const target = resolveVariable(ref, variables);
+  return target?.kind === "state" && target.stateId ? target.stateId : ref;
 }
 
 /**
@@ -123,8 +259,9 @@ export function initialValue(type: string): unknown {
 export interface InternalValue {
   /** The variable's id: stable across renames. */
   id: string;
+  /** The name, which is also the reference (`Object.name` stands in). */
   name: string;
-  /** The reference an expression/local can use (identifier-safe, unique). */
+  /** The reference an expression/local can use. */
   key: string;
   value: unknown;
   type: string;
@@ -133,7 +270,6 @@ export interface InternalValue {
 
 /** Split a list into its in-memory constants: values now, states only named. */
 export function constantValues(variables: GlobalVariable[]): InternalValue[] {
-  const taken = newLocalTaken();
   const out: InternalValue[] = [];
   for (const v of variables) {
     if (v.kind !== "constant") continue;
@@ -141,7 +277,7 @@ export function constantValues(variables: GlobalVariable[]): InternalValue[] {
     out.push({
       id: v.id,
       name: v.name,
-      key: sanitizeLabel(v.name, taken),
+      key: v.name,
       value: parsed.error ? undefined : parsed.value,
       type: v.type,
       unit: v.unit,
@@ -166,9 +302,15 @@ export function migrateVariables(raw: unknown): VariableLibrary {
         .filter((v: any) => v && typeof v.id === "string")
         .map((v: any): GlobalVariable => {
           const kind = v.kind === "state" ? "state" : "constant";
+          const enums = Array.isArray(v.enums)
+            ? v.enums.filter((e: any) => typeof e === "string" && e)
+            : undefined;
           return {
             id: v.id,
-            name: String(v.name ?? v.id),
+            // Names are the reference: an older list gets its dots/spaces
+            // cleaned up here, once, on load — and trimmed, which the live
+            // form must not do (a trailing space would eat the next word).
+            name: restrictName(String(v.name ?? v.id)).replace(/^_+|_+$/g, ""),
             kind,
             type: String(v.type ?? (kind === "state" ? "mixed" : "string")),
             value: kind === "constant" ? String(v.value ?? "") : undefined,
@@ -178,6 +320,11 @@ export function migrateVariables(raw: unknown): VariableLibrary {
                 : undefined,
             unit: v.unit ? String(v.unit) : undefined,
             notes: v.notes ? String(v.notes) : undefined,
+            role: v.role ? String(v.role) : undefined,
+            enums: enums?.length ? enums : undefined,
+            min: Number.isFinite(v.min) ? Number(v.min) : undefined,
+            max: Number.isFinite(v.max) ? Number(v.max) : undefined,
+            step: Number.isFinite(v.step) ? Number(v.step) : undefined,
           };
         })
     : [];

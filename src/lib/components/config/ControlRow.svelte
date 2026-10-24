@@ -6,6 +6,8 @@
   import { applyRead } from "$lib/utils/transform";
   import { computeVirtual, type LocalControl } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import { stateIdFor, variableScope } from "$lib/config/variables";
   import { historyEnabled } from "$lib/config/history-ops";
   import TransformEditor from "./TransformEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
@@ -43,9 +45,10 @@
 
   function live() {
     if (!control.stateId) return undefined;
-    const st: any = ioBroker.states.get(control.stateId);
+    const id = stateIdFor(control.stateId, getVariables());
+    const st: any = ioBroker.states.get(id);
     if (st) return { val: st.val, ts: st.ts };
-    return getPickerValue(control.stateId);
+    return getPickerValue(id);
   }
 
   const valueLabel = $derived.by(() => {
@@ -56,9 +59,17 @@
 
   function liveOf(c: Control): unknown {
     if (c.kind === "virtual" || !c.stateId) return undefined;
-    const st: any = ioBroker.states.get(c.stateId);
+    const st: any = ioBroker.states.get(stateIdFor(c.stateId, getVariables()));
     return st ? applyRead(st.val, c.transform) : undefined;
   }
+
+  /** Variables as scope extras: constants by value, state variables live. */
+  const variableExtras = $derived(
+    variableScope(
+      getVariables(),
+      (id) => (ioBroker.states as Map<string, any>)?.get?.(id)?.val,
+    ),
+  );
 
   const virtualValue = $derived.by(() => {
     if (!isVirtual) return undefined;
@@ -72,6 +83,7 @@
       { virtual: control.virtual },
       locals,
       getVirtualPool(),
+      variableExtras,
     );
   });
 

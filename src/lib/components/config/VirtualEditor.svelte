@@ -10,6 +10,8 @@
     type LocalControl,
   } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import { stateIdFor, variableScope } from "$lib/config/variables";
   import {
     getFormulas,
     addFormula,
@@ -62,9 +64,18 @@
 
   function liveOf(c: Control): unknown {
     if (c.kind === "virtual" || !c.stateId) return undefined;
-    const st: any = ioBroker.states.get(c.stateId);
+    // A control may name a variable; its value is the state's behind it.
+    const st: any = ioBroker.states.get(stateIdFor(c.stateId, getVariables()));
     return st ? applyRead(st.val, c.transform) : undefined;
   }
+
+  /** Variables as scope extras: constants by value, state variables live. */
+  const variableExtras = $derived(
+    variableScope(
+      getVariables(),
+      (id) => (ioBroker.states as Map<string, any>)?.get?.(id)?.val,
+    ),
+  );
 
   // Local variable legend (state controls only), mirroring buildScope's naming.
   const legend = $derived.by(() => {
@@ -87,7 +98,12 @@
   );
 
   const preview = $derived(
-    computeVirtual({ virtual: { expr, precision } }, locals, getVirtualPool()),
+    computeVirtual(
+      { virtual: { expr, precision } },
+      locals,
+      getVirtualPool(),
+      variableExtras,
+    ),
   );
 
   function pickTemplate(id: string) {
