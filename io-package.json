@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.23",
+        "version": "0.0.24",
         "news": {
+            "0.0.24": {
+                "en": "The state picker always opens with an empty search, showing the full state tree; it no longer prefills the control's current state or the new device's name (the adapter/room/type/role filters are still remembered)",
+                "de": "Der State-Picker öffnet immer mit leerer Suche und zeigt den vollständigen State-Baum; er füllt weder den aktuellen State des Controls noch den Namen des neuen Geräts vor (Adapter-/Raum-/Typ-/Rollenfilter bleiben gemerkt)"
+            },
             "0.0.23": {
                 "en": "Editing a device opens the form directly under its row — highlighted and scrolled into view — instead of at the top of the page; new devices still use the top form. The tile editor's device action is now Replace this tile's device: it never deletes the device, Cancel changes nothing, and deleting a device on the Devices page removes its tiles and says how many",
                 "de": "Das Bearbeiten eines Geräts öffnet das Formular direkt unter seiner Zeile — hervorgehoben und in den Blick gescrollt — statt oben auf der Seite; neue Geräte nutzen weiter das Formular oben. Die Geräte-Aktion im Kachel-Editor heißt jetzt „Replace this tile's device“: Sie löscht nie das Gerät, Abbrechen ändert nichts, und das Löschen eines Geräts auf der Geräte-Seite entfernt seine Kacheln und nennt deren Anzahl"
@@ -78,10 +82,6 @@
             "0.0.5": {
                 "en": "The top bar tints red while the layout editor is open",
                 "de": "Die obere Leiste färbt sich rot, solange der Layout-Editor offen ist"
-            },
-            "0.0.4": {
-                "en": "Change a control's state in the device editor; state ids keep their end visible; the dashboard no longer saves an untouched seed",
-                "de": "State eines Controls im Geräteeditor ändern; State-IDs zeigen ihr Ende; das Dashboard speichert keinen unberührten Seed mehr"
             }
         },
         "titleLang": {
