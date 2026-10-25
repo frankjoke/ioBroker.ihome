@@ -166,7 +166,9 @@
    */
   function applySettings(s) {
     if (isValidPin(s.pin)) storage.pin = s.pin;
-    if (typeof s.lockPencil === "boolean") storage.lockPencil = s.lockPencil;
+    // The flag has no third state: an absent key means off (D-3), so a stale
+    // cache can never claim the editor is locked.
+    storage.lockPencil = s.lockPencil === true;
   }
 
   // The used set grows while the app loads (the registry and the pages arrive

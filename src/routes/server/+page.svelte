@@ -180,8 +180,12 @@
           storage.pin = pin;
           askingPin = false;
           // The reload must not beat the broker write, or the new PIN never
-          // reaches the settings document.
-          void updateSettings({ pin }).then(() => applyAndReload());
+          // reaches the settings document; a failed write keeps the page open
+          // (the Security card reports it) instead of saving the connection
+          // behind a PIN the document does not know.
+          void updateSettings({ pin }).then((ok) => {
+            if (ok) applyAndReload();
+          });
         }}
         onCancel={() => (askingPin = false)}
       />

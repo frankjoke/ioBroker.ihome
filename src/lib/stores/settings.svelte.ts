@@ -20,6 +20,8 @@ let settings = $state<Settings>({});
 let loaded = $state(false);
 let saveFailed = $state(false);
 let initPromise: Promise<void> | null = null;
+/** How the owner mirrors an adopted document into its cache (the layout). */
+let applier: ((settings: Settings) => void) | undefined;
 
 export function getSettings(): Settings {
   return settings;
@@ -52,23 +54,19 @@ async function ensureSettingsObject() {
 }
 
 /**
- * Merge a patch into the document and write it at once: settings change only on
- * a deliberate action, and the forced-PIN flow reloads right after — a debounce
- * would lose that write. The in-memory copy takes the change first, so the UI
- * answers immediately; a failed write is reported, not hidden.
+ * The one write path (seed and user changes alike): merge, take the change in
+ * memory, write, then hand the document to the applier. Immediate — settings
+ * change only on a deliberate action, and the forced-PIN flow reloads right
+ * after; a debounce would lose that write.
  */
-export async function updateSettings(
-  patch: Partial<Settings>,
-): Promise<boolean> {
-  if (!ioBroker.connected) {
-    saveFailed = true;
-    return false;
-  }
+async function writeDocument(patch: Partial<Settings>): Promise<boolean> {
   const next = mergeSettings(settings, patch);
   settings = next;
   try {
     await ioBroker.setState(SETTINGS_ID, JSON.stringify(next));
+    loaded = true;
     saveFailed = false;
+    applier?.(next);
     return true;
   } catch (e) {
     saveFailed = true;
@@ -78,15 +76,37 @@ export async function updateSettings(
 }
 
 /**
+ * Merge a patch into the document and write it. A document this browser has not
+ * read yet must never be replaced by a patch: wait for the first read, and
+ * refuse (reporting "not saved") when it produced nothing.
+ */
+export async function updateSettings(
+  patch: Partial<Settings>,
+): Promise<boolean> {
+  if (!ioBroker.connected) {
+    saveFailed = true;
+    return false;
+  }
+  if (!loaded && initPromise) await initPromise;
+  if (!loaded) {
+    saveFailed = true;
+    return false;
+  }
+  return writeDocument(patch);
+}
+
+/**
  * Load the document once the socket is up and keep following it. `apply` gets
- * every version this browser adopts — the first read and each remote change —
- * so the layout can mirror it into the cache. Nothing readable (offline, or a
- * document that is not an object) leaves the memo unset, so a later call retries;
- * an unreadable document is never overwritten on load (D-1).
+ * every version this browser adopts — the first read, each remote change and
+ * every successful write — so the layout can mirror it into the cache. Nothing
+ * readable (offline, or a document that is not an object) leaves the memo unset,
+ * so a later call retries; an unreadable document is never overwritten on load
+ * (D-1).
  */
 export function initSettings(
   apply?: (settings: Settings) => void,
 ): Promise<void> {
+  if (apply) applier = apply;
   if (!initPromise) {
     initPromise = (async () => {
       const until = Date.now() + 10_000;
@@ -99,13 +119,18 @@ export function initSettings(
         console.error("initSettings ensureSettingsObject:", e);
       }
       registerProgramStateId(SETTINGS_ID);
-      let st = await ioBroker.getState(SETTINGS_ID);
+      let st = await ioBroker.getState(SETTINGS_ID, true);
       if (!st) {
         // A state that has never been written reads as "not found" on this
-        // client (it omits a null value). The object was ensured above, so this
-        // is an empty document: seed it, then read it back to attach the update
-        // handler.
-        if (!(await updateSettings({ pin: DEFAULT_PIN }))) {
+        // client (it omits a null value) — but so does a failed read. Ask once
+        // more before treating the document as empty.
+        await ioBroker.wait(300);
+        st = await ioBroker.getState(SETTINGS_ID, true);
+      }
+      if (!st) {
+        // The object was ensured above and two reads found no value: an empty
+        // document. Seed it, then read it back to attach the update handler.
+        if (!(await writeDocument({ pin: DEFAULT_PIN }))) {
           initPromise = null;
           return;
         }
@@ -126,7 +151,10 @@ export function initSettings(
         if (JSON.stringify(settings) === JSON.stringify(parsed)) return true;
         settings = parsed;
         loaded = true;
-        apply?.(settings);
+        applier?.(settings);
+        // A document without a valid PIN is seeded again, whichever device
+        // removed it (the rule belongs to the document, not to the first load).
+        if (missingPin(parsed)) void writeDocument({ pin: DEFAULT_PIN });
         return true;
       };
       const doc = settingsDocument(st.value);
@@ -137,9 +165,9 @@ export function initSettings(
       settings = doc;
       loaded = true;
       if (missingPin(doc)) {
-        await updateSettings({ pin: DEFAULT_PIN });
+        await writeDocument({ pin: DEFAULT_PIN });
       }
-      apply?.(getSettings());
+      applier?.(getSettings());
     })().catch((e) => {
       console.error("initSettings:", e);
       initPromise = null;
