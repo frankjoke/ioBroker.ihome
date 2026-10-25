@@ -5,6 +5,8 @@ const utils = require("@iobroker/adapter-core");
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
 // lives in a subfolder so the instance root stays free for adapter logic.
+// `settings` is the shared settings document (PIN and future UI/behaviour
+// settings), not a dashboard document — the same folder keeps one owner.
 const CONFIG_FOLDER = "config";
 const DOCS = [
   "pageList",
@@ -12,6 +14,7 @@ const DOCS = [
   "templateList",
   "formulaList",
   "variableList",
+  "settings",
 ];
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
