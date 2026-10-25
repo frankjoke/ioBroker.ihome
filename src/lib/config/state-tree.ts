@@ -1,4 +1,5 @@
 import { localizeName, nameText } from "$lib/config/format";
+import type { GlobalVariable } from "$lib/config/variables";
 
 export interface StateRef {
   id: string;
@@ -144,6 +145,44 @@ export function buildStateTree(states: StateRef[]): StateNode[] {
 }
 
 /**
+ * The `_Variables` root of the state picker. Only state-kind variables appear:
+ * a constant has no state to read or write. The leaf id is the bare variable
+ * name — the reference the alias layer resolves — while `obj` is the real
+ * state's object, so the leaf shows that state's role/unit/write and its live
+ * value. A variable whose state is not in the cache becomes a read-only,
+ * synthesized object (still pickable, and it shows "unavailable" until a value
+ * arrives).
+ */
+export function buildVariableNode(
+  variables: GlobalVariable[],
+  objects: Map<string, any>,
+): StateNode | null {
+  const children: StateNode[] = [];
+  for (const v of variables) {
+    if (v.kind !== "state" || !v.stateId) continue;
+    const real = objects.get(v.stateId);
+    children.push({
+      id: v.name,
+      label: v.name,
+      kind: "state",
+      obj: real ?? {
+        _id: v.stateId,
+        common: {
+          name: v.name,
+          type: v.type,
+          role: v.role,
+          unit: v.unit,
+          write: false,
+        },
+      },
+    });
+  }
+  if (!children.length) return null;
+  children.sort((a, b) => a.id.localeCompare(b.id));
+  return { id: "_Variables", label: "_Variables", kind: "adapter", children };
+}
+
+/**
  * Stable, unique key for a tree node. A state leaf and a folder can share the
  * same path (a state id that is also a folder prefix), so the key must include
  * the kind.
@@ -152,7 +191,9 @@ export function nodeKey(node: StateNode): string {
   return `${node.kind}:${node.id}`;
 }
 
-/** State leaves currently visible (under expanded branches), capped at `limit`. */
+/** State leaves currently visible (under expanded branches), capped at `limit`.
+ *  The id is the state to fetch: a variable leaf's selected id is its bare
+ *  name, but its value lives in the real state named by `obj._id`. */
 export function collectVisibleLeaves(
   nodes: StateNode[],
   expanded: { has(id: string): boolean },
@@ -163,7 +204,7 @@ export function collectVisibleLeaves(
     for (const node of list) {
       if (out.length >= limit) return;
       if (node.kind === "state") {
-        out.push(node.id);
+        out.push(node.obj?._id ?? node.id);
       } else if (expanded.has(node.id) && node.children) {
         walk(node.children);
       }

@@ -5,9 +5,11 @@
     collectStates,
     applyFilters,
     buildStateTree,
+    buildVariableNode,
     collectVisibleLeaves,
     adapterOf,
   } from "$lib/config/state-tree";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import { suggestFeature, roleLabel } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
   import { fetchPickerValues } from "$lib/picker-values.svelte.js";
@@ -72,9 +74,30 @@
   const roleOptions = $derived(roles.map((r) => ({ value: r, label: r })));
 
   const filtered = $derived(applyFilters(allStates, pickerFilters, roomsOf));
+  // Global state variables, as the pickable aliases they are: the search box
+  // filters them by name or by the real state id, the other filters stay for
+  // the broker tree (a variable's adapter is not its own).
+  const searchText = $derived((pickerFilters.search ?? "").toLowerCase());
+  const variableNode = $derived(
+    buildVariableNode(
+      getVariables()
+        .filter((v) => v.kind === "state" && v.stateId)
+        .filter(
+          (v) =>
+            !searchText ||
+            v.name.toLowerCase().includes(searchText) ||
+            String(v.stateId).toLowerCase().includes(searchText),
+        ),
+      objects,
+    ),
+  );
   // Build the full tree so every adapter is listed as a root by default; only
-  // collapsed branches stay cheap (children render on expand).
-  const tree = $derived(buildStateTree(filtered));
+  // collapsed branches stay cheap (children render on expand). Variables lead.
+  const tree = $derived(
+    variableNode
+      ? [variableNode, ...buildStateTree(filtered)]
+      : buildStateTree(filtered),
+  );
 
   // Fetch values for exactly the visible (expanded) leaves, debounced so typing
   // in the search box does not fire a burst of requests.
@@ -97,14 +120,19 @@
   }
 
   function add() {
+    const variables = new Map(
+      (variableNode?.children ?? []).map((node) => [node.id, node]),
+    );
     const controls = [...selection].map((id): Control => {
-      const obj = objects.get(id);
+      const variable = variables.get(id);
+      const obj = variable?.obj ?? objects.get(id);
       return {
         id: newId(),
         feature: suggestFeature(obj, deviceType) ?? "value",
         stateId: id,
         writable: !!obj?.common?.write,
-        label: roleLabel(obj),
+        // A variable is named as the state it stands for.
+        label: variable ? id : roleLabel(obj),
         unit: defaultUnit(obj),
       };
     });
@@ -160,7 +188,7 @@
     </div>
 
     <div class="results">
-      {#if filtered.length === 0}
+      {#if filtered.length === 0 && !variableNode}
         <p class="empty text-muted">No matching states.</p>
       {:else}
         <StateTree nodes={tree} {selection} onToggle={toggle} />

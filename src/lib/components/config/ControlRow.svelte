@@ -36,7 +36,10 @@
 
   const isVirtual = $derived(control.kind === "virtual");
   const canHistory = $derived(
-    !!control.stateId && historyEnabled(ioBroker.objects.get(control.stateId)),
+    !!control.stateId &&
+      historyEnabled(
+        ioBroker.objects.get(stateIdFor(control.stateId, getVariables())),
+      ),
   );
 
   $effect(() => {

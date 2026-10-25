@@ -23,11 +23,12 @@
   }
 
   function leafValue(node: StateNode): string {
-    const pv = getPickerValue(node.id);
+    const id = node.obj?._id ?? node.id;
+    const pv = getPickerValue(id);
     if (pv) {
       return `${formatValue(pv.val, node.obj?.common?.unit)} · ${formatAge(pv.ts)}`;
     }
-    return isPickerFetched(node.id) ? "unavailable" : "…";
+    return isPickerFetched(id) ? "unavailable" : "…";
   }
 </script>
 
@@ -44,7 +45,7 @@
             />
             <span class="leaf-main">
               <span class="leaf-name">{node.label}</span>
-              <span class="leaf-id">{node.id}</span>
+              <span class="leaf-id">{node.obj?._id ?? node.id}</span>
             </span>
             <span class="leaf-value">{leafValue(node)}</span>
           </label>

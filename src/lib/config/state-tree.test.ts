@@ -3,6 +3,7 @@ import {
   collectStates,
   applyFilters,
   buildStateTree,
+  buildVariableNode,
   collectVisibleLeaves,
   ancestorObjects,
   parentName,
@@ -168,4 +169,77 @@ it("builds an adapter-rooted tree with state leaves", () => {
     n.kind === "state" ? leaves.push(n.id) : n.children?.forEach(walk);
   walk(hue);
   expect(leaves.sort()).toEqual(["hue.0.lamp.bri", "hue.0.lamp.on"]);
+});
+
+it("builds the _Variables group from state variables, named as states", () => {
+  const objects = new Map<string, any>([
+    [
+      "0_userdata.0.T",
+      {
+        _id: "0_userdata.0.T",
+        type: "state",
+        common: {
+          name: "Temp",
+          role: "value.temperature",
+          unit: "°C",
+          write: true,
+        },
+      },
+    ],
+  ]);
+  const vars = [
+    {
+      id: "1",
+      name: "TestVar",
+      kind: "state",
+      stateId: "0_userdata.0.T",
+      type: "number",
+    },
+    { id: "2", name: "Price", kind: "constant", type: "number", value: "14" },
+    {
+      id: "3",
+      name: "Missing",
+      kind: "state",
+      stateId: "0_userdata.0.X",
+      type: "boolean",
+    },
+  ] as any;
+  const node = buildVariableNode(vars, objects)!;
+  expect(node.id).toBe("_Variables");
+  expect(node.label).toBe("_Variables");
+  // the name is the state name; a missing state is synthesized read-only
+  expect(node.children!.map((n) => [n.id, n.label, n.obj?._id])).toEqual([
+    ["Missing", "Missing", "0_userdata.0.X"],
+    ["TestVar", "TestVar", "0_userdata.0.T"],
+  ]);
+  expect(node.children![1].obj.common.write).toBe(true);
+  expect(node.children![0].obj.common.write).toBe(false);
+  expect(buildVariableNode([], objects)).toBeNull();
+  expect(
+    buildVariableNode(
+      vars.filter((v) => v.kind === "constant"),
+      objects,
+    ),
+  ).toBeNull();
+});
+
+it("fetches a variable leaf's value from the real state behind it", () => {
+  const tree = [
+    {
+      id: "_Variables",
+      label: "_Variables",
+      kind: "adapter" as const,
+      children: [
+        {
+          id: "TestVar",
+          label: "TestVar",
+          kind: "state" as const,
+          obj: { _id: "0_userdata.0.T" },
+        },
+      ],
+    },
+  ];
+  expect(collectVisibleLeaves(tree, new Set(["_Variables"]))).toEqual([
+    "0_userdata.0.T",
+  ]);
 });

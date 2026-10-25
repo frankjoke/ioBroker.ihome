@@ -16,6 +16,8 @@
   } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
   import { roomForState, roomName, enumLabel } from "$lib/config/rooms";
+  import { stateIdFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   let {
@@ -68,11 +70,15 @@
   function addStates(newControls: Control[]) {
     const wasEmpty = controls.length === 0;
     controls = [...controls, ...newControls];
+    // A control may name a variable; its real state answers the room and type
+    // questions (the picker stores the bare name on purpose).
+    const variables = getVariables();
+    const realId = (id: string | undefined) => stateIdFor(id ?? "", variables);
 
     // auto-fill the device room from the first added state that resolves one
     if (!room) {
       for (const c of newControls) {
-        const r = roomForState(ioBroker.enums, c.stateId);
+        const r = roomForState(ioBroker.enums, realId(c.stateId));
         if (r) {
           room = r;
           break;
@@ -81,7 +87,7 @@
     }
 
     if (wasEmpty && newControls.length) {
-      const stateId = newControls[0].stateId;
+      const stateId = realId(newControls[0].stateId);
       // derive the device type from the first state (role, or a parent folder's role)
       if (type === "Custom") {
         type = suggestDeviceType(
@@ -122,7 +128,7 @@
     if (replaceIndex === null || !picked) return;
     const i = replaceIndex;
     const row = controls[i];
-    const previous = objects.get(row.stateId ?? "");
+    const previous = objects.get(stateIdFor(row.stateId ?? "", getVariables()));
     replaceIndex = null;
     updateControl(
       i,
