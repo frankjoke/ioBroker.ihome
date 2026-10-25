@@ -27,7 +27,7 @@
     placementsOfDevice,
   } from "$lib/config/layout-ops";
   import { commitLayout, getPageRegistry } from "$lib/stores/pages.svelte.js";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import {
     peekRequestedLayout,
     requestDeviceConfig,
@@ -38,6 +38,8 @@
 
   let editing = $state<Device | null>(null);
   let showForm = $state(false);
+  /** The inline form's card, scrolled into view when an edit opens. */
+  let inlineForm = $state<HTMLDivElement | null>(null);
   let roomFilter = $state<string[]>([]);
   let typeFilter = $state<string[]>([]);
   let search = $state("");
@@ -106,6 +108,11 @@
       roomName(ioBroker.enums, d.room ?? ""),
     ),
   );
+  /** Is the edited device in the visible list? If a filter hides it, the form
+   *  falls back to the top rather than vanish with its row. */
+  const editingShown = $derived(
+    !!editing && sortedDevices.some((d) => d.id === editing!.id),
+  );
 
   function roomsOf(id: string): string[] {
     return roomsOfEnum(ioBroker.enums, id);
@@ -129,6 +136,11 @@
   function editDevice(d: Device) {
     editing = d;
     showForm = true;
+    // The editor sits under the device; bring it into view so a device far
+    // down the list does not look un-edited at the top of the page.
+    void tick().then(() =>
+      inlineForm?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+    );
   }
 
   function duplicateDevice(d: Device) {
@@ -232,7 +244,7 @@
     </div>
   </div>
 
-  {#if showForm}
+  {#if showForm && (!editing || !editingShown)}
     <div class="card form-card">
       {#key editing?.id ?? "new"}
         <DeviceForm
@@ -296,7 +308,7 @@
       {#each sortedDevices as d (d.id)}
         {@const seen = lastUpdate(d)}
         {@const icon = enrichedById.get(d.id)?.objectIcon}
-        <div class="card device-row">
+        <div class="card device-row" class:editing={editing?.id === d.id}>
           <div class="device-main">
             <span class="device-title">
               {#if icon}
@@ -353,6 +365,21 @@
             </button>
           </div>
         </div>
+        {#if editing?.id === d.id}
+          <div class="card form-card inline-form" bind:this={inlineForm}>
+            {#key editing.id}
+              <DeviceForm
+                device={editing}
+                {objects}
+                {roomsOf}
+                {rooms}
+                {devices}
+                {onSave}
+                {onCancel}
+              />
+            {/key}
+          </div>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -466,6 +493,17 @@
     gap: 1rem;
     padding: 0.75rem 1rem;
     flex-wrap: wrap;
+  }
+
+  /* The device whose editor is open below it. */
+  .device-row.editing {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+  }
+
+  /* Leave room for the sticky app bar when the editor scrolls into view. */
+  .inline-form {
+    scroll-margin-top: 56px;
   }
 
   .device-main {
