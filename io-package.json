@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.20",
+        "version": "0.0.21",
         "news": {
+            "0.0.21": {
+                "en": "Page links are readable: a new page's address is the slug of its name (#/p/wohnzimmer) instead of a random id; pages created before this update are renamed once, and the link stays as created when the page is renamed later",
+                "de": "Seitenlinks sind lesbar: Die Adresse einer neuen Seite ist der Slug ihres Namens (#/p/wohnzimmer) statt einer Zufalls-ID; vor diesem Update angelegte Seiten werden einmalig umbenannt, und der Link bleibt beim späteren Umbenennen der Seite erhalten"
+            },
             "0.0.20": {
                 "en": "New pages and sections ask for a name before they are created: a duplicate name is refused, Cancel creates nothing, and the new page or section is selected right away — no more silent rooms and sections behind the current one",
                 "de": "Neue Seiten und Abschnitte fragen vor dem Anlegen nach einem Namen: ein doppelter Name wird abgelehnt, Abbrechen legt nichts an, und die neue Seite bzw. der neue Abschnitt ist sofort ausgewählt — keine stillen Seiten und Abschnitte mehr hinter der aktuellen"
@@ -78,19 +82,6 @@
             "0.0.2": {
                 "en": "Fix the dashboard's default socket connection and the adapter icon",
                 "de": "Standard-Socket-Verbindung des Dashboards und das Adapter-Icon korrigiert"
-            },
-            "0.0.1": {
-                "en": "Initial release of the iHome adapter",
-                "de": "Erste Veröffentlichung des iHome-Adapters",
-                "ru": "Первый выпуск визуального интерфейс-адаптера",
-                "pt": "Primeiro lançamento do adaptador de interface visual",
-                "nl": "Eerste release van de visual interface adapter",
-                "fr": "Première version de l'adaptateur d'interface visuelle",
-                "it": "Prima versione dell'adattatore di interfaccia visiva",
-                "es": "Primera versión del adaptador de interfaz visual",
-                "pl": "Pierwsze wydanie adaptera interfejsu wizualnego",
-                "uk": "Перший випуск адаптера візуального інтерфейсу",
-                "zh-cn": "首次发布可视化界面适配器"
             }
         },
         "titleLang": {
