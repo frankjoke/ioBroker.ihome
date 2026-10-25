@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.18",
+        "version": "0.0.19",
         "news": {
+            "0.0.19": {
+                "en": "A User Interface page (the first cog page in a session) sets the installation's defaults: page, section and tile background colours, the tile name and value text sizes, and the 1×1 tile scale up to 200 % — shared by every device; the cog returns to the last config page a tab visited",
+                "de": "Eine Seite „User Interface“ (die erste Zahnrad-Seite einer Sitzung) legt die Standardwerte der Installation fest: Hintergrundfarben für Seite, Abschnitt und Tile, die Textgrößen von Tile-Name und -Wert sowie die Größe eines 1×1-Tiles bis 200 % — geteilt von allen Geräten; das Zahnrad kehrt zur zuletzt besuchten Konfigurationsseite eines Tabs zurück"
+            },
             "0.0.18": {
                 "en": "The PIN and the layout editor's lock are shared settings now: they live in ihome.0.config.settings, a missing PIN is seeded there as the default 4321, and every device follows a change. The pencil lock ships off, so the layout editor stays quick during installation, while every configuration page still requires the PIN",
                 "de": "PIN und Sperre des Layout-Editors sind jetzt geteilte Einstellungen: Sie liegen in ihome.0.config.settings, eine fehlende PIN wird dort als Standard 4321 angelegt, und jedes Gerät folgt einer Änderung. Die Stift-Sperre ist standardmäßig aus, damit der Layout-Editor bei der Installation schnell bleibt, während jede Konfigurationsseite weiterhin die PIN verlangt"
