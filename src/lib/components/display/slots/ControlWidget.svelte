@@ -104,6 +104,9 @@
     onclick={(e) => {
       e.stopPropagation();
       write(true, true);
+      // A button state is momentary: release it again, so adapters that expect
+      // a pulse do not see a stuck "on".
+      setTimeout(() => write(false), 300);
     }}
   >
     Press

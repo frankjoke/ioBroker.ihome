@@ -14,8 +14,7 @@ import {
   variableScope,
 } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
-import { deviceObjectIcon } from "$lib/config/icon-ops";
-import { iconSrc } from "$lib/utils/icon-url";
+import { deviceFaceIcon, deviceObjectIcon } from "$lib/config/icon-ops";
 import { readable } from "svelte/store";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -256,9 +255,7 @@ function _devicesEnriched(): EnrichedDevice[] {
           controls.map((c) => c.stateId),
         )
       : undefined;
-    const objectIcon =
-      device.icon ??
-      (iconHit ? iconSrc(iconHit.value, iconHit.from) : undefined);
+    const objectIcon = deviceFaceIcon(device.icon, iconHit, device.type);
     return {
       ...device,
       controls,

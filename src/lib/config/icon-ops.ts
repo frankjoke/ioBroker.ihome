@@ -2,6 +2,10 @@
 // objects behind its controls (A65). Pure: the caller passes the object map, so
 // nothing here touches the socket, the DOM or a store.
 
+import type { DeviceType } from "$lib/types/device";
+import { PRESETS } from "$lib/config/presets";
+import { iconSrc } from "$lib/utils/icon-url";
+
 export interface IconOwner {
   adapter: string;
   instance?: string;
@@ -83,6 +87,36 @@ export function deviceObjectIcon(
     if (hit) return hit;
   }
   return undefined;
+}
+
+/** The glyph a type's preset puts on its headline slot — the tile's look icon. */
+export function presetGlyph(type: DeviceType): string | undefined {
+  for (const slot of PRESETS[type]?.slots ?? []) {
+    const glyph = slot.icon?.glyph;
+    if (glyph) return glyph;
+  }
+  return undefined;
+}
+
+/**
+ * A device's face: its own icon, else a real object icon, else the type's preset
+ * glyph instead of the bare adapter fallback. A variable-created state carries
+ * no icon of its own, so the adapter logo (iHome / 0_userdata) would be shown —
+ * uninformative, and not what the tile's look shows.
+ */
+export function deviceFaceIcon(
+  own: string | undefined,
+  iconHit: { from: string; value: string } | undefined,
+  type: DeviceType,
+): string | undefined {
+  if (own) return own;
+  if (iconHit && !iconHit.from.startsWith("system.adapter.")) {
+    return iconSrc(iconHit.value, iconHit.from);
+  }
+  return (
+    presetGlyph(type) ??
+    (iconHit ? iconSrc(iconHit.value, iconHit.from) : undefined)
+  );
 }
 
 /**

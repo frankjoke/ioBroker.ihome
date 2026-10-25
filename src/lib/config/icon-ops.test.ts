@@ -1,9 +1,11 @@
 import { it, expect } from "vitest";
 import {
   brokerIconPath,
+  deviceFaceIcon,
   deviceObjectIcon,
   objectIconValue,
   ownerOf,
+  presetGlyph,
   resolveIcon,
 } from "$lib/config/icon-ops";
 
@@ -133,4 +135,27 @@ it("takes the device's first control that resolves (A65)", () => {
   });
   expect(deviceObjectIcon(o, [undefined, "a.0.none"])).toBeUndefined();
   expect(deviceObjectIcon(o, [])).toBeUndefined();
+});
+
+it("uses the device type's preset glyph instead of the adapter fallback", () => {
+  expect(presetGlyph("Button")).toBe("touch_app");
+  expect(presetGlyph("Switch")).toBe("power_settings_new");
+  expect(presetGlyph("Light")).toBe("lightbulb");
+  // A variable-created state has no icon; its hit is only the adapter logo.
+  expect(
+    deviceFaceIcon(
+      undefined,
+      { from: "system.adapter.ihome.0", value: "ihome.png" },
+      "Button",
+    ),
+  ).toBe("touch_app");
+  // A real object icon wins over the type glyph.
+  expect(
+    deviceFaceIcon(
+      undefined,
+      { from: "alias.0.Lamp", value: "lamp.svg" },
+      "Switch",
+    ),
+  ).toContain("lamp.svg");
+  expect(deviceFaceIcon("own-icon", undefined, "Button")).toBe("own-icon");
 });
