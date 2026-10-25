@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.26",
+        "version": "0.0.27",
         "news": {
+            "0.0.27": {
+                "en": "A device's icon ignores page and adapter logos on its state's path (the 0_userdata page icon, the iHome adapter icon): when nothing on that path carries a real icon, the device type's glyph is used — the same one the tile look and the slots show (device_thermostat for a Thermometer, touch_app for a Button)",
+                "de": "Das Icon eines Geräts ignoriert Seiten- und Adapter-Logos auf dem Pfad seines States (das 0_userdata-Seitenicon, das iHome-Adaptericon): Trägt nichts auf diesem Pfad ein echtes Icon, wird das Glyph des Gerätetyps verwendet — dasselbe, das Look und Slots zeigen (device_thermostat für ein Thermometer, touch_app für einen Button)"
+            },
             "0.0.26": {
                 "en": "A device created from a variable now shows its type's icon — the same glyph the tile's look shows (touch_app for a Button, lightbulb for a Light) — instead of the adapter logo when the state has no icon of its own. A press button writes true and releases the state to false after 300 ms, so momentary button states no longer stick on",
                 "de": "Ein aus einer Variable erzeugtes Gerät zeigt jetzt das Icon seines Typs — dasselbe Glyph wie im Look der Kachel (touch_app für einen Button, lightbulb für ein Licht) — statt des Adapter-Logos, wenn der State kein eigenes Icon hat. Eine Drucktaste schreibt true und setzt den State nach 300 ms wieder auf false, sodass momentane Tastenzustände nicht mehr hängen bleiben"
@@ -78,10 +82,6 @@
             "0.0.8": {
                 "en": "Edit-mode bar colour works on older browsers too (plain theme colour instead of color-mix)",
                 "de": "Farbe der Bearbeitungsleiste funktioniert auch in älteren Browsern (einfache Themenfarbe statt color-mix)"
-            },
-            "0.0.7": {
-                "en": "The edit pencil no longer reloads the dashboard; new worker versions are picked up immediately",
-                "de": "Der Bearbeitungsstift lädt das Dashboard nicht mehr neu; neue Worker-Versionen werden sofort übernommen"
             }
         },
         "titleLang": {
