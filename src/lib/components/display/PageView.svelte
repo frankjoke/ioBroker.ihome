@@ -89,6 +89,9 @@
     gap: 1.25rem;
     min-height: 100vh;
     padding: 8px;
+    /* A User Interface default (ui-settings.ts); an explicit page background
+       is inline and wins. */
+    background-color: var(--ui-page-bg, transparent);
   }
 
   /* A `newLine` section is preceded by this: full width, no height, so the

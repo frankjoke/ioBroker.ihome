@@ -102,6 +102,9 @@
     flex: 0 1 auto;
     min-width: min(100%, var(--tile-w, 57px));
     max-width: 100%;
+    /* A User Interface default (ui-settings.ts); an explicit background is
+       inline and wins. */
+    background-color: var(--ui-section-bg, transparent);
   }
 
   /* `appearance.border: true` draws the section's box; absent is today's look. */

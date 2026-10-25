@@ -617,7 +617,9 @@
     text-align: center;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md, 12px);
-    background-color: var(--surface-container-lowest);
+    /* A User Interface default (ui-settings.ts); an explicit tile background is
+       inline and wins. */
+    background-color: var(--ui-tile-bg, var(--surface-container-lowest));
   }
 
   .tile.interactive {
@@ -669,7 +671,7 @@
   }
 
   .tile-name {
-    font-size: var(--body-sm);
+    font-size: var(--ui-name-size, var(--body-sm));
     font-weight: 600;
     overflow-wrap: anywhere;
     max-width: 100%;

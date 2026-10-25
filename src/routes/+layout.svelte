@@ -40,7 +40,8 @@
     isValidPin,
     unlock,
   } from "$lib/config/pin.svelte";
-  import { initSettings } from "$lib/stores/settings.svelte";
+  import { effectiveUi, uiCss } from "$lib/config/ui-settings";
+  import { getSettings, initSettings } from "$lib/stores/settings.svelte";
   import AppBar from "$lib/components/AppBar.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
 
@@ -159,6 +160,8 @@
    */
   const storedPin = $derived(effectivePin(storage.pin));
   const configLocked = $derived(configNeedsPin(isDisplay, isUnlocked()));
+  /** The display defaults, published as custom properties for every component. */
+  const ui = $derived(effectiveUi(getSettings()));
 
   /**
    * The settings doc is the truth; the storage keys are its cache.
@@ -267,7 +270,12 @@
   <title>iHome</title>
 </svelte:head>
 
-<div class="app-shell" class:display={isDisplay} class:config={!isDisplay}>
+<div
+  class="app-shell"
+  class:display={isDisplay}
+  class:config={!isDisplay}
+  style={uiCss(ui)}
+>
   {#if cloudNotice}
     <p class="cloud-notice" role="status">
       <span class="material-symbols-outlined">cloud_sync</span>
