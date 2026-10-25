@@ -5,6 +5,7 @@ import {
   filterDevices,
   matchesMember,
   loadPages,
+  migratePageIds,
   parsePageRegistry,
   migratePageRegistry,
   PAGE_REGISTRY_VERSION,
@@ -510,4 +511,63 @@ it("the display's placeholder distinguishes connecting, unreadable and empty", (
   // really no pages: the document loaded (or was seeded) and holds none
   expect(pagePlaceholder(true, "loaded")).toBe("none");
   expect(pagePlaceholder(true, "seeded")).toBe("none");
+});
+
+const V4 = "6f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+const V4B = "7a2b3c4d-5e6f-4a70-9b8c-0d1e2f3a4b5c";
+
+it("migrates generated page ids to the slug of their title, in page order", () => {
+  const registry = {
+    version: 1,
+    updatedAt: 1,
+    pages: [
+      { id: "rooms", title: "Rooms", groups: [] },
+      { id: V4, title: "New page", groups: [] },
+      { id: V4B, title: "Wohn Zimmer", groups: [] },
+    ],
+  } as never;
+  const { registry: next, renames } = migratePageIds(registry);
+  expect(next.pages.map((p) => p.id)).toEqual([
+    "rooms",
+    "new-page",
+    "wohn-zimmer",
+  ]);
+  expect(renames).toEqual({ [V4]: "new-page", [V4B]: "wohn-zimmer" });
+});
+
+it("migrates only generated ids, and gives colliding slugs a counter", () => {
+  const registry = {
+    version: 1,
+    updatedAt: 1,
+    pages: [
+      { id: "bad", title: "Bad", groups: [] },
+      { id: V4, title: "Bad", groups: [] },
+      { id: V4B, title: "Bad", groups: [] },
+    ],
+  } as never;
+  const { registry: next, renames } = migratePageIds(registry);
+  expect(next.pages.map((p) => p.id)).toEqual(["bad", "bad-2", "bad-3"]);
+  expect(renames).toEqual({ [V4]: "bad-2", [V4B]: "bad-3" });
+});
+
+it("leaves a readable registry alone (same document, no write)", () => {
+  const registry = {
+    version: 1,
+    updatedAt: 1,
+    pages: [{ id: "rooms", title: "Rooms", groups: [] }],
+  } as never;
+  const result = migratePageIds(registry);
+  expect(result.registry).toBe(registry);
+  expect(result.renames).toEqual({});
+});
+
+it("keeps a generated id when the title has no latin letters", () => {
+  const registry = {
+    version: 1,
+    updatedAt: 1,
+    pages: [{ id: V4, title: "中文", groups: [] }],
+  } as never;
+  const result = migratePageIds(registry);
+  expect(result.registry).toBe(registry);
+  expect(result.renames).toEqual({});
 });

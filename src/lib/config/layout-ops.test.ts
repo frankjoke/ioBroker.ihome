@@ -158,6 +158,19 @@ it("adds a page (with one empty section) and a section with a fresh id", () => {
   expect(withSection.pages[0].groups[2].id).toBeTruthy();
 });
 
+it("gives a new page a readable id from its name", () => {
+  expect(addPage(regWithTiles(), "Chores").pages[1].id).toBe("chores");
+  // Different names that slug the same get a counter; an existing id is avoided.
+  const a = addPage(regWithTiles(), "Wohn Zimmer");
+  const b = addPage(a, "Wohn-Zimmer");
+  expect(a.pages[1].id).toBe("wohn-zimmer");
+  expect(b.pages[2].id).toBe("wohn-zimmer-2");
+  expect(addPage(regWithTiles(), "P").pages[1].id).toBe("p-2");
+  // Nothing transliterable still gets a usable, non-empty id.
+  const unicode = addPage(regWithTiles(), "中文");
+  expect(unicode.pages[1].id).toBeTruthy();
+});
+
 it("inserts a page, section and tiles at a given index", () => {
   const topPage = addPage(regWithTiles(), "First", 0);
   expect(topPage.pages.map((p) => p.title)).toEqual(["First", "P"]);

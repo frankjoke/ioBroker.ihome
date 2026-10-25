@@ -9,6 +9,7 @@ import type {
 } from "$lib/types/display";
 import { enumsOfState } from "$lib/config/rooms";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
+import { slugify, uniqueSlug } from "$lib/config/slug";
 
 /** A device reduced to what filtering needs. */
 export interface FilterableDevice {
@@ -392,6 +393,40 @@ export type LoadedPages =
  */
 export function mayWritePages(kind: LoadedPages["kind"] | null): boolean {
   return kind === "loaded" || kind === "seeded";
+}
+
+/** What `newId()` produces: the ids the '+' used to give every page. */
+const GENERATED_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * One-time rename of generated page ids to the slug of their title, so a page
+ * link reads `#/p/wohnzimmer` instead of a UUID. Readable ids (the seeded
+ * `rooms`/`home`, or a slug) are left alone; a title without latin letters
+ * keeps its generated id. The map lets the caller rewrite the last page and
+ * redirect an open link; the returned registry is the same object when there
+ * was nothing to rename, so no write is triggered.
+ */
+export function migratePageIds(reg: PageRegistry): {
+  registry: PageRegistry;
+  renames: Record<string, string>;
+} {
+  const taken = new Set(reg.pages.map((page) => page.id));
+  const renames: Record<string, string> = {};
+  const pages = reg.pages.map((page) => {
+    if (!GENERATED_ID.test(page.id)) return page;
+    const base = slugify(page.title ?? "");
+    if (!base) return page;
+    const id = uniqueSlug(base, taken);
+    taken.add(id);
+    renames[page.id] = id;
+    return { ...page, id };
+  });
+  if (!Object.keys(renames).length) return { registry: reg, renames };
+  return {
+    registry: { ...reg, pages, updatedAt: Date.now() },
+    renames,
+  };
 }
 
 export function loadPages(

@@ -9,6 +9,7 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   loadPages,
   mayWritePages,
+  migratePageIds,
   migratePageRegistry,
   parsePageRegistry,
   type FilterableDevice,
@@ -85,6 +86,14 @@ let saveFailed = $state(false);
 /** How the stored document last loaded — nothing may be written unless a read
  *  actually succeeded (`loaded`) or this run seeded it (`seeded`). */
 let pagesLoadKind = $state<LoadedPages["kind"] | null>(null);
+/** Generated page ids renamed on this load (old id → readable id): the display
+ *  redirects an open old link once; other loads see only the new ids. */
+let pageIdRenames: Record<string, string> = {};
+
+/** The renames applied when the current document was loaded (usually none). */
+export function renamedPageIds(): Record<string, string> {
+  return pageIdRenames;
+}
 
 /** How the last document read went — `null` while nothing has been read yet.
  *  The display uses it to tell "still loading" from "really no pages". */
@@ -218,7 +227,18 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       }
       const loaded = loadPages(st?.value, seed);
       pagesLoadKind = loaded.kind;
-      if (loaded.registry) setPageRegistry(loaded.registry);
+      if (loaded.registry) {
+        const { registry, renames } = migratePageIds(loaded.registry);
+        setPageRegistry(registry);
+        if (Object.keys(renames).length) {
+          pageIdRenames = renames;
+          const last = renames[view.lastPage];
+          if (last) setLastPage(last);
+          // Loaded documents only: an in-memory seed is not written just
+          // because a rename ran (and seeds carry readable ids anyway).
+          if (loaded.kind === "loaded") commitLayout(registry);
+        }
+      }
       // A seed stays in memory until the user actually does something: writing
       // it here is what overwrote a document the adapter had not migrated yet
       // (an empty read means "nothing there yet", not "the user wants this").

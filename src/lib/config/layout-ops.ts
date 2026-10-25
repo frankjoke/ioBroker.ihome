@@ -1,5 +1,6 @@
 import { newId } from "$lib/utils/ids";
 import { deepCopy } from "$lib/utils/json";
+import { slugify, uniqueSlug } from "$lib/config/slug";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 /**
@@ -149,8 +150,17 @@ export function addPage(
 ): PageRegistry {
   return withPages(reg, (pages) => {
     const next = [...pages];
+    // The id is the readable link (#/p/<id>): the name's slug, made unique.
+    // It is chosen here and never follows a later rename.
+    const base = slugify(title);
+    const id = base
+      ? uniqueSlug(
+          base,
+          pages.map((page) => page.id),
+        )
+      : newId();
     next.splice(at ?? next.length, 0, {
-      id: newId(),
+      id,
       title,
       groups: [{ id: newId(), title: "New section", tiles: [] }],
     });
