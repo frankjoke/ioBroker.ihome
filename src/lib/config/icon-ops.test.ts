@@ -159,3 +159,30 @@ it("uses the device type's preset glyph instead of the adapter fallback", () => 
   ).toContain("lamp.svg");
   expect(deviceFaceIcon("own-icon", undefined, "Button")).toBe("own-icon");
 });
+
+it("ignores page and adapter logos on the state's path", () => {
+  const o = new Map<string, any>([
+    [
+      "0_userdata.0",
+      { _id: "0_userdata.0", type: "meta", common: { icon: "page.svg" } },
+    ],
+    ["0_userdata.0.X", { _id: "0_userdata.0.X", type: "state", common: {} }],
+    [
+      "system.adapter.0_userdata",
+      {
+        _id: "system.adapter.0_userdata",
+        type: "adapter",
+        common: { icon: "adapter.png" },
+      },
+    ],
+  ]);
+  // The meta root's page icon is skipped; only the adapter fallback remains.
+  expect(resolveIcon(o, "0_userdata.0.X")).toEqual({
+    from: "system.adapter.0_userdata",
+    value: "adapter.png",
+  });
+  // With no adapter fallback, there is no icon at all (the type glyph is used).
+  expect(
+    resolveIcon(new Map([...o].slice(0, 2)), "0_userdata.0.X"),
+  ).toBeUndefined();
+});

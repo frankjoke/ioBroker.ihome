@@ -32,6 +32,11 @@ export function ownerOf(id: string): IconOwner {
 
 const FIELDS = ["modelIcon", "extIcon", "icon"] as const;
 
+/** Infrastructure objects carry a page/adapter logo, not a device's face: skip
+ *  them while walking a state's path (0_userdata.0 is a `meta` root with the
+ *  page icon; ihome.0 is an instance with the adapter icon). */
+const INFRASTRUCTURE_TYPES = new Set(["meta", "instance", "adapter"]);
+
 /** The first icon field an object carries, in A65's order. */
 export function objectIconValue(
   obj: unknown,
@@ -58,7 +63,11 @@ export function resolveIcon(
 ): { from: string; value: string } | undefined {
   let cur = String(id ?? "");
   while (cur) {
-    const hit = objectIconValue(objects.get(cur));
+    const obj = objects.get(cur);
+    const hit =
+      obj && !INFRASTRUCTURE_TYPES.has(String(obj.type))
+        ? objectIconValue(obj)
+        : undefined;
     if (hit) return { from: cur, value: hit.value };
     const cut = cur.lastIndexOf(".");
     if (cut < 0) break;
