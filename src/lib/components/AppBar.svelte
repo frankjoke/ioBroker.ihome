@@ -26,6 +26,7 @@
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
+  import { CONFIG_LAST_KEY, cogTarget } from "$lib/config/config-nav";
   import { getStorage } from "$lib/tools.svelte";
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
 
@@ -81,6 +82,44 @@
 
   const storage = getStorage();
   const storedPin = $derived(effectivePin(storage.pin));
+
+  function lastConfig(): string | null {
+    try {
+      return sessionStorage.getItem(CONFIG_LAST_KEY);
+    } catch {
+      return null; // private mode: the cog just opens the UI page
+    }
+  }
+  function rememberConfig(id: string) {
+    try {
+      sessionStorage.setItem(CONFIG_LAST_KEY, id);
+    } catch {
+      /* private mode: the memory is simply not kept */
+    }
+  }
+
+  // The tab remembers the last config page it showed; the cog returns there
+  // after the first entry, which lands on the UI page.
+  $effect(() => {
+    if (isDisplay) return;
+    if (!configPages.some((p) => p.id === routeId)) return;
+    rememberConfig(routeId);
+  });
+
+  // In config mode the cog points at the page being shown (the stored value is
+  // written by the effect above, one render later); on the display it returns
+  // to the remembered page, or to the UI page when this tab has not visited one.
+  const cogHref = $derived(
+    pageHref(
+      !isDisplay && configPages.some((p) => p.id === routeId)
+        ? routeId
+        : cogTarget(
+            lastConfig(),
+            configPages.map((p) => p.id),
+          ),
+      base,
+    ),
+  );
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
    *  Capture phase: SvelteKit's router listens earlier than a delegated
@@ -208,9 +247,9 @@
 
     <a
       class="icon-btn"
-      href={`${base}/#/variables`}
-      title="Global variables"
-      aria-label="Global variables"
+      href={cogHref}
+      title="Configuration"
+      aria-label="Configuration"
     >
       <span class="material-symbols-outlined">settings</span>
     </a>
