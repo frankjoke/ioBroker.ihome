@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.17",
+        "version": "0.0.18",
         "news": {
+            "0.0.18": {
+                "en": "The PIN and the layout editor's lock are shared settings now: they live in ihome.0.config.settings, a missing PIN is seeded there as the default 4321, and every device follows a change. The pencil lock ships off, so the layout editor stays quick during installation, while every configuration page still requires the PIN",
+                "de": "PIN und Sperre des Layout-Editors sind jetzt geteilte Einstellungen: Sie liegen in ihome.0.config.settings, eine fehlende PIN wird dort als Standard 4321 angelegt, und jedes Gerät folgt einer Änderung. Die Stift-Sperre ist standardmäßig aus, damit der Layout-Editor bei der Installation schnell bleibt, während jede Konfigurationsseite weiterhin die PIN verlangt"
+            },
             "0.0.17": {
                 "en": "Global variables now act as an alias inside the app: a variable name can stand where a state id is named — a device control, a rule, a formula — and reading, subscribing and writing all go to the state behind it, so pointing a variable at another state updates every use without touching them. Names are the reference and are restricted (no dots or spaces), duplicates and reserved names (sum, get, active, …) are refused, and a state created from the variable list can carry a role, min/max/step and room/function membership",
                 "de": "Globale Variablen wirken jetzt als Alias innerhalb der App: Ein Variablenname kann dort stehen, wo ein State genannt wird — bei Geräte-Controls, Regeln, Formeln — und Lesen, Abonnieren und Schreiben gehen an den dahinterliegenden State; zeigt eine Variable auf einen anderen State, folgen alle Verwendungen, ohne sie anzufassen. Namen sind die Referenz und eingeschränkt (keine Punkte oder Leerzeichen), Doppelungen und reservierte Namen (sum, get, active, …) werden abgelehnt, und ein aus der Variablenliste angelegter State kann Rolle, Min/Max/Step sowie Raum-/Funktions-Zuordnung tragen"
