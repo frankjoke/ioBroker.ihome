@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.19",
+        "version": "0.0.20",
         "news": {
+            "0.0.20": {
+                "en": "New pages and sections ask for a name before they are created: a duplicate name is refused, Cancel creates nothing, and the new page or section is selected right away — no more silent rooms and sections behind the current one",
+                "de": "Neue Seiten und Abschnitte fragen vor dem Anlegen nach einem Namen: ein doppelter Name wird abgelehnt, Abbrechen legt nichts an, und die neue Seite bzw. der neue Abschnitt ist sofort ausgewählt — keine stillen Seiten und Abschnitte mehr hinter der aktuellen"
+            },
             "0.0.19": {
                 "en": "A User Interface page (the first cog page in a session) sets the installation's defaults: page, section and tile background colours, the tile name and value text sizes, and the 1×1 tile scale up to 200 % — shared by every device; the cog returns to the last config page a tab visited",
                 "de": "Eine Seite „User Interface“ (die erste Zahnrad-Seite einer Sitzung) legt die Standardwerte der Installation fest: Hintergrundfarben für Seite, Abschnitt und Tile, die Textgrößen von Tile-Name und -Wert sowie die Größe eines 1×1-Tiles bis 200 % — geteilt von allen Geräten; das Zahnrad kehrt zur zuletzt besuchten Konfigurationsseite eines Tabs zurück"
