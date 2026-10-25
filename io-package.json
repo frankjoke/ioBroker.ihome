@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.21",
+        "version": "0.0.22",
         "news": {
+            "0.0.22": {
+                "en": "Global state variables appear in the state picker as the first _Variables group: pick one and the control stores the variable name — shown as the state — while role, unit, writability and the room/type suggestion come from the real state behind it",
+                "de": "Globale Zustandsvariablen erscheinen im State-Picker als erste Gruppe _Variables: Wählt man eine, speichert das Control den Variablennamen — angezeigt als State —, während Rolle, Einheit, Schreibbarkeit sowie Raum-/Typ-Vorschlag vom dahinterliegenden echten State kommen"
+            },
             "0.0.21": {
                 "en": "Page links are readable: a new page's address is the slug of its name (#/p/wohnzimmer) instead of a random id; pages created before this update are renamed once, and the link stays as created when the page is renamed later",
                 "de": "Seitenlinks sind lesbar: Die Adresse einer neuen Seite ist der Slug ihres Namens (#/p/wohnzimmer) statt einer Zufalls-ID; vor diesem Update angelegte Seiten werden einmalig umbenannt, und der Link bleibt beim späteren Umbenennen der Seite erhalten"
@@ -78,10 +82,6 @@
             "0.0.3": {
                 "en": "Dashboard documents moved to the config folder (ihome.0.config.*)",
                 "de": "Dashboard-Dokumente in den config-Ordner verschoben (ihome.0.config.*)"
-            },
-            "0.0.2": {
-                "en": "Fix the dashboard's default socket connection and the adapter icon",
-                "de": "Standard-Socket-Verbindung des Dashboards und das Adapter-Icon korrigiert"
             }
         },
         "titleLang": {
