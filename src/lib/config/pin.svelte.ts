@@ -1,14 +1,20 @@
-// The PIN that stands in front of the configuration UI, and the only home of
-// its rule: digits, 4 to 6 characters, default "4321". Routes and components
-// call this module instead of restating the rule.
+// The PIN that stands in front of the configuration, and the only home of its
+// rule: digits, 4 to 6 characters, default "4321". Routes and components call
+// this module instead of restating the rule.
+//
+// What it guards: every route that is not the display (Devices, Global
+// Variables, Formula Templates, Server & Security) and every entrance into the
+// layout editor — the AppBar pencil, a Ctrl/Cmd+click on a page tab, a tile or
+// a section header. Without the PIN the app shows the configured UI and
+// nothing that changes it.
 //
 // The stored value lives in localStorage["__VISUAL__:pin"], written by the
 // layout's defineStorage call under the app's existing "__VISUAL__:" prefix —
 // plaintext and per device. This is a convenience lock, NOT a security
 // boundary: anyone with devtools on this device (or with the broker access this
 // app already has) can read or delete the key and walk in. The lock keeps a
-// curious tap on the wall display away from the broker address and the formula
-// templates; it protects nothing on the broker.
+// curious tap on the wall display away from the config; it protects nothing on
+// the broker.
 //
 // Removing "__VISUAL__:pin" is still the recovery recipe: the default returns,
 // so "4321" opens the page again and the next connection save re-arms the forced
@@ -20,22 +26,14 @@
 // pages document, not with localStorage, and they never reach the settings:
 // this PIN opens a detail page, not the app.
 //
-// The pencil flag, however, is here: "__VISUAL__:lockPencil"
-// (default off) puts the same lock in front of the layout editor — with it on,
-// every fresh entrance asks for the PIN unless this session is already
-// unlocked. The cog keeps guarding the settings; that split is what a future
-// per-user setup can build on.
-//
-// The unlock flag at the bottom is module state, so a reload locks the route
-// again — nothing about "unlocked" is persisted.
+// The unlock flag at the bottom is module state, so a reload locks everything
+// again — nothing about "unlocked" is persisted. One unlock covers the session:
+// every gate reads the same flag.
 
 export const DEFAULT_PIN = "4321";
 
 /** The name the layout's defineStorage call composes into `__VISUAL__:pin`. */
 export const PIN_STORAGE_KEY = "pin";
-
-/** ... and into `__VISUAL__:lockPencil`, the layout editor's own lock. */
-export const LOCK_PENCIL_STORAGE_KEY = "lockPencil";
 
 /** Digits only, 4 to 6, as a string — a number is not a PIN. */
 export function isValidPin(value: unknown): boolean {
@@ -55,14 +53,10 @@ export function effectivePin(stored: unknown): string {
     : DEFAULT_PIN;
 }
 
-/** With the flag on, a fresh entrance into the layout editor asks for the PIN
- *  first — unless this session is already unlocked. Only a real `true` locks:
- *  a missing or malformed flag leaves the editor as open as it always was. */
-export function pencilNeedsPin(
-  lockPencil: unknown,
-  unlocked: boolean,
-): boolean {
-  return lockPencil === true && !unlocked;
+/** The layout's own entrance rule: every route but the display needs the PIN,
+ *  and the session is unlocked for all of them at once. */
+export function configNeedsPin(isDisplay: boolean, unlocked: boolean): boolean {
+  return !isDisplay && !unlocked;
 }
 
 /** A tile's own PIN guards its detail page, and only there: with no detail

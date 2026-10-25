@@ -1,6 +1,5 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { goto } from "$app/navigation";
   import { page as route } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
@@ -28,12 +27,7 @@
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { getStorage } from "$lib/tools.svelte";
-  import {
-    effectivePin,
-    isUnlocked,
-    pencilNeedsPin,
-    unlock,
-  } from "$lib/config/pin.svelte";
+  import { effectivePin, unlock } from "$lib/config/pin.svelte";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -87,21 +81,6 @@
 
   const storage = getStorage();
   const storedPin = $derived(effectivePin(storage.pin));
-  let askingServerPin = $state(false);
-
-  /**
-   * The server page asks for the PIN here — on the way in — instead of the page
-   * asking on load. A reload (or a dev-server reload) must never throw a modal
-   * at the operator; only a deliberate press of the wifi button does.
-   *
-   * Capture phase: SvelteKit's router listens before a delegated `onclick`, so
-   * only a capture handler can still say no (same reason as `onPageClick`).
-   */
-  function onServerClick(event: MouseEvent) {
-    if (isUnlocked()) return;
-    event.preventDefault();
-    askingServerPin = true;
-  }
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
    *  Capture phase: SvelteKit's router listens earlier than a delegated
@@ -112,7 +91,7 @@
       // Also suppresses the browser's open-in-new-tab for this hash link.
       event.preventDefault();
       requestLayoutConfig({ pageId: id });
-      openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
+      openSheetGated();
       return;
     }
     // In the editor the tabs move the sheet, not the route (A43): the display
@@ -141,7 +120,7 @@
       closeSheet();
       return;
     }
-    openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
+    openSheetGated();
   }
 </script>
 
@@ -217,7 +196,6 @@
       class="icon-btn status-btn"
       class:connected={isConnected}
       href={`${base}/#/server`}
-      onclickcapture={onServerClick}
       title={isConnected
         ? "Connected — open Server & Security"
         : "Not connected — open Server & Security"}
@@ -238,22 +216,6 @@
     </a>
   </div>
 </header>
-
-{#if askingServerPin}
-  <PinModal
-    title="Enter PIN for Server & Security"
-    expected={storedPin}
-    onSubmit={() => {
-      unlock();
-      askingServerPin = false;
-      // `goto`, not `location.hash = …`: SvelteKit's hash router reloads the
-      // page on a direct hash edit, and that reload dropped the unlock just
-      // granted (the server page came back locked).
-      void goto("#/server");
-    }}
-    onCancel={() => (askingServerPin = false)}
-  />
-{/if}
 
 {#if isPinAsked()}
   <PinModal

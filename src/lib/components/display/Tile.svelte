@@ -46,12 +46,7 @@
     wantsDeviceConfig,
   } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
-  import { getStorage } from "$lib/tools.svelte";
-  import {
-    isUnlocked,
-    pencilNeedsPin,
-    tileNeedsPin,
-  } from "$lib/config/pin.svelte";
+  import { tileNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
   import BadgeRow from "./BadgeRow.svelte";
@@ -96,8 +91,6 @@
      *  out so the sheet's Detail Page checkbox asks the tile's own answer (A47). */
     onDetail?: (hasModal: boolean) => void;
   } = $props();
-
-  const storage = getStorage();
 
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
@@ -421,7 +414,7 @@
   function openEditor() {
     if (anchor) {
       requestLayoutConfig(anchor);
-      openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
+      openSheetGated();
       return;
     }
     requestDeviceConfig(device.id);

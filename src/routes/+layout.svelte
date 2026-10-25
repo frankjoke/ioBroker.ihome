@@ -2,6 +2,7 @@
   import "../app.css";
   import { onMount } from "svelte";
   import { base } from "$app/paths";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { building, dev } from "$app/environment";
   import {
@@ -32,7 +33,14 @@
   import { seedPages, toFilterable } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
+  import {
+    configNeedsPin,
+    effectivePin,
+    isUnlocked,
+    unlock,
+  } from "$lib/config/pin.svelte";
   import AppBar from "$lib/components/AppBar.svelte";
+  import PinModal from "$lib/components/common/PinModal.svelte";
 
   let { children } = $props();
 
@@ -40,9 +48,6 @@
     ["hostPort", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
     ["pin", { init: "" }],
-    // The layout editor's own lock (pin.svelte.ts): off, the pencil works as
-    // it always did; on, every fresh entrance asks for the PIN first.
-    ["lockPencil", { init: false }],
     // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
     // unreachable, the app navigates to its own page on the cloud host, where
     // the browser's portal session takes over. Off by default — a wall display
@@ -139,6 +144,16 @@
     current === "/" || current.startsWith("/p/") || current === "/layout",
   );
 
+  /**
+   * Everything but the display is configuration and sits behind the PIN
+   * (pin.svelte.ts). One gate here covers every entrance — the cog, the config
+   * tabs, a Ctrl/Cmd+click shortcut, a bookmark, a reload — so no page has to
+   * repeat it. The route's content is not rendered while locked: the page
+   * cannot mount, so nothing in it can run. Cancelling goes back to the display.
+   */
+  const storedPin = $derived(effectivePin(storage.pin));
+  const configLocked = $derived(configNeedsPin(isDisplay, isUnlocked()));
+
   // The used set grows while the app loads (the registry and the pages arrive
   // after the first connect): subscribe again whenever it does, so no device
   // tile is left without live values. The connect itself subscribes once; this
@@ -226,11 +241,6 @@
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   });
-
-  function connect() {
-    // connection options are read at startup — persist and reload
-    location.reload();
-  }
 </script>
 
 <svelte:head>
@@ -247,7 +257,17 @@
   <AppBar />
 
   <main class="app-main">
-    {@render children()}
+    {#if configLocked}
+      <PinModal
+        title="Enter PIN for the configuration"
+        hint="The display stays open; changing its configuration needs the PIN."
+        expected={storedPin}
+        onSubmit={() => unlock()}
+        onCancel={() => void goto("#/")}
+      />
+    {:else}
+      {@render children()}
+    {/if}
   </main>
 
   {#if !isConnected}
@@ -263,32 +283,12 @@
         </div>
 
         <div class="footer-fields">
-          <div class="field">
-            <label class="label-mono" for="footer-host">Host:Port</label>
-            <input
-              id="footer-host"
-              type="text"
-              bind:value={storage.hostPort}
-              disabled={isConnected}
-            />
-          </div>
-          <div class="field">
-            <label class="label-mono" for="footer-ns">Namespace</label>
-            <input
-              id="footer-ns"
-              type="text"
-              bind:value={storage.namespace}
-              disabled={isConnected}
-            />
-          </div>
-          {#if !isConnected}
-            <!-- The other, un-gated path to hostPort: the settings route asks
-                 for a PIN, this footer (disconnected only) does not. PIN-gating
-                 it was scoped out of the PIN task. -->
-            <button class="btn btn-primary" onclick={connect}
-              >Apply & Reload</button
-            >
-          {/if}
+          <!-- The connection fields live on Server & Security only: a display
+               that is offline must not be a second, ungated way to repoint the
+               broker. That page asks for the PIN, like every config route. -->
+          <a class="btn btn-primary" href={`${base}/#/server`}
+            >Configure connection</a
+          >
         </div>
 
         {#if isConnected}
@@ -389,18 +389,6 @@
     align-items: flex-end;
     gap: 0.75rem;
     flex-wrap: wrap;
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .field input {
-    min-width: 180px;
-    font-family: var(--font-mono);
-    font-size: var(--body-sm);
   }
 
   /* The moment before the cloud hand-over: on screen, above everything, and

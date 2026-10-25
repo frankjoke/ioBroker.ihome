@@ -5,6 +5,8 @@
  * sheet opens on still travels as a handoff, because it crosses a navigation —
  * from the devices page, say — and must survive it.)
  */
+import { isUnlocked } from "$lib/config/pin.svelte";
+
 export const sheet = $state<{ open: boolean }>({ open: false });
 
 /* A gated entrance waits here while the PIN is asked — module state too, so a
@@ -20,13 +22,13 @@ export function closeSheet(): void {
 }
 
 /**
- * A fresh entrance: the pencil, or a Ctrl/Cmd+click shortcut. With the pencil
- * lock on and this session not unlocked, the ask opens instead of the sheet.
- * `needsPin` is the caller's read of `pencilNeedsPin` — the store cannot reach
- * the layout's per-context storage itself.
+ * A fresh entrance into the layout editor: the pencil, or a Ctrl/Cmd+click
+ * shortcut. While this session is still locked the ask opens instead of the
+ * sheet — the editor changes the configuration, so it sits behind the same PIN
+ * as the config pages.
  */
-export function openSheetGated(needsPin: boolean): void {
-  if (needsPin) {
+export function openSheetGated(): void {
+  if (!isUnlocked()) {
     pinAsked = true;
     return;
   }

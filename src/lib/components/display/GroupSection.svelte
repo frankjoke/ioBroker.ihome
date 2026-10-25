@@ -6,8 +6,6 @@
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
-  import { getStorage } from "$lib/tools.svelte";
-  import { isUnlocked, pencilNeedsPin } from "$lib/config/pin.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -25,8 +23,6 @@
     bp: Breakpoint;
     pageId: string;
   } = $props();
-
-  const storage = getStorage();
 
   /**
    * The section is exactly as wide as its tiles need (the pass decided), plus
@@ -53,7 +49,7 @@
     event.preventDefault();
     event.stopPropagation();
     requestLayoutConfig({ pageId, sectionId: group.id });
-    openSheetGated(pencilNeedsPin(storage.lockPencil, isUnlocked()));
+    openSheetGated();
   }
 </script>
 

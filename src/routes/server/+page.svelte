@@ -1,13 +1,11 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { onMount } from "svelte";
   import { getStorage } from "$lib/tools.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import {
     effectivePin,
     isDefaultPin,
     isUnlocked,
-    unlock,
   } from "$lib/config/pin.svelte";
   import ioPackage from "../../../io-package.json";
 
@@ -30,14 +28,6 @@
   }
 
   let askingPin = $state(false);
-  /** The unlock ask: the page itself stays quiet (no lock banner), but a
-   *  bookmarked or reloaded visit while locked must not be a dead end — the
-   *  modal opens on arrival. Coming from the wifi button the AppBar has already
-   *  asked, so this is a no-op on that path. */
-  let askingUnlock = $state(false);
-  onMount(() => {
-    if (!isUnlocked()) askingUnlock = true;
-  });
   /** The change flow: current PIN first, then the new one. */
   let pinStep = $state<"off" | "verify" | "new">("off");
 
@@ -154,15 +144,9 @@
       <div class="card-body settings-card-body">
         <p class="text-muted hint">
           {pinIsDefault
-            ? "The shipped default PIN is still in use — change it to your own. It guards the settings on this device only, and it is a convenience lock, not a security boundary."
-            : "A PIN guards the settings on this device only. It is a convenience lock, not a security boundary."}
+            ? "The shipped default PIN is still in use — change it to your own. It guards the whole configuration on this device only, and it is a convenience lock, not a security boundary."
+            : "A PIN guards the whole configuration on this device only. It is a convenience lock, not a security boundary."}
         </p>
-        <label class="check">
-          <input type="checkbox" bind:checked={storage.lockPencil} />
-          <span
-            >Ask for the PIN before the layout editor (the pencil) opens</span
-          >
-        </label>
         <button class="btn btn-primary" onclick={() => (pinStep = "verify")}
           >Change PIN</button
         >
@@ -223,20 +207,9 @@
     </section>
   </fieldset>
 
-  <!-- Every modal above opens only from a control inside the fieldset, so a
-         locked page can never hold one open in a disabled state; the unlock
-         prompt is the one that must work while locked, hence outside. -->
-  {#if askingUnlock}
-    <PinModal
-      title="Enter PIN for Server & Security"
-      expected={storedPin}
-      onSubmit={() => {
-        unlock();
-        askingUnlock = false;
-      }}
-      onCancel={() => (askingUnlock = false)}
-    />
-  {/if}
+  <!-- The modals above open only from a control inside the fieldset; the
+       route-level PIN gate in +layout.svelte is what asks before this page
+       mounts at all. -->
 </div>
 
 <style>
