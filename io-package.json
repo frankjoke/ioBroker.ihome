@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.24",
+        "version": "0.0.25",
         "news": {
+            "0.0.25": {
+                "en": "A control's feature is kept in line with its device type: a device created from a state now gets the feature its final type defines (a Button gets press, not the generic boolean power), and existing controls with a feature the type does not have are repaired on load — the affected button tiles render again. A device also inherits the room and the adapter icon from the variable's state",
+                "de": "Das Feature eines Controls bleibt mit dem Gerätetyp im Einklang: Ein aus einem State erzeugtes Gerät bekommt das Feature seines endgültigen Typs (ein Button erhält press, nicht das generische Boolean-power), und vorhandene Controls mit einem Feature, das der Typ nicht kennt, werden beim Laden repariert — die betroffenen Button-Kacheln erscheinen wieder. Ein Gerät übernimmt außerdem Raum und Adapter-Icon vom State der Variable"
+            },
             "0.0.24": {
                 "en": "The state picker always opens with an empty search, showing the full state tree; it no longer prefills the control's current state or the new device's name (the adapter/room/type/role filters are still remembered)",
                 "de": "Der State-Picker öffnet immer mit leerer Suche und zeigt den vollständigen State-Baum; er füllt weder den aktuellen State des Controls noch den Namen des neuen Geräts vor (Adapter-/Raum-/Typ-/Rollenfilter bleiben gemerkt)"
@@ -78,10 +82,6 @@
             "0.0.6": {
                 "en": "Deployed updates show up on the next reload (the service worker no longer serves a cached shell)",
                 "de": "Ausgelieferte Updates erscheinen beim nächsten Neuladen (der Service-Worker liefert keine gecachte Shell mehr)"
-            },
-            "0.0.5": {
-                "en": "The top bar tints red while the layout editor is open",
-                "de": "Die obere Leiste färbt sich rot, solange der Layout-Editor offen ist"
             }
         },
         "titleLang": {
