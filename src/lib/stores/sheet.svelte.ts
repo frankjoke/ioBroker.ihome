@@ -7,7 +7,7 @@
  */
 import { isUnlocked } from "$lib/config/pin.svelte";
 import { layoutNeedsPin } from "$lib/config/settings-ops";
-import { getSettings } from "$lib/stores/settings.svelte";
+import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
 
 export const sheet = $state<{ open: boolean }>({ open: false });
 
@@ -25,13 +25,16 @@ export function closeSheet(): void {
 
 /**
  * A fresh entrance into the layout editor: the pencil, or a Ctrl/Cmd+click
- * shortcut. It asks only when the shared settings document turns `lockPencil`
- * on (default off, for the busy installation phase) and this session is still
- * locked. The config routes are gated regardless — their rule lives in
+ * shortcut. It asks when the shared settings document turns `lockPencil` on
+ * (default off, for the busy installation phase) and this session is still
+ * locked. Until that document has been read there is no flag to trust, so the
+ * entrance asks — otherwise a quick click after a reload would walk past the
+ * lock. The config routes are gated regardless; their rule lives in
  * +layout.svelte.
  */
 export function openSheetGated(): void {
-  if (layoutNeedsPin(getSettings().lockPencil, isUnlocked())) {
+  const lockPencil = isSettingsLoaded() ? getSettings().lockPencil : true;
+  if (layoutNeedsPin(lockPencil, isUnlocked())) {
     pinAsked = true;
     return;
   }
