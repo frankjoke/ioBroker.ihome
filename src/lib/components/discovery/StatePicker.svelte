@@ -15,7 +15,6 @@
   import { fetchPickerValues } from "$lib/picker-values.svelte.js";
   import { pickerFilters, pickerExpanded } from "$lib/picker-state.svelte.js";
   import { SvelteSet } from "svelte/reactivity";
-  import { untrack } from "svelte";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
 
@@ -25,7 +24,6 @@
     roomsOf,
     rooms,
     enums = undefined,
-    initialSearch = "",
     mode = "add",
     onAdd,
     onClose,
@@ -35,16 +33,16 @@
     roomsOf: (id: string) => string[];
     rooms: { id: string; label: string; icon?: string }[];
     enums?: any;
-    initialSearch?: string;
     /** "replace" points an existing control at another state — one pick only */
     mode?: "add" | "replace";
     onAdd: (controls: Control[]) => void;
     onClose: () => void;
   } = $props();
 
-  // Pre-filter by the device name on open (e.g. for a new device).
-  const initialSearchValue = untrack(() => initialSearch);
-  if (initialSearchValue) pickerFilters.search = initialSearchValue;
+  // Every open starts from the whole tree: a search from the previous open (or
+  // a prefilled state id / device name) must not keep the states hidden. The
+  // adapter/room/type/role filters stay remembered — only the text is cleared.
+  pickerFilters.search = "";
 
   const selection = new SvelteSet<string>();
 

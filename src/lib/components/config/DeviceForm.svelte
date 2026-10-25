@@ -291,11 +291,6 @@
     {rooms}
     enums={ioBroker.enums}
     mode={replaceIndex !== null ? "replace" : "add"}
-    initialSearch={replaceIndex !== null
-      ? (controls[replaceIndex]?.stateId ?? "")
-      : device
-        ? ""
-        : name}
     onAdd={(picked) =>
       replaceIndex !== null ? replaceState(picked[0]) : addStates(picked)}
     onClose={() => {
