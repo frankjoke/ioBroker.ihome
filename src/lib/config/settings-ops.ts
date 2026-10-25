@@ -19,6 +19,14 @@ export function parseSettings(raw: unknown): Settings | null {
   return value as Settings;
 }
 
+/** The document a first read gets: a never-written state (null/undefined/"")
+ *  is an empty document — it gets seeded; malformed content stays unreadable
+ *  and is never overwritten on load. */
+export function settingsDocument(raw: unknown): Settings | null {
+  if (raw === null || raw === undefined || raw === "") return {};
+  return parseSettings(raw);
+}
+
 export function mergeSettings(
   current: Settings,
   patch: Partial<Settings>,

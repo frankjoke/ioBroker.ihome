@@ -8,6 +8,7 @@ import {
   mergeSettings,
   missingPin,
   parseSettings,
+  settingsDocument,
   type Settings,
 } from "$lib/config/settings-ops";
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -117,14 +118,14 @@ export function initSettings(
         apply?.(settings);
         return true;
       };
-      const parsed = parseSettings(st.value);
-      if (!parsed) {
+      const doc = settingsDocument(st.value);
+      if (!doc) {
         initPromise = null;
         return;
       }
-      settings = parsed;
+      settings = doc;
       loaded = true;
-      if (missingPin(parsed)) {
+      if (missingPin(doc)) {
         await updateSettings({ pin: DEFAULT_PIN });
       }
       apply?.(getSettings());

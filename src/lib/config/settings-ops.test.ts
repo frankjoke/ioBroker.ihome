@@ -5,6 +5,7 @@ import {
   mergeSettings,
   missingPin,
   parseSettings,
+  settingsDocument,
 } from "$lib/config/settings-ops";
 
 it("parseSettings accepts only a readable object", () => {
@@ -16,6 +17,17 @@ it("parseSettings accepts only a readable object", () => {
   expect(parseSettings(null)).toBeNull();
   expect(parseSettings(42)).toBeNull();
   expect(parseSettings("plain")).toBeNull();
+});
+
+it("settingsDocument treats a never-written state as an empty document", () => {
+  // A freshly created state has no value: that is "no document yet", not junk.
+  expect(settingsDocument(null)).toEqual({});
+  expect(settingsDocument(undefined)).toEqual({});
+  expect(settingsDocument("")).toEqual({});
+  expect(settingsDocument('{"pin":"1234"}')).toEqual({ pin: "1234" });
+  // Real junk is still unreadable and is never overwritten on load.
+  expect(settingsDocument("{bad")).toBeNull();
+  expect(settingsDocument("[1,2]")).toBeNull();
 });
 
 it("mergeSettings keeps unknown keys and never mutates its inputs", () => {
