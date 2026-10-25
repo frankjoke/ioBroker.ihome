@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.28",
+        "version": "0.0.29",
         "news": {
+            "0.0.29": {
+                "en": "Changing a slot's source in the tile or device editor now uses the same state picker as a device control: the full state tree with adapter, room, type and role filters and the _Variables group, plus a This device strip for the device's own controls — variables and any state are pickable, and the slot reads the value live",
+                "de": "Das Ändern der Quelle eines Slots im Kachel- oder Geräte-Editor nutzt jetzt denselben State-Picker wie ein Geräte-Control: den vollständigen State-Baum mit Adapter-, Raum-, Typ- und Rollenfiltern und der _Variables-Gruppe, dazu eine Leiste „This device“ für die eigenen Controls des Geräts — Variablen und jeder State sind wählbar, und der Slot liest den Wert live"
+            },
             "0.0.28": {
                 "en": "A slot added in the tile editor from Any state now shows its live value right away, and after a reload: the state behind a raw slot is subscribed and fetched like a device control (it used to stay “—” until the same state was also added to the device)",
                 "de": "Ein im Kachel-Editor unter „Any state“ hinzugefügter Slot zeigt seinen Live-Wert jetzt sofort und auch nach einem Neuladen: Der State hinter einem rohen Slot wird wie ein Geräte-Control abonniert und gelesen (bisher blieb er bei „—“ , bis derselbe State auch am Gerät hing)"
@@ -78,10 +82,6 @@
             "0.0.10": {
                 "en": "The dashboard shell always revalidates with the server, so the web adapter's cache headers cannot serve a stale build",
                 "de": "Die Dashboard-Shell fragt immer beim Server nach, damit die Cache-Header des Web-Adapters keine alte Version liefern können"
-            },
-            "0.0.9": {
-                "en": "Edit-mode bar: more red in the light theme, clearly red in the dark one",
-                "de": "Bearbeitungsleiste: roter im hellen Theme, deutlich rot im dunklen"
             }
         },
         "titleLang": {
