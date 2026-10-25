@@ -37,8 +37,10 @@
     configNeedsPin,
     effectivePin,
     isUnlocked,
+    isValidPin,
     unlock,
   } from "$lib/config/pin.svelte";
+  import { initSettings } from "$lib/stores/settings.svelte";
   import AppBar from "$lib/components/AppBar.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
 
@@ -48,6 +50,10 @@
     ["hostPort", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
     ["pin", { init: "" }],
+    // Cache of the shared doc's lock flag (settings.svelte.ts): the broker value
+    // wins once loaded; this keeps the pencil gate working before/without a
+    // socket. Ships off — the editor is used a lot during installation.
+    ["lockPencil", { init: false }],
     // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
     // unreachable, the app navigates to its own page on the cloud host, where
     // the browser's portal session takes over. Off by default — a wall display
@@ -154,6 +160,15 @@
   const storedPin = $derived(effectivePin(storage.pin));
   const configLocked = $derived(configNeedsPin(isDisplay, isUnlocked()));
 
+  /**
+   * The settings doc is the truth; the storage keys are its cache.
+   * @param {Record<string, unknown>} s
+   */
+  function applySettings(s) {
+    if (isValidPin(s.pin)) storage.pin = s.pin;
+    if (typeof s.lockPencil === "boolean") storage.lockPencil = s.lockPencil;
+  }
+
   // The used set grows while the app loads (the registry and the pages arrive
   // after the first connect): subscribe again whenever it does, so no device
   // tile is left without live values. The connect itself subscribes once; this
@@ -162,6 +177,8 @@
     getUsedStateIds(); // tracked: the $state version and the id sets
     if (!ioBroker.connected) return;
     ioBroker.syncSubscriptions();
+    // Also the retry for a settings read that found no socket on first try.
+    void initSettings(applySettings);
   });
 
   // Load all device states once the socket is up and the object cache is ready,
@@ -221,6 +238,7 @@
     initFormulas();
     initVariables();
     initTemplates();
+    void initSettings(applySettings);
     loadViewState();
     // Registered here rather than by SvelteKit: its own call uses
     // `updateViaCache: 'imports'`, and the ioBroker web adapter serves

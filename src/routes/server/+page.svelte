@@ -7,6 +7,10 @@
     isDefaultPin,
     isUnlocked,
   } from "$lib/config/pin.svelte";
+  import {
+    settingsSaveFailed,
+    updateSettings,
+  } from "$lib/stores/settings.svelte";
   import ioPackage from "../../../io-package.json";
 
   const storage = getStorage();
@@ -144,9 +148,23 @@
       <div class="card-body settings-card-body">
         <p class="text-muted hint">
           {pinIsDefault
-            ? "The shipped default PIN is still in use — change it to your own. It guards the whole configuration on this device only, and it is a convenience lock, not a security boundary."
-            : "A PIN guards the whole configuration on this device only. It is a convenience lock, not a security boundary."}
+            ? "The shipped default PIN is still in use — change it to your own. It guards the whole configuration of this ioBroker for every device, and it is a convenience lock, not a security boundary."
+            : "A PIN guards the whole configuration of this ioBroker for every device. It is a convenience lock, not a security boundary."}
         </p>
+        <label class="check">
+          <input
+            type="checkbox"
+            bind:checked={storage.lockPencil}
+            onchange={() =>
+              void updateSettings({ lockPencil: storage.lockPencil })}
+          />
+          <span
+            >Ask for the PIN before the layout editor (the pencil) opens</span
+          >
+        </label>
+        {#if settingsSaveFailed()}
+          <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+        {/if}
         <button class="btn btn-primary" onclick={() => (pinStep = "verify")}
           >Change PIN</button
         >
@@ -161,7 +179,9 @@
         onSubmit={(pin) => {
           storage.pin = pin;
           askingPin = false;
-          applyAndReload();
+          // The reload must not beat the broker write, or the new PIN never
+          // reaches the settings document.
+          void updateSettings({ pin }).then(() => applyAndReload());
         }}
         onCancel={() => (askingPin = false)}
       />
@@ -181,10 +201,11 @@
     {#if pinStep === "new"}
       <PinModal
         title="Choose a new PIN"
-        hint="Digits only, 4 to 6 characters. It guards the settings on this device."
+        hint="Digits only, 4 to 6 characters. It guards the configuration on every device."
         confirmLabel="Save PIN"
         onSubmit={(pin) => {
           storage.pin = pin;
+          void updateSettings({ pin });
           pinStep = "off";
         }}
         onCancel={() => (pinStep = "off")}
