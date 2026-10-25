@@ -15,6 +15,8 @@
     breakpointFor,
     type Breakpoint,
   } from "$lib/config/size-ops";
+  import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
+  import { getSettings } from "$lib/stores/settings.svelte";
   import GroupSection from "./GroupSection.svelte";
   import type { Page } from "$lib/types/display";
   import type { EnrichedDevice } from "$lib/types/device";
@@ -39,10 +41,14 @@
   // A section renders its placements, in order — not the filter it came from (A8).
   const groups = $derived(resolvePage(page, devices));
 
+  const ui = $derived(effectiveUi(getSettings()));
+  /** The 1×1 module at the installation's scale (ui-settings.ts). */
+  const moduleSize = $derived(scaledTile(def, ui.tileScale));
+
   const templates = $derived(getTemplateRegistry().templates);
   // How many tile modules fit on one line at this width — the page's own padding
   // (12px each side) and the grid gap (6px), matching the CSS below.
-  const maxModules = $derived(modulesFor(width, def.tileW, 6, 24));
+  const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 24));
   /** A tile's width in modules — the *same* calculation the tile renders with. */
   const spanOf = (t: ResolvedTile<DisplayDevice>): number =>
     effectiveSpan(t.placement.tile, t.device, templates, bp).w;
@@ -53,7 +59,7 @@
   );
 
   const pageStyle = $derived(
-    `--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px; ${backgroundCss(page.background)}`,
+    `--tile-w: ${moduleSize.w}px; --tile-h: ${moduleSize.h}px; ${backgroundCss(page.background)}`,
   );
 </script>
 

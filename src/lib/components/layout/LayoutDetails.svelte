@@ -21,6 +21,8 @@
     breakpointFor,
     type TileSpan,
   } from "$lib/config/size-ops";
+  import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
+  import { getSettings } from "$lib/stores/settings.svelte";
   import {
     effectiveSpan,
     pickable,
@@ -148,6 +150,10 @@
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
+  );
+  /** The preview shows the display's real module, scale included. */
+  const previewModule = $derived(
+    scaledTile(def, effectiveUi(getSettings()).tileScale),
   );
 
   const page = $derived(registry.pages.find((p) => p.id === selection.pageId));
@@ -829,7 +835,7 @@
 
     <div
       class="preview"
-      style={`--tile-w: ${def.tileW}px; --tile-h: ${def.tileH}px;`}
+      style={`--tile-w: ${previewModule.w}px; --tile-h: ${previewModule.h}px;`}
     >
       <GroupSection
         group={section}
