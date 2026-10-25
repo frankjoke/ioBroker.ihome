@@ -185,7 +185,7 @@ export function initVariables() {
         console.error("initVariables ensureVariableObject:", e);
       }
       registerVariableStateIds();
-      const st = await ioBroker.getState(VARIABLE_LIST_ID);
+      const st = await ioBroker.getState(VARIABLE_LIST_ID, true);
       if (st) {
         st.onUpdate = (_cl, state) => {
           const raw = state?.val;

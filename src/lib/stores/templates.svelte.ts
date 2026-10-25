@@ -151,7 +151,7 @@ export function initTemplates(): Promise<void> {
       } catch (e) {
         console.error("initTemplates ensureTemplatesObject:", e);
       }
-      const st = await ioBroker.getState(TEMPLATE_LIST_ID);
+      const st = await ioBroker.getState(TEMPLATE_LIST_ID, true);
       if (!st) {
         templatesLoadKind = "absent";
         initPromise = null;

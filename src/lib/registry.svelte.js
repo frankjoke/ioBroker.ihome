@@ -105,7 +105,7 @@ export function initRegistry() {
       } catch (e) {
         console.error("initRegistry ensureRegistryObject:", e);
       }
-      const st = await ioBroker.getState(DEVICE_LIST_ID);
+      const st = await ioBroker.getState(DEVICE_LIST_ID, true);
       if (st) {
         st.onUpdate = (_cl, state) => {
           const parsed = parseRegistry(state?.val);

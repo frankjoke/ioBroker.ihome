@@ -73,7 +73,7 @@ export function initFormulas() {
         console.error("initFormulas ensureFormulaObject:", e);
       }
       registerFormulaStateIds();
-      const st = await ioBroker.getState(FORMULA_LIST_ID);
+      const st = await ioBroker.getState(FORMULA_LIST_ID, true);
       if (st) {
         st.onUpdate = (_cl, state) => {
           const raw = state?.val;

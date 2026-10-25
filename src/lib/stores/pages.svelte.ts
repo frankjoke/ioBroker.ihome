@@ -208,7 +208,7 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       }
       // Seeding from an empty enum cache would write pages with no groups.
       await waitForEnumCache();
-      const st = await ioBroker.getState(PAGE_LIST_ID);
+      const st = await ioBroker.getState(PAGE_LIST_ID, true);
       if (!ioBroker.connected) {
         // Not reachable after the wait — leave the promise unset so a later
         // call retries instead of caching an empty registry.
