@@ -47,7 +47,7 @@
 
   const templates = $derived(getTemplateRegistry().templates);
   // How many tile modules fit on one line at this width — the page's own padding
-  // (12px each side) and the grid gap (6px), matching the CSS below.
+  // (8px each side) and the grid gap (6px), matching the CSS below.
   const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 24));
   /** A tile's width in modules — the *same* calculation the tile renders with. */
   const spanOf = (t: ResolvedTile<DisplayDevice>): number =>

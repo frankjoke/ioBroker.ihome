@@ -88,3 +88,13 @@ export function clampSpan(size: Size | undefined, bp: Breakpoint): TileSpan {
   const def = BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0];
   return { w: cap(size?.w, def.maxW), h: cap(size?.h, def.maxH) };
 }
+
+/**
+ * A tile's rendered columns: its own span, never wider than the section that
+ * holds it. A scaled 1×1 module fits fewer columns than the static cap allows,
+ * so a wide tile would otherwise leave its section's box. `modules = 0` is the
+ * fluid/preview case (auto-fill), where there is no fixed width to clamp to.
+ */
+export function tileColumns(spanW: number, modules: number): number {
+  return modules > 0 ? Math.min(spanW, modules) : spanW;
+}

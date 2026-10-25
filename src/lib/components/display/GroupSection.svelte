@@ -84,6 +84,7 @@
         {bp}
         title={t.placement.title}
         tile={t.placement.tile}
+        limit={modules}
         newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
       />

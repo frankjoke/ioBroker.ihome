@@ -39,7 +39,11 @@
     type ResolvedBadge,
     type TimeSource,
   } from "$lib/config/rule-ops";
-  import { clampSpan, type Breakpoint } from "$lib/config/size-ops";
+  import {
+    clampSpan,
+    tileColumns,
+    type Breakpoint,
+  } from "$lib/config/size-ops";
   import {
     requestDeviceConfig,
     requestLayoutConfig,
@@ -67,6 +71,7 @@
     tile,
     anchor,
     newLine,
+    limit = 0,
     openModal = null,
     onModalClose,
     onDetail,
@@ -81,6 +86,9 @@
     anchor?: PlacementAnchor;
     /** The tree asks for a line break before this tile. */
     newLine?: boolean;
+    /** The section's column count, so a wide tile cannot leave its box when the
+     *  1×1 module is scaled up; 0/absent → fluid (preview). */
+    limit?: number;
     /** The layout sheet's "modal view": asks this tile to open its own modal
      *  (only the tile knows its modal's rows). `inline` asks for the
      *  non-blocking form. Absent → never asked; withdrawn → it closes. */
@@ -101,6 +109,8 @@
     resolveTemplate(device, getTemplateRegistry().templates),
   );
   const span = $derived(clampSpan(tile?.size ?? template.size, bp));
+  /** What the grid actually gives it — never more columns than the section has. */
+  const columns = $derived(tileColumns(span.w, limit ?? 0));
   // The name the tile shows: its own, else the device's — and nothing at all
   // when the placement says `""` (A41).
   const tileName = $derived(title ?? tileTitle(device));
@@ -526,7 +536,7 @@
   data-placement-id={anchor?.placementId}
   style="grid-column: {newLine
     ? '1'
-    : 'auto'} / span {span.w}; grid-row: span {span.h}; {tileVars}"
+    : 'auto'} / span {columns}; grid-row: span {span.h}; {tileVars}"
   class:interactive={hasModal}
   bind:this={tileEl}
   role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
@@ -558,7 +568,7 @@
         style={slotStyle(r.slot, r.control)}
         icon={bodyIcon(r)}
         anchor={r.slot === headline}
-        stack={r.slot === headline && span.w < 2}
+        stack={r.slot === headline && columns < 2}
         onPrimary={r.control && r.control === primary
           ? togglePrimary
           : undefined}

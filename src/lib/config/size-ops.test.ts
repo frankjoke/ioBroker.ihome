@@ -5,6 +5,7 @@ import {
   SIZE_MAX,
   breakpointFor,
   clampSpan,
+  tileColumns,
 } from "$lib/config/size-ops";
 import { modulesFor } from "$lib/config/section-layout";
 
@@ -49,6 +50,12 @@ it("floors a nonsense size to one module", () => {
     w: 1,
     h: 1,
   });
+});
+
+it("clamps a tile's rendered columns to the section's module count", () => {
+  expect(tileColumns(10, 7)).toBe(7); // a wide tile in a scaled, narrower section
+  expect(tileColumns(2, 7)).toBe(2);
+  expect(tileColumns(10, 0)).toBe(10); // fluid/preview: nothing to clamp to
 });
 
 it("keeps the values the stylesheet needs", () => {
