@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.25",
+        "version": "0.0.26",
         "news": {
+            "0.0.26": {
+                "en": "A device created from a variable now shows its type's icon — the same glyph the tile's look shows (touch_app for a Button, lightbulb for a Light) — instead of the adapter logo when the state has no icon of its own. A press button writes true and releases the state to false after 300 ms, so momentary button states no longer stick on",
+                "de": "Ein aus einer Variable erzeugtes Gerät zeigt jetzt das Icon seines Typs — dasselbe Glyph wie im Look der Kachel (touch_app für einen Button, lightbulb für ein Licht) — statt des Adapter-Logos, wenn der State kein eigenes Icon hat. Eine Drucktaste schreibt true und setzt den State nach 300 ms wieder auf false, sodass momentane Tastenzustände nicht mehr hängen bleiben"
+            },
             "0.0.25": {
                 "en": "A control's feature is kept in line with its device type: a device created from a state now gets the feature its final type defines (a Button gets press, not the generic boolean power), and existing controls with a feature the type does not have are repaired on load — the affected button tiles render again. A device also inherits the room and the adapter icon from the variable's state",
                 "de": "Das Feature eines Controls bleibt mit dem Gerätetyp im Einklang: Ein aus einem State erzeugtes Gerät bekommt das Feature seines endgültigen Typs (ein Button erhält press, nicht das generische Boolean-power), und vorhandene Controls mit einem Feature, das der Typ nicht kennt, werden beim Laden repariert — die betroffenen Button-Kacheln erscheinen wieder. Ein Gerät übernimmt außerdem Raum und Adapter-Icon vom State der Variable"
@@ -78,10 +82,6 @@
             "0.0.7": {
                 "en": "The edit pencil no longer reloads the dashboard; new worker versions are picked up immediately",
                 "de": "Der Bearbeitungsstift lädt das Dashboard nicht mehr neu; neue Worker-Versionen werden sofort übernommen"
-            },
-            "0.0.6": {
-                "en": "Deployed updates show up on the next reload (the service worker no longer serves a cached shell)",
-                "de": "Ausgelieferte Updates erscheinen beim nächsten Neuladen (der Service-Worker liefert keine gecachte Shell mehr)"
             }
         },
         "titleLang": {
