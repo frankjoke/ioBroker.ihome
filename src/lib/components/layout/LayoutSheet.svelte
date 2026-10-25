@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import NameModal from "$lib/components/common/NameModal.svelte";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
@@ -25,7 +26,9 @@
     duplicatePlacement,
     duplicateSection,
     movePlacement,
+    pageTitleTaken,
     patchPlacement,
+    sectionTitleTaken,
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
@@ -63,6 +66,10 @@
 
   let selection = $state<LayoutSelection | null>(null);
   let pendingDelete = $state<LayoutSelection | null>(null);
+  /** The '+' asks for a name first; nothing is created until it is submitted. */
+  let pendingCreate = $state<
+    { kind: "page" } | { kind: "section"; pageId: string } | null
+  >(null);
   /** Change device: the anchor whose device is being swapped, then the confirm. */
   let pendingSwap = $state<{
     anchor: PlacementAnchor;
@@ -135,6 +142,29 @@
 
   function selectTile(id: string): void {
     selection = { kind: "tile", pageId, sectionId, placementId: id };
+  }
+
+  /** Create the named page and move the cursor onto it (and its first section). */
+  function createPage(title: string): void {
+    const next = addPage(registry, title);
+    const created = next.pages[next.pages.length - 1]; // addPage appends here
+    if (!commitLayout(next)) return;
+    onPage(created.id);
+    const first = created.groups?.[0];
+    selection = first
+      ? { kind: "section", pageId: created.id, sectionId: first.id }
+      : { kind: "page", pageId: created.id };
+    pendingCreate = null;
+  }
+
+  /** Create the named section in this page and select it (the device picker follows). */
+  function createSection(title: string): void {
+    if (!pageId) return;
+    const next = addSection(registry, pageId, title);
+    const created = next.pages.find((p) => p.id === pageId)?.groups?.at(-1);
+    if (!created || !commitLayout(next)) return;
+    selection = { kind: "section", pageId, sectionId: created.id };
+    pendingCreate = null;
   }
 
   // The "modal view": a checkbox on the Tile title's line asks the sheet's own
@@ -378,7 +408,7 @@
             : "Not editable: the page document did not load"}
           aria-label="Add page"
           disabled={!writable}
-          onclick={() => commitLayout(addPage(registry))}
+          onclick={() => (pendingCreate = { kind: "page" })}
         >
           <span class="material-symbols-outlined">add</span>
         </button>
@@ -414,7 +444,7 @@
       class="icon-btn"
       title="Add page"
       aria-label="Add page"
-      onclick={() => commitLayout(addPage(registry))}
+      onclick={() => (pendingCreate = { kind: "page" })}
     >
       <span class="material-symbols-outlined">add</span>
     </button>
@@ -468,7 +498,7 @@
       class="icon-btn"
       title="Add section"
       aria-label="Add section"
-      onclick={() => commitLayout(addSection(registry, pageId))}
+      onclick={() => (pendingCreate = { kind: "section", pageId })}
     >
       <span class="material-symbols-outlined">add</span>
     </button>
@@ -799,6 +829,25 @@
     Its own slots, background and active condition are dropped — they were built
     for {pendingSwap.oldName}. The title and the position stay.
   </ConfirmModal>
+{/if}
+
+{#if pendingCreate}
+  {@const target = pendingCreate}
+  <NameModal
+    title={target.kind === "page" ? "New page" : "New section"}
+    label={target.kind === "page" ? "Page name" : "Section name"}
+    validate={(value) => {
+      if (!value) return "Enter a name";
+      const taken =
+        target.kind === "page"
+          ? pageTitleTaken(registry, value)
+          : sectionTitleTaken(page, value);
+      return taken ? "That name is already used" : null;
+    }}
+    onSubmit={(name) =>
+      target.kind === "page" ? createPage(name) : createSection(name)}
+    onCancel={() => (pendingCreate = null)}
+  />
 {/if}
 
 <style>

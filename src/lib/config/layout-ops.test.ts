@@ -13,10 +13,12 @@ import {
   movePage,
   movePlacement,
   moveSection,
+  pageTitleTaken,
   parseLayoutRef,
   patchPage,
   patchPlacement,
   patchSection,
+  sectionTitleTaken,
 } from "$lib/config/layout-ops";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
@@ -183,6 +185,23 @@ it("moves a page and a section by index", () => {
   expect(
     moveSection(regWithTiles(), "p", 1, 0).pages[0].groups.map((g) => g.id),
   ).toEqual(["g2", "g"]);
+});
+
+it("reports a taken page title, ignoring case and surrounding spaces", () => {
+  expect(pageTitleTaken(regWithTiles(), "P")).toBe(true);
+  expect(pageTitleTaken(regWithTiles(), "  p ")).toBe(true);
+  expect(pageTitleTaken(regWithTiles(), "Chores")).toBe(false);
+  // The page itself does not count (a future rename of it may keep its name).
+  expect(pageTitleTaken(regWithTiles(), "P", "p")).toBe(false);
+  // An empty name is the modal's rule, not a duplicate.
+  expect(pageTitleTaken(regWithTiles(), "   ")).toBe(false);
+});
+
+it("reports a taken section title inside its page only", () => {
+  expect(sectionTitleTaken(regWithTiles().pages[0], "g2")).toBe(true);
+  expect(sectionTitleTaken(regWithTiles().pages[0], "Chores")).toBe(false);
+  expect(sectionTitleTaken(regWithTiles().pages[0], "G", "g")).toBe(false);
+  expect(sectionTitleTaken(undefined, "G")).toBe(false);
 });
 
 it("returns the registry unchanged for an unknown page or section", () => {

@@ -212,6 +212,41 @@ export function addSection(
   });
 }
 
+/** Is `title` already a sibling's? Trimmed and case-insensitive, so "Bad"
+ *  and " bad " are the same name to the selectors. An empty name is not a
+ *  duplicate — the caller decides whether it may exist at all. */
+function titleTaken(
+  items: { id: string; title?: string }[],
+  title: string,
+  exceptId?: string,
+): boolean {
+  const wanted = title.trim().toLowerCase();
+  if (!wanted) return false;
+  return items.some(
+    (item) =>
+      item.id !== exceptId &&
+      (item.title ?? "").trim().toLowerCase() === wanted,
+  );
+}
+
+/** Would a new page with this title collide with an existing one? */
+export function pageTitleTaken(
+  reg: PageRegistry,
+  title: string,
+  exceptId?: string,
+): boolean {
+  return titleTaken(reg.pages, title, exceptId);
+}
+
+/** Would a new section with this title collide inside this page? */
+export function sectionTitleTaken(
+  page: Page | undefined,
+  title: string,
+  exceptId?: string,
+): boolean {
+  return titleTaken(page?.groups ?? [], title, exceptId);
+}
+
 export function deleteSection(
   reg: PageRegistry,
   pageId: string,
