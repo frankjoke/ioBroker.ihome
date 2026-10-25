@@ -29,6 +29,8 @@ export async function waitForEnumCache(ms = 8000): Promise<void> {
   }
 }
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { stateIdFor } from "$lib/config/variables";
+import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
 import type { PageRegistry } from "$lib/types/display";
 
@@ -54,6 +56,7 @@ export function setPageRegistry(reg: PageRegistry): void {
  * ids that exist in the object tree are registered.
  */
 function registerSlotStateIds(reg: PageRegistry): void {
+  const variables = getVariableLibrary().variables ?? [];
   for (const page of reg.pages ?? []) {
     for (const group of page.groups ?? []) {
       for (const placement of group.tiles ?? []) {
@@ -61,8 +64,14 @@ function registerSlotStateIds(reg: PageRegistry): void {
           ...(placement.tile?.slots ?? []).map((slot) => slot.source),
           placement.tile?.active?.source,
         ];
-        for (const id of sources) {
-          if (id && ioBroker.objects.get(id)) registerProgramStateId(id);
+        for (const raw of sources) {
+          if (!raw) continue;
+          // A feature name has no dot and is not a state; a state id does. Do
+          // not require the object cache here — at page load it is often not
+          // populated yet, and a skipped id would never be read at all (the
+          // slot then shows "—" until some other use subscribes it).
+          const id = stateIdFor(raw, variables);
+          if (id.includes(".")) registerProgramStateId(id);
         }
         // The tile's *own* slots carry rules of their own (the editor writes
         // them), and those rules' `get("…")` ids need the same treatment as

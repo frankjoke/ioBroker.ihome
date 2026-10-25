@@ -131,10 +131,10 @@ export function getUsedStateIds(): Set<string> {
     for (const slot of device.slots ?? []) {
       // A slot's raw `source` (the device editor lets a slot point at any
       // state, not only a control of this device) and its rules'
-      // `get("…")` ids both need subscribing. Only ids that exist in the
-      // object tree are registered — a feature name is not a state id.
+      // `get("…")` ids both need subscribing. A feature name has no dot; a
+      // state id does. No object-cache check at load time.
       const source = stateIdOf(slot?.source);
-      if (source && objectSource?.get(source)) {
+      if (source && source.includes(".")) {
         ids.add(source);
       }
       addRuleStateIds(slot?.rules, ids);

@@ -6,6 +6,8 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { parseTemplateRegistry } from "$lib/config/template-ops";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { stateIdFor } from "$lib/config/variables";
+import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import type { TemplateRegistry } from "$lib/types/display";
 
 export const TEMPLATE_LIST_ID = "ihome.0.config.templateList";
@@ -118,15 +120,16 @@ export function commitTemplates(next: TemplateRegistry): boolean {
  */
 function registerTemplateStateIds(): void {
   registerProgramStateId(TEMPLATE_LIST_ID);
+  const variables = getVariableLibrary().variables ?? [];
   for (const template of getTemplateRegistry().templates ?? []) {
     for (const slot of template?.slots ?? []) {
       const source = slot?.source;
-      if (
-        typeof source === "string" &&
-        source &&
-        ioBroker.objects.get(source)
-      ) {
-        registerProgramStateId(source);
+      if (typeof source === "string" && source) {
+        // A feature name (no dot) is not a state; a state id is. No object-cache
+        // check: at load the cache can still be empty, and a skipped id is never
+        // read (the slot then shows "—").
+        const id = stateIdFor(source, variables);
+        if (id.includes(".")) registerProgramStateId(id);
       }
       for (const rule of slot?.rules ?? []) {
         for (const id of stateIdsInExpression(rule?.when ?? "")) {

@@ -12,7 +12,7 @@
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
   import { defineStorage } from "$lib/tools.svelte";
-  import { reloadUsedStates } from "$lib/states.svelte.js";
+  import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
     setStateSource,
     setObjectSource,
@@ -182,6 +182,9 @@
     getUsedStateIds(); // tracked: the $state version and the id sets
     if (!ioBroker.connected) return;
     ioBroker.syncSubscriptions();
+    // Fetch ids that only now became used (a raw slot source added in the
+    // editor, a new control): subscribing alone does not load their value.
+    void loadUsedStates();
     // Also the retry for a settings read that found no socket on first try.
     void initSettings(applySettings);
   });
