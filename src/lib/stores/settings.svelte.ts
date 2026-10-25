@@ -19,8 +19,6 @@ export const SETTINGS_ID = "ihome.0.config.settings";
 let settings = $state<Settings>({});
 let loaded = $state(false);
 let saveFailed = $state(false);
-/** The last document this browser wrote: its own echo is ignored (as pages does). */
-let lastSent: string | null = null;
 let initPromise: Promise<void> | null = null;
 
 export function getSettings(): Settings {
@@ -68,9 +66,8 @@ export async function updateSettings(
   }
   const next = mergeSettings(settings, patch);
   settings = next;
-  lastSent = JSON.stringify(next);
   try {
-    await ioBroker.setState(SETTINGS_ID, lastSent);
+    await ioBroker.setState(SETTINGS_ID, JSON.stringify(next));
     saveFailed = false;
     return true;
   } catch (e) {
@@ -102,17 +99,31 @@ export function initSettings(
         console.error("initSettings ensureSettingsObject:", e);
       }
       registerProgramStateId(SETTINGS_ID);
-      const st = await ioBroker.getState(SETTINGS_ID);
+      let st = await ioBroker.getState(SETTINGS_ID);
       if (!st) {
-        initPromise = null;
-        return;
+        // A state that has never been written reads as "not found" on this
+        // client (it omits a null value). The object was ensured above, so this
+        // is an empty document: seed it, then read it back to attach the update
+        // handler.
+        if (!(await updateSettings({ pin: DEFAULT_PIN }))) {
+          initPromise = null;
+          return;
+        }
+        st = await ioBroker.getState(SETTINGS_ID, true);
+        if (!st) {
+          initPromise = null;
+          return;
+        }
       }
       // Registered before the first parse: a repaired document still arrives.
+      // The document is compared by content with the copy in hand — an echo of
+      // our own write, a re-send, and a remote revert to the same value all mean
+      // there is nothing to do; a real remote change still applies (the last
+      // value we sent is not treated as "ours" forever).
       st.onUpdate = (_cl, state) => {
         const parsed = parseSettings(state?.val);
         if (!parsed) return true;
-        const asString = JSON.stringify(parsed);
-        if (lastSent !== null && lastSent === asString) return true;
+        if (JSON.stringify(settings) === JSON.stringify(parsed)) return true;
         settings = parsed;
         loaded = true;
         apply?.(settings);
