@@ -7,6 +7,7 @@ import {
   roleLabel,
   widgetFor,
   featureDef,
+  featureForType,
 } from "$lib/config/features";
 
 it("takes the role tail, capitalised, as the label", () => {
@@ -121,4 +122,20 @@ it("has a feature table for every device type", () => {
       "Custom",
     ]),
   );
+});
+
+it("featureForType keeps a valid feature and repairs a mismatch", () => {
+  // Button has only `press`: a boolean fallback from Custom must not survive.
+  expect(featureForType("Button", "power")).toBe("press");
+  expect(featureForType("Button", "press")).toBe("press");
+  // A switch keeps its power; a light's brightness is valid.
+  expect(featureForType("Switch", "power")).toBe("power");
+  expect(featureForType("Light", "brightness")).toBe("brightness");
+  // The state's role/type suggests the best fitting feature when there is one.
+  expect(
+    featureForType("Switch", "press", { common: { type: "boolean" } }),
+  ).toBe("power");
+  expect(
+    featureForType("Button", undefined, { common: { role: "button" } }),
+  ).toBe("press");
 });

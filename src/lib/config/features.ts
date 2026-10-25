@@ -254,3 +254,22 @@ export function suggestFeature(
   }
   return type === "boolean" ? "power" : "value";
 }
+
+/**
+ * The feature a control should carry for its device type: the current one when
+ * the type defines it, else the state's suggestion for that type, else the
+ * type's first feature. `suggestFeature` alone can hand back a feature the
+ * final type does not have (a new device starts as Custom, whose boolean
+ * fallback is "power" — then the type is inferred as Button, whose only feature
+ * is "press", and a template slot for "press" finds nothing).
+ */
+export function featureForType(
+  type: DeviceType,
+  feature: string | undefined,
+  obj?: any,
+): string {
+  if (feature && featureDef(type, feature)) return feature;
+  const suggested = suggestFeature(obj, type);
+  if (suggested && featureDef(type, suggested)) return suggested;
+  return DEVICE_FEATURES[type]?.[0]?.feature ?? "value";
+}

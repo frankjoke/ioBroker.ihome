@@ -13,6 +13,7 @@
     suggestDeviceType,
     suggestDeviceName,
     DEVICE_TYPES,
+    featureForType,
   } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
   import { roomForState, roomName, enumLabel } from "$lib/config/rooms";
@@ -57,6 +58,24 @@
   // auto-open the picker for a brand-new (empty) device
   let showPicker = $state(untrack(() => !device));
 
+  /** The state object behind a control (a variable name resolves to its state). */
+  function objOf(control: Control): any {
+    const id = control.stateId
+      ? stateIdFor(control.stateId, getVariables())
+      : "";
+    return id ? objects.get(id) : undefined;
+  }
+
+  /** Keep every control's feature one the device type defines: changing the
+   *  type (or the type inferred from the first state) must not leave a control
+   *  on a feature the type's templates cannot address. */
+  function alignFeatures(nextType: DeviceType): void {
+    controls = controls.map((c) => ({
+      ...c,
+      feature: featureForType(nextType, c.feature, objOf(c)),
+    }));
+  }
+
   // room options as badges; keep a legacy/unknown room so it isn't dropped
   const roomOptions = $derived(
     room && !rooms.some((r) => r.id === room)
@@ -95,6 +114,9 @@
           ancestorObjects(objects, stateId),
         );
       }
+      // The picker suggested features for the type the form had (Custom for a
+      // new device); align them with the type this device actually got.
+      alignFeatures(type);
       // default name: Room.Type (.Superstate when a same-type device is in the room)
       if (!name.trim()) {
         const duplicate = devices.some(
@@ -219,7 +241,14 @@
     >
     <label class="field"
       ><span class="label-mono">Type</span>
-      <select bind:value={type}>
+      <select
+        value={type}
+        onchange={(e) => {
+          const next = e.currentTarget.value as DeviceType;
+          type = next;
+          alignFeatures(next);
+        }}
+      >
         {#each DEVICE_TYPES as t (t)}
           <option value={t}>{t}</option>
         {/each}

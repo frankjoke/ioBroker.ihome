@@ -176,4 +176,36 @@ describe("migrateRegistry", () => {
     const out = migrateRegistry(raw);
     expect(out.devices[0].controls[0].unit).toBe("OFF/ON");
   });
+
+  it("aligns a control's feature with its device type", () => {
+    const raw = {
+      version: 1,
+      updatedAt: 0,
+      devices: [
+        {
+          id: "d1",
+          name: "B",
+          type: "Button",
+          controls: [{ id: "c1", feature: "power", stateId: "a.0.b" }],
+        },
+        {
+          id: "d2",
+          name: "S",
+          type: "Switch",
+          controls: [{ id: "c2", feature: "power", stateId: "a.0.c" }],
+        },
+        {
+          id: "d3",
+          name: "X",
+          type: "Mystery",
+          controls: [{ id: "c3", feature: "power", stateId: "a.0.d" }],
+        },
+      ],
+    };
+    const out = migrateRegistry(raw);
+    expect(out.devices[0].controls[0].feature).toBe("press");
+    expect(out.devices[1].controls[0].feature).toBe("power");
+    // An unknown type is left alone (there is no feature list to align to).
+    expect(out.devices[2].controls[0].feature).toBe("power");
+  });
 });

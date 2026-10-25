@@ -1,4 +1,5 @@
 import type { Transform, TransformStep } from "$lib/types/device";
+import { DEVICE_FEATURES, featureForType } from "$lib/config/features";
 
 export interface StepResult {
   value: unknown;
@@ -120,7 +121,9 @@ export function migrateTransform(old: unknown): Transform | undefined {
   return undefined;
 }
 
-/** Migrate every control transform in a raw registry object. */
+/** Migrate every control transform in a raw registry object, and repair a
+ *  control feature its device type does not define (a new device starts as
+ *  Custom, whose boolean fallback is "power"; a Button only has "press"). */
 export function migrateRegistry(raw: any): any {
   if (!raw || !Array.isArray(raw.devices)) return raw;
   return {
@@ -128,13 +131,21 @@ export function migrateRegistry(raw: any): any {
     devices: raw.devices.map((d: any) => ({
       ...d,
       controls: Array.isArray(d.controls)
-        ? d.controls.map((c: any) => ({
-            ...c,
-            // Legacy boolean unit was on-first ("ON/OFF"); the boolean formatter
-            // reads false-first, so normalise or existing controls read inverted.
-            unit: c.unit === "ON/OFF" ? "OFF/ON" : c.unit,
-            transform: migrateTransform(c.transform),
-          }))
+        ? d.controls.map((c: any) => {
+            const feature =
+              d.type && DEVICE_FEATURES[d.type]
+                ? featureForType(d.type, c.feature)
+                : c.feature;
+            return {
+              ...c,
+              feature,
+              // Legacy boolean unit was on-first ("ON/OFF"); the boolean
+              // formatter reads false-first, so normalise or existing controls
+              // read inverted.
+              unit: c.unit === "ON/OFF" ? "OFF/ON" : c.unit,
+              transform: migrateTransform(c.transform),
+            };
+          })
         : d.controls,
     })),
   };
