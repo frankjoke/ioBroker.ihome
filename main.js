@@ -165,9 +165,12 @@ class IHome extends utils.Adapter {
     // The constants of the loaded config live in memory (loadVariables); the
     // list itself may be edited by the SPA later, so keep the copy current.
     await this.loadVariables();
-    this.subscribeState(`${CONFIG_FOLDER}.variableList`, () =>
-      this.loadVariables(),
-    );
+    this.subscribeStates(`${CONFIG_FOLDER}.variableList`);
+    this.on("stateChange", (id, state) => {
+      if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList` && state) {
+        void this.loadVariables();
+      }
+    });
   }
 
   /**
