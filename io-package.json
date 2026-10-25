@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.27",
+        "version": "0.0.28",
         "news": {
+            "0.0.28": {
+                "en": "A slot added in the tile editor from Any state now shows its live value right away, and after a reload: the state behind a raw slot is subscribed and fetched like a device control (it used to stay “—” until the same state was also added to the device)",
+                "de": "Ein im Kachel-Editor unter „Any state“ hinzugefügter Slot zeigt seinen Live-Wert jetzt sofort und auch nach einem Neuladen: Der State hinter einem rohen Slot wird wie ein Geräte-Control abonniert und gelesen (bisher blieb er bei „—“ , bis derselbe State auch am Gerät hing)"
+            },
             "0.0.27": {
                 "en": "A device's icon ignores page and adapter logos on its state's path (the 0_userdata page icon, the iHome adapter icon): when nothing on that path carries a real icon, the device type's glyph is used — the same one the tile look and the slots show (device_thermostat for a Thermometer, touch_app for a Button)",
                 "de": "Das Icon eines Geräts ignoriert Seiten- und Adapter-Logos auf dem Pfad seines States (das 0_userdata-Seitenicon, das iHome-Adaptericon): Trägt nichts auf diesem Pfad ein echtes Icon, wird das Glyph des Gerätetyps verwendet — dasselbe, das Look und Slots zeigen (device_thermostat für ein Thermometer, touch_app für einen Button)"
@@ -78,10 +82,6 @@
             "0.0.9": {
                 "en": "Edit-mode bar: more red in the light theme, clearly red in the dark one",
                 "de": "Bearbeitungsleiste: roter im hellen Theme, deutlich rot im dunklen"
-            },
-            "0.0.8": {
-                "en": "Edit-mode bar colour works on older browsers too (plain theme colour instead of color-mix)",
-                "de": "Farbe der Bearbeitungsleiste funktioniert auch in älteren Browsern (einfache Themenfarbe statt color-mix)"
             }
         },
         "titleLang": {
