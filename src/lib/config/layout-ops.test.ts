@@ -6,6 +6,7 @@ import {
   deletePage,
   deletePlacement,
   deleteSection,
+  deleteDevicePlacements,
   duplicatePage,
   duplicatePlacement,
   duplicateSection,
@@ -18,6 +19,8 @@ import {
   patchPage,
   patchPlacement,
   patchSection,
+  placementsOfDevice,
+  replacePlacementDevices,
   sectionTitleTaken,
 } from "$lib/config/layout-ops";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
@@ -315,4 +318,71 @@ it("duplicatePlacement deep-copies the tile so the copy cannot mutate the origin
   expect(next.pages[0].groups[0].tiles![0].tile!.slots![0].source).toBe(
     "power",
   );
+});
+
+it("finds and removes every placement of a device, on every page", () => {
+  const base = regWithTiles();
+  const extra: PageRegistry = {
+    ...base,
+    pages: [
+      ...base.pages,
+      {
+        id: "p2",
+        title: "P2",
+        groups: [
+          {
+            id: "g3",
+            tiles: [
+              { id: "g3-t0", device: "t1dev" },
+              { id: "g3-t1", device: "other" },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const found = placementsOfDevice(extra, "t1dev");
+  expect(
+    found.map((f) => [f.pageId, f.sectionId, f.index, f.placement.id]),
+  ).toEqual([
+    ["p", "g", 0, "g-t0"],
+    ["p2", "g3", 0, "g3-t0"],
+  ]);
+  const { registry: next, removed } = deleteDevicePlacements(extra, "t1dev");
+  expect(removed).toBe(2);
+  expect(next.pages[0].groups[0].tiles).toEqual([]);
+  expect(next.pages[1].groups[0].tiles?.map((t) => t.id)).toEqual(["g3-t1"]);
+  // no match: the same document, so nothing is written
+  const none = deleteDevicePlacements(extra, "absent");
+  expect(none.removed).toBe(0);
+  expect(none.registry).toBe(extra);
+});
+
+it("replaces a placement's device with a fresh tile, keeping the position", () => {
+  const { registry: next } = (() => {
+    return {
+      registry: replacePlacementDevices(regWithTiles(), "p", "g", "g-t0", [
+        "newdev",
+      ]),
+    };
+  })();
+  const tiles = next.pages[0].groups[0].tiles ?? [];
+  expect(tiles).toHaveLength(1);
+  expect(tiles[0].id).not.toBe("g-t0"); // a fresh placement, no stale config
+  expect(tiles[0].device).toBe("newdev");
+  // several picks fill the same position in order
+  const multi = replacePlacementDevices(regWithTiles(), "p", "g", "g-t0", [
+    "a",
+    "b",
+  ]);
+  expect(multi.pages[0].groups[0].tiles?.map((t) => t.device)).toEqual([
+    "a",
+    "b",
+  ]);
+  // a stale id changes nothing (same document)
+  expect(
+    replacePlacementDevices(regWithTiles(), "p", "g", "gone", [
+      "a",
+    ]).pages[0].groups[0].tiles?.map((t) => t.device),
+  ).toEqual(["t1dev"]);
 });

@@ -22,6 +22,11 @@
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
+  import {
+    deleteDevicePlacements,
+    placementsOfDevice,
+  } from "$lib/config/layout-ops";
+  import { commitLayout, getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { onMount } from "svelte";
   import {
     peekRequestedLayout,
@@ -39,6 +44,8 @@
   let sortBy = $state<SortKey>("name");
   let sortDir = $state<SortDir>("asc");
   let pendingDelete = $state<Device | null>(null);
+  /** The tiles the device still holds when the confirm opens (they go with it). */
+  let pendingTiles = $state(0);
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const devices = $derived(getCanonicalRegistry().devices ?? []);
@@ -133,12 +140,23 @@
 
   function deleteDevice(d: Device) {
     pendingDelete = d;
+    pendingTiles = placementsOfDevice(getPageRegistry(), d.id).length;
   }
 
   function confirmDelete() {
     const d = pendingDelete;
-    if (d) commit(devices.filter((x) => x.id !== d.id));
+    if (d) {
+      commit(devices.filter((x) => x.id !== d.id));
+      // A tile without its main device is dead weight: remove it with the
+      // device (the sheet offers a replacement when it is the open tile).
+      const { registry, removed } = deleteDevicePlacements(
+        getPageRegistry(),
+        d.id,
+      );
+      if (removed) commitLayout(registry);
+    }
     pendingDelete = null;
+    pendingTiles = 0;
   }
 
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
@@ -356,7 +374,10 @@
           : "s"}</span
       >?
     </p>
-    <p class="text-muted">This cannot be undone.</p>
+    <p class="text-muted">
+      Its {pendingTiles} tile{pendingTiles === 1 ? "" : "s"} on the pages will be
+      removed with it. This cannot be undone.
+    </p>
   </ConfirmModal>
 {/if}
 

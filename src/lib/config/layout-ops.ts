@@ -354,6 +354,92 @@ export function deletePlacement(
   }));
 }
 
+/**
+ * Put fresh placements for `deviceIds` where the old placement was — the tile
+ * editor's "replace this tile's device". The old placement's own config (slots,
+ * title, size) is dropped: it was built for the old device. The device itself
+ * stays in the registry, so it is still pickable everywhere. A stale id changes
+ * nothing.
+ */
+export function replacePlacementDevices(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  placementId: string,
+  deviceIds: string[],
+): PageRegistry {
+  const ids = deviceIds.filter(Boolean);
+  if (!ids.length) return reg;
+  return mapSection(reg, pageId, sectionId, (section) => {
+    const tiles = section.tiles ?? [];
+    const at = tiles.findIndex((tile) => tile.id === placementId);
+    if (at < 0) return section;
+    const fresh = ids.map((device) => ({ id: newId(), device }));
+    const next = [...tiles];
+    next.splice(at, 1, ...fresh);
+    return { ...section, tiles: next };
+  });
+}
+
+/** One placement that depends on a device, addressed well enough to count it,
+ *  remove it, or reopen the device picker at its position. */
+export interface DevicePlacement {
+  pageId: string;
+  sectionId: string;
+  index: number;
+  placement: Placement;
+}
+
+/** Every placement whose *main* device is `deviceId`, in document order. */
+export function placementsOfDevice(
+  reg: PageRegistry,
+  deviceId: string,
+): DevicePlacement[] {
+  const out: DevicePlacement[] = [];
+  for (const page of reg.pages ?? []) {
+    for (const section of page.groups ?? []) {
+      (section.tiles ?? []).forEach((placement, index) => {
+        if (placement.device === deviceId) {
+          out.push({
+            pageId: page.id,
+            sectionId: section.id,
+            index,
+            placement,
+          });
+        }
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Drop every placement that used the device. A tile without its main device is
+ * a dead entry: the sheet's Tile list shows the raw id and the display shows
+ * nothing. Returns the same registry when nothing matched, so no write happens.
+ */
+export function deleteDevicePlacements(
+  reg: PageRegistry,
+  deviceId: string,
+): { registry: PageRegistry; removed: number } {
+  let removed = 0;
+  const pages = (reg.pages ?? []).map((page) => {
+    let changed = false;
+    const groups = (page.groups ?? []).map((section) => {
+      const tiles = section.tiles ?? [];
+      const kept = tiles.filter((tile) => tile.device !== deviceId);
+      if (kept.length === tiles.length) return section;
+      changed = true;
+      removed += tiles.length - kept.length;
+      return { ...section, tiles: kept };
+    });
+    return changed ? { ...page, groups } : page;
+  });
+  return removed
+    ? { registry: { ...reg, updatedAt: Date.now(), pages }, removed }
+    : { registry: reg, removed: 0 };
+}
+
 export function duplicatePlacement(
   reg: PageRegistry,
   pageId: string,

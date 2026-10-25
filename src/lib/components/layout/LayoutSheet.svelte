@@ -28,6 +28,7 @@
     movePlacement,
     pageTitleTaken,
     patchPlacement,
+    replacePlacementDevices,
     sectionTitleTaken,
     type LayoutSelection,
     type PlacementAnchor,
@@ -79,7 +80,14 @@
   /** The Device selector, to put its own value back when a swap is cancelled. */
   let deviceSelect = $state<HTMLSelectElement | undefined>(undefined);
   let pickerFor = $state<
-    | { kind: "device"; pageId: string; sectionId: string; at?: number }
+    | {
+        kind: "device";
+        pageId: string;
+        sectionId: string;
+        at?: number;
+        /** The tile whose device is being replaced: cancel changes nothing. */
+        replace?: PlacementAnchor;
+      }
     | { kind: "slot"; anchor: PlacementAnchor; at?: number }
     | null
   >(null);
@@ -187,8 +195,6 @@
   // tile's device, or a brand-new one when the line's `+` asked for it.
   let mode = $state<"tile" | "device">("tile");
   let creating = $state(false);
-  /** The device the Device line's delete asks about, once confirmed. */
-  let pendingDeviceDelete = $state<Device | null>(null);
   const canonicalDevice = $derived(
     tileDevice
       ? (getCanonicalRegistry().devices.find((d) => d.id === tileDevice.id) ??
@@ -209,22 +215,6 @@
     });
     saveRegistry();
     creating = false;
-    mode = "tile";
-  }
-
-  /** Remove a device from the registry. Tiles that used it dangle — the display
-   *  skips them and the Device line says "no device". */
-  function removeDevice(): void {
-    const d = pendingDeviceDelete;
-    pendingDeviceDelete = null;
-    if (!d) return;
-    const reg = getCanonicalRegistry();
-    setCanonicalRegistry({
-      version: (reg.version ?? 0) + 1,
-      updatedAt: Date.now(),
-      devices: reg.devices.filter((x) => x.id !== d.id),
-    });
-    saveRegistry();
     mode = "tile";
   }
 
@@ -318,6 +308,20 @@
     if (added) {
       selection = { kind: "tile", pageId, sectionId, placementId: added.id };
     }
+  }
+
+  /** "Replace this tile's device": pick a device first, then the old placement is
+   *  swapped for a fresh one in its position. The device itself is never touched,
+   *  and cancelling the picker leaves the tile exactly as it was. */
+  function openReplaceDevice(): void {
+    if (!tileAnchor) return;
+    pickerFor = {
+      kind: "device",
+      pageId: tileAnchor.pageId,
+      sectionId: tileAnchor.sectionId,
+      at: tileIndex,
+      replace: tileAnchor,
+    };
   }
 
   /** Change device (A25): the Device line's selector picks one. A materialised
@@ -676,13 +680,13 @@
     </button>
     <button
       type="button"
-      class="icon-btn danger"
-      title="Delete this device"
-      aria-label="Delete this device"
-      disabled={!canonicalDevice}
-      onclick={() => (pendingDeviceDelete = canonicalDevice)}
+      class="icon-btn"
+      title="Replace this tile's device"
+      aria-label="Replace this tile's device"
+      disabled={!tileAnchor}
+      onclick={openReplaceDevice}
     >
-      <span class="material-symbols-outlined">delete</span>
+      <span class="material-symbols-outlined">swap_horiz</span>
     </button>
   </div>
 
@@ -763,9 +767,49 @@
         registry.pages
           .find((p) => p.id === target.pageId)
           ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
-      ).map((t) => t.device)}
+      )
+        .map((t) => t.device)
+        // The tile being replaced keeps its own device selectable (a fresh tile
+        // with the same device is a valid choice).
+        .filter(
+          (id) =>
+            id !==
+            (target.replace
+              ? placementOfAnchor(target.replace)?.device
+              : undefined),
+        )}
       onAdd={(deviceIds) => {
-        addDevicesTo(target.pageId, target.sectionId, deviceIds, target.at);
+        // Snapshot before closing the picker: `target` reads the reactive value,
+        // which becomes null the moment `pickerFor` is cleared.
+        const replace = target.replace;
+        const targetPage = target.pageId;
+        const targetSection = target.sectionId;
+        const at = target.at;
+        if (replace) {
+          const next = replacePlacementDevices(
+            registry,
+            replace.pageId,
+            replace.sectionId,
+            replace.placementId,
+            deviceIds,
+          );
+          commitLayout(next);
+          pickerFor = null;
+          const added = next.pages
+            .find((p) => p.id === targetPage)
+            ?.groups.find((g) => g.id === targetSection)
+            ?.tiles?.find((t) => t.device === deviceIds[0]);
+          if (added) {
+            selection = {
+              kind: "tile",
+              pageId: targetPage,
+              sectionId: targetSection,
+              placementId: added.id,
+            };
+          }
+          return;
+        }
+        addDevicesTo(targetPage, targetSection, deviceIds, at);
       }}
       onClose={() => (pickerFor = null)}
     />
@@ -790,29 +834,6 @@
   >
     The tiles disappear from this page. The devices themselves stay in the
     registry.
-  </ConfirmModal>
-{/if}
-
-{#if pendingDeviceDelete}
-  <ConfirmModal
-    title="Delete device"
-    confirmLabel="Delete"
-    onConfirm={removeDevice}
-    onCancel={() => (pendingDeviceDelete = null)}
-  >
-    <p>
-      Delete <strong>{pendingDeviceDelete.name}</strong>
-      <span class="text-muted"
-        >— {pendingDeviceDelete.type}, {pendingDeviceDelete.controls?.length ??
-          0} control{pendingDeviceDelete.controls?.length === 1
-          ? ""
-          : "s"}</span
-      >?
-    </p>
-    <p class="text-muted">
-      Tiles that used it keep their place but show nothing until they get
-      another device. This cannot be undone.
-    </p>
   </ConfirmModal>
 {/if}
 
