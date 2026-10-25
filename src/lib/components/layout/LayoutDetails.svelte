@@ -71,7 +71,8 @@
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
+  import StatePicker from "$lib/components/discovery/StatePicker.svelte";
+  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -172,6 +173,9 @@
   );
 
   const templates = $derived(getTemplateRegistry().templates ?? []);
+  /** The device state picker's room filters, as on the Devices page. */
+  const rooms = $derived(roomList(ioBroker.enums));
+  const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
   const typeTemplates = $derived(
     device ? templates.filter((t) => t.type === device.type) : [],
   );
@@ -2005,8 +2009,13 @@
   {/if}
 
   {#if activePicker && device}
-    <SlotPicker
+    <StatePicker
+      deviceType={device.type}
       {device}
+      objects={ioBroker.objects}
+      {roomsOf}
+      {rooms}
+      enums={ioBroker.enums}
       mode="source"
       onAdd={() => {}}
       onSource={setActiveSource}
@@ -2015,8 +2024,13 @@
   {/if}
 
   {#if sourcePickerFor !== null && device}
-    <SlotPicker
+    <StatePicker
+      deviceType={device.type}
       {device}
+      objects={ioBroker.objects}
+      {roomsOf}
+      {rooms}
+      enums={ioBroker.enums}
       mode="source"
       onAdd={() => {}}
       onSource={(source) => {

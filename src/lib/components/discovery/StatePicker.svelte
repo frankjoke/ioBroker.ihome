@@ -12,32 +12,42 @@
   import { getVariables } from "$lib/stores/variables.svelte";
   import { suggestFeature, roleLabel } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
+  import { sourceForControl } from "$lib/config/template-ops";
   import { fetchPickerValues } from "$lib/picker-values.svelte.js";
   import { pickerFilters, pickerExpanded } from "$lib/picker-state.svelte.js";
   import { SvelteSet } from "svelte/reactivity";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
 
   let {
     deviceType,
+    device,
     objects,
     roomsOf,
     rooms,
     enums = undefined,
     mode = "add",
     onAdd,
+    onSource,
     onClose,
   }: {
     deviceType: DeviceType;
+    /** In source mode: the device whose controls are offered above the tree. */
+    device?: EnrichedDevice;
     objects: Map<string, any>;
     roomsOf: (id: string) => string[];
     rooms: { id: string; label: string; icon?: string }[];
     enums?: any;
-    /** "replace" points an existing control at another state — one pick only */
-    mode?: "add" | "replace";
+    /** "replace" points an existing control at another state — one pick only.
+     *  "source" returns one source string for a slot or active condition. */
+    mode?: "add" | "replace" | "source";
     onAdd: (controls: Control[]) => void;
+    onSource?: (source: string) => void;
     onClose: () => void;
   } = $props();
+
+  const isSource = $derived(mode === "source");
 
   // Every open starts from the whole tree: a search from the previous open (or
   // a prefilled state id / device name) must not keep the states hidden. The
@@ -106,7 +116,19 @@
     return () => clearTimeout(t);
   });
 
+  const controls = $derived((device?.controls ?? []).filter((c) => !c.hidden));
+
+  /** A source points at a feature while that is unambiguous on this device,
+   *  else at the control's id — exactly what the slot pickers store (A36). */
+  function pickControl(c: EnrichedControl) {
+    onSource?.(sourceForControl(controls, c) || c.id);
+  }
+
   function toggle(id: string) {
+    if (mode === "source") {
+      onSource?.(id);
+      return;
+    }
     if (mode === "replace") {
       selection.clear();
       selection.add(id);
@@ -118,6 +140,7 @@
   }
 
   function add() {
+    if (isSource) return; // source mode picks on click
     const variables = new Map(
       (variableNode?.children ?? []).map((node) => [node.id, node]),
     );
@@ -138,10 +161,25 @@
   }
 </script>
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Add states">
+<div
+  class="modal"
+  role="dialog"
+  aria-modal="true"
+  aria-label={isSource
+    ? "Choose a source"
+    : mode === "replace"
+      ? "Change state"
+      : "Add states"}
+>
   <div class="modal-content">
     <div class="modal-head">
-      <h3>{mode === "replace" ? "Change state" : "Add states"}</h3>
+      <h3>
+        {isSource
+          ? "Choose a source"
+          : mode === "replace"
+            ? "Change state"
+            : "Add states"}
+      </h3>
       <button
         type="button"
         class="icon-btn"
@@ -151,6 +189,24 @@
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
+
+    {#if isSource && controls.length}
+      <div class="device-sources">
+        <span class="device-sources-label">This device</span>
+        <div class="device-sources-list">
+          {#each controls as c (c.id)}
+            <button
+              type="button"
+              class="device-source"
+              title={c.stateId ?? c.feature}
+              onclick={() => pickControl(c)}
+            >
+              {c.label || c.feature || c.id}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <div class="filters">
       <input
@@ -194,23 +250,30 @@
     </div>
 
     <div class="actions">
-      <span class="text-muted">{selection.size} selected</span>
-      <div class="actions-buttons">
-        <button type="button" class="btn" onclick={onClose}>Cancel</button>
-        <button
-          type="button"
-          class="btn btn-primary"
-          disabled={selection.size === 0}
-          onclick={add}
-        >
-          {#if mode === "replace"}
-            Use state
-          {:else}
-            Add {selection.size || ""}
-            {selection.size === 1 ? "control" : "controls"}
-          {/if}
-        </button>
-      </div>
+      {#if isSource}
+        <span class="text-muted">Pick a control or a state</span>
+        <div class="actions-buttons">
+          <button type="button" class="btn" onclick={onClose}>Cancel</button>
+        </div>
+      {:else}
+        <span class="text-muted">{selection.size} selected</span>
+        <div class="actions-buttons">
+          <button type="button" class="btn" onclick={onClose}>Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={selection.size === 0}
+            onclick={add}
+          >
+            {#if mode === "replace"}
+              Use state
+            {:else}
+              Add {selection.size || ""}
+              {selection.size === 1 ? "control" : "controls"}
+            {/if}
+          </button>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -260,6 +323,40 @@
     display: grid;
     grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
     gap: 0.5rem;
+  }
+
+  .device-sources {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .device-sources-label {
+    font-size: var(--body-sm);
+    color: var(--text-muted);
+  }
+
+  .device-sources-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    max-height: 7.5rem;
+    overflow: auto;
+  }
+
+  .device-source {
+    border: 1px solid var(--border-color);
+    background: var(--surface-color, #fff);
+    color: var(--text-color);
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    cursor: pointer;
+  }
+
+  .device-source:hover {
+    border-color: var(--accent-color, #1976d2);
   }
 
   .filters input,
