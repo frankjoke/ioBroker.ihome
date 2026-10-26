@@ -11,10 +11,13 @@
     nodes,
     selection,
     onToggle,
+    onPick,
   }: {
     nodes: StateNode[];
     selection: Set<string>;
     onToggle: (id: string) => void;
+    /** When set, a leaf is a one-click button instead of a checkbox. */
+    onPick?: (id: string) => void;
   } = $props();
 
   function toggleExpand(id: string) {
@@ -32,23 +35,37 @@
   }
 </script>
 
+{#snippet leafBody(node: StateNode)}
+  <span class="leaf-main">
+    <span class="leaf-name">{node.label}</span>
+    <span class="leaf-id">{node.obj?._id ?? node.id}</span>
+  </span>
+  <span class="leaf-value">{leafValue(node)}</span>
+{/snippet}
+
 {#snippet nodeList(list: StateNode[])}
   <ul class="tree">
     {#each list as node (nodeKey(node))}
       {#if node.kind === "state"}
         <li class="leaf" class:selected={selection.has(node.id)}>
-          <label>
-            <input
-              type="checkbox"
-              checked={selection.has(node.id)}
-              onchange={() => onToggle(node.id)}
-            />
-            <span class="leaf-main">
-              <span class="leaf-name">{node.label}</span>
-              <span class="leaf-id">{node.obj?._id ?? node.id}</span>
-            </span>
-            <span class="leaf-value">{leafValue(node)}</span>
-          </label>
+          {#if onPick}
+            <button
+              type="button"
+              class="leaf-pick"
+              onclick={() => onPick(node.id)}
+            >
+              {@render leafBody(node)}
+            </button>
+          {:else}
+            <label>
+              <input
+                type="checkbox"
+                checked={selection.has(node.id)}
+                onchange={() => onToggle(node.id)}
+              />
+              {@render leafBody(node)}
+            </label>
+          {/if}
         </li>
       {:else}
         <li class="branch">
@@ -109,13 +126,28 @@
     color: var(--text-muted);
   }
 
-  .leaf label {
+  .leaf label,
+  .leaf-pick {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.25rem 0.5rem;
     border-radius: var(--border-radius-sm, 4px);
     cursor: pointer;
+  }
+
+  .leaf-pick {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .leaf label:hover,
+  .leaf-pick:hover {
+    background-color: var(--surface-container);
   }
 
   .leaf.selected label {
