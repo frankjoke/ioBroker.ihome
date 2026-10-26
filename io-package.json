@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.29",
+        "version": "0.0.30",
         "news": {
+            "0.0.30": {
+                "en": "Adding a slot from Any state uses the same state picker as changing a source: the full tree with adapter, room, type and role filters, live values and the _Variables group, while the Kind dropdown and the other add-slot tabs stay as they were",
+                "de": "Das Hinzufügen eines Slots unter „Any state“ nutzt denselben State-Picker wie das Ändern einer Quelle: den vollständigen Baum mit Adapter-, Raum-, Typ- und Rollenfiltern, Live-Werten und der _Variables-Gruppe, während die Kind-Auswahl und die übrigen Reiter unverändert bleiben"
+            },
             "0.0.29": {
                 "en": "Changing a slot's source in the tile or device editor now uses the same state picker as a device control: the full state tree with adapter, room, type and role filters and the _Variables group, plus a This device strip for the device's own controls — variables and any state are pickable, and the slot reads the value live",
                 "de": "Das Ändern der Quelle eines Slots im Kachel- oder Geräte-Editor nutzt jetzt denselben State-Picker wie ein Geräte-Control: den vollständigen State-Baum mit Adapter-, Raum-, Typ- und Rollenfiltern und der _Variables-Gruppe, dazu eine Leiste „This device“ für die eigenen Controls des Geräts — Variablen und jeder State sind wählbar, und der Slot liest den Wert live"
@@ -78,10 +82,6 @@
             "0.0.11": {
                 "en": "Uses the published ioBroker WebSocket client, and a locally started PWA can be pointed at a broker address configured in the app",
                 "de": "Nutzt den veröffentlichten ioBroker-WebSocket-Client; eine lokal gestartete PWA kann über eine in der App konfigurierte Broker-Adresse verbunden werden"
-            },
-            "0.0.10": {
-                "en": "The dashboard shell always revalidates with the server, so the web adapter's cache headers cannot serve a stale build",
-                "de": "Die Dashboard-Shell fragt immer beim Server nach, damit die Cache-Header des Web-Adapters keine alte Version liefern können"
             }
         },
         "titleLang": {
