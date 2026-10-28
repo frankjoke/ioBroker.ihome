@@ -1422,6 +1422,24 @@
                       />
                     </label>
                   </div>
+                  <div class="row">
+                    <label
+                      class="check"
+                      title="Hide the current value and unit; only the slider remains"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.hideValue !== true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            hideValue: e.currentTarget.checked
+                              ? undefined
+                              : true,
+                          })}
+                      />
+                      <span>show value</span>
+                    </label>
+                  </div>
                 {/if}
                 {#if slot.kind === "badge"}
                   <div class="row">

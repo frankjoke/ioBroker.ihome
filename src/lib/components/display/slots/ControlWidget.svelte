@@ -44,6 +44,8 @@
     (control.object?.common ?? {}) as Record<string, any>,
   );
   const range = $derived(levelRange(common, options));
+  /** The slot's value/unit readout can be hidden, leaving only the slider. */
+  const showValue = $derived(options.hideValue !== true);
 
   // Keep a drag on a slider from reaching the tile underneath it.
   function stop(e: Event) {
@@ -79,7 +81,9 @@
       onclick={stop}
       onchange={(e) => write(Number(e.currentTarget.value))}
     />
-    <span class="mono">{formatValue(control.liveValue, control.unit)}</span>
+    {#if showValue}
+      <span class="mono">{formatValue(control.liveValue, control.unit)}</span>
+    {/if}
   </div>
 {:else if control.widget === "color"}
   <input
