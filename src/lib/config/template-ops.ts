@@ -407,12 +407,7 @@ export function parseTemplateRegistry(raw: unknown): TemplateRegistry | null {
  */
 export function effectiveSpan(
   tile: { size?: Size } | undefined,
-  device: unknown,
-  templates: Template[],
   bp: Breakpoint,
 ): TileSpan {
-  return clampSpan(
-    tile?.size ?? resolveTemplate(device as Device, templates).size,
-    bp,
-  );
+  return clampSpan(tile?.size ?? { w: 1, h: 1 }, bp);
 }

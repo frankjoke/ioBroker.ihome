@@ -1,16 +1,12 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { goto } from "$app/navigation";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
-  import {
-    primaryControl,
-    resolveControl,
-    resolveTemplate,
-    tileTitle,
-  } from "$lib/config/template-ops";
+  import { primaryControl, resolveControl } from "$lib/config/template-ops";
   import { evalActive } from "$lib/config/tile-ops";
+  import { resolveTile } from "$lib/config/tile-resolve";
+  import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
     headlineSlot,
     rowIcon,
@@ -21,7 +17,7 @@
     type SlotRow,
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
-  import { getVirtualPool } from "$lib/stores/devices";
+  import { devicesEnrichedStore, getVirtualPool } from "$lib/stores/devices";
   import { getVariables } from "$lib/stores/variables.svelte";
   import {
     stateIdFor,
@@ -44,11 +40,7 @@
     tileColumns,
     type Breakpoint,
   } from "$lib/config/size-ops";
-  import {
-    requestDeviceConfig,
-    requestLayoutConfig,
-    wantsDeviceConfig,
-  } from "$lib/pages.js";
+  import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
   import { tileNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
@@ -61,11 +53,11 @@
     EnrichedDevice,
     SlotControl,
   } from "$lib/types/device";
-  import type { Rule, Slot, TileConfig } from "$lib/types/display";
+  import type { Rule, Slot, TileConfig, Placement } from "$lib/types/display";
   import type { PlacementAnchor } from "$lib/config/layout-ops";
 
   let {
-    device,
+    placement,
     bp,
     title,
     tile,
@@ -76,11 +68,11 @@
     onModalClose,
     onDetail,
   }: {
-    device: EnrichedDevice;
+    /** The placement this tile is: its title and own config. */
+    placement?: Placement;
     bp: Breakpoint;
-    /** The placement's title wins over the one derived from the device. */
+    /** Preview overrides; absent → the placement's own. */
     title?: string;
-    /** The placement's own config: its size wins over the template's (A9). */
     tile?: TileConfig;
     /** Where this tile sits on a page — what the display hands the editor (A16). */
     anchor?: PlacementAnchor;
@@ -100,20 +92,29 @@
     onDetail?: (hasModal: boolean) => void;
   } = $props();
 
+  const sourceLook = $derived<SourceLook>({
+    devices: $devicesEnrichedStore,
+    states: ioBroker.states as Map<string, any>,
+    objects: ioBroker.objects as Map<string, any>,
+  });
+  const resolution = $derived(
+    resolveTile(tile ?? placement?.tile, title ?? placement?.title, sourceLook),
+  );
+  /** The control bag derived from this tile's slots — never a device identity. */
+  const device = $derived(resolution.device);
+  const workingTile = $derived(resolution.tile);
+
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
     (device.controls ?? []).filter((c) => !c.hidden),
   );
 
-  const template = $derived(
-    resolveTemplate(device, getTemplateRegistry().templates),
-  );
-  const span = $derived(clampSpan(tile?.size ?? template.size, bp));
+  const span = $derived(clampSpan(workingTile?.size ?? { w: 1, h: 1 }, bp));
   /** What the grid actually gives it — never more columns than the section has. */
   const columns = $derived(tileColumns(span.w, limit ?? 0));
-  // The name the tile shows: its own, else the device's — and nothing at all
+  // The name the tile shows: its own, else the placement's — and nothing at all
   // when the placement says `""` (A41).
-  const tileName = $derived(title ?? tileTitle(device));
+  const tileName = $derived(title ?? placement?.title ?? "");
   const primary = $derived(primaryControl(shownControls));
 
   // Spec §4.1 + label fallback: feature → control id → state id → label.
@@ -144,18 +145,31 @@
   }
 
   // The tile's active reading (A30): its condition over the live value of the
-  // control or raw state it names; no condition means never active.
-  const activeCond = $derived(tile?.active);
+  // source it names; no condition means never active.
+  const activeCond = $derived(workingTile?.active);
+  const activeResolved = $derived(
+    activeCond?.source && typeof activeCond.source === "object"
+      ? resolveSlotSource(activeCond.source, sourceLook)
+      : undefined,
+  );
   const activeSource = $derived(
     typeof activeCond?.source === "string" ? activeCond.source : undefined,
   );
   const activeControl = $derived(
-    activeSource
-      ? (resolveControl(shownControls, activeSource) ??
+    activeResolved ??
+      (activeSource
+        ? (resolveControl(shownControls, activeSource) ??
           rawControl(activeSource))
-      : undefined,
+        : undefined),
   );
-  const active = $derived(evalActive(activeCond, activeControl?.liveValue));
+  const activeValue = $derived(
+    activeResolved
+      ? activeResolved.value
+      : activeControl && "liveValue" in activeControl
+        ? activeControl.liveValue
+        : undefined,
+  );
+  const active = $derived(evalActive(activeCond, activeValue));
   // The tile's own flag wins the name `active` over a control alias of the same
   // name, so `when: "active"` always means the tile's state.
   const scope = $derived({
@@ -208,13 +222,15 @@
         return typeof v === "number" ? v : undefined;
       };
       if (source) {
+        const resolved = resolution.sources.get(source);
+        if (resolved?.stateId) return pick(resolved.stateId);
         const control = resolveControl(shownControls, source);
         if (control) return pick(control.stateId);
         return pick(sourceId(source)); // a raw state id, or a variable
       }
       let latest: number | undefined;
-      for (const c of controls0()) {
-        const v = pick(c.stateId);
+      for (const resolved of resolution.sources.values()) {
+        const v = pick(resolved.stateId);
         if (typeof v === "number" && (latest === undefined || v > latest)) {
           latest = v;
         }
@@ -234,7 +250,7 @@
    * cannot drift from what the tile actually shows.
    */
   const parts = $derived(
-    tileParts(device, tile, getTemplateRegistry().templates, {
+    tileParts(device, workingTile, getTemplateRegistry().templates, {
       active,
       raw: rawControl,
       pool: getVirtualPool(),
@@ -255,14 +271,14 @@
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
-  const look = $derived(stateLook(tile, active));
+  const look = $derived(stateLook(workingTile, active));
   const accentColor = $derived(look.color ?? tileStyle.color);
   // A glow colour of its own turns the glow on, whatever the rules said (A71).
   const glowing = $derived(look.glow !== undefined || tileStyle.glow === true);
   // The tile's own painted background first (A33): a rule's background is
   // appended after it, so the live condition still wins; the state look last.
   const tileVars = $derived(
-    `${backgroundCss(tile?.background)} --tile-accent: ${
+    `${backgroundCss(workingTile?.background)} --tile-accent: ${
       accentColor ?? "transparent"
     }; --tile-glow-color: ${
       look.glow ?? accentColor ?? "transparent"
@@ -427,11 +443,8 @@
   function openEditor() {
     if (anchor) {
       requestLayoutConfig(anchor);
-      openSheetGated();
-      return;
     }
-    requestDeviceConfig(device.id);
-    void goto("#/devices");
+    openSheetGated();
   }
 
   function onCapture(event: MouseEvent) {
@@ -447,7 +460,7 @@
    *  a protected tile asks on every open — no session unlock — while the
    *  sheet's preview (the `openModal` prop below) never comes through here. */
   function openDetail(): void {
-    if (tileNeedsPin(tile?.pin, hasModal)) askPin = true;
+    if (tileNeedsPin(workingTile?.pin, hasModal)) askPin = true;
     else modalOpen = true;
   }
 

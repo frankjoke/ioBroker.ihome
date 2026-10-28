@@ -1,7 +1,6 @@
 <script lang="ts">
   import { backgroundCss } from "$lib/config/appearance";
-  import type { Group, Size } from "$lib/types/display";
-  import type { EnrichedDevice } from "$lib/types/device";
+  import type { Group } from "$lib/types/display";
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
@@ -17,7 +16,7 @@
     pageId,
   }: {
     group: Group;
-    tiles: ResolvedTile<EnrichedDevice & { size?: Size }>[];
+    tiles: ResolvedTile[];
     /** The section's width in tile modules from the layout pass; 0 → fluid. */
     modules?: number;
     bp: Breakpoint;
@@ -80,10 +79,8 @@
   >
     {#each tiles as t (t.placement.id)}
       <Tile
-        device={t.device}
+        placement={t.placement}
         {bp}
-        title={t.placement.title}
-        tile={t.placement.tile}
         limit={modules}
         newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}

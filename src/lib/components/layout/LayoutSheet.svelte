@@ -785,10 +785,8 @@
   {#if currentTile && tileDevice}
     <div class="modal-view">
       <Tile
-        device={tileDevice}
+        placement={currentTile}
         bp={previewBp}
-        title={currentTile.title}
-        tile={currentTile.tile}
         openModal={modalShown ? modalRequest : null}
         onModalClose={() => (modalShown = false)}
         onDetail={noteDetail}

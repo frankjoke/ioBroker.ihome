@@ -8,15 +8,8 @@ const tile = (id: string, span: number, newLine = false): ResolvedTile => {
   return {
     placement: {
       id,
-      device: `dev-${id}`,
       ...(newLine ? { newLine } : {}),
     } as Placement,
-    device: {
-      id: `dev-${id}`,
-      name: id,
-      type: "Value",
-      visibleControls: 1,
-    } as ResolvedTile["device"],
   };
 };
 const spanOf = (t: ResolvedTile) => SPANS[t.placement.id] ?? 1;

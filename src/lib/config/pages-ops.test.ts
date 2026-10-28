@@ -18,8 +18,6 @@ import {
 import type { Page } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import { DEVICE_TYPES } from "$lib/config/features";
-import { blankDevice } from "$lib/config/blank-tile";
-
 const dev = (over: Partial<FilterableDevice>): FilterableDevice => ({
   id: "x",
   name: "X",
@@ -456,7 +454,7 @@ it("refuses to touch a registry that was never loaded", () => {
 // ------------------------------------------------------- resolving placements
 // Task 3: the display walks a section's placements, not its filter.
 
-it("resolves a page from its placement lists, in order, skipping dangling devices", () => {
+it("resolves a page from its placement lists, in order", () => {
   const page: Page = {
     id: "p",
     title: "P",
@@ -464,48 +462,15 @@ it("resolves a page from its placement lists, in order, skipping dangling device
       {
         id: "g",
         tiles: [
-          { id: "t1", device: "b" },
-          { id: "t2", device: "gone" },
-          { id: "t3", device: "a" },
+          { id: "t1", tile: { slots: [] } },
+          { id: "t2", tile: { slots: [] } },
+          { id: "t3", tile: { slots: [] } },
         ],
       },
     ],
   };
-  const res = resolvePage(
-    page,
-    [dev({ id: "a" }), dev({ id: "b" })],
-    blankDevice(),
-  );
-  expect(res[0].tiles.map((t) => t.device.id)).toEqual(["b", "a"]);
-  expect(res[0].tiles.map((t) => t.placement.id)).toEqual(["t1", "t3"]);
-});
-
-it("renders a blank placement with no devices and showEmpty off", () => {
-  const page: Page = {
-    id: "p",
-    title: "P",
-    groups: [{ id: "g", tiles: [{ id: "t", device: "@blank" }] }],
-  };
-  const res = resolvePage(page, [], blankDevice());
-  expect(res).toHaveLength(1);
-  expect(res[0].tiles[0].device.id).toBe("@blank");
-});
-
-it("still skips a placement whose device is gone", () => {
-  const page: Page = {
-    id: "p",
-    title: "P",
-    groups: [
-      {
-        id: "g",
-        tiles: [
-          { id: "t", device: "@blank" },
-          { id: "u", device: "gone" },
-        ],
-      },
-    ],
-  };
-  expect(resolvePage(page, [], blankDevice())[0].tiles).toHaveLength(1);
+  const res = resolvePage(page);
+  expect(res[0].tiles.map((t) => t.placement.id)).toEqual(["t1", "t2", "t3"]);
 });
 
 it("accepts a document carrying a blank placement", () => {
@@ -537,16 +502,16 @@ it("accepts a v2 placement without a device", () => {
   ]);
 });
 
-it("shows the same device in two sections (no claiming)", () => {
+it("keeps the same placement in two sections", () => {
   const page: Page = {
     id: "p",
     title: "P",
     groups: [
-      { id: "g1", tiles: [{ id: "t1", device: "a" }] },
-      { id: "g2", tiles: [{ id: "t2", device: "a" }] },
+      { id: "g1", tiles: [{ id: "t1", tile: { slots: [] } }] },
+      { id: "g2", tiles: [{ id: "t2", tile: { slots: [] } }] },
     ],
   };
-  expect(resolvePage(page, [dev({ id: "a" })], blankDevice())).toHaveLength(2);
+  expect(resolvePage(page)).toHaveLength(2);
 });
 
 it("keeps an empty placement list invisible unless showEmpty", () => {
@@ -558,7 +523,7 @@ it("keeps an empty placement list invisible unless showEmpty", () => {
       { id: "g2", tiles: [], showEmpty: true },
     ],
   };
-  const res = resolvePage(page, [dev({})], blankDevice());
+  const res = resolvePage(page);
   expect(res.map((r) => r.group.id)).toEqual(["g2"]);
 });
 

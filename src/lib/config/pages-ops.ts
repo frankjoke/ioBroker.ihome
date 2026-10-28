@@ -8,7 +8,6 @@ import type {
   Placement,
 } from "$lib/types/display";
 import { enumsOfState } from "$lib/config/rooms";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 import { slugify, uniqueSlug } from "$lib/config/slug";
 
@@ -38,16 +37,15 @@ export interface MemberGroup<T = FilterableDevice> {
   devices: T[];
 }
 
-/** One tile of a section, with the device its placement points at. */
-export interface ResolvedTile<T = FilterableDevice> {
+/** One tile of a section: its placement. */
+export interface ResolvedTile {
   placement: Placement;
-  device: T;
 }
 
 /** What the display renders: a section and its tiles, in order. */
-export interface ResolvedGroup<T = FilterableDevice> {
+export interface ResolvedGroup {
   group: Group;
-  tiles: ResolvedTile<T>[];
+  tiles: ResolvedTile[];
 }
 
 /**
@@ -120,24 +118,8 @@ export function resolveByMember<T extends FilterableDevice>(
  * tiles), and a device with nothing to show is skipped unless the section asks
  * for empties.
  */
-export function resolveSection<T extends FilterableDevice>(
-  group: Group,
-  devices: T[],
-  blank: T,
-): ResolvedTile<T>[] {
-  const byId = new Map(devices.map((d) => [d.id, d]));
-  const tiles: ResolvedTile<T>[] = [];
-  for (const placement of group.tiles ?? []) {
-    if (placement.device === BLANK_DEVICE_ID) {
-      tiles.push({ placement, device: blank });
-      continue;
-    }
-    const device = byId.get(placement.device);
-    if (!device) continue; // dangling: the device is gone from the registry
-    if (device.visibleControls < 1 && group.showEmpty !== true) continue;
-    tiles.push({ placement, device });
-  }
-  return tiles;
+export function resolveSection(group: Group): ResolvedTile[] {
+  return (group.tiles ?? []).map((placement) => ({ placement }));
 }
 
 /**
@@ -146,13 +128,9 @@ export function resolveSection<T extends FilterableDevice>(
  * one section — nothing is claimed — and a section with nothing to show
  * disappears unless it asks for empties.
  */
-export function resolvePage<T extends FilterableDevice>(
-  page: Page,
-  devices: T[],
-  blank: T,
-): ResolvedGroup<T>[] {
+export function resolvePage(page: Page): ResolvedGroup[] {
   return (page.groups ?? [])
-    .map((group) => ({ group, tiles: resolveSection(group, devices, blank) }))
+    .map((group) => ({ group, tiles: resolveSection(group) }))
     .filter((r) => r.tiles.length > 0 || r.group.showEmpty === true);
 }
 

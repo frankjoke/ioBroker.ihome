@@ -10,11 +10,7 @@
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
-  import {
-    resolveSection,
-    toFilterable,
-    type FilterableDevice,
-  } from "$lib/config/pages-ops";
+  import { resolveSection } from "$lib/config/pages-ops";
   import {
     BREAKPOINTS,
     SIZE_MAX,
@@ -338,12 +334,7 @@
     return `Shown: ${SHOW_LABEL[cur]} — click for ${SHOW_LABEL[nextShow(slot)]}`;
   }
 
-  // The preview resolves through the display's own resolver, so it needs the
-  // same device shape the display feeds it.
-  type DisplayDevice = EnrichedDevice & FilterableDevice;
-  const displayDevices = $derived(
-    devices.map((d) => toFilterable(d)) as DisplayDevice[],
-  );
+  // The preview resolves through the display's own resolver.
 
   /** Page fields: an empty value removes the property. */
   function setPage(
@@ -450,12 +441,7 @@
    */
   function effectiveTileSpan(): TileSpan {
     if (!tile) return { w: 1, h: 1 };
-    return effectiveSpan(
-      tile.tile,
-      device,
-      getTemplateRegistry().templates,
-      bp,
-    );
+    return effectiveSpan(tile.tile, bp);
   }
 
   function setSize(axis: "w" | "h", raw: string): void {
@@ -852,7 +838,7 @@
     >
       <GroupSection
         group={section}
-        tiles={resolveSection(section, displayDevices, blankDevice())}
+        tiles={resolveSection(section)}
         {bp}
         pageId={page?.id ?? ""}
       />

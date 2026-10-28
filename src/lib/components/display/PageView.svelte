@@ -1,16 +1,8 @@
 <script lang="ts">
-  import { devicesEnrichedStore } from "$lib/stores/devices";
   import { backgroundCss } from "$lib/config/appearance";
-  import {
-    resolvePage,
-    toFilterable,
-    type FilterableDevice,
-    type ResolvedTile,
-  } from "$lib/config/pages-ops";
+  import { resolvePage, type ResolvedTile } from "$lib/config/pages-ops";
   import { layoutSection, modulesFor } from "$lib/config/section-layout";
   import { effectiveSpan } from "$lib/config/template-ops";
-  import { blankDevice } from "$lib/config/blank-tile";
-  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import {
     BREAKPOINTS,
     breakpointFor,
@@ -20,7 +12,6 @@
   import { getSettings } from "$lib/stores/settings.svelte";
   import GroupSection from "./GroupSection.svelte";
   import type { Page } from "$lib/types/display";
-  import type { EnrichedDevice } from "$lib/types/device";
 
   let { page }: { page: Page } = $props();
 
@@ -34,25 +25,19 @@
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
   );
 
-  type DisplayDevice = EnrichedDevice & FilterableDevice;
-
-  const devices = $derived<DisplayDevice[]>(
-    $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
-  );
   // A section renders its placements, in order — not the filter it came from (A8).
-  const groups = $derived(resolvePage(page, devices, blankDevice()));
+  const groups = $derived(resolvePage(page));
 
   const ui = $derived(effectiveUi(getSettings()));
   /** The 1×1 module at the installation's scale (ui-settings.ts). */
   const moduleSize = $derived(scaledTile(def, ui.tileScale));
 
-  const templates = $derived(getTemplateRegistry().templates);
   // How many tile modules fit on one line at this width — the page's own padding
   // (8px each side) and the grid gap (6px), matching the CSS below.
   const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 24));
   /** A tile's width in modules — the *same* calculation the tile renders with. */
-  const spanOf = (t: ResolvedTile<DisplayDevice>): number =>
-    effectiveSpan(t.placement.tile, t.device, templates, bp).w;
+  const spanOf = (t: ResolvedTile): number =>
+    effectiveSpan(t.placement.tile, bp).w;
   // The pass interprets the tree: which row/column each tile gets, and how wide
   // each section is (as wide as its tiles need).
   const sections = $derived(

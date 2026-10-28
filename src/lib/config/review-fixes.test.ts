@@ -7,7 +7,6 @@ import {
 import { movePlacement } from "$lib/config/layout-ops";
 import { effectiveSpan } from "$lib/config/template-ops";
 import { newId } from "$lib/utils/ids";
-import { PRESETS } from "$lib/config/presets";
 import type { Page, PageRegistry } from "$lib/types/display";
 
 const dev = (over: Record<string, unknown> = {}) => ({
@@ -145,23 +144,11 @@ it("makes an id even where crypto.randomUUID is missing (plain HTTP)", () => {
 });
 
 // ------------------------------------------- I3/I10: one effective size everywhere
-it("resolves a tile's effective size from its placement, else its template", () => {
-  const blind = {
-    id: "b",
-    name: "Blind",
-    type: "Blind" as const,
-    controls: [],
-    visibleControls: 1,
-  };
-  const templates = Object.values(PRESETS);
-  // the preset's own size, clamped per breakpoint
-  expect(effectiveSpan(undefined, blind, templates, "phone")).toEqual(
-    PRESETS.Blind.size,
-  );
+it("a tile without a size is 1×1; its own size wins", () => {
+  // The size comes from the tile only; there is no device/template chain.
+  expect(effectiveSpan(undefined, "phone")).toEqual({ w: 1, h: 1 });
   // the placement's size wins
-  expect(
-    effectiveSpan({ size: { w: 2, h: 2 } }, blind, templates, "desktop"),
-  ).toEqual({
+  expect(effectiveSpan({ size: { w: 2, h: 2 } }, "desktop")).toEqual({
     w: 2,
     h: 2,
   });

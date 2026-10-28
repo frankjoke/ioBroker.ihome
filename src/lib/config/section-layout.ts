@@ -22,16 +22,16 @@ export function modulesFor(
 }
 
 /** One tile with the position the renderer gives it (module units, 0-based). */
-export type PlacedTile<T = unknown> = ResolvedTile<T> & {
+export type PlacedTile = ResolvedTile & {
   row: number;
   column: number;
   /** Its width in modules, clamped to what the page can show. */
   span: number;
 };
 
-export interface PlacedSection<T = unknown> {
+export interface PlacedSection {
   group: Group;
-  tiles: PlacedTile<T>[];
+  tiles: PlacedTile[];
   /** The section's width in modules: as wide as its widest row. */
   modules: number;
   rows: number;
@@ -41,14 +41,14 @@ export interface PlacedSection<T = unknown> {
  * Place one section's tiles: left to right, wrapping only when the next tile
  * would not fit — or when the tile entry carries `newLine`.
  */
-export function layoutSection<T>(
+export function layoutSection(
   group: Group,
-  tiles: ResolvedTile<T>[],
-  spanOf: (tile: ResolvedTile<T>) => number,
+  tiles: ResolvedTile[],
+  spanOf: (tile: ResolvedTile) => number,
   maxModules: number,
-): PlacedSection<T> {
+): PlacedSection {
   const limit = Math.max(1, maxModules);
-  const placed: PlacedTile<T>[] = [];
+  const placed: PlacedTile[] = [];
   let row = 0;
   let column = 0;
   let widest = 0;
