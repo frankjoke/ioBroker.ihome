@@ -13,6 +13,7 @@
     enums = undefined,
     onAdd,
     onBlank,
+    onNewDevice,
     onClose,
   }: {
     devices: EnrichedDevice[];
@@ -23,6 +24,8 @@
     onAdd: (deviceIds: string[]) => void;
     /** Add a device-less tile; absent while replacing a tile's device. */
     onBlank?: () => void;
+    /** Create a device and place it; absent while replacing a tile's device. */
+    onNewDevice?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -122,9 +125,17 @@
       />
     </div>
 
-    {#if onBlank}
+    {#if onBlank || onNewDevice}
       <div class="create-row">
-        <button type="button" class="btn" onclick={onBlank}>Blank tile</button>
+        {#if onBlank}
+          <button type="button" class="btn" onclick={onBlank}>Blank tile</button
+          >
+        {/if}
+        {#if onNewDevice}
+          <button type="button" class="btn" onclick={onNewDevice}>
+            New device…
+          </button>
+        {/if}
       </div>
     {/if}
 

@@ -94,6 +94,13 @@
     | null
   >(null);
 
+  /** Where a device being created goes: a fresh tile, or an existing blank tile. */
+  let pendingDeviceFor = $state<
+    | { kind: "place"; pageId: string; sectionId: string; at?: number }
+    | { kind: "attach"; anchor: PlacementAnchor }
+    | null
+  >(null);
+
   const registry = $derived(getPageRegistry());
   const devices = $derived($devicesEnrichedStore);
   const rooms = $derived(roomList(ioBroker.enums));
@@ -205,6 +212,8 @@
   );
 
   function saveDevice(d: Device): void {
+    const target = pendingDeviceFor;
+    pendingDeviceFor = null;
     const reg = getCanonicalRegistry();
     const idx = reg.devices.findIndex((x) => x.id === d.id);
     setCanonicalRegistry({
@@ -218,6 +227,9 @@
     saveRegistry();
     creating = false;
     mode = "tile";
+    if (target?.kind === "place") {
+      addDevicesTo(target.pageId, target.sectionId, [d.id], target.at);
+    }
   }
 
   // The modal view, the device editor and a new-device draft all belong to the
@@ -312,6 +324,19 @@
     if (added) {
       selection = { kind: "tile", pageId, sectionId, placementId: added.id };
     }
+  }
+
+  /** Open the device form to create a device and place it in `target`. */
+  function startNewDevice(target: {
+    kind: "place";
+    pageId: string;
+    sectionId: string;
+    at?: number;
+  }): void {
+    pickerFor = null;
+    pendingDeviceFor = target;
+    creating = true;
+    mode = "device";
   }
 
   /** A device-less tile (B5): no dedupe, so a section may hold several. */
@@ -755,6 +780,7 @@
           onCancel={() => {
             creating = false;
             mode = "tile";
+            pendingDeviceFor = null;
           }}
         />
       {/key}
@@ -785,6 +811,15 @@
       enums={ioBroker.enums}
       onBlank={!target.replace
         ? () => addBlankTo(target.pageId, target.sectionId, target.at)
+        : undefined}
+      onNewDevice={!target.replace
+        ? () =>
+            startNewDevice({
+              kind: "place",
+              pageId: target.pageId,
+              sectionId: target.sectionId,
+              at: target.at,
+            })
         : undefined}
       listed={(
         registry.pages
