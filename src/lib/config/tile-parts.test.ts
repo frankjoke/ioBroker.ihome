@@ -15,6 +15,7 @@ import type {
   SlotControl,
 } from "$lib/types/device";
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
+import { blankDevice } from "$lib/config/blank-tile";
 
 const control = (
   id: string,
@@ -105,6 +106,12 @@ it("a frame slot passes through without a control", () => {
   );
   expect(parts.body[0].control).toBeUndefined();
   expect(parts.modal[0].control).toBeUndefined();
+});
+
+it("a blank tile does not inherit the preset chain", () => {
+  const parts = tileParts(blankDevice(), undefined, []);
+  expect(parts.slots).toEqual([]);
+  expect(parts.rows).toEqual([]);
 });
 
 it("keeps a tile badge in the corners and out of the modal", () => {

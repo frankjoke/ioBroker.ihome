@@ -7,6 +7,7 @@ import {
   slotVisible,
 } from "$lib/config/template-ops";
 import { slotWhere } from "$lib/config/tile-ops";
+import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   resolveBadges,
   resolveStyle,
@@ -76,7 +77,10 @@ export function tileParts(
   const pool = opts?.pool ?? [];
   // The tile's own slots once it was materialised; the chain's until then (A18).
   const chain = resolveTemplate(device, templates);
-  const slots = tile?.slots ?? chain.slots;
+  const slots =
+    device.id === BLANK_DEVICE_ID
+      ? (tile?.slots ?? [])
+      : (tile?.slots ?? chain.slots);
 
   /** Does this slot carry the glyph the template gives it (A67)? Such a glyph is
    *  a type default, not a choice, so the device's found icon may stand in for

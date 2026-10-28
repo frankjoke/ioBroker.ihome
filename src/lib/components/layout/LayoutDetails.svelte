@@ -73,7 +73,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
-  import { blankDevice } from "$lib/config/blank-tile";
+  import { BLANK_DEVICE_ID, blankDevice } from "$lib/config/blank-tile";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -170,8 +170,13 @@
       : undefined,
   );
   const device = $derived(
-    tile ? devices.find((d) => d.id === tile.device) : undefined,
+    tile
+      ? (devices.find((d) => d.id === tile.device) ??
+          (tile.device === BLANK_DEVICE_ID ? blankDevice() : undefined))
+      : undefined,
   );
+  /** A tile without a device: no chain, no templates, no "This device". */
+  const blank = $derived(device?.id === BLANK_DEVICE_ID);
 
   const templates = $derived(getTemplateRegistry().templates ?? []);
   /** The device state picker's room filters, as on the Devices page. */
@@ -225,7 +230,7 @@
   /** The rows the pane lists: the tile's own slots, else the chain's (A18). */
   const shownSlots = $derived(
     tile?.tile?.slots ??
-      (device ? resolveTemplate(device, templates).slots : []),
+      (blank ? [] : device ? resolveTemplate(device, templates).slots : []),
   );
 
   /** The states the look block edits (A71): the inactive one is also the

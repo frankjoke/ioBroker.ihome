@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import type { Device } from "$lib/types/device";
+import { blankDevice } from "$lib/config/blank-tile";
 import type {
   ActiveCondition,
   ActiveOp,
@@ -99,6 +100,11 @@ it("ensureTile materialises from nothing and resetTile drops the whole tile", ()
   const ensured = ensureTile(bare, device(), []);
   expect(ensured.tile.slots!.length).toBeGreaterThan(0);
   expect(resetTile(ensured)).toEqual(bare);
+});
+
+it("ensureTile gives a blank placement an empty 1x1 tile", () => {
+  const ensured = ensureTile({ id: "p", device: "@blank" }, blankDevice(), []);
+  expect(ensured.tile).toEqual({ size: { w: 1, h: 1 }, slots: [] });
 });
 
 it("slot ops keep order, copy the tile and bail out on bad indexes", () => {

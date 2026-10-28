@@ -18,6 +18,7 @@ import type {
   TemplateRegistry,
 } from "$lib/types/display";
 import { presetForType, resolveTemplate } from "$lib/config/template-ops";
+import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   mapPlacement,
   moveItem,
@@ -52,7 +53,10 @@ export function ensureTile(
 ): Placement & { tile: TileConfig } {
   if (placement.tile?.slots)
     return placement as Placement & { tile: TileConfig };
-  const base = materialiseTile(device, templates);
+  const base: TileConfig =
+    placement.device === BLANK_DEVICE_ID
+      ? { size: { w: 1, h: 1 }, slots: [] }
+      : materialiseTile(device, templates);
   return {
     ...placement,
     // `slots` is re-pinned because a partial never carries one (the early
