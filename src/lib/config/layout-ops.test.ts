@@ -2,7 +2,9 @@ import { it, expect } from "vitest";
 import {
   addPage,
   addSection,
+  appendBlank,
   appendDevices,
+  attachDevice,
   deletePage,
   deletePlacement,
   deleteSection,
@@ -385,4 +387,73 @@ it("replaces a placement's device with a fresh tile, keeping the position", () =
       "a",
     ]).pages[0].groups[0].tiles?.map((t) => t.device),
   ).toEqual(["t1dev"]);
+});
+
+it("appendBlank adds several blank placements", () => {
+  const base = reg([{ id: "p", title: "P", groups: [{ id: "g", tiles: [] }] }]);
+  const one = appendBlank(base, "p", "g");
+  const two = appendBlank(one, "p", "g");
+  expect(two.pages[0].groups[0].tiles).toHaveLength(2);
+  expect(two.pages[0].groups[0].tiles.every((t) => t.device === "@blank")).toBe(
+    true,
+  );
+});
+
+it("deleteDevicePlacements leaves blank placements alone", () => {
+  const base = reg([
+    {
+      id: "p",
+      title: "P",
+      groups: [{ id: "g", tiles: [{ id: "b", device: "@blank" }] }],
+    },
+  ]);
+  expect(deleteDevicePlacements(base, "dev-1").removed).toBe(0);
+});
+
+it("attachDevice keeps the tile's title and configuration", () => {
+  const base = reg([
+    {
+      id: "p",
+      title: "P",
+      groups: [
+        {
+          id: "g",
+          tiles: [
+            {
+              id: "b",
+              device: "@blank",
+              title: "Frame",
+              tile: { slots: [{ kind: "frame", options: { url: "x" } }] },
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+  const next = attachDevice(
+    base,
+    { pageId: "p", sectionId: "g", placementId: "b" },
+    "dev-1",
+  );
+  expect(next.pages[0].groups[0].tiles[0]).toEqual({
+    id: "b",
+    device: "dev-1",
+    title: "Frame",
+    tile: { slots: [{ kind: "frame", options: { url: "x" } }] },
+  });
+});
+
+it("duplicating a blank tile keeps it blank", () => {
+  const base = reg([
+    {
+      id: "p",
+      title: "P",
+      groups: [{ id: "g", tiles: [{ id: "b", device: "@blank" }] }],
+    },
+  ]);
+  const next = duplicatePlacement(base, "p", "g", "b");
+  expect(next.pages[0].groups[0].tiles.map((t) => t.device)).toEqual([
+    "@blank",
+    "@blank",
+  ]);
 });

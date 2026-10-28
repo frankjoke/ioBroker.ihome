@@ -1,6 +1,7 @@
 import { newId } from "$lib/utils/ids";
 import { deepCopy } from "$lib/utils/json";
 import { slugify, uniqueSlug } from "$lib/config/slug";
+import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 /**
@@ -340,6 +341,44 @@ export function appendDevices(
     tiles.splice(at ?? tiles.length, 0, ...added);
     return { ...section, tiles };
   });
+}
+
+/**
+ * Append one blank placement (no device). No device dedupe: a section may hold
+ * several blank tiles. `at` inserts at that index instead of appending.
+ */
+export function appendBlank(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  at?: number,
+): PageRegistry {
+  return mapSection(reg, pageId, sectionId, (section) => {
+    const tiles = [...(section.tiles ?? [])];
+    tiles.splice(at ?? tiles.length, 0, {
+      id: newId(),
+      device: BLANK_DEVICE_ID,
+    });
+    return { ...section, tiles };
+  });
+}
+
+/**
+ * Attach a device to a placement in place — a blank tile keeps its title and
+ * tile config (frame, raw slots, background). The device itself is untouched.
+ */
+export function attachDevice(
+  reg: PageRegistry,
+  anchor: PlacementAnchor,
+  deviceId: string,
+): PageRegistry {
+  return patchPlacement(
+    reg,
+    anchor.pageId,
+    anchor.sectionId,
+    anchor.placementId,
+    { device: deviceId },
+  );
 }
 
 export function deletePlacement(
