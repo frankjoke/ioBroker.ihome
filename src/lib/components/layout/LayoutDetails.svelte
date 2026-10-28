@@ -312,18 +312,6 @@
     edit((t) => setSlotWhere(t, i, nextSlotWhere(slot, tileVisibleCount)));
   }
 
-  /** The explicit value-slot homes: tile and/or detail page. */
-  function setWhere(i: number, onTile: boolean, onDetail: boolean): void {
-    if (!onTile && !onDetail) return;
-    edit((t) =>
-      setSlotWhere(
-        t,
-        i,
-        onTile && onDetail ? "both" : onTile ? "tile" : "modal",
-      ),
-    );
-  }
-
   function cycleShowWhen(i: number, slot: Slot): void {
     const next = nextShow(slot);
     edit((t) =>
@@ -645,6 +633,30 @@
     });
   }
 
+  /** The level readout's three homes, in click order. */
+  function valueWhereOf(slot: Slot): "tile" | "both" | "modal" {
+    return slot.options?.valueWhere === "tile" ||
+      slot.options?.valueWhere === "modal"
+      ? slot.options.valueWhere
+      : "both";
+  }
+
+  function nextValueWhere(slot: Slot): "tile" | "both" | "modal" {
+    const cur = valueWhereOf(slot);
+    return cur === "tile" ? "both" : cur === "both" ? "modal" : "tile";
+  }
+
+  function valueWhereTitle(slot: Slot): string {
+    return `Value shows: ${WHERE_LABEL[valueWhereOf(slot)]} — click for ${
+      WHERE_LABEL[nextValueWhere(slot)]
+    }`;
+  }
+
+  function cycleValueWhere(i: number, slot: Slot): void {
+    const next = nextValueWhere(slot);
+    setValueWhere(i, next === "both" ? undefined : next);
+  }
+
   function patchOptions(
     slotIndex: number,
     patch: Record<string, unknown>,
@@ -730,6 +742,24 @@
     if (a) onAddSlot?.(a, at);
   }
 </script>
+
+{#snippet whereButton(
+  where: "tile" | "both" | "modal",
+  title: string,
+  on: boolean,
+  onclick: () => void,
+)}
+  <button
+    type="button"
+    class="icon-btn"
+    class:on
+    {title}
+    aria-label={title}
+    {onclick}
+  >
+    <span class="material-symbols-outlined">{WHERE_GLYPH[where]}</span>
+  </button>
+{/snippet}
 
 {#snippet lookColor(
   label: string,
@@ -1161,18 +1191,12 @@
                 {/if}
               </button>
               <span class="row-actions">
-                <button
-                  type="button"
-                  class="icon-btn"
-                  class:on={slotWhere(slot) !== "tile"}
-                  title={whereTitle(slot)}
-                  aria-label={whereTitle(slot)}
-                  onclick={() => cycleWhere(i, slot)}
-                >
-                  <span class="material-symbols-outlined"
-                    >{WHERE_GLYPH[slotWhere(slot)]}</span
-                  >
-                </button>
+                {@render whereButton(
+                  slotWhere(slot),
+                  whereTitle(slot),
+                  slotWhere(slot) !== "tile",
+                  () => cycleWhere(i, slot),
+                )}
                 <button
                   type="button"
                   class="icon-btn"
@@ -1414,43 +1438,12 @@
                   {#if slot.kind === "value"}
                     <div class="row">
                       <span class="label-mono">Show in</span>
-                      <label
-                        class="check"
-                        title={tileVisibleCount <= 1 &&
-                        slotWhere(slot) !== "modal"
-                          ? "One slot must stay on the tile"
-                          : "Show this value on the tile"}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={slotWhere(slot) !== "modal"}
-                          disabled={tileVisibleCount <= 1 &&
-                            slotWhere(slot) !== "modal"}
-                          onchange={(e) =>
-                            setWhere(
-                              i,
-                              e.currentTarget.checked,
-                              slotWhere(slot) !== "tile",
-                            )}
-                        />
-                        <span>Tile</span>
-                      </label>
-                      <label
-                        class="check"
-                        title="Show this value in the detail page"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={slotWhere(slot) !== "tile"}
-                          onchange={(e) =>
-                            setWhere(
-                              i,
-                              slotWhere(slot) !== "modal",
-                              e.currentTarget.checked,
-                            )}
-                        />
-                        <span>Detail page</span>
-                      </label>
+                      {@render whereButton(
+                        slotWhere(slot),
+                        whereTitle(slot),
+                        slotWhere(slot) !== "tile",
+                        () => cycleWhere(i, slot),
+                      )}
                     </div>
                   {/if}
                   <p class="note text-muted">
@@ -1512,24 +1505,13 @@
                       />
                       <span>show value</span>
                     </label>
-                    <label class="small">
-                      <span class="label-mono">value in</span>
-                      <select
-                        value={String(slot.options?.valueWhere ?? "both")}
-                        disabled={slot.options?.hideValue === true}
-                        onchange={(e) =>
-                          setValueWhere(
-                            i,
-                            e.currentTarget.value === "both"
-                              ? undefined
-                              : (e.currentTarget.value as "tile" | "modal"),
-                          )}
-                      >
-                        <option value="tile">tile</option>
-                        <option value="both">tile + detail</option>
-                        <option value="modal">detail page</option>
-                      </select>
-                    </label>
+                    <span class="label-mono">value in</span>
+                    {@render whereButton(
+                      valueWhereOf(slot),
+                      valueWhereTitle(slot),
+                      valueWhereOf(slot) !== "both",
+                      () => cycleValueWhere(i, slot),
+                    )}
                   </div>
                 {/if}
                 {#if slot.kind === "badge"}
@@ -1684,13 +1666,11 @@
                           Choose glyph…
                         {/if}
                       </button>
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        class:on={slot.icon.where !== undefined}
-                        title={iconWhereTitle(i)}
-                        aria-label={iconWhereTitle(i)}
-                        onclick={() =>
+                      {@render whereButton(
+                        slot.icon.where ?? "both",
+                        iconWhereTitle(i),
+                        slot.icon.where !== undefined,
+                        () =>
                           edit((t) =>
                             patchIcon(t, i, {
                               where:
@@ -1698,12 +1678,8 @@
                                   ? undefined
                                   : nextIconWhere(i),
                             }),
-                          )}
-                      >
-                        <span class="material-symbols-outlined"
-                          >{WHERE_GLYPH[slot.icon.where ?? "both"]}</span
-                        >
-                      </button>
+                          ),
+                      )}
                     {/if}
                   </div>
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
