@@ -1,5 +1,6 @@
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 import type { LayoutSelection } from "$lib/config/layout-ops";
+import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 
 /**
  * Where the layout sheet is pointing, derived from the selection it holds.
@@ -75,6 +76,9 @@ export function swapDecision(
   deviceId: string,
 ): "noop" | "confirm" | "apply" {
   if (!placement || !deviceId || placement.device === deviceId) return "noop";
+  // A blank tile's config is device-agnostic (frame, raw states, title): there
+  // is nothing to lose, so attaching needs no confirmation.
+  if (placement.device === BLANK_DEVICE_ID) return "apply";
   return placement.tile ? "confirm" : "apply";
 }
 
@@ -84,7 +88,10 @@ export function swapDecision(
  * device's, else the id it still points at (a device that was deleted).
  */
 export function tileLabel(placement: Placement, deviceName?: string): string {
-  const name = placement.title || deviceName || placement.device;
+  const name =
+    placement.title ||
+    deviceName ||
+    (placement.device === BLANK_DEVICE_ID ? "Blank tile" : placement.device);
   const size = placement.tile?.size;
   return size ? `${name} · ${size.w}×${size.h}` : name;
 }

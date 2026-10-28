@@ -131,3 +131,17 @@ it("labels a tile name · w×h, degrading one step at a time", () => {
   expect(tileLabel(placement("t1", "e59a"))).toBe("e59a");
   expect(tileLabel({ ...placement("t1"), title: "" }, "Garten")).toBe("Garten");
 });
+
+it("labels a blank placement and keeps a title over the fallback", () => {
+  expect(tileLabel({ id: "t", device: "@blank" })).toBe("Blank tile");
+  expect(tileLabel({ id: "t", device: "@blank", title: "Frame" })).toBe(
+    "Frame",
+  );
+});
+
+it("swaps a blank placement without the config-loss confirmation", () => {
+  expect(
+    swapDecision({ id: "t", device: "@blank", tile: { slots: [] } }, "dev-1"),
+  ).toBe("apply");
+  expect(swapDecision({ id: "t", device: "@blank" }, "")).toBe("noop");
+});
