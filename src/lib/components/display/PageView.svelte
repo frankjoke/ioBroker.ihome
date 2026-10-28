@@ -9,6 +9,7 @@
   } from "$lib/config/pages-ops";
   import { layoutSection, modulesFor } from "$lib/config/section-layout";
   import { effectiveSpan } from "$lib/config/template-ops";
+  import { blankDevice } from "$lib/config/blank-tile";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import {
     BREAKPOINTS,
@@ -39,7 +40,7 @@
     $devicesEnrichedStore.map((d) => toFilterable(d)) as DisplayDevice[],
   );
   // A section renders its placements, in order — not the filter it came from (A8).
-  const groups = $derived(resolvePage(page, devices));
+  const groups = $derived(resolvePage(page, devices, blankDevice()));
 
   const ui = $derived(effectiveUi(getSettings()));
   /** The 1×1 module at the installation's scale (ui-settings.ts). */

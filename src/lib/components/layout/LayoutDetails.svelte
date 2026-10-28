@@ -73,6 +73,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
+  import { blankDevice } from "$lib/config/blank-tile";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -843,7 +844,7 @@
     >
       <GroupSection
         group={section}
-        tiles={resolveSection(section, displayDevices)}
+        tiles={resolveSection(section, displayDevices, blankDevice())}
         {bp}
         pageId={page?.id ?? ""}
       />

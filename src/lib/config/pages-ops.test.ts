@@ -18,6 +18,7 @@ import {
 import type { Page } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import { DEVICE_TYPES } from "$lib/config/features";
+import { blankDevice } from "$lib/config/blank-tile";
 
 const dev = (over: Partial<FilterableDevice>): FilterableDevice => ({
   id: "x",
@@ -470,9 +471,55 @@ it("resolves a page from its placement lists, in order, skipping dangling device
       },
     ],
   };
-  const res = resolvePage(page, [dev({ id: "a" }), dev({ id: "b" })]);
+  const res = resolvePage(
+    page,
+    [dev({ id: "a" }), dev({ id: "b" })],
+    blankDevice(),
+  );
   expect(res[0].tiles.map((t) => t.device.id)).toEqual(["b", "a"]);
   expect(res[0].tiles.map((t) => t.placement.id)).toEqual(["t1", "t3"]);
+});
+
+it("renders a blank placement with no devices and showEmpty off", () => {
+  const page: Page = {
+    id: "p",
+    title: "P",
+    groups: [{ id: "g", tiles: [{ id: "t", device: "@blank" }] }],
+  };
+  const res = resolvePage(page, [], blankDevice());
+  expect(res).toHaveLength(1);
+  expect(res[0].tiles[0].device.id).toBe("@blank");
+});
+
+it("still skips a placement whose device is gone", () => {
+  const page: Page = {
+    id: "p",
+    title: "P",
+    groups: [
+      {
+        id: "g",
+        tiles: [
+          { id: "t", device: "@blank" },
+          { id: "u", device: "gone" },
+        ],
+      },
+    ],
+  };
+  expect(resolvePage(page, [], blankDevice())[0].tiles).toHaveLength(1);
+});
+
+it("accepts a document carrying a blank placement", () => {
+  const doc = {
+    pages: [
+      {
+        id: "p",
+        groups: [{ id: "g", tiles: [{ id: "t", device: "@blank" }] }],
+      },
+    ],
+  };
+  expect(parsePageRegistry(doc)?.pages[0].groups[0].tiles).toEqual([
+    { id: "t", device: "@blank" },
+  ]);
 });
 
 it("shows the same device in two sections (no claiming)", () => {
@@ -484,7 +531,7 @@ it("shows the same device in two sections (no claiming)", () => {
       { id: "g2", tiles: [{ id: "t2", device: "a" }] },
     ],
   };
-  expect(resolvePage(page, [dev({ id: "a" })])).toHaveLength(2);
+  expect(resolvePage(page, [dev({ id: "a" })], blankDevice())).toHaveLength(2);
 });
 
 it("keeps an empty placement list invisible unless showEmpty", () => {
@@ -496,7 +543,7 @@ it("keeps an empty placement list invisible unless showEmpty", () => {
       { id: "g2", tiles: [], showEmpty: true },
     ],
   };
-  const res = resolvePage(page, [dev({})]);
+  const res = resolvePage(page, [dev({})], blankDevice());
   expect(res.map((r) => r.group.id)).toEqual(["g2"]);
 });
 

@@ -8,6 +8,7 @@ import type {
   Placement,
 } from "$lib/types/display";
 import { enumsOfState } from "$lib/config/rooms";
+import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 import { slugify, uniqueSlug } from "$lib/config/slug";
 
@@ -122,10 +123,15 @@ export function resolveByMember<T extends FilterableDevice>(
 export function resolveSection<T extends FilterableDevice>(
   group: Group,
   devices: T[],
+  blank: T,
 ): ResolvedTile<T>[] {
   const byId = new Map(devices.map((d) => [d.id, d]));
   const tiles: ResolvedTile<T>[] = [];
   for (const placement of group.tiles ?? []) {
+    if (placement.device === BLANK_DEVICE_ID) {
+      tiles.push({ placement, device: blank });
+      continue;
+    }
     const device = byId.get(placement.device);
     if (!device) continue; // dangling: the device is gone from the registry
     if (device.visibleControls < 1 && group.showEmpty !== true) continue;
@@ -143,9 +149,10 @@ export function resolveSection<T extends FilterableDevice>(
 export function resolvePage<T extends FilterableDevice>(
   page: Page,
   devices: T[],
+  blank: T,
 ): ResolvedGroup<T>[] {
   return (page.groups ?? [])
-    .map((group) => ({ group, tiles: resolveSection(group, devices) }))
+    .map((group) => ({ group, tiles: resolveSection(group, devices, blank) }))
     .filter((r) => r.tiles.length > 0 || r.group.showEmpty === true);
 }
 
