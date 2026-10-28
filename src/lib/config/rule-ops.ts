@@ -325,9 +325,9 @@ function controlBadge(
 ): ResolvedBadge | undefined {
   const pick =
     typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
+  const source = typeof slot.source === "string" ? slot.source : undefined;
   const control =
-    badgeControl(device, slot.source, pick) ??
-    (slot.source ? raw?.(slot.source) : undefined);
+    badgeControl(device, source, pick) ?? (source ? raw?.(source) : undefined);
   if (!control) return undefined;
   // Slot rules first, the control's own defaults last (spec §4.1.1).
   const style = resolveStyle(

@@ -522,6 +522,21 @@ it("accepts a document carrying a blank placement", () => {
   ]);
 });
 
+it("accepts a v2 placement without a device", () => {
+  const doc = {
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [{ id: "g", tiles: [{ id: "t", tile: { slots: [] } }] }],
+      },
+    ],
+  };
+  expect(parsePageRegistry(doc)?.pages[0].groups[0].tiles).toEqual([
+    { id: "t", tile: { slots: [] } },
+  ]);
+});
+
 it("shows the same device in two sections (no claiming)", () => {
   const page: Page = {
     id: "p",

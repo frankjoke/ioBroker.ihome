@@ -325,7 +325,14 @@ function isPlacement(v: unknown): boolean {
   if (!v || typeof v !== "object") return false;
   const t = v as Record<string, unknown>;
   if (typeof t.id !== "string" || !t.id) return false;
-  if (typeof t.device !== "string" || !t.device) return false;
+  // v1 placements carry a device; v2 placements do not (and must carry a tile
+  // config — a tile without a slot has nothing to show). Both parse.
+  if (t.device !== undefined && (typeof t.device !== "string" || !t.device)) {
+    return false;
+  }
+  if (t.device === undefined && (!t.tile || typeof t.tile !== "object")) {
+    return false;
+  }
   if (t.title !== undefined && typeof t.title !== "string") return false;
   if (t.newLine !== undefined && typeof t.newLine !== "boolean") return false;
   if (t.tile !== undefined && (!t.tile || typeof t.tile !== "object")) {

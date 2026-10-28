@@ -133,7 +133,9 @@ export function getUsedStateIds(): Set<string> {
       // state, not only a control of this device) and its rules'
       // `get("…")` ids both need subscribing. A feature name has no dot; a
       // state id does. No object-cache check at load time.
-      const source = stateIdOf(slot?.source);
+      const source = stateIdOf(
+        typeof slot?.source === "string" ? slot.source : undefined,
+      );
       if (source && source.includes(".")) {
         ids.add(source);
       }

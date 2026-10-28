@@ -195,21 +195,23 @@
   });
 
   const activeCond = $derived(tile?.tile?.active);
+  const activeSource = $derived(
+    typeof activeCond?.source === "string" ? activeCond.source : undefined,
+  );
   const activeControl = $derived(
-    activeCond?.source && device
-      ? resolveControl(device.controls ?? [], activeCond.source)
+    activeSource && device
+      ? resolveControl(device.controls ?? [], activeSource)
       : undefined,
   );
   const activeFound = $derived(
-    !activeCond?.source ||
+    !activeSource ||
       !!activeControl ||
-      !!(ioBroker.objects as Map<string, any>)?.get?.(activeCond.source),
+      !!(ioBroker.objects as Map<string, any>)?.get?.(activeSource),
   );
   const activeValue = $derived(
     activeControl
       ? activeControl.liveValue
-      : (ioBroker.states as Map<string, any>)?.get?.(activeCond?.source ?? "")
-          ?.val,
+      : (ioBroker.states as Map<string, any>)?.get?.(activeSource ?? "")?.val,
   );
   const readingText = $derived.by(() => {
     const raw = activeValue;
@@ -266,6 +268,7 @@
 
   const KIND_GLYPH: Record<SlotKind, string> = {
     value: "numbers",
+    switch: "toggle_on",
     level: "tune",
     color: "palette",
     enum: "list",
@@ -575,6 +578,7 @@
       return url || "no page";
     }
     if (slot.source) {
+      if (typeof slot.source !== "string") return slot.source.kind;
       const control = resolveControl(device?.controls ?? [], slot.source);
       return control ? control.label || control.feature : slot.source;
     }
@@ -595,12 +599,11 @@
    * own sources, not control names.
    */
   function slotUnresolved(slot: Slot): boolean {
-    if (
-      slot.kind === "badge" &&
-      (slot.source === "ago" || slot.source === "offline")
-    )
-      return false;
+    if (slot.kind === "badge" && typeof slot.source === "string") {
+      if (slot.source === "ago" || slot.source === "offline") return false;
+    }
     if (slot.source) {
+      if (typeof slot.source !== "string") return false;
       return (
         !resolveControl(device?.controls ?? [], slot.source) &&
         !isRawState(slot.source)
@@ -1304,7 +1307,7 @@
                               : "auto (next control)"}</span
                         >
                       </button>
-                      {#if slot.source && isRawState(slot.source)}
+                      {#if typeof slot.source === "string" && isRawState(slot.source)}
                         <span class="hint-badge text-muted">read-only</span>
                       {/if}
                     </div>

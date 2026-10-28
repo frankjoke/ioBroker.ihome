@@ -65,7 +65,7 @@ function registerSlotStateIds(reg: PageRegistry): void {
           placement.tile?.active?.source,
         ];
         for (const raw of sources) {
-          if (!raw) continue;
+          if (typeof raw !== "string") continue;
           // A feature name has no dot and is not a state; a state id does. Do
           // not require the object cache here — at page load it is often not
           // populated yet, and a skipped id would never be read at all (the

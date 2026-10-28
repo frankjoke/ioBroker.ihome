@@ -74,7 +74,7 @@ export type ActiveOp = "truthy" | "gt" | "gte" | "lt" | "lte" | "eq" | "ne";
 
 export interface ActiveCondition {
   /** A device control (feature → id → stateId → label), a placeholder hint, or a raw state id. */
-  source: string;
+  source: string | SlotSource;
   op: ActiveOp;
   /** The right-hand side; unused by `truthy`. Stored as text, compared loosely. */
   value?: string;
@@ -83,7 +83,9 @@ export interface ActiveCondition {
 /** One tile on one section: which device, what it is called there, how it looks. */
 export interface Placement {
   id: string;
-  device: string;
+  /** Legacy v1 only: the device a placement was built from. Never read by the
+   *  v2 renderer; the migration removes it. */
+  device?: string;
   /** This placement's own name. Absent → the device's name; `""` → no name at
    * all (the tile shows nothing where its name would be, A41). */
   title?: string;
@@ -124,6 +126,7 @@ export interface PageRegistry {
 /** The closed vocabulary the renderer knows how to draw (spec §6). */
 export type SlotKind =
   | "value"
+  | "switch"
   | "level"
   | "color"
   | "enum"
@@ -171,9 +174,16 @@ export interface SlotSpark {
   color?: string;
 }
 
+/** What a slot reads (v2): a device control, a raw state, or a device (badges).
+ *  A v1 document still carries a string source; the migration converts it. */
+export type SlotSource =
+  | { kind: "control"; device: string; control: string }
+  | { kind: "state"; stateId: string }
+  | { kind: "device"; device: string };
+
 export interface Slot {
   kind: SlotKind;
-  source?: string; // control feature → control id → state id
+  source?: string | SlotSource; // v1 string during the migration; v2 union
   /** Another device's control: a tile may show more than its own device (A11). */
   from?: string;
   label?: string;

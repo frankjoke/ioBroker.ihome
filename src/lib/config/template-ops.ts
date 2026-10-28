@@ -288,8 +288,10 @@ export function pickSlotControls<T extends PickableControl>(
     }
 
     if (slot.source) {
-      const control =
-        resolveControl(list, slot.source) ?? options?.raw?.(slot.source);
+      const source = typeof slot.source === "string" ? slot.source : undefined;
+      const control = source
+        ? (resolveControl(list, source) ?? options?.raw?.(source))
+        : undefined;
       if (!control) {
         out.push({ slot, dormant: true });
         continue;

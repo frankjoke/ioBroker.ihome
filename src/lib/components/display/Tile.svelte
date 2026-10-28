@@ -118,7 +118,7 @@
 
   // Spec §4.1 + label fallback: feature → control id → state id → label.
   function controlFor(slot: Slot): EnrichedControl | undefined {
-    if (!slot.source) return undefined;
+    if (typeof slot.source !== "string") return undefined;
     return resolveControl(shownControls, slot.source);
   }
 
@@ -146,10 +146,13 @@
   // The tile's active reading (A30): its condition over the live value of the
   // control or raw state it names; no condition means never active.
   const activeCond = $derived(tile?.active);
+  const activeSource = $derived(
+    typeof activeCond?.source === "string" ? activeCond.source : undefined,
+  );
   const activeControl = $derived(
-    activeCond?.source
-      ? (resolveControl(shownControls, activeCond.source) ??
-          rawControl(activeCond.source))
+    activeSource
+      ? (resolveControl(shownControls, activeSource) ??
+          rawControl(activeSource))
       : undefined,
   );
   const active = $derived(evalActive(activeCond, activeControl?.liveValue));
