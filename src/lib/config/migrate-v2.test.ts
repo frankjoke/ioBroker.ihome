@@ -150,6 +150,26 @@ it("resolves a pick-hint slot to a real control", () => {
   expect(report.droppedSlots).toBeGreaterThan(0); // humidity pick has no control
 });
 
+it("copies a device name without its type suffix as the tile title", () => {
+  const thermo: Device = {
+    id: "bad",
+    name: "Bad.Thermometer",
+    type: "Thermometer",
+    controls: [
+      ctl("t", "temperature", {
+        label: "Temperature",
+        common: { role: "value.temperature" },
+      }),
+    ],
+  };
+  const { registry } = migratePagesV2(
+    reg([{ id: "t", device: "bad" }]),
+    [thermo],
+    [],
+  );
+  expect(registry.pages[0].groups[0].tiles[0].title).toBe("Bad");
+});
+
 it("leaves a v2 placement alone", () => {
   const v2: Placement = {
     id: "t",

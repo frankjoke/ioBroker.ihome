@@ -4,6 +4,7 @@ import {
   resolveControl,
   resolveTemplate,
   pickSlotControls,
+  tileTitle,
 } from "$lib/config/template-ops";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
 import type { Control, Device } from "$lib/types/device";
@@ -247,8 +248,7 @@ export function migratePagesV2(
           }
         }
 
-        const title =
-          legacy.title ?? (device ? (device.title ?? device.name) : undefined);
+        const title = legacy.title ?? (device ? tileTitle(device) : undefined);
         const placement: Placement = {
           id: legacy.id,
           ...(title !== undefined ? { title } : {}),
