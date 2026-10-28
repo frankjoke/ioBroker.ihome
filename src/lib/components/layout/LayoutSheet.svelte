@@ -16,9 +16,11 @@
   } from "$lib/stores/devices.svelte.js";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
+  import { blankDevice, isBlankPlacement } from "$lib/config/blank-tile";
   import {
     addPage,
     addSection,
+    appendBlank,
     appendDevices,
     deletePage,
     deletePlacement,
@@ -265,9 +267,11 @@
   /** The device a tile's placement points at, if it is still in the registry. */
   function deviceOfAnchor(anchor: PlacementAnchor): EnrichedDevice | undefined {
     const placement = placementOfAnchor(anchor);
-    return placement
+    const found = placement
       ? devices.find((d) => d.id === placement.device)
       : undefined;
+    if (found) return found;
+    return placement && isBlankPlacement(placement) ? blankDevice() : undefined;
   }
 
   /** A dangling device is refused: the tree already warns on the row. `at`
@@ -302,6 +306,22 @@
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
     const next = appendDevices(registry, pageId, sectionId, deviceIds, at);
+    commitLayout(next);
+    pickerFor = null;
+    const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
+    if (added) {
+      selection = { kind: "tile", pageId, sectionId, placementId: added.id };
+    }
+  }
+
+  /** A device-less tile (B5): no dedupe, so a section may hold several. */
+  function addBlankTo(pageId: string, sectionId: string, at?: number): void {
+    const sectionIn = (reg: PageRegistry) =>
+      reg.pages
+        .find((p) => p.id === pageId)
+        ?.groups.find((g) => g.id === sectionId);
+    const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
+    const next = appendBlank(registry, pageId, sectionId, at);
     commitLayout(next);
     pickerFor = null;
     const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
@@ -763,6 +783,9 @@
       {devices}
       {rooms}
       enums={ioBroker.enums}
+      onBlank={!target.replace
+        ? () => addBlankTo(target.pageId, target.sectionId, target.at)
+        : undefined}
       listed={(
         registry.pages
           .find((p) => p.id === target.pageId)

@@ -12,6 +12,7 @@
     listed = [],
     enums = undefined,
     onAdd,
+    onBlank,
     onClose,
   }: {
     devices: EnrichedDevice[];
@@ -20,6 +21,8 @@
     listed?: string[];
     enums?: any;
     onAdd: (deviceIds: string[]) => void;
+    /** Add a device-less tile; absent while replacing a tile's device. */
+    onBlank?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -119,6 +122,12 @@
       />
     </div>
 
+    {#if onBlank}
+      <div class="create-row">
+        <button type="button" class="btn" onclick={onBlank}>Blank tile</button>
+      </div>
+    {/if}
+
     <div class="results">
       {#if filtered.length === 0}
         <p class="empty text-muted">No matching devices.</p>
@@ -217,6 +226,11 @@
   .filters {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .create-row {
+    display: flex;
     gap: 0.5rem;
   }
 

@@ -449,7 +449,7 @@
     if (!tile) return { w: 1, h: 1 };
     return effectiveSpan(
       tile.tile,
-      devices.find((d) => d.id === tile!.device),
+      device,
       getTemplateRegistry().templates,
       bp,
     );
