@@ -16,12 +16,17 @@
   } from "$lib/stores/devices.svelte.js";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
-  import { blankDevice, isBlankPlacement } from "$lib/config/blank-tile";
+  import {
+    BLANK_DEVICE_ID,
+    blankDevice,
+    isBlankPlacement,
+  } from "$lib/config/blank-tile";
   import {
     addPage,
     addSection,
     appendBlank,
     appendDevices,
+    attachDevice,
     deletePage,
     deletePlacement,
     deleteSection,
@@ -229,6 +234,9 @@
     mode = "tile";
     if (target?.kind === "place") {
       addDevicesTo(target.pageId, target.sectionId, [d.id], target.at);
+    } else if (target?.kind === "attach") {
+      commitLayout(attachDevice(registry, target.anchor, d.id));
+      selection = { kind: "tile", ...target.anchor };
     }
   }
 
@@ -388,14 +396,17 @@
   }
 
   function applySwap(anchor: PlacementAnchor, deviceId: string): void {
+    const placement = placementOfAnchor(anchor);
     commitLayout(
-      patchPlacement(
-        registry,
-        anchor.pageId,
-        anchor.sectionId,
-        anchor.placementId,
-        { device: deviceId, tile: undefined },
-      ),
+      placement && isBlankPlacement(placement)
+        ? attachDevice(registry, anchor, deviceId)
+        : patchPlacement(
+            registry,
+            anchor.pageId,
+            anchor.sectionId,
+            anchor.placementId,
+            { device: deviceId, tile: undefined },
+          ),
     );
     pendingSwap = null;
   }
@@ -686,6 +697,9 @@
       {#if !tileDevice}
         <option value="">no device</option>
       {/if}
+      {#if currentTile && isBlankPlacement(currentTile)}
+        <option value={BLANK_DEVICE_ID}>Blank tile</option>
+      {/if}
       {#each devices as d (d.id)}
         <option value={d.id}>{d.name || d.id}</option>
       {/each}
@@ -717,6 +731,10 @@
       title="Add a device"
       aria-label="Add a device"
       onclick={() => {
+        pendingDeviceFor =
+          tileAnchor && currentTile && isBlankPlacement(currentTile)
+            ? { kind: "attach", anchor: tileAnchor }
+            : null;
         creating = true;
         mode = "device";
       }}
@@ -844,6 +862,13 @@
         const targetSection = target.sectionId;
         const at = target.at;
         if (replace) {
+          const old = placementOfAnchor(replace);
+          if (old && isBlankPlacement(old)) {
+            commitLayout(attachDevice(registry, replace, deviceIds[0]));
+            pickerFor = null;
+            selection = { kind: "tile", ...replace };
+            return;
+          }
           const next = replacePlacementDevices(
             registry,
             replace.pageId,
