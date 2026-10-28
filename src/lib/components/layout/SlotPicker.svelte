@@ -56,6 +56,17 @@
 
   const controls = $derived((device.controls ?? []).filter((c) => !c.hidden));
 
+  // A device with no visible control (a blank tile) has nothing to offer under
+  // "This device"; the page tab is then the useful default.
+  const tabs = $derived(
+    TABS.filter((t) => t.id !== "device" || controls.length > 0),
+  );
+  $effect(() => {
+    if (!tabs.some((t) => t.id === tab)) {
+      setTab(controls.length ? "device" : "page");
+    }
+  });
+
   /** The tree's filters, as on the Devices page. */
   const objects = $derived(ioBroker.objects as Map<string, any>);
   const rooms = $derived(roomList(ioBroker.enums));
@@ -110,7 +121,7 @@
     </div>
 
     <div class="tabs" role="tablist">
-      {#each TABS as t (t.id)}
+      {#each tabs as t (t.id)}
         <button
           type="button"
           role="tab"

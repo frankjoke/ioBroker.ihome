@@ -1931,54 +1931,56 @@
       </div>
     </div>
 
-    <div class="field">
-      <span class="label-mono">Template</span>
-      <span class="device-name">{sourceLine}</span>
-      <div class="row">
-        <input
-          type="text"
-          placeholder="template name"
-          bind:value={templateName}
-        />
-        <button
-          type="button"
-          class="btn btn-sm"
-          disabled={!isTemplatesWritable() || !templateName.trim()}
-          onclick={saveTemplate}>Save as template…</button
-        >
-        {#if getTemplateSaveFailed()}
-          <span
-            class="badge badge-danger"
-            title="The last write to templateList failed">not saved</span
+    {#if !blank}
+      <div class="field">
+        <span class="label-mono">Template</span>
+        <span class="device-name">{sourceLine}</span>
+        <div class="row">
+          <input
+            type="text"
+            placeholder="template name"
+            bind:value={templateName}
+          />
+          <button
+            type="button"
+            class="btn btn-sm"
+            disabled={!isTemplatesWritable() || !templateName.trim()}
+            onclick={saveTemplate}>Save as template…</button
           >
+          {#if getTemplateSaveFailed()}
+            <span
+              class="badge badge-danger"
+              title="The last write to templateList failed">not saved</span
+            >
+          {/if}
+        </div>
+        {#if typeTemplates.length}
+          <div class="row">
+            <select bind:value={applyId}>
+              <option value="">apply a template…</option>
+              {#each typeTemplates as t (t.id)}
+                <option value={t.id}>{t.name}</option>
+              {/each}
+            </select>
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={!applyId}
+              onclick={() => (pendingApply = true)}>Apply</button
+            >
+          </div>
+        {/if}
+        {#if tile.tile}
+          <div class="row">
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => (pendingReset = true)}>Reset to chain</button
+            >
+          </div>
         {/if}
       </div>
-      {#if typeTemplates.length}
-        <div class="row">
-          <select bind:value={applyId}>
-            <option value="">apply a template…</option>
-            {#each typeTemplates as t (t.id)}
-              <option value={t.id}>{t.name}</option>
-            {/each}
-          </select>
-          <button
-            type="button"
-            class="btn btn-sm"
-            disabled={!applyId}
-            onclick={() => (pendingApply = true)}>Apply</button
-          >
-        </div>
-      {/if}
-      {#if tile.tile}
-        <div class="row">
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={() => (pendingReset = true)}>Reset to chain</button
-          >
-        </div>
-      {/if}
-    </div>
+    {/if}
 
     <label class="field">
       <span class="label-mono">Move to section</span>
