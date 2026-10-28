@@ -2,9 +2,17 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { formatValue } from "$lib/config/format";
+  import { levelRange } from "$lib/config/features";
   import type { EnrichedControl } from "$lib/types/device";
 
-  let { control }: { control: EnrichedControl } = $props();
+  let {
+    control,
+    options = {},
+  }: {
+    control: EnrichedControl;
+    /** The slot's own knobs (min/max/step): what the user set in the tile editor. */
+    options?: Record<string, unknown>;
+  } = $props();
 
   function truthy(v: unknown): boolean {
     return v === true || v === "true" || v === 1 || v === "1";
@@ -35,6 +43,7 @@
   const common = $derived(
     (control.object?.common ?? {}) as Record<string, any>,
   );
+  const range = $derived(levelRange(common, options));
 
   // Keep a drag on a slider from reaching the tile underneath it.
   function stop(e: Event) {
@@ -61,9 +70,9 @@
     <input
       type="range"
       aria-label={control.label || control.feature}
-      min={common.min ?? 0}
-      max={common.max ?? 100}
-      step={common.step ?? 1}
+      min={range.min}
+      max={range.max}
+      step={range.step}
       value={control.liveValue ?? 0}
       disabled={!control.writable}
       onpointerdown={stop}
@@ -133,16 +142,24 @@
 
   .level {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
     min-width: 0;
     width: 100%;
   }
 
+  /* The slider's 6rem basis keeps the reading beside it while there is room;
+     on a narrow tile both no longer fit on one line and the reading wraps
+     underneath, centred, instead of squeezing the slider to nothing. */
   .level input {
-    flex: 1;
-    min-width: 2rem;
-    width: 100%;
+    flex: 1 1 6rem;
+    min-width: 0;
+  }
+
+  .level .mono {
+    flex: 0 0 auto;
   }
 
   .color {

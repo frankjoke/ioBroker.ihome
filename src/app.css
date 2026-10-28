@@ -553,6 +553,15 @@ textarea {
     background-color var(--transition-normal);
 }
 
+/* A range is not a text field: the chrome above shrinks its content box, and
+   Chrome keeps the thumb inside that box while the track spans the full width,
+   so a value of 100 % stops short of the track's end. Vertical padding stays. */
+input[type="range"] {
+  padding: 0.5rem 0;
+  border: 0;
+  background: transparent;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);

@@ -8,6 +8,7 @@ import {
   widgetFor,
   featureDef,
   featureForType,
+  levelRange,
 } from "$lib/config/features";
 
 it("takes the role tail, capitalised, as the label", () => {
@@ -138,4 +139,39 @@ it("featureForType keeps a valid feature and repairs a mismatch", () => {
   expect(
     featureForType("Button", undefined, { common: { role: "button" } }),
   ).toBe("press");
+});
+
+it("levelRange: the object's range when the slot sets none", () => {
+  expect(levelRange({ min: 0, max: 255, step: 5 })).toEqual({
+    min: 0,
+    max: 255,
+    step: 5,
+  });
+  expect(levelRange({ min: "0", max: "255", step: "5" })).toEqual({
+    min: 0,
+    max: 255,
+    step: 5,
+  });
+});
+
+it("levelRange: a slot's own range wins over the object's", () => {
+  expect(
+    levelRange({ min: 0, max: 100, step: 1 }, { min: 10, max: 90, step: 10 }),
+  ).toEqual({ min: 10, max: 90, step: 10 });
+  // A partial slot range only overrides the knobs it names.
+  expect(levelRange({ min: 0, max: 100, step: 1 }, { step: 10 })).toEqual({
+    min: 0,
+    max: 100,
+    step: 10,
+  });
+});
+
+it("levelRange: falls back to 0/100/1 and ignores a bad step", () => {
+  expect(levelRange({})).toEqual({ min: 0, max: 100, step: 1 });
+  expect(levelRange({}, { step: 0 })).toEqual({ min: 0, max: 100, step: 1 });
+  expect(levelRange({ step: 2 }, { step: Number.NaN })).toEqual({
+    min: 0,
+    max: 100,
+    step: 2,
+  });
 });

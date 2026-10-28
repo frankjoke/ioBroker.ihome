@@ -192,6 +192,37 @@ export function widgetFor(deviceType: DeviceType, feature: string): Widget {
   return featureDef(deviceType, feature)?.widget ?? "value";
 }
 
+function levelNumber(v: unknown): number | undefined {
+  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * What a level slider allows: the slot's own min/max/step when it sets them,
+ * else the state object's, else 0/100/1. A step must be positive to be usable.
+ */
+export function levelRange(
+  common: Record<string, unknown> = {},
+  options: Record<string, unknown> = {},
+): { min: number; max: number; step: number } {
+  const slotStep = levelNumber(options.step);
+  const commonStep = levelNumber(common.step);
+  return {
+    min: levelNumber(options.min) ?? levelNumber(common.min) ?? 0,
+    max: levelNumber(options.max) ?? levelNumber(common.max) ?? 100,
+    step:
+      slotStep !== undefined && slotStep > 0
+        ? slotStep
+        : commonStep !== undefined && commonStep > 0
+          ? commonStep
+          : 1,
+  };
+}
+
 /** Default device name: `Room.Type` (+ `.Superstate` when disambiguating). */
 export function suggestDeviceName(
   type: DeviceType,

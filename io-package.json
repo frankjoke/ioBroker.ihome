@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.30",
+        "version": "0.0.32",
         "news": {
+            "0.0.32": {
+                "en": "Blank tiles: a tile can be added without a device (frames, raw values, badges), a device can be created from the add-tile picker, and a device attaches to a blank tile without losing its layout. The level slider follows the slot's own min/max/step and its thumb reaches both ends of the track.",
+                "de": "Leere Kacheln: Eine Kachel kann ohne Gerät angelegt werden (Webseiten, Rohwerte, Badges), ein Gerät lässt sich direkt aus dem Kachel-Picker erzeugen, und ein Gerät hängt sich an eine leere Kachel, ohne deren Layout zu verlieren. Der Level-Slider beachtet min/max/step des Slots und sein Griff erreicht beide Enden der Spur."
+            },
             "0.0.30": {
                 "en": "Adding a slot from Any state uses the same state picker as changing a source: the full tree with adapter, room, type and role filters, live values and the _Variables group, while the Kind dropdown and the other add-slot tabs stay as they were",
                 "de": "Das Hinzufügen eines Slots unter „Any state“ nutzt denselben State-Picker wie das Ändern einer Quelle: den vollständigen Baum mit Adapter-, Raum-, Typ- und Rollenfiltern, Live-Werten und der _Variables-Gruppe, während die Kind-Auswahl und die übrigen Reiter unverändert bleiben"
@@ -78,10 +82,6 @@
             "0.0.12": {
                 "en": "The connection settings stay editable while connected: save and the dashboard reconnects with the new broker address or namespace",
                 "de": "Die Verbindungseinstellungen bleiben auch im verbundenen Zustand bearbeitbar: Speichern verbindet das Dashboard mit der neuen Broker-Adresse bzw. dem Namespace neu"
-            },
-            "0.0.11": {
-                "en": "Uses the published ioBroker WebSocket client, and a locally started PWA can be pointed at a broker address configured in the app",
-                "de": "Nutzt den veröffentlichten ioBroker-WebSocket-Client; eine lokal gestartete PWA kann über eine in der App konfigurierte Broker-Adresse verbunden werden"
             }
         },
         "titleLang": {

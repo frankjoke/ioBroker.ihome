@@ -62,7 +62,10 @@
   {:else if slot.kind === "frame"}
     <FrameSlot {slot} />
   {:else if needsControl && control}
-    <ControlWidget control={control as EnrichedControl} />
+    <ControlWidget
+      control={control as EnrichedControl}
+      options={slot.options}
+    />
   {/if}
 {/snippet}
 
