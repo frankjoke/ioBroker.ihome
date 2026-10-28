@@ -1,6 +1,10 @@
 import { widgetFor } from "$lib/config/features";
 import { slotFromControl, slotKindForWidget } from "$lib/config/slot-create";
-import { resolveControl, resolveTemplate } from "$lib/config/template-ops";
+import {
+  resolveControl,
+  resolveTemplate,
+  pickSlotControls,
+} from "$lib/config/template-ops";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
 import type { Control, Device } from "$lib/types/device";
 import type {
@@ -174,14 +178,46 @@ export function migratePagesV2(
           legacy.tile?.slots ?? chain?.slots ?? [];
 
         const slots: Slot[] = [];
-        for (const slot of sourceSlots) {
+        const picked = device
+          ? pickSlotControls(sourceSlots as Slot[], device.controls ?? [], {})
+          : [];
+        sourceSlots.forEach((slot, index) => {
+          if (
+            slot.source === undefined &&
+            slot.kind !== "frame" &&
+            device &&
+            picked[index]?.control
+          ) {
+            const control = picked[index].control!;
+            const base = slotFromControl(
+              device,
+              control,
+              widgetFor(device.type, control.feature),
+            );
+            slots.push({
+              ...base,
+              ...slot,
+              kind: kindFor(control, device, slot.kind),
+              source: {
+                kind: "control",
+                device: device.id,
+                control: control.id,
+              },
+              label: slot.label ?? base.label,
+              unit: slot.unit ?? base.unit,
+              ...(base.options || slot.options
+                ? { options: { ...base.options, ...slot.options } }
+                : {}),
+            });
+            return;
+          }
           const converted = convertSlot(slot, device, variables);
           if (converted) slots.push(converted);
           else {
             report.droppedSlots++;
             changed = true;
           }
-        }
+        });
 
         if (!slots.length) {
           report.droppedPlacements++;
@@ -212,8 +248,7 @@ export function migratePagesV2(
         }
 
         const title =
-          legacy.title ??
-          (chain && device ? (device.title ?? device.name) : undefined);
+          legacy.title ?? (device ? (device.title ?? device.name) : undefined);
         const placement: Placement = {
           id: legacy.id,
           ...(title !== undefined ? { title } : {}),

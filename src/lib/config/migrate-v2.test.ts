@@ -125,6 +125,31 @@ it("drops a placement whose device is gone and has no slots", () => {
   expect(report.droppedPlacements).toBe(1);
 });
 
+it("resolves a pick-hint slot to a real control", () => {
+  const thermo: Device = {
+    id: "thermo",
+    name: "Thermometer",
+    type: "Thermometer",
+    controls: [
+      ctl("t", "temperature", {
+        label: "Temperature",
+        common: { role: "value.temperature", unit: "°C" },
+      }),
+    ],
+  };
+  const { registry, report } = migratePagesV2(
+    reg([{ id: "t", device: "thermo" }]),
+    [thermo],
+    [],
+  );
+  const slots = registry.pages[0].groups[0].tiles[0].tile?.slots ?? [];
+  expect(slots[0]).toMatchObject({
+    kind: "value",
+    source: { kind: "control", device: "thermo", control: "t" },
+  });
+  expect(report.droppedSlots).toBeGreaterThan(0); // humidity pick has no control
+});
+
 it("leaves a v2 placement alone", () => {
   const v2: Placement = {
     id: "t",

@@ -391,13 +391,11 @@
 
   /** The pane's one way to edit the tile's own config: materialise, then `fn`. */
   function edit(fn: (tile: TileConfig) => TileConfig): void {
-    if (!page || !section || !tile || !device) return;
+    if (!page || !section || !tile) return;
     onChange(
       editTile(
         registry,
         { pageId: page.id, sectionId: section.id, placementId: tile.id },
-        device,
-        getTemplateRegistry().templates,
         fn,
       ),
     );

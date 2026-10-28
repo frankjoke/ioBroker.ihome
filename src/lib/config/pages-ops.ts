@@ -135,7 +135,7 @@ export function resolvePage(page: Page): ResolvedGroup[] {
 }
 
 /** The page-registry schema version this build writes (A15). */
-export const PAGE_REGISTRY_VERSION = 1;
+export const PAGE_REGISTRY_VERSION = 2;
 
 /**
  * The one-time bridge from a member-based document to explicit placements: every

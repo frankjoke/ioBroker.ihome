@@ -12,9 +12,12 @@ import {
   migratePageIds,
   migratePageRegistry,
   parsePageRegistry,
+  toFilterable,
+  PAGE_REGISTRY_VERSION,
   type FilterableDevice,
   type LoadedPages,
 } from "$lib/config/pages-ops";
+import { migratePagesV2 } from "$lib/config/migrate-v2";
 
 /**
  * Wait for the enum cache: `connected` flips before objects/enums are in, and
@@ -28,13 +31,19 @@ export async function waitForEnumCache(ms = 8000): Promise<void> {
     await ioBroker.wait(200);
   }
 }
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import {
+  registerProgramStateId,
+  getCanonicalRegistry,
+} from "$lib/stores/devices.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
-import type { PageRegistry } from "$lib/types/display";
+import type { Device } from "$lib/types/device";
+import type { PageRegistry, Template } from "$lib/types/display";
 
 export const PAGE_LIST_ID = "ihome.0.config.pageList";
+/** The one-time v1 document, kept before the first v2 write. */
+export const PAGE_BACKUP_ID = "ihome.0.config.pageListV1";
 
 const emptyRegistry: PageRegistry = { version: 0, updatedAt: 0, pages: [] };
 
@@ -65,13 +74,28 @@ function registerSlotStateIds(reg: PageRegistry): void {
           placement.tile?.active?.source,
         ];
         for (const raw of sources) {
-          if (typeof raw !== "string") continue;
-          // A feature name has no dot and is not a state; a state id does. Do
-          // not require the object cache here — at page load it is often not
-          // populated yet, and a skipped id would never be read at all (the
-          // slot then shows "—" until some other use subscribes it).
-          const id = stateIdFor(raw, variables);
-          if (id.includes(".")) registerProgramStateId(id);
+          if (typeof raw === "string") {
+            // A feature name has no dot and is not a state; a state id does. Do
+            // not require the object cache here — at page load it is often not
+            // populated yet, and a skipped id would never be read at all (the
+            // slot then shows "—" until some other use subscribes it).
+            const id = stateIdFor(raw, variables);
+            if (id.includes(".")) registerProgramStateId(id);
+            continue;
+          }
+          if (!raw) continue;
+          if (raw.kind === "state") {
+            if (raw.stateId.includes(".")) registerProgramStateId(raw.stateId);
+          } else if (raw.kind === "control") {
+            const device = getCanonicalRegistry().devices.find(
+              (d) => d.id === raw.device,
+            );
+            const stateId = device?.controls.find(
+              (c) => c.id === raw.control,
+            )?.stateId;
+            const id = stateId ? stateIdFor(stateId, variables) : "";
+            if (id.includes(".")) registerProgramStateId(id);
+          }
         }
         // The tile's *own* slots carry rules of their own (the editor writes
         // them), and those rules' `get("…")` ids need the same treatment as
@@ -91,6 +115,8 @@ function registerSlotStateIds(reg: PageRegistry): void {
 let initPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSent: string | null = null;
+/** The raw document read from the broker, kept for the one-time v1 backup. */
+let rawPages: string | null = null;
 let saveFailed = $state(false);
 /** How the stored document last loaded — nothing may be written unless a read
  *  actually succeeded (`loaded`) or this run seeded it (`seeded`). */
@@ -189,10 +215,63 @@ export function commitLayout(next: PageRegistry): boolean {
  * once both the registry and the device list are loaded. It is a no-op when the
  * document is already current, so it is safe on every connect.
  */
-export function migrateLayout(devices: FilterableDevice[]): boolean {
-  const { registry, changed } = migratePageRegistry(getPageRegistry(), devices);
-  if (changed) commitLayout(registry);
-  return changed;
+/** Write the pre-migration document once; a later migration never overwrites it. */
+async function writeBackupOnce(raw: string): Promise<void> {
+  try {
+    const existing = await ioBroker.getState(PAGE_BACKUP_ID, true);
+    if (
+      existing &&
+      existing.val !== undefined &&
+      existing.val !== null &&
+      existing.val !== ""
+    ) {
+      return;
+    }
+    const obj = await ioBroker.getObject(PAGE_BACKUP_ID);
+    if (!obj) {
+      await ioBroker.emitAsync("setObject", PAGE_BACKUP_ID, {
+        type: "state",
+        common: {
+          name: "iHome display pages (v1 backup)",
+          type: "json",
+          role: "json",
+          read: true,
+          write: false,
+        },
+        native: {},
+      });
+    }
+    await ioBroker.setState(PAGE_BACKUP_ID, raw);
+  } catch (e) {
+    console.error("backup pages v1:", e);
+  }
+}
+
+/**
+ * The one-time v1 → v2 conversion, after devices and templates are loaded. The
+ * filter→placement bridge runs first for a very old document; the v1 document
+ * is backed up once before the first v2 write.
+ */
+export async function migrateLayout(
+  devices: Device[],
+  templates: Template[],
+): Promise<boolean> {
+  const bridge = migratePageRegistry(
+    getPageRegistry(),
+    devices.map((d) => toFilterable(d)),
+  );
+  const { registry, changed } = migratePagesV2(
+    bridge.registry,
+    devices,
+    templates,
+    getVariableLibrary().variables ?? [],
+  );
+  const version = getPageRegistry().version ?? 0;
+  if (!bridge.changed && !changed && version >= PAGE_REGISTRY_VERSION) {
+    return false;
+  }
+  if (rawPages) await writeBackupOnce(rawPages);
+  return commitLayout({ ...registry, version: PAGE_REGISTRY_VERSION });
 }
 
 /**
@@ -218,6 +297,12 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       // Seeding from an empty enum cache would write pages with no groups.
       await waitForEnumCache();
       const st = await ioBroker.getState(PAGE_LIST_ID, true);
+      rawPages =
+        st?.val !== undefined && st?.val !== null && st?.val !== ""
+          ? typeof st.val === "string"
+            ? st.val
+            : JSON.stringify(st.val)
+          : null;
       if (!ioBroker.connected) {
         // Not reachable after the wait — leave the promise unset so a later
         // call retries instead of caching an empty registry.

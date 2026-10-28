@@ -312,11 +312,7 @@
   function addSlotTo(anchor: PlacementAnchor, slot: Slot, at?: number): void {
     const device = deviceOfAnchor(anchor);
     if (!device) return;
-    commitLayout(
-      editTile(registry, anchor, device, getTemplateRegistry().templates, (t) =>
-        addSlot(t, slot, at),
-      ),
-    );
+    commitLayout(editTile(registry, anchor, (t) => addSlot(t, slot, at)));
     pickerFor = null;
   }
 

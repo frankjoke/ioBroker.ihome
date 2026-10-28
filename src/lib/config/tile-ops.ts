@@ -18,7 +18,6 @@ import type {
   TemplateRegistry,
 } from "$lib/types/display";
 import { presetForType, resolveTemplate } from "$lib/config/template-ops";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   mapPlacement,
   moveItem,
@@ -42,26 +41,17 @@ export function materialiseTile(
 }
 
 /**
- * A tile that has slots is already materialised; anything else gets the chain's
- * config, with whatever partial fields a legacy `tile` already carried (its
- * size, say) winning over the materialised base.
+ * A tile that has slots is already complete; a legacy partial gets an empty
+ * slot list (the v1 migration resolves the chain before the editor sees it).
  */
 export function ensureTile(
   placement: Placement,
-  device: Device,
-  templates: Template[],
 ): Placement & { tile: TileConfig } {
   if (placement.tile?.slots)
     return placement as Placement & { tile: TileConfig };
-  const base: TileConfig =
-    placement.device === BLANK_DEVICE_ID
-      ? { size: { w: 1, h: 1 }, slots: [] }
-      : materialiseTile(device, templates);
   return {
     ...placement,
-    // `slots` is re-pinned because a partial never carries one (the early
-    // return already handled the case where it did).
-    tile: { ...base, ...(placement.tile ?? {}), slots: base.slots },
+    tile: { ...(placement.tile ?? {}), slots: [] },
   };
 }
 
@@ -344,8 +334,6 @@ export function moveRule(
 export function editTile(
   reg: PageRegistry,
   anchor: PlacementAnchor,
-  device: Device,
-  templates: Template[],
   fn: (tile: TileConfig) => TileConfig,
 ): PageRegistry {
   return mapPlacement(
@@ -354,7 +342,7 @@ export function editTile(
     anchor.sectionId,
     anchor.placementId,
     (placement) => {
-      const ensured = ensureTile(placement, device, templates);
+      const ensured = ensureTile(placement);
       return { ...ensured, tile: fn(ensured.tile) };
     },
   );

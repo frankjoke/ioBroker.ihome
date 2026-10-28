@@ -1,6 +1,5 @@
 import { it, expect } from "vitest";
 import type { Device } from "$lib/types/device";
-import { blankDevice } from "$lib/config/blank-tile";
 import type {
   ActiveCondition,
   ActiveOp,
@@ -83,28 +82,23 @@ it("ensureTile leaves a materialised placement alone and keeps a legacy size", (
     device: "d1",
     tile: { size: { w: 2 as const, h: 1 as const }, slots: [] },
   };
-  expect(ensureTile(materialised, device(), [])).toBe(materialised);
+  expect(ensureTile(materialised)).toBe(materialised);
 
   const legacy = {
     id: "p",
     device: "d1",
     tile: { size: { w: 2 as const, h: 1 as const } },
   };
-  const ensured = ensureTile(legacy, device(), []);
+  const ensured = ensureTile(legacy);
   expect(ensured.tile.size).toEqual({ w: 2, h: 1 });
-  expect(Array.isArray(ensured.tile.slots)).toBe(true);
+  expect(ensured.tile.slots).toEqual([]);
 });
 
-it("ensureTile materialises from nothing and resetTile drops the whole tile", () => {
+it("ensureTile fills an empty slot list and resetTile drops the whole tile", () => {
   const bare = { id: "p", device: "d1" };
-  const ensured = ensureTile(bare, device(), []);
-  expect(ensured.tile.slots!.length).toBeGreaterThan(0);
+  const ensured = ensureTile(bare);
+  expect(ensured.tile.slots).toEqual([]);
   expect(resetTile(ensured)).toEqual(bare);
-});
-
-it("ensureTile gives a blank placement an empty 1x1 tile", () => {
-  const ensured = ensureTile({ id: "p", device: "@blank" }, blankDevice(), []);
-  expect(ensured.tile).toEqual({ size: { w: 1, h: 1 }, slots: [] });
 });
 
 it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
@@ -226,8 +220,6 @@ it("editTile materialises once, applies the op and leaves siblings alone", () =>
   const next = editTile(
     reg,
     { pageId: "p", sectionId: "g", placementId: "t1" },
-    device(),
-    [],
     (t) => addSlot(t, { kind: "value", source: "power" }),
   );
   expect(next.updatedAt).toBeGreaterThan(0);
@@ -240,8 +232,6 @@ it("editTile materialises once, applies the op and leaves siblings alone", () =>
     editTile(
       reg,
       { pageId: "nope", sectionId: "g", placementId: "t1" },
-      device(),
-      [],
       (t) => t,
     ).pages,
   ).toEqual(reg.pages);

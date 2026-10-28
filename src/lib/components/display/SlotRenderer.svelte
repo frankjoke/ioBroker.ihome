@@ -39,7 +39,8 @@
 
   // Kinds with a control are useless without one; value falls back.
   const needsControl = $derived(
-    slot.kind === "level" ||
+    slot.kind === "switch" ||
+      slot.kind === "level" ||
       slot.kind === "color" ||
       slot.kind === "enum" ||
       slot.kind === "button" ||
