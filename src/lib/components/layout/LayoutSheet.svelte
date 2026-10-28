@@ -166,6 +166,25 @@
     selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
+  /** Move the selected tile to another section of this page (append at the end). */
+  function moveTileToSection(targetId: string): void {
+    if (!tileId || !targetId || targetId === sectionId) return;
+    const target = page?.groups.find((g) => g.id === targetId);
+    if (!target) return;
+    const next = movePlacement(
+      registry,
+      { pageId, sectionId, index: tileIndex },
+      { pageId, sectionId: targetId, index: target.tiles?.length ?? 0 },
+    );
+    if (!commitLayout(next)) return;
+    selection = {
+      kind: "tile",
+      pageId,
+      sectionId: targetId,
+      placementId: tileId,
+    };
+  }
+
   /** Create the named page and move the cursor onto it (and its first section). */
   function createPage(title: string): void {
     const next = addPage(registry, title);
@@ -620,6 +639,24 @@
         >
       {/each}
     </select>
+    <select
+      class="move-select"
+      aria-label="Move to section"
+      title="Move this tile to another section"
+      disabled={!tileAnchor}
+      onchange={(e) => {
+        const target = e.currentTarget.value;
+        e.currentTarget.value = "";
+        moveTileToSection(target);
+      }}
+    >
+      <option value="">Move to…</option>
+      {#each page?.groups ?? [] as g (g.id)}
+        {#if g.id !== sectionId}
+          <option value={g.id}>{g.title || "Section"}</option>
+        {/if}
+      {/each}
+    </select>
     <button
       type="button"
       class="icon-btn"
@@ -1009,6 +1046,11 @@
     display: flex;
     align-items: center;
     gap: 2px;
+    min-width: 0;
+  }
+
+  .line .move-select {
+    max-width: 8.5rem;
     min-width: 0;
   }
 

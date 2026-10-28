@@ -91,7 +91,7 @@ export function tileLabel(placement: Placement, deviceName?: string): string {
   const name =
     placement.title ||
     deviceName ||
-    (placement.device === BLANK_DEVICE_ID ? "Blank tile" : placement.device);
+    (placement.device ? placement.device : "Tile");
   const size = placement.tile?.size;
   return size ? `${name} · ${size.w}×${size.h}` : name;
 }
