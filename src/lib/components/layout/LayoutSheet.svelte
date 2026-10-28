@@ -157,6 +157,8 @@
   $effect(() => {
     const hit = picked;
     if (!hit) return;
+    pageOpen = false;
+    sectionOpen = false;
     selection = { kind: "tile", ...hit };
   });
 
@@ -167,6 +169,8 @@
 
   function selectTile(id: string): void {
     if (ignoreSelection) return;
+    pageOpen = false;
+    sectionOpen = false;
     selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
@@ -383,6 +387,8 @@
     pickerFor = null;
     pendingDeviceFor = target;
     creating = true;
+    pageOpen = false;
+    sectionOpen = false;
     mode = "device";
   }
 
@@ -535,7 +541,10 @@
       title="Page settings"
       aria-label="Page settings"
       aria-expanded={pageOpen}
-      onclick={() => (pageOpen = !pageOpen)}
+      onclick={() => {
+        pageOpen = !pageOpen;
+        if (pageOpen) sectionOpen = false;
+      }}
     >
       <span class="material-symbols-outlined">edit</span>
     </button>
@@ -589,7 +598,10 @@
       title="Section settings"
       aria-label="Section settings"
       aria-expanded={sectionOpen}
-      onclick={() => (sectionOpen = !sectionOpen)}
+      onclick={() => {
+        sectionOpen = !sectionOpen;
+        if (sectionOpen) pageOpen = false;
+      }}
     >
       <span class="material-symbols-outlined">edit</span>
     </button>
@@ -773,6 +785,8 @@
         }
         pendingDeviceFor = null;
         creating = false;
+        pageOpen = false;
+        sectionOpen = false;
         mode = "device";
       }}
     >
@@ -791,6 +805,8 @@
             ? { kind: "attach", anchor: tileAnchor }
             : null;
         creating = true;
+        pageOpen = false;
+        sectionOpen = false;
         mode = "device";
       }}
     >
@@ -854,7 +870,7 @@
         />
       {/key}
     </div>
-  {:else if tileSelection}
+  {:else if tileSelection && !pageOpen && !sectionOpen}
     <div class="fold tile-editor">
       <LayoutDetails
         {registry}

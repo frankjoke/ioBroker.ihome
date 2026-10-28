@@ -25,11 +25,11 @@
 
   /**
    * The section is exactly as wide as its tiles need (the pass decided), plus
-   * its own decoration: a bordered section subtracts border and padding from that
-   * width (`box-sizing: border-box`), so they have to be added back or the grid
-   * spills out of the border (review I5).
+   * its own decoration: every section reserves the border/padding box, so a
+   * bordered section's tiles start at the same y as an unbordered one's. The
+   * width calc adds the same 14px (`box-sizing: border-box`).
    */
-  const decoration = $derived(group.appearance?.border === true ? 14 : 0);
+  const decoration = 14;
   const width = $derived(
     modules > 0
       ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px + ${decoration}px);`
@@ -100,6 +100,12 @@
     flex: 0 1 auto;
     min-width: min(100%, var(--tile-w, 57px));
     max-width: 100%;
+    /* Every section reserves the same border/padding box, so tiles in bordered
+       and unbordered sections start at the same y. */
+    box-sizing: border-box;
+    padding: 4px 6px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-md, 12px);
     /* A User Interface default (ui-settings.ts); an explicit background is
        inline and wins. */
     background-color: var(--ui-section-bg, transparent);
@@ -107,9 +113,7 @@
 
   /* `appearance.border: true` draws the section's box; absent is today's look. */
   .group.bordered {
-    padding: 4px 6px 6px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md, 12px);
+    border-color: var(--border-color);
   }
 
   .group-title {

@@ -78,6 +78,9 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: flex-start;
+    /* Lines keep their content height; without this the 100vh min-height
+       stretches the lines and leaves a blank band before the next row. */
+    align-content: flex-start;
     gap: 1.25rem;
     min-height: 100vh;
     padding: 8px;
