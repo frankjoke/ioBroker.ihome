@@ -312,6 +312,18 @@
     edit((t) => setSlotWhere(t, i, nextSlotWhere(slot, tileVisibleCount)));
   }
 
+  /** The explicit value-slot homes: tile and/or detail page. */
+  function setWhere(i: number, onTile: boolean, onDetail: boolean): void {
+    if (!onTile && !onDetail) return;
+    edit((t) =>
+      setSlotWhere(
+        t,
+        i,
+        onTile && onDetail ? "both" : onTile ? "tile" : "modal",
+      ),
+    );
+  }
+
   function cycleShowWhen(i: number, slot: Slot): void {
     const next = nextShow(slot);
     edit((t) =>
@@ -1380,6 +1392,48 @@
                       </label>
                     {/if}
                   </div>
+                  {#if slot.kind === "value"}
+                    <div class="row">
+                      <span class="label-mono">Show in</span>
+                      <label
+                        class="check"
+                        title={tileVisibleCount <= 1 &&
+                        slotWhere(slot) !== "modal"
+                          ? "One slot must stay on the tile"
+                          : "Show this value on the tile"}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={slotWhere(slot) !== "modal"}
+                          disabled={tileVisibleCount <= 1 &&
+                            slotWhere(slot) !== "modal"}
+                          onchange={(e) =>
+                            setWhere(
+                              i,
+                              e.currentTarget.checked,
+                              slotWhere(slot) !== "tile",
+                            )}
+                        />
+                        <span>Tile</span>
+                      </label>
+                      <label
+                        class="check"
+                        title="Show this value in the detail page"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={slotWhere(slot) !== "tile"}
+                          onchange={(e) =>
+                            setWhere(
+                              i,
+                              slotWhere(slot) !== "modal",
+                              e.currentTarget.checked,
+                            )}
+                        />
+                        <span>Detail page</span>
+                      </label>
+                    </div>
+                  {/if}
                   <p class="note text-muted">
                     A hint pins no control: the display looks up the control
                     whose name, role or unit matches while it renders, so one
