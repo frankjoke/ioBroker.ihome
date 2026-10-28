@@ -118,6 +118,7 @@
               control={r.control}
               style={r.style}
               emphasis="secondary"
+              home="modal"
             />
           </div>
         {:else}
@@ -163,6 +164,7 @@
                 style={r.style}
                 onPrimary={r.onPrimary}
                 emphasis="secondary"
+                home="modal"
               />
             </div>
           </div>

@@ -8,10 +8,13 @@
   let {
     control,
     options = {},
+    home = "tile",
   }: {
     control: EnrichedControl;
     /** The slot's own knobs (min/max/step): what the user set in the tile editor. */
     options?: Record<string, unknown>;
+    /** Which surface renders this control: the tile or the detail page. */
+    home?: "tile" | "modal";
   } = $props();
 
   function truthy(v: unknown): boolean {
@@ -44,8 +47,16 @@
     (control.object?.common ?? {}) as Record<string, any>,
   );
   const range = $derived(levelRange(common, options));
-  /** The slot's value/unit readout can be hidden, leaving only the slider. */
-  const showValue = $derived(options.hideValue !== true);
+  /** The readout's own homes; absent = both. `hideValue` turns it off entirely. */
+  const valueWhere = $derived(
+    options.valueWhere === "tile" || options.valueWhere === "modal"
+      ? options.valueWhere
+      : "both",
+  );
+  const showValue = $derived(
+    options.hideValue !== true &&
+      (valueWhere === "both" || valueWhere === home),
+  );
 
   // Keep a drag on a slider from reaching the tile underneath it.
   function stop(e: Event) {

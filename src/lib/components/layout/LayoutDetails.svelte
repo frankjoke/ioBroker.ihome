@@ -626,6 +626,25 @@
     return Number.isFinite(value) ? value : undefined;
   }
 
+  /** The level readout's homes; a detail home needs the slot in the modal. */
+  function setValueWhere(
+    i: number,
+    where: "tile" | "both" | "modal" | undefined,
+  ): void {
+    edit((t) => {
+      const slot = (t.slots ?? [])[i];
+      if (!slot) return t;
+      const options = { ...(slot.options ?? {}) };
+      if (where === undefined) delete options.valueWhere;
+      else options.valueWhere = where;
+      let next = patchSlot(t, i, { options });
+      if (where && where !== "tile" && slotWhere(slot) === "tile") {
+        next = setSlotWhere(next, i, "both");
+      }
+      return next;
+    });
+  }
+
   function patchOptions(
     slotIndex: number,
     patch: Record<string, unknown>,
@@ -1492,6 +1511,24 @@
                           })}
                       />
                       <span>show value</span>
+                    </label>
+                    <label class="small">
+                      <span class="label-mono">value in</span>
+                      <select
+                        value={String(slot.options?.valueWhere ?? "both")}
+                        disabled={slot.options?.hideValue === true}
+                        onchange={(e) =>
+                          setValueWhere(
+                            i,
+                            e.currentTarget.value === "both"
+                              ? undefined
+                              : (e.currentTarget.value as "tile" | "modal"),
+                          )}
+                      >
+                        <option value="tile">tile</option>
+                        <option value="both">tile + detail</option>
+                        <option value="modal">detail page</option>
+                      </select>
                     </label>
                   </div>
                 {/if}

@@ -21,6 +21,7 @@
     icon,
     stack = false,
     anchor = false,
+    home = "tile",
   }: {
     slot: Slot;
     device: EnrichedDevice;
@@ -35,6 +36,8 @@
     stack?: boolean;
     /** The headline row: the tile measures its glyph for the chart band. */
     anchor?: boolean;
+    /** The surface this renderer draws on: the tile or the detail page. */
+    home?: "tile" | "modal";
   } = $props();
 
   // Kinds with a control are useless without one; value falls back.
@@ -66,6 +69,7 @@
     <ControlWidget
       control={control as EnrichedControl}
       options={slot.options}
+      {home}
     />
   {/if}
 {/snippet}
