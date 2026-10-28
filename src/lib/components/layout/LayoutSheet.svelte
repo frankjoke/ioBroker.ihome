@@ -216,6 +216,13 @@
       : null,
   );
 
+  /** Leave the device editor; a target remembered for a later Save dies with it. */
+  function closeDeviceEditor(): void {
+    creating = false;
+    mode = "tile";
+    pendingDeviceFor = null;
+  }
+
   function saveDevice(d: Device): void {
     const target = pendingDeviceFor;
     pendingDeviceFor = null;
@@ -250,6 +257,7 @@
       modalShown = false;
       mode = "tile";
       creating = false;
+      pendingDeviceFor = null;
     });
   });
 
@@ -368,6 +376,7 @@
    *  and cancelling the picker leaves the tile exactly as it was. */
   function openReplaceDevice(): void {
     if (!tileAnchor) return;
+    pendingDeviceFor = null;
     pickerFor = {
       kind: "device",
       pageId: tileAnchor.pageId,
@@ -717,8 +726,13 @@
       aria-expanded={mode === "device"}
       disabled={!canonicalDevice}
       onclick={() => {
+        if (mode === "device") {
+          closeDeviceEditor();
+          return;
+        }
+        pendingDeviceFor = null;
         creating = false;
-        mode = mode === "device" ? "tile" : "device";
+        mode = "device";
       }}
     >
       <span class="material-symbols-outlined"
@@ -796,9 +810,7 @@
           showHead={false}
           onSave={saveDevice}
           onCancel={() => {
-            creating = false;
-            mode = "tile";
-            pendingDeviceFor = null;
+            closeDeviceEditor();
           }}
         />
       {/key}
@@ -894,7 +906,10 @@
         }
         addDevicesTo(targetPage, targetSection, deviceIds, at);
       }}
-      onClose={() => (pickerFor = null)}
+      onClose={() => {
+        pickerFor = null;
+        pendingDeviceFor = null;
+      }}
     />
   {:else}
     {@const device = deviceOfAnchor(target.anchor)}

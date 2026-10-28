@@ -397,6 +397,10 @@ it("appendBlank adds several blank placements", () => {
   expect(two.pages[0].groups[0].tiles.every((t) => t.device === "@blank")).toBe(
     true,
   );
+  expect(two.pages[0].groups[0].tiles[0].tile).toEqual({
+    size: { w: 1, h: 1 },
+    slots: [],
+  });
 });
 
 it("deleteDevicePlacements leaves blank placements alone", () => {

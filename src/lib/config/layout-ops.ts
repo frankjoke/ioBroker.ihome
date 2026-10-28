@@ -358,6 +358,9 @@ export function appendBlank(
     tiles.splice(at ?? tiles.length, 0, {
       id: newId(),
       device: BLANK_DEVICE_ID,
+      // B5: the blank tile is pinned to 1x1 and owns an empty slot list, so
+      // attaching a device before configuring it does not adopt its preset.
+      tile: { size: { w: 1, h: 1 }, slots: [] },
     });
     return { ...section, tiles };
   });
