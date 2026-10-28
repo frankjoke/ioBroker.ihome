@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
+  import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
@@ -86,6 +87,7 @@
   } | null>(null);
   /** The Device selector, to put its own value back when a swap is cancelled. */
   let deviceSelect = $state<HTMLSelectElement | undefined>(undefined);
+  let moveOpen = $state(false);
   let pickerFor = $state<
     | {
         kind: "device";
@@ -159,30 +161,43 @@
   });
 
   function selectSection(id: string): void {
+    if (ignoreSelection) return;
     selection = { kind: "section", pageId, sectionId: id };
   }
 
   function selectTile(id: string): void {
+    if (ignoreSelection) return;
     selection = { kind: "tile", pageId, sectionId, placementId: id };
   }
 
+  /** The section/tile selects rewrite their value when the moved tile changes
+   *  sections; the browser may fire a change for the temporary first option.
+   *  Ignore those changes for one tick so the moved tile stays selected. */
+  let ignoreSelection = false;
+
   /** Move the selected tile to another section of this page (append at the end). */
-  function moveTileToSection(targetId: string): void {
-    if (!tileId || !targetId || targetId === sectionId) return;
+  function moveTileToSection(targetId: string): boolean {
+    if (!tileId || !targetId || targetId === sectionId) return false;
     const target = page?.groups.find((g) => g.id === targetId);
-    if (!target) return;
+    if (!target) return false;
+    ignoreSelection = true;
     const next = movePlacement(
       registry,
       { pageId, sectionId, index: tileIndex },
       { pageId, sectionId: targetId, index: target.tiles?.length ?? 0 },
     );
-    if (!commitLayout(next)) return;
+    if (!commitLayout(next)) {
+      ignoreSelection = false;
+      return false;
+    }
     selection = {
       kind: "tile",
       pageId,
       sectionId: targetId,
       placementId: tileId,
     };
+    setTimeout(() => (ignoreSelection = false), 60);
+    return true;
   }
 
   /** Create the named page and move the cursor onto it (and its first section). */
@@ -277,6 +292,7 @@
       mode = "tile";
       creating = false;
       pendingDeviceFor = null;
+      moveOpen = false;
     });
   });
 
@@ -639,24 +655,16 @@
         >
       {/each}
     </select>
-    <select
-      class="move-select"
-      aria-label="Move to section"
-      title="Move this tile to another section"
+    <button
+      type="button"
+      class="icon-btn"
+      title="Move to another section"
+      aria-label="Move to another section"
       disabled={!tileAnchor}
-      onchange={(e) => {
-        const target = e.currentTarget.value;
-        e.currentTarget.value = "";
-        moveTileToSection(target);
-      }}
+      onclick={() => (moveOpen = true)}
     >
-      <option value="">Move to…</option>
-      {#each page?.groups ?? [] as g (g.id)}
-        {#if g.id !== sectionId}
-          <option value={g.id}>{g.title || "Section"}</option>
-        {/if}
-      {/each}
-    </select>
+      <span class="material-symbols-outlined">drive_file_move</span>
+    </button>
     <button
       type="button"
       class="icon-btn"
@@ -954,6 +962,18 @@
   {/if}
 {/if}
 
+{#if moveOpen && tileAnchor && currentTile}
+  <MoveTileModal
+    title={`Move “${tileLabel(currentTile)}”`}
+    sections={(page?.groups ?? []).map((g) => ({ id: g.id, title: g.title }))}
+    current={sectionId}
+    onMove={(id) => {
+      if (moveTileToSection(id)) moveOpen = false;
+    }}
+    onClose={() => (moveOpen = false)}
+  />
+{/if}
+
 {#if pendingDelete}
   <ConfirmModal
     title={deleteTitle(pendingDelete)}
@@ -1046,11 +1066,6 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    min-width: 0;
-  }
-
-  .line .move-select {
-    max-width: 8.5rem;
     min-width: 0;
   }
 
