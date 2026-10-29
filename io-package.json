@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "news": {
+            "0.1.1": {
+                "en": "HTML slots: a tile can carry a full local HTML document — scripts, styles and same-origin access — inline or from a state, shown on its detail page. {{NAME}} placeholders read Global Variables or raw states, and the document can call ihome.setState/getState/setVariable/getVariable. Includes the usual icon/label basics, slot labels above pages and a light Samsung remote sample.",
+                "de": "HTML-Slots: Eine Kachel kann ein vollständiges lokales HTML-Dokument tragen — Skripte, Styles und Same-Origin-Zugriff — inline oder aus einem State, angezeigt auf ihrer Detailseite. {{NAME}}-Platzhalter lesen Globale Variablen oder Roh-States, und das Dokument kann ihome.setState/getState/setVariable/getVariable aufrufen. Enthält die üblichen Icon-/Label-Grundlagen, Slot-Labels über Seiten und ein helles Samsung-Remote-Beispiel."
+            },
             "0.1.0": {
                 "en": "One picker for every state or control selection: the same modal adds a slot, picks a tile's active source, edits device controls or a variable, and lists the tile's own sources first. The layout editor keeps the selected tile across view/edit, moves tiles and sections through dialogs, reorders pages, and can hide the pencil for everyone. The mobile bar drops the network icon (the cog shows the connection) and page-tab icons on narrow screens; the theme choice now lives in User Interface and stays per browser.",
                 "de": "Ein Picker für jede State- oder Control-Auswahl: Dasselbe Fenster legt einen Slot an, wählt die aktive Quelle einer Kachel, bearbeitet Geräte-Controls oder eine Variable und zeigt die Quellen der Kachel zuerst. Der Layout-Editor behält die gewählte Kachel über Ansicht/Editor, verschiebt Kacheln und Bereiche per Dialog, ordnet Seiten um und kann den Stift für alle ausblenden. Die mobile Leiste verliert das Netzwerk-Icon (das Zahnrad zeigt die Verbindung) und auf schmalen Bildschirmen die Seiten-Icons; die Theme-Wahl liegt jetzt unter Benutzeroberfläche und bleibt pro Browser."
@@ -78,10 +82,6 @@
             "0.0.15": {
                 "en": "iHome connects the ioBroker way: the web adapter's own socket locally and through iobroker.pro (opt-in hand-over when the local instance stays unreachable), and it subscribes only to the states its tiles and rules actually read — a chatty installation no longer trips the cloud adapter's event limit",
                 "de": "iHome verbindet sich nach ioBroker-Art: der eigene Socket des Web-Adapters lokal und über iobroker.pro (optionaler Wechsel, wenn die lokale Instanz nicht erreichbar bleibt), und es abonniert nur die States, die seine Kacheln und Regeln wirklich lesen — eine lebhafte Installation reizt das Event-Limit des Cloud-Adapters nicht mehr aus"
-            },
-            "0.0.14": {
-                "en": "A tile can guard its detail page with its own PIN (asked on a number pad, every time); the layout editor opens from any page, and the page tabs wear their page's colour",
-                "de": "Ein Tile kann seine Detailseite mit einer eigenen PIN schützen (Eingabe über eine Zifferntastatur, bei jedem Öffnen); der Layout-Editor öffnet von jeder Seite, und die Seiten-Reiter tragen die Farbe ihrer Seite"
             }
         },
         "titleLang": {
