@@ -3,10 +3,13 @@ import { writeControl, resetWriteLocks } from "$lib/utils/control-write";
 
 function fakeClient() {
   const writes: unknown[] = [];
+  const ids: string[] = [];
   return {
     writes,
-    setState: (_id: string, value: unknown) => {
+    ids,
+    setState: (id: string, value: unknown) => {
       writes.push(value);
+      ids.push(id);
       return Promise.resolve();
     },
   };
@@ -63,6 +66,20 @@ it("refuses to write a control that cannot take it", () => {
     }),
   ).toBe(false);
   expect(client.writes).toEqual([]);
+});
+
+it("writes a raw-state switch through the same path", () => {
+  resetWriteLocks();
+  const client = fakeClient();
+  expect(
+    writeControl(
+      client,
+      { stateId: "0_userdata.0.x", writable: true, available: true },
+      true,
+    ),
+  ).toBe(true);
+  expect(client.ids).toEqual(["0_userdata.0.x"]);
+  expect(client.writes).toEqual([true]);
 });
 
 it("holds a toggle until the broker confirms it, not for a fixed time", () => {

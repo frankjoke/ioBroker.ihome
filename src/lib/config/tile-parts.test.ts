@@ -16,6 +16,7 @@ import type {
 } from "$lib/types/device";
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
+import { resolveTile } from "$lib/config/tile-resolve";
 
 const control = (
   id: string,
@@ -106,6 +107,29 @@ it("a frame slot passes through without a control", () => {
   );
   expect(parts.body[0].control).toBeUndefined();
   expect(parts.modal[0].control).toBeUndefined();
+});
+
+it("a writable state source yields a switch row", () => {
+  const stateId = "0_userdata.0.x";
+  const resolution = resolveTile(
+    { slots: [{ kind: "switch", source: { kind: "state", stateId } }] },
+    "Lamp",
+    {
+      devices: [],
+      states: new Map([[stateId, { val: false }]]),
+      objects: new Map([
+        [stateId, { common: { name: "Lamp", type: "boolean", write: true } }],
+      ]),
+    },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none);
+  expect(parts.rows).toHaveLength(1);
+  expect(parts.rows[0].control).toMatchObject({
+    widget: "switch",
+    writable: true,
+    stateId,
+    liveValue: false,
+  });
 });
 
 it("a blank tile does not inherit the preset chain", () => {

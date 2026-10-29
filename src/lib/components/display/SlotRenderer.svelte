@@ -53,9 +53,9 @@
 </script>
 
 {#snippet content()}
-  <!-- The control-bearing kinds below only open up for a control that resolved
-       from the device (a raw-state pseudo-control reaches the value kind only),
-       so the cast to the full enriched shape is safe. -->
+  <!-- The control-bearing kinds below only open up for a resolved control (a
+       device control or the pseudo-control of a raw state), so the cast to the
+       full enriched shape is safe. -->
   {#if slot.kind === "value"}
     <ValueSlot {slot} {control} {onPrimary} {emphasis} />
   {:else if slot.kind === "history-list" && control}
