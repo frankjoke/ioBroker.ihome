@@ -22,11 +22,8 @@
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
-  import {
-    deleteDevicePlacements,
-    placementsOfDevice,
-  } from "$lib/config/layout-ops";
-  import { commitLayout, getPageRegistry } from "$lib/stores/pages.svelte.js";
+  import { slotsReferencingDevice } from "$lib/config/layout-ops";
+  import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { onMount, tick } from "svelte";
   import {
     peekRequestedLayout,
@@ -46,8 +43,8 @@
   let sortBy = $state<SortKey>("name");
   let sortDir = $state<SortDir>("asc");
   let pendingDelete = $state<Device | null>(null);
-  /** The tiles the device still holds when the confirm opens (they go with it). */
-  let pendingTiles = $state(0);
+  /** The slots that will go unavailable when the device is deleted. */
+  let pendingSlots = $state(0);
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const devices = $derived(getCanonicalRegistry().devices ?? []);
@@ -152,23 +149,16 @@
 
   function deleteDevice(d: Device) {
     pendingDelete = d;
-    pendingTiles = placementsOfDevice(getPageRegistry(), d.id).length;
+    pendingSlots = slotsReferencingDevice(getPageRegistry(), d);
   }
 
   function confirmDelete() {
     const d = pendingDelete;
-    if (d) {
-      commit(devices.filter((x) => x.id !== d.id));
-      // A tile without its main device is dead weight: remove it with the
-      // device (the sheet offers a replacement when it is the open tile).
-      const { registry, removed } = deleteDevicePlacements(
-        getPageRegistry(),
-        d.id,
-      );
-      if (removed) commitLayout(registry);
-    }
+    // The pages keep their tiles: a slot whose device is gone shows
+    // unavailable, and returns when a device with the same id is added back.
+    if (d) commit(devices.filter((x) => x.id !== d.id));
     pendingDelete = null;
-    pendingTiles = 0;
+    pendingSlots = 0;
   }
 
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
@@ -402,8 +392,8 @@
       >?
     </p>
     <p class="text-muted">
-      Its {pendingTiles} tile{pendingTiles === 1 ? "" : "s"} on the pages will be
-      removed with it. This cannot be undone.
+      {pendingSlots} slot{pendingSlots === 1 ? "" : "s"} on the pages reference this
+      device. They will show unavailable; no tiles are deleted.
     </p>
   </ConfirmModal>
 {/if}

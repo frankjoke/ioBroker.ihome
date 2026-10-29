@@ -1,6 +1,7 @@
 import { newId } from "$lib/utils/ids";
 import { deepCopy } from "$lib/utils/json";
 import { slugify, uniqueSlug } from "$lib/config/slug";
+import { resolveControl } from "$lib/config/template-ops";
 import type {
   Group,
   Page,
@@ -8,6 +9,7 @@ import type {
   Placement,
   Slot,
 } from "$lib/types/display";
+import type { Device } from "$lib/types/device";
 
 /**
  * Every mutation the layout editor can make, as a pure function.
@@ -355,63 +357,42 @@ export function deletePlacement(
   }));
 }
 
-/** One placement that depends on a device, addressed well enough to count it,
- *  remove it, or reopen the device picker at its position. */
-export interface DevicePlacement {
-  pageId: string;
-  sectionId: string;
-  index: number;
-  placement: Placement;
-}
-
-/** Every placement whose *main* device is `deviceId`, in document order. */
-export function placementsOfDevice(
+/**
+ * How many slots point at this device: directly (control/device sources) or
+ * through a legacy string that names one of its controls. Deleting the device
+ * leaves every tile in place; the count is what the confirm warns about.
+ */
+export function slotsReferencingDevice(
   reg: PageRegistry,
-  deviceId: string,
-): DevicePlacement[] {
-  const out: DevicePlacement[] = [];
+  device: Device,
+): number {
+  let count = 0;
   for (const page of reg.pages ?? []) {
     for (const section of page.groups ?? []) {
-      (section.tiles ?? []).forEach((placement, index) => {
-        if (placement.device === deviceId) {
-          out.push({
-            pageId: page.id,
-            sectionId: section.id,
-            index,
-            placement,
-          });
+      for (const placement of section.tiles ?? []) {
+        for (const slot of placement.tile?.slots ?? []) {
+          const source = slot.source;
+          if (typeof source === "string") {
+            // A v1 string names a control, not a device: attribute it through
+            // the placement's own device when that is still recorded.
+            const owner = placement.device;
+            if (
+              (!owner || owner === device.id) &&
+              resolveControl(device.controls ?? [], source)
+            ) {
+              count++;
+            }
+          } else if (
+            (source?.kind === "control" || source?.kind === "device") &&
+            source.device === device.id
+          ) {
+            count++;
+          }
         }
-      });
+      }
     }
   }
-  return out;
-}
-
-/**
- * Drop every placement that used the device. A tile without its main device is
- * a dead entry: the sheet's Tile list shows the raw id and the display shows
- * nothing. Returns the same registry when nothing matched, so no write happens.
- */
-export function deleteDevicePlacements(
-  reg: PageRegistry,
-  deviceId: string,
-): { registry: PageRegistry; removed: number } {
-  let removed = 0;
-  const pages = (reg.pages ?? []).map((page) => {
-    let changed = false;
-    const groups = (page.groups ?? []).map((section) => {
-      const tiles = section.tiles ?? [];
-      const kept = tiles.filter((tile) => tile.device !== deviceId);
-      if (kept.length === tiles.length) return section;
-      changed = true;
-      removed += tiles.length - kept.length;
-      return { ...section, tiles: kept };
-    });
-    return changed ? { ...page, groups } : page;
-  });
-  return removed
-    ? { registry: { ...reg, updatedAt: Date.now(), pages }, removed }
-    : { registry: reg, removed: 0 };
+  return count;
 }
 
 export function duplicatePlacement(

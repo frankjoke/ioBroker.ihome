@@ -6,7 +6,6 @@ import {
   deletePage,
   deletePlacement,
   deleteSection,
-  deleteDevicePlacements,
   duplicatePage,
   duplicatePlacement,
   duplicateSection,
@@ -19,10 +18,11 @@ import {
   patchPage,
   patchPlacement,
   patchSection,
-  placementsOfDevice,
   sectionTitleTaken,
+  slotsReferencingDevice,
 } from "$lib/config/layout-ops";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
+import type { Device } from "$lib/types/device";
 
 const reg = (pages: Page[]): PageRegistry => ({
   version: 1,
@@ -325,53 +325,75 @@ it("duplicatePlacement deep-copies the tile so the copy cannot mutate the origin
   );
 });
 
-it("finds and removes every placement of a device, on every page", () => {
-  const base = regWithTiles();
-  const extra: PageRegistry = {
-    ...base,
-    pages: [
-      ...base.pages,
-      {
-        id: "p2",
-        title: "P2",
-        groups: [
-          {
-            id: "g3",
-            tiles: [
-              { id: "g3-t0", device: "t1dev" },
-              { id: "g3-t1", device: "other" },
-            ],
-          },
-        ],
-      },
+it("counts every slot that references a device", () => {
+  const device = {
+    id: "t1dev",
+    name: "Dev",
+    type: "Light",
+    controls: [
+      { id: "c1", feature: "power", writable: true },
+      { id: "c2", feature: "brightness", writable: true },
     ],
-  };
-  const found = placementsOfDevice(extra, "t1dev");
-  expect(
-    found.map((f) => [f.pageId, f.sectionId, f.index, f.placement.id]),
-  ).toEqual([
-    ["p", "g", 0, "g-t0"],
-    ["p2", "g3", 0, "g3-t0"],
-  ]);
-  const { registry: next, removed } = deleteDevicePlacements(extra, "t1dev");
-  expect(removed).toBe(2);
-  expect(next.pages[0].groups[0].tiles).toEqual([]);
-  expect(next.pages[1].groups[0].tiles?.map((t) => t.id)).toEqual(["g3-t1"]);
-  // no match: the same document, so nothing is written
-  const none = deleteDevicePlacements(extra, "absent");
-  expect(none.removed).toBe(0);
-  expect(none.registry).toBe(extra);
-});
+  } as Device;
 
-it("deleteDevicePlacements leaves blank placements alone", () => {
-  const base = reg([
+  const layout = reg([
     {
       id: "p",
       title: "P",
-      groups: [{ id: "g", tiles: [{ id: "b", device: "@blank" }] }],
+      groups: [
+        {
+          id: "g",
+          tiles: [
+            {
+              id: "t0",
+              device: "t1dev",
+              tile: {
+                slots: [
+                  {
+                    kind: "switch",
+                    source: {
+                      kind: "control",
+                      device: "t1dev",
+                      control: "c1",
+                    },
+                  },
+                  { kind: "value", source: "brightness" }, // legacy string
+                  {
+                    kind: "value",
+                    source: { kind: "state", stateId: "0_userdata.0.x" },
+                  },
+                ],
+              },
+            },
+            {
+              id: "t1",
+              tile: {
+                slots: [
+                  {
+                    kind: "badge",
+                    source: { kind: "device", device: "t1dev" },
+                  },
+                  {
+                    kind: "switch",
+                    source: {
+                      kind: "control",
+                      device: "other",
+                      control: "c1",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
     },
   ]);
-  expect(deleteDevicePlacements(base, "dev-1").removed).toBe(0);
+
+  expect(slotsReferencingDevice(layout, device)).toBe(3);
+  // Counting is a read: deleting the device must not remove a tile.
+  expect(layout.pages[0].groups[0].tiles).toHaveLength(2);
+  expect(slotsReferencingDevice(layout, { ...device, id: "absent" })).toBe(0);
 });
 
 it("duplicating a blank tile keeps it blank", () => {
