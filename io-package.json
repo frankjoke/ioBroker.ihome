@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.32",
+        "version": "0.0.33",
         "news": {
+            "0.0.33": {
+                "en": "Tiles are now built from slots: each slot reads a device control or any raw state, and a tile no longer owns a device. Loading a device adds slots only for its real controls, and existing pages migrate once with a backup (pageListV1).",
+                "de": "Kacheln bestehen jetzt aus Slots: Jeder Slot liest ein Geräte-Control oder einen beliebigen Roh-State, und eine Kachel besitzt kein Gerät mehr. Das Laden eines Geräts erzeugt Slots nur für seine tatsächlichen Controls, und vorhandene Seiten werden einmalig mit einer Sicherung (pageListV1) migriert."
+            },
             "0.0.32": {
                 "en": "Blank tiles: a tile can be added without a device (frames, raw values, badges), a device can be created from the add-tile picker, and a device attaches to a blank tile without losing its layout. The level slider follows the slot's own min/max/step and its thumb reaches both ends of the track.",
                 "de": "Leere Kacheln: Eine Kachel kann ohne Gerät angelegt werden (Webseiten, Rohwerte, Badges), ein Gerät lässt sich direkt aus dem Kachel-Picker erzeugen, und ein Gerät hängt sich an eine leere Kachel, ohne deren Layout zu verlieren. Der Level-Slider beachtet min/max/step des Slots und sein Griff erreicht beide Enden der Spur."

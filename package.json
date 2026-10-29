@@ -1,6 +1,6 @@
 {
   "name": "iobroker.ihome",
-  "version": "0.0.32",
+  "version": "0.0.33",
   "description": "iHome — dashboard adapter for ioBroker home automation (Svelte SPA + PWA)",
   "author": {
     "name": "Frank Joke",
