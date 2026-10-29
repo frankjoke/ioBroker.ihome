@@ -1,5 +1,5 @@
 import type { EnrichedDevice, SlotControl } from "$lib/types/device";
-import type { Slot, Template, TileConfig } from "$lib/types/display";
+import type { Slot, SlotKind, Template, TileConfig } from "$lib/types/display";
 import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
@@ -167,10 +167,26 @@ export function tileParts(
   };
 }
 
-/** The tile's face (A52): the first value slot, else the first slot — a legacy
- *  Button tile's face is its button. */
+/** The tile's face: the first slot that actually renders a reading (value,
+ *  switch, level, …). A badge or frame never becomes the face while a real slot
+ *  exists. This is the slot the tile's own icon (look glyph) dresses, so a
+ *  switch-first tile keeps its main icon on the first slot instead of moving it
+ *  to a later value slot. Falls back to the first slot when nothing else exists. */
+const FACE_KINDS = new Set<SlotKind>([
+  "value",
+  "switch",
+  "level",
+  "color",
+  "enum",
+  "button",
+]);
+
 export function headlineSlot(slots: Slot[]): Slot | undefined {
-  return slots.find((s) => s.kind === "value") ?? slots[0];
+  return (
+    slots.find((s) => FACE_KINDS.has(s.kind)) ??
+    slots.find((s) => s.kind !== "badge" && s.kind !== "frame") ??
+    slots[0]
+  );
 }
 
 /** The look of the tile's current state (A71). A tile with no active condition

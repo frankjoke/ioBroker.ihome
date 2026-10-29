@@ -301,20 +301,18 @@ it("exposes the very slots its rows carry, chain or materialised (A46/A52)", () 
   expect(materialised.slots).toBe(mine.slots);
 });
 
-it("picks the headline: the first value slot, else the first slot", () => {
-  // A value anywhere wins, even when it lives only in the modal (A52).
-  const value: Slot = {
-    kind: "value",
-    source: "humidity",
-    where: "modal",
-  };
-  expect(headlineSlot([{ kind: "badge" }, { kind: "button" }, value])).toBe(
-    value,
-  );
+it("picks the headline: the first face slot, never a badge or frame", () => {
+  // The first real slot is the face, even when a value follows it: a switch
+  // keeps the main icon on the first slot instead of handing it to the value.
+  const button: Slot = { kind: "button" };
+  const value: Slot = { kind: "value", source: "humidity", where: "modal" };
+  expect(headlineSlot([{ kind: "badge" }, button, value])).toBe(button);
+  expect(headlineSlot([{ kind: "frame" }, value])).toBe(value);
+  expect(headlineSlot([value, button])).toBe(value);
 
-  // Without one, the first slot is the face.
+  // With no face-kind, the first non-badge/non-frame, else the first slot.
   const badge: Slot = { kind: "badge" };
-  expect(headlineSlot([badge, { kind: "button" }])).toBe(badge);
+  expect(headlineSlot([badge, { kind: "frame" }])).toBe(badge);
   expect(headlineSlot([])).toBeUndefined();
 });
 
