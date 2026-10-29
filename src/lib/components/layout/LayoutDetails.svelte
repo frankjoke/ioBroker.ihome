@@ -117,6 +117,8 @@
   let expandedSlot = $state<number | null>(null);
   let openRules = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
+  /** The state picker for an HTML slot's document. */
+  let htmlSourceFor = $state<number | null>(null);
   let ruleIconFor = $state<{ slot: number; rule: number } | null>(null);
   /** The slot icon's own picker (A57). */
   let iconPickerFor = $state<number | null>(null);
@@ -233,7 +235,14 @@
   /** The kinds the Icon block is offered on (A57) — data-bearing slots, not
    *  badges, frames or charts. The renderer stays generic: it draws any
    *  descriptor a document carries. */
-  const ICON_KINDS: SlotKind[] = ["value", "level", "color", "enum", "button"];
+  const ICON_KINDS: SlotKind[] = [
+    "value",
+    "level",
+    "color",
+    "enum",
+    "button",
+    "html",
+  ];
 
   /** The three homes a slot can have (A34), in click order, and their icons. */
   const WHERE_GLYPH = {
@@ -459,7 +468,16 @@
     if (slot.kind === "frame") {
       return String(slot.options?.url ?? "") || "no page";
     }
-    if (slot.kind === "html") return slot.label || "HTML";
+    if (slot.kind === "html") {
+      if (
+        slot.source &&
+        typeof slot.source === "object" &&
+        slot.source.kind === "state"
+      ) {
+        return slot.label || slot.source.stateId;
+      }
+      return slot.label || "HTML";
+    }
     const source = slot.source;
     if (!source) return "no source";
     if (typeof source === "string") return source; // legacy v1 source
@@ -469,6 +487,14 @@
     const control = device?.controls?.find((c) => c.id === source.control);
     const name = control?.label || control?.feature || source.control;
     return device ? `${device.name || device.id}.${name}` : name;
+  }
+
+  /** The state an HTML slot reads its document from, or the picker's prompt. */
+  function htmlStateLabel(slot: Slot): string {
+    const source = slot.source;
+    return source && typeof source === "object" && source.kind === "state"
+      ? source.stateId
+      : "Choose a state…";
   }
 
   /**
@@ -1248,17 +1274,54 @@
                       <span>ignore pointer</span>
                     </label>
                   {:else if slot.kind === "html"}
-                    <label class="small grow">
-                      <span class="label-mono">HTML</span>
-                      <textarea
-                        class="html-input"
-                        rows="8"
-                        placeholder="<!doctype html>…"
-                        value={String(slot.options?.html ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, { html: e.currentTarget.value })}
-                      ></textarea>
-                    </label>
+                    <div class="small grow html-block">
+                      <label class="small grow">
+                        <span class="label-mono">HTML</span>
+                        <textarea
+                          class="html-input"
+                          rows="8"
+                          placeholder="<!doctype html>…"
+                          value={String(slot.options?.html ?? "")}
+                          oninput={(e) =>
+                            patchOptions(i, { html: e.currentTarget.value })}
+                        ></textarea>
+                      </label>
+                      <div class="row">
+                        <div class="small grow">
+                          <span class="label-mono">From state</span>
+                          <button
+                            type="button"
+                            class="btn btn-sm source-pick"
+                            title="Read the HTML from a state's string value"
+                            onclick={() => (htmlSourceFor = i)}
+                          >
+                            <Icon value="edit" size={15} />
+                            <span class="source-name"
+                              >{htmlStateLabel(slot)}</span
+                            >
+                          </button>
+                        </div>
+                        {#if slot.source}
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            title="Use the inline HTML again"
+                            aria-label="Clear the HTML state"
+                            onclick={() =>
+                              edit((t) =>
+                                patchSlot(t, i, { source: undefined }),
+                              )}
+                          >
+                            <span class="material-symbols-outlined">delete</span
+                            >
+                          </button>
+                        {/if}
+                      </div>
+                      <p class="note text-muted">
+                        A state's string value wins over the inline HTML; empty
+                        or missing falls back to it.
+                      </p>
+                    </div>
                   {:else}
                     <div class="small grow">
                       <span class="label-mono">Source</span>
@@ -1960,6 +2023,22 @@
     />
   {/if}
 
+  {#if htmlSourceFor !== null}
+    <SourcePicker
+      mode="state"
+      title="Choose an HTML state"
+      onState={(id) => {
+        const slotIndex = htmlSourceFor;
+        htmlSourceFor = null;
+        if (slotIndex === null) return;
+        edit((t) =>
+          patchSlot(t, slotIndex, { source: { kind: "state", stateId: id } }),
+        );
+      }}
+      onClose={() => (htmlSourceFor = null)}
+    />
+  {/if}
+
   {#if ruleIconFor}
     <IconPicker
       icon={shownSlots[ruleIconFor.slot]?.rules?.[ruleIconFor.rule]?.icon}
@@ -2056,6 +2135,15 @@
     font-size: 0.75rem;
     line-height: 1.35;
     resize: vertical;
+  }
+
+  .html-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
   }
 
   .row.between {

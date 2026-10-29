@@ -533,7 +533,8 @@
         </label>
         <div class="actions">
           <span class="text-muted">
-            Runs as a local document in a frame; detail page only by default.
+            Runs as a local document in a frame; detail page only by default. A
+            state can replace it in the slot editor.
           </span>
           <button
             type="button"

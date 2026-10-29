@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Samsung TV Fernbedienung</title>
+<style>
+
+  :root { color-scheme: light }
+
+  * { box-sizing: border-box }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 20% 0%, #eef5ff 0%, #dfe9f7 45%, #f8fafc 100%);
+    color: #1f2937;
+    font: 15px/1.35 system-ui, sans-serif
+  }
+
+  main {
+    width: min(420px, 92vw);
+    padding: 18px;
+    border: 1px solid #dbe5f1;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 18px 45px rgba(30, 64, 175, 0.14);
+    backdrop-filter: blur(8px)
+  }
+
+  h1 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    color: #1d4ed8
+  }
+
+  #pad, #num {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px
+  }
+
+  #num { margin-top: 8px }
+
+  button {
+    padding: 10px 6px;
+    border: 1px solid #d7e2f0;
+    border-radius: 10px;
+    background: #fff;
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    transition: background-color 0.15s, border-color 0.15s, transform 0.05s
+  }
+
+  button:hover { background: #eef5ff; border-color: #9fc0ea }
+  button:active {
+    background: #dbeafe;
+    border-color: #60a5fa;
+    transform: translateY(1px)
+  }
+
+  #pad button:not(.round) { min-height: 42px }
+
+  /* The nine direction/menu keys: compact, not the old full squares. */
+  #pad .round {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    padding: 4px;
+    font-size: 12px
+  }
+
+  #num button { min-height: 38px; font-size: 12px }
+
+  .row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 8px
+  }
+
+  .row button { min-height: 38px; font-size: 12px }
+
+  input[type=text] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #cfdcec;
+    background: #fff;
+    color: #1f2937;
+    margin-bottom: 8px;
+    font: inherit
+  }
+
+  input[type=text]:focus {
+    outline: 2px solid #bfdbfe;
+    border-color: #93c5fd
+  }
+
+  #status {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: #64748b;
+    min-height: 1.3em
+  }
+
+  .ok { color: #15803d !important }
+  .bad { color: #b91c1c !important }
+</style>
+<main>
+  <h1>Samsung TV · 192.168.178.23</h1>
+  <input id="host" type="text" value="192.168.178.23" spellcheck="false">
+  <div id="pad">
+    <button id="power">Power</button>
+    <button data-key="KEY_HOME">Home</button>
+    <button data-key="KEY_RETURN">Zurück</button>
+    <button data-key="KEY_INFO" class="round">i</button>
+    <button data-key="KEY_UP" class="round">▲</button>
+    <button data-key="KEY_VOLUMEUP" class="round">Vol +</button>
+    <button data-key="KEY_LEFT" class="round">◀</button>
+    <button data-key="KEY_ENTER" class="round">OK</button>
+    <button data-key="KEY_RIGHT" class="round">▶</button>
+    <button data-key="KEY_MUTE" class="round">Mute</button>
+    <button data-key="KEY_DOWN" class="round">▼</button>
+    <button data-key="KEY_VOLUMEDOWN" class="round">Vol −</button>
+  </div>
+  <div id="num">
+    <button data-key="KEY_1">1</button>
+    <button data-key="KEY_2">2</button>
+    <button data-key="KEY_3">3</button>
+    <button data-key="KEY_4">4</button>
+    <button data-key="KEY_5">5</button>
+    <button data-key="KEY_6">6</button>
+    <button data-key="KEY_7">7</button>
+    <button data-key="KEY_8">8</button>
+    <button data-key="KEY_9">9</button>
+    <button data-key="KEY_PRE_CH" title="letzter Sender">↩ letzter</button>
+    <button data-key="KEY_0">0</button>
+    <button data-key="KEY_EXIT" title="Exit">Exit</button>
+  </div>
+  <div class="row">
+    <button data-key="KEY_CHANNELUP">CH +</button>
+    <button data-key="KEY_CHANNELDOWN">CH −</button>
+    <button data-key="KEY_PLAYPAUSE">Play</button>
+    <button data-key="KEY_SOURCE">Source</button>
+    <button data-key="KEY_MENU">Menü</button>
+    <button data-key="KEY_GUIDE">Guide</button>
+    <button id="apps">Apps testen</button>
+    <button id="conn">Verbinden</button>
+  </div>
+  <p id="status">nicht verbunden</p>
+</main>
+<script>
+  const NAME = btoa("opencode-remote"); // derselbe Name, den der TV kennt
+  // Im Adapter gibt es keinen Python-Server: hier später den ioBroker-Weg eintragen
+  // (State ihome.0.tv.wake setzen, siehe samsung.js im Adapter-Root).
+  const WAKE_URL = "/wake";
+  let ws = null;
+  const $status = document.getElementById("status");
+  const setStatus = (t, cls = "") => { $status.textContent = t; $status.className = cls; };
+  const host = () => document.getElementById("host").value.trim();
+
+  // Ein Verbindungsversuch: löst auf, sobald der TV ms.channel.connect schickt.
+  function openSocket(timeout = 8000) {
+    return new Promise((resolve, reject) => {
+      const url = `ws://${host()}:8001/api/v2/channels/samsung.remote.control?name=${encodeURIComponent(NAME)}`;
+      const s = new WebSocket(url);
+      const timer = setTimeout(() => { s.close(); reject(new Error("TV antwortet nicht (an?)")); }, timeout);
+      s.onopen = () => setStatus("Handshake … am TV ggf. bestätigen");
+      s.onerror = () => { clearTimeout(timer); reject(new Error("keine Verbindung – TV an, gleiches WLAN?")); };
+      s.onclose = () => { clearTimeout(timer); reject(new Error("Verbindung getrennt")); };
+      s.onmessage = (e) => {
+        const m = JSON.parse(e.data);
+        if (m.event === "ms.channel.connect") {
+          clearTimeout(timer);
+          ws = s;
+          s.onclose = () => { ws = null; setStatus("Verbindung getrennt"); };
+          setStatus("verbunden mit " + host(), "ok");
+          resolve(s);
+        } else if (m.event === "ms.channel.unauthorized") {
+          clearTimeout(timer); s.close();
+          reject(new Error("TV hat abgelehnt – Geräteliste am TV prüfen"));
+        } else if (m.event === "ms.channel.timeOut") {
+          clearTimeout(timer); s.close();
+          reject(new Error("TimeOut – am TV „Zulassen“ drücken"));
+        } else if (m.event === "ed.installedApp.get") {
+          const apps = m.data?.data ?? m.data ?? [];
+          setStatus(`OK – TV antwortet, ${Array.isArray(apps) ? apps.length : "?"} Apps`, "ok");
+        }
+      };
+    });
+  }
+
+  async function connect() {
+    setStatus("verbinde …");
+    try { await openSocket(); } catch (e) { setStatus(e.message, "bad"); }
+  }
+
+  // Power: verbunden → Standby. Getrennt → WoL über den lokalen Server, dann warten.
+  async function power() {
+    if (ws && ws.readyState === 1) return send("KEY_POWER");
+    setStatus("wecke TV per WoL …");
+    try {
+      const r = await fetch(WAKE_URL);
+      if (!r.ok) throw new Error();
+    } catch {
+      return setStatus("Einschalten braucht den lokalen Server: python tv.py serve", "bad");
+    }
+    for (let i = 1; i <= 12; i++) {
+      setStatus(`TV bootet … ${i * 3}s`);
+      await new Promise(r => setTimeout(r, 3000));
+      try { await openSocket(4000); return; } catch { }
+    }
+    setStatus("TV nicht aufgewacht – WoL im TV aktiviert?", "bad");
+  }
+
+  function send(cmd) {
+    if (!ws || ws.readyState !== 1) return setStatus("nicht verbunden", "bad");
+    ws.send(JSON.stringify({
+      method: "ms.remote.control",
+      params: { Cmd: "Click", DataOfCmd: cmd, Option: "false", TypeOfRemote: "SendRemoteKey" }
+    }));
+  }
+
+  document.getElementById("conn").onclick = connect;
+  document.getElementById("power").onclick = power;
+  document.getElementById("apps").onclick = () => {
+    if (!ws || ws.readyState !== 1) return setStatus("nicht verbunden", "bad");
+    ws.send(JSON.stringify({ method: "ms.channel.emit", params: { event: "ed.installedApp.get", to: "host" } }));
+    setStatus("frage Apps ab …");
+  };
+  document.querySelectorAll("[data-key]").forEach(b => b.onclick = () => send(b.dataset.key));
+
+  const KEYS = {
+    ArrowUp: "KEY_UP", ArrowDown: "KEY_DOWN", ArrowLeft: "KEY_LEFT", ArrowRight: "KEY_RIGHT",
+    Enter: "KEY_ENTER", Backspace: "KEY_RETURN", h: "KEY_HOME", m: "KEY_MUTE", "+": "KEY_VOLUMEUP",
+    "-": "KEY_VOLUMEDOWN", p: "KEY_PLAYPAUSE", s: "KEY_SOURCE"
+  };
+  for (let i = 0; i <= 9; i++) KEYS[i] = "KEY_" + i;  // Ziffern = Kanalnummer
+  addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") return;
+    const k = KEYS[e.key];
+    if (k) { e.preventDefault(); send(k); }
+  });
+  connect();
+</script>
+
+</html>

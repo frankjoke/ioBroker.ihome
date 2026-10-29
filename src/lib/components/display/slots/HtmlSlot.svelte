@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { stateIdFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import type { Slot } from "$lib/types/display";
 
   /**
@@ -8,11 +11,28 @@
    * working (the Samsung remote needs its WebSocket and wake call); the content
    * is authored by someone with editor access, so it is trusted like the rest
    * of the page document.
+   *
+   * When the slot names a state, that state's string value is the document and
+   * wins over the inline text; an empty/missing state falls back to the text.
    */
   let { slot }: { slot: Slot } = $props();
 
+  const stateId = $derived(
+    slot.source &&
+      typeof slot.source === "object" &&
+      slot.source.kind === "state"
+      ? stateIdFor(slot.source.stateId, getVariables())
+      : "",
+  );
+  const stateHtml = $derived(
+    stateId ? ioBroker.states.get(stateId)?.val : undefined,
+  );
   const html = $derived(
-    typeof slot.options?.html === "string" ? slot.options.html : "",
+    typeof stateHtml === "string" && stateHtml.trim()
+      ? stateHtml
+      : typeof slot.options?.html === "string"
+        ? slot.options.html
+        : "",
   );
 </script>
 
