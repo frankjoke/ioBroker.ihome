@@ -66,7 +66,7 @@
     onClose: () => void;
   } = $props();
 
-  type Tab = "device" | "state" | "page" | "badge";
+  type Tab = "device" | "state" | "page" | "badge" | "html";
 
   const TABS: Record<PickerMode, { id: Tab; label: string }[]> = {
     slot: [
@@ -74,6 +74,7 @@
       { id: "state", label: "Any state" },
       { id: "page", label: "Web page" },
       { id: "badge", label: "Badge" },
+      { id: "html", label: "HTML" },
     ],
     source: [
       { id: "device", label: "From device" },
@@ -97,6 +98,7 @@
   const pickedControls = new SvelteMap<string, Control>();
   let stateKind = $state<"auto" | SlotKind>("auto");
   let url = $state("");
+  let html = $state("");
   let badgeKind = $state<"value" | "ago" | "offline">("value");
   let badgeControlId = $state("");
   /** A badge may read any state, not only a control of the chosen device. */
@@ -372,6 +374,12 @@
     if (text) onSlots?.([{ kind: "frame", options: { url: text } }]);
   }
 
+  /** A local HTML document: detail-only by default, full scripts and styles. */
+  function addHtml(): void {
+    if (!html.trim()) return;
+    onSlots?.([{ kind: "html", where: "modal", options: { html: html } }]);
+  }
+
   /** A badge reads a control (value or time since), or the device itself. */
   function addBadge(): void {
     const device = selectedDevice;
@@ -511,6 +519,29 @@
           The page loads in a frame (A38) — the tile's own space, or the modal's
           wide row, as this slot's destination says.
         </p>
+      </div>
+    {:else if tab === "html"}
+      <div class="placeholder">
+        <label class="small grow">
+          <span class="label-mono">HTML</span>
+          <textarea
+            class="html-input"
+            rows="10"
+            bind:value={html}
+            placeholder="<!doctype html>…"
+          ></textarea>
+        </label>
+        <div class="actions">
+          <span class="text-muted">
+            Runs as a local document in a frame; detail page only by default.
+          </span>
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={!html.trim()}
+            onclick={addHtml}>Add HTML slot</button
+          >
+        </div>
       </div>
     {:else}
       {#if tab === "device" && scopedSources}
@@ -816,6 +847,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
+    flex-wrap: wrap;
   }
 
   .tab {
@@ -938,6 +970,15 @@
   .hint-note {
     font-size: 0.75rem;
     margin: 0;
+  }
+
+  .html-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    resize: vertical;
   }
 
   .empty {

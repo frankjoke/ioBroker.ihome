@@ -281,8 +281,9 @@ export function pickSlotControls<T extends PickableControl>(
     if (!slotVisible(slot, options?.active === true)) continue;
 
     // A frame shows a web page (A38): nothing to claim, nothing to consume —
-    // it walks through control-less, so tile, modal and pane all keep it.
-    if (slot.kind === "frame") {
+    // it walks through control-less, so tile, modal and pane all keep it. A
+    // local HTML slot has the same shape.
+    if (slot.kind === "frame" || slot.kind === "html") {
       out.push({ slot });
       continue;
     }

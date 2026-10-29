@@ -81,7 +81,7 @@ export function resolveTile(
   const slots: Slot[] = [];
 
   (tile?.slots ?? []).forEach((slot, index) => {
-    if (slot.kind === "frame") {
+    if (slot.kind === "frame" || slot.kind === "html") {
       slots.push(slot);
       return;
     }

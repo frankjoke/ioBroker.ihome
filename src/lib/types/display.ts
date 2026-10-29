@@ -133,7 +133,8 @@ export type SlotKind =
   | "button"
   | "badge"
   | "history-list"
-  | "frame";
+  | "frame"
+  | "html";
 
 /** A conditional style, evaluated top-to-bottom; the last match wins. */
 export interface Rule {

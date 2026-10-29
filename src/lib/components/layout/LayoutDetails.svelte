@@ -227,6 +227,7 @@
     badge: "label",
     "history-list": "history",
     frame: "web_asset",
+    html: "code",
   };
 
   /** The kinds the Icon block is offered on (A57) — data-bearing slots, not
@@ -458,6 +459,7 @@
     if (slot.kind === "frame") {
       return String(slot.options?.url ?? "") || "no page";
     }
+    if (slot.kind === "html") return slot.label || "HTML";
     const source = slot.source;
     if (!source) return "no source";
     if (typeof source === "string") return source; // legacy v1 source
@@ -475,7 +477,7 @@
    * dormant: it exists, its state is just unavailable right now.
    */
   function slotUnresolved(slot: Slot): boolean {
-    if (slot.kind === "frame") return false;
+    if (slot.kind === "frame" || slot.kind === "html") return false;
     const source = slot.source;
     if (!source) return true;
     if (typeof source === "string") {
@@ -1245,6 +1247,18 @@
                       />
                       <span>ignore pointer</span>
                     </label>
+                  {:else if slot.kind === "html"}
+                    <label class="small grow">
+                      <span class="label-mono">HTML</span>
+                      <textarea
+                        class="html-input"
+                        rows="8"
+                        placeholder="<!doctype html>…"
+                        value={String(slot.options?.html ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, { html: e.currentTarget.value })}
+                      ></textarea>
+                    </label>
                   {:else}
                     <div class="small grow">
                       <span class="label-mono">Source</span>
@@ -1291,7 +1305,7 @@
                     />
                   </label>
                 </div>
-                {#if slot.kind !== "frame"}
+                {#if slot.kind !== "frame" && slot.kind !== "html"}
                   <div class="row">
                     <label class="small grow">
                       <span class="label-mono">Hint</span>
@@ -2031,6 +2045,17 @@
   .row input[type="text"] {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .row textarea.html-input {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    resize: vertical;
   }
 
   .row.between {

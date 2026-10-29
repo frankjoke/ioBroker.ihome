@@ -4,6 +4,7 @@
   import ValueSlot from "./slots/ValueSlot.svelte";
   import HistoryListSlot from "./slots/HistoryListSlot.svelte";
   import FrameSlot from "./slots/FrameSlot.svelte";
+  import HtmlSlot from "./slots/HtmlSlot.svelte";
   import type { Slot } from "$lib/types/display";
   import type {
     EnrichedControl,
@@ -65,6 +66,8 @@
     />
   {:else if slot.kind === "frame"}
     <FrameSlot {slot} />
+  {:else if slot.kind === "html"}
+    <HtmlSlot {slot} />
   {:else if needsControl && control}
     <ControlWidget
       control={control as EnrichedControl}

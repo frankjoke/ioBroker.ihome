@@ -101,7 +101,7 @@
       style:--panel-max={bodyMaxHeight}
     >
       {#each rows as r, i (i)}
-        {#if r.slot.kind === "frame"}
+        {#if r.slot.kind === "frame" || r.slot.kind === "html"}
           {#if r.icon}
             <div class="row frame-cap">
               <span class="row-icon" style:color={r.icon.color}>

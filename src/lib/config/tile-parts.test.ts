@@ -110,6 +110,23 @@ it("a frame slot passes through without a control", () => {
   expect(parts.modal[0].control).toBeUndefined();
 });
 
+it("an html slot passes through and is never the tile face", () => {
+  const parts = tileParts(
+    device(),
+    tile([
+      {
+        kind: "html",
+        options: { html: "<h1>Hello</h1>" },
+        where: "modal",
+      },
+    ]),
+    none,
+  );
+  expect(parts.modal[0].control).toBeUndefined();
+  const value: Slot = { kind: "value", source: "temperature" };
+  expect(headlineSlot([{ kind: "html" }, value])).toBe(value);
+});
+
 it("a writable state source yields a switch row", () => {
   const stateId = "0_userdata.0.x";
   const resolution = resolveTile(

@@ -117,7 +117,7 @@ export function tileParts(
   })
     .filter(
       (r) =>
-        (r.slot.kind === "frame" || r.control) &&
+        (r.slot.kind === "frame" || r.slot.kind === "html" || r.control) &&
         styleOf(r.slot, r.control).hidden !== true,
     )
     .map((r) => ({
@@ -184,7 +184,9 @@ const FACE_KINDS = new Set<SlotKind>([
 export function headlineSlot(slots: Slot[]): Slot | undefined {
   return (
     slots.find((s) => FACE_KINDS.has(s.kind)) ??
-    slots.find((s) => s.kind !== "badge" && s.kind !== "frame") ??
+    slots.find(
+      (s) => s.kind !== "badge" && s.kind !== "frame" && s.kind !== "html",
+    ) ??
     slots[0]
   );
 }
