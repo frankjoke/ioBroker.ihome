@@ -85,8 +85,9 @@ it("a fresh module instance is locked again (a reload re-locks)", async () => {
 
 it("unlocking persists nothing: no localStorage is touched", () => {
   const g = globalThis as { localStorage?: unknown };
-  expect("localStorage" in g).toBe(false);
+  // Node 26 defines the global (as undefined) without --localstorage-file.
+  const before = g.localStorage;
   unlock();
-  expect("localStorage" in g).toBe(false);
+  expect(g.localStorage).toBe(before);
   lock();
 });
