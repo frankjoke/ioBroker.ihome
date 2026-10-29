@@ -3,31 +3,20 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
   import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
-  import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
-  import DevicePicker from "$lib/components/layout/DevicePicker.svelte";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
   import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
-  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     getCanonicalRegistry,
     setCanonicalRegistry,
   } from "$lib/stores/devices.svelte.js";
   import { saveRegistry } from "$lib/registry.svelte.js";
-  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
-  import {
-    BLANK_DEVICE_ID,
-    blankDevice,
-    isBlankPlacement,
-  } from "$lib/config/blank-tile";
   import {
     addPage,
     addSection,
-    appendBlank,
-    appendDevices,
-    attachDevice,
+    appendTile,
     deletePage,
     deletePlacement,
     deleteSection,
@@ -35,18 +24,12 @@
     duplicateSection,
     movePlacement,
     pageTitleTaken,
-    patchPlacement,
-    replacePlacementDevices,
     sectionTitleTaken,
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
   import { addSlot, editTile } from "$lib/config/tile-ops";
-  import {
-    sheetCursor,
-    swapDecision,
-    tileLabel,
-  } from "$lib/config/sheet-cursor";
+  import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -55,7 +38,6 @@
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
-  import type { EnrichedDevice } from "$lib/types/device";
   import type { Device } from "$lib/types/device";
   import type { PageRegistry, Slot } from "$lib/types/display";
 
@@ -79,38 +61,15 @@
   let pendingCreate = $state<
     { kind: "page" } | { kind: "section"; pageId: string } | null
   >(null);
-  /** Change device: the anchor whose device is being swapped, then the confirm. */
-  let pendingSwap = $state<{
-    anchor: PlacementAnchor;
-    deviceId: string;
-    oldName: string;
-  } | null>(null);
-  /** The Device selector, to put its own value back when a swap is cancelled. */
-  let deviceSelect = $state<HTMLSelectElement | undefined>(undefined);
   let moveOpen = $state(false);
   let pickerFor = $state<
-    | {
-        kind: "device";
-        pageId: string;
-        sectionId: string;
-        at?: number;
-        /** The tile whose device is being replaced: cancel changes nothing. */
-        replace?: PlacementAnchor;
-      }
     | { kind: "slot"; anchor: PlacementAnchor; at?: number }
-    | null
-  >(null);
-
-  /** Where a device being created goes: a fresh tile, or an existing blank tile. */
-  let pendingDeviceFor = $state<
-    | { kind: "place"; pageId: string; sectionId: string; at?: number }
-    | { kind: "attach"; anchor: PlacementAnchor }
+    | { kind: "newTile"; pageId: string; sectionId: string; at?: number }
     | null
   >(null);
 
   const registry = $derived(getPageRegistry());
   const devices = $derived($devicesEnrichedStore);
-  const rooms = $derived(roomList(ioBroker.enums));
   const saveFailed = $derived(getLayoutSaveFailed());
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
@@ -237,65 +196,13 @@
    *  use it, so the window's is fine (the sheet is not the tile's surface). */
   let previewBp = $state<Breakpoint>(breakpointFor(1400));
   const currentTile = $derived(tiles.find((t) => t.id === tileId));
-  const tileDevice = $derived(
-    tileAnchor ? deviceOfAnchor(tileAnchor) : undefined,
-  );
 
-  // The sheet's body is one editor at a time: the tile's layout, or a device.
-  // The Device line switches between them — the tile editor's details are
-  // replaced, not stacked under a second long form. Device mode edits the
-  // tile's device, or a brand-new one when the line's `+` asked for it.
-  let mode = $state<"tile" | "device">("tile");
-  let creating = $state(false);
-  const canonicalDevice = $derived(
-    tileDevice
-      ? (getCanonicalRegistry().devices.find((d) => d.id === tileDevice.id) ??
-          null)
-      : null,
-  );
-
-  /** Leave the device editor; a target remembered for a later Save dies with it. */
-  function closeDeviceEditor(): void {
-    creating = false;
-    mode = "tile";
-    pendingDeviceFor = null;
-  }
-
-  function saveDevice(d: Device): void {
-    const target = pendingDeviceFor;
-    pendingDeviceFor = null;
-    const reg = getCanonicalRegistry();
-    const idx = reg.devices.findIndex((x) => x.id === d.id);
-    setCanonicalRegistry({
-      version: (reg.version ?? 0) + 1,
-      updatedAt: Date.now(),
-      devices:
-        idx >= 0
-          ? reg.devices.map((x) => (x.id === d.id ? d : x))
-          : [...reg.devices, d],
-    });
-    saveRegistry();
-    creating = false;
-    mode = "tile";
-    if (target?.kind === "place") {
-      addDevicesTo(target.pageId, target.sectionId, [d.id], target.at);
-    } else if (target?.kind === "attach") {
-      commitLayout(attachDevice(registry, target.anchor, d.id));
-      selection = { kind: "tile", ...target.anchor };
-    }
-  }
-
-  // The modal view, the device editor and a new-device draft all belong to the
-  // tile they were opened for (A50): move to another tile — by the sheet, a
-  // pick, a page fallback or a handoff — and everything closes, rather than
-  // editing the new tile's device under the old screen.
+  // The modal view belongs to the tile it was opened for (A50): move to another
+  // tile and it closes, rather than showing the new tile's preview.
   $effect(() => {
     void tileId;
     untrack(() => {
       modalShown = false;
-      mode = "tile";
-      creating = false;
-      pendingDeviceFor = null;
       moveOpen = false;
     });
   });
@@ -323,145 +230,78 @@
     return () => window.removeEventListener("resize", onResize);
   });
 
-  /** The placement a tree/pane address points at, if it still exists. */
-  function placementOfAnchor(anchor: PlacementAnchor) {
-    return registry.pages
-      .find((p) => p.id === anchor.pageId)
-      ?.groups.find((g) => g.id === anchor.sectionId)
-      ?.tiles?.find((t) => t.id === anchor.placementId);
-  }
-
-  /** The device a tile's placement points at, if it is still in the registry. */
-  function deviceOfAnchor(anchor: PlacementAnchor): EnrichedDevice | undefined {
-    const placement = placementOfAnchor(anchor);
-    const found = placement
-      ? devices.find((d) => d.id === placement.device)
-      : undefined;
-    if (found) return found;
-    return placement && isBlankPlacement(placement) ? blankDevice() : undefined;
-  }
-
-  /** A dangling device is refused: the tree already warns on the row. `at`
-   * inserts the new slot there instead of appending (the list-end `+`). */
+  /** The panel's Add slot: the source picker decides what is read. `at`
+   *  inserts the new slot there instead of appending (the row's `+`). */
   function openSlotPicker(anchor: PlacementAnchor, at?: number): void {
-    if (!deviceOfAnchor(anchor)) return;
     pickerFor = { kind: "slot", anchor, at };
   }
 
-  function addSlotTo(anchor: PlacementAnchor, slot: Slot, at?: number): void {
-    const device = deviceOfAnchor(anchor);
-    if (!device) return;
-    commitLayout(editTile(registry, anchor, (t) => addSlot(t, slot, at)));
-    pickerFor = null;
+  /** A new tile starts with the picker's first slot (S8): never an empty tile. */
+  function openNewTile(pageId: string, sectionId: string, at?: number): void {
+    if (!pageId || !sectionId) return;
+    pickerFor = { kind: "newTile", pageId, sectionId, at };
   }
 
-  /** The device picker's add: place them, then select the first new tile, so the
-   * tree opens its section and the pane shows it ready for its slots (A40). */
-  function addDevicesTo(
-    pageId: string,
-    sectionId: string,
-    deviceIds: string[],
+  function addSlotsTo(
+    anchor: PlacementAnchor,
+    slots: Slot[],
     at?: number,
   ): void {
+    if (!slots.length) return;
+    commitLayout(
+      editTile(registry, anchor, (t) =>
+        slots.reduce(
+          (tile, slot, i) =>
+            addSlot(tile, slot, at === undefined ? undefined : at + i),
+          t,
+        ),
+      ),
+    );
+    pickerFor = null;
+  }
+
+  function addTileWith(
+    pageId: string,
+    sectionId: string,
+    slots: Slot[],
+    at?: number,
+  ): void {
+    if (!slots.length) return;
     const sectionIn = (reg: PageRegistry) =>
       reg.pages
         .find((p) => p.id === pageId)
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
-    const next = appendDevices(registry, pageId, sectionId, deviceIds, at);
-    commitLayout(next);
-    pickerFor = null;
+    let next = appendTile(registry, pageId, sectionId, slots[0], at);
     const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
-    if (added) {
-      selection = { kind: "tile", pageId, sectionId, placementId: added.id };
-    }
-  }
-
-  /** Open the device form to create a device and place it in `target`. */
-  function startNewDevice(target: {
-    kind: "place";
-    pageId: string;
-    sectionId: string;
-    at?: number;
-  }): void {
-    pickerFor = null;
-    pendingDeviceFor = target;
-    creating = true;
-    pageOpen = false;
-    sectionOpen = false;
-    mode = "device";
-  }
-
-  /** A device-less tile (B5): no dedupe, so a section may hold several. */
-  function addBlankTo(pageId: string, sectionId: string, at?: number): void {
-    const sectionIn = (reg: PageRegistry) =>
-      reg.pages
-        .find((p) => p.id === pageId)
-        ?.groups.find((g) => g.id === sectionId);
-    const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
-    const next = appendBlank(registry, pageId, sectionId, at);
-    commitLayout(next);
-    pickerFor = null;
-    const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
-    if (added) {
-      selection = { kind: "tile", pageId, sectionId, placementId: added.id };
-    }
-  }
-
-  /** "Replace this tile's device": pick a device first, then the old placement is
-   *  swapped for a fresh one in its position. The device itself is never touched,
-   *  and cancelling the picker leaves the tile exactly as it was. */
-  function openReplaceDevice(): void {
-    if (!tileAnchor) return;
-    pendingDeviceFor = null;
-    pickerFor = {
-      kind: "device",
-      pageId: tileAnchor.pageId,
-      sectionId: tileAnchor.sectionId,
-      at: tileIndex,
-      replace: tileAnchor,
-    };
-  }
-
-  /** Change device (A25): the Device line's selector picks one. A materialised
-   *  tile asks first — its own config goes with the old device. */
-  function pickSwapDevice(deviceId: string): void {
-    const anchor = tileAnchor;
-    if (!anchor) return;
-    const placement = placementOfAnchor(anchor);
-    const decision = swapDecision(placement, deviceId);
-    if (decision === "noop") return;
-    if (decision === "apply" && placement) {
-      applySwap(anchor, deviceId);
+    if (!added) {
+      pickerFor = null;
       return;
     }
-    if (!placement) return;
-    const oldName =
-      devices.find((d) => d.id === placement.device)?.name ?? placement.device;
-    pendingSwap = { anchor, deviceId, oldName };
+    if (slots.length > 1) {
+      next = editTile(next, { pageId, sectionId, placementId: added.id }, (t) =>
+        slots.slice(1).reduce((tile, slot) => addSlot(tile, slot), t),
+      );
+    }
+    commitLayout(next);
+    pickerFor = null;
+    selection = { kind: "tile", pageId, sectionId, placementId: added.id };
   }
 
-  function applySwap(anchor: PlacementAnchor, deviceId: string): void {
-    const placement = placementOfAnchor(anchor);
-    commitLayout(
-      placement && isBlankPlacement(placement)
-        ? attachDevice(registry, anchor, deviceId)
-        : patchPlacement(
-            registry,
-            anchor.pageId,
-            anchor.sectionId,
-            anchor.placementId,
-            { device: deviceId, tile: undefined },
-          ),
-    );
-    pendingSwap = null;
-  }
-
-  /** Cancelled swap: the select already shows the rejected device (its value
-   *  expression did not change), so put the tile's own back by hand. */
-  function cancelSwap(): void {
-    pendingSwap = null;
-    if (deviceSelect) deviceSelect.value = tileDevice?.id ?? "";
+  /** Persist a device created from the slot picker; it is not placed by itself
+   *  (S9: the picker only returns it as the selected source collection). */
+  function saveNewDevice(d: Device): void {
+    const reg = getCanonicalRegistry();
+    const idx = reg.devices.findIndex((x) => x.id === d.id);
+    setCanonicalRegistry({
+      version: (reg.version ?? 0) + 1,
+      updatedAt: Date.now(),
+      devices:
+        idx >= 0
+          ? reg.devices.map((x) => (x.id === d.id ? d : x))
+          : [...reg.devices, d],
+    });
+    saveRegistry();
   }
 
   function confirmDelete(): void {
@@ -659,12 +499,7 @@
         <option value="">no tiles yet</option>
       {/if}
       {#each tiles as t (t.id)}
-        <option value={t.id}
-          >{tileLabel(
-            t,
-            deviceOfAnchor({ pageId, sectionId, placementId: t.id })?.name,
-          )}</option
-        >
+        <option value={t.id}>{tileLabel(t)}</option>
       {/each}
     </select>
     <button
@@ -682,7 +517,8 @@
       class="icon-btn"
       title="Add tile"
       aria-label="Add tile"
-      onclick={() => (pickerFor = { kind: "device", pageId, sectionId })}
+      disabled={!sectionId}
+      onclick={() => openNewTile(pageId, sectionId)}
     >
       <span class="material-symbols-outlined">add</span>
     </button>
@@ -744,102 +580,13 @@
     </button>
   </div>
 
-  <!-- Device: the fourth line — a selector of devices (changing it is the
-       change-device action) and the switch into the device's own editor. The
-       editor replaces the tile editor below rather than stacking with it. -->
-  <div class="line">
-    <span class="label-mono">Device</span>
-    <select
-      bind:this={deviceSelect}
-      value={tileDevice?.id ?? ""}
-      aria-label="Device"
-      disabled={!tileAnchor}
-      onchange={(e) => pickSwapDevice(e.currentTarget.value)}
-    >
-      {#if !tileDevice}
-        <option value="">no device</option>
-      {/if}
-      {#if currentTile && isBlankPlacement(currentTile)}
-        <option value={BLANK_DEVICE_ID}>Blank tile</option>
-      {/if}
-      {#each devices as d (d.id)}
-        <option value={d.id}>{d.name || d.id}</option>
-      {/each}
-    </select>
-    <button
-      type="button"
-      class="icon-btn"
-      class:on={mode === "device"}
-      title={mode === "device"
-        ? "Back to the tile's layout"
-        : "Edit this device"}
-      aria-label={mode === "device"
-        ? "Back to the tile's layout"
-        : "Edit this device"}
-      aria-expanded={mode === "device"}
-      disabled={!canonicalDevice}
-      onclick={() => {
-        if (mode === "device") {
-          closeDeviceEditor();
-          return;
-        }
-        pendingDeviceFor = null;
-        creating = false;
-        pageOpen = false;
-        sectionOpen = false;
-        mode = "device";
-      }}
-    >
-      <span class="material-symbols-outlined"
-        >{mode === "device" ? "arrow_back" : "edit"}</span
-      >
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Add a device"
-      aria-label="Add a device"
-      onclick={() => {
-        pendingDeviceFor =
-          tileAnchor && currentTile && isBlankPlacement(currentTile)
-            ? { kind: "attach", anchor: tileAnchor }
-            : null;
-        creating = true;
-        pageOpen = false;
-        sectionOpen = false;
-        mode = "device";
-      }}
-    >
-      <span class="material-symbols-outlined">add</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Replace this tile's device"
-      aria-label="Replace this tile's device"
-      disabled={!tileAnchor}
-      onclick={openReplaceDevice}
-    >
-      <span class="material-symbols-outlined">swap_horiz</span>
-    </button>
-  </div>
-
-  <!-- Which editor the body below is: the tile's layout, or a device's form. -->
-  {#if mode === "device" || tileSelection}
-    <span class="label-mono editor-mode"
-      >{mode === "device"
-        ? creating
-          ? "ADD DEVICE"
-          : "EDIT DEVICE"
-        : "EDIT TILE"}</span
-    >
-  {/if}
-
+  <!-- The sheet's body is always the tile editor: the device is a reusable
+       control collection on the Devices page, never a tile's identity. -->
   <!-- The sheet's own hidden Tile: it answers whether there is a detail page
          (A47, via `noteDetail`) and opens that modal for real when the box is
          ticked — only the tile resolves its rows. Non-modal, so it appears over
          the display and the sheet stays usable. -->
-  {#if currentTile && tileDevice}
+  {#if currentTile}
     <div class="modal-view">
       <Tile
         placement={currentTile}
@@ -851,26 +598,9 @@
     </div>
   {/if}
 
-  <!-- One editor at a time: the tile's layout, or a device (the tile's, or a new
-       one). -->
-  {#if mode === "device"}
-    <div class="fold device-editor">
-      {#key creating ? "new" : (canonicalDevice?.id ?? "none")}
-        <DeviceForm
-          device={creating ? null : canonicalDevice}
-          objects={ioBroker.objects}
-          roomsOf={(id) => roomsOfEnum(ioBroker.enums, id)}
-          {rooms}
-          devices={getCanonicalRegistry().devices}
-          showHead={false}
-          onSave={saveDevice}
-          onCancel={() => {
-            closeDeviceEditor();
-          }}
-        />
-      {/key}
-    </div>
-  {:else if tileSelection && !pageOpen && !sectionOpen}
+  <!-- One editor at a time: the selected tile's layout. Page/section edits
+       fold out under their own line and close the tile editor. -->
+  {#if tileSelection && !pageOpen && !sectionOpen}
     <div class="fold tile-editor">
       <LayoutDetails
         {registry}
@@ -889,93 +619,22 @@
 
 {#if pickerFor}
   {@const target = pickerFor}
-  {#if target.kind === "device"}
-    <DevicePicker
-      {devices}
-      {rooms}
-      enums={ioBroker.enums}
-      onBlank={!target.replace
-        ? () => addBlankTo(target.pageId, target.sectionId, target.at)
-        : undefined}
-      onNewDevice={!target.replace
-        ? () =>
-            startNewDevice({
-              kind: "place",
-              pageId: target.pageId,
-              sectionId: target.sectionId,
-              at: target.at,
-            })
-        : undefined}
-      listed={(
-        registry.pages
-          .find((p) => p.id === target.pageId)
-          ?.groups.find((g) => g.id === target.sectionId)?.tiles ?? []
-      )
-        .map((t) => t.device)
-        // The tile being replaced keeps its own device selectable (a fresh tile
-        // with the same device is a valid choice).
-        .filter(
-          (id) =>
-            id !==
-            (target.replace
-              ? placementOfAnchor(target.replace)?.device
-              : undefined),
-        )}
-      onAdd={(deviceIds) => {
-        // Snapshot before closing the picker: `target` reads the reactive value,
-        // which becomes null the moment `pickerFor` is cleared.
-        const replace = target.replace;
-        const targetPage = target.pageId;
-        const targetSection = target.sectionId;
-        const at = target.at;
-        if (replace) {
-          const old = placementOfAnchor(replace);
-          if (old && isBlankPlacement(old)) {
-            commitLayout(attachDevice(registry, replace, deviceIds[0]));
-            pickerFor = null;
-            selection = { kind: "tile", ...replace };
-            return;
-          }
-          const next = replacePlacementDevices(
-            registry,
-            replace.pageId,
-            replace.sectionId,
-            replace.placementId,
-            deviceIds,
-          );
-          commitLayout(next);
-          pickerFor = null;
-          const added = next.pages
-            .find((p) => p.id === targetPage)
-            ?.groups.find((g) => g.id === targetSection)
-            ?.tiles?.find((t) => t.device === deviceIds[0]);
-          if (added) {
-            selection = {
-              kind: "tile",
-              pageId: targetPage,
-              sectionId: targetSection,
-              placementId: added.id,
-            };
-          }
-          return;
-        }
-        addDevicesTo(targetPage, targetSection, deviceIds, at);
-      }}
-      onClose={() => {
-        pickerFor = null;
-        pendingDeviceFor = null;
-      }}
-    />
-  {:else}
-    {@const device = deviceOfAnchor(target.anchor)}
-    {#if device}
-      <SlotPicker
-        {device}
-        onAdd={(slot) => addSlotTo(target.anchor, slot, target.at)}
-        onClose={() => (pickerFor = null)}
-      />
-    {/if}
-  {/if}
+  <SlotPicker
+    {devices}
+    templates={getTemplateRegistry().templates ?? []}
+    title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
+    onAdd={(slots) => {
+      // Snapshot before closing: `target` reads the reactive value, which
+      // becomes null the moment `pickerFor` is cleared.
+      if (target.kind === "newTile") {
+        addTileWith(target.pageId, target.sectionId, slots, target.at);
+      } else {
+        addSlotsTo(target.anchor, slots, target.at);
+      }
+    }}
+    onSaveDevice={saveNewDevice}
+    onClose={() => (pickerFor = null)}
+  />
 {/if}
 
 {#if moveOpen && tileAnchor && currentTile}
@@ -999,21 +658,6 @@
   >
     The tiles disappear from this page. The devices themselves stay in the
     registry.
-  </ConfirmModal>
-{/if}
-
-{#if pendingSwap}
-  <ConfirmModal
-    title={`Change to “${
-      devices.find((d) => d.id === pendingSwap!.deviceId)?.name ??
-      pendingSwap.deviceId
-    }”?`}
-    confirmLabel="Change"
-    onConfirm={() => applySwap(pendingSwap!.anchor, pendingSwap!.deviceId)}
-    onCancel={cancelSwap}
-  >
-    Its own slots, background and active condition are dropped — they were built
-    for {pendingSwap.oldName}. The title and the position stay.
   </ConfirmModal>
 {/if}
 
@@ -1071,11 +715,6 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 1.6rem;
-  }
-
-  /* The mode label sits over the body it names, not in the line rhythm. */
-  .editor-mode {
-    margin-top: 0.2rem;
   }
 
   .line {

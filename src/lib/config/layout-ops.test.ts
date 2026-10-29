@@ -2,9 +2,7 @@ import { it, expect } from "vitest";
 import {
   addPage,
   addSection,
-  appendBlank,
-  appendDevices,
-  attachDevice,
+  appendTile,
   deletePage,
   deletePlacement,
   deleteSection,
@@ -22,7 +20,6 @@ import {
   patchPlacement,
   patchSection,
   placementsOfDevice,
-  replacePlacementDevices,
   sectionTitleTaken,
 } from "$lib/config/layout-ops";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
@@ -82,18 +79,18 @@ it("duplicates a page with fresh ids for its sections and tiles", () => {
   expect(copy.groups[0].tiles?.[0].device).toBe("t1dev");
 });
 
-it("appends devices once, in order, skipping what is already there", () => {
-  const next = appendDevices(regWithTiles(), "p", "g", [
-    "x",
-    "t1dev",
-    "y",
-    "x",
-  ]);
-  expect(next.pages[0].groups[0].tiles?.map((t) => t.device)).toEqual([
-    "t1dev",
-    "x",
-    "y",
-  ]);
+it("appends a tile with its first slot, at the given index", () => {
+  const slot = {
+    kind: "value" as const,
+    source: { kind: "state" as const, stateId: "x" },
+  };
+  const next = appendTile(regWithTiles(), "p", "g", slot);
+  expect(next.pages[0].groups[0].tiles?.at(-1)?.tile?.slots).toEqual([slot]);
+  expect(next.pages[0].groups[0].tiles?.at(-1)?.id).toBeTruthy();
+
+  const top = appendTile(regWithTiles(), "p", "g", slot, 0);
+  expect(top.pages[0].groups[0].tiles?.[0].tile?.slots).toEqual([slot]);
+  expect(top.pages[0].groups[0].tiles?.[1].id).toBe("g-t0");
 });
 
 it("moves a placement between sections", () => {
@@ -187,11 +184,17 @@ it("inserts a page, section and tiles at a given index", () => {
     "G2",
   ]);
 
-  const topTiles = appendDevices(regWithTiles(), "p", "g", ["x"], 0);
-  expect(topTiles.pages[0].groups[0].tiles?.map((t) => t.device)).toEqual([
-    "x",
-    "t1dev",
+  const topTiles = appendTile(
+    regWithTiles(),
+    "p",
+    "g",
+    { kind: "value", source: "x" },
+    0,
+  );
+  expect(topTiles.pages[0].groups[0].tiles?.[0].tile?.slots).toEqual([
+    { kind: "value", source: "x" },
   ]);
+  expect(topTiles.pages[0].groups[0].tiles?.[1].id).toBe("g-t0");
 });
 
 it("moves a page and a section by index", () => {
@@ -227,7 +230,7 @@ it("returns the registry unchanged for an unknown page or section", () => {
   expect(deleteSection(reg0, "nope", "g").pages).toEqual(reg0.pages);
   expect(deletePage(reg0, "nope").pages).toEqual(reg0.pages);
   expect(
-    appendDevices(reg0, "p", "nope", ["x"]).pages[0].groups[0].tiles,
+    appendTile(reg0, "p", "nope", { kind: "value" }).pages[0].groups[0].tiles,
   ).toEqual(reg0.pages[0].groups[0].tiles);
   expect(deletePage(reg0, "nope").pages[0].groups[0].tiles?.[0].device).toBe(
     "t1dev",
@@ -360,49 +363,6 @@ it("finds and removes every placement of a device, on every page", () => {
   expect(none.registry).toBe(extra);
 });
 
-it("replaces a placement's device with a fresh tile, keeping the position", () => {
-  const { registry: next } = (() => {
-    return {
-      registry: replacePlacementDevices(regWithTiles(), "p", "g", "g-t0", [
-        "newdev",
-      ]),
-    };
-  })();
-  const tiles = next.pages[0].groups[0].tiles ?? [];
-  expect(tiles).toHaveLength(1);
-  expect(tiles[0].id).not.toBe("g-t0"); // a fresh placement, no stale config
-  expect(tiles[0].device).toBe("newdev");
-  // several picks fill the same position in order
-  const multi = replacePlacementDevices(regWithTiles(), "p", "g", "g-t0", [
-    "a",
-    "b",
-  ]);
-  expect(multi.pages[0].groups[0].tiles?.map((t) => t.device)).toEqual([
-    "a",
-    "b",
-  ]);
-  // a stale id changes nothing (same document)
-  expect(
-    replacePlacementDevices(regWithTiles(), "p", "g", "gone", [
-      "a",
-    ]).pages[0].groups[0].tiles?.map((t) => t.device),
-  ).toEqual(["t1dev"]);
-});
-
-it("appendBlank adds several blank placements", () => {
-  const base = reg([{ id: "p", title: "P", groups: [{ id: "g", tiles: [] }] }]);
-  const one = appendBlank(base, "p", "g");
-  const two = appendBlank(one, "p", "g");
-  expect(two.pages[0].groups[0].tiles).toHaveLength(2);
-  expect(two.pages[0].groups[0].tiles.every((t) => t.device === "@blank")).toBe(
-    true,
-  );
-  expect(two.pages[0].groups[0].tiles[0].tile).toEqual({
-    size: { w: 1, h: 1 },
-    slots: [],
-  });
-});
-
 it("deleteDevicePlacements leaves blank placements alone", () => {
   const base = reg([
     {
@@ -412,39 +372,6 @@ it("deleteDevicePlacements leaves blank placements alone", () => {
     },
   ]);
   expect(deleteDevicePlacements(base, "dev-1").removed).toBe(0);
-});
-
-it("attachDevice keeps the tile's title and configuration", () => {
-  const base = reg([
-    {
-      id: "p",
-      title: "P",
-      groups: [
-        {
-          id: "g",
-          tiles: [
-            {
-              id: "b",
-              device: "@blank",
-              title: "Frame",
-              tile: { slots: [{ kind: "frame", options: { url: "x" } }] },
-            },
-          ],
-        },
-      ],
-    },
-  ]);
-  const next = attachDevice(
-    base,
-    { pageId: "p", sectionId: "g", placementId: "b" },
-    "dev-1",
-  );
-  expect(next.pages[0].groups[0].tiles[0]).toEqual({
-    id: "b",
-    device: "dev-1",
-    title: "Frame",
-    tile: { slots: [{ kind: "frame", options: { url: "x" } }] },
-  });
 });
 
 it("duplicating a blank tile keeps it blank", () => {

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { SvelteSet } from "svelte/reactivity";
   import { isHexColor } from "$lib/config/appearance";
   import {
     movePlacement,
@@ -19,18 +18,9 @@
   } from "$lib/config/size-ops";
   import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
   import { getSettings } from "$lib/stores/settings.svelte";
-  import {
-    effectiveSpan,
-    pickable,
-    pickControl,
-    pickSlotControls,
-    resolveControl,
-    resolveTemplate,
-    slotVisible,
-  } from "$lib/config/template-ops";
+  import { effectiveSpan, slotVisible } from "$lib/config/template-ops";
   import {
     addRule,
-    applyTemplate,
     clearRuleIcons,
     editTile,
     evalActive,
@@ -47,20 +37,14 @@
     setSlotSource,
     setSlotWhere,
     slotWhere,
-    templateFromTile,
-    upsertTemplate,
   } from "$lib/config/tile-ops";
   import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
+  import { resolveTile } from "$lib/config/tile-resolve";
+  import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
-  import {
-    commitTemplates,
-    getTemplateRegistry,
-    getTemplateSaveFailed,
-    isTemplatesWritable,
-  } from "$lib/stores/templates.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -70,7 +54,6 @@
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
-  import { BLANK_DEVICE_ID, blankDevice } from "$lib/config/blank-tile";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -83,11 +66,12 @@
     Slot,
     SlotIcon,
     SlotKind,
+    SlotSource,
     SlotSpark,
     StateLook,
     TileConfig,
   } from "$lib/types/display";
-  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
+  import type { EnrichedDevice } from "$lib/types/device";
   import type { Snippet } from "svelte";
 
   let {
@@ -131,12 +115,6 @@
   let iconPicker = $state<null | "page" | "section">(null);
   /** The source picker for the tile's active condition. */
   let activePicker = $state(false);
-  /** Template actions in flight. */
-  let templateName = $state("");
-  let pendingReplace = $state<string | null>(null);
-  let applyId = $state("");
-  let pendingApply = $state(false);
-  let pendingReset = $state(false);
   /** Slot UI: which row is expanded, which rules block is open, pickers. */
   let expandedSlot = $state<number | null>(null);
   let openRules = $state<number | null>(null);
@@ -166,48 +144,37 @@
       ? (section?.tiles ?? []).find((t) => t.id === selection.placementId)
       : undefined,
   );
+  const sourceLook = $derived<SourceLook>({
+    devices,
+    states: (ioBroker.states ?? new Map()) as Map<string, any>,
+    objects: (ioBroker.objects ?? new Map()) as Map<string, any>,
+  });
+  /** The tile's synthetic control bag: what its slots read, nothing more. */
   const device = $derived(
-    tile
-      ? (devices.find((d) => d.id === tile.device) ??
-          (tile.device === BLANK_DEVICE_ID ? blankDevice() : undefined))
-      : undefined,
+    resolveTile(tile?.tile, tile?.title, sourceLook).device,
   );
-  /** A tile without a device: no chain, no templates, no "This device". */
-  const blank = $derived(device?.id === BLANK_DEVICE_ID);
 
-  const templates = $derived(getTemplateRegistry().templates ?? []);
   /** The device state picker's room filters, as on the Devices page. */
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
-  const typeTemplates = $derived(
-    device ? templates.filter((t) => t.type === device.type) : [],
-  );
-
-  /** Where the tile's config came from: a user template, or the device chain. */
-  const sourceLine = $derived.by(() => {
-    const id = tile?.tile?.template;
-    if (!id) return "device chain";
-    const name = templates.find((t) => t.id === id)?.name;
-    return name ? `copied from ${name}` : "device chain";
-  });
 
   const activeCond = $derived(tile?.tile?.active);
+  const activeResolved = $derived(
+    activeCond?.source && typeof activeCond.source === "object"
+      ? resolveSlotSource(activeCond.source, sourceLook)
+      : undefined,
+  );
   const activeSource = $derived(
     typeof activeCond?.source === "string" ? activeCond.source : undefined,
   );
-  const activeControl = $derived(
-    activeSource && device
-      ? resolveControl(device.controls ?? [], activeSource)
-      : undefined,
-  );
   const activeFound = $derived(
-    !activeSource ||
-      !!activeControl ||
-      !!(ioBroker.objects as Map<string, any>)?.get?.(activeSource),
+    !activeCond?.source ||
+      (activeResolved ? activeResolved.available !== false : false) ||
+      !!sourceLook.objects.get(activeSource ?? ""),
   );
   const activeValue = $derived(
-    activeControl
-      ? activeControl.liveValue
+    activeResolved
+      ? activeResolved.value
       : (ioBroker.states as Map<string, any>)?.get?.(activeSource ?? "")?.val,
   );
   const readingText = $derived.by(() => {
@@ -226,11 +193,8 @@
     { op: "ne", label: "≠" },
   ];
 
-  /** The rows the pane lists: the tile's own slots, else the chain's (A18). */
-  const shownSlots = $derived(
-    tile?.tile?.slots ??
-      (blank ? [] : device ? resolveTemplate(device, templates).slots : []),
-  );
+  /** The rows the pane lists: the tile's own slots (v2: always these). */
+  const shownSlots = $derived(tile?.tile?.slots ?? []);
 
   /** The states the look block edits (A71): the inactive one is also the
    *  tile's default, so a tile with no active condition edits just that. */
@@ -253,15 +217,6 @@
     const base = ruleScope(device.controls ?? [], getVirtualPool());
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
-
-  /** The pane's own resolution of the slots, for the Sparkline hint (A63). */
-  const pickedRows = $derived(
-    device
-      ? pickSlotControls(shownSlots, device.controls ?? [], {
-          active: tileActive,
-        })
-      : [],
-  );
 
   const KIND_GLYPH: Record<SlotKind, string> = {
     value: "numbers",
@@ -453,7 +408,7 @@
     edit((t) => ({ ...t, size }));
   }
 
-  function setActiveSource(source: string): void {
+  function setActiveSource(source: SlotSource | string): void {
     activePicker = false;
     edit((t) => ({
       ...t,
@@ -486,32 +441,6 @@
     edit((t) => setLook(t, state, patch));
   }
 
-  function saveTemplate(): void {
-    const name = templateName.trim();
-    if (!name || !tile || !device) return;
-    if (templates.some((t) => t.name === name && t.type === device.type)) {
-      pendingReplace = name;
-      return;
-    }
-    doSaveTemplate(name);
-  }
-
-  function doSaveTemplate(name: string): void {
-    if (!tile || !device) return;
-    const next = templateFromTile(tile.tile ?? {}, device, templates, name);
-    commitTemplates(upsertTemplate(getTemplateRegistry(), next));
-    pendingReplace = null;
-    templateName = "";
-  }
-
-  function doApply(): void {
-    const chosen = templates.find((t) => t.id === applyId);
-    if (!chosen || !tile) return;
-    setTile({ tile: applyTemplate(tile, chosen).tile });
-    pendingApply = false;
-    applyId = "";
-  }
-
   /** Appends the placement to the chosen section, then the pane follows it. */
   function moveTileTo(key: string): void {
     const a = anchor();
@@ -536,67 +465,58 @@
   // ------------------------------------------------------------------- slots
 
   /**
-   * The control a slot's hint finds right now — on a fresh hand, because the
-   * display walks the slots in order and grows a used-set as it goes (A36).
+   * A source's own label, for the active-condition line: `Device.Control`,
+   * a state id, or a device name (v2 sources are objects).
    */
-  function hintedControl(slot: Slot): EnrichedControl | undefined {
-    const hint = String(slot.options?.pick ?? "");
-    if (!hint.trim()) return undefined;
-    const picked = pickControl(
-      pickable(device?.controls ?? []),
-      hint,
-      new SvelteSet<string>(),
-    );
-    return picked
-      ? (device?.controls ?? []).find((c) => c.id === picked.id)
-      : undefined;
+  function sourceLabel(source: SlotSource | string): string {
+    return slotLabel({ kind: "value", source });
   }
 
   /**
-   * What a slot row shows next to its kind: the control it reads under the
-   * device's own name for it (A36) — a raw state keeps its id, a hint names
-   * the control it finds. The hint's own wording stays in the fold-out editor.
+   * What a slot row shows next to its kind: `Device.Control` for a control
+   * reference, the state id for a raw state, the URL for a frame (S3).
    */
   function slotLabel(slot: Slot): string {
     if (slot.kind === "frame") {
-      const url = String(slot.options?.url ?? "");
-      return url || "no page";
+      return String(slot.options?.url ?? "") || "no page";
     }
-    if (slot.source) {
-      if (typeof slot.source !== "string") return slot.source.kind;
-      const control = resolveControl(device?.controls ?? [], slot.source);
-      return control ? control.label || control.feature : slot.source;
-    }
-    const hinted = hintedControl(slot);
-    if (hinted) return hinted.label || hinted.feature;
-    const hint = String(slot.options?.pick ?? "");
-    return hint.trim() ? hint : "auto";
-  }
-
-  /** A source that names a raw state object rather than a control (A21). */
-  function isRawState(source: string): boolean {
-    return !!(ioBroker.objects as Map<string, any>)?.get?.(source);
+    const source = slot.source;
+    if (!source) return "no source";
+    if (typeof source === "string") return source; // legacy v1 source
+    if (source.kind === "state") return source.stateId;
+    const device = devices.find((d) => d.id === source.device);
+    if (source.kind === "device") return device?.name || source.device;
+    const control = device?.controls?.find((c) => c.id === source.control);
+    const name = control?.label || control?.feature || source.control;
+    return device ? `${device.name || device.id}.${name}` : name;
   }
 
   /**
-   * A20: a source or hint that matches nothing is dormant on the display, so the
-   * pane marks it and offers to bind it. `ago`/`offline` are the badge clock's
-   * own sources, not control names.
+   * A source that resolves to nothing is dormant on the display, so the pane
+   * marks it and offers to bind it. A control that merely is offline is not
+   * dormant: it exists, its state is just unavailable right now.
    */
   function slotUnresolved(slot: Slot): boolean {
-    if (slot.kind === "badge" && typeof slot.source === "string") {
-      if (slot.source === "ago" || slot.source === "offline") return false;
-    }
-    if (slot.source) {
-      if (typeof slot.source !== "string") return false;
+    if (slot.kind === "frame") return false;
+    const source = slot.source;
+    if (!source) return true;
+    if (typeof source === "string") {
       return (
-        !resolveControl(device?.controls ?? [], slot.source) &&
-        !isRawState(slot.source)
+        !devices.some((d) =>
+          (d.controls ?? []).some(
+            (c) =>
+              c.feature === source || c.id === source || c.stateId === source,
+          ),
+        ) && !sourceLook.objects.get(source)
       );
     }
-    const hint = String(slot.options?.pick ?? "");
-    if (!hint.trim()) return false;
-    return !hintedControl(slot);
+    if (source.kind === "state") return !sourceLook.objects.get(source.stateId);
+    if (source.kind === "device") {
+      return !devices.some((d) => d.id === source.device);
+    }
+    return !devices
+      .find((d) => d.id === source.device)
+      ?.controls?.some((c) => c.id === source.control);
   }
 
   /** A rule's live dot: green when `when` evaluates to true, red on error. */
@@ -703,8 +623,24 @@
   /** Does this slot's reading carry history (A63)? Drives the hint and the
    *  disabled toggle. */
   function sparkReady(i: number): boolean {
-    const slot = shownSlots[i];
-    return hasHistory(pickedRows.find((r) => r.slot === slot)?.control);
+    const source = shownSlots[i]?.source;
+    if (!source) return false;
+    if (typeof source === "string") {
+      return hasHistory(
+        devices
+          .flatMap((d) => d.controls ?? [])
+          .find(
+            (c) =>
+              c.feature === source || c.id === source || c.stateId === source,
+          ),
+      );
+    }
+    if (source.kind !== "control") return false;
+    return hasHistory(
+      devices
+        .find((d) => d.id === source.device)
+        ?.controls?.find((c) => c.id === source.control),
+    );
   }
 
   /** The colour select's value: "" (auto), a palette token, or "custom". */
@@ -951,7 +887,7 @@
           class="btn btn-sm"
           onclick={() => (activePicker = true)}
         >
-          {activeCond?.source || "not set"}
+          {activeCond?.source ? sourceLabel(activeCond.source) : "not set"}
         </button>
         {#if activeCond}
           <select
@@ -1134,7 +1070,6 @@
             class="icon-btn"
             title="Add slot"
             aria-label="Add slot"
-            disabled={!device}
             onclick={() => requestAddSlot()}
           >
             <span class="material-symbols-outlined">add</span>
@@ -1238,8 +1173,11 @@
                 <button
                   type="button"
                   class="icon-btn"
-                  title="Remove slot"
+                  title={shownSlots.length <= 1
+                    ? "One slot must stay — a tile is never empty"
+                    : "Remove slot"}
                   aria-label="Remove slot"
+                  disabled={shownSlots.length <= 1}
                   onclick={() => removeSlotAt(i)}
                 >
                   <span class="material-symbols-outlined">delete</span>
@@ -1316,22 +1254,13 @@
                         type="button"
                         class="btn btn-sm source-pick"
                         title={slot.source
-                          ? `Change source — now ${slot.source}`
-                          : "Pin one control instead of a hint"}
+                          ? `Change source — now ${slotLabel(slot)}`
+                          : "Choose a source"}
                         onclick={() => (sourcePickerFor = i)}
                       >
                         <Icon value="edit" size={15} />
-                        <span class="source-name"
-                          >{slot.source
-                            ? slotLabel(slot)
-                            : slot.options?.pick
-                              ? `${slotLabel(slot)} (hint)`
-                              : "auto (next control)"}</span
-                        >
+                        <span class="source-name">{slotLabel(slot)}</span>
                       </button>
-                      {#if typeof slot.source === "string" && isRawState(slot.source)}
-                        <span class="hint-badge text-muted">read-only</span>
-                      {/if}
                     </div>
                   {/if}
                 </div>
@@ -1980,57 +1909,6 @@
       </div>
     </div>
 
-    {#if !blank}
-      <div class="field">
-        <span class="label-mono">Template</span>
-        <span class="device-name">{sourceLine}</span>
-        <div class="row">
-          <input
-            type="text"
-            placeholder="template name"
-            bind:value={templateName}
-          />
-          <button
-            type="button"
-            class="btn btn-sm"
-            disabled={!isTemplatesWritable() || !templateName.trim()}
-            onclick={saveTemplate}>Save as template…</button
-          >
-          {#if getTemplateSaveFailed()}
-            <span
-              class="badge badge-danger"
-              title="The last write to templateList failed">not saved</span
-            >
-          {/if}
-        </div>
-        {#if typeTemplates.length}
-          <div class="row">
-            <select bind:value={applyId}>
-              <option value="">apply a template…</option>
-              {#each typeTemplates as t (t.id)}
-                <option value={t.id}>{t.name}</option>
-              {/each}
-            </select>
-            <button
-              type="button"
-              class="btn btn-sm"
-              disabled={!applyId}
-              onclick={() => (pendingApply = true)}>Apply</button
-            >
-          </div>
-        {/if}
-        {#if tile.tile}
-          <div class="row">
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => (pendingReset = true)}>Reset to chain</button
-            >
-          </div>
-        {/if}
-      </div>
-    {/if}
-
     <label class="field">
       <span class="label-mono">Move to section</span>
       <select
@@ -2065,32 +1943,32 @@
     />
   {/if}
 
-  {#if activePicker && device}
+  {#if activePicker}
     <StatePicker
-      deviceType={device.type}
-      {device}
+      deviceType="Custom"
+      {devices}
       objects={ioBroker.objects}
       {roomsOf}
       {rooms}
       enums={ioBroker.enums}
-      mode="source"
+      mode="slot"
       onAdd={() => {}}
-      onSource={setActiveSource}
+      onSlotSource={setActiveSource}
       onClose={() => (activePicker = false)}
     />
   {/if}
 
-  {#if sourcePickerFor !== null && device}
+  {#if sourcePickerFor !== null}
     <StatePicker
-      deviceType={device.type}
-      {device}
+      deviceType="Custom"
+      {devices}
       objects={ioBroker.objects}
       {roomsOf}
       {rooms}
       enums={ioBroker.enums}
-      mode="source"
+      mode="slot"
       onAdd={() => {}}
-      onSource={(source) => {
+      onSlotSource={(source) => {
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;
         if (slotIndex === null) return;
@@ -2147,44 +2025,6 @@
       }}
       onClose={() => (lookIconFor = null)}
     />
-  {/if}
-
-  {#if pendingReplace}
-    <ConfirmModal
-      title={`Replace “${pendingReplace}”?`}
-      confirmLabel="Replace"
-      onConfirm={() => doSaveTemplate(pendingReplace!)}
-      onCancel={() => (pendingReplace = null)}
-    >
-      A template of that name already exists for this device type. Saving
-      replaces it (same id), so every tile that uses it changes too.
-    </ConfirmModal>
-  {/if}
-
-  {#if pendingApply}
-    <ConfirmModal
-      title="Apply this template?"
-      confirmLabel="Apply"
-      onConfirm={doApply}
-      onCancel={() => (pendingApply = false)}
-    >
-      Its size, slots and background replace the tile's. The active condition
-      and the tile's title stay.
-    </ConfirmModal>
-  {/if}
-
-  {#if pendingReset}
-    <ConfirmModal
-      title="Reset this tile?"
-      confirmLabel="Reset"
-      onConfirm={() => {
-        setTile({ tile: undefined });
-        pendingReset = false;
-      }}
-      onCancel={() => (pendingReset = false)}
-    >
-      The tile returns to its device/template chain.
-    </ConfirmModal>
   {/if}
 </div>
 
@@ -2252,10 +2092,6 @@
     display: flex;
     align-items: center;
     gap: 0.25rem;
-  }
-
-  .device-name {
-    font-size: var(--body-sm);
   }
 
   .live {

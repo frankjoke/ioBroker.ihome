@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { DeviceType, Control } from "$lib/types/device";
   import { newId } from "$lib/utils/ids";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -8,10 +9,12 @@
   import { SvelteSet } from "svelte/reactivity";
   import StateBrowser from "./StateBrowser.svelte";
   import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
+  import type { SlotSource } from "$lib/types/display";
 
   let {
     deviceType,
     device,
+    devices = [],
     objects,
     roomsOf,
     rooms,
@@ -19,36 +22,64 @@
     mode = "add",
     onAdd,
     onSource,
+    onSlotSource,
     onClose,
   }: {
     deviceType: DeviceType;
     /** In source mode: the device whose controls are offered above the tree. */
     device?: EnrichedDevice;
+    /** In slot mode: every device to choose a control from. */
+    devices?: EnrichedDevice[];
     objects: Map<string, any>;
     roomsOf: (id: string) => string[];
     rooms: { id: string; label: string; icon?: string }[];
     enums?: any;
     /** "replace" points an existing control at another state — one pick only.
-     *  "source" returns one source string for a slot or active condition. */
-    mode?: "add" | "replace" | "source";
+     *  "source" returns one source string, "slot" a v2 SlotSource. */
+    mode?: "add" | "replace" | "source" | "slot";
     onAdd: (controls: Control[]) => void;
     onSource?: (source: string) => void;
+    onSlotSource?: (source: SlotSource) => void;
     onClose: () => void;
   } = $props();
 
-  const isSource = $derived(mode === "source");
+  const isSource = $derived(mode === "source" || mode === "slot");
+
+  // Slot mode picks a control from any device; the list starts on the one the
+  // caller named.
+  let chosenDeviceId = $state(
+    untrack(() => device?.id ?? devices[0]?.id ?? ""),
+  );
+  const chosenDevice = $derived(
+    devices.find((d) => d.id === chosenDeviceId) ?? device,
+  );
 
   const selection = new SvelteSet<string>();
 
-  const controls = $derived((device?.controls ?? []).filter((c) => !c.hidden));
+  const controls = $derived(
+    (chosenDevice?.controls ?? []).filter((c) => !c.hidden),
+  );
 
   /** A source points at a feature while that is unambiguous on this device,
    *  else at the control's id — exactly what the slot pickers store (A36). */
   function pickControl(c: EnrichedControl) {
+    if (mode === "slot") {
+      if (!chosenDevice) return;
+      onSlotSource?.({
+        kind: "control",
+        device: chosenDevice.id,
+        control: c.id,
+      });
+      return;
+    }
     onSource?.(sourceForControl(controls, c) || c.id);
   }
 
   function toggle(id: string) {
+    if (mode === "slot") {
+      onSlotSource?.({ kind: "state", stateId: id });
+      return;
+    }
     if (mode === "source") {
       onSource?.(id);
       return;
@@ -125,9 +156,22 @@
       </button>
     </div>
 
+    {#if mode === "slot" && devices.length > 1}
+      <label class="device-select">
+        <span class="label-mono">Device</span>
+        <select bind:value={chosenDeviceId}>
+          {#each devices as d (d.id)}
+            <option value={d.id}>{d.name || d.id}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
+
     {#if isSource && controls.length}
       <div class="device-sources">
-        <span class="device-sources-label">This device</span>
+        <span class="device-sources-label"
+          >{chosenDevice?.name || "This device"}</span
+        >
         <div class="device-sources-list">
           {#each controls as c (c.id)}
             <button
@@ -220,6 +264,17 @@
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
+  }
+
+  .device-select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .device-select select {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .device-sources {

@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { sheetCursor, swapDecision, tileLabel } from "$lib/config/sheet-cursor";
+import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 const placement = (id: string, device = "d1"): Placement => ({
@@ -109,16 +109,7 @@ it("takes the display's page when it is given, and the selection's otherwise", (
   expect(sheetCursor(twoPages(), null, "gone").pageId).toBe("rooms");
 });
 
-it("decides what changing a tile's device means", () => {
-  expect(swapDecision(undefined, "d2")).toBe("noop");
-  expect(swapDecision(placement("t1", "d1"), "")).toBe("noop");
-  expect(swapDecision(placement("t1", "d1"), "d1")).toBe("noop");
-  expect(swapDecision(placement("t1", "d1"), "d2")).toBe("apply");
-  const own = { ...placement("t1", "d1"), tile: { slots: [] } };
-  expect(swapDecision(own, "d2")).toBe("confirm");
-});
-
-it("labels a tile name · w×h, degrading one step at a time", () => {
+it("labels a tile name · w×h, degrading to the title and then Tile", () => {
   const sized: Placement = {
     ...placement("t1", "d1"),
     tile: { size: { w: 6, h: 4 } },
@@ -127,19 +118,12 @@ it("labels a tile name · w×h, degrading one step at a time", () => {
   expect(tileLabel({ ...sized, title: "Warmwasser" }, "Heizung")).toBe(
     "Warmwasser · 6×4",
   );
-  // No device left (deleted), no title: the id it still points at.
-  expect(tileLabel(placement("t1", "e59a"))).toBe("e59a");
+  // No title and no device name: the tile is just a tile.
+  expect(tileLabel(placement("t1", "e59a"))).toBe("Tile");
   expect(tileLabel({ ...placement("t1"), title: "" }, "Garten")).toBe("Garten");
 });
 
 it("labels a device-less placement and keeps a title over the fallback", () => {
   expect(tileLabel({ id: "t" })).toBe("Tile");
   expect(tileLabel({ id: "t", title: "Frame" })).toBe("Frame");
-});
-
-it("swaps a blank placement without the config-loss confirmation", () => {
-  expect(
-    swapDecision({ id: "t", device: "@blank", tile: { slots: [] } }, "dev-1"),
-  ).toBe("apply");
-  expect(swapDecision({ id: "t", device: "@blank" }, "")).toBe("noop");
 });

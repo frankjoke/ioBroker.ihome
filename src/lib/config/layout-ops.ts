@@ -1,8 +1,13 @@
 import { newId } from "$lib/utils/ids";
 import { deepCopy } from "$lib/utils/json";
 import { slugify, uniqueSlug } from "$lib/config/slug";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
-import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
+import type {
+  Group,
+  Page,
+  PageRegistry,
+  Placement,
+  Slot,
+} from "$lib/types/display";
 
 /**
  * Every mutation the layout editor can make, as a pure function.
@@ -317,71 +322,25 @@ export function patchSection(
 // ---------------------------------------------------------------- placements
 
 /**
- * Append devices to a section as placements, in the given order. Ids already in
- * the section are skipped, and so are repeats inside `deviceIds` — the picker
- * can hand us a list with duplicates without creating two tiles for one device.
- * `at` inserts at that index instead of appending (the list-end `+`).
+ * Add a tile that starts with its first slot (S8): a tile is never empty, and
+ * the source picker's pick is what creates it. `at` inserts at that index
+ * instead of appending (the list-end `+`).
  */
-export function appendDevices(
+export function appendTile(
   reg: PageRegistry,
   pageId: string,
   sectionId: string,
-  deviceIds: string[],
-  at?: number,
-): PageRegistry {
-  return mapSection(reg, pageId, sectionId, (section) => {
-    const seen = new Set((section.tiles ?? []).map((tile) => tile.device));
-    const added: Placement[] = [];
-    for (const device of deviceIds) {
-      if (!device || seen.has(device)) continue;
-      seen.add(device);
-      added.push({ id: newId(), device });
-    }
-    const tiles = [...(section.tiles ?? [])];
-    tiles.splice(at ?? tiles.length, 0, ...added);
-    return { ...section, tiles };
-  });
-}
-
-/**
- * Append one blank placement (no device). No device dedupe: a section may hold
- * several blank tiles. `at` inserts at that index instead of appending.
- */
-export function appendBlank(
-  reg: PageRegistry,
-  pageId: string,
-  sectionId: string,
+  slot: Slot,
   at?: number,
 ): PageRegistry {
   return mapSection(reg, pageId, sectionId, (section) => {
     const tiles = [...(section.tiles ?? [])];
     tiles.splice(at ?? tiles.length, 0, {
       id: newId(),
-      device: BLANK_DEVICE_ID,
-      // B5: the blank tile is pinned to 1x1 and owns an empty slot list, so
-      // attaching a device before configuring it does not adopt its preset.
-      tile: { size: { w: 1, h: 1 }, slots: [] },
+      tile: { slots: [slot] },
     });
     return { ...section, tiles };
   });
-}
-
-/**
- * Attach a device to a placement in place — a blank tile keeps its title and
- * tile config (frame, raw slots, background). The device itself is untouched.
- */
-export function attachDevice(
-  reg: PageRegistry,
-  anchor: PlacementAnchor,
-  deviceId: string,
-): PageRegistry {
-  return patchPlacement(
-    reg,
-    anchor.pageId,
-    anchor.sectionId,
-    anchor.placementId,
-    { device: deviceId },
-  );
 }
 
 export function deletePlacement(
@@ -394,33 +353,6 @@ export function deletePlacement(
     ...section,
     tiles: (section.tiles ?? []).filter((tile) => tile.id !== placementId),
   }));
-}
-
-/**
- * Put fresh placements for `deviceIds` where the old placement was — the tile
- * editor's "replace this tile's device". The old placement's own config (slots,
- * title, size) is dropped: it was built for the old device. The device itself
- * stays in the registry, so it is still pickable everywhere. A stale id changes
- * nothing.
- */
-export function replacePlacementDevices(
-  reg: PageRegistry,
-  pageId: string,
-  sectionId: string,
-  placementId: string,
-  deviceIds: string[],
-): PageRegistry {
-  const ids = deviceIds.filter(Boolean);
-  if (!ids.length) return reg;
-  return mapSection(reg, pageId, sectionId, (section) => {
-    const tiles = section.tiles ?? [];
-    const at = tiles.findIndex((tile) => tile.id === placementId);
-    if (at < 0) return section;
-    const fresh = ids.map((device) => ({ id: newId(), device }));
-    const next = [...tiles];
-    next.splice(at, 1, ...fresh);
-    return { ...section, tiles: next };
-  });
 }
 
 /** One placement that depends on a device, addressed well enough to count it,

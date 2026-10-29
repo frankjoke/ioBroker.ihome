@@ -1,6 +1,5 @@
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 import type { LayoutSelection } from "$lib/config/layout-ops";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 
 /**
  * Where the layout sheet is pointing, derived from the selection it holds.
@@ -66,32 +65,13 @@ export function sheetCursor(
 }
 
 /**
- * What changing a placement's device means (A25/A50): the Device line's selector
- * can pick the device it already has (nothing), a device for a tile that carries
- * no config of its own (just do it), or a device for a tile that does (ask —
- * its slots, background and active condition were built for the old one).
- */
-export function swapDecision(
-  placement: Placement | undefined,
-  deviceId: string,
-): "noop" | "confirm" | "apply" {
-  if (!placement || !deviceId || placement.device === deviceId) return "noop";
-  // A blank tile's config is device-agnostic (frame, raw states, title): there
-  // is nothing to lose, so attaching needs no confirmation.
-  if (placement.device === BLANK_DEVICE_ID) return "apply";
-  return placement.tile ? "confirm" : "apply";
-}
-
-/**
  * A tile line's label (A44): what the placement is called, plus its size when it
  * has one — `name · w×h`. The name is the placement's own title, else the
- * device's, else the id it still points at (a device that was deleted).
+ * device name the caller passes as a suggestion, else `Tile` — a tile has no
+ * device identity of its own (v2).
  */
 export function tileLabel(placement: Placement, deviceName?: string): string {
-  const name =
-    placement.title ||
-    deviceName ||
-    (placement.device ? placement.device : "Tile");
+  const name = placement.title || deviceName || "Tile";
   const size = placement.tile?.size;
   return size ? `${name} · ${size.w}×${size.h}` : name;
 }

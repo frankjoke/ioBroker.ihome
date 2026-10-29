@@ -1,115 +1,175 @@
 <script lang="ts">
+  import { SvelteSet } from "svelte/reactivity";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
-  import { sourceForControl } from "$lib/config/template-ops";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
-  import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
-  import type { Slot, SlotKind } from "$lib/types/display";
+  import DeviceForm from "$lib/components/config/DeviceForm.svelte";
+  import {
+    slotFromControl,
+    slotFromState,
+    slotKindForWidget,
+    suggestedSlots,
+  } from "$lib/config/slot-create";
+  import { resolveTemplate } from "$lib/config/template-ops";
+  import { widgetForState } from "$lib/config/slot-source";
+  import type {
+    Device,
+    EnrichedControl,
+    EnrichedDevice,
+  } from "$lib/types/device";
+  import type { Slot, SlotKind, Template } from "$lib/types/display";
 
   let {
-    device,
+    devices,
+    templates = [],
+    title = "Add a slot",
     onAdd,
+    onSaveDevice,
     onClose,
   }: {
-    device: EnrichedDevice;
-    onAdd: (slot: Slot) => void;
+    devices: EnrichedDevice[];
+    templates?: Template[];
+    title?: string;
+    onAdd: (slots: Slot[]) => void;
+    /** Persist a device created here; the picker then selects it. */
+    onSaveDevice: (device: Device) => void;
     onClose: () => void;
   } = $props();
 
-  type Tab = "device" | "placeholder" | "page" | "state";
-
-  /** Widget-like kinds only make sense on a real control of this device (A21). */
-  const DEVICE_KINDS: SlotKind[] = [
-    "level",
-    "color",
-    "enum",
-    "button",
-    "history-list",
+  type Tab = "device" | "state" | "page" | "badge";
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "device", label: "From device" },
+    { id: "state", label: "Any state" },
+    { id: "page", label: "Web page" },
+    { id: "badge", label: "Badge" },
   ];
 
   let tab = $state<Tab>("device");
-  let kind = $state<SlotKind>("value");
-  let hint = $state("");
+  let search = $state("");
+  let selectedDeviceId = $state("");
+  let selectedControls = new SvelteSet<string>();
+  let stateKind = $state<"auto" | SlotKind>("auto");
   let url = $state("");
+  let badgeKind = $state<"value" | "ago" | "offline">("value");
+  let badgeControlId = $state("");
+  let creatingDevice = $state(false);
+  /** A device saved in this picker before the store's list caught up. */
+  let createdDevice = $state<EnrichedDevice | null>(null);
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "device", label: "This device" },
-    { id: "placeholder", label: "Placeholder" },
-    { id: "page", label: "Web page" },
-    { id: "state", label: "Any state" },
-  ];
-
-  function kindsFor(t: Tab): SlotKind[] {
-    if (t === "page") return ["frame"];
-    // No "icon" any more (A56/A57): the icon is a property of the slot it decorates.
-    return t === "device"
-      ? ["value", "badge", ...DEVICE_KINDS]
-      : ["value", "badge"];
-  }
-
-  const kinds = $derived(kindsFor(tab));
-
-  function setTab(next: Tab) {
-    tab = next;
-    if (!kindsFor(next).includes(kind)) kind = "value";
-  }
-
-  const controls = $derived((device.controls ?? []).filter((c) => !c.hidden));
-
-  // A device with no visible control (a blank tile) has nothing to offer under
-  // "This device"; the page tab is then the useful default.
-  const tabs = $derived(
-    TABS.filter((t) => t.id !== "device" || controls.length > 0),
-  );
-  $effect(() => {
-    if (!tabs.some((t) => t.id === tab)) {
-      setTab(controls.length ? "device" : "page");
-    }
-  });
-
-  /** The tree's filters, as on the Devices page. */
   const objects = $derived(ioBroker.objects as Map<string, any>);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
 
-  /** What a picked control writes into the slot (A36): the control's feature
-   *  while that is unambiguous on this device, else the id naming exactly it. */
-  function sourceOf(c: EnrichedControl): string {
-    return sourceForControl(controls, c) || c.id;
+  const filtered = $derived(
+    devices.filter(
+      (d) =>
+        !search ||
+        d.name.toLowerCase().includes(search.toLowerCase()) ||
+        d.type.toLowerCase().includes(search.toLowerCase()),
+    ),
+  );
+
+  const selectedDevice = $derived(
+    devices.find((d) => d.id === selectedDeviceId) ??
+      (createdDevice?.id === selectedDeviceId ? createdDevice : undefined),
+  );
+  const controls = $derived(
+    (selectedDevice?.controls ?? []).filter((c) => !c.hidden),
+  );
+  const suggestions = $derived(
+    selectedDevice
+      ? suggestedSlots(
+          selectedDevice,
+          resolveTemplate(selectedDevice, templates).slots,
+        )
+      : [],
+  );
+
+  // The first device is the useful default; the list is still one click away.
+  $effect(() => {
+    if (!selectedDeviceId && devices.length) {
+      selectedDeviceId = devices[0].id;
+    }
+  });
+
+  function toggleControl(id: string): void {
+    if (selectedControls.has(id)) selectedControls.delete(id);
+    else selectedControls.add(id);
   }
 
-  function pickControl(c: EnrichedControl) {
-    onAdd({ kind, source: sourceOf(c) });
+  function addControl(c: EnrichedControl): void {
+    if (!selectedDevice) return;
+    onAdd([slotFromControl(selectedDevice, c)]);
   }
 
-  function pickState(id: string) {
-    onAdd({ kind, source: id });
+  function addSelected(): void {
+    if (!selectedDevice) return;
+    const slots = controls
+      .filter((c) => selectedControls.has(c.id))
+      .map((c) => slotFromControl(selectedDevice!, c));
+    if (slots.length) onAdd(slots);
   }
 
-  function addPlaceholder() {
-    const text = hint.trim();
-    if (!text) return;
-    onAdd({ kind, options: { pick: text } });
+  function addSuggested(): void {
+    if (suggestions.length) onAdd(suggestions);
+  }
+
+  function pickState(id: string): void {
+    const object = objects.get(id);
+    const kind =
+      stateKind === "auto"
+        ? slotKindForWidget(widgetForState(object))
+        : stateKind;
+    onAdd([slotFromState(id, object, kind)]);
   }
 
   /** A frame slot (A38): the page it shows is its whole content. */
-  function addPage() {
+  function addPage(): void {
     const text = url.trim();
-    if (!text) return;
-    onAdd({ kind: "frame", options: { url: text } });
+    if (text) onAdd([{ kind: "frame", options: { url: text } }]);
   }
 
-  function onKey(event: KeyboardEvent) {
-    if (event.key === "Escape") onClose();
+  /** A badge reads a control (value or time since), or the device itself. */
+  function addBadge(): void {
+    const device = selectedDevice;
+    if (!device) return;
+    if (badgeKind === "offline") {
+      onAdd([{ kind: "badge", source: { kind: "device", device: device.id } }]);
+      return;
+    }
+    const control = controls.find((c) => c.id === badgeControlId);
+    if (!control) return;
+    const base = slotFromControl(device, control);
+    onAdd([
+      {
+        ...base,
+        kind: "badge",
+        ...(badgeKind === "ago"
+          ? { options: { derive: "ago", from: "ts" } }
+          : {}),
+      },
+    ]);
+  }
+
+  function saveDevice(d: Device): void {
+    onSaveDevice(d);
+    createdDevice = d as EnrichedDevice;
+    selectedDeviceId = d.id;
+    selectedControls.clear();
+    creatingDevice = false;
+  }
+
+  function onKey(event: KeyboardEvent): void {
+    if (event.key === "Escape" && !creatingDevice) onClose();
   }
 </script>
 
 <svelte:window onkeydown={onKey} />
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Add a slot">
+<div class="modal" role="dialog" aria-modal="true" aria-label={title}>
   <div class="modal-content">
     <div class="modal-head">
-      <h3>Add a slot</h3>
+      <h3>{title}</h3>
       <button
         type="button"
         class="icon-btn"
@@ -121,26 +181,31 @@
     </div>
 
     <div class="tabs" role="tablist">
-      {#each tabs as t (t.id)}
+      {#each TABS as t (t.id)}
         <button
           type="button"
           role="tab"
           aria-selected={tab === t.id}
           class="tab"
           class:active={tab === t.id}
-          onclick={() => setTab(t.id)}>{t.label}</button
+          onclick={() => (tab = t.id)}>{t.label}</button
         >
       {/each}
-      {#if tab !== "page"}
+      {#if tab === "state"}
         <label class="kind">
           <span class="label-mono">Kind</span>
           <select
-            value={kind}
-            onchange={(e) => (kind = e.currentTarget.value as SlotKind)}
+            value={stateKind}
+            onchange={(e) =>
+              (stateKind = e.currentTarget.value as "auto" | SlotKind)}
           >
-            {#each kinds as k (k)}
-              <option value={k}>{k}</option>
-            {/each}
+            <option value="auto">auto</option>
+            <option value="value">value</option>
+            <option value="level">level</option>
+            <option value="switch">switch</option>
+            <option value="color">color</option>
+            <option value="enum">enum</option>
+            <option value="button">button</option>
           </select>
         </label>
       {/if}
@@ -154,9 +219,66 @@
         enums={ioBroker.enums}
         onPick={pickState}
       />
+    {:else if tab === "page"}
+      <div class="placeholder">
+        <div class="row-input">
+          <input
+            type="text"
+            placeholder="http://…/echarts/index.html?preset=…"
+            bind:value={url}
+          />
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={!url.trim()}
+            onclick={addPage}>Add page</button
+          >
+        </div>
+        <p class="text-muted hint-note">
+          The page loads in a frame (A38) — the tile's own space, or the modal's
+          wide row, as this slot's destination says.
+        </p>
+      </div>
     {:else}
-      <div class="results">
-        {#if tab === "device"}
+      <div class="device-pick">
+        <div class="row-input">
+          <input
+            type="search"
+            placeholder="Search device…"
+            bind:value={search}
+          />
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => (creatingDevice = true)}>New device…</button
+          >
+        </div>
+        <ul class="list device-list">
+          {#each filtered as d (d.id)}
+            <li>
+              <button
+                type="button"
+                class="row"
+                class:picked={selectedDeviceId === d.id}
+                onclick={() => {
+                  selectedDeviceId = d.id;
+                  selectedControls.clear();
+                  badgeControlId = "";
+                }}
+              >
+                <span class="name">{d.name || d.id}</span>
+                <span class="meta text-muted">{d.type}</span>
+              </button>
+            </li>
+          {/each}
+          {#if filtered.length === 0}
+            <li class="empty text-muted">No device matches.</li>
+          {/if}
+        </ul>
+      </div>
+
+      {#if selectedDevice && tab === "device"}
+        <div class="results">
           {#if controls.length === 0}
             <p class="empty text-muted">
               This device has no controls to offer.
@@ -165,64 +287,94 @@
             <ul class="list">
               {#each controls as c (c.id)}
                 <li>
-                  <button
-                    type="button"
-                    class="row"
-                    onclick={() => pickControl(c)}
-                  >
-                    <span class="name">{c.label || c.feature}</span>
+                  <label class="row">
+                    <input
+                      type="checkbox"
+                      checked={selectedControls.has(c.id)}
+                      onchange={() => toggleControl(c.id)}
+                    />
+                    <span class="name">{c.label || c.feature || c.id}</span>
                     <span class="meta text-muted">{c.stateId || c.id}</span>
                     {#if c.unit}
                       <span class="meta text-muted">{c.unit}</span>
                     {/if}
-                  </button>
+                  </label>
                 </li>
               {/each}
             </ul>
           {/if}
-        {:else if tab === "placeholder"}
+        </div>
+        <div class="actions">
+          <span class="text-muted">{selectedControls.size} selected</span>
+          <div class="actions-buttons">
+            <button
+              type="button"
+              class="btn"
+              disabled={!suggestions.length}
+              title={suggestions.length
+                ? "Add the slots this device type suggests"
+                : "Nothing to suggest for this device"}
+              onclick={addSuggested}
+            >
+              Add suggested{suggestions.length
+                ? ` (${suggestions.length})`
+                : ""}
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              disabled={selectedControls.size === 0}
+              onclick={addSelected}
+            >
+              Add {selectedControls.size || ""}
+              {selectedControls.size === 1 ? "slot" : "slots"}
+            </button>
+          </div>
+        </div>
+      {:else if selectedDevice && tab === "badge"}
+        <div class="results">
           <div class="placeholder">
-            <div class="row-input">
-              <input
-                type="text"
-                placeholder="e.g. temperature, Leistung…"
-                bind:value={hint}
-              />
+            <div class="row">
+              <label class="small">
+                <span class="label-mono">Shows</span>
+                <select bind:value={badgeKind}>
+                  <option value="value">value</option>
+                  <option value="ago">time since</option>
+                  <option value="offline">device offline</option>
+                </select>
+              </label>
+              {#if badgeKind !== "offline"}
+                <label class="small grow">
+                  <span class="label-mono">Control</span>
+                  <select bind:value={badgeControlId}>
+                    <option value="">choose…</option>
+                    {#each controls as c (c.id)}
+                      <option value={c.id}
+                        >{c.label || c.feature || c.id}</option
+                      >
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+            </div>
+            <div class="actions">
+              <span class="text-muted">
+                {badgeKind === "offline"
+                  ? "Shown while the device has no reachable state"
+                  : badgeKind === "ago"
+                    ? "Shown as the time since that control last reported"
+                    : "Shown as that control's value in a corner"}
+              </span>
               <button
                 type="button"
                 class="btn btn-primary"
-                disabled={!hint.trim()}
-                onclick={addPlaceholder}>Add hint</button
+                disabled={badgeKind !== "offline" && !badgeControlId}
+                onclick={addBadge}>Add badge</button
               >
             </div>
-            <p class="text-muted hint-note">
-              The hint resolves the control whose name matches it while the
-              display renders; a device without one shows nothing here and keeps
-              the other rows where they are (A20).
-            </p>
           </div>
-        {:else}
-          <div class="placeholder">
-            <div class="row-input">
-              <input
-                type="text"
-                placeholder="http://…/echarts/index.html?preset=…"
-                bind:value={url}
-              />
-              <button
-                type="button"
-                class="btn btn-primary"
-                disabled={!url.trim()}
-                onclick={addPage}>Add page</button
-              >
-            </div>
-            <p class="text-muted hint-note">
-              The page loads in a frame (A38) — the tile's own space, or the
-              modal's wide row, as this slot's destination says.
-            </p>
-          </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
     {/if}
 
     <div class="actions">
@@ -233,6 +385,22 @@
     </div>
   </div>
 </div>
+
+{#if creatingDevice}
+  <div class="modal" role="dialog" aria-modal="true" aria-label="New device">
+    <div class="modal-content device-modal">
+      <DeviceForm
+        device={null}
+        objects={ioBroker.objects}
+        {roomsOf}
+        {rooms}
+        {devices}
+        onSave={saveDevice}
+        onCancel={() => (creatingDevice = false)}
+      />
+    </div>
+  </div>
+{/if}
 
 <style>
   .modal {
@@ -252,10 +420,15 @@
     border-radius: var(--border-radius-lg, 8px);
     width: min(720px, 100%);
     max-height: 90vh;
+    overflow: auto;
     display: flex;
     flex-direction: column;
     padding: 1rem;
     gap: 0.75rem;
+  }
+
+  .device-modal {
+    width: min(680px, 100%);
   }
 
   .modal-head {
@@ -313,12 +486,26 @@
     padding: 0.25rem;
   }
 
+  .device-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .device-list {
+    max-height: 9rem;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    padding: 0.2rem;
+  }
+
   .results {
     overflow: auto;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
     padding: 0.35rem;
-    min-height: 12rem;
+    min-height: 9rem;
   }
 
   .list {
@@ -343,6 +530,11 @@
 
   .row:hover {
     background-color: var(--surface-container);
+  }
+
+  .row.picked {
+    background-color: var(--primary-container);
+    color: var(--on-primary-container);
   }
 
   .name {
@@ -387,6 +579,11 @@
   .empty {
     padding: 0.5rem;
     font-size: var(--body-sm);
+  }
+
+  .grow {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .actions {

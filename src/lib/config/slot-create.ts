@@ -76,8 +76,14 @@ export function slotFromState(
 export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
   const out: Slot[] = [];
   for (const slot of recipe) {
-    if (typeof slot.source !== "string") continue;
-    const control = resolveControl(device.controls ?? [], slot.source);
+    // A recipe names its control by source or by hint (`options.pick`); the
+    // hinted presets (Thermometer's positional readings) use the latter.
+    const hint =
+      typeof slot.source === "string"
+        ? slot.source
+        : String(slot.options?.pick ?? "");
+    if (!hint.trim()) continue;
+    const control = resolveControl(device.controls ?? [], hint);
     if (!control) continue;
     const widget = widgetFor(device.type, control.feature);
     const base = slotFromControl(device, control, widget);
@@ -85,6 +91,11 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
       slot.kind === "value" && widget !== "value"
         ? slotKindForWidget(widget)
         : slot.kind;
+    // The hint is dead weight once the source pins the control (A36).
+    const options: Record<string, unknown> = { ...(base.options ?? {}) };
+    for (const [key, value] of Object.entries(slot.options ?? {})) {
+      if (key !== "pick" && value !== undefined) options[key] = value;
+    }
     out.push({
       ...base,
       ...slot,
@@ -92,9 +103,7 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
       source: base.source,
       label: slot.label ?? base.label,
       unit: slot.unit ?? base.unit,
-      ...(base.options || slot.options
-        ? { options: { ...base.options, ...slot.options } }
-        : {}),
+      ...(Object.keys(options).length ? { options } : { options: undefined }),
     });
   }
   return out;

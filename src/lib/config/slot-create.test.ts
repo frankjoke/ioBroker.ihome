@@ -55,6 +55,25 @@ it("keeps only controls the device actually has", () => {
   });
 });
 
+it("resolves a preset's pick hint to the device's actual control", () => {
+  const thermometer = device({
+    type: "Thermometer",
+    controls: [
+      ctl("t1", "temperature", { label: "Temperature" }),
+      ctl("h1", "humidity", { label: "Humidity" }),
+    ],
+  });
+  const slots = suggestedSlots(thermometer, PRESETS.Thermometer.slots);
+  expect(slots.map((s) => s.kind)).toEqual(["value", "value"]);
+  expect(slots.map((s) => s.source)).toEqual([
+    { kind: "control", device: "dev", control: "t1" },
+    { kind: "control", device: "dev", control: "h1" },
+  ]);
+  // The hint is dead weight once the source pins the control.
+  expect(slots.every((s) => s.options?.pick === undefined)).toBe(true);
+  expect(slots[0].label).toBe("Temperature");
+});
+
 it("maps a switch control to a switch slot", () => {
   const sw = device({
     type: "Switch",

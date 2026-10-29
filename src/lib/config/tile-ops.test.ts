@@ -1,23 +1,17 @@
 import { it, expect } from "vitest";
-import type { Device } from "$lib/types/device";
 import type {
   ActiveCondition,
   ActiveOp,
   PageRegistry,
-  Placement,
-  TemplateRegistry,
   TileConfig,
-  Template,
 } from "$lib/types/display";
 import {
   addRule,
   addSlot,
-  applyTemplate,
   clearRuleIcons,
   editTile,
   ensureTile,
   evalActive,
-  materialiseTile,
   moveRule,
   moveSlot,
   nextSlotWhere,
@@ -32,49 +26,7 @@ import {
   setSlotSource,
   setSlotWhere,
   slotWhere,
-  templateFromTile,
-  upsertTemplate,
 } from "./tile-ops";
-
-const device = (over: Partial<Device> = {}): Device =>
-  ({
-    id: "d1",
-    type: "Switch",
-    name: "Pumpe",
-    controls: [],
-    ...over,
-  }) as Device;
-
-const userTemplate = (over: Partial<Template> = {}): Template =>
-  ({
-    id: "t1",
-    name: "Pump",
-    type: "Switch",
-    slots: [
-      {
-        kind: "value",
-        source: "power",
-        rules: [{ when: "power > 0", glow: true }],
-      },
-    ],
-    ...over,
-  }) as Template;
-
-it("materialises a tile from the chain: template id, size and a deep-copied slot list", () => {
-  const t = userTemplate();
-  const tile = materialiseTile(device({ template: "t1" }), [t]);
-  expect(tile.template).toBe("t1");
-  // The chain is preset base + user template + device slots, merged; the user
-  // template's own slot must be in there, deep-copied (never shared).
-  const power = tile.slots?.find((s) => s.source === "power");
-  expect(power).toBeDefined();
-  expect(power).not.toBe(t.slots.at(0));
-  expect(power?.rules?.at(0)).not.toBe(t.slots.at(0)?.rules?.at(0));
-});
-
-it("materialising without a template names the type preset", () => {
-  expect(materialiseTile(device(), []).template).toBe("Switch");
-});
 
 it("ensureTile leaves a materialised placement alone and keeps a legacy size", () => {
   const materialised = {
@@ -116,6 +68,8 @@ it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
     "Leistung",
   );
   expect(removeSlot(two, 0).slots?.length).toBe(1);
+  // S8: the last slot stays — the tile never becomes empty.
+  expect(removeSlot(tile, 0)).toBe(tile);
 });
 
 it("a slot's where picks its home; the last tile slot cannot move to the modal (A34)", () => {
@@ -276,20 +230,6 @@ it("evalActive — text fallback is case-insensitive; junk degrades", () => {
   expect(evalActive({ source: "s", op: "eq", value: "0" }, "")).toBe(false); // "" must not parse as 0
 });
 
-it("templateFromTile copies, never shares: mutating the tile leaves the template alone", () => {
-  const tile: TileConfig = {
-    size: { w: 2, h: 2 },
-    background: { kind: "solid", value: "#101418" },
-    slots: [{ kind: "value", source: "power", rules: [{ when: "power > 0" }] }],
-  };
-  const t = templateFromTile(tile, device({ type: "Switch" }), [], "  Pumpe  ");
-  expect(t.name).toBe("Pumpe");
-  expect(t.type).toBe("Switch");
-  tile.slots![0].source = "mutated";
-  expect(t.slots[0].source).toBe("power");
-  expect(t.slots[0]).not.toBe(tile.slots![0]);
-});
-
 it("patches one spark field and never leaves {} behind", () => {
   const t: TileConfig = { slots: [{ kind: "value", source: "power" }] };
   expect(patchSpark(t, 0, { enabled: true }).slots?.[0].spark).toEqual({
@@ -308,53 +248,6 @@ it("patches one spark field and never leaves {} behind", () => {
 
   // A bad index leaves the list — copied — untouched.
   expect(patchSpark(t, 9, { color: "#f00" }).slots).toEqual(t.slots);
-});
-
-it("upsertTemplate appends once, then overwrites by name+type keeping the id", () => {
-  const empty: TemplateRegistry = { version: 0, updatedAt: 0, templates: [] };
-  const one = upsertTemplate(empty, userTemplate({ id: "a", name: "Pump" }));
-  expect(one.version).toBe(1);
-  const two = upsertTemplate(
-    one,
-    userTemplate({ id: "b", name: "Pump", slots: [{ kind: "badge" }] }),
-  );
-  expect(two.templates.length).toBe(1);
-  expect(two.templates[0].id).toBe("a");
-  expect(two.templates[0].slots).toEqual([{ kind: "badge" }]);
-  const otherType = upsertTemplate(
-    two,
-    userTemplate({ id: "c", name: "Pump", type: "Light" }),
-  );
-  expect(otherType.templates.length).toBe(2);
-});
-
-it("applyTemplate replaces size, slots and background but keeps the active condition", () => {
-  const placement: Placement = {
-    id: "p",
-    device: "d1",
-    title: "Garten",
-    tile: {
-      size: { w: 1, h: 1 },
-      background: { kind: "solid", value: "#000" },
-      active: { source: "power", op: "truthy" },
-      slots: [{ kind: "value", source: "old" }],
-    },
-  };
-  const next = applyTemplate(
-    placement,
-    userTemplate({
-      id: "t9",
-      background: { kind: "solid", value: "#111" },
-      slots: [{ kind: "value", source: "new" }],
-    }),
-  );
-  expect(next.title).toBe("Garten");
-  expect(next.tile?.template).toBe("t9");
-  expect(next.tile?.slots).toEqual([{ kind: "value", source: "new" }]);
-  expect(next.tile?.background?.value).toBe("#111");
-  expect(next.tile?.active?.source).toBe("power");
-  const bare = applyTemplate(placement, userTemplate({ id: "t9", slots: [] }));
-  expect(bare.tile?.background).toBeUndefined(); // the template has none: the old one drops
 });
 
 it("drops a slot's rule glyphs when a glyph is chosen (A70)", () => {

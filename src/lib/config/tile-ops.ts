@@ -1,9 +1,6 @@
-// The tile's own config as pure operations (A18): a tile is *materialised* —
-// a complete {template, size, slots} copied from the device → template → preset
-// chain — on the first edit, and diverges independently from then on. Reset
-// drops `tile` and returns the tile to its chain. Every op returns a new value
-// (input never mutated); the caller commits through the store's write path.
-import type { Device } from "$lib/types/device";
+// The tile's own config as pure operations (A18): a tile owns its slots and
+// display fields; there is no device chain behind it (v2). Every op returns a
+// new value (input never mutated); the caller commits through the store.
 import type {
   ActiveCondition,
   PageRegistry,
@@ -14,31 +11,13 @@ import type {
   SlotSpark,
   StateLook,
   TileConfig,
-  Template,
-  TemplateRegistry,
 } from "$lib/types/display";
-import { presetForType, resolveTemplate } from "$lib/config/template-ops";
 import {
   mapPlacement,
   moveItem,
   type PlacementAnchor,
 } from "$lib/config/layout-ops";
 import { truthy } from "$lib/config/rule-ops";
-import { deepCopy } from "$lib/utils/json";
-import { newId } from "$lib/utils/ids";
-
-/** The complete config a first edit starts from, deep-copied off the chain. */
-export function materialiseTile(
-  device: Device,
-  templates: Template[],
-): TileConfig {
-  const resolved = resolveTemplate(device, templates);
-  return {
-    template: device.template ?? presetForType(device.type).id,
-    size: { ...resolved.size },
-    slots: deepCopy(resolved.slots),
-  };
-}
 
 /**
  * A tile that has slots is already complete; a legacy partial gets an empty
@@ -76,11 +55,14 @@ export function addSlot(tile: TileConfig, slot: Slot, at?: number): TileConfig {
   return withSlots(tile, slots);
 }
 
-/** A bad index leaves the list — copied — untouched, like `moveItem`. */
+/** A bad index leaves the list — copied — untouched, like `moveItem`. The last
+ *  slot is refused (S8): a tile never becomes empty. */
 export function removeSlot(tile: TileConfig, index: number): TileConfig {
+  const slots = tile.slots ?? [];
+  if (slots.length <= 1) return tile;
   return withSlots(
     tile,
-    (tile.slots ?? []).filter((_, i) => i !== index),
+    slots.filter((_, i) => i !== index),
   );
 }
 
@@ -114,7 +96,7 @@ export function patchSlot(
 export function setSlotSource(
   tile: TileConfig,
   index: number,
-  source: string,
+  source: Slot["source"],
 ): TileConfig {
   return withSlots(
     tile,
@@ -329,8 +311,8 @@ export function moveRule(
 
 // ------------------------------------------------------------------ edits
 
-/** The pane's and the tree's one way to edit a tile: materialise once, then
- *  apply `fn` to its own config. Unknown addresses return the registry untouched. */
+/** The pane's and the tree's one way to edit a tile: apply `fn` to its own
+ *  config. Unknown addresses return the registry untouched. */
 export function editTile(
   reg: PageRegistry,
   anchor: PlacementAnchor,
@@ -346,70 +328,6 @@ export function editTile(
       return { ...ensured, tile: fn(ensured.tile) };
     },
   );
-}
-
-// ---------------------------------------------------------------- templates
-
-/** The tile's layout as a per-type template: size + slots + CSS background; the
- *  type's features come from the chain, `active` stays on the tile (A19). */
-export function templateFromTile(
-  tile: TileConfig,
-  device: Device,
-  templates: Template[],
-  name: string,
-): Template {
-  const chain = resolveTemplate(device, templates);
-  return {
-    id: newId(),
-    name: name.trim(),
-    type: device.type,
-    size: { ...(tile.size ?? chain.size) },
-    features: deepCopy(chain.features),
-    slots: deepCopy(tile.slots ?? []),
-    ...(tile.background ? { background: deepCopy(tile.background) } : {}),
-  };
-}
-
-/** Append, or replace the template with the same (name, type) keeping its id. */
-export function upsertTemplate(
-  registry: TemplateRegistry,
-  template: Template,
-): TemplateRegistry {
-  const list = registry.templates ?? [];
-  const at = list.findIndex(
-    (t) => t.name === template.name && t.type === template.type,
-  );
-  const next = [...list];
-  if (at < 0) next.push(deepCopy(template));
-  else next[at] = { ...deepCopy(template), id: list[at].id };
-  return {
-    ...registry,
-    version: (registry.version ?? 0) + 1,
-    updatedAt: Date.now(),
-    templates: next,
-  };
-}
-
-/** Replace the placement's size, slots and background with the template's; the
- *  tile's own active condition survives. */
-export function applyTemplate(
-  placement: Placement,
-  template: Template,
-): Placement {
-  const active = placement.tile?.active;
-  const size = template.size ?? placement.tile?.size;
-  return {
-    ...placement,
-    tile: {
-      template: template.id,
-      ...(size ? { size: { ...size } } : {}),
-      ...(template.background
-        ? { background: deepCopy(template.background) }
-        : {}),
-      ...(active ? { active: deepCopy(active) } : {}),
-      slots: deepCopy(template.slots),
-    },
-  };
 }
 
 // ------------------------------------------------------------------ active
