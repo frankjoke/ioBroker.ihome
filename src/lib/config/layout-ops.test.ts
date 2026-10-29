@@ -13,6 +13,7 @@ import {
   movePage,
   movePlacement,
   moveSection,
+  moveSectionToPage,
   pageTitleTaken,
   parseLayoutRef,
   patchPage,
@@ -68,6 +69,23 @@ it("duplicates a section with fresh ids at every level below it", () => {
   // the input registry is untouched
   expect(reg0.pages[0].groups).toHaveLength(2);
   expect(reg0.pages[0].groups[0].tiles?.[0].id).toBe("g-t0");
+});
+
+it("moves a section, with its tiles, to the end of another page", () => {
+  const reg0 = reg([
+    { id: "p", title: "P", groups: [section("g", ["t1dev"]), section("g2")] },
+    { id: "q", title: "Q", groups: [section("h")] },
+  ]);
+  const next = moveSectionToPage(reg0, "p", "g", "q");
+  expect(next.pages[0].groups.map((g) => g.id)).toEqual(["g2"]);
+  expect(next.pages[1].groups.map((g) => g.id)).toEqual(["h", "g"]);
+  expect(next.pages[1].groups[1].tiles?.[0].id).toBe("g-t0");
+  // the input registry is untouched
+  expect(reg0.pages[0].groups).toHaveLength(2);
+  expect(reg0.pages[1].groups).toHaveLength(1);
+  // same page or unknown target: no change
+  expect(moveSectionToPage(reg0, "p", "g", "p")).toBe(reg0);
+  expect(moveSectionToPage(reg0, "p", "g", "missing")).toBe(reg0);
 });
 
 it("duplicates a page with fresh ids for its sections and tiles", () => {

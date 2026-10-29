@@ -1,24 +1,43 @@
 <script lang="ts">
+  import { untrack } from "svelte";
+
   let {
     title,
-    sections,
-    current,
+    pages,
+    currentPageId,
+    currentSectionId,
     onMove,
     onClose,
   }: {
     title: string;
-    sections: { id: string; title?: string }[];
-    /** The section the tile is in now: disabled as a destination. */
-    current: string;
-    onMove: (sectionId: string) => void;
+    pages: {
+      id: string;
+      title?: string;
+      sections: { id: string; title?: string }[];
+    }[];
+    currentPageId: string;
+    currentSectionId: string;
+    onMove: (pageId: string, sectionId: string) => void;
     onClose: () => void;
   } = $props();
 
-  const initialTarget = () => sections.find((s) => s.id !== current)?.id ?? "";
-  let target = $state(initialTarget());
+  const key = (pageId: string, sectionId: string) => `${pageId}|${sectionId}`;
+  const current = $derived(key(currentPageId, currentSectionId));
+  let target = $state(
+    untrack(() => {
+      const own = pages.find((p) => p.id === currentPageId);
+      for (const section of own?.sections ?? []) {
+        const value = key(currentPageId, section.id);
+        if (value !== current) return value;
+      }
+      return "";
+    }),
+  );
 
   function confirm(): void {
-    if (target && target !== current) onMove(target);
+    if (!target || target === current) return;
+    const [pageId, sectionId] = target.split("|");
+    onMove(pageId, sectionId);
   }
 </script>
 
@@ -38,14 +57,19 @@
   <div class="modal-card card">
     <h3>{title}</h3>
     <label class="field">
-      <span class="label-mono">Destination</span>
+      <span class="label-mono">Destination section</span>
       <select bind:value={target}>
-        {#each sections as section (section.id)}
-          <option value={section.id} disabled={section.id === current}>
-            {section.title || "Section"}{section.id === current
-              ? " (current)"
-              : ""}
-          </option>
+        {#each pages as page (page.id)}
+          <optgroup label={page.title || "Page"}>
+            {#each page.sections as section (section.id)}
+              {@const value = key(page.id, section.id)}
+              <option {value} disabled={value === current}>
+                {section.title || "Section"}{value === current
+                  ? " (current)"
+                  : ""}
+              </option>
+            {/each}
+          </optgroup>
         {/each}
       </select>
     </label>

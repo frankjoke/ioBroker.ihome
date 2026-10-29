@@ -8,8 +8,14 @@
 import { isUnlocked } from "$lib/config/pin.svelte";
 import { layoutNeedsPin } from "$lib/config/settings-ops";
 import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
+import type { LayoutSelection } from "$lib/config/layout-ops";
 
-export const sheet = $state<{ open: boolean }>({ open: false });
+export const sheet = $state<{
+  open: boolean;
+  /** What the sheet was editing when it closed: the eye/pencil toggle keeps
+   *  the tile the user was on, not the first one of the page. */
+  selection: LayoutSelection | null;
+}>({ open: false, selection: null });
 
 /* A gated entrance waits here while the PIN is asked — module state too, so a
  * reload drops the ask and the entrance has to be made again. */

@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  effectiveHidePencil,
   effectiveLockPencil,
   layoutNeedsPin,
   mergeSettings,
@@ -55,6 +56,13 @@ it("effectiveLockPencil locks only for a real boolean true", () => {
   expect(effectiveLockPencil(undefined)).toBe(false);
   expect(effectiveLockPencil("true")).toBe(false);
   expect(effectiveLockPencil(1)).toBe(false);
+});
+
+it("effectiveHidePencil hides only for a real boolean true", () => {
+  expect(effectiveHidePencil(true)).toBe(true);
+  expect(effectiveHidePencil(false)).toBe(false);
+  expect(effectiveHidePencil(undefined)).toBe(false);
+  expect(effectiveHidePencil("true")).toBe(false);
 });
 
 it("layoutNeedsPin asks only with the flag on and the session locked", () => {

@@ -42,6 +42,11 @@ export function effectiveLockPencil(value: unknown): boolean {
   return value === true;
 }
 
+/** The UI page's "hide the pencil" flag: separate from the PIN lock. */
+export function effectiveHidePencil(value: unknown): boolean {
+  return value === true;
+}
+
 export function layoutNeedsPin(
   lockPencil: unknown,
   unlocked: boolean,

@@ -3,7 +3,7 @@
   import { newId } from "$lib/utils/ids";
   import { untrack } from "svelte";
   import ControlRow from "./ControlRow.svelte";
-  import StatePicker from "$lib/components/discovery/StatePicker.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { projectDevice } from "$lib/config/project";
   import { ancestorObjects, parentName } from "$lib/config/state-tree";
@@ -313,14 +313,13 @@
 </div>
 
 {#if showPicker || replaceIndex !== null}
-  <StatePicker
+  <SourcePicker
+    mode="control"
+    title={replaceIndex !== null ? "Change state" : "Add states"}
     deviceType={type}
-    {objects}
-    {roomsOf}
-    {rooms}
-    enums={ioBroker.enums}
-    mode={replaceIndex !== null ? "replace" : "add"}
-    onAdd={(picked) =>
+    {devices}
+    single={replaceIndex !== null}
+    onControls={(picked) =>
       replaceIndex !== null ? replaceState(picked[0]) : addStates(picked)}
     onClose={() => {
       showPicker = false;

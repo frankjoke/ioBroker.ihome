@@ -2,11 +2,12 @@
   import { onMount, untrack } from "svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
-  import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import Tile from "$lib/components/display/Tile.svelte";
   import { breakpointFor, type Breakpoint } from "$lib/config/size-ops";
   import LayoutDetails from "$lib/components/layout/LayoutDetails.svelte";
-  import SlotPicker from "$lib/components/layout/SlotPicker.svelte";
+  import MoveSectionModal from "$lib/components/layout/MoveSectionModal.svelte";
+  import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
     getCanonicalRegistry,
@@ -23,6 +24,8 @@
     duplicatePlacement,
     duplicateSection,
     movePlacement,
+    movePage,
+    moveSectionToPage,
     pageTitleTaken,
     patchPlacement,
     sectionTitleTaken,
@@ -40,6 +43,7 @@
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
+  import { sheet } from "$lib/stores/sheet.svelte";
   import type { Device } from "$lib/types/device";
   import type { PageRegistry, Slot } from "$lib/types/display";
 
@@ -57,13 +61,13 @@
     picked?: PlacementAnchor | null;
   } = $props();
 
-  let selection = $state<LayoutSelection | null>(null);
+  let selection = $state<LayoutSelection | null>(sheet.selection);
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** The '+' asks for a name first; nothing is created until it is submitted. */
   let pendingCreate = $state<
     { kind: "page" } | { kind: "section"; pageId: string } | null
   >(null);
-  let moveOpen = $state(false);
+  let tileMoveOpen = $state(false);
   let pickerFor = $state<
     | { kind: "slot"; anchor: PlacementAnchor; at?: number }
     | { kind: "newTile"; pageId: string; sectionId: string; at?: number }
@@ -82,11 +86,14 @@
   // follow it and picking in one sets it. No tree and no second pane.
   let pageOpen = $state(false);
   let sectionOpen = $state(false);
+  /** The section line's move button shows the page destination at the pane's end. */
+  let sectionModalOpen = $state(false);
 
   // The cursor itself is a pure module (A45): page → section → tile, each with
   // its fallback, and its page is the display's (the `pageId` prop).
   const cursor = $derived(sheetCursor(registry, selection, pageId));
   const page = $derived(cursor.page);
+  const pageIndex = $derived(registry.pages.findIndex((p) => p.id === pageId));
   const section = $derived(cursor.section);
   const sectionId = $derived(cursor.sectionId);
   const tiles = $derived(cursor.tiles);
@@ -111,6 +118,12 @@
     }
   });
 
+  // The eye/pencil toggle unmounts the sheet: remember the cursor so the
+  // return lands on the tile that was being edited, not the page's first tile.
+  $effect(() => {
+    sheet.selection = selection;
+  });
+
   // A click in the display points the cursor at its tile (A48). The page moves
   // with it, but that already happened at the click (+page.svelte): calling
   // back into the display's page state from here would track it, and every
@@ -124,45 +137,13 @@
   });
 
   function selectSection(id: string): void {
-    if (ignoreSelection) return;
     selection = { kind: "section", pageId, sectionId: id };
   }
 
   function selectTile(id: string): void {
-    if (ignoreSelection) return;
     pageOpen = false;
     sectionOpen = false;
     selection = { kind: "tile", pageId, sectionId, placementId: id };
-  }
-
-  /** The section/tile selects rewrite their value when the moved tile changes
-   *  sections; the browser may fire a change for the temporary first option.
-   *  Ignore those changes for one tick so the moved tile stays selected. */
-  let ignoreSelection = false;
-
-  /** Move the selected tile to another section of this page (append at the end). */
-  function moveTileToSection(targetId: string): boolean {
-    if (!tileId || !targetId || targetId === sectionId) return false;
-    const target = page?.groups.find((g) => g.id === targetId);
-    if (!target) return false;
-    ignoreSelection = true;
-    const next = movePlacement(
-      registry,
-      { pageId, sectionId, index: tileIndex },
-      { pageId, sectionId: targetId, index: target.tiles?.length ?? 0 },
-    );
-    if (!commitLayout(next)) {
-      ignoreSelection = false;
-      return false;
-    }
-    selection = {
-      kind: "tile",
-      pageId,
-      sectionId: targetId,
-      placementId: tileId,
-    };
-    setTimeout(() => (ignoreSelection = false), 60);
-    return true;
   }
 
   /** Create the named page and move the cursor onto it (and its first section). */
@@ -188,6 +169,54 @@
     pendingCreate = null;
   }
 
+  /** The move-section modal: keep the section selected and follow its new page. */
+  function moveSectionToPageAndFollow(toPageId: string): void {
+    if (!page || !section || toPageId === page.id) return;
+    const movedId = section.id;
+    const next = moveSectionToPage(registry, page.id, movedId, toPageId);
+    if (next === registry) {
+      sectionModalOpen = false;
+      return;
+    }
+    if (!commitLayout(next)) return;
+    sectionModalOpen = false;
+    selection = { kind: "section", pageId: toPageId, sectionId: movedId };
+    if (toPageId !== pageId) onPage(toPageId);
+  }
+
+  /** The move-tile modal: append the tile to the target section and follow it. */
+  function moveTileToSection(toPageId: string, toSectionId: string): void {
+    const anchor = tileAnchor;
+    if (!anchor || tileIndex < 0) return;
+    if (toPageId === anchor.pageId && toSectionId === anchor.sectionId) return;
+    const target = registry.pages
+      .find((p) => p.id === toPageId)
+      ?.groups?.find((g) => g.id === toSectionId);
+    if (!target) return;
+    const next = movePlacement(
+      registry,
+      {
+        pageId: anchor.pageId,
+        sectionId: anchor.sectionId,
+        index: tileIndex,
+      },
+      {
+        pageId: toPageId,
+        sectionId: toSectionId,
+        index: (target.tiles ?? []).length,
+      },
+    );
+    if (!commitLayout(next)) return;
+    tileMoveOpen = false;
+    selection = {
+      kind: "tile",
+      pageId: toPageId,
+      sectionId: toSectionId,
+      placementId: anchor.placementId,
+    };
+    if (toPageId !== pageId) onPage(toPageId);
+  }
+
   // The "modal view": a checkbox on the Tile title's line asks the sheet's own
   // Tile to open its modal — non-modally, so it appears over the display and
   // nothing is blocked. The display behind cannot show it by itself: a modal
@@ -205,7 +234,7 @@
     void tileId;
     untrack(() => {
       modalShown = false;
-      moveOpen = false;
+      tileMoveOpen = false;
     });
   });
 
@@ -415,10 +444,14 @@
       aria-expanded={pageOpen}
       onclick={() => {
         pageOpen = !pageOpen;
-        if (pageOpen) sectionOpen = false;
+        if (pageOpen) {
+          sectionOpen = false;
+        }
       }}
     >
-      <span class="material-symbols-outlined">edit</span>
+      <span class="material-symbols-outlined"
+        >{pageOpen ? "close" : "edit"}</span
+      >
     </button>
     <button
       type="button"
@@ -431,6 +464,26 @@
     </button>
     <button
       type="button"
+      class="icon-btn"
+      title="Move page up"
+      aria-label="Move page up"
+      disabled={pageIndex <= 0}
+      onclick={() => commitLayout(movePage(registry, pageIndex, pageIndex - 1))}
+    >
+      <span class="material-symbols-outlined">arrow_upward</span>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Move page down"
+      aria-label="Move page down"
+      disabled={pageIndex < 0 || pageIndex >= registry.pages.length - 1}
+      onclick={() => commitLayout(movePage(registry, pageIndex, pageIndex + 1))}
+    >
+      <span class="material-symbols-outlined">arrow_downward</span>
+    </button>
+    <button
+      type="button"
       class="icon-btn danger"
       title="Delete page"
       aria-label="Delete page"
@@ -440,177 +493,195 @@
     </button>
   </div>
   {#if pageOpen && page}
-    <div class="fold">
+    <div>
       <LayoutDetails
         {registry}
         {devices}
         selection={{ kind: "page", pageId }}
         onChange={commitLayout}
-        onSelect={(next) => (selection = next)}
       />
     </div>
   {/if}
 
-  <!-- Section: the same, scoped to the page above. -->
-  <div class="line">
-    <span class="label-mono">Section</span>
-    <select
-      value={sectionId}
-      aria-label="Section"
-      onchange={(e) => selectSection(e.currentTarget.value)}
-    >
-      {#each page?.groups ?? [] as g (g.id)}
-        <option value={g.id}>{g.title || g.id}</option>
-      {/each}
-    </select>
-    <button
-      type="button"
-      class="icon-btn"
-      class:on={sectionOpen}
-      title="Section settings"
-      aria-label="Section settings"
-      aria-expanded={sectionOpen}
-      onclick={() => {
-        sectionOpen = !sectionOpen;
-        if (sectionOpen) pageOpen = false;
-      }}
-    >
-      <span class="material-symbols-outlined">edit</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Add section"
-      aria-label="Add section"
-      onclick={() => (pendingCreate = { kind: "section", pageId })}
-    >
-      <span class="material-symbols-outlined">add</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Duplicate section"
-      aria-label="Duplicate section"
-      onclick={() =>
-        commitLayout(duplicateSection(registry, pageId, sectionId))}
-    >
-      <span class="material-symbols-outlined">content_copy</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn danger"
-      title="Delete section"
-      aria-label="Delete section"
-      onclick={() => (pendingDelete = { kind: "section", pageId, sectionId })}
-    >
-      <span class="material-symbols-outlined">delete</span>
-    </button>
-  </div>
-  {#if sectionOpen && section}
-    <div class="fold">
-      <LayoutDetails
-        {registry}
-        {devices}
-        selection={{ kind: "section", pageId, sectionId }}
-        onChange={commitLayout}
-        onSelect={(next) => (selection = next)}
-      />
+  {#if !pageOpen}
+    <!-- Section: the same, scoped to the page above. -->
+    <div class="line">
+      <span class="label-mono">Section</span>
+      <select
+        value={sectionId}
+        aria-label="Section"
+        onchange={(e) => selectSection(e.currentTarget.value)}
+      >
+        {#each page?.groups ?? [] as g (g.id)}
+          <option value={g.id}>{g.title || g.id}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="icon-btn"
+        class:on={sectionOpen}
+        title="Section settings"
+        aria-label="Section settings"
+        aria-expanded={sectionOpen}
+        onclick={() => {
+          sectionOpen = !sectionOpen;
+          if (sectionOpen) {
+            pageOpen = false;
+          }
+        }}
+      >
+        <span class="material-symbols-outlined"
+          >{sectionOpen ? "close" : "edit"}</span
+        >
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Add section"
+        aria-label="Add section"
+        onclick={() => (pendingCreate = { kind: "section", pageId })}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move to another page"
+        aria-label="Move to another page"
+        aria-haspopup="dialog"
+        disabled={!section}
+        onclick={() => (sectionModalOpen = true)}
+      >
+        <span class="material-symbols-outlined">drive_file_move</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Duplicate section"
+        aria-label="Duplicate section"
+        onclick={() =>
+          commitLayout(duplicateSection(registry, pageId, sectionId))}
+      >
+        <span class="material-symbols-outlined">content_copy</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        title="Delete section"
+        aria-label="Delete section"
+        onclick={() => (pendingDelete = { kind: "section", pageId, sectionId })}
+      >
+        <span class="material-symbols-outlined">delete</span>
+      </button>
     </div>
+    {#if sectionOpen && section}
+      <div>
+        <LayoutDetails
+          {registry}
+          {devices}
+          selection={{ kind: "section", pageId, sectionId }}
+          onChange={commitLayout}
+        />
+      </div>
+    {/if}
   {/if}
 
-  <!-- Tile: the same shape a third time — pick one, and its editor is the
+  {#if !pageOpen && !sectionOpen}
+    <!-- Tile: the same shape a third time — pick one, and its editor is the
          sheet's body. No list: the display behind shows the tiles. -->
-  <div class="line">
-    <span class="label-mono">Tile</span>
-    <select
-      value={tileId}
-      aria-label="Tile"
-      onchange={(e) => selectTile(e.currentTarget.value)}
-    >
-      {#if tiles.length === 0}
-        <option value="">no tiles yet</option>
-      {/if}
-      {#each tiles as t (t.id)}
-        <option value={t.id}>{tileLabel(t)}</option>
-      {/each}
-    </select>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Move to another section"
-      aria-label="Move to another section"
-      disabled={!tileAnchor}
-      onclick={() => (moveOpen = true)}
-    >
-      <span class="material-symbols-outlined">drive_file_move</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Add tile"
-      aria-label="Add tile"
-      disabled={!sectionId}
-      onclick={() => openNewTile(pageId, sectionId)}
-    >
-      <span class="material-symbols-outlined">add</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Duplicate tile"
-      aria-label="Duplicate tile"
-      disabled={!tileAnchor}
-      onclick={() =>
-        commitLayout(duplicatePlacement(registry, pageId, sectionId, tileId))}
-    >
-      <span class="material-symbols-outlined">content_copy</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Move up"
-      aria-label="Move up"
-      disabled={!tileAnchor || tileIndex <= 0}
-      onclick={() =>
-        commitLayout(
-          movePlacement(
-            registry,
-            { pageId, sectionId, index: tileIndex },
-            { pageId, sectionId, index: tileIndex - 1 },
-          ),
-        )}
-    >
-      <span class="material-symbols-outlined">arrow_upward</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Move down"
-      aria-label="Move down"
-      disabled={!tileAnchor || tileIndex === tiles.length - 1}
-      onclick={() =>
-        commitLayout(
-          movePlacement(
-            registry,
-            { pageId, sectionId, index: tileIndex },
-            { pageId, sectionId, index: tileIndex + 1 },
-          ),
-        )}
-    >
-      <span class="material-symbols-outlined">arrow_downward</span>
-    </button>
-    <button
-      type="button"
-      class="icon-btn danger"
-      title="Remove tile"
-      aria-label="Remove tile"
-      disabled={!tileAnchor}
-      onclick={() =>
-        commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
-    >
-      <span class="material-symbols-outlined">delete</span>
-    </button>
-  </div>
+    <div class="line">
+      <span class="label-mono">Tile</span>
+      <select
+        value={tileId}
+        aria-label="Tile"
+        onchange={(e) => selectTile(e.currentTarget.value)}
+      >
+        {#if tiles.length === 0}
+          <option value="">no tiles yet</option>
+        {/if}
+        {#each tiles as t (t.id)}
+          <option value={t.id}>{tileLabel(t)}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Add tile"
+        aria-label="Add tile"
+        disabled={!sectionId}
+        onclick={() => openNewTile(pageId, sectionId)}
+      >
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move to another section"
+        aria-label="Move to another section"
+        aria-haspopup="dialog"
+        disabled={!tileAnchor}
+        onclick={() => (tileMoveOpen = true)}
+      >
+        <span class="material-symbols-outlined">drive_file_move</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Duplicate tile"
+        aria-label="Duplicate tile"
+        disabled={!tileAnchor}
+        onclick={() =>
+          commitLayout(duplicatePlacement(registry, pageId, sectionId, tileId))}
+      >
+        <span class="material-symbols-outlined">content_copy</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move up"
+        aria-label="Move up"
+        disabled={!tileAnchor || tileIndex <= 0}
+        onclick={() =>
+          commitLayout(
+            movePlacement(
+              registry,
+              { pageId, sectionId, index: tileIndex },
+              { pageId, sectionId, index: tileIndex - 1 },
+            ),
+          )}
+      >
+        <span class="material-symbols-outlined">arrow_upward</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        title="Move down"
+        aria-label="Move down"
+        disabled={!tileAnchor || tileIndex === tiles.length - 1}
+        onclick={() =>
+          commitLayout(
+            movePlacement(
+              registry,
+              { pageId, sectionId, index: tileIndex },
+              { pageId, sectionId, index: tileIndex + 1 },
+            ),
+          )}
+      >
+        <span class="material-symbols-outlined">arrow_downward</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        title="Remove tile"
+        aria-label="Remove tile"
+        disabled={!tileAnchor}
+        onclick={() =>
+          commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
+      >
+        <span class="material-symbols-outlined">delete</span>
+      </button>
+    </div>
+  {/if}
 
   <!-- The sheet's body is always the tile editor: the device is a reusable
        control collection on the Devices page, never a tile's identity. -->
@@ -633,13 +704,12 @@
   <!-- One editor at a time: the selected tile's layout. Page/section edits
        fold out under their own line and close the tile editor. -->
   {#if tileSelection && !pageOpen && !sectionOpen}
-    <div class="fold tile-editor">
+    <div class="tile-editor">
       <LayoutDetails
         {registry}
         {devices}
         selection={tileSelection}
         onChange={commitLayout}
-        onSelect={(next) => (selection = next)}
         onAddSlot={openSlotPicker}
         {hasDetail}
         detailShown={modalShown}
@@ -651,11 +721,13 @@
 
 {#if pickerFor}
   {@const target = pickerFor}
-  <SlotPicker
+  <SourcePicker
+    mode="slot"
     {devices}
     templates={getTemplateRegistry().templates ?? []}
+    slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
-    onAdd={(slots) => {
+    onSlots={(slots) => {
       // Snapshot before closing: `target` reads the reactive value, which
       // becomes null the moment `pickerFor` is cleared.
       if (target.kind === "newTile") {
@@ -669,15 +741,28 @@
   />
 {/if}
 
-{#if moveOpen && tileAnchor && currentTile}
+{#if sectionModalOpen && section}
+  <MoveSectionModal
+    title={`Move “${section.title || "section"}”`}
+    pages={registry.pages.map((p) => ({ id: p.id, title: p.title }))}
+    current={page?.id ?? pageId}
+    onMove={moveSectionToPageAndFollow}
+    onClose={() => (sectionModalOpen = false)}
+  />
+{/if}
+
+{#if tileMoveOpen && tileAnchor && currentTile}
   <MoveTileModal
     title={`Move “${tileLabel(currentTile)}”`}
-    sections={(page?.groups ?? []).map((g) => ({ id: g.id, title: g.title }))}
-    current={sectionId}
-    onMove={(id) => {
-      if (moveTileToSection(id)) moveOpen = false;
-    }}
-    onClose={() => (moveOpen = false)}
+    pages={registry.pages.map((p) => ({
+      id: p.id,
+      title: p.title,
+      sections: (p.groups ?? []).map((g) => ({ id: g.id, title: g.title })),
+    }))}
+    currentPageId={tileAnchor.pageId}
+    currentSectionId={tileAnchor.sectionId}
+    onMove={moveTileToSection}
+    onClose={() => (tileMoveOpen = false)}
   />
 {/if}
 
@@ -765,12 +850,6 @@
   .line select {
     flex: 1 1 auto;
     min-width: 0;
-  }
-
-  /* A fold-out reads as belonging to the line above it. */
-  .fold {
-    padding-left: 0.6rem;
-    border-left: 2px solid var(--border-color);
   }
 
   .tile-editor {

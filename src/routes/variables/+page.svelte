@@ -25,7 +25,7 @@
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
-  import StatePicker from "$lib/components/discovery/StatePicker.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import {
     enumLabelFromObject,
     roomList,
@@ -645,14 +645,10 @@
   {/if}
 
   {#if picking}
-    <StatePicker
-      deviceType="Value"
-      {objects}
-      {rooms}
-      {roomsOf}
-      enums={ioBroker.enums}
-      mode="replace"
-      onAdd={(controls) => pickState(controls[0]?.stateId ?? "")}
+    <SourcePicker
+      mode="state"
+      title="Choose a state"
+      onState={(id) => pickState(id)}
       onClose={() => (picking = false)}
     />
   {/if}

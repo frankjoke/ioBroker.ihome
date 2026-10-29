@@ -305,6 +305,36 @@ export function moveSection(
   }));
 }
 
+/** Move a whole section to the end of another page. Same page or a missing
+ *  source/target leaves the registry untouched. */
+export function moveSectionToPage(
+  reg: PageRegistry,
+  fromPageId: string,
+  sectionId: string,
+  toPageId: string,
+): PageRegistry {
+  if (fromPageId === toPageId) return reg;
+  const from = reg.pages.find((p) => p.id === fromPageId);
+  const section = from?.groups?.find((g) => g.id === sectionId);
+  const to = reg.pages.find((p) => p.id === toPageId);
+  if (!section || !to) return reg;
+  return {
+    ...reg,
+    pages: reg.pages.map((p) => {
+      if (p.id === fromPageId) {
+        return {
+          ...p,
+          groups: (p.groups ?? []).filter((g) => g.id !== sectionId),
+        };
+      }
+      if (p.id === toPageId) {
+        return { ...p, groups: [...(p.groups ?? []), section] };
+      }
+      return p;
+    }),
+  };
+}
+
 /**
  * Patch a section's own fields (title, icon, appearance, …). A field set to
  * `undefined` disappears from the document instead of being stored empty.

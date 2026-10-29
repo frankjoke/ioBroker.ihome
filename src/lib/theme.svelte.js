@@ -30,12 +30,33 @@ export function setTheme(mode) {
 }
 
 /**
- * Resolve the theme actually in effect (auto follows the system).
+ * The ioBroker admin's own theme choice, read from the same origin's
+ * localStorage. The admin calls the setting `App.themeName`; its dark themes
+ * are `dark`, `blue` and `modernDark`.
+ * @returns {"auto" | "light" | "dark"}
+ */
+export function adminTheme() {
+  try {
+    const name = globalThis.localStorage?.getItem("App.themeName");
+    if (name && name !== "auto") {
+      return ["dark", "blue", "modernDark"].includes(name) ? "dark" : "light";
+    }
+  } catch {
+    /* private mode or no storage: fall through to the system */
+  }
+  return "auto";
+}
+
+/**
+ * Resolve the theme actually in effect: an explicit light/dark wins, else the
+ * ioBroker admin's theme, else the system preference.
  * @param {ThemeMode} [mode]
  * @returns {"light" | "dark"}
  */
 export function effectiveTheme(mode = getTheme()) {
   if (mode === "light" || mode === "dark") return mode;
+  const fallback = adminTheme();
+  if (fallback !== "auto") return fallback;
   return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";

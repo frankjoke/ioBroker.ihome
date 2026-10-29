@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { isHexColor } from "$lib/config/appearance";
   import {
-    movePlacement,
     patchPage,
     patchPlacement,
     patchSection,
@@ -54,7 +53,7 @@
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
-  import StatePicker from "$lib/components/discovery/StatePicker.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
@@ -81,7 +80,6 @@
     devices,
     selection,
     onChange,
-    onSelect,
     onAddSlot,
     hasDetail = false,
     detailShown = false,
@@ -91,8 +89,6 @@
     devices: EnrichedDevice[];
     selection: LayoutSelection;
     onChange: (next: PageRegistry) => void;
-    /** Move-to-section hands the pane to the tile's new address. */
-    onSelect?: (selection: LayoutSelection) => void;
     /** Add slot: the route owns the picker. `at` inserts there instead of
      * appending (the list-end `+`). */
     onAddSlot?: (anchor: PlacementAnchor, at?: number) => void;
@@ -442,27 +438,6 @@
     patch: Partial<StateLook>,
   ): void {
     edit((t) => setLook(t, state, patch));
-  }
-
-  /** Appends the placement to the chosen section, then the pane follows it. */
-  function moveTileTo(key: string): void {
-    const a = anchor();
-    if (!a || !section) return;
-    const at = (section.tiles ?? []).findIndex((t) => t.id === a.placementId);
-    if (at < 0) return;
-    const [pageId, sectionId] = key.split("|");
-    const target = registry.pages
-      .find((p) => p.id === pageId)
-      ?.groups.find((g) => g.id === sectionId);
-    if (!target) return;
-    onChange(
-      movePlacement(
-        registry,
-        { pageId: a.pageId, sectionId: a.sectionId, index: at },
-        { pageId, sectionId, index: (target.tiles ?? []).length },
-      ),
-    );
-    onSelect?.({ kind: "tile", pageId, sectionId, placementId: a.placementId });
   }
 
   // ------------------------------------------------------------------- slots
@@ -1113,13 +1088,16 @@
                 {#if slot.spark && slot.spark.enabled !== false}
                   <Icon value="show_chart" size={15} />
                 {/if}
-                <span class="slot-summary"
-                  >{slot.kind} · {slotLabel(
-                    slot,
-                  )}{#if !slot.source && slot.options?.pick}<span
-                      class="hint-mark text-muted">(hint)</span
-                    >{/if}</span
+                <span
+                  class="slot-summary"
+                  title={`${slot.kind} · ${slotLabel(slot)}`}
                 >
+                  <span class="slot-kind">{slot.kind} ·</span>
+                  <span class="slot-name">{slotLabel(slot)}</span>
+                  {#if !slot.source && slot.options?.pick}
+                    <span class="hint-mark text-muted">(hint)</span>
+                  {/if}
+                </span>
                 {#if slot === headlineSlot(shownSlots)}
                   <span
                     class="hint-badge"
@@ -1927,27 +1905,6 @@
         {/each}
       </div>
     </div>
-
-    <label class="field">
-      <span class="label-mono">Move to section</span>
-      <select
-        value={`${page?.id ?? ""}|${section?.id ?? ""}`}
-        onchange={(e) => moveTileTo(e.currentTarget.value)}
-      >
-        {#each registry.pages as p (p.id)}
-          <optgroup label={p.title || p.id}>
-            {#each p.groups as g (g.id)}
-              <option
-                value={`${p.id}|${g.id}`}
-                disabled={p.id === page?.id && g.id === section?.id}
-              >
-                {g.title || g.id}
-              </option>
-            {/each}
-          </optgroup>
-        {/each}
-      </select>
-    </label>
   {/if}
 
   {#if iconPicker}
@@ -1963,31 +1920,23 @@
   {/if}
 
   {#if activePicker}
-    <StatePicker
-      deviceType="Custom"
+    <SourcePicker
+      mode="source"
+      title="Choose a source"
       {devices}
-      objects={ioBroker.objects}
-      {roomsOf}
-      {rooms}
-      enums={ioBroker.enums}
-      mode="slot"
-      onAdd={() => {}}
-      onSlotSource={setActiveSource}
+      slots={shownSlots}
+      onSource={setActiveSource}
       onClose={() => (activePicker = false)}
     />
   {/if}
 
   {#if sourcePickerFor !== null}
-    <StatePicker
-      deviceType="Custom"
+    <SourcePicker
+      mode="source"
+      title="Choose a source"
       {devices}
-      objects={ioBroker.objects}
-      {roomsOf}
-      {rooms}
-      enums={ioBroker.enums}
-      mode="slot"
-      onAdd={() => {}}
-      onSlotSource={(source) => {
+      slots={shownSlots}
+      onSource={(source) => {
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;
         if (slotIndex === null) return;
@@ -2163,9 +2112,26 @@
   }
 
   .slot-summary {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .slot-kind {
+    flex: 0 0 auto;
+  }
+
+  /* The tail of a state id carries the difference; a left ellipsis keeps it
+     visible (the full name is the row's title). */
+  .slot-name {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    direction: rtl;
+    text-align: left;
   }
 
   /* Its own gap: the svelte compiler trims the space before an inline element. */

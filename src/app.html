@@ -31,10 +31,23 @@
 				try {
 					var mode = localStorage.getItem("__VISUAL__:theme");
 					mode = mode ? JSON.parse(mode) : "auto";
-					var dark =
-						mode === "dark" ||
-						(mode !== "light" &&
-							window.matchMedia("(prefers-color-scheme: dark)").matches);
+					var dark;
+					if (mode === "dark") {
+						dark = true;
+					} else if (mode === "light") {
+						dark = false;
+					} else {
+						// Auto: the admin's own theme (same origin), then the OS.
+						var admin = localStorage.getItem("App.themeName");
+						if (admin && admin !== "auto") {
+							dark =
+								["dark", "blue", "modernDark"].indexOf(admin) !== -1;
+						} else {
+							dark = window.matchMedia(
+								"(prefers-color-scheme: dark)",
+							).matches;
+						}
+					}
 					if (dark) document.documentElement.classList.add("dark");
 				} catch (e) {
 					/* ignore */

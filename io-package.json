@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.0.33",
+        "version": "0.1.0",
         "news": {
+            "0.1.0": {
+                "en": "One picker for every state or control selection: the same modal adds a slot, picks a tile's active source, edits device controls or a variable, and lists the tile's own sources first. The layout editor keeps the selected tile across view/edit, moves tiles and sections through dialogs, reorders pages, and can hide the pencil for everyone. The mobile bar drops the network icon (the cog shows the connection) and page-tab icons on narrow screens; the theme choice now lives in User Interface and stays per browser.",
+                "de": "Ein Picker für jede State- oder Control-Auswahl: Dasselbe Fenster legt einen Slot an, wählt die aktive Quelle einer Kachel, bearbeitet Geräte-Controls oder eine Variable und zeigt die Quellen der Kachel zuerst. Der Layout-Editor behält die gewählte Kachel über Ansicht/Editor, verschiebt Kacheln und Bereiche per Dialog, ordnet Seiten um und kann den Stift für alle ausblenden. Die mobile Leiste verliert das Netzwerk-Icon (das Zahnrad zeigt die Verbindung) und auf schmalen Bildschirmen die Seiten-Icons; die Theme-Wahl liegt jetzt unter Benutzeroberfläche und bleibt pro Browser."
+            },
             "0.0.33": {
                 "en": "Tiles are now built from slots: each slot reads a device control or any raw state, and a tile no longer owns a device. Loading a device adds slots only for its real controls, and existing pages migrate once with a backup (pageListV1).",
                 "de": "Kacheln bestehen jetzt aus Slots: Jeder Slot liest ein Geräte-Control oder einen beliebigen Roh-State, und eine Kachel besitzt kein Gerät mehr. Das Laden eines Geräts erzeugt Slots nur für seine tatsächlichen Controls, und vorhandene Seiten werden einmalig mit einer Sicherung (pageListV1) migriert."
@@ -78,14 +82,6 @@
             "0.0.14": {
                 "en": "A tile can guard its detail page with its own PIN (asked on a number pad, every time); the layout editor opens from any page, and the page tabs wear their page's colour",
                 "de": "Ein Tile kann seine Detailseite mit einer eigenen PIN schützen (Eingabe über eine Zifferntastatur, bei jedem Öffnen); der Layout-Editor öffnet von jeder Seite, und die Seiten-Reiter tragen die Farbe ihrer Seite"
-            },
-            "0.0.13": {
-                "en": "Settings can be locked with a PIN (change it under Security); the layout editor can be locked too, and navigating no longer reloads the dashboard",
-                "de": "Einstellungen lassen sich mit einer PIN sperren (änderbar unter Security); der Layout-Editor kann ebenfalls gesperrt werden, und Navigation lädt das Dashboard nicht mehr neu"
-            },
-            "0.0.12": {
-                "en": "The connection settings stay editable while connected: save and the dashboard reconnects with the new broker address or namespace",
-                "de": "Die Verbindungseinstellungen bleiben auch im verbundenen Zustand bearbeitbar: Speichern verbindet das Dashboard mit der neuen Broker-Adresse bzw. dem Namespace neu"
             }
         },
         "titleLang": {

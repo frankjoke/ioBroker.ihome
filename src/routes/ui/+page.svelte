@@ -11,8 +11,10 @@
     settingsSaveFailed,
     updateSettings,
   } from "$lib/stores/settings.svelte";
+  import ThemeToggle from "$lib/ThemeToggle.svelte";
 
   const ui = $derived(effectiveUi(getSettings()));
+  const hidePencil = $derived(getSettings().hidePencil === true);
 
   // Local drafts: dragging a slider must not write the document on every tick.
   // They follow the document (also a change from another device); the write
@@ -72,6 +74,49 @@
       </p>
     </div>
   </div>
+
+  <section class="card">
+    <div class="card-header">
+      <span class="material-symbols-outlined">contrast</span>
+      <h2 class="card-title">Theme</h2>
+    </div>
+    <div class="card-body ui-body">
+      <div class="ui-row">
+        <span class="label-mono row-label">Colour theme</span>
+        <ThemeToggle />
+      </div>
+      <p class="hint text-muted">
+        Saved in this browser only. Auto follows the ioBroker admin theme, then
+        the operating system.
+      </p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <span class="material-symbols-outlined">edit_off</span>
+      <h2 class="card-title">Layout editor</h2>
+    </div>
+    <div class="card-body ui-body">
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={hidePencil}
+          onchange={(e) =>
+            void updateSettings({ hidePencil: e.currentTarget.checked })}
+        />
+        <span>Hide the layout pencil in the main bar</span>
+      </label>
+      <p class="hint text-muted">
+        Applies to every device using this ioBroker. The editor can still be
+        opened with the PIN-gated shortcut (Ctrl/Cmd+click a page tab), so this
+        hides the easy entrance; it is not a security boundary.
+      </p>
+      {#if settingsSaveFailed()}
+        <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+      {/if}
+    </div>
+  </section>
 
   <section class="card">
     <div class="card-header">
@@ -221,6 +266,13 @@
 
   .hint {
     font-size: var(--body-sm);
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
   }
 
   .card-header {

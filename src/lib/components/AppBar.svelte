@@ -22,13 +22,14 @@
     wantsDeviceConfig,
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
-  import ThemeToggle from "$lib/ThemeToggle.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { CONFIG_LAST_KEY, cogTarget } from "$lib/config/config-nav";
   import { getStorage } from "$lib/tools.svelte";
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
+  import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
+  import { effectiveHidePencil } from "$lib/config/settings-ops";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -53,6 +54,11 @@
       : (treePages[0]?.id ?? "");
   });
   const isConnected = $derived(!!ioBroker.connected);
+  /** The UI page can hide the pencil for everyone; until the settings document
+   *  is read, hide it — an unauthorized pencil must not flash in. */
+  const hidePencil = $derived(
+    !isSettingsLoaded() || effectiveHidePencil(getSettings().hidePencil),
+  );
 
   /**
    * A tab is a folder tab for its own page: it wears the page's solid
@@ -205,17 +211,19 @@
          the tab row, so the tabs stay pages and nothing else. The eye is the
          same switch, read the other way. -->
     {#if isDisplay}
-      <a
-        class="icon-btn"
-        href={`${base}/#/`}
-        title={sheet.open ? "Back to the display" : "Edit the layout"}
-        aria-label={sheet.open ? "Back to the display" : "Edit the layout"}
-        onclick={onPencilClick}
-      >
-        <span class="material-symbols-outlined"
-          >{sheet.open ? "visibility" : "edit"}</span
+      {#if !hidePencil || sheet.open}
+        <a
+          class="icon-btn"
+          href={`${base}/#/`}
+          title={sheet.open ? "Back to the display" : "Edit the layout"}
+          aria-label={sheet.open ? "Back to the display" : "Edit the layout"}
+          onclick={onPencilClick}
         >
-      </a>
+          <span class="material-symbols-outlined"
+            >{sheet.open ? "visibility" : "edit"}</span
+          >
+        </a>
+      {/if}
     {/if}
 
     {#if !isDisplay}
@@ -229,27 +237,16 @@
       </a>
     {/if}
 
-    <ThemeToggle variant="cycle" />
-
     <a
       class="icon-btn status-btn"
       class:connected={isConnected}
-      href={`${base}/#/server`}
-      title={isConnected
-        ? "Connected — open Server & Security"
-        : "Not connected — open Server & Security"}
-      aria-label={isConnected ? "Connected" : "Not connected"}
-    >
-      <span class="material-symbols-outlined"
-        >{isConnected ? "wifi" : "wifi_off"}</span
-      >
-    </a>
-
-    <a
-      class="icon-btn"
       href={cogHref}
-      title="Configuration"
-      aria-label="Configuration"
+      title={isConnected
+        ? "Configuration — connected"
+        : "Configuration — not connected"}
+      aria-label={isConnected
+        ? "Configuration, connected"
+        : "Configuration, not connected"}
     >
       <span class="material-symbols-outlined">settings</span>
     </a>
@@ -359,6 +356,14 @@
   }
   .tab .material-symbols-outlined {
     font-size: 18px;
+  }
+
+  /* On a phone the tabs keep their labels and give up the page icons. */
+  @media (max-width: 820px) {
+    .tab :global(.material-symbols-outlined),
+    .tab :global(.icon-img) {
+      display: none;
+    }
   }
 
   .actions {
