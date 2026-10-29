@@ -67,6 +67,7 @@
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import WhereButton from "$lib/components/layout/WhereButton.svelte";
   import StatePicker from "$lib/components/discovery/StatePicker.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import { BLANK_DEVICE_ID, blankDevice } from "$lib/config/blank-tile";
@@ -743,24 +744,6 @@
   }
 </script>
 
-{#snippet whereButton(
-  where: "tile" | "both" | "modal",
-  title: string,
-  on: boolean,
-  onclick: () => void,
-)}
-  <button
-    type="button"
-    class="icon-btn"
-    class:on
-    {title}
-    aria-label={title}
-    {onclick}
-  >
-    <span class="material-symbols-outlined">{WHERE_GLYPH[where]}</span>
-  </button>
-{/snippet}
-
 {#snippet lookColor(
   label: string,
   value: string | undefined,
@@ -1191,12 +1174,12 @@
                 {/if}
               </button>
               <span class="row-actions">
-                {@render whereButton(
-                  slotWhere(slot),
-                  whereTitle(slot),
-                  slotWhere(slot) !== "tile",
-                  () => cycleWhere(i, slot),
-                )}
+                <WhereButton
+                  where={slotWhere(slot)}
+                  title={whereTitle(slot)}
+                  active={slotWhere(slot) !== "tile"}
+                  onCycle={() => cycleWhere(i, slot)}
+                />
                 <button
                   type="button"
                   class="icon-btn"
@@ -1433,19 +1416,14 @@
                         />
                         <span>unit</span>
                       </label>
+                      <WhereButton
+                        where={slotWhere(slot)}
+                        title={whereTitle(slot)}
+                        active={slotWhere(slot) !== "tile"}
+                        onCycle={() => cycleWhere(i, slot)}
+                      />
                     {/if}
                   </div>
-                  {#if slot.kind === "value"}
-                    <div class="row">
-                      <span class="label-mono">Show in</span>
-                      {@render whereButton(
-                        slotWhere(slot),
-                        whereTitle(slot),
-                        slotWhere(slot) !== "tile",
-                        () => cycleWhere(i, slot),
-                      )}
-                    </div>
-                  {/if}
                   <p class="note text-muted">
                     A hint pins no control: the display looks up the control
                     whose name, role or unit matches while it renders, so one
@@ -1505,13 +1483,12 @@
                       />
                       <span>show value</span>
                     </label>
-                    <span class="label-mono">value in</span>
-                    {@render whereButton(
-                      valueWhereOf(slot),
-                      valueWhereTitle(slot),
-                      valueWhereOf(slot) !== "both",
-                      () => cycleValueWhere(i, slot),
-                    )}
+                    <WhereButton
+                      where={valueWhereOf(slot)}
+                      title={valueWhereTitle(slot)}
+                      active={valueWhereOf(slot) !== "both"}
+                      onCycle={() => cycleValueWhere(i, slot)}
+                    />
                   </div>
                 {/if}
                 {#if slot.kind === "badge"}
@@ -1666,11 +1643,11 @@
                           Choose glyph…
                         {/if}
                       </button>
-                      {@render whereButton(
-                        slot.icon.where ?? "both",
-                        iconWhereTitle(i),
-                        slot.icon.where !== undefined,
-                        () =>
+                      <WhereButton
+                        where={slot.icon.where ?? "both"}
+                        title={iconWhereTitle(i)}
+                        active={slot.icon.where !== undefined}
+                        onCycle={() =>
                           edit((t) =>
                             patchIcon(t, i, {
                               where:
@@ -1678,8 +1655,8 @@
                                   ? undefined
                                   : nextIconWhere(i),
                             }),
-                          ),
-                      )}
+                          )}
+                      />
                     {/if}
                   </div>
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
