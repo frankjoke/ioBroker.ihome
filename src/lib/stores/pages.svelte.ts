@@ -256,6 +256,19 @@ export async function migrateLayout(
   devices: Device[],
   templates: Template[],
 ): Promise<boolean> {
+  // A first-run seed must never win a race with a stored document: on a reload
+  // the page state can read empty for a moment (the seed incident). Only a
+  // document actually read is migrated; anything else is re-read from the
+  // broker first, and an empty re-read leaves the seed in memory.
+  if (pagesLoadKind !== "loaded") {
+    const st = await ioBroker.getState(PAGE_LIST_ID, true);
+    const raw = st?.val ?? st?.value;
+    const stored = parsePageRegistry(raw);
+    if (!stored) return false;
+    rawPages = typeof raw === "string" ? raw : JSON.stringify(raw);
+    setPageRegistry(stored);
+    pagesLoadKind = "loaded";
+  }
   const bridge = migratePageRegistry(
     getPageRegistry(),
     devices.map((d) => toFilterable(d)),
