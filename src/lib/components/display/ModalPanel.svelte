@@ -102,11 +102,16 @@
     >
       {#each rows as r, i (i)}
         {#if r.slot.kind === "frame" || r.slot.kind === "html"}
-          {#if r.icon}
+          {#if r.icon || r.slot.label}
             <div class="row frame-cap">
-              <span class="row-icon" style:color={r.icon.color}>
-                <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
-              </span>
+              {#if r.icon}
+                <span class="row-icon" style:color={r.icon.color}>
+                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                </span>
+              {/if}
+              {#if r.slot.label}
+                <span class="frame-label">{r.slot.label}</span>
+              {/if}
             </div>
           {/if}
           <!-- A page has no name column: it takes the panel's whole width, and
@@ -240,6 +245,12 @@
 
   .frame-cap {
     justify-content: center;
+    gap: 0.35rem;
+  }
+
+  .frame-label {
+    font-size: var(--body-sm);
+    font-weight: 600;
   }
 
   /* The badges that live in the modal (A34) — the tile's chips, in sequence. */
