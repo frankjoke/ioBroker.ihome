@@ -533,8 +533,9 @@
         </label>
         <div class="actions">
           <span class="text-muted">
-            Runs as a local document in a frame; detail page only by default. A
-            state can replace it in the slot editor.
+            Runs as a local document in a frame; detail page only by default.
+            &#123;&#123;NAME&#125;&#125; placeholders and ihome.setState(…) work
+            in it.
           </span>
           <button
             type="button"

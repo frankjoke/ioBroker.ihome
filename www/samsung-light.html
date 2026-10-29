@@ -114,8 +114,7 @@
   .bad { color: #b91c1c !important }
 </style>
 <main>
-  <h1>Samsung TV · 192.168.178.23</h1>
-  <input id="host" type="text" value="192.168.178.23" spellcheck="false">
+  <h1>Samsung TV · {{TV_IP}}</h1>
   <div id="pad">
     <button id="power">Power</button>
     <button data-key="KEY_HOME">Home</button>
@@ -164,7 +163,7 @@
   let ws = null;
   const $status = document.getElementById("status");
   const setStatus = (t, cls = "") => { $status.textContent = t; $status.className = cls; };
-  const host = () => document.getElementById("host").value.trim();
+  const host = () => "{{TV_IP}}";
 
   // Ein Verbindungsversuch: löst auf, sobald der TV ms.channel.connect schickt.
   function openSocket(timeout = 8000) {

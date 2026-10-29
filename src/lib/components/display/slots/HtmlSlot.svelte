@@ -2,6 +2,12 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { registerProgramStateId } from "$lib/stores/devices.svelte.js";
+  import {
+    placeholderKeys,
+    renderHtmlDocument,
+  } from "$lib/config/html-template";
+  import { installHtmlBridge } from "$lib/html-bridge";
   import type { Slot } from "$lib/types/display";
 
   /**
@@ -14,8 +20,14 @@
    *
    * When the slot names a state, that state's string value is the document and
    * wins over the inline text; an empty/missing state falls back to the text.
+   * `{{name}}` placeholders read Global Variables (or raw dotted state ids)
+   * before the document is handed to the frame.
    */
   let { slot }: { slot: Slot } = $props();
+
+  // The frame's `ihome.*` bridge is the parent's object; install it before the
+  // iframe parses its document.
+  installHtmlBridge();
 
   const stateId = $derived(
     slot.source &&
@@ -27,13 +39,40 @@
   const stateHtml = $derived(
     stateId ? ioBroker.states.get(stateId)?.val : undefined,
   );
-  const html = $derived(
+  const rawHtml = $derived(
     typeof stateHtml === "string" && stateHtml.trim()
       ? stateHtml
       : typeof slot.options?.html === "string"
         ? slot.options.html
         : "",
   );
+
+  /** Subscribe every state a placeholder names, so a raw state id fills in. */
+  $effect(() => {
+    for (const key of placeholderKeys(rawHtml)) {
+      const variable = getVariables().find((v) => v.name === key);
+      const id =
+        variable?.kind === "state" && variable.stateId
+          ? variable.stateId
+          : key.includes(".")
+            ? key
+            : "";
+      if (id) registerProgramStateId(id);
+    }
+  });
+
+  function placeholderValue(key: string): unknown {
+    const variable = getVariables().find((v) => v.name === key);
+    if (variable) {
+      if (variable.kind === "state" && variable.stateId) {
+        return ioBroker.states.get(variable.stateId)?.val;
+      }
+      return variable.value;
+    }
+    return key.includes(".") ? ioBroker.states.get(key)?.val : undefined;
+  }
+
+  const html = $derived(renderHtmlDocument(rawHtml, placeholderValue));
 </script>
 
 {#if html.trim()}

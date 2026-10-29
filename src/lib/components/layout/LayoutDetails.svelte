@@ -1320,6 +1320,9 @@
                       <p class="note text-muted">
                         A state's string value wins over the inline HTML; empty
                         or missing falls back to it.
+                        &#123;&#123;NAME&#125;&#125; reads a Global Variable (or
+                        a dotted state id); scripts can call
+                        <code>ihome.setState(id, value)</code>.
                       </p>
                     </div>
                   {:else}
