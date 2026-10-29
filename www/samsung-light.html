@@ -112,6 +112,19 @@
 
   .ok { color: #15803d !important }
   .bad { color: #b91c1c !important }
+
+  /* Power off: everything except the Power button is dimmed and inert. */
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(0.9);
+    box-shadow: none;
+  }
+
+  button:disabled:hover {
+    background: #fff;
+    border-color: #d7e2f0;
+  }
 </style>
 <main>
   <h1>Samsung TV · {{TV_IP}}</h1>
@@ -161,6 +174,7 @@
   // same state. Replace the id if the plug changes.
   const TV_STATE = "shelly.1.shellyplusplugs#e465b8b93fd4#1.Relay0.Switch";
   let ws = null;
+  let powerOn = null;
   const $status = document.getElementById("status");
   const setStatus = (t, cls = "") => { $status.textContent = t; $status.className = cls; };
   const host = () => "{{TV_IP}}";
@@ -201,6 +215,36 @@
     try { await openSocket(); } catch (e) { setStatus(e.message, "bad"); }
   }
 
+  // Every button except Power waits for the TV state; off = dimmed/disabled.
+  function setPowerUI(on) {
+    document.querySelectorAll("button").forEach((button) => {
+      if (button.id === "power") return;
+      button.disabled = !on;
+    });
+  }
+
+  // Read the plug state on load and after changes (the tile switch may move it).
+  async function refreshPower() {
+    try {
+      const on = !!(await getState(TV_STATE));
+      setPowerUI(on);
+      if (on === powerOn) return;
+      powerOn = on;
+      if (on) {
+        setStatus("TV an", "ok");
+        connect();
+      } else {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        setStatus("TV aus", "");
+      }
+    } catch {
+      setPowerUI(false);
+    }
+  }
+
   // Power: the TV's plug state is the source; toggle it. The tile switch and
   // this button share the state.
   async function power() {
@@ -209,12 +253,14 @@
       const on = await getState(TV_STATE);
       await setState(TV_STATE, !on);
       setStatus(on ? "TV aus" : "TV an", "ok");
+      await refreshPower();
     } catch {
       setStatus("TV-State nicht erreichbar", "bad");
     }
   }
 
   function send(cmd) {
+    if (!powerOn) return;
     if (!ws || ws.readyState !== 1) return setStatus("nicht verbunden", "bad");
     ws.send(JSON.stringify({
       method: "ms.remote.control",
@@ -242,7 +288,9 @@
     const k = KEYS[e.key];
     if (k) { e.preventDefault(); send(k); }
   });
-  connect();
+  setPowerUI(false);
+  refreshPower();
+  setInterval(refreshPower, 3000);
 </script>
 
 </html>
