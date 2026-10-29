@@ -99,7 +99,9 @@ export function widgetForState(object: any): Widget {
   if (common.type === "color" || role.includes("color")) return "color";
   if (
     common.type === "number" &&
-    (common.min !== undefined || common.max !== undefined)
+    (common.min !== undefined ||
+      common.max !== undefined ||
+      /level|dimmer|brightness|setpoint|position|volume/.test(role))
   ) {
     return "level";
   }

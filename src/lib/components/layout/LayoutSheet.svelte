@@ -24,11 +24,13 @@
     duplicateSection,
     movePlacement,
     pageTitleTaken,
+    patchPlacement,
     sectionTitleTaken,
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
   import { addSlot, editTile } from "$lib/config/tile-ops";
+  import { tileSeed } from "$lib/config/slot-create";
   import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
@@ -272,11 +274,41 @@
         .find((p) => p.id === pageId)
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
-    let next = appendTile(registry, pageId, sectionId, slots[0], at);
+    // A new tile takes its name, size and default glyph from its first slot
+    // once (S11) — a frozen offer, not a live device link.
+    const seed = tileSeed(slots, devices, getTemplateRegistry().templates);
+    const first =
+      seed.icon && !slots[0].icon?.glyph
+        ? { ...slots[0], icon: { ...slots[0].icon, glyph: seed.icon } }
+        : slots[0];
+    let next = appendTile(registry, pageId, sectionId, first, at);
     const added = sectionIn(next)?.tiles.find((t) => !before.has(t.id));
     if (!added) {
       pickerFor = null;
       return;
+    }
+    const anchor = { pageId, sectionId, placementId: added.id };
+    const seedSize = seed.size;
+    if (seedSize) {
+      next = editTile(next, anchor, (t) => ({ ...t, size: seedSize }));
+    }
+    const seedTitle = seed.title;
+    if (seedTitle) {
+      next = patchPlacement(next, pageId, sectionId, added.id, {
+        title: seedTitle,
+      });
+    }
+    // The type's glyph is the tile's face even when the headline slot is a
+    // value or another slot: the first slot offers it once (S11).
+    const seedIcon = seed.icon;
+    if (seedIcon) {
+      next = editTile(next, anchor, (t) => ({
+        ...t,
+        look: {
+          ...t.look,
+          inactive: { ...t.look?.inactive, glyph: seedIcon },
+        },
+      }));
     }
     if (slots.length > 1) {
       next = editTile(next, { pageId, sectionId, placementId: added.id }, (t) =>

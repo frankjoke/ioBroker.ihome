@@ -4,6 +4,7 @@ import {
   slotFromControl,
   slotFromState,
   slotKindForWidget,
+  tileSeed,
 } from "$lib/config/slot-create";
 import { PRESETS } from "$lib/config/presets";
 import type { Control, Device } from "$lib/types/device";
@@ -52,6 +53,51 @@ it("keeps only controls the device actually has", () => {
     kind: "control",
     device: light.id,
     control: "c1",
+  });
+});
+
+it("uses the state's role/type over the device type's feature", () => {
+  const consumption = ctl("c1", "power", {
+    object: {
+      common: {
+        name: "CONSUMPTION",
+        role: "value.power.consumption",
+        type: "number",
+        unit: "Wh",
+        write: false,
+      },
+    },
+  } as unknown as Partial<Control>);
+  expect(
+    slotFromControl(device({ type: "Switch" }), consumption),
+  ).toMatchObject({
+    kind: "value",
+    label: "CONSUMPTION",
+    unit: "Wh",
+  });
+
+  const power = ctl("c2", "power", {
+    object: {
+      common: { name: "SET", role: "switch", type: "boolean", write: true },
+    },
+  } as unknown as Partial<Control>);
+  expect(slotFromControl(device({ type: "Switch" }), power).kind).toBe(
+    "switch",
+  );
+});
+
+it("a new tile takes its name, size and glyph from the first control", () => {
+  const dev = device({
+    id: "brunnen",
+    name: "Brunnen",
+    type: "Switch",
+    controls: [ctl("c1", "power")],
+  });
+  const slots = [slotFromControl(dev, dev.controls[0])];
+  expect(tileSeed(slots, [dev], [])).toEqual({
+    title: "Brunnen",
+    size: { w: 1, h: 1 },
+    icon: "power_settings_new",
   });
 });
 

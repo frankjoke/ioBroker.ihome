@@ -1,8 +1,14 @@
 import { localizeName } from "$lib/config/format";
 import { widgetFor } from "$lib/config/features";
-import { resolveControl } from "$lib/config/template-ops";
+import { presetGlyph } from "$lib/config/icon-ops";
+import {
+  resolveControl,
+  resolveTemplate,
+  tileTitle,
+} from "$lib/config/template-ops";
+import { widgetForState } from "$lib/config/slot-source";
 import type { Control, Device, Widget } from "$lib/types/device";
-import type { Slot, SlotKind } from "$lib/types/display";
+import type { Size, Slot, SlotKind, Template } from "$lib/types/display";
 
 /** The slot that renders a control widget. */
 export function slotKindForWidget(widget: Widget): SlotKind {
@@ -33,11 +39,20 @@ function rangeOptions(common: Record<string, any>): Record<string, unknown> {
 /** A slot from a device control: metadata is copied, the source stays live. */
 export function slotFromControl(
   device: Device,
-  control: Control,
+  control: Control & { object?: { common?: Record<string, any> } },
   widget?: Widget,
 ): Slot {
-  const common = control.common ?? {};
-  const w = widget ?? widgetFor(device.type, control.feature);
+  // The live state's own role/type is the truth about what a control reads: a
+  // "power" feature may be a number (W/Wh) even though the type preset says
+  // switch. Only a control with no object falls back to the type's feature map.
+  const common = {
+    ...(control.common ?? {}),
+    ...(control.object?.common ?? {}),
+  };
+  const hasStateShape = !!(common.role || common.type || common.states);
+  const w = hasStateShape
+    ? widgetForState({ common })
+    : (widget ?? widgetFor(device.type, control.feature));
   const options = rangeOptions(common);
   const label = control.label ?? (localizeName(common.name) || undefined);
   const unit = control.unit ?? common.unit;
@@ -90,10 +105,18 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
     if (!control) continue;
     const widget = widgetFor(device.type, control.feature);
     const base = slotFromControl(device, control, widget);
-    const kind =
-      slot.kind === "value" && widget !== "value"
-        ? slotKindForWidget(widget)
-        : slot.kind;
+    // The live state's shape wins over the recipe's kind: a recipe's "switch"
+    // hint on a Wh reading must still render as a value. Non-widget kinds
+    // (history-list, icon, …) are the recipe's own and stay.
+    const widgetKinds: SlotKind[] = [
+      "value",
+      "level",
+      "switch",
+      "color",
+      "enum",
+      "button",
+    ];
+    const kind = widgetKinds.includes(slot.kind) ? base.kind : slot.kind;
     // The hint is dead weight once the source pins the control (A36).
     const options: Record<string, unknown> = { ...(base.options ?? {}) };
     for (const [key, value] of Object.entries(slot.options ?? {})) {
@@ -110,4 +133,35 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
     });
   }
   return out;
+}
+
+/** What a brand-new tile inherits from its first slot: a name, the type's size
+ *  and one default glyph. An offer frozen at creation, never a live link (S11). */
+export interface TileSeed {
+  title?: string;
+  size?: Size;
+  icon?: string;
+}
+
+export function tileSeed(
+  slots: Slot[],
+  devices: Device[],
+  templates: Template[],
+): TileSeed {
+  const first = slots[0];
+  if (!first || first.kind === "frame") return {};
+  const source = first.source;
+  if (!source || typeof source === "string") {
+    return first.label ? { title: first.label } : {};
+  }
+  if (source.kind === "state") {
+    return first.label ? { title: first.label } : {};
+  }
+  const device = devices.find((d) => d.id === source.device);
+  if (!device) return first.label ? { title: first.label } : {};
+  return {
+    title: tileTitle(device) || undefined,
+    size: resolveTemplate(device, templates).size,
+    icon: presetGlyph(device.type),
+  };
 }
