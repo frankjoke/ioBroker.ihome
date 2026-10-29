@@ -4,12 +4,15 @@ import type {
   Widget,
 } from "$lib/types/device";
 import type { SlotSource } from "$lib/types/display";
+import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
 
 /** What the resolver reads: the enriched devices and the broker caches. */
 export interface SourceLook {
   devices: EnrichedDevice[];
   states: Map<string, any>;
   objects: Map<string, any>;
+  /** A raw-state source may name a variable; the library maps it to its state. */
+  variables?: GlobalVariable[];
 }
 
 /** A slot's source, resolved for rendering and writing. */
@@ -18,6 +21,8 @@ export interface ResolvedSource {
   writable: boolean;
   available: boolean;
   stateId?: string;
+  /** Every state behind a device source: its badge clock reads the newest. */
+  stateIds?: string[];
   object?: any;
   control?: EnrichedControl;
   widget?: Widget;
@@ -58,13 +63,14 @@ export function resolveSlotSource(
     };
   }
   if (source.kind === "state") {
-    const object = look.objects.get(source.stateId);
-    const state = look.states.get(source.stateId);
+    const stateId = stateIdFor(source.stateId, look.variables ?? []);
+    const object = look.objects.get(stateId);
+    const state = look.states.get(stateId);
     return {
       value: state?.val,
       writable: object?.common?.write === true,
       available: !!object || state !== undefined,
-      stateId: source.stateId,
+      stateId,
       object,
       widget: widgetForState(object),
       unit: object?.common?.unit,
@@ -77,6 +83,9 @@ export function resolveSlotSource(
     value: undefined,
     writable: false,
     available: (device.controls ?? []).some((c) => c.available === true),
+    stateIds: (device.controls ?? [])
+      .map((c) => c.stateId)
+      .filter((id): id is string => !!id),
     label: device.name,
   };
 }
@@ -102,9 +111,10 @@ export function widgetForState(object: any): Widget {
 export function sourceStateIds(
   source: SlotSource | undefined,
   devices: EnrichedDevice[],
+  variables: GlobalVariable[] = [],
 ): string[] {
   if (!source) return [];
-  if (source.kind === "state") return [source.stateId];
+  if (source.kind === "state") return [stateIdFor(source.stateId, variables)];
   if (source.kind === "device") return [];
   const device = devices.find((d) => d.id === source.device);
   const stateId = device?.controls?.find(

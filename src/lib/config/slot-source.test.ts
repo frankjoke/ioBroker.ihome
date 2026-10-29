@@ -42,6 +42,40 @@ const look = (
   objects: extra.objects ?? new Map(),
 });
 
+it("resolves a state source that names a variable to its real state", () => {
+  const variables = [
+    {
+      name: "LampVar",
+      kind: "state",
+      stateId: "0_userdata.0.lamp",
+      type: "boolean",
+      role: "switch",
+    },
+  ] as SourceLook["variables"];
+  const l = look([], {
+    states: new Map([["0_userdata.0.lamp", { val: true }]]),
+    objects: new Map([
+      [
+        "0_userdata.0.lamp",
+        { common: { write: true, type: "boolean", role: "switch" } },
+      ],
+    ]),
+  });
+  l.variables = variables;
+  expect(
+    resolveSlotSource({ kind: "state", stateId: "LampVar" }, l),
+  ).toMatchObject({
+    value: true,
+    writable: true,
+    available: true,
+    stateId: "0_userdata.0.lamp",
+    widget: "switch",
+  });
+  expect(
+    sourceStateIds({ kind: "state", stateId: "LampVar" }, [], variables),
+  ).toEqual(["0_userdata.0.lamp"]);
+});
+
 it("resolves a control reference live, through the device alias", () => {
   const d = device({ controls: [ctl("c1", "brightness", "s1", 42)] });
   expect(

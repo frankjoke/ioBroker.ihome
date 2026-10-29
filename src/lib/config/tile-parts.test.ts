@@ -17,6 +17,7 @@ import type {
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
 import { resolveTile } from "$lib/config/tile-resolve";
+import { resolveBadges } from "$lib/config/rule-ops";
 
 const control = (
   id: string,
@@ -130,6 +131,82 @@ it("a writable state source yields a switch row", () => {
     stateId,
     liveValue: false,
   });
+});
+
+it("a device badge reports only the device it names", () => {
+  const stateId = "dev.0.state";
+  const make = (available: boolean, derive?: "ago") => {
+    const resolution = resolveTile(
+      {
+        slots: [
+          {
+            kind: "badge",
+            source: { kind: "device", device: "dev" },
+            ...(derive ? { options: { derive } } : {}),
+          },
+        ],
+      },
+      "Dev",
+      {
+        devices: [
+          {
+            id: "dev",
+            name: "Dev",
+            type: "Switch",
+            available,
+            exists: true,
+            controls: [
+              {
+                id: "c1",
+                feature: "power",
+                stateId,
+                writable: true,
+                available,
+                exists: true,
+              },
+            ],
+          } as unknown as EnrichedDevice,
+        ],
+        states: new Map([[stateId, { val: false, ts: 1000 }]]),
+        objects: new Map([[stateId, { common: {} }]]),
+      },
+    );
+    return {
+      resolution,
+      parts: tileParts(resolution.device, resolution.tile, none),
+    };
+  };
+
+  const offline = make(false);
+  expect(offline.parts.badgeSlots[0].source).toBe("offline");
+  expect(offline.parts.badgeSlots[0].options?.of).toBe("slot:0");
+  expect(
+    resolveBadges(
+      offline.parts.badgeSlots,
+      offline.resolution.device,
+      { at: () => undefined },
+      2000,
+    ).map((b) => b.source),
+  ).toEqual(["offline"]);
+
+  const online = make(true);
+  expect(
+    resolveBadges(
+      online.parts.badgeSlots,
+      online.resolution.device,
+      { at: () => undefined },
+      2000,
+    ),
+  ).toEqual([]);
+
+  const ago = make(true, "ago");
+  const badges = resolveBadges(
+    ago.parts.badgeSlots,
+    ago.resolution.device,
+    { at: (source) => (source === "slot:0" ? 1000 : undefined) },
+    2000,
+  );
+  expect(badges.map((b) => b.source)).toEqual(["ago"]);
 });
 
 it("a blank tile does not inherit the preset chain", () => {

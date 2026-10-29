@@ -41,6 +41,8 @@
   import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
+  import { stateIdFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
@@ -148,6 +150,7 @@
     devices,
     states: (ioBroker.states ?? new Map()) as Map<string, any>,
     objects: (ioBroker.objects ?? new Map()) as Map<string, any>,
+    variables: getVariables(),
   });
   /** The tile's synthetic control bag: what its slots read, nothing more. */
   const device = $derived(
@@ -501,16 +504,22 @@
     const source = slot.source;
     if (!source) return true;
     if (typeof source === "string") {
+      const id = stateIdFor(source, getVariables());
       return (
         !devices.some((d) =>
           (d.controls ?? []).some(
             (c) =>
               c.feature === source || c.id === source || c.stateId === source,
           ),
-        ) && !sourceLook.objects.get(source)
+        ) &&
+        !sourceLook.objects.get(id) &&
+        !sourceLook.states.get(id)
       );
     }
-    if (source.kind === "state") return !sourceLook.objects.get(source.stateId);
+    if (source.kind === "state") {
+      const id = stateIdFor(source.stateId, getVariables());
+      return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
+    }
     if (source.kind === "device") {
       return !devices.some((d) => d.id === source.device);
     }
@@ -576,6 +585,17 @@
   function cycleValueWhere(i: number, slot: Slot): void {
     const next = nextValueWhere(slot);
     setValueWhere(i, next === "both" ? undefined : next);
+  }
+
+  /** A badge's source kind decides what it can show: a control/state reads a
+   *  value or its age, a device reports offline or its age. */
+  function isDeviceBadge(slot: Slot): boolean {
+    return typeof slot.source === "object" && slot.source?.kind === "device";
+  }
+
+  function badgeShows(slot: Slot): "value" | "ago" | "offline" {
+    if (slot.options?.derive === "ago") return "ago";
+    return isDeviceBadge(slot) ? "offline" : "value";
   }
 
   function patchOptions(
@@ -1422,46 +1442,45 @@
                 {/if}
                 {#if slot.kind === "badge"}
                   <div class="row">
-                    <label class="small grow">
-                      <span class="label-mono">of</span>
-                      <input
-                        type="text"
-                        placeholder="control the clock reads"
-                        value={String(slot.options?.of ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            of: e.currentTarget.value.trim() || undefined,
-                          })}
-                      />
-                    </label>
                     <label class="small">
-                      <span class="label-mono">from</span>
+                      <span class="label-mono">shows</span>
                       <select
-                        value={String(slot.options?.from ?? "ts")}
+                        value={badgeShows(slot)}
                         onchange={(e) =>
                           patchOptions(i, {
-                            from:
-                              e.currentTarget.value === "lc" ? "lc" : undefined,
+                            derive:
+                              e.currentTarget.value === "ago"
+                                ? "ago"
+                                : undefined,
+                            of: undefined,
                           })}
                       >
-                        <option value="ts">update (ts)</option>
-                        <option value="lc">change (lc)</option>
+                        {#if isDeviceBadge(slot)}
+                          <option value="offline">offline</option>
+                        {:else}
+                          <option value="value">value</option>
+                        {/if}
+                        <option value="ago">time since</option>
                       </select>
                     </label>
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      onclick={() =>
-                        edit((t) => patchSlot(t, i, { source: "ago" }))}
-                      >ago</button
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      onclick={() =>
-                        edit((t) => patchSlot(t, i, { source: "offline" }))}
-                      >offline</button
-                    >
+                    {#if badgeShows(slot) === "ago"}
+                      <label class="small">
+                        <span class="label-mono">from</span>
+                        <select
+                          value={String(slot.options?.from ?? "ts")}
+                          onchange={(e) =>
+                            patchOptions(i, {
+                              from:
+                                e.currentTarget.value === "lc"
+                                  ? "lc"
+                                  : undefined,
+                            })}
+                        >
+                          <option value="ts">update (ts)</option>
+                          <option value="lc">change (lc)</option>
+                        </select>
+                      </label>
+                    {/if}
                   </div>
                   <div class="row">
                     <label class="small">

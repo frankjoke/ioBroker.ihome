@@ -12,6 +12,7 @@
   } from "$lib/config/slot-create";
   import { resolveTemplate } from "$lib/config/template-ops";
   import { widgetForState } from "$lib/config/slot-source";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import type {
     Device,
     EnrichedControl,
@@ -52,6 +53,8 @@
   let url = $state("");
   let badgeKind = $state<"value" | "ago" | "offline">("value");
   let badgeControlId = $state("");
+  /** A badge may read any state, not only a control of the chosen device. */
+  let badgeState = $state("");
   let creatingDevice = $state(false);
   /** A device saved in this picker before the store's list caught up. */
   let createdDevice = $state<EnrichedDevice | null>(null);
@@ -114,8 +117,31 @@
     if (suggestions.length) onAdd(suggestions);
   }
 
+  /** A tree leaf may be a variable name; its metadata is the real state's
+   *  object, while the slot keeps the name (the alias resolves it live). */
+  function objectForState(id: string): any {
+    const variable = getVariables().find(
+      (v) => v.kind === "state" && v.name === id,
+    );
+    const realId = variable?.stateId ? String(variable.stateId) : id;
+    return (
+      objects.get(realId) ??
+      (variable
+        ? {
+            common: {
+              name: variable.name,
+              type: variable.type,
+              role: variable.role,
+              unit: variable.unit,
+              write: false,
+            },
+          }
+        : undefined)
+    );
+  }
+
   function pickState(id: string): void {
-    const object = objects.get(id);
+    const object = objectForState(id);
     const kind =
       stateKind === "auto"
         ? slotKindForWidget(widgetForState(object))
@@ -135,6 +161,21 @@
     if (!device) return;
     if (badgeKind === "offline") {
       onAdd([{ kind: "badge", source: { kind: "device", device: device.id } }]);
+      return;
+    }
+    const stateId = badgeState.trim();
+    if (stateId) {
+      const base = slotFromState(stateId, objectForState(stateId), "badge");
+      onAdd([
+        {
+          ...base,
+          ...(badgeKind === "ago"
+            ? {
+                options: { ...(base.options ?? {}), derive: "ago", from: "ts" },
+              }
+            : {}),
+        },
+      ]);
       return;
     }
     const control = controls.find((c) => c.id === badgeControlId);
@@ -355,6 +396,14 @@
                     {/each}
                   </select>
                 </label>
+                <label class="small grow">
+                  <span class="label-mono">or state</span>
+                  <input
+                    type="text"
+                    placeholder="state id or variable"
+                    bind:value={badgeState}
+                  />
+                </label>
               {/if}
             </div>
             <div class="actions">
@@ -368,7 +417,9 @@
               <button
                 type="button"
                 class="btn btn-primary"
-                disabled={badgeKind !== "offline" && !badgeControlId}
+                disabled={badgeKind !== "offline" &&
+                  !badgeControlId &&
+                  !badgeState.trim()}
                 onclick={addBadge}>Add badge</button
               >
             </div>

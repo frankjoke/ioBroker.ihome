@@ -5,7 +5,11 @@ const PAGE_LIST_ID = "ihome.0.config.pageList";
 const PAGE_BACKUP_ID = "ihome.0.config.pageListV1";
 
 const h = vi.hoisted(() => {
-  const state = { pageRaw: null as unknown, backup: null as unknown };
+  const state = {
+    pageRaw: null as unknown,
+    backup: null as unknown,
+    failBackup: false,
+  };
   const getState = vi.fn(async (id: string) =>
     id === "ihome.0.config.pageList"
       ? { val: state.pageRaw }
@@ -14,6 +18,9 @@ const h = vi.hoisted(() => {
         : null,
   );
   const setState = vi.fn(async (id: string, value: unknown) => {
+    if (id === "ihome.0.config.pageListV1" && state.failBackup) {
+      throw new Error("backup unavailable");
+    }
     if (id === "ihome.0.config.pageList") state.pageRaw = value;
     if (id === "ihome.0.config.pageListV1") state.backup = value;
   });
@@ -30,7 +37,7 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
     wait: vi.fn(async () => {}),
     states: new Map(),
     objects: new Map(),
-    enums: new Map(),
+    enums: { getList: () => [{ id: "rooms.0" }] },
   },
 }));
 
@@ -99,4 +106,45 @@ it("re-reads the stored v1 document before migrating a seed", async () => {
   });
   expect(h.setState).toHaveBeenCalledWith(PAGE_BACKUP_ID, JSON.stringify(v1));
   expect(h.setState).toHaveBeenCalledWith(PAGE_LIST_ID, expect.any(String));
+});
+
+it("does not write v2 when the backup cannot be secured", async () => {
+  vi.resetModules();
+  const mod = await import("./pages.svelte");
+  h.state.pageRaw = v1;
+  h.state.backup = null;
+  h.state.failBackup = true;
+  h.setState.mockClear();
+
+  expect(await mod.migrateLayout([light], [])).toBe(false);
+  expect(h.state.pageRaw).toBe(v1);
+  expect(h.setState).toHaveBeenCalledWith(PAGE_BACKUP_ID, JSON.stringify(v1));
+});
+
+it("materialises a fresh seed in memory without writing it", async () => {
+  vi.resetModules();
+  const mod = await import("./pages.svelte");
+  h.state.pageRaw = "";
+  h.state.backup = null;
+  h.state.failBackup = false;
+  h.setState.mockClear();
+
+  await mod.initPages(() => ({
+    version: 0,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "rooms",
+        title: "Rooms",
+        groups: [{ id: "g", title: "Lights", member: { type: "Light" } }],
+      },
+    ],
+  }));
+  // The seed is not a stored document, so the migration must not write it.
+  expect(await mod.migrateLayout([light], [])).toBe(false);
+  expect(h.setState).not.toHaveBeenCalled();
+  // ...but it still has to render: member groups become placements in memory.
+  const tiles = mod.getPageRegistry().pages[0].groups[0].tiles ?? [];
+  expect(tiles.length).toBeGreaterThan(0);
+  expect(tiles[0].tile?.slots?.length).toBeGreaterThan(0);
 });

@@ -370,7 +370,15 @@ export function resolveBadges(
   const clock: TimeSource =
     typeof time === "object" && time !== null ? time : { at: () => stamp };
   const scope = ruleScope((device.controls ?? []) as LocalControl[], pool);
-  const offline = offlineBadge(device);
+  /** A derived badge may name one control/device key (`options.of`): its
+   *  availability is that source's, not the whole tile's synthetic bag. */
+  const offlineFor = (of: string | undefined): ResolvedBadge | undefined => {
+    if (!of) return offlineBadge(device);
+    const control = (device.controls ?? []).find((c) => c.id === of);
+    return control
+      ? offlineBadge({ controls: [control] } as unknown as BadgeDevice)
+      : undefined;
+  };
   const out: ResolvedBadge[] = [];
   for (const slot of slots ?? []) {
     if (slot.kind !== "badge") continue;
@@ -381,6 +389,9 @@ export function resolveBadges(
     // The derived ago/offline badges have no rules; their slot colour outranks
     // the tone they are born with (a control badge resolves colour itself).
     const color = badgeColor(slot.options?.color);
+    const of =
+      typeof slot.options?.of === "string" ? slot.options.of : undefined;
+    const offline = offlineFor(of);
     let badge: ResolvedBadge | undefined;
     // An offline device says *that*, not a misleading "how long ago it was".
     if (slot.source === "ago") {
@@ -388,8 +399,6 @@ export function resolveBadges(
       // badge on a motion sensor is the last *motion*, not the last battery
       // report. `options.from` picks `ts` (still reporting) or `lc` (last value
       // change); the default is the device-wide newest `ts`.
-      const of =
-        typeof slot.options?.of === "string" ? slot.options.of : undefined;
       const from = slot.options?.from === "lc" ? "lc" : "ts";
       badge = offline ? undefined : agoBadge(clock.at(of, from), now);
       if (badge && color) badge.color = color;

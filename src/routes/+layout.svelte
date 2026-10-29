@@ -211,7 +211,9 @@
       // inside initPages (a partial device list would migrate sections to empty).
       // `initPages` is memoised: this is either the same load or the first one.
       await initPages(seedDisplayPages);
-      // The v2 conversion needs the user templates (the chain's suggestions).
+      // The v2 conversion needs the user templates (the chain's suggestions)
+      // and the variable library (a source may name a variable, not a state).
+      await initVariables();
       await initTemplates();
       // Migrate from the *canonical* device list — a synchronous snapshot — not
       // from the enriched display store, which polls every 50ms and can still

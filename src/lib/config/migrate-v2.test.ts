@@ -37,6 +37,31 @@ const reg = (tiles: Placement[]): PageRegistry => ({
 
 const source = (s: unknown): SlotSource => s as SlotSource;
 
+it("keeps a hint-only badge by resolving its pick", () => {
+  const doc = reg([
+    {
+      id: "t",
+      device: "light",
+      tile: { slots: [{ kind: "badge", options: { pick: "power" } }] },
+    },
+  ]);
+  const { registry, report } = migratePagesV2(doc, [light()], []);
+  expect(report.droppedSlots).toBe(0);
+  expect(
+    registry.pages[0].groups[0].tiles?.[0].tile?.slots?.[0].source,
+  ).toEqual({ kind: "control", device: "light", control: "p" });
+});
+
+it("leaves an already-v2 document alone, even with a legacy source", () => {
+  const doc: PageRegistry = {
+    ...reg([{ id: "t", tile: { slots: [{ kind: "badge", source: "ago" }] } }]),
+    version: 2,
+  };
+  const { registry, changed } = migratePagesV2(doc, [light()], []);
+  expect(changed).toBe(false);
+  expect(registry).toBe(doc);
+});
+
 it("migrates a chain-only placement to the device's real controls", () => {
   const { registry, report } = migratePagesV2(
     reg([{ id: "t", device: "light" }]),

@@ -85,7 +85,8 @@ function registerSlotStateIds(reg: PageRegistry): void {
           }
           if (!raw) continue;
           if (raw.kind === "state") {
-            if (raw.stateId.includes(".")) registerProgramStateId(raw.stateId);
+            const id = stateIdFor(raw.stateId, variables);
+            if (id.includes(".")) registerProgramStateId(id);
           } else if (raw.kind === "control") {
             const device = getCanonicalRegistry().devices.find(
               (d) => d.id === raw.device,
@@ -173,18 +174,34 @@ async function ensurePagesObject() {
 export function savePages(): void {
   if (saveTimer) clearTimeout(saveTimer);
   const snapshot = JSON.stringify(getPageRegistry());
-  saveTimer = setTimeout(() => {
+  saveTimer = setTimeout(async () => {
     // A disconnected socket resolves `emitAsync` without sending anything, so a
     // write would look successful while the broker never saw it (review I1).
     if (!ioBroker.connected) {
       saveFailed = true;
       return;
     }
+    // The first write of a seed may race a stored document (the seed incident):
+    // re-read before writing, and let the stored document win.
+    if (pagesLoadKind === "seeded") {
+      const st = await ioBroker.getState(PAGE_LIST_ID, true);
+      const raw = st?.val ?? st?.value;
+      const stored = parsePageRegistry(raw);
+      if (stored) {
+        rawPages = typeof raw === "string" ? raw : JSON.stringify(raw);
+        setPageRegistry(stored);
+        pagesLoadKind = "loaded";
+        saveFailed = false;
+        return;
+      }
+    }
     lastSent = snapshot;
     ioBroker
       .setState(PAGE_LIST_ID, snapshot)
       .then(() => {
         saveFailed = false;
+        // The seed/edit is stored now: later writes need no guard.
+        pagesLoadKind = "loaded";
       })
       .catch((e) => {
         saveFailed = true;
@@ -215,8 +232,9 @@ export function commitLayout(next: PageRegistry): boolean {
  * once both the registry and the device list are loaded. It is a no-op when the
  * document is already current, so it is safe on every connect.
  */
-/** Write the pre-migration document once; a later migration never overwrites it. */
-async function writeBackupOnce(raw: string): Promise<void> {
+/** Write the pre-migration document once; a later migration never overwrites it.
+ *  False means the backup could not be secured, so the v2 write must not run. */
+async function writeBackupOnce(raw: string): Promise<boolean> {
   try {
     const existing = await ioBroker.getState(PAGE_BACKUP_ID, true);
     if (
@@ -225,7 +243,7 @@ async function writeBackupOnce(raw: string): Promise<void> {
       existing.val !== null &&
       existing.val !== ""
     ) {
-      return;
+      return true;
     }
     const obj = await ioBroker.getObject(PAGE_BACKUP_ID);
     if (!obj) {
@@ -242,8 +260,10 @@ async function writeBackupOnce(raw: string): Promise<void> {
       });
     }
     await ioBroker.setState(PAGE_BACKUP_ID, raw);
+    return true;
   } catch (e) {
     console.error("backup pages v1:", e);
+    return false;
   }
 }
 
@@ -260,30 +280,49 @@ export async function migrateLayout(
   // the page state can read empty for a moment (the seed incident). Only a
   // document actually read is migrated; anything else is re-read from the
   // broker first, and an empty re-read leaves the seed in memory.
+  // A seed is materialised in memory but never written: the user's first edit
+  // is what persists it. A loaded document is the only thing we migrate to disk.
+  let write = true;
   if (pagesLoadKind !== "loaded") {
     const st = await ioBroker.getState(PAGE_LIST_ID, true);
     const raw = st?.val ?? st?.value;
     const stored = parsePageRegistry(raw);
-    if (!stored) return false;
-    rawPages = typeof raw === "string" ? raw : JSON.stringify(raw);
-    setPageRegistry(stored);
-    pagesLoadKind = "loaded";
+    if (stored) {
+      rawPages = typeof raw === "string" ? raw : JSON.stringify(raw);
+      setPageRegistry(stored);
+      pagesLoadKind = "loaded";
+    } else if (pagesLoadKind === "seeded") {
+      write = false;
+    } else {
+      return false;
+    }
   }
+  const version = getPageRegistry().version ?? 0;
   const bridge = migratePageRegistry(
     getPageRegistry(),
     devices.map((d) => toFilterable(d)),
   );
-  const { registry, changed } = migratePagesV2(
-    bridge.registry,
+  // The bridge bumps to v2 itself; the v2 gate in migratePagesV2 must see the
+  // document as it was read (v1), not the bridge's output.
+  const { registry, changed, report } = migratePagesV2(
+    { ...bridge.registry, version },
     devices,
     templates,
     getVariableLibrary().variables ?? [],
   );
-  const version = getPageRegistry().version ?? 0;
   if (!bridge.changed && !changed && version >= PAGE_REGISTRY_VERSION) {
     return false;
   }
-  if (rawPages) await writeBackupOnce(rawPages);
+  if (!write) {
+    setPageRegistry({ ...registry, version: PAGE_REGISTRY_VERSION });
+    return false;
+  }
+  if (changed) {
+    console.info("pages migrated to v2", report);
+  }
+  // Never write v2 without the one-time v1 document: a failed backup aborts.
+  const backup = rawPages ?? JSON.stringify(getPageRegistry());
+  if (!(await writeBackupOnce(backup))) return false;
   return commitLayout({ ...registry, version: PAGE_REGISTRY_VERSION });
 }
 

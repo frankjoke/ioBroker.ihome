@@ -55,6 +55,17 @@ it("keeps only controls the device actually has", () => {
   });
 });
 
+it("never suggests a hidden control", () => {
+  const light = device({
+    type: "Light",
+    controls: [
+      ctl("c1", "power", { hidden: true }),
+      ctl("c2", "brightness", { hidden: true, common: { min: 0, max: 100 } }),
+    ],
+  });
+  expect(suggestedSlots(light, PRESETS.Light.slots)).toEqual([]);
+});
+
 it("resolves a preset's pick hint to the device's actual control", () => {
   const thermometer = device({
     type: "Thermometer",

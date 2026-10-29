@@ -61,7 +61,7 @@ function pseudoControl(
     transform: resolved?.control?.transform,
     history: resolved?.control?.history,
     rules: resolved?.control?.rules,
-    hidden: false,
+    hidden: resolved?.control?.hidden === true,
   };
 }
 
@@ -97,13 +97,13 @@ export function resolveTile(
     if (resolved) sources.set(key, resolved);
 
     if (slot.kind === "badge" && slot.source.kind === "device") {
-      const derive = slot.options?.derive === "ago";
+      // The badge stays tied to *this* device: its pseudo-control carries the
+      // device's availability and the clock key names the rescued state ids.
+      controls.push(pseudoControl(key, slot, resolved));
       slots.push({
         ...slot,
-        source: derive ? "ago" : "offline",
-        ...(derive
-          ? { options: { ...slot.options, derive: undefined, of: undefined } }
-          : {}),
+        source: slot.options?.derive === "ago" ? "ago" : "offline",
+        options: { ...slot.options, derive: undefined, of: key },
       });
       return;
     }

@@ -83,7 +83,10 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
         ? slot.source
         : String(slot.options?.pick ?? "");
     if (!hint.trim()) continue;
-    const control = resolveControl(device.controls ?? [], hint);
+    const control = resolveControl(
+      (device.controls ?? []).filter((c) => !c.hidden),
+      hint,
+    );
     if (!control) continue;
     const widget = widgetFor(device.type, control.feature);
     const base = slotFromControl(device, control, widget);

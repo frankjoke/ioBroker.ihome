@@ -1,9 +1,12 @@
 import { widgetFor } from "$lib/config/features";
+import { PAGE_REGISTRY_VERSION } from "$lib/config/pages-ops";
 import { slotFromControl, slotKindForWidget } from "$lib/config/slot-create";
 import {
   resolveControl,
   resolveTemplate,
   pickSlotControls,
+  pickable,
+  pickControl,
   tileTitle,
 } from "$lib/config/template-ops";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
@@ -51,7 +54,10 @@ function convertSource(
   variables: GlobalVariable[],
 ): SlotSource | undefined {
   const control = device
-    ? resolveControl(device.controls ?? [], raw)
+    ? resolveControl(
+        (device.controls ?? []).filter((c) => !c.hidden),
+        raw,
+      )
     : undefined;
   if (control && device) return controlSource(device, control);
   return stateSource(raw, variables);
@@ -99,9 +105,23 @@ function convertSlot(
       delete options.of;
       return { ...raw, source, options: { ...options, derive: "ago" } };
     }
-    const source = rawSource
+    const pick =
+      typeof raw.options?.pick === "string" ? raw.options.pick : undefined;
+    let source = rawSource
       ? convertSource(rawSource, device, variables)
       : undefined;
+    // A hint-only badge (the old `resolveBadges` read `options.pick` too).
+    if (!source && pick && device) {
+      const chosen = pickControl(
+        pickable(device.controls ?? []),
+        pick,
+        new Set(),
+      );
+      const control = chosen
+        ? device.controls.find((c) => c.id === chosen.id)
+        : undefined;
+      if (control) source = controlSource(device, control);
+    }
     return source ? { ...raw, source } : undefined;
   }
 
@@ -161,6 +181,11 @@ export function migratePagesV2(
     droppedSlots: 0,
     droppedPlacements: 0,
   };
+  // A document already written by v2 is authoritative: never drop a stray
+  // legacy source from it (the display still understands the string arm).
+  if ((reg.version ?? 0) >= PAGE_REGISTRY_VERSION) {
+    return { registry: reg, report, changed: false };
+  }
 
   const pages = (reg.pages ?? []).map((page) => ({
     ...page,

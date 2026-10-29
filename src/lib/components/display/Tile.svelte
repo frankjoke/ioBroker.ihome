@@ -96,6 +96,7 @@
     devices: $devicesEnrichedStore,
     states: ioBroker.states as Map<string, any>,
     objects: ioBroker.objects as Map<string, any>,
+    variables: getVariables(),
   });
   const resolution = $derived(
     resolveTile(tile ?? placement?.tile, title ?? placement?.title, sourceLook),
@@ -224,6 +225,16 @@
       if (source) {
         const resolved = resolution.sources.get(source);
         if (resolved?.stateId) return pick(resolved.stateId);
+        if (resolved?.stateIds?.length) {
+          let latest: number | undefined;
+          for (const id of resolved.stateIds) {
+            const v = pick(id);
+            if (typeof v === "number" && (latest === undefined || v > latest)) {
+              latest = v;
+            }
+          }
+          return latest;
+        }
         const control = resolveControl(shownControls, source);
         if (control) return pick(control.stateId);
         return pick(sourceId(source)); // a raw state id, or a variable
@@ -600,8 +611,8 @@
 {#if modalOpen}
   <TileModal
     {device}
-    {title}
-    background={tile?.background}
+    title={tileName}
+    background={workingTile?.background}
     rows={modalRows}
     badges={modalBadges}
     {headIcon}
@@ -618,7 +629,7 @@
 {#if askPin}
   <PinModal
     title={`Enter PIN for ${tileName}`}
-    expected={tile?.pin}
+    expected={workingTile?.pin}
     onSubmit={() => {
       askPin = false;
       modalOpen = true;
