@@ -85,6 +85,7 @@
     <div
       class="slot-cluster"
       class:stack
+      class:fill={slot.kind === "frame" || slot.kind === "html"}
       data-chart-anchor={anchor ? "" : undefined}
     >
       {#if onPrimary}
@@ -129,6 +130,21 @@
   .slot-cluster.stack {
     flex-direction: column;
     gap: 0.1rem;
+  }
+
+  /* A frame/html is a surface, not a reading: with an icon beside it, the
+     cluster still takes the tile's leftover height so the iframe's 100% has a
+     definite parent to fill. */
+  .slot-cluster.fill {
+    flex: 1 1 auto;
+    width: 100%;
+    align-items: stretch;
+    flex-wrap: nowrap;
+  }
+
+  .slot-cluster.fill > .slot-icon {
+    align-self: center;
+    flex: 0 0 auto;
   }
 
   .slot-icon {
