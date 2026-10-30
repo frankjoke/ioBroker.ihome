@@ -18,6 +18,9 @@ const DOCS = [
 // Data of the pre-adapter test namespace; copied once, then left untouched.
 const LEGACY_PREFIX = "0_userdata.0.Test.AiHome.";
 
+/** How often the adapter logs that it is still alive. */
+const HEARTBEAT_MS = 10 * 60 * 1000;
+
 interface VariableInput {
   id?: unknown;
   name?: unknown;
@@ -105,6 +108,8 @@ class IHome extends utils.Adapter {
    * src/lib/config/variables.ts and src/lib/stores/variables.svelte.ts).
    */
   private variables: Variables = { constants: {}, states: {} };
+  private heartbeat?: ReturnType<typeof setInterval>;
+  private readonly startedAt = Date.now();
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
@@ -210,9 +215,20 @@ class IHome extends utils.Adapter {
         void this.loadVariables();
       }
     });
+
+    this.log.info(`iHome ${this.version ?? ""} started (${this.namespace})`);
+    this.heartbeat = setInterval(() => {
+      const minutes = Math.round((Date.now() - this.startedAt) / 60_000);
+      this.log.info(`iHome alive (${minutes} min, ${this.namespace})`);
+    }, HEARTBEAT_MS);
   }
 
   private onUnload(callback: () => void): void {
+    if (this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = undefined;
+    }
+    this.log.info(`iHome shutting down (${this.namespace})`);
     callback();
   }
 }
