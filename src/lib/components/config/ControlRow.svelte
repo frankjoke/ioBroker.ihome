@@ -11,6 +11,7 @@
   import { stateIdFor, variableScope } from "$lib/config/variables";
   import { historyEnabled } from "$lib/config/history-ops";
   import TransformEditor from "./TransformEditor.svelte";
+  import ControlMetaEditor from "./ControlMetaEditor.svelte";
   import VirtualEditor from "./VirtualEditor.svelte";
   import HistoryEditor from "./HistoryEditor.svelte";
   import HistorySummary from "./HistorySummary.svelte";
@@ -34,6 +35,7 @@
   let showTransform = $state(false);
   let showFormula = $state(false);
   let showHistory = $state(false);
+  let showMeta = $state(false);
 
   const isVirtual = $derived(control.kind === "virtual");
   const canHistory = $derived(
@@ -189,6 +191,17 @@
       >
         <span class="material-symbols-outlined">functions</span>
       </button>
+
+      <button
+        type="button"
+        class="icon-btn"
+        class:active={showMeta}
+        title="Metadata"
+        aria-label="Toggle metadata"
+        onclick={() => (showMeta = !showMeta)}
+      >
+        <span class="material-symbols-outlined">tune</span>
+      </button>
     {/if}
 
     <button
@@ -220,6 +233,10 @@
       /></label
     >
   </div>
+
+  {#if showMeta && !isVirtual}
+    <ControlMetaEditor {control} onChange={(c) => onChange(c)} />
+  {/if}
 
   {#if !isVirtual && control.history && control.stateId}
     <HistorySummary {control} />

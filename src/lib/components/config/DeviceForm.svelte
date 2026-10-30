@@ -16,7 +16,17 @@
     featureForType,
   } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
-  import { roomForState, roomName, enumLabel } from "$lib/config/rooms";
+  import {
+    roomForState,
+    roomName,
+    enumLabel,
+    enumLabelFromObject,
+  } from "$lib/config/rooms";
+  import {
+    effectiveCommon,
+    effectiveFunctions,
+    effectiveRoom,
+  } from "$lib/config/state-meta";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -57,6 +67,70 @@
   let controls = $state<Control[]>(init?.controls ?? []);
   // auto-open the picker for a brand-new (empty) device
   let showPicker = $state(untrack(() => !device));
+
+  // Control-list filters (spec §7): they read the effective metadata, so a
+  // corrected control is found by its correction.
+  let filterText = $state("");
+  let filterRoom = $state("");
+  let filterFunction = $state("");
+  let filterRole = $state("");
+
+  function metaOf(control: Control) {
+    return effectiveCommon(control, objOf(control));
+  }
+
+  const filterRoles = $derived(
+    [
+      ...new Set(
+        controls.map((c) => metaOf(c).role).filter((r): r is string => !!r),
+      ),
+    ].sort(),
+  );
+  const functionFilterOptions = $derived(
+    (ioBroker.enums?.getList?.("functions") ?? []).map((e: any) => ({
+      value: e._id,
+      label: enumLabelFromObject(e),
+    })),
+  );
+  const visibleControls = $derived.by(() => {
+    const text = filterText.trim().toLowerCase();
+    return controls
+      .map((control, index) => ({ control, index }))
+      .filter(({ control }) => {
+        const meta = metaOf(control);
+        if (filterRole && meta.role !== filterRole) return false;
+        if (
+          filterRoom &&
+          effectiveRoom(control, objOf(control), room, ioBroker.enums) !==
+            filterRoom
+        ) {
+          return false;
+        }
+        if (
+          filterFunction &&
+          !effectiveFunctions(
+            control,
+            objOf(control),
+            undefined,
+            ioBroker.enums,
+          ).includes(filterFunction)
+        ) {
+          return false;
+        }
+        if (!text) return true;
+        return [
+          control.feature,
+          control.label,
+          control.stateId,
+          meta.role,
+          meta.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(text);
+      });
+  });
 
   /** The state object behind a control (a variable name resolves to its state). */
   function objOf(control: Control): any {
@@ -293,17 +367,43 @@
     </div>
     {#if controls.length === 0}
       <p class="text-muted">No controls yet — add a state.</p>
+    {:else}
+      <div class="filters">
+        <input
+          type="search"
+          placeholder="Search controls…"
+          bind:value={filterText}
+        />
+        <select bind:value={filterRoom}>
+          <option value="">All rooms</option>
+          {#each rooms as r (r.id)}<option value={r.id}>{r.label}</option
+            >{/each}
+        </select>
+        <select bind:value={filterFunction}>
+          <option value="">All functions</option>
+          {#each functionFilterOptions as f (f.value)}
+            <option value={f.value}>{f.label}</option>
+          {/each}
+        </select>
+        <select bind:value={filterRole}>
+          <option value="">All roles</option>
+          {#each filterRoles as r (r)}<option value={r}>{r}</option>{/each}
+        </select>
+      </div>
+      {#if visibleControls.length === 0}
+        <p class="text-muted">No control matches the filters.</p>
+      {/if}
+      {#each visibleControls as row (row.control.id)}
+        <ControlRow
+          control={row.control}
+          siblings={controls}
+          autoOpen={row.control.id === autoOpenId}
+          onChange={(c) => updateControl(row.index, c)}
+          onChangeState={() => (replaceIndex = row.index)}
+          onRemove={() => removeControl(row.index)}
+        />
+      {/each}
     {/if}
-    {#each controls as control, i (control.id)}
-      <ControlRow
-        {control}
-        siblings={controls}
-        autoOpen={control.id === autoOpenId}
-        onChange={(c) => updateControl(i, c)}
-        onChangeState={() => (replaceIndex = i)}
-        onRemove={() => removeControl(i)}
-      />
-    {/each}
   </div>
 
   <div class="actions">
@@ -390,6 +490,18 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .filters input,
+  .filters select {
+    flex: 1 1 8rem;
+    min-width: 0;
   }
 
   .head-actions {
