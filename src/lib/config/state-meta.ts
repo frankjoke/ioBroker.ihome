@@ -87,6 +87,17 @@ export function effectiveCommon(
   return meta;
 }
 
+/** The unit to show: an empty effective unit (hideUnit, or an explicitly empty
+ *  unit) hides it even when the slot still carries an older copied unit. */
+export function unitFor(
+  slotUnit: string | undefined,
+  metaUnit: string | undefined,
+  fallbackUnit?: string,
+): string | undefined {
+  if (metaUnit === "") return undefined;
+  return slotUnit ?? metaUnit ?? fallbackUnit;
+}
+
 /** A control's room: its own correction, else the state's enum membership
  *  (walking parent ids), else the device's room. */
 export function effectiveRoom(

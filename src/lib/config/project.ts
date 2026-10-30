@@ -16,6 +16,19 @@ export function projectControl(c: Control): Control {
     formulaId: c.formulaId,
     history: c.history,
     rules: c.rules,
+    // Metadata corrections (spec §3); all optional.
+    role: c.role,
+    type: c.type,
+    states: c.states,
+    hideUnit: c.hideUnit,
+    min: c.min,
+    max: c.max,
+    step: c.step,
+    read: c.read,
+    write: c.write,
+    room: c.room,
+    functions: c.functions,
+    common: c.common,
   };
 }
 

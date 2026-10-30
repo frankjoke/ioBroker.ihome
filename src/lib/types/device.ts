@@ -187,6 +187,7 @@ export interface SlotControl {
   role?: string;
   type?: string;
   states?: Record<string, string> | string[];
+  meta?: ControlMeta;
   liveValue?: unknown;
   writable?: boolean;
   /** The control's history config (A59): what a chart reads. A raw-state

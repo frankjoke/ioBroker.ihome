@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatAge, splitReading } from "$lib/config/format";
-  import { normalizeStates } from "$lib/config/state-meta";
+  import { normalizeStates, unitFor } from "$lib/config/state-meta";
   import {
     ensureHistory,
     noteLive,
@@ -36,7 +36,7 @@
   function reading(v: unknown): string {
     const parts = splitReading(
       v,
-      control.meta?.unit ?? control.unit,
+      unitFor(undefined, control.meta?.unit, control.unit),
       undefined,
       normalizeStates(control.meta?.states ?? control.states),
     );

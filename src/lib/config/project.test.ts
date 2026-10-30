@@ -33,6 +33,40 @@ it("strips non-model fields from a control", () => {
   });
 });
 
+it("keeps the control's metadata corrections", () => {
+  const c: any = {
+    id: "c",
+    feature: "power",
+    writable: true,
+    role: "switch",
+    type: "boolean",
+    states: { "0": "Aus", "1": "Ein" },
+    hideUnit: true,
+    min: 0,
+    max: 1,
+    step: 1,
+    read: true,
+    write: true,
+    room: "enum.rooms.Bad",
+    functions: ["enum.functions.Licht"],
+    common: { role: "switch" },
+  };
+  expect(projectControl(c)).toMatchObject({
+    role: "switch",
+    type: "boolean",
+    states: { "0": "Aus", "1": "Ein" },
+    hideUnit: true,
+    min: 0,
+    max: 1,
+    step: 1,
+    read: true,
+    write: true,
+    room: "enum.rooms.Bad",
+    functions: ["enum.functions.Licht"],
+    common: { role: "switch" },
+  });
+});
+
 it("keeps formulaId on a projected control", () => {
   const c: any = {
     id: "v",

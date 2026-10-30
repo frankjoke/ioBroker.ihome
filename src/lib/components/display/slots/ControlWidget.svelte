@@ -2,7 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { splitReading } from "$lib/config/format";
-  import { normalizeStates } from "$lib/config/state-meta";
+  import { normalizeStates, unitFor } from "$lib/config/state-meta";
   import { levelRange } from "$lib/config/features";
   import type { EnrichedControl } from "$lib/types/device";
 
@@ -52,7 +52,7 @@
   function readout(): string {
     const parts = splitReading(
       control.liveValue,
-      control.meta?.unit ?? control.unit,
+      unitFor(undefined, control.meta?.unit, control.unit),
       undefined,
       normalizeStates(control.meta?.states ?? control.states),
     );

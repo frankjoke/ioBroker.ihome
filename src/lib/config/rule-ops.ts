@@ -11,7 +11,7 @@ import {
   type ScopeExtras,
 } from "$lib/config/virtual-ops";
 import { formatAge, splitReading } from "$lib/config/format";
-import { normalizeStates } from "$lib/config/state-meta";
+import { normalizeStates, unitFor } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
 import type { ControlMeta } from "$lib/types/device";
 
@@ -346,7 +346,7 @@ function controlBadge(
   const explicitTone = TONES.includes(style.tone as BadgeTone);
   const parts = splitReading(
     control.liveValue,
-    slot.unit ?? control.meta?.unit ?? control.unit,
+    unitFor(slot.unit, control.meta?.unit, control.unit),
     undefined,
     normalizeStates(control.meta?.states ?? control.states),
   );

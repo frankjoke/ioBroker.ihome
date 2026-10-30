@@ -1,6 +1,6 @@
 <script lang="ts">
   import { splitReading } from "$lib/config/format";
-  import { normalizeStates } from "$lib/config/state-meta";
+  import { normalizeStates, unitFor } from "$lib/config/state-meta";
   import type { Slot } from "$lib/types/display";
   import type { SlotControl } from "$lib/types/device";
 
@@ -33,7 +33,7 @@
           // knob — the reading rounds to it, trailing zeros drop.
           slot.options?.hideUnit === true
             ? undefined
-            : (slot.unit ?? control.unit),
+            : unitFor(slot.unit, control.meta?.unit, control.unit),
           decimals,
           normalizeStates(control.states),
         )

@@ -5,6 +5,7 @@ import {
   widgetForMeta,
   effectiveRoom,
   effectiveFunctions,
+  unitFor,
 } from "$lib/config/state-meta";
 import type { Control } from "$lib/types/device";
 
@@ -47,6 +48,13 @@ it("keeps the object value when the control says nothing", () => {
   });
   expect(meta.role).toBe("value.power");
   expect(meta.unit).toBe("W");
+});
+
+it("hides the unit even when a slot carries an older copied unit", () => {
+  expect(unitFor("W", "", "W")).toBeUndefined();
+  expect(unitFor("kW", "W", "W")).toBe("kW");
+  expect(unitFor(undefined, "W", "W")).toBe("W");
+  expect(unitFor(undefined, undefined, "W")).toBe("W");
 });
 
 it("distinguishes hideUnit from an inherited unit", () => {
