@@ -385,35 +385,23 @@
     }
   }
 
-  function deleteMessage(target: LayoutSelection | null): string {
-    if (target?.kind === "tile") {
-      return "The tile disappears from this page. The device stays in the registry.";
-    }
-    if (target?.kind === "section") {
-      return "The tiles of this section disappear. The devices themselves stay in the registry.";
-    }
-    return "The tiles disappear from this page. The devices themselves stay in the registry.";
-  }
-
   function deleteTitle(target: LayoutSelection | null): string {
     if (target?.kind === "page") {
       const page = registry.pages.find((p) => p.id === target.pageId);
-      return `Delete “${page?.title || "page"}”?`;
+      return `Delete page “${page?.title || "page"}”`;
     }
     if (target?.kind === "section") {
-      const section = registry.pages
-        .find((p) => p.id === target.pageId)
-        ?.groups.find((g) => g.id === target.sectionId);
-      return `Delete “${section?.title || "section"}”?`;
+      const page = registry.pages.find((p) => p.id === target.pageId);
+      const section = page?.groups.find((g) => g.id === target.sectionId);
+      return `Delete section “${section?.title || "section"}” from page “${page?.title || "page"}”`;
     }
     if (target?.kind === "tile") {
-      const tile = registry.pages
-        .find((p) => p.id === target.pageId)
-        ?.groups.find((g) => g.id === target.sectionId)
-        ?.tiles.find((t) => t.id === target.placementId);
-      return `Delete “${tile?.title || "tile"}”?`;
+      const page = registry.pages.find((p) => p.id === target.pageId);
+      const section = page?.groups.find((g) => g.id === target.sectionId);
+      const tile = section?.tiles.find((t) => t.id === target.placementId);
+      return `Delete tile “${tile?.title || "tile"}” from section “${section?.title || "section"}”`;
     }
-    return "Delete?";
+    return "Delete";
   }
 </script>
 
@@ -803,9 +791,7 @@
     confirmLabel="Delete"
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}
-  >
-    {deleteMessage(pendingDelete)}
-  </ConfirmModal>
+  />
 {/if}
 
 {#if pendingCreate}

@@ -705,6 +705,15 @@
     if (openRules === slotIndex) openRules = null;
   }
 
+  function slotDeleteTitle(index: number): string {
+    const slot = shownSlots[index];
+    const name = slot?.label || slot?.kind || "slot";
+    const tileName = String(tile?.title ?? "").trim();
+    return tileName
+      ? `Delete slot “${name}” from tile “${tileName}”`
+      : `Delete slot “${name}”`;
+  }
+
   function requestAddSlot(at?: number): void {
     const a = anchor();
     if (a) onAddSlot?.(a, at);
@@ -2149,23 +2158,15 @@
 
   {#if pendingSlotDelete !== null}
     <ConfirmModal
-      title="Remove this slot?"
-      confirmLabel="Remove"
+      title={slotDeleteTitle(pendingSlotDelete)}
+      confirmLabel="Delete"
       onConfirm={() => {
         const index = pendingSlotDelete;
         pendingSlotDelete = null;
         if (index !== null) removeSlotAt(index);
       }}
       onCancel={() => (pendingSlotDelete = null)}
-    >
-      Removes
-      <strong
-        >{shownSlots[pendingSlotDelete]?.label ||
-          shownSlots[pendingSlotDelete]?.kind ||
-          "this slot"}</strong
-      >
-      from the tile. The device control stays.
-    </ConfirmModal>
+    />
   {/if}
 </div>
 
