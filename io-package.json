@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.1.2",
+        "version": "0.1.3",
         "news": {
+            "0.1.3": {
+                "en": "Device controls can now correct a badly decorated state: role, type, value labels (states), unit and hide-unit, min/max/step, read/write, room and functions. The correction wins over the broker object and drives the widget choice, value formatting, badges, device list and slot creation. Both selectors filter by room and function (the device picker also by name/control), every slot kind has its own icon, the tile has a separate icon before its name, duplicate control labels are numbered, and deleting a slot or tile asks first.",
+                "de": "Geräte-Controls können einen schlecht dekorierten State jetzt korrigieren: Rolle, Typ, Wertelabels (states), Einheit und Einheit ausblenden, Min/Max/Step, Lesen/Schreiben, Raum und Funktionen. Die Korrektur gewinnt über das Broker-Objekt und steuert Widget-Wahl, Wertformatierung, Badges, Geräteliste und Slot-Erzeugung. Beide Auswahlen filtern nach Raum und Funktion (die Geräteauswahl auch nach Name/Control), jeder Slot-Typ hat sein eigenes Icon, die Kachel hat ein eigenes Icon vor ihrem Namen, doppelte Control-Namen werden nummeriert, und das Löschen eines Slots oder einer Kachel fragt vorher nach."
+            },
             "0.1.2": {
                 "en": "A phone is now a narrow desktop: tiles keep their configured width and height (clamped only to the screen), sections wrap side by side instead of one per line, and the phone module is larger so names and values stop wrapping. HTML/frame slots show their icon and label as a caption above the surface and fill the whole tile, and a phone trims its margins so five 1×1 tiles fit per row from 408 px.",
                 "de": "Ein Handy ist jetzt ein schmaler Desktop: Kacheln behalten ihre eingestellte Breite und Höhe (nur auf den Bildschirm begrenzt), Bereiche umbrechen nebeneinander statt einer pro Zeile, und das Handy-Modul ist größer, damit Namen und Werte nicht mehr umbrechen. HTML-/Frame-Slots zeigen Icon und Label als Überschrift über der Fläche und füllen die ganze Kachel; ein Handy spart Ränder, sodass ab 408 px fünf 1×1-Kacheln pro Zeile passen."
@@ -78,10 +82,6 @@
             "0.0.17": {
                 "en": "Global variables now act as an alias inside the app: a variable name can stand where a state id is named — a device control, a rule, a formula — and reading, subscribing and writing all go to the state behind it, so pointing a variable at another state updates every use without touching them. Names are the reference and are restricted (no dots or spaces), duplicates and reserved names (sum, get, active, …) are refused, and a state created from the variable list can carry a role, min/max/step and room/function membership",
                 "de": "Globale Variablen wirken jetzt als Alias innerhalb der App: Ein Variablenname kann dort stehen, wo ein State genannt wird — bei Geräte-Controls, Regeln, Formeln — und Lesen, Abonnieren und Schreiben gehen an den dahinterliegenden State; zeigt eine Variable auf einen anderen State, folgen alle Verwendungen, ohne sie anzufassen. Namen sind die Referenz und eingeschränkt (keine Punkte oder Leerzeichen), Doppelungen und reservierte Namen (sum, get, active, …) werden abgelehnt, und ein aus der Variablenliste angelegter State kann Rolle, Min/Max/Step sowie Raum-/Funktions-Zuordnung tragen"
-            },
-            "0.0.16": {
-                "en": "Configuration is split into tabs — Devices, Global Variables, Formula Templates, Server & Security — behind a blue config bar whose open tab is the folder that opens into the page. Global Variables manages iHome-internal constants (kept in memory by the dashboard and the adapter, never broker states) and named references to ioBroker states, picked from the tree or created on save at a namespace you choose; iHome's own states are pinned to ihome.<n>.Variables so no adapter object can be overwritten",
-                "de": "Die Konfiguration ist in Reiter aufgeteilt — Devices, Global Variables, Formula Templates, Server & Security — hinter einer blauen Konfigurationsleiste, deren offener Reiter der Ordner ist, der sich in die Seite öffnet. Global Variables verwaltet iHome-interne Konstanten (nur im Speicher von Dashboard und Adapter, niemals Broker-States) und benannte Verweise auf ioBroker-States — aus dem Baum gewählt oder beim Speichern in einem gewählten Namespace angelegt; iHome-eigene States liegen fest unter ihome.<n>.Variables, damit kein Adapter-Objekt überschrieben werden kann"
             }
         },
         "titleLang": {
