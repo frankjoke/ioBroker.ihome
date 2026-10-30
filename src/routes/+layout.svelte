@@ -16,6 +16,7 @@
   import {
     setStateSource,
     setObjectSource,
+    setEnumSource,
     getCanonicalRegistry,
     devicesEnrichedStore,
     getUsedStateIds,
@@ -198,6 +199,7 @@
     // share the live caches with the device store (no import cycle)
     setStateSource(ioBroker.states);
     setObjectSource(ioBroker.objects);
+    setEnumSource(ioBroker.enums);
     void ioBroker.objects.size;
     void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).

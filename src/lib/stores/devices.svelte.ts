@@ -15,6 +15,11 @@ import {
 } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { deviceFaceIcon, deviceObjectIcon } from "$lib/config/icon-ops";
+import {
+  effectiveCommon,
+  effectiveRoom,
+  widgetForMeta,
+} from "$lib/config/state-meta";
 import { readable } from "svelte/store";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -47,6 +52,12 @@ export function setStateSource(src: Map<string, any> | null) {
 }
 export function setObjectSource(src: Map<string, any> | null) {
   objectSource = src;
+}
+// The enum cache for a control's effective room (the same injection pattern:
+// ioBrokerConnect imports this store, so the store must not import it back).
+let enumSource: any = null;
+export function setEnumSource(src: any) {
+  enumSource = src;
 }
 
 // ------------------------------------------------------------- used state ids
@@ -218,6 +229,7 @@ function _devicesEnriched(): EnrichedDevice[] {
           : st !== undefined
             ? applyRead(st.val, control.transform)
             : undefined;
+        const meta = effectiveCommon(control, obj);
         return {
           ...control,
           stateId,
@@ -225,9 +237,10 @@ function _devicesEnriched(): EnrichedDevice[] {
           available: !!isConst || st !== undefined || obj !== undefined,
           exists: !!isConst || obj !== undefined,
           writable: isConst ? false : control.writable,
-          displayRoom: device.room ?? obj?.common?.room ?? undefined,
+          displayRoom: effectiveRoom(control, obj, device.room, enumSource),
           object: obj,
-          widget: widgetFor(device.type, control.feature),
+          meta,
+          widget: widgetForMeta(meta, widgetFor(device.type, control.feature)),
         };
       },
     );
