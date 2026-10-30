@@ -42,6 +42,7 @@
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@types/node": "^22.20.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.1",
@@ -61,26 +62,30 @@
     "vitest": "^4.1.11",
     "workbox-precaching": "^7.4.0"
   },
-  "main": "main.js",
+  "main": "build/main.js",
   "files": [
     "admin/",
     "www/",
     "io-package.json",
     "LICENSE",
     "README.md",
-    "main.js"
+    "build/"
   ],
   "scripts": {
     "dev": "vite dev --open",
-    "build": "vite build",
+    "build:adapter": "tsc -p tsconfig.adapter.json",
+    "build:adapter:watch": "tsc -p tsconfig.adapter.json --watch",
+    "build": "npm run build:adapter && vite build",
     "pack": "npm run build && npm pack",
     "deploy:www": "node scripts/deploy-www.mjs",
     "preview": "vite preview",
     "test": "npm run test:unit && npm run test:package && npm run test:integration",
     "test:unit": "vitest run",
+    "pretest:package": "npm run build:adapter",
     "test:package": "mocha test/package.js --exit",
+    "pretest:integration": "npm run build:adapter",
     "test:integration": "mocha test/integration.js --exit",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.adapter.json --noEmit",
     "lint": "eslint -c eslint.config.mjs .",
     "translate": "translate-adapter",
     "release": "release-script"

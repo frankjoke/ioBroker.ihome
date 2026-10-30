@@ -1,6 +1,4 @@
-"use strict";
-
-const utils = require("@iobroker/adapter-core");
+import * as utils from "@iobroker/adapter-core";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -15,25 +13,60 @@ const DOCS = [
   "formulaList",
   "variableList",
   "settings",
-];
+] as const;
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
 const LEGACY_PREFIX = "0_userdata.0.Test.AiHome.";
+
+interface VariableInput {
+  id?: unknown;
+  name?: unknown;
+  type?: unknown;
+  unit?: unknown;
+  kind?: unknown;
+  stateId?: unknown;
+  value?: unknown;
+}
+
+interface VariableDoc {
+  variables?: VariableInput[];
+}
+
+interface VariableEntry {
+  id: string;
+  name: string;
+  type: string;
+  unit?: string;
+}
+
+interface ConstantEntry extends VariableEntry {
+  val: unknown;
+}
+
+interface StateEntry extends VariableEntry {
+  stateId: string;
+}
+
+interface Variables {
+  constants: Record<string, ConstantEntry>;
+  states: Record<string, StateEntry>;
+}
 
 /**
  * The SPA seeds an empty page document when it cannot read one yet (e.g. the
  * dashboard was opened before this migration ran, or a browser still holds the
  * old bundle). Such a placeholder counts as empty here — otherwise the real
  * documents could never come across. A document with any tile is never touched.
- *
- * @param {unknown} val - state value
  */
-function isPlaceholder(val) {
+function isPlaceholder(val: unknown): boolean {
   try {
-    const doc = typeof val === "string" ? JSON.parse(val) : val;
+    const doc = (typeof val === "string" ? JSON.parse(val) : val) as {
+      seeded?: unknown;
+      pages?: unknown;
+    } | null;
     if (!doc || doc.seeded !== true || !Array.isArray(doc.pages)) return false;
-    return !doc.pages.some((p) =>
-      (p.groups || []).some((g) => (g.tiles || []).length),
+    return !doc.pages.some((p: any) =>
+      (p?.groups ?? []).some((g: any) => (g?.tiles ?? []).length),
     );
   } catch {
     return false;
@@ -46,11 +79,8 @@ function isPlaceholder(val) {
  *
  * shortcut: this mirrors the SPA's `convertValue()` in
  * src/lib/config/variables.ts — unify both if a third consumer appears.
- *
- * @param {{type?: string, value?: unknown}} v - a variable list entry
- * @returns {unknown} the typed value, or undefined when malformed
  */
-function constantValue(v) {
+function constantValue(v: VariableInput): unknown {
   const raw = String(v.value ?? "");
   if (v.type === "number") {
     const n = Number(raw.trim());
@@ -67,30 +97,28 @@ function constantValue(v) {
 
 class IHome extends utils.Adapter {
   /**
-   * @param {Partial<utils.AdapterOptions>} [options] - Adapter options
+   * The config's global variables, materialised in memory when the config
+   * loads — never broker objects, nothing to update:
+   *   constants: name -> { id, name, type, unit, val }  iHome-internal values
+   *   states:    name -> { id, name, type, unit, stateId }  broker references
+   * The SPA builds the same two views from the same document (see
+   * src/lib/config/variables.ts and src/lib/stores/variables.svelte.ts).
    */
-  constructor(options) {
+  private variables: Variables = { constants: {}, states: {} };
+
+  public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
-    /**
-     * The config's global variables, materialised in memory when the config
-     * loads — never broker objects, nothing to update:
-     *   constants: name -> { id, name, type, unit, val }  iHome-internal values
-     *   states:    name -> { id, name, type, unit, stateId }  broker references
-     * The SPA builds the same two views from the same document (see
-     * src/lib/config/variables.ts and src/lib/stores/variables.svelte.ts).
-     */
-    this.variables = { constants: {}, states: {} };
   }
 
   /**
    * Rebuild the in-memory variables from the config document. Called once the
    * config is loaded and again whenever the SPA edits the list.
    */
-  async loadVariables() {
+  private async loadVariables(): Promise<void> {
     const st = await this.getStateAsync(`${CONFIG_FOLDER}.variableList`);
-    let doc = st?.val;
+    let doc: unknown = st?.val;
     if (typeof doc === "string") {
       try {
         doc = JSON.parse(doc);
@@ -98,17 +126,21 @@ class IHome extends utils.Adapter {
         doc = null;
       }
     }
-    /** @type {Record<string, object>} */
-    const constants = {};
-    /** @type {Record<string, object>} */
-    const states = {};
-    for (const v of Array.isArray(doc?.variables) ? doc.variables : []) {
+    const list =
+      doc &&
+      typeof doc === "object" &&
+      Array.isArray((doc as VariableDoc).variables)
+        ? ((doc as VariableDoc).variables as VariableInput[])
+        : [];
+    const constants: Record<string, ConstantEntry> = {};
+    const states: Record<string, StateEntry> = {};
+    for (const v of list) {
       if (!v || typeof v.id !== "string") continue;
-      const entry = {
+      const entry: VariableEntry = {
         id: v.id,
         name: String(v.name ?? v.id),
         type: String(v.type ?? "string"),
-        unit: v.unit,
+        unit: v.unit == null ? undefined : String(v.unit),
       };
       if (v.kind === "state" && typeof v.stateId === "string") {
         states[entry.name] = { ...entry, stateId: v.stateId };
@@ -123,12 +155,19 @@ class IHome extends utils.Adapter {
     );
   }
 
-  async onReady() {
+  private async onReady(): Promise<void> {
     for (const name of DOCS) {
       const target = `${CONFIG_FOLDER}.${name}`;
       await this.setObjectNotExistsAsync(target, {
         type: "state",
-        common: { name, type: "json", role: "json", read: true, write: true },
+        common: {
+          name,
+          // The broker accepts "json"; ioBroker's CommonType omits it.
+          type: "json" as never,
+          role: "json",
+          read: true,
+          write: true,
+        },
         native: {},
       });
 
@@ -173,17 +212,15 @@ class IHome extends utils.Adapter {
     });
   }
 
-  /**
-   * @param {() => void} callback - Callback function
-   */
-  onUnload(callback) {
+  private onUnload(callback: () => void): void {
     callback();
   }
 }
 
 if (require.main !== module) {
   // Export the constructor in compact mode
-  module.exports = (options) => new IHome(options);
+  module.exports = (options?: Partial<utils.AdapterOptions>) =>
+    new IHome(options);
 } else {
   // Otherwise start the instance directly
   new IHome();

@@ -129,6 +129,7 @@
             "type": "free",
             "license": "MIT"
         },
+        "main": "build/main.js",
         "platform": "Javascript/Node.js",
         "icon": "ihome.png",
         "enabled": true,

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": "adapter",
+    "outDir": "build",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": false,
+    "noEmitOnError": true,
+    "types": ["node"]
+  },
+  "include": ["adapter/**/*.ts"],
+  "exclude": ["adapter/**/*.test.ts"]
+}
