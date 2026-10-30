@@ -2,7 +2,12 @@
   import { untrack } from "svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
+  import {
+    roomList,
+    roomsOf as roomsOfEnum,
+    enumLabelFromObject,
+  } from "$lib/config/rooms";
+  import { effectiveFunctions, effectiveRoom } from "$lib/config/state-meta";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
   import {
@@ -116,14 +121,66 @@
       ? [...devices, createdDevice]
       : devices,
   );
-  const filtered = $derived(
-    allDevices.filter(
-      (d) =>
-        !search ||
-        d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.type.toLowerCase().includes(search.toLowerCase()),
-    ),
+  // The device picker's filters: name/control text, room and function. They
+  // widen the match to the device's controls, so a device is found by what it
+  // actually offers (a 200-device installation needs this).
+  let deviceRoom = $state("");
+  let deviceFunction = $state("");
+  const deviceFunctionOptions = $derived(
+    (ioBroker.enums?.getList?.("functions") ?? []).map((e: any) => ({
+      value: e._id,
+      label: enumLabelFromObject(e),
+    })),
   );
+  const filtered = $derived.by(() => {
+    const q = search.trim().toLowerCase();
+    return allDevices.filter((d) => {
+      if (q) {
+        const text = [
+          d.name,
+          d.title,
+          d.type,
+          ...(d.controls ?? []).flatMap((c) => [c.label, c.feature, c.stateId]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      const controls = (d.controls ?? []).filter((c) => !c.hidden);
+      const objectOf = (c: Control) => objectForState(c.stateId ?? "");
+      if (
+        deviceRoom &&
+        !(
+          d.room === deviceRoom ||
+          controls.some(
+            (c) =>
+              effectiveRoom(c, objectOf(c), d.room, ioBroker.enums) ===
+              deviceRoom,
+          )
+        )
+      ) {
+        return false;
+      }
+      if (
+        deviceFunction &&
+        !(
+          d.functions?.includes(deviceFunction) ||
+          controls.some((c) =>
+            effectiveFunctions(
+              c,
+              objectOf(c),
+              d.functions,
+              ioBroker.enums,
+            ).includes(deviceFunction),
+          )
+        )
+      ) {
+        return false;
+      }
+      return true;
+    });
+  });
   const selectedDevice = $derived(
     allDevices.find((d) => d.id === selectedDeviceId),
   );
@@ -592,9 +649,21 @@
         <div class="row-input">
           <input
             type="search"
-            placeholder="Search device…"
+            placeholder="Search name or control…"
             bind:value={search}
           />
+          <select bind:value={deviceRoom} title="Room">
+            <option value="">All rooms</option>
+            {#each rooms as r (r.id)}
+              <option value={r.id}>{r.label}</option>
+            {/each}
+          </select>
+          <select bind:value={deviceFunction} title="Function">
+            <option value="">All functions</option>
+            {#each deviceFunctionOptions as f (f.value)}
+              <option value={f.value}>{f.label}</option>
+            {/each}
+          </select>
           {#if onSaveDevice}
             <button
               type="button"
@@ -965,6 +1034,12 @@
 
   .row-input input {
     flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.35rem;
+  }
+
+  .row-input select {
+    flex: 0 1 9rem;
     min-width: 0;
     padding: 0.35rem;
   }

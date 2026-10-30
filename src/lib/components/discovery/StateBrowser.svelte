@@ -36,33 +36,16 @@
 
   // Every open starts from the whole tree: a search from the previous open (or
   // a prefilled state id / device name) must not keep the states hidden. The
-  // adapter/room/type/role filters stay remembered — only the text is cleared.
+  // adapter/room/function filters stay remembered — only the text is cleared.
   pickerFilters.search = "";
 
   const allStates = $derived(collectStates(objects));
   const adapters = $derived(
     [...new SvelteSet(allStates.map((s) => adapterOf(s.id)))].sort(),
   );
-  const types = $derived(
-    [
-      ...new SvelteSet(
-        allStates.map((s) => String(s.obj?.common?.type ?? "")).filter(Boolean),
-      ),
-    ].sort(),
-  );
-  const roles = $derived(
-    [
-      ...new SvelteSet(
-        allStates.map((s) => String(s.obj?.common?.role ?? "")).filter(Boolean),
-      ),
-    ].sort(),
-  );
-
   const roomOptions = $derived(
     rooms.map((r) => ({ value: r.id, label: r.label, icon: r.icon })),
   );
-  const typeOptions = $derived(types.map((t) => ({ value: t, label: t })));
-  const roleOptions = $derived(roles.map((r) => ({ value: r, label: r })));
   const functionOptions = $derived(
     (enums?.getList?.("functions") ?? []).map((e: any) => ({
       value: e._id,
@@ -135,18 +118,6 @@
     placeholder="All functions"
     onChange={(v) => (pickerFilters.functions = v)}
   />
-  <MultiSelect
-    options={typeOptions}
-    selected={pickerFilters.type}
-    placeholder="All types"
-    onChange={(v) => (pickerFilters.type = v)}
-  />
-  <MultiSelect
-    options={roleOptions}
-    selected={pickerFilters.role}
-    placeholder="All roles"
-    onChange={(v) => (pickerFilters.role = v)}
-  />
 </div>
 
 <div class="results">
@@ -160,7 +131,7 @@
 <style>
   .filters {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 0.5rem;
   }
 

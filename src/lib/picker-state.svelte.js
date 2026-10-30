@@ -7,8 +7,6 @@ export const pickerFilters = $state({
   adapter: "",
   room: [],
   functions: [],
-  type: [],
-  role: [],
   search: "",
 });
 
