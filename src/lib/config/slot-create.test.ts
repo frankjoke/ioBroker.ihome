@@ -28,18 +28,35 @@ const device = (over: Partial<Device> = {}): Device => ({
   ...over,
 });
 
-it("copies label/unit/min/max/step into the slot", () => {
+it("copies label/min/max/step into the slot, not the unit", () => {
   const control = ctl("c1", "brightness", {
     label: "Brightness",
     common: { min: 0, max: 100, step: 5, unit: "%" },
   });
-  expect(slotFromControl(device(), control)).toMatchObject({
+  const slot = slotFromControl(device(), control);
+  expect(slot).toMatchObject({
     kind: "level",
     source: { kind: "control", device: "dev", control: "c1" },
     label: "Brightness",
-    unit: "%",
     options: { min: 0, max: 100, step: 5 },
   });
+  // The resolver returns the effective unit; the slot only overrides it.
+  expect(slot.unit).toBeUndefined();
+});
+
+it("lets the control correction decide the slot kind, not the object", () => {
+  const device = { id: "d", type: "Switch", controls: [] } as any;
+  const slot = slotFromControl(device, {
+    id: "c",
+    feature: "power",
+    writable: true,
+    role: "switch",
+    states: { "0": "Standby", "1": "Heizung" },
+    object: { common: { role: "value", type: "number", states: { "0": "x" } } },
+  } as any);
+  expect(slot.kind).toBe("enum");
+  expect(slot.label).toBeUndefined();
+  expect(slot.unit).toBeUndefined();
 });
 
 it("keeps only controls the device actually has", () => {
@@ -68,13 +85,13 @@ it("uses the state's role/type over the device type's feature", () => {
       },
     },
   } as unknown as Partial<Control>);
-  expect(
-    slotFromControl(device({ type: "Switch" }), consumption),
-  ).toMatchObject({
+  const unitSlot = slotFromControl(device({ type: "Switch" }), consumption);
+  expect(unitSlot).toMatchObject({
     kind: "value",
     label: "CONSUMPTION",
-    unit: "Wh",
   });
+  // The unit comes back through the resolver, not the slot document.
+  expect(unitSlot.unit).toBeUndefined();
 
   const power = ctl("c2", "power", {
     object: {

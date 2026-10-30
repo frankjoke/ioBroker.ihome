@@ -6,7 +6,7 @@ import {
   resolveTemplate,
   tileTitle,
 } from "$lib/config/template-ops";
-import { widgetForState } from "$lib/config/slot-source";
+import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
 import type { Control, Device, Widget } from "$lib/types/device";
 import type { Size, Slot, SlotKind, Template } from "$lib/types/display";
 
@@ -42,25 +42,23 @@ export function slotFromControl(
   control: Control & { object?: { common?: Record<string, any> } },
   widget?: Widget,
 ): Slot {
-  // The live state's own role/type is the truth about what a control reads: a
+  // The control's correction is the truth about what it reads (spec §3): a
   // "power" feature may be a number (W/Wh) even though the type preset says
-  // switch. Only a control with no object falls back to the type's feature map.
-  const common = {
-    ...(control.common ?? {}),
-    ...(control.object?.common ?? {}),
-  };
-  const hasStateShape = !!(common.role || common.type || common.states);
-  const w = hasStateShape
-    ? widgetForState({ common })
-    : (widget ?? widgetFor(device.type, control.feature));
-  const options = rangeOptions(common);
-  const label = control.label ?? (localizeName(common.name) || undefined);
-  const unit = control.unit ?? common.unit;
+  // switch. The device type/feature map is only the fallback when the effective
+  // shape says nothing.
+  const meta =
+    (control as any).meta ?? effectiveCommon(control, control.object);
+  const w = widgetForMeta(
+    meta,
+    widget ?? widgetFor(device.type, control.feature),
+  );
+  const options = rangeOptions(meta);
+  const label = control.label ?? meta.name;
+  // No unit copy: the resolver returns the effective unit (and hideUnit).
   return {
     kind: slotKindForWidget(w),
     source: { kind: "control", device: device.id, control: control.id },
     ...(label ? { label } : {}),
-    ...(unit ? { unit } : {}),
     ...(Object.keys(options).length ? { options } : {}),
   };
 }

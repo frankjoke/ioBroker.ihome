@@ -137,6 +137,9 @@ export function widgetForMeta(meta: ControlMeta, fallback?: Widget): Widget {
   ) {
     return "level";
   }
+  // A value role (a Wh reading, a temperature) is a reading, not the device
+  // type's switch — it beats the preset, as it did before the correction layer.
+  if (/^value(\.|$)/.test(role) && type !== "boolean") return "value";
   if (fallback) return fallback;
   if (type === "boolean" && meta.write === true) return "switch";
   return "value";

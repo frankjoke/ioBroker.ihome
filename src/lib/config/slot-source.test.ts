@@ -154,6 +154,36 @@ it("a device source is available while one of its controls is", () => {
   ).toMatchObject({ available: true, writable: false });
 });
 
+it("a control source carries its corrected meta, not the object", () => {
+  const control = {
+    id: "c",
+    feature: "power",
+    stateId: "a.0.x",
+    liveValue: 1,
+    writable: true,
+    available: true,
+    meta: {
+      role: "switch",
+      unit: "",
+      states: { "0": "Aus", "1": "Ein" },
+    },
+    widget: "switch",
+  } as any;
+  const res = resolveSlotSource(
+    { kind: "control", device: "d", control: "c" },
+    {
+      devices: [{ id: "d", controls: [control] }] as any,
+      states: new Map(),
+      objects: new Map(),
+    },
+  );
+  expect(res).toMatchObject({
+    role: "switch",
+    unit: "",
+    states: { "0": "Aus", "1": "Ein" },
+  });
+});
+
 it("sourceStateIds names the state behind a control and a raw state", () => {
   const d = device({
     controls: [ctl("c1", "brightness", "0_userdata.0.lamp", 1)],

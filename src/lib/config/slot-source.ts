@@ -1,10 +1,16 @@
 import type {
+  Control,
   EnrichedControl,
   EnrichedDevice,
   Widget,
 } from "$lib/types/device";
 import type { SlotSource } from "$lib/types/display";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
+import {
+  effectiveCommon,
+  normalizeStates,
+  widgetForMeta,
+} from "$lib/config/state-meta";
 
 /** What the resolver reads: the enriched devices and the broker caches. */
 export interface SourceLook {
@@ -28,6 +34,9 @@ export interface ResolvedSource {
   widget?: Widget;
   unit?: string;
   label?: string;
+  role?: string;
+  type?: string;
+  states?: Record<string, string>;
 }
 
 /**
@@ -58,8 +67,11 @@ export function resolveSlotSource(
       object: control.object,
       control,
       widget: control.widget,
-      unit: control.unit,
+      unit: control.meta?.unit ?? control.unit,
       label: control.label ?? control.feature,
+      role: control.meta?.role,
+      type: control.meta?.type,
+      states: control.meta?.states,
     };
   }
   if (source.kind === "state") {
@@ -75,6 +87,9 @@ export function resolveSlotSource(
       widget: widgetForState(object),
       unit: object?.common?.unit,
       label: object?.common?.name,
+      role: object?.common?.role,
+      type: object?.common?.type,
+      states: normalizeStates(object?.common?.states),
     };
   }
   const device = look.devices.find((d) => d.id === source.device);
@@ -90,22 +105,11 @@ export function resolveSlotSource(
   };
 }
 
-/** The widget a raw state suggests (a slot may override it). */
+/** The widget a raw state suggests (a slot may override it). Same inference as
+ *  a control, with no device-type fallback. */
 export function widgetForState(object: any): Widget {
-  const common = object?.common ?? {};
-  const role = String(common.role ?? "");
-  if (common.states) return "enum";
-  if (common.type === "boolean" || role.includes("switch")) return "switch";
-  if (common.type === "color" || role.includes("color")) return "color";
-  if (
-    common.type === "number" &&
-    (common.min !== undefined ||
-      common.max !== undefined ||
-      /level|dimmer|brightness|setpoint|position|volume/.test(role))
-  ) {
-    return "level";
-  }
-  return "value";
+  const neutral = { id: "", feature: "", writable: false } as Control;
+  return widgetForMeta(effectiveCommon(neutral, object));
 }
 
 /** Every state id a source needs subscribed. Control sources resolve through
