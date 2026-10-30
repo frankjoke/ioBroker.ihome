@@ -126,6 +126,8 @@
   let lookIconFor = $state<"active" | "inactive" | null>(null);
   /** The tile's own icon picker (A72): separate from every slot's icon. */
   let tileIconPicker = $state(false);
+  /** The slot whose trash button was pressed; the modal decides. */
+  let pendingSlotDelete = $state<number | null>(null);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -1246,7 +1248,7 @@
                     : "Remove slot"}
                   aria-label="Remove slot"
                   disabled={shownSlots.length <= 1}
-                  onclick={() => removeSlotAt(i)}
+                  onclick={() => (pendingSlotDelete = i)}
                 >
                   <span class="material-symbols-outlined">delete</span>
                 </button>
@@ -2143,6 +2145,27 @@
       }}
       onClose={() => (lookIconFor = null)}
     />
+  {/if}
+
+  {#if pendingSlotDelete !== null}
+    <ConfirmModal
+      title="Remove this slot?"
+      confirmLabel="Remove"
+      onConfirm={() => {
+        const index = pendingSlotDelete;
+        pendingSlotDelete = null;
+        if (index !== null) removeSlotAt(index);
+      }}
+      onCancel={() => (pendingSlotDelete = null)}
+    >
+      Removes
+      <strong
+        >{shownSlots[pendingSlotDelete]?.label ||
+          shownSlots[pendingSlotDelete]?.kind ||
+          "this slot"}</strong
+      >
+      from the tile. The device control stays.
+    </ConfirmModal>
   {/if}
 </div>
 

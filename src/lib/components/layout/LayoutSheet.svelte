@@ -373,7 +373,26 @@
       commitLayout(deletePage(registry, target.pageId));
     } else if (target.kind === "section") {
       commitLayout(deleteSection(registry, target.pageId, target.sectionId));
+    } else if (target.kind === "tile") {
+      commitLayout(
+        deletePlacement(
+          registry,
+          target.pageId,
+          target.sectionId,
+          target.placementId,
+        ),
+      );
     }
+  }
+
+  function deleteMessage(target: LayoutSelection | null): string {
+    if (target?.kind === "tile") {
+      return "The tile disappears from this page. The device stays in the registry.";
+    }
+    if (target?.kind === "section") {
+      return "The tiles of this section disappear. The devices themselves stay in the registry.";
+    }
+    return "The tiles disappear from this page. The devices themselves stay in the registry.";
   }
 
   function deleteTitle(target: LayoutSelection | null): string {
@@ -386,6 +405,13 @@
         .find((p) => p.id === target.pageId)
         ?.groups.find((g) => g.id === target.sectionId);
       return `Delete “${section?.title || "section"}”?`;
+    }
+    if (target?.kind === "tile") {
+      const tile = registry.pages
+        .find((p) => p.id === target.pageId)
+        ?.groups.find((g) => g.id === target.sectionId)
+        ?.tiles.find((t) => t.id === target.placementId);
+      return `Delete “${tile?.title || "tile"}”?`;
     }
     return "Delete?";
   }
@@ -676,7 +702,12 @@
         aria-label="Remove tile"
         disabled={!tileAnchor}
         onclick={() =>
-          commitLayout(deletePlacement(registry, pageId, sectionId, tileId))}
+          (pendingDelete = {
+            kind: "tile",
+            pageId,
+            sectionId,
+            placementId: tileId,
+          })}
       >
         <span class="material-symbols-outlined">delete</span>
       </button>
@@ -773,8 +804,7 @@
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}
   >
-    The tiles disappear from this page. The devices themselves stay in the
-    registry.
+    {deleteMessage(pendingDelete)}
   </ConfirmModal>
 {/if}
 
