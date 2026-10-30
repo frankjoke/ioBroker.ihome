@@ -6,23 +6,47 @@
   } from "$lib/picker-values.svelte.js";
   import { formatAge, formatValue } from "$lib/config/format";
   import { pickerExpanded } from "$lib/picker-state.svelte.js";
+  import { enumsOfState, enumLabel } from "$lib/config/rooms";
 
   let {
     nodes,
     selection,
     onToggle,
     onPick,
+    enums = undefined,
   }: {
     nodes: StateNode[];
     selection: Set<string>;
     onToggle: (id: string) => void;
     /** When set, a leaf is a one-click button instead of a checkbox. */
     onPick?: (id: string) => void;
+    /** The enum cache, so a leaf's tooltip says which room/function it is in. */
+    enums?: any;
   } = $props();
 
   function toggleExpand(id: string) {
     if (pickerExpanded.has(id)) pickerExpanded.delete(id);
     else pickerExpanded.add(id);
+  }
+
+  /** The row's hover text: the id plus the metadata the filters use. */
+  function leafTitle(node: StateNode): string {
+    const id = node.obj?._id ?? node.id;
+    const common = node.obj?.common ?? {};
+    const rooms = enumsOfState(enums, id, "rooms").map((r: string) =>
+      enumLabel(enums, r, "rooms"),
+    );
+    const functions = enumsOfState(enums, id, "functions").map((f: string) =>
+      enumLabel(enums, f, "functions"),
+    );
+    return [
+      id,
+      rooms.length ? `room: ${rooms.join(", ")}` : "",
+      functions.length ? `function: ${functions.join(", ")}` : "",
+      common.role ? `role: ${common.role}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   function leafValue(node: StateNode): string {
@@ -47,7 +71,11 @@
   <ul class="tree">
     {#each list as node (nodeKey(node))}
       {#if node.kind === "state"}
-        <li class="leaf" class:selected={selection.has(node.id)}>
+        <li
+          class="leaf"
+          class:selected={selection.has(node.id)}
+          title={leafTitle(node)}
+        >
           {#if onPick}
             <button
               type="button"

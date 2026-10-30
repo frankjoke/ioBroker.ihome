@@ -6,6 +6,7 @@ import { SvelteSet } from "svelte/reactivity";
 export const pickerFilters = $state({
   adapter: "",
   room: [],
+  functions: [],
   type: [],
   role: [],
   search: "",

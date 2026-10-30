@@ -19,6 +19,7 @@ export type FilterValue = string | string[] | undefined;
 export interface StateFilters {
   adapter?: FilterValue;
   room?: FilterValue;
+  functions?: FilterValue;
   type?: FilterValue;
   role?: FilterValue;
   search?: string;
@@ -68,11 +69,13 @@ export function applyFilters(
   states: StateRef[],
   filters: StateFilters,
   roomsOf?: (id: string) => string[],
+  functionsOf?: (id: string) => string[],
 ): StateRef[] {
   const adapters = toList(filters.adapter);
   const types = toList(filters.type);
   const roles = toList(filters.role);
   const roomSel = toList(filters.room);
+  const functionSel = toList(filters.functions);
   return states.filter((s) => {
     const common = s.obj?.common ?? {};
     if (adapters.length && !adapters.includes(adapterOf(s.id))) return false;
@@ -94,6 +97,10 @@ export function applyFilters(
     if (roomSel.length) {
       const r = roomsOf?.(s.id) ?? [];
       if (!roomSel.some((x) => r.includes(x))) return false;
+    }
+    if (functionSel.length) {
+      const f = functionsOf?.(s.id) ?? [];
+      if (!functionSel.some((x) => f.includes(x))) return false;
     }
     return true;
   });

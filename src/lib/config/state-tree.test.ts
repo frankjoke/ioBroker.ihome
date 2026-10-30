@@ -63,6 +63,19 @@ it("collects only state objects", () => {
   );
   expect(collectStates(objects)).toHaveLength(3);
 });
+it("filters by function membership", () => {
+  const functionsOf = (id: string) =>
+    id === "hue.0.lamp.bri" ? ["enum.functions.Licht"] : [];
+  expect(
+    applyFilters(
+      collectStates(objects),
+      { functions: ["enum.functions.Licht"] },
+      undefined,
+      functionsOf,
+    ),
+  ).toHaveLength(1);
+});
+
 it("filters by adapter", () => {
   expect(
     applyFilters(collectStates(objects), { adapter: "hue.0" }),

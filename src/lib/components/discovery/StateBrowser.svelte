@@ -13,6 +13,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import { enumsOfState, enumLabelFromObject } from "$lib/config/rooms";
 
   let {
     objects,
@@ -62,8 +63,17 @@
   );
   const typeOptions = $derived(types.map((t) => ({ value: t, label: t })));
   const roleOptions = $derived(roles.map((r) => ({ value: r, label: r })));
+  const functionOptions = $derived(
+    (enums?.getList?.("functions") ?? []).map((e: any) => ({
+      value: e._id,
+      label: enumLabelFromObject(e),
+    })),
+  );
 
-  const filtered = $derived(applyFilters(allStates, pickerFilters, roomsOf));
+  const functionsOf = (id: string) => enumsOfState(enums, id, "functions");
+  const filtered = $derived(
+    applyFilters(allStates, pickerFilters, roomsOf, functionsOf),
+  );
   // Global state variables, as the pickable aliases they are: the search box
   // filters them by name or by the real state id, the other filters stay for
   // the broker tree (a variable's adapter is not its own).
@@ -119,6 +129,13 @@
     onChange={(v) => (pickerFilters.room = v)}
   />
   <MultiSelect
+    options={functionOptions}
+    selected={pickerFilters.functions}
+    {enums}
+    placeholder="All functions"
+    onChange={(v) => (pickerFilters.functions = v)}
+  />
+  <MultiSelect
     options={typeOptions}
     selected={pickerFilters.type}
     placeholder="All types"
@@ -136,14 +153,14 @@
   {#if filtered.length === 0 && !variableNode}
     <p class="empty text-muted">No matching states.</p>
   {:else}
-    <StateTree nodes={tree} {selection} {onToggle} {onPick} />
+    <StateTree nodes={tree} {selection} {onToggle} {onPick} {enums} />
   {/if}
 </div>
 
 <style>
   .filters {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
     gap: 0.5rem;
   }
 
