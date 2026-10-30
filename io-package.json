@@ -137,9 +137,9 @@
         "readme": "https://github.com/frankjoke/ioBroker.ihome/blob/main/README.md",
         "loglevel": "info",
         "tier": 3,
-        "mode": "once",
+        "mode": "daemon",
         "type": "general",
-        "compact": true,
+        "compact": false,
         "singleton": true,
         "adminUI": {
             "config": "none"
