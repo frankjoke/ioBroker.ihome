@@ -9,6 +9,7 @@ import {
   type ResolvedSource,
   type SourceLook,
 } from "$lib/config/slot-source";
+import { effectiveCommon } from "$lib/config/state-meta";
 
 /** What a tile's slots resolve to: a control bag shaped like a device, the
  *  tile with pseudo-id sources, and the live sources behind each id. */
@@ -56,12 +57,14 @@ function pseudoControl(
     role: resolved?.role,
     type: resolved?.type,
     states: resolved?.states,
-    meta: resolved?.control?.meta ?? {
-      role: resolved?.role,
-      type: resolved?.type,
-      states: resolved?.states,
-      unit: resolved?.unit,
-    },
+    meta:
+      resolved?.control?.meta ??
+      (resolved
+        ? effectiveCommon(
+            { id: "", feature: "", writable: false } as EnrichedControl,
+            resolved.object,
+          )
+        : undefined),
     liveValue: resolved?.value,
     available: resolved?.available === true,
     exists: resolved?.available === true,

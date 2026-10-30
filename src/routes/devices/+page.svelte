@@ -6,7 +6,8 @@
     devicesEnrichedStore,
   } from "$lib/stores/devices";
   import { newId } from "$lib/utils/ids";
-  import { formatAge, formatValue } from "$lib/config/format";
+  import { formatAge, splitReading } from "$lib/config/format";
+  import { unitFor } from "$lib/config/state-meta";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
@@ -59,9 +60,18 @@
       device.controls) as EnrichedControl[];
     return (controls ?? [])
       .filter((c) => !c.hidden)
-      .map(
-        (c) => `${c.label || c.feature}: ${formatValue(c.liveValue, c.unit)}`,
-      )
+      .map((c) => {
+        const parts = splitReading(
+          c.liveValue,
+          unitFor(undefined, c.meta?.unit, c.unit),
+          undefined,
+          c.meta?.states,
+        );
+        const reading = parts.unit
+          ? `${parts.value} ${parts.unit}`
+          : parts.value;
+        return `${c.label || c.feature}: ${reading}`;
+      })
       .join(", ");
   }
 

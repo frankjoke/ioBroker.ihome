@@ -96,6 +96,7 @@
       "write",
       "room",
       "functions",
+      "common",
     ] as const) {
       delete (next as any)[key];
     }
@@ -185,7 +186,7 @@
         type="checkbox"
         checked={control.write ?? meta.write ?? false}
         onchange={(e) => patch({ write: e.currentTarget.checked })}
-      /> writable</label
+      /> state writable (metadata)</label
     >
   </div>
 

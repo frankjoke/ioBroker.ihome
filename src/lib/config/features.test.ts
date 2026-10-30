@@ -154,12 +154,13 @@ it("levelRange: the object's range when the slot sets none", () => {
   });
 });
 
-it("levelRange: a slot's own range wins over the object's", () => {
+it("levelRange: the effective metadata wins over a copied slot range", () => {
+  // The control correction is the truth; copied slot ranges only fill gaps.
   expect(
     levelRange({ min: 0, max: 100, step: 1 }, { min: 10, max: 90, step: 10 }),
-  ).toEqual({ min: 10, max: 90, step: 10 });
-  // A partial slot range only overrides the knobs it names.
-  expect(levelRange({ min: 0, max: 100, step: 1 }, { step: 10 })).toEqual({
+  ).toEqual({ min: 0, max: 100, step: 1 });
+  // A slot range fills a knob the metadata does not name.
+  expect(levelRange({ min: 0, max: 100 }, { step: 10 })).toEqual({
     min: 0,
     max: 100,
     step: 10,

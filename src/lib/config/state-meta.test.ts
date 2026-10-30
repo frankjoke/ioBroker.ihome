@@ -57,6 +57,17 @@ it("hides the unit even when a slot carries an older copied unit", () => {
   expect(unitFor(undefined, undefined, "W")).toBe("W");
 });
 
+it("legacy common beats the object and nothing is mutated", () => {
+  const object = { common: { role: "value", unit: "W" } };
+  const source = control({ common: { role: "level.dimmer" } });
+  const before = JSON.stringify(source);
+  const meta = effectiveCommon(source, object);
+  expect(meta.role).toBe("level.dimmer");
+  expect(meta.unit).toBe("W");
+  expect(JSON.stringify(source)).toBe(before);
+  expect(object).toEqual({ common: { role: "value", unit: "W" } });
+});
+
 it("distinguishes hideUnit from an inherited unit", () => {
   const object = { common: { unit: "W" } };
   expect(effectiveCommon(control({ hideUnit: true }), object).unit).toBe("");

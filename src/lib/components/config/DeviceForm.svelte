@@ -111,7 +111,7 @@
           !effectiveFunctions(
             control,
             objOf(control),
-            undefined,
+            device?.functions,
             ioBroker.enums,
           ).includes(filterFunction)
         ) {

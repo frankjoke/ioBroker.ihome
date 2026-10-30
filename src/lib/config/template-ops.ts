@@ -238,13 +238,14 @@ export interface PickableControl extends Pickable {
   feature?: string;
   object?: { common?: { role?: string } };
   common?: { role?: string };
+  meta?: { role?: string; unit?: string };
 }
 
 export function pickable<T extends PickableControl>(controls: T[]): Pickable[] {
   return (controls ?? []).map((c) => ({
     id: c.id,
-    role: c.object?.common?.role ?? c.common?.role,
-    unit: c.unit,
+    role: c.meta?.role ?? c.object?.common?.role ?? c.common?.role,
+    unit: c.meta?.unit ?? c.unit,
     label: c.label ?? c.feature,
   }));
 }

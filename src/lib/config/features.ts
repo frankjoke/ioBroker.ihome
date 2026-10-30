@@ -202,8 +202,9 @@ function levelNumber(v: unknown): number | undefined {
 }
 
 /**
- * What a level slider allows: the slot's own min/max/step when it sets them,
- * else the state object's, else 0/100/1. A step must be positive to be usable.
+ * What a level slider allows: the effective metadata's min/max/step, else a
+ * slot range that fills a gap (a copied or hand-set value), else 0/100/1. A
+ * step must be positive to be usable.
  */
 export function levelRange(
   common: Record<string, unknown> = {},
@@ -212,13 +213,13 @@ export function levelRange(
   const slotStep = levelNumber(options.step);
   const commonStep = levelNumber(common.step);
   return {
-    min: levelNumber(options.min) ?? levelNumber(common.min) ?? 0,
-    max: levelNumber(options.max) ?? levelNumber(common.max) ?? 100,
+    min: levelNumber(common.min) ?? levelNumber(options.min) ?? 0,
+    max: levelNumber(common.max) ?? levelNumber(options.max) ?? 100,
     step:
-      slotStep !== undefined && slotStep > 0
-        ? slotStep
-        : commonStep !== undefined && commonStep > 0
-          ? commonStep
+      commonStep !== undefined && commonStep > 0
+        ? commonStep
+        : slotStep !== undefined && slotStep > 0
+          ? slotStep
           : 1,
   };
 }
