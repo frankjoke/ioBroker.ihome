@@ -29,7 +29,9 @@
    * bordered section's tiles start at the same y as an unbordered one's. The
    * width calc adds the same 14px (`box-sizing: border-box`).
    */
-  const decoration = 14;
+  // The section's horizontal padding/border box: narrower on a phone, so the
+  // page's column count (PageView) has to use the same number.
+  const decoration = $derived(bp === "phone" ? 10 : 14);
   const width = $derived(
     modules > 0
       ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px + ${decoration}px);`
@@ -56,6 +58,7 @@
   class="group"
   class:bordered={group.appearance?.border === true}
   class:new-line={group.newLine === true}
+  class:phone={bp === "phone"}
   style="{background} {width}"
 >
   {#if group.title}
@@ -114,6 +117,12 @@
   /* `appearance.border: true` draws the section's box; absent is today's look. */
   .group.bordered {
     border-color: var(--border-color);
+  }
+
+  /* A phone gives the tiles the margin (see PageView's pagePad). */
+  .group.phone {
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
   .group-title {

@@ -32,10 +32,17 @@
   /** The 1×1 module at the installation's scale (ui-settings.ts). */
   const moduleSize = $derived(scaledTile(def, ui.tileScale));
 
-  // How many tile modules fit on one line at this width — the page's own padding
-  // (8px each side), the section's padding/border box (14px) and the grid gap
-  // (6px), matching the CSS below.
-  const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 30));
+  // A phone spends as little room as it can on margins: 4px each side, and the
+  // section's own box shrinks with it (GroupSection). Every other breakpoint
+  // keeps 8px/14px.
+  const phone = $derived(bp === "phone");
+  const pagePad = $derived(phone ? 4 : 8);
+  // How many tile modules fit on one line at this width — the page's padding,
+  // the section's padding/border box and the grid gap (6px), matching the CSS
+  // below.
+  const maxModules = $derived(
+    modulesFor(width, moduleSize.w, 6, pagePad * 2 + (phone ? 10 : 14)),
+  );
   /** A tile's width in modules — the *same* calculation the tile renders with. */
   const spanOf = (t: ResolvedTile): number =>
     effectiveSpan(t.placement.tile, bp).w;
@@ -46,7 +53,7 @@
   );
 
   const pageStyle = $derived(
-    `--tile-w: ${moduleSize.w}px; --tile-h: ${moduleSize.h}px; ${backgroundCss(page.background)}`,
+    `--tile-w: ${moduleSize.w}px; --tile-h: ${moduleSize.h}px; --page-pad: ${pagePad}px; ${backgroundCss(page.background)}`,
   );
 </script>
 
@@ -84,7 +91,8 @@
     align-content: flex-start;
     gap: 1.25rem;
     min-height: 100vh;
-    padding: 8px;
+    /* A phone's margin is 4px (see pagePad above). */
+    padding: var(--page-pad, 8px);
     /* A User Interface default (ui-settings.ts); an explicit page background
        is inline and wins. */
     background-color: var(--ui-page-bg, transparent);
