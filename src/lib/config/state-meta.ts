@@ -1,5 +1,6 @@
 import type { Control, ControlMeta, Widget } from "$lib/types/device";
 import { localizeName } from "$lib/config/format";
+import { enumsOfState } from "$lib/config/rooms";
 
 /**
  * The one place a control's correction meets the broker object (spec §3):
@@ -84,6 +85,35 @@ export function effectiveCommon(
     write: flag(merged.write),
   };
   return meta;
+}
+
+/** A control's room: its own correction, else the state's enum membership
+ *  (walking parent ids), else the device's room. */
+export function effectiveRoom(
+  control: Control,
+  object: { _id?: string } | undefined,
+  deviceRoom: string | undefined,
+  enums: unknown,
+): string | undefined {
+  const own = String(control.room ?? "").trim();
+  if (own) return own;
+  const id = object?._id ?? control.stateId ?? "";
+  const found = id ? enumsOfState(enums, id, "rooms") : [];
+  return found[0] ?? deviceRoom;
+}
+
+/** A control's functions: its own correction, else the state's enum membership,
+ *  else the device's functions. */
+export function effectiveFunctions(
+  control: Control,
+  object: { _id?: string } | undefined,
+  deviceFunctions: string[] | undefined,
+  enums: unknown,
+): string[] {
+  if (control.functions?.length) return [...control.functions];
+  const id = object?._id ?? control.stateId ?? "";
+  const found = id ? enumsOfState(enums, id, "functions") : [];
+  return found.length ? found : (deviceFunctions ?? []);
 }
 
 /**

@@ -3,6 +3,8 @@ import {
   normalizeStates,
   effectiveCommon,
   widgetForMeta,
+  effectiveRoom,
+  effectiveFunctions,
 } from "$lib/config/state-meta";
 import type { Control } from "$lib/types/device";
 
@@ -51,6 +53,48 @@ it("distinguishes hideUnit from an inherited unit", () => {
   const object = { common: { unit: "W" } };
   expect(effectiveCommon(control({ hideUnit: true }), object).unit).toBe("");
   expect(effectiveCommon(control(), object).unit).toBe("W");
+});
+
+const enums = {
+  getList: (type: string) =>
+    type === "functions" ? [{ _id: "enum.functions.Licht" }] : [],
+  get: (id: string) =>
+    id === "alias.0.Kanal"
+      ? { functions: [{ _id: "enum.functions.Licht" }] }
+      : id === "alias.0.Raum"
+        ? { rooms: [{ _id: "enum.rooms.Bad" }] }
+        : undefined,
+};
+
+it("resolves room and functions control -> enum (parent walk) -> device", () => {
+  expect(
+    effectiveRoom(
+      control({ room: "enum.rooms.Kueche" }),
+      { _id: "alias.0.Kanal.SET" },
+      "enum.rooms.Bad",
+      enums,
+    ),
+  ).toBe("enum.rooms.Kueche");
+  expect(
+    effectiveRoom(control(), { _id: "alias.0.Raum.SET" }, undefined, enums),
+  ).toBe("enum.rooms.Bad");
+  expect(effectiveRoom(control(), undefined, "enum.rooms.EG", enums)).toBe(
+    "enum.rooms.EG",
+  );
+  expect(
+    effectiveFunctions(
+      control({ functions: ["enum.functions.Heizung"] }),
+      undefined,
+      undefined,
+      enums,
+    ),
+  ).toEqual(["enum.functions.Heizung"]);
+  expect(
+    effectiveFunctions(control(), { _id: "alias.0.Kanal.SET" }, [], enums),
+  ).toEqual(["enum.functions.Licht"]);
+  expect(
+    effectiveFunctions(control(), undefined, ["enum.functions.Wetter"], enums),
+  ).toEqual(["enum.functions.Wetter"]);
 });
 
 it("infers a widget from the effective shape, then the fallback", () => {
