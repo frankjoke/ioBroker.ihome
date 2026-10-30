@@ -85,10 +85,10 @@ it("gives duplicate control labels a number, without mutating the input", () => 
   ];
   expect(uniqueControlLabels(list).map((c) => c.label)).toEqual([
     "Light",
-    "Light 2",
-    "Light 3",
+    "Light2",
+    "Light3",
     "power",
-    "power 2",
+    "power2",
   ]);
   expect(list[1].label).toBe("Light");
 });
