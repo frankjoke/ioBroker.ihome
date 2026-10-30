@@ -78,14 +78,34 @@
 {/snippet}
 
 {#if show}
-  {#if icon}
+  {#if (slot.kind === "frame" || slot.kind === "html") && home === "tile"}
+    <!-- A frame/html is a surface: its icon and label sit above it, as on the
+         detail page. Beside it they would squeeze the frame out of the tile
+         (an iframe cannot shrink below its width: 100%). -->
+    <div class="slot-frame">
+      {#if icon || slot.label}
+        <div class="slot-cap">
+          {#if icon}
+            <span class="slot-icon" style:color={icon.color}>
+              <Icon
+                value={icon.glyph}
+                size={icon.size ?? 17}
+                dim={icon.disabled}
+              />
+            </span>
+          {/if}
+          {#if slot.label}<span class="slot-label">{slot.label}</span>{/if}
+        </div>
+      {/if}
+      {@render content()}
+    </div>
+  {:else if icon}
     <!-- The slot's icon and its reading, one cluster (A53): side by side when
          the line fits; the headline stacks at a 1-wide span so a 1×1 tile puts
          the icon above the value. -->
     <div
       class="slot-cluster"
       class:stack
-      class:fill={slot.kind === "frame" || slot.kind === "html"}
       data-chart-anchor={anchor ? "" : undefined}
     >
       {#if onPrimary}
@@ -132,19 +152,30 @@
     gap: 0.1rem;
   }
 
-  /* A frame/html is a surface, not a reading: with an icon beside it, the
-     cluster still takes the tile's leftover height so the iframe's 100% has a
-     definite parent to fill. */
-  .slot-cluster.fill {
+  /* The frame/html surface and its caption: the caption takes its own height
+     and the frame fills the rest; the iframe's own 100% would count the
+     caption too, so it grows instead. */
+  .slot-frame {
+    display: flex;
+    flex-direction: column;
     flex: 1 1 auto;
     width: 100%;
-    align-items: stretch;
-    flex-wrap: nowrap;
+    min-height: 0;
   }
 
-  .slot-cluster.fill > .slot-icon {
-    align-self: center;
-    flex: 0 0 auto;
+  .slot-cap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-size: var(--body-sm);
+    font-weight: 600;
+  }
+
+  .slot-frame :global(iframe) {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
   }
 
   .slot-icon {
