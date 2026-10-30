@@ -53,8 +53,8 @@ export const BREAKPOINTS: BreakpointDef[] = [
   {
     name: "phone",
     minWidth: 0,
-    tileW: 45,
-    tileH: 90,
+    tileW: 61,
+    tileH: 122,
     maxW: SIZE_MAX,
     maxH: SIZE_MAX,
   },

@@ -52,7 +52,7 @@ it("keeps the values the stylesheet needs", () => {
   expect(
     BREAKPOINTS.map((b) => [b.name, b.tileW, b.tileH, b.maxW, b.maxH]),
   ).toEqual([
-    ["phone", 45, 90, SIZE_MAX, SIZE_MAX],
+    ["phone", 61, 122, SIZE_MAX, SIZE_MAX],
     ["tablet", 51, 102, SIZE_MAX, SIZE_MAX],
     ["desktop", 57, 114, SIZE_MAX, SIZE_MAX],
   ]);

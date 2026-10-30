@@ -33,8 +33,9 @@
   const moduleSize = $derived(scaledTile(def, ui.tileScale));
 
   // How many tile modules fit on one line at this width — the page's own padding
-  // (8px each side) and the grid gap (6px), matching the CSS below.
-  const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 24));
+  // (8px each side), the section's padding/border box (14px) and the grid gap
+  // (6px), matching the CSS below.
+  const maxModules = $derived(modulesFor(width, moduleSize.w, 6, 30));
   /** A tile's width in modules — the *same* calculation the tile renders with. */
   const spanOf = (t: ResolvedTile): number =>
     effectiveSpan(t.placement.tile, bp).w;
