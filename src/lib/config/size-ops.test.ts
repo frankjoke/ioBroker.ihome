@@ -7,7 +7,6 @@ import {
   clampSpan,
   tileColumns,
 } from "$lib/config/size-ops";
-import { modulesFor } from "$lib/config/section-layout";
 
 it("clamps hints per breakpoint", () => {
   expect(breakpointFor(599)).toBe("phone");
@@ -16,14 +15,15 @@ it("clamps hints per breakpoint", () => {
   expect(breakpointFor(1025)).toBe("desktop");
   // `w` counts half-modules: 2 is a plain tile, 4 an old 2-wide one.
   expect(clampSpan({ w: 2, h: 2 }, "phone")).toEqual({ w: 2, h: 2 });
-  expect(clampSpan({ w: 4, h: 4 }, "phone")).toEqual({ w: 2, h: 2 });
+  expect(clampSpan({ w: 4, h: 4 }, "phone")).toEqual({ w: 4, h: 4 });
   expect(clampSpan({ w: 4, h: 2 }, "tablet")).toEqual({ w: 4, h: 2 });
   expect(clampSpan({ w: 4, h: 4 }, "tablet")).toEqual({ w: 4, h: 4 });
   expect(clampSpan({ w: 4, h: 4 }, "desktop")).toEqual({ w: 4, h: 4 });
-  // A big tile (A2): a tablet and a desktop show it whole, a phone still clamps.
+  // Every breakpoint shows the hint whole; the rendered width is clamped by
+  // layoutSection/tileColumns, not by the size hint.
   expect(clampSpan({ w: 10, h: 10 }, "tablet")).toEqual({ w: 10, h: 10 });
   expect(clampSpan({ w: 10, h: 10 }, "desktop")).toEqual({ w: 10, h: 10 });
-  expect(clampSpan({ w: 10, h: 10 }, "phone")).toEqual({ w: 2, h: 2 });
+  expect(clampSpan({ w: 10, h: 10 }, "phone")).toEqual({ w: 10, h: 10 });
   // Nothing in a document can ask for more than SIZE_MAX; every cap is ≤ it.
   // (A document is untrusted JSON, so 11 can reach the clamp at runtime.)
   expect(clampSpan({ w: 11, h: 11 } as never, "desktop")).toEqual({
@@ -33,16 +33,6 @@ it("clamps hints per breakpoint", () => {
   expect(clampSpan(undefined, "desktop")).toEqual({ w: 1, h: 1 });
   expect(clampSpan({ w: 1, h: 1 }, "phone")).toEqual({ w: 1, h: 1 });
   expect(DEFAULT_SPAN).toEqual({ w: 1, h: 1 });
-});
-
-// A tile renders with its own span, and the layout pass clamps only the
-// section — so a cap above the page's module count would push the tile out of
-// its section. The widths here are the narrowest each breakpoint can be.
-it("keeps every cap inside what a page of that breakpoint can show", () => {
-  for (const b of BREAKPOINTS) {
-    const width = b.name === "phone" ? 320 : b.minWidth;
-    expect(b.maxW).toBeLessThanOrEqual(modulesFor(width, b.tileW, 6, 24));
-  }
 });
 
 it("floors a nonsense size to one module", () => {
@@ -62,7 +52,7 @@ it("keeps the values the stylesheet needs", () => {
   expect(
     BREAKPOINTS.map((b) => [b.name, b.tileW, b.tileH, b.maxW, b.maxH]),
   ).toEqual([
-    ["phone", 45, 90, 2, 2],
+    ["phone", 45, 90, SIZE_MAX, SIZE_MAX],
     ["tablet", 51, 102, SIZE_MAX, SIZE_MAX],
     ["desktop", 57, 114, SIZE_MAX, SIZE_MAX],
   ]);

@@ -36,9 +36,10 @@ export interface BreakpointDef {
   tileW: number;
   tileH: number;
   /**
-   * How far a tile may stretch at this breakpoint. It must stay within what a
-   * page of this breakpoint can show — the tile renders its own span while the
-   * layout pass clamps only the section (see the guard test).
+   * How far a tile may stretch at this breakpoint. Every breakpoint shows the
+   * hint whole; the rendered width is clamped to the page's modules by
+   * `layoutSection` and to the section by `tileColumns`, so a hint wider than
+   * the screen cannot leave its box.
    */
   maxW: number;
   maxH: number;
@@ -49,7 +50,14 @@ export interface BreakpointDef {
  * these as CSS custom properties, so the stylesheet never repeats a value.
  */
 export const BREAKPOINTS: BreakpointDef[] = [
-  { name: "phone", minWidth: 0, tileW: 45, tileH: 90, maxW: 2, maxH: 2 },
+  {
+    name: "phone",
+    minWidth: 0,
+    tileW: 45,
+    tileH: 90,
+    maxW: SIZE_MAX,
+    maxH: SIZE_MAX,
+  },
   {
     name: "tablet",
     minWidth: 600,

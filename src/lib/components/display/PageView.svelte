@@ -72,8 +72,8 @@
 
 <style>
   .page {
-    /* Sections flow: as many per row as the width allows, the rest wrap. A
-       phone stacks them (base breakpoint — the same 600px size-ops uses). */
+    /* Sections flow at every width: as many per row as the width allows, the
+       rest wrap. A phone is a narrow desktop, not a one-section column. */
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -95,12 +95,6 @@
     flex-basis: 100%;
     height: 0;
     margin: 0;
-  }
-
-  @media (max-width: 599px) {
-    .page {
-      flex-direction: column;
-    }
   }
 
   .empty {
