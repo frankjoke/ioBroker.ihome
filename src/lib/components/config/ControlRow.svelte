@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Control } from "$lib/types/device";
   import { getPickerValue } from "$lib/picker-values.svelte.js";
-  import { formatAge, formatValue } from "$lib/config/format";
+  import { formatAge, formatValue, splitReading } from "$lib/config/format";
+  import { effectiveCommon } from "$lib/config/state-meta";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { applyRead } from "$lib/utils/transform";
   import { computeVirtual, type LocalControl } from "$lib/config/virtual-ops";
@@ -57,7 +58,11 @@
   const valueLabel = $derived.by(() => {
     const l = live();
     if (!l) return "…";
-    return `${formatValue(l.val, control.unit)} · ${formatAge(l.ts)}`;
+    const id = stateIdFor(control.stateId ?? "", getVariables());
+    const meta = effectiveCommon(control, ioBroker.objects.get(id));
+    const parts = splitReading(l.val, meta.unit, undefined, meta.states);
+    const reading = parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
+    return `${reading} · ${formatAge(l.ts)}`;
   });
 
   function liveOf(c: Control): unknown {

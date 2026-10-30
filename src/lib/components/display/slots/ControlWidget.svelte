@@ -1,7 +1,8 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
-  import { formatValue } from "$lib/config/format";
+  import { splitReading } from "$lib/config/format";
+  import { normalizeStates } from "$lib/config/state-meta";
   import { levelRange } from "$lib/config/features";
   import type { EnrichedControl } from "$lib/types/device";
 
@@ -30,23 +31,33 @@
   }
 
   function enumOptions(): { value: string; label: string }[] {
-    const states = control.object?.common?.states;
-    if (!states) return [];
-    if (Array.isArray(states)) {
-      return states.map((label: unknown, i: number) => ({
-        value: String(i),
-        label: String(label),
-      }));
-    }
-    return Object.entries(states as Record<string, unknown>).map(
-      ([value, label]) => ({ value, label: String(label) }),
+    // The corrected map wins over the broker object (spec §6); raw states carry
+    // their own states through the resolver.
+    const states = normalizeStates(
+      control.meta?.states ?? control.states ?? control.object?.common?.states,
     );
+    return states
+      ? Object.entries(states).map(([value, label]) => ({ value, label }))
+      : [];
   }
 
   const common = $derived(
     (control.object?.common ?? {}) as Record<string, any>,
   );
-  const range = $derived(levelRange(common, options));
+  const range = $derived(
+    levelRange((control.meta ?? common) as Record<string, unknown>, options),
+  );
+
+  /** The mono readout with the effective unit and states labels. */
+  function readout(): string {
+    const parts = splitReading(
+      control.liveValue,
+      control.meta?.unit ?? control.unit,
+      undefined,
+      normalizeStates(control.meta?.states ?? control.states),
+    );
+    return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
+  }
   /** The readout's own homes; absent = both. `hideValue` turns it off entirely. */
   const valueWhere = $derived(
     options.valueWhere === "tile" || options.valueWhere === "modal"
@@ -93,7 +104,7 @@
       onchange={(e) => write(Number(e.currentTarget.value))}
     />
     {#if showValue}
-      <span class="mono">{formatValue(control.liveValue, control.unit)}</span>
+      <span class="mono">{readout()}</span>
     {/if}
   </div>
 {:else if control.widget === "color"}
@@ -136,7 +147,7 @@
     Press
   </button>
 {:else}
-  <span class="mono">{formatValue(control.liveValue, control.unit)}</span>
+  <span class="mono">{readout()}</span>
 {/if}
 
 <style>

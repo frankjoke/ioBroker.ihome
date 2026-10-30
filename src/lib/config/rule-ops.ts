@@ -10,8 +10,10 @@ import {
   type Scope,
   type ScopeExtras,
 } from "$lib/config/virtual-ops";
-import { formatAge, formatValue } from "$lib/config/format";
+import { formatAge, splitReading } from "$lib/config/format";
+import { normalizeStates } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
+import type { ControlMeta } from "$lib/types/device";
 
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
 
@@ -291,6 +293,8 @@ export interface BadgeControl {
   hidden?: boolean;
   liveValue?: unknown;
   unit?: string;
+  states?: Record<string, string> | string[];
+  meta?: ControlMeta;
   rules?: Rule[];
 }
 
@@ -340,11 +344,17 @@ function controlBadge(
   // Colour precedence: a matched rule's colour, then a matched rule's tone,
   // then the slot's static colour, then the tone default (`info`).
   const explicitTone = TONES.includes(style.tone as BadgeTone);
+  const parts = splitReading(
+    control.liveValue,
+    slot.unit ?? control.meta?.unit ?? control.unit,
+    undefined,
+    normalizeStates(control.meta?.states ?? control.states),
+  );
   return {
     source: String(slot.source),
     icon: style.icon ?? "info",
     tone: toneOf(style),
-    label: formatValue(control.liveValue, slot.unit ?? control.unit),
+    label: parts.unit ? `${parts.value} ${parts.unit}` : parts.value,
     color:
       style.color ??
       (explicitTone ? undefined : badgeColor(slot.options?.color)),

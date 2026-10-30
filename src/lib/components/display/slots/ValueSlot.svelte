@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { splitValueUnit } from "$lib/config/format";
+  import { splitReading } from "$lib/config/format";
+  import { normalizeStates } from "$lib/config/state-meta";
   import type { Slot } from "$lib/types/display";
   import type { SlotControl } from "$lib/types/device";
 
@@ -25,7 +26,7 @@
 
   const parts = $derived(
     control
-      ? splitValueUnit(
+      ? splitReading(
           control.liveValue,
           // `hideUnit` drops the unit to save width; a boolean's unit is its
           // OFF/ON label and stays either way. `decimals` is the precision
@@ -34,6 +35,7 @@
             ? undefined
             : (slot.unit ?? control.unit),
           decimals,
+          normalizeStates(control.states),
         )
       : { value: "—", unit: "" },
   );

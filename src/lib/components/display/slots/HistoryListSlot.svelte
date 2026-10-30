@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { formatAge, formatValue } from "$lib/config/format";
+  import { formatAge, splitReading } from "$lib/config/format";
+  import { normalizeStates } from "$lib/config/state-meta";
   import {
     ensureHistory,
     noteLive,
@@ -30,6 +31,17 @@
   const rows = $derived(
     entry?.series?.length ? entry.series.slice(-count).reverse() : [],
   );
+
+  /** A sample with the effective unit and states label. */
+  function reading(v: unknown): string {
+    const parts = splitReading(
+      v,
+      control.meta?.unit ?? control.unit,
+      undefined,
+      normalizeStates(control.meta?.states ?? control.states),
+    );
+    return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
+  }
 </script>
 
 {#if spec && rows.length}
@@ -37,7 +49,7 @@
     {#each rows as p (p.ts)}
       <li>
         <span class="ago text-muted">{formatAge(p.ts)}</span>
-        <span class="val mono">{formatValue(p.val, control.unit)}</span>
+        <span class="val mono">{reading(p.val)}</span>
       </li>
     {/each}
   </ul>

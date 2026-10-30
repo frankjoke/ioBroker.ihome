@@ -5,6 +5,7 @@ import {
   formatNumber,
   formatSlotText,
   formatValue,
+  splitReading,
   splitValueUnit,
 } from "$lib/config/format";
 
@@ -72,6 +73,19 @@ it("splits a slot's value from its unit so the unit can be styled apart", () => 
   expect(splitValueUnit(null, "°C")).toEqual({ value: "—", unit: "" });
   expect(splitValueUnit(undefined, "°C")).toEqual({ value: "—", unit: "" });
   expect(splitValueUnit("abc", "x")).toEqual({ value: "abc", unit: "x" });
+});
+
+it("renders a states label without a unit", () => {
+  expect(splitReading(1, "°C", undefined, { "1": "Heizung" })).toEqual({
+    value: "Heizung",
+    unit: "",
+  });
+  expect(splitReading(1.234, "kW", 1)).toEqual({ value: "1.2", unit: "kW" });
+  expect(splitReading(false, "Aus/Ein")).toEqual({ value: "Aus", unit: "" });
+  expect(splitReading(2, "°C", undefined, { "1": "Heizung" })).toEqual({
+    value: "2",
+    unit: "°C",
+  });
 });
 
 it("rounds a reading to its slot's precision, trailing zeros dropped", () => {

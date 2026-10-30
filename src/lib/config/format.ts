@@ -56,17 +56,30 @@ export function formatNumber(v: unknown, decimals?: number): string {
  * consumed as the label and never repeated; a missing value shows "—" with no
  * unit, because "— °C" is noise.
  */
-export function splitValueUnit(
+export function splitReading(
   v: unknown,
   unit?: string,
   decimals?: number,
+  states?: Record<string, string>,
 ): { value: string; unit: string } {
   if (v === null || v === undefined) return { value: "—", unit: "" };
+  // A states label is the whole reading: "Standby °C" would be noise.
+  const label = states?.[String(v)];
+  if (label !== undefined) return { value: label, unit: "" };
   if (typeof v === "boolean") {
     return { value: formatBoolean(v, unit || "Off/On"), unit: "" };
   }
   if (typeof v === "object") return { value: JSON.stringify(v), unit: "" };
   return { value: formatNumber(v, decimals), unit: unit ? String(unit) : "" };
+}
+
+/** The same split without a states map (the pre-metadata contract). */
+export function splitValueUnit(
+  v: unknown,
+  unit?: string,
+  decimals?: number,
+): { value: string; unit: string } {
+  return splitReading(v, unit, decimals);
 }
 
 /**
