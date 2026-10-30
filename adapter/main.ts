@@ -122,12 +122,14 @@ class IHome extends utils.Adapter {
    * config is loaded and again whenever the SPA edits the list.
    */
   private async loadVariables(): Promise<void> {
+    this.log.debug(`Loading ${CONFIG_FOLDER}.variableList`);
     const st = await this.getStateAsync(`${CONFIG_FOLDER}.variableList`);
     let doc: unknown = st?.val;
     if (typeof doc === "string") {
       try {
         doc = JSON.parse(doc);
       } catch {
+        this.log.debug(`${CONFIG_FOLDER}.variableList is not valid JSON`);
         doc = null;
       }
     }
@@ -161,6 +163,9 @@ class IHome extends utils.Adapter {
   }
 
   private async onReady(): Promise<void> {
+    this.log.debug(
+      `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
+    );
     for (const name of DOCS) {
       const target = `${CONFIG_FOLDER}.${name}`;
       await this.setObjectNotExistsAsync(target, {
@@ -177,6 +182,15 @@ class IHome extends utils.Adapter {
       });
 
       const current = await this.getStateAsync(target);
+      this.log.debug(
+        `Document ${target}: ${
+          current?.val == null
+            ? "empty"
+            : isPlaceholder(current.val)
+              ? "placeholder"
+              : "present"
+        }`,
+      );
       if (current?.val == null || isPlaceholder(current.val)) {
         // oldest first: the test namespace, then the plain state in the root
         const fromLegacy = await this.getForeignStateAsync(
@@ -185,6 +199,13 @@ class IHome extends utils.Adapter {
         const fromRoot = await this.getStateAsync(name);
         const source = fromLegacy?.val != null ? fromLegacy : fromRoot;
         if (source?.val != null) {
+          this.log.debug(
+            `Document ${target}: copying from ${
+              fromLegacy?.val != null
+                ? "the legacy namespace"
+                : "the root state"
+            }`,
+          );
           await this.setStateAsync(target, { val: source.val, ack: true });
           this.log.info(`Copied ${name} to ${this.namespace}.${target}`);
         }
@@ -201,6 +222,9 @@ class IHome extends utils.Adapter {
           );
         } else {
           await this.delObjectAsync(name);
+          this.log.debug(
+            `Document ${target}: removing the old root state ${name}`,
+          );
           this.log.info(`Removed the old root state ${this.namespace}.${name}`);
         }
       }
@@ -212,6 +236,7 @@ class IHome extends utils.Adapter {
     this.subscribeStates(`${CONFIG_FOLDER}.variableList`);
     this.on("stateChange", (id, state) => {
       if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList` && state) {
+        this.log.debug(`${CONFIG_FOLDER}.variableList changed; reloading`);
         void this.loadVariables();
       }
     });
@@ -224,6 +249,7 @@ class IHome extends utils.Adapter {
   }
 
   private onUnload(callback: () => void): void {
+    this.log.debug("Unload: stopping the heartbeat");
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = undefined;
