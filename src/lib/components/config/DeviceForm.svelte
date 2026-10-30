@@ -7,7 +7,10 @@
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { projectDevice } from "$lib/config/project";
   import { ancestorObjects, parentName } from "$lib/config/state-tree";
-  import { applyPickedState } from "$lib/config/control-ops";
+  import {
+    applyPickedState,
+    uniqueControlLabels,
+  } from "$lib/config/control-ops";
   import {
     roleLabel,
     suggestDeviceType,
@@ -162,7 +165,9 @@
 
   function addStates(newControls: Control[]) {
     const wasEmpty = controls.length === 0;
-    controls = [...controls, ...newControls];
+    // Two switches of the same light both arrive labelled "Light": number the
+    // repeats so a control can be told apart in the tile editor.
+    controls = uniqueControlLabels([...controls, ...newControls]);
     // A control may name a variable; its real state answers the room and type
     // questions (the picker stores the bare name on purpose).
     const variables = getVariables();
@@ -257,7 +262,7 @@
     // belong to the page/template editors, so they are carried over untouched —
     // an edit here must never delete them.
     const before = device?.controls ?? [];
-    const controlsWithRules = controls.map((c) => {
+    const controlsWithRules = uniqueControlLabels(controls).map((c) => {
       const prev = before.find((k) => k.id === c.id);
       return prev?.rules ? { ...c, rules: prev.rules } : c;
     });

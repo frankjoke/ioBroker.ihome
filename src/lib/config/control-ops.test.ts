@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyPickedState } from "./control-ops";
+import { applyPickedState, uniqueControlLabels } from "./control-ops";
 import type { Control } from "$lib/types/device";
 
 const row = (over: Partial<Control> = {}): Control => ({
@@ -73,4 +73,22 @@ describe("applyPickedState", () => {
       aggregate: "average",
     });
   });
+});
+
+it("gives duplicate control labels a number, without mutating the input", () => {
+  const list = [
+    row({ id: "a", label: "Light" }),
+    row({ id: "b", label: "Light" }),
+    row({ id: "c", label: "Light" }),
+    row({ id: "d", label: undefined, feature: "power" }),
+    row({ id: "e", label: undefined, feature: "power" }),
+  ];
+  expect(uniqueControlLabels(list).map((c) => c.label)).toEqual([
+    "Light",
+    "Light 2",
+    "Light 3",
+    "power",
+    "power 2",
+  ]);
+  expect(list[1].label).toBe("Light");
 });
