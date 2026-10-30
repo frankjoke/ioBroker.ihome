@@ -82,6 +82,21 @@ export interface HistorySpec {
   aggregate?: HistoryAggregate;
 }
 
+/** What a control's state really is, after the control's correction beats the
+ *  broker object's `common` (spec §3): one merge, read by rendering and slots. */
+export interface ControlMeta {
+  name?: string;
+  role?: string;
+  type?: string;
+  states?: Record<string, string>;
+  unit?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  read?: boolean;
+  write?: boolean;
+}
+
 export interface Control {
   id: string;
   kind?: "state" | "virtual";
@@ -97,6 +112,18 @@ export interface Control {
   history?: HistorySpec;
   rules?: Rule[];
   common?: ControlCommon;
+  // Corrections over the broker object (spec §3); all optional.
+  role?: string;
+  type?: string;
+  states?: Record<string, string> | string[];
+  hideUnit?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  read?: boolean;
+  write?: boolean;
+  room?: string;
+  functions?: string[];
 }
 
 export interface Device {
@@ -143,6 +170,8 @@ export interface EnrichedControl extends Control {
   object?: any;
   widget?: Widget;
   virtualError?: string;
+  /** The effective metadata: control correction → object → defaults. */
+  meta?: ControlMeta;
 }
 
 /**
