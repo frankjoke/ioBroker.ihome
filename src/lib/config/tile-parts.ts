@@ -203,6 +203,30 @@ export function stateLook(
   return tile.look?.[active ? "active" : "inactive"] ?? {};
 }
 
+/** The glyph of the tile's face: the state's look, then the tile's own icon,
+ *  then the headline slot's icon. The slot icon stays the row's own. */
+export function faceGlyph(
+  look: StateLook,
+  tileIcon?: string,
+  slotGlyph?: string,
+): string | undefined {
+  return look.glyph ?? tileIcon ?? slotGlyph;
+}
+
+/** The icon before the tile name (detail header): the tile's own icon, then
+ *  the state's look, then the headline slot's icon, then the device's face. */
+export function headerIcon(
+  tileIcon: string | undefined,
+  look: StateLook,
+  headline?: { glyph: string; color?: string; disabled?: boolean },
+  deviceIcon?: string,
+): { glyph: string; color?: string; disabled?: boolean } | undefined {
+  if (tileIcon) return { glyph: tileIcon };
+  if (look.glyph) return { glyph: look.glyph, color: look.color };
+  if (headline) return headline;
+  return deviceIcon ? { glyph: deviceIcon } : undefined;
+}
+
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
  *  there — the last matching rule's glyph beats the descriptor's, and a glyph the
  *  template gave gives way to the device's own icon (A67). */

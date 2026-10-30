@@ -124,6 +124,8 @@
   let iconPickerFor = $state<number | null>(null);
   /** The active look's glyph picker (A71). */
   let lookIconFor = $state<"active" | "inactive" | null>(null);
+  /** The tile's own icon picker (A72): separate from every slot's icon. */
+  let tileIconPicker = $state(false);
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -950,6 +952,42 @@
           </span>
         {/if}
       </div>
+    </div>
+
+    <div class="field">
+      <div class="row">
+        <span class="label-mono">Tile icon</span>
+        <button
+          type="button"
+          class="btn btn-sm glyph-pick"
+          title={tile?.tile?.icon
+            ? `Tile icon: ${tile.tile.icon} — click to change`
+            : "Choose the tile's own icon"}
+          onclick={() => (tileIconPicker = true)}
+        >
+          {#if tile?.tile?.icon}
+            <Icon value={tile.tile.icon} size={18} />
+          {:else}
+            Choose glyph…
+          {/if}
+        </button>
+        {#if tile?.tile?.icon}
+          <button
+            type="button"
+            class="icon-btn"
+            title="Clear tile icon"
+            aria-label="Clear tile icon"
+            onclick={() => edit((t) => ({ ...t, icon: undefined }))}
+          >
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        {/if}
+      </div>
+      <p class="note text-muted">
+        Shown before the tile name on its detail page and as the tile face
+        default. Each slot keeps its own icon; a state look glyph still wins on
+        the face.
+      </p>
     </div>
 
     <div class="field">
@@ -2079,6 +2117,18 @@
         });
       }}
       onClose={() => (iconPickerFor = null)}
+    />
+  {/if}
+
+  {#if tileIconPicker}
+    <IconPicker
+      icon={tile?.tile?.icon}
+      onPick={(value) => {
+        const glyph = value.trim();
+        tileIconPicker = false;
+        edit((t) => ({ ...t, icon: glyph || undefined }));
+      }}
+      onClose={() => (tileIconPicker = false)}
     />
   {/if}
 

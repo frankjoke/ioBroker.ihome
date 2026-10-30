@@ -8,6 +8,8 @@
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
+    faceGlyph,
+    headerIcon,
     headlineSlot,
     rowIcon,
     rowSpark,
@@ -314,7 +316,11 @@
     const where = r.slot.icon?.where ?? "both";
     if (where !== "both" && where !== "tile") return undefined;
     const icon = rowIcon(r, "tile", device.objectIcon);
-    const glyph = lk.glyph ?? icon?.glyph;
+    const glyph = faceGlyph(
+      lk,
+      main ? workingTile?.icon : undefined,
+      icon?.glyph,
+    );
     if (!glyph) return undefined;
     return {
       glyph,
@@ -368,7 +374,8 @@
   // descriptor and homes. The header deliberately does not consult the row's
   // visibility — a conditionally hidden headline still greets its own page.
   const headIcon = $derived.by(() => {
-    // A54: the headline's own icon greets the name…
+    // A54/A72: the tile's own icon, then its state look, then the headline's
+    // icon, then the device's face (A67).
     const own = headline
       ? rowIcon(
           {
@@ -379,9 +386,7 @@
           device.objectIcon,
         )
       : undefined;
-    if (own) return own;
-    // …else the device's own face (A67): the icon its objects carry.
-    return device.objectIcon ? { glyph: device.objectIcon } : undefined;
+    return headerIcon(workingTile?.icon, look, own, device.objectIcon);
   });
 
   // What the sheet's Detail Page checkbox asks about (A47): the tile's own

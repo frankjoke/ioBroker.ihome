@@ -2,6 +2,8 @@ import { it, expect } from "vitest";
 import {
   CHART_PALETTE,
   hasHistory,
+  faceGlyph,
+  headerIcon,
   headlineSlot,
   rowIcon,
   rowSpark,
@@ -638,4 +640,25 @@ it("reads a tile's state look, the inactive one as its default (A71)", () => {
   expect(stateLook(undefined, true)).toEqual({});
   // The state without its own entry keeps the rules.
   expect(stateLook(on({ look: { active: look.active } }), false)).toEqual({});
+});
+
+it("the tile icon is separate from the headline slot icon", () => {
+  // Face: state look → tile icon → headline slot icon.
+  expect(faceGlyph({ glyph: "look" }, "tile", "slot")).toBe("look");
+  expect(faceGlyph({}, "tile", "slot")).toBe("tile");
+  expect(faceGlyph({}, undefined, "slot")).toBe("slot");
+  // Header: tile icon → state look → headline slot icon → device icon.
+  expect(
+    headerIcon("tile", { glyph: "look" }, { glyph: "slot" }, "device"),
+  ).toEqual({ glyph: "tile" });
+  expect(
+    headerIcon(undefined, { glyph: "look", color: "red" }, { glyph: "slot" }),
+  ).toEqual({ glyph: "look", color: "red" });
+  expect(headerIcon(undefined, {}, { glyph: "slot" })).toEqual({
+    glyph: "slot",
+  });
+  expect(headerIcon(undefined, {}, undefined, "device")).toEqual({
+    glyph: "device",
+  });
+  expect(headerIcon(undefined, {})).toBeUndefined();
 });
