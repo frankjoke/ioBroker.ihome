@@ -232,15 +232,19 @@
     html: "code",
   };
 
-  /** The kinds the Icon block is offered on (A57) — data-bearing slots, not
-   *  badges, frames or charts. The renderer stays generic: it draws any
-   *  descriptor a document carries. */
+  /** The kinds the Icon block is offered on (A57). Every rendered slot can
+   *  carry its own icon, including switches, raw states, history lists and
+   *  frames; only badges get their glyph from the badge renderer (rule/icon),
+   *  so the block would be a no-op there. */
   const ICON_KINDS: SlotKind[] = [
     "value",
+    "switch",
     "level",
     "color",
     "enum",
     "button",
+    "history-list",
+    "frame",
     "html",
   ];
 
