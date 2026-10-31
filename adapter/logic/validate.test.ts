@@ -168,7 +168,12 @@ it("accepts a $init row and an expression init state", () => {
         kind: "machine",
         inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" } } },
         init: {
-          state: { op: "if", cond: { ref: "p" }, then: { const: "A" }, else: { const: "B" } },
+          state: {
+            op: "if",
+            cond: { ref: "p" },
+            then: { const: "A" },
+            else: { const: "B" },
+          },
           run: true,
         },
         states: {
@@ -179,4 +184,28 @@ it("accepts a $init row and an expression init state", () => {
     ],
   };
   expect(validateLogicDocument(doc)).toEqual([]);
+});
+
+it("rejects an unknown event source", () => {
+  const bad: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "s",
+        name: "S",
+        kind: "machine",
+        inputs: {
+          e: {
+            from: { type: "state", ref: "0_userdata.0.E" },
+            kind: "event",
+            source: "nope" as never,
+          },
+        },
+        states: { A: {} },
+      },
+    ],
+  };
+  expect(
+    validateLogicDocument(bad).some((i) => i.path === "inputs.e.source"),
+  ).toBe(true);
 });

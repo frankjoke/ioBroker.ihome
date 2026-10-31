@@ -241,7 +241,7 @@ class IHome extends utils.Adapter {
             return undefined;
           },
         },
-        { ownFrom: `system.adapter.${this.namespace}` },
+        { ownFrom: this.namespace },
       );
     } catch (error) {
       this.log.warn(`logic engine not rebuilt: ${error}`);
@@ -340,6 +340,9 @@ class IHome extends utils.Adapter {
     const state = {
       val: coerceStateValue(value, this.stateTypes.get(id)) as never,
       ack,
+      // Short, stable origin for other adapters/scripts and the engine's
+      // self-attribution (the SPA and the JS adapter both see it).
+      from: this.namespace,
     };
     const fail = (error: unknown) =>
       this.log.warn(`logic: cannot write ${id}: ${error}`);

@@ -119,6 +119,19 @@
             <option value="false">commands only</option>
             <option value="true">confirmations only</option>
           </select>
+          <select
+            aria-label={`Source for ${name}`}
+            value={input.source ?? "external"}
+            onchange={(e) =>
+              update(name, {
+                ...input,
+                source: e.currentTarget.value as "external" | "self" | "any",
+              })}
+          >
+            <option value="external">external sources</option>
+            <option value="self">own writes</option>
+            <option value="any">any source</option>
+          </select>
         {/if}
       {:else if input.from.type === "memory"}
         <input
@@ -144,6 +157,21 @@
           <option value="variable">variable</option>
           <option value="event">event</option>
         </select>
+        {#if (input.kind ?? "variable") === "event"}
+          <select
+            aria-label={`Source for ${name}`}
+            value={input.source ?? "external"}
+            onchange={(e) =>
+              update(name, {
+                ...input,
+                source: e.currentTarget.value as "external" | "self" | "any",
+              })}
+          >
+            <option value="external">external sources</option>
+            <option value="self">own writes</option>
+            <option value="any">any source</option>
+          </select>
+        {/if}
       {:else}
         <input
           class="mono"

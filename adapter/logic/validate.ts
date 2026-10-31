@@ -132,6 +132,14 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         if (typeof source.ref !== "string" || !source.ref) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
         }
+        if (
+          input.source !== undefined &&
+          input.source !== "external" &&
+          input.source !== "self" &&
+          input.source !== "any"
+        ) {
+          add(id, `inputs.${name}.source`, "unknown event source");
+        }
       } else {
         add(id, `inputs.${name}.from.type`, "unknown source type");
       }
@@ -157,7 +165,12 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       }
       checkOutput(id, logic.output, new Set(), add);
       if (logic.init?.state !== undefined || logic.init?.match !== undefined) {
-        add(id, "init", "init.state/init.match are ignored for function logics", "warn");
+        add(
+          id,
+          "init",
+          "init.state/init.match are ignored for function logics",
+          "warn",
+        );
       }
     } else if (logic.kind === "machine") {
       if (!isRecord(logic.states)) {
@@ -292,11 +305,7 @@ function checkInit(
   if (!init) return;
   if (init.match !== undefined) {
     const output = logic.output;
-    if (
-      init.match !== "output" ||
-      output?.scope !== "state" ||
-      !output.map
-    ) {
+    if (init.match !== "output" || output?.scope !== "state" || !output.map) {
       add(
         id,
         "init.match",

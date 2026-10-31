@@ -23,6 +23,8 @@ export interface Input {
   mode?: "changed" | "any";
   /** Event + state inputs only. Default "any". */
   ack?: "any" | "true" | "false";
+  /** Event inputs only: which writers may trigger. Default "external". */
+  source?: "external" | "self" | "any";
 }
 
 export type Forward = "changed" | "always";

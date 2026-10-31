@@ -73,11 +73,21 @@ interface Runtime {
   init: boolean;
 }
 
+interface EventMeta {
+  /** Writer: an adapter instance, `memory:<logicId>`, `timer`, or `init`. */
+  from: string;
+  /** True when this very logic caused the change. */
+  self: boolean;
+  ack?: boolean;
+  ts?: number;
+}
+
 interface Job {
   rt: Runtime;
   input: string;
   value: unknown;
   depth: number;
+  meta: EventMeta;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -157,6 +167,12 @@ export function createEngine(
   }
 
   const queue: Job[] = [];
+  /** Writes this engine made, per state id, for self-attribution. */
+  const pendingWrites = new Map<
+    string,
+    Array<{ value: unknown; logicId: string }>
+  >();
+  let currentMeta: EventMeta = { from: "", self: false };
   let running = false;
   let started = false;
   let chainSeen = new Set<string>();
@@ -167,6 +183,10 @@ export function createEngine(
 
   function resolveIn(rt: Runtime, ref: string): unknown {
     if (ref === "$init") return rt.init;
+    if (ref === "$from") return currentMeta.from;
+    if (ref === "$self") return currentMeta.self;
+    if (ref === "$ack") return currentMeta.ack;
+    if (ref === "$ts") return currentMeta.ts;
     const input = rt.inputs.get(ref);
     if (input) {
       if (input.input.from.type === "memory") {
@@ -261,10 +281,16 @@ export function createEngine(
       return;
     }
     chainSeen.add(key);
-    if (job.rt.def.kind === "function") {
-      runFunction(job.rt, job.depth);
-    } else {
-      handleMachine(job);
+    const previousMeta = currentMeta;
+    currentMeta = job.meta;
+    try {
+      if (job.rt.def.kind === "function") {
+        runFunction(job.rt, job.depth);
+      } else {
+        handleMachine(job);
+      }
+    } finally {
+      currentMeta = previousMeta;
     }
   }
 
@@ -382,6 +408,7 @@ export function createEngine(
     value: unknown,
     forward: Forward | undefined,
     depth: number,
+    producer: string,
   ): void {
     if (
       (forward ?? "changed") === "changed" &&
@@ -391,7 +418,7 @@ export function createEngine(
       return;
     }
     memory.set(name, value);
-    emitMemory(name, value, depth + 1);
+    emitMemory(name, value, depth + 1, producer);
   }
 
   function writeTarget(
@@ -405,27 +432,50 @@ export function createEngine(
     const input = rt.inputs.get(ref);
     if (input) {
       if (input.input.from.type === "memory") {
-        writeMemory(input.input.from.ref, value, forward, depth);
+        writeMemory(input.input.from.ref, value, forward, depth, rt.def.id);
       } else if (input.stateId) {
-        writeState(input.stateId, value, ack, forward);
+        writeState(rt, input.stateId, value, ack, forward);
       }
       return;
     }
     if (declaredMemory.has(ref) || memory.has(ref)) {
-      writeMemory(ref, value, forward, depth);
+      writeMemory(ref, value, forward, depth, rt.def.id);
       return;
     }
     if (ref.includes(".")) {
-      writeState(ref, value, ack, forward);
+      writeState(rt, ref, value, ack, forward);
       return;
     }
     const variable = deps.resolveVariable?.(ref);
-    if (variable?.kind === "state")
-      writeState(variable.stateId, value, ack, forward);
-    else warn(rt.def.id, `cannot write ${ref}: not a state or memory name`);
+    if (variable?.kind === "state") {
+      writeState(rt, variable.stateId, value, ack, forward);
+    } else {
+      warn(rt.def.id, `cannot write ${ref}: not a state or memory name`);
+    }
+  }
+
+  function noteWrite(id: string, value: unknown, logicId: string): void {
+    const list = pendingWrites.get(id) ?? [];
+    list.push({ value, logicId });
+    if (list.length > 32) list.shift();
+    pendingWrites.set(id, list);
+  }
+
+  function claimWrite(
+    id: string,
+    from: string,
+    value: unknown,
+  ): string | undefined {
+    if (!ownFrom || !from.startsWith(ownFrom)) return undefined;
+    const list = pendingWrites.get(id);
+    if (!list) return undefined;
+    const index = list.findIndex((entry) => Object.is(entry.value, value));
+    if (index < 0) return undefined;
+    return list.splice(index, 1)[0].logicId;
   }
 
   function writeState(
+    rt: Runtime,
     id: string,
     value: unknown,
     ack: boolean,
@@ -437,6 +487,7 @@ export function createEngine(
     ) {
       return;
     }
+    noteWrite(id, value, rt.def.id);
     deps.write(id, value, ack);
   }
 
@@ -489,13 +540,14 @@ export function createEngine(
       rt.hasOutput = true;
       // The stored memory value is the reference (spec §5.6), not the last
       // write of this logic: a seeded value must not emit an event.
-      writeMemory(name, value, output.forward, depth);
+      writeMemory(name, value, output.forward, depth, rt.def.id);
       return;
     }
     const mapped = outputValue(rt, value);
     if (!forwardAllows(rt, mapped, output.forward)) return;
     rt.lastOutput = mapped;
     rt.hasOutput = true;
+    noteWrite(output.ref, mapped, rt.def.id);
     deps.write(output.ref, mapped, true);
   }
 
@@ -508,14 +560,28 @@ export function createEngine(
     transition(rt, chosen, 0);
     if (def.init?.run === true) {
       // The `$init` rows run after entering, with $init true.
-      handleMachine({ rt, input: "$init", value: true, depth: 0 });
+      handleMachine({
+        rt,
+        input: "$init",
+        value: true,
+        depth: 0,
+        meta: { from: "init", self: true, ts: deps.now() },
+      });
     }
     rt.init = false;
   }
 
-  function chooseStart(rt: Runtime, def: MachineLogic, names: string[]): string {
+  function chooseStart(
+    rt: Runtime,
+    def: MachineLogic,
+    names: string[],
+  ): string {
     const init = def.init;
-    if (init?.match === "output" && rt.output.scope === "state" && rt.output.map) {
+    if (
+      init?.match === "output" &&
+      rt.output.scope === "state" &&
+      rt.output.map
+    ) {
       const current = deps.read(rt.output.ref);
       for (const name of names) {
         if (Object.is(rt.output.map[name], current)) return name;
@@ -548,24 +614,55 @@ export function createEngine(
       if (!started) return;
       input.last = deps.now();
       input.hasLast = true;
-      enqueue({ rt, input: input.name, value: input.last, depth: 0 });
+      enqueue({
+        rt,
+        input: input.name,
+        value: input.last,
+        depth: 0,
+        meta: { from: "timer", self: true, ts: deps.now() },
+      });
       armTimer(rt, input);
     }, ms);
     rt.timers.set(input.name, handle);
   }
 
-  function emitMemory(name: string, value: unknown, depth: number): void {
+  function emitMemory(
+    name: string,
+    value: unknown,
+    depth: number,
+    producer: string,
+  ): void {
     for (const rt of runtimes) {
       for (const input of rt.inputs.values()) {
         if (
-          input.input.kind === "event" &&
-          input.input.from.type === "memory" &&
-          input.input.from.ref === name
+          input.input.kind !== "event" ||
+          input.input.from.type !== "memory" ||
+          input.input.from.ref !== name
         ) {
-          enqueue({ rt, input: input.name, value, depth });
+          continue;
         }
+        const self = producer === rt.def.id;
+        if (!sourceAllows(input, self)) continue;
+        enqueue({
+          rt,
+          input: input.name,
+          value,
+          depth,
+          meta: {
+            from: `memory:${producer}`,
+            self,
+            ack: false,
+            ts: deps.now(),
+          },
+        });
       }
     }
+  }
+
+  function sourceAllows(input: InputRuntime, self: boolean): boolean {
+    const source = input.input.source ?? "external";
+    if (source === "any") return true;
+    return source === "self" ? self : !self;
   }
 
   function ackMatches(filter: Input["ack"], ack: boolean | undefined): boolean {
@@ -608,11 +705,13 @@ export function createEngine(
     },
     onStateChange(change) {
       if (!started) return;
-      if (ownFrom && change.from?.startsWith(ownFrom)) return;
+      const writer = claimWrite(change.id, change.from ?? "", change.val);
       for (const rt of runtimes) {
+        const self = writer === rt.def.id;
         for (const input of rt.inputs.values()) {
           if (input.stateId !== change.id) continue;
           if ((input.input.kind ?? "variable") !== "event") continue;
+          if (!sourceAllows(input, self)) continue;
           if (input.input.mode === "any") {
             // every update counts, even the same value
           } else if (input.hasLast && Object.is(input.last, change.val)) {
@@ -622,7 +721,18 @@ export function createEngine(
           if (!ackMatches(input.input.ack, change.ack)) continue;
           input.last = change.val;
           input.hasLast = true;
-          enqueue({ rt, input: input.name, value: change.val, depth: 0 });
+          enqueue({
+            rt,
+            input: input.name,
+            value: change.val,
+            depth: 0,
+            meta: {
+              from: change.from ?? "",
+              self,
+              ack: change.ack,
+              ts: change.ts,
+            },
+          });
         }
       }
     },

@@ -79,12 +79,168 @@ it("honours the ack filter", () => {
   expect(h.writes).toHaveLength(base + 1);
 });
 
-it("ignores its own writes", () => {
-  const { h, engine } = engineWith(doc());
+it("ignores its own output echo by default", () => {
+  const echo: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "echo",
+        name: "Echo",
+        kind: "function",
+        inputs: {
+          v: { from: { type: "state", ref: "0_userdata.0.V" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.V",
+          type: "number",
+          forward: "always",
+        },
+        expr: { const: 1 },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.V": 0 });
+  const engine = createEngine(echo, h.deps, { ownFrom: "ihome.0" });
+  h.attach(engine);
   engine.start();
   const base = h.writes.length;
-  h.change("0_userdata.0.T", 2, { from: "system.adapter.ihome.0" });
+  h.change("0_userdata.0.V", 1, { from: "ihome.0" }); // the echo of start's write
   expect(h.writes).toHaveLength(base);
+  h.change("0_userdata.0.V", 2, { from: "hue.0" }); // a real external change
+  expect(h.writes).toHaveLength(base + 1);
+});
+
+it("lets another logic's write be an external event", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "writer",
+        name: "Writer",
+        kind: "function",
+        inputs: {
+          x: { from: { type: "state", ref: "0_userdata.0.X" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "number",
+          forward: "always",
+        },
+        expr: { const: 1 },
+      },
+      {
+        id: "reader",
+        name: "Reader",
+        kind: "function",
+        inputs: {
+          o: {
+            from: { type: "state", ref: "0_userdata.0.OUT" },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.DONE",
+          type: "number",
+          forward: "always",
+        },
+        expr: { const: 1 },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.X": 0, "0_userdata.0.OUT": 0 });
+  const engine = createEngine(doc, h.deps, { ownFrom: "ihome.0" });
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.OUT", 1, { from: "ihome.0" }); // the writer's output
+  expect(h.writes.filter((w) => w.id === "0_userdata.0.DONE")).toHaveLength(1);
+});
+
+it("source self sees only this logic's writes", () => {
+  const self: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "self",
+        name: "Self",
+        kind: "machine",
+        inputs: {
+          v: {
+            from: { type: "state", ref: "0_userdata.0.W" },
+            kind: "event",
+            source: "self",
+          },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: {
+            enter: [
+              {
+                set: {
+                  target: { ref: "0_userdata.0.W" },
+                  value: { const: true },
+                },
+              },
+            ],
+            on: [{ on: "v", if: { ref: "$self" }, goto: "B" }],
+          },
+          B: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.W": false });
+  const engine = createEngine(self, h.deps, { ownFrom: "ihome.0" });
+  h.attach(engine);
+  engine.start(); // A's enter writes W=true
+  h.change("0_userdata.0.W", false, { from: "hh.0" }); // external: ignored
+  expect(engine.memoryValue("self")).toBe("A");
+  h.change("0_userdata.0.W", true, { from: "ihome.0" }); // own write
+  expect(engine.memoryValue("self")).toBe("B");
+});
+
+it("exposes $from and $self to rows", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "meta",
+        name: "Meta",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: {
+            on: [
+              {
+                on: "e",
+                if: {
+                  op: "eq",
+                  left: { ref: "$from" },
+                  right: { const: "hue.0" },
+                },
+                goto: "B",
+              },
+            ],
+          },
+          B: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0 });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.E", 1, { from: "hue.0" });
+  expect(engine.memoryValue("meta")).toBe("B");
 });
 
 it("noop writes nothing", () => {
@@ -179,7 +335,13 @@ it("stops a memory loop with one warning", () => {
         id: "echo",
         name: "Echo",
         kind: "function",
-        inputs: { x: { from: { type: "memory", ref: "x" }, kind: "event" } },
+        inputs: {
+          x: {
+            from: { type: "memory", ref: "x" },
+            kind: "event",
+            source: "any",
+          },
+        },
         output: { scope: "memory", name: "x", forward: "always" },
         expr: { const: 1 },
       },
@@ -471,13 +633,18 @@ function startup(output: Output, init?: MachineLogic["init"]): LogicDocument {
         name: "Start",
         kind: "machine",
         inputs: {
-          power: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+          power: {
+            from: { type: "state", ref: "0_userdata.0.P" },
+            kind: "event",
+          },
         },
         output,
         init,
         start: "Idle",
         states: {
-          Idle: { on: [{ on: "power", is: { op: "eq", value: true }, goto: "On" }] },
+          Idle: {
+            on: [{ on: "power", is: { op: "eq", value: true }, goto: "On" }],
+          },
           On: {},
         },
       },
@@ -487,7 +654,10 @@ function startup(output: Output, init?: MachineLogic["init"]): LogicDocument {
 
 it("starts in the constant init state", () => {
   const h = createHarness({ "0_userdata.0.P": false });
-  const engine = createEngine(startup({ scope: "memory" }, { state: "On" }), h.deps);
+  const engine = createEngine(
+    startup({ scope: "memory" }, { state: "On" }),
+    h.deps,
+  );
   h.attach(engine);
   engine.start();
   expect(engine.memoryValue("start")).toBe("On");
@@ -553,26 +723,39 @@ it("falls back when the output value matches no state", () => {
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([
-    { id: "0_userdata.0.B", value: 1, ack: true },
-  ]);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: 1, ack: true }]);
 });
 
 it("exposes $init only during the start evaluation", () => {
-  const h = createHarness({ "0_userdata.0.P": false, "0_userdata.0.FLAG": false });
+  const h = createHarness({
+    "0_userdata.0.P": false,
+    "0_userdata.0.FLAG": false,
+  });
   const doc = startup({ scope: "memory" }, { run: true });
   const logic = doc.logics[0] as MachineLogic;
   logic.states.Idle.enter = [
-    { set: { target: { ref: "0_userdata.0.FLAG" }, value: { ref: "$init" }, forward: "always" } },
+    {
+      set: {
+        target: { ref: "0_userdata.0.FLAG" },
+        value: { ref: "$init" },
+        forward: "always",
+      },
+    },
   ];
   logic.states.Idle.on = [{ on: "$init", goto: "On" }];
   logic.states.On.on = [{ on: "power", goto: "Idle" }];
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.FLAG", value: true, ack: false }]);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: true, ack: false },
+  ]);
   h.change("0_userdata.0.P", true);
-  expect(h.writes.at(-1)).toEqual({ id: "0_userdata.0.FLAG", value: false, ack: false });
+  expect(h.writes.at(-1)).toEqual({
+    id: "0_userdata.0.FLAG",
+    value: false,
+    ack: false,
+  });
 });
 
 it("runs a function once at start unless init.run is false", () => {
@@ -583,7 +766,9 @@ it("runs a function once at start unless init.run is false", () => {
         id: "calc",
         name: "Calc",
         kind: "function",
-        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        inputs: {
+          p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+        },
         output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
         init: run === undefined ? undefined : { run },
         expr: { ref: "$init" },
@@ -622,7 +807,9 @@ it("starts machines after functions, so computed memory is visible", () => {
         id: "function-second",
         name: "Function second",
         kind: "function",
-        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        inputs: {
+          p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+        },
         output: { scope: "memory", name: "computed" },
         expr: { const: "On" },
       },
