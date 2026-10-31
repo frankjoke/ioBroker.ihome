@@ -652,7 +652,8 @@ export function createEngine(
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
     stateLog(rt, `writes “${String(mapped)}” to “${target}”`);
-    deps.write(target, mapped, true);
+    // A command, not a confirmation: devices act on ack=false only.
+    deps.write(target, mapped, false);
   }
 
   function startMachine(rt: Runtime): void {

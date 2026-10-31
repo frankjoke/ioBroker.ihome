@@ -43,7 +43,7 @@ it("runs on change only by default and writes only on change", () => {
   const base = h.writes.length; // the start evaluation wrote once
   h.change("0_userdata.0.T", 4);
   expect(h.writes.slice(base)).toEqual([
-    { id: "0_userdata.0.OUT", value: 8, ack: true },
+    { id: "0_userdata.0.OUT", value: 8, ack: false },
   ]);
   h.change("0_userdata.0.T", 4);
   expect(h.writes).toHaveLength(base + 1);
@@ -253,7 +253,7 @@ it("noop writes nothing", () => {
 it("writes a function result once at start", () => {
   const { h, engine } = engineWith(doc());
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 6, ack: true }]);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 6, ack: false }]);
 });
 
 const memoryDoc = (forward: "changed" | "always"): LogicDocument => ({
@@ -471,12 +471,12 @@ it("maps a boolean output by the On prefix, and a map overrides it", () => {
     return { on, off: h.writes.at(-1) };
   };
   expect(run()).toEqual({
-    on: { id: "0_userdata.0.B", value: true, ack: true },
-    off: { id: "0_userdata.0.B", value: false, ack: true },
+    on: { id: "0_userdata.0.B", value: true, ack: false },
+    off: { id: "0_userdata.0.B", value: false, ack: false },
   });
   expect(run({ On: false, Idle: true })).toEqual({
-    on: { id: "0_userdata.0.B", value: false, ack: true },
-    off: { id: "0_userdata.0.B", value: true, ack: true },
+    on: { id: "0_userdata.0.B", value: false, ack: false },
+    off: { id: "0_userdata.0.B", value: true, ack: false },
   });
 });
 
@@ -599,7 +599,9 @@ it("does not emit a memory event when the value matches the seeded one", () => {
   engine.start();
   // The watcher runs once at start (5). An event for the unchanged seeded
   // value would run it again and write the same 5 a second time.
-  expect(h.writes).toEqual([{ id: "0_userdata.0.WATCH", value: 5, ack: true }]);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.WATCH", value: 5, ack: false },
+  ]);
 });
 
 it("skips an invalid logic instead of throwing out of start", () => {
@@ -698,14 +700,14 @@ it("matches the state to the current output value, first declaration wins", () =
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: true, ack: true }]);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: true, ack: false }]);
 
   const h2 = createHarness({ "0_userdata.0.B": false });
   const engine2 = createEngine(doc, h2.deps);
   h2.attach(engine2);
   engine2.start();
   expect(h2.writes).toEqual([
-    { id: "0_userdata.0.B", value: false, ack: true },
+    { id: "0_userdata.0.B", value: false, ack: false },
   ]); // the start write resyncs the state
 });
 
@@ -723,7 +725,7 @@ it("falls back when the output value matches no state", () => {
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: 1, ack: true }]);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: 1, ack: false }]);
 });
 
 it("exposes $init only during the start evaluation", () => {
@@ -779,7 +781,7 @@ it("runs a function once at start unless init.run is false", () => {
   const engine = createEngine(fn(), h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 1, ack: true }]);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 1, ack: false }]);
 
   const h2 = createHarness({ "0_userdata.0.P": false });
   const engine2 = createEngine(fn(false), h2.deps);
@@ -885,7 +887,7 @@ it("writes the state index for a number output", () => {
   expect(h.writes.at(-1)).toEqual({
     id: "0_userdata.0.LEVEL",
     value: 1,
-    ack: true,
+    ack: false,
   });
 });
 
@@ -1035,6 +1037,6 @@ it("resolves a global variable name used as the output ref", () => {
   expect(h.writes[0]).toEqual({
     id: "ihome.0.Variables.TestState_Switch",
     value: 1,
-    ack: true,
+    ack: false,
   });
 });
