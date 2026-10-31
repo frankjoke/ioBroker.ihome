@@ -132,6 +132,18 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         if (typeof source.ref !== "string" || !source.ref) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
         }
+        if (source.type === "state" && source.refs !== undefined) {
+          if (
+            !Array.isArray(source.refs) ||
+            source.refs.some((ref) => typeof ref !== "string" || !ref)
+          ) {
+            add(
+              id,
+              `inputs.${name}.from.refs`,
+              "every extra state needs an id",
+            );
+          }
+        }
         if (
           input.source !== undefined &&
           input.source !== "external" &&

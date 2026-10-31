@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Input, InputSource } from "$logic/types";
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import StateRefField from "./StateRefField.svelte";
+  import MultiStateField from "./MultiStateField.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
 
@@ -147,12 +147,21 @@
 
           {#if input.from.type === "state"}
             <div class="field wide">
-              <span class="label-mono">State</span>
-              <StateRefField
-                value={input.from.ref}
-                label={`State for ${name}`}
-                onchange={(ref) =>
-                  update(name, { ...input, from: { type: "state", ref } })}
+              <span class="label-mono">States</span>
+              <MultiStateField
+                value={[input.from.ref, ...(input.from.refs ?? [])].filter(
+                  Boolean,
+                )}
+                label={`States for ${name}`}
+                onchange={(ids) =>
+                  update(name, {
+                    ...input,
+                    from: {
+                      type: "state",
+                      ref: ids[0] ?? "",
+                      refs: ids.slice(1),
+                    },
+                  })}
               />
             </div>
             <label class="field"

@@ -11,7 +11,7 @@ export type Duration = string;
 export type Operator = "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
 
 export type InputSource =
-  | { type: "state"; ref: string }
+  | { type: "state"; ref: string; refs?: string[] }
   | { type: "memory"; ref: string }
   | { type: "timer"; every: Duration };
 

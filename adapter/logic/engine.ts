@@ -53,7 +53,10 @@ export interface Engine {
 interface InputRuntime {
   name: string;
   input: Input;
-  stateId?: string;
+  /** A state input may name several states: any of them is the same event. */
+  stateIds: string[];
+  /** Per source, so a second button with the same value still fires. */
+  lastById: Map<string, unknown>;
   last?: unknown;
   hasLast: boolean;
 }
@@ -146,13 +149,17 @@ export function createEngine(
     }
     const inputs = new Map<string, InputRuntime>();
     for (const [name, input] of Object.entries(def.inputs ?? {})) {
+      const stateIds =
+        input.from.type === "state"
+          ? [input.from.ref, ...(input.from.refs ?? [])]
+              .map((ref) => resolveStateId(ref))
+              .filter((id): id is string => !!id)
+          : [];
       inputs.set(name, {
         name,
         input,
-        stateId:
-          input.from.type === "state"
-            ? resolveStateId(input.from.ref)
-            : undefined,
+        stateIds,
+        lastById: new Map<string, unknown>(),
         hasLast: false,
       });
     }
@@ -193,7 +200,8 @@ export function createEngine(
         return memory.get(input.input.from.ref);
       }
       if (input.input.from.type === "timer") return input.last;
-      return input.stateId ? deps.read(input.stateId) : undefined;
+      if (input.hasLast) return input.last;
+      return input.stateIds[0] ? deps.read(input.stateIds[0]) : undefined;
     }
     if (memory.has(ref) || declaredMemory.has(ref)) return memory.get(ref);
     if (ref.includes(".")) return deps.read(ref);
@@ -206,7 +214,7 @@ export function createEngine(
 
   function externalId(ref: string, rt: Runtime): string | undefined {
     const input = rt.inputs.get(ref);
-    if (input) return input.stateId;
+    if (input) return undefined; // its sources are added explicitly below
     if (memory.has(ref) || declaredMemory.has(ref)) return undefined;
     if (ref.includes(".")) return ref;
     const variable = deps.resolveVariable?.(ref);
@@ -234,7 +242,7 @@ export function createEngine(
         if (id) ids.add(id);
       }
       for (const input of rt.inputs.values()) {
-        if (input.stateId) ids.add(input.stateId);
+        for (const id of input.stateIds) ids.add(id);
       }
       if (rt.output.scope === "state") ids.add(rt.output.ref);
     }
@@ -438,8 +446,10 @@ export function createEngine(
     if (input) {
       if (input.input.from.type === "memory") {
         writeMemory(input.input.from.ref, value, forward, depth, rt.def.id);
-      } else if (input.stateId) {
-        writeState(rt, input.stateId, value, ack, forward);
+      } else {
+        for (const id of input.stateIds) {
+          writeState(rt, id, value, ack, forward);
+        }
       }
       return;
     }
@@ -726,15 +736,20 @@ export function createEngine(
       for (const rt of runtimes) {
         const self = writer === rt.def.id;
         for (const input of rt.inputs.values()) {
-          if (input.stateId !== change.id) continue;
+          if (!input.stateIds.includes(change.id)) continue;
           if ((input.input.kind ?? "variable") !== "event") continue;
           if (!sourceAllows(input, self)) continue;
+          const seen = input.lastById.has(change.id);
           if (input.input.mode === "any") {
             // every update counts, even the same value
-          } else if (input.hasLast && Object.is(input.last, change.val)) {
-            input.last = change.val;
+          } else if (
+            seen &&
+            Object.is(input.lastById.get(change.id), change.val)
+          ) {
+            input.lastById.set(change.id, change.val);
             continue;
           }
+          input.lastById.set(change.id, change.val);
           if (!ackMatches(input.input.ack, change.ack)) continue;
           input.last = change.val;
           input.hasLast = true;

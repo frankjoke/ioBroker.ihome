@@ -888,3 +888,51 @@ it("writes the state index for a number output", () => {
     ack: true,
   });
 });
+
+it("one input can listen to several states as the same event", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "buttons",
+        name: "Buttons",
+        kind: "function",
+        inputs: {
+          b: {
+            from: {
+              type: "state",
+              ref: "0_userdata.0.B1",
+              refs: ["0_userdata.0.B2"],
+            },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "number",
+          forward: "always",
+        },
+        expr: { ref: "b" },
+      },
+    ],
+  };
+  const h = createHarness({
+    "0_userdata.0.B1": false,
+    "0_userdata.0.B2": false,
+  });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  expect(engine.subscriptions().sort()).toEqual([
+    "0_userdata.0.B1",
+    "0_userdata.0.B2",
+    "0_userdata.0.OUT",
+  ]);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.B2", true);
+  expect(h.writes.at(-1)?.value).toBe(1);
+  h.change("0_userdata.0.B1", true); // the other button, same value
+  expect(h.writes.at(-1)?.value).toBe(1);
+  expect(h.writes).toHaveLength(2);
+});
