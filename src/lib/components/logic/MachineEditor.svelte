@@ -3,6 +3,7 @@
   import ActionList from "./ActionList.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
 
   let {
     logic,
@@ -26,6 +27,12 @@
   let openRow = $state<number | null>(null);
   /** The Options tab: $init today, $all and more later. */
   let openOption = $state<"init" | "all" | null>(null);
+  /** Nothing disappears from the document without a confirmation. */
+  let pendingDelete = $state<
+    | { kind: "state"; name: string }
+    | { kind: "event"; state: string; index: number }
+    | null
+  >(null);
 
   const init = $derived<Init>(logic.init ?? {});
   const canMatch = $derived(logic.output?.scope === "state");
@@ -299,6 +306,16 @@
           </span>
           <span class="spacer"></span>
           <IconButton
+            icon={openState === name ? "expand_less" : "edit"}
+            label={`Edit ${name}`}
+            title={openState === name ? "Close" : "Edit"}
+            active={openState === name}
+            onclick={() => {
+              openState = openState === name ? null : name;
+              openRow = null;
+            }}
+          />
+          <IconButton
             icon="arrow_upward"
             label={`Move ${name} up`}
             title="Move up"
@@ -313,22 +330,12 @@
             onclick={() => moveState(name, 1)}
           />
           <IconButton
-            icon={openState === name ? "expand_less" : "edit"}
-            label={`Edit ${name}`}
-            title={openState === name ? "Close" : "Edit"}
-            active={openState === name}
-            onclick={() => {
-              openState = openState === name ? null : name;
-              openRow = null;
-            }}
-          />
-          <IconButton
             icon="delete"
             label={`Delete ${name}`}
             title="Delete"
             color="var(--danger-color)"
             disabled={stateNames.length <= 1}
-            onclick={() => removeState(name)}
+            onclick={() => (pendingDelete = { kind: "state", name })}
           />
         </div>
 
@@ -433,7 +440,8 @@
                       label={`Delete event ${index + 1} of ${name}`}
                       title="Delete"
                       color="var(--danger-color)"
-                      onclick={() => removeRow(name, index)}
+                      onclick={() =>
+                        (pendingDelete = { kind: "event", state: name, index })}
                     />
                   </div>
 
@@ -567,6 +575,27 @@
     {/each}
   </div>
 </div>
+
+{#if pendingDelete}
+  <ConfirmModal
+    title={pendingDelete.kind === "state"
+      ? `Delete state ${pendingDelete.name}?`
+      : `Delete this event in ${pendingDelete.state}?`}
+    confirmLabel="Delete"
+    onConfirm={() => {
+      if (pendingDelete?.kind === "state") removeState(pendingDelete.name);
+      else if (pendingDelete?.kind === "event") {
+        removeRow(pendingDelete.state, pendingDelete.index);
+      }
+      pendingDelete = null;
+    }}
+    onCancel={() => (pendingDelete = null)}
+  >
+    {pendingDelete.kind === "state"
+      ? "The state and its events are removed from the document."
+      : "The event row is removed from this state."}
+  </ConfirmModal>
+{/if}
 
 <style>
   .machine,

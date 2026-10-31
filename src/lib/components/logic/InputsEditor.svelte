@@ -2,6 +2,7 @@
   import type { Input, InputSource } from "$logic/types";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import StateRefField from "./StateRefField.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
 
   let {
     inputs,
@@ -16,6 +17,8 @@
 
   /** The row whose fields are open; one at a time. */
   let editing = $state<string | null>(null);
+  /** Deleting an input always asks first. */
+  let pendingDelete = $state<string | null>(null);
 
   function update(name: string, input: Input) {
     onchange({ ...inputs, [name]: input });
@@ -106,7 +109,7 @@
           label={`Delete ${name}`}
           title="Delete"
           color="var(--danger-color)"
-          onclick={() => remove(name)}
+          onclick={() => (pendingDelete = name)}
         />
       </div>
 
@@ -271,6 +274,20 @@
     <p class="hint text-muted">No inputs yet — use the + on the line above.</p>
   {/if}
 </div>
+
+{#if pendingDelete}
+  <ConfirmModal
+    title={`Delete input ${pendingDelete}?`}
+    confirmLabel="Delete"
+    onConfirm={() => {
+      if (pendingDelete) remove(pendingDelete);
+      pendingDelete = null;
+    }}
+    onCancel={() => (pendingDelete = null)}
+  >
+    Rows and conditions that use this input will no longer resolve.
+  </ConfirmModal>
+{/if}
 
 <style>
   .inputs {
