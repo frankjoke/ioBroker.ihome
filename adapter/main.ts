@@ -1,4 +1,7 @@
 import * as utils from "@iobroker/adapter-core";
+import { createEngine, type Engine, type StateChange } from "./logic/engine";
+import { parseLogicDocument } from "./logic/validate";
+import type { LogicDocument } from "./logic/types";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -13,6 +16,7 @@ const DOCS = [
   "formulaList",
   "variableList",
   "settings",
+  "logicList",
 ] as const;
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
@@ -77,6 +81,20 @@ function isPlaceholder(val: unknown): boolean {
 }
 
 /**
+ * A logic write as the target state's declared type. ioBroker coerces too, but
+ * an explicit conversion keeps the engine's last-written value comparable.
+ */
+function coerceStateValue(value: unknown, type?: string): unknown {
+  if (type === "number") {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : value;
+  }
+  if (type === "boolean") return Boolean(value);
+  if (type === "string") return String(value);
+  return value;
+}
+
+/**
  * A constant's stored text as its declared type; `undefined` when it cannot be
  * read as that type.
  *
@@ -108,6 +126,13 @@ class IHome extends utils.Adapter {
    * src/lib/config/variables.ts and src/lib/stores/variables.svelte.ts).
    */
   private variables: Variables = { constants: {}, states: {} };
+  private engine?: Engine;
+  /** External ids the current engine subscribes to (for unsubscribing). */
+  private logicIds: string[] = [];
+  /** Last seen state per logic-referenced id; `read` never awaits. */
+  private logicValues = new Map<string, StateChange>();
+  /** `common.type` of a referenced state, for writes. */
+  private stateTypes = new Map<string, string>();
   private heartbeat?: ReturnType<typeof setInterval>;
   private readonly startedAt = Date.now();
 
@@ -162,8 +187,134 @@ class IHome extends utils.Adapter {
     );
   }
 
-  private async onReady(): Promise<void> {
-    this.log.debug(
+  /**
+   * The logic engine (spec 2026-10-31). Reads its document, subscribes exactly
+   * the refs it names, then swaps engines so a reload never leaves a gap with
+   * the old timers still armed. An unreadable or newer document leaves the
+   * running engine untouched.
+   */
+  private async loadLogics(): Promise<void> {
+    const target = `${CONFIG_FOLDER}.logicList`;
+    let doc: LogicDocument | null = { version: 1, logics: [] };
+    try {
+      const stored = await this.getStateAsync(target);
+      const raw = stored?.val;
+      if (raw != null && raw !== "") {
+        doc = parseLogicDocument(raw);
+        if (!doc) {
+          this.log.warn(
+            `${target} is unreadable or newer than this adapter — keeping the running logic engine`,
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      this.log.warn(`cannot read ${target}: ${error}`);
+      return;
+    }
+
+    const next = createEngine(
+      doc,
+      {
+        read: (id) => this.logicValues.get(id)?.val,
+        write: (id, value, ack) => this.writeLogicState(id, value, ack),
+        log: (level, logicId, message) => {
+          const line = `[logic ${logicId}] ${message}`;
+          if (level === "warn") this.log.warn(line);
+          else this.log.info(line);
+        },
+        now: () => Date.now(),
+        setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+        clearTimeout: (handle) =>
+          clearTimeout(handle as unknown as NodeJS.Timeout),
+        resolveVariable: (name) => {
+          const constant = this.variables.constants[name];
+          if (constant) return { kind: "const", value: constant.val };
+          const variable = this.variables.states[name];
+          if (variable) return { kind: "state", stateId: variable.stateId };
+          return undefined;
+        },
+      },
+      { ownFrom: `system.adapter.${this.namespace}` },
+    );
+
+    const ids = next.subscriptions();
+    await this.warmLogicCache(ids);
+    const before = new Set(this.logicIds);
+    const isOwn = (id: string) => id.startsWith(`${this.namespace}.`);
+    const added = ids.filter((id) => !before.has(id));
+    const removed = this.logicIds.filter((id) => !ids.includes(id));
+    try {
+      const own = added.filter(isOwn);
+      const foreign = added.filter((id) => !isOwn(id));
+      if (own.length) await this.subscribeStatesAsync(own);
+      if (foreign.length) await this.subscribeForeignStatesAsync(foreign);
+      const ownGone = removed.filter(isOwn);
+      const foreignGone = removed.filter((id) => !isOwn(id));
+      if (ownGone.length) await this.unsubscribeStatesAsync(ownGone);
+      if (foreignGone.length) await this.unsubscribeForeignStatesAsync(foreignGone);
+    } catch (error) {
+      this.log.warn(`logic subscriptions: ${error}`);
+    }
+
+    this.engine?.stop();
+    this.logicIds = ids;
+    this.engine = next;
+    next.start();
+    this.log.info(
+      `Logic engine: ${doc.logics.length} logic(s), ${ids.length} subscribed state(s)`,
+    );
+  }
+
+  /** Fill the engine's read cache before it starts; reads then never await. */
+  private async warmLogicCache(ids: string[]): Promise<void> {
+    const isOwn = (id: string) => id.startsWith(`${this.namespace}.`);
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const state = isOwn(id)
+            ? await this.getStateAsync(id)
+            : await this.getForeignStateAsync(id);
+          if (state) {
+            this.logicValues.set(id, {
+              id,
+              val: state.val,
+              ack: state.ack,
+              from: state.from,
+              ts: state.ts,
+            });
+          }
+        } catch (error) {
+          this.log.debug(`logic: cannot read ${id}: ${error}`);
+        }
+        try {
+          const object = isOwn(id)
+            ? await this.getObjectAsync(id)
+            : await this.getForeignObjectAsync(id);
+          const type = (object?.common as { type?: string } | undefined)?.type;
+          if (type) this.stateTypes.set(id, type);
+        } catch {
+          // a state without an object keeps its value type
+        }
+      }),
+    );
+  }
+
+  private writeLogicState(id: string, value: unknown, ack: boolean): void {
+    const state = {
+      val: coerceStateValue(value, this.stateTypes.get(id)) as never,
+      ack,
+    };
+    const fail = (error: unknown) =>
+      this.log.warn(`logic: cannot write ${id}: ${error}`);
+    if (id.startsWith(`${this.namespace}.`)) {
+      this.setStateAsync(id, state).catch(fail);
+    } else {
+      this.setForeignStateAsync(id, state).catch(fail);
+    }
+  }
+
+  private async onReady(): Promise<void> {    this.log.debug(
       `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
     );
     for (const name of DOCS) {
@@ -234,12 +385,33 @@ class IHome extends utils.Adapter {
     // list itself may be edited by the SPA later, so keep the copy current.
     await this.loadVariables();
     this.subscribeStates(`${CONFIG_FOLDER}.variableList`);
+    this.subscribeStates(`${CONFIG_FOLDER}.logicList`);
     this.on("stateChange", (id, state) => {
-      if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList` && state) {
+      if (!state) return;
+      this.logicValues.set(id, {
+        id,
+        val: state.val,
+        ack: state.ack,
+        from: state.from,
+        ts: state.ts,
+      });
+      this.engine?.onStateChange({
+        id,
+        val: state.val,
+        ack: state.ack,
+        from: state.from,
+        ts: state.ts,
+      });
+      if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList`) {
         this.log.debug(`${CONFIG_FOLDER}.variableList changed; reloading`);
-        void this.loadVariables();
+        // A variable edit can change what a logic ref resolves to.
+        void this.loadVariables().then(() => this.loadLogics());
+      } else if (id === `${this.namespace}.${CONFIG_FOLDER}.logicList`) {
+        this.log.debug(`${CONFIG_FOLDER}.logicList changed; reloading the engine`);
+        void this.loadLogics();
       }
     });
+    await this.loadLogics();
 
     this.log.info(`iHome ${this.version ?? ""} started (${this.namespace})`);
     this.heartbeat = setInterval(() => {
@@ -249,7 +421,11 @@ class IHome extends utils.Adapter {
   }
 
   private onUnload(callback: () => void): void {
-    this.log.debug("Unload: stopping the heartbeat");
+    this.log.debug("Unload: stopping the heartbeat and the logic engine");
+    if (this.engine) {
+      this.engine.stop();
+      this.engine = undefined;
+    }
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = undefined;

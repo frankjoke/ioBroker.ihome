@@ -14,5 +14,5 @@
     "types": ["node"]
   },
   "include": ["adapter/**/*.ts"],
-  "exclude": ["adapter/**/*.test.ts"]
+  "exclude": ["adapter/**/*.test.ts", "adapter/logic/testing.ts"]
 }
