@@ -162,7 +162,7 @@
           </div>
           <div class="logic-actions">
             <label class="inline"
-              >on <input
+              >enabled <input
                 type="checkbox"
                 checked={logic.enabled !== false}
                 onchange={(e) => toggle(logic, e.currentTarget.checked)}

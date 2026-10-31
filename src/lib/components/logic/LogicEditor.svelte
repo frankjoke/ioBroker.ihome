@@ -214,12 +214,21 @@
   }
 
   .editor-head {
+    display: flex;
+    align-items: center;
     gap: 0.6rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+  }
+
+  .editor-head .badge,
+  .editor-head .inline,
+  .editor-head .label-mono {
+    flex: 0 0 auto;
   }
 
   .logic-name {
-    flex: 1 1 12rem;
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 600;
   }
 
