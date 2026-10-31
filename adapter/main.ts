@@ -302,8 +302,9 @@ class IHome extends utils.Adapter {
     this.engine?.stop();
     this.logicIds = ids;
     this.engine = next;
+    const active = doc.logics.filter((logic) => logic.enabled !== false).length;
     this.log.info(
-      `Logic engine: ${doc.logics.length} logic(s), ${ids.length} subscribed state(s)`,
+      `Logic engine: ${doc.logics.length} logic(s) (${active} active), ${ids.length} subscribed state(s)`,
     );
   }
 
