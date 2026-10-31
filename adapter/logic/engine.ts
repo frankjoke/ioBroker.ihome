@@ -639,12 +639,19 @@ export function createEngine(
       return;
     }
     const mapped = outputValue(rt, value);
-    if (!forwardAllows(rt, mapped, output.forward)) return;
     const target = outputTargetId(rt);
     if (!target) return;
+    if (!forwardAllows(rt, mapped, output.forward)) {
+      stateLog(
+        rt,
+        `skips writing “${target}” — value “${String(mapped)}” is unchanged`,
+      );
+      return;
+    }
     rt.lastOutput = mapped;
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
+    stateLog(rt, `writes “${String(mapped)}” to “${target}”`);
     deps.write(target, mapped, true);
   }
 
