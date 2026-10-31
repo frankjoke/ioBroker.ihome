@@ -140,7 +140,7 @@
           })}
       />
       <span class="hint text-muted">
-        * matches any name; every other state writes false
+        * matches all; will be true
       </span>
     </div>
   {:else if output.type === "number" && stateNames.length > 0}
