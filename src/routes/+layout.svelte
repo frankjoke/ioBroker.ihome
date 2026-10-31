@@ -31,6 +31,7 @@
     waitForEnumCache,
   } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
+  import { initLogics } from "$lib/stores/logics.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
@@ -232,6 +233,7 @@
       // and the variable library (a source may name a variable, not a state).
       await initVariables();
       await initTemplates();
+      await initLogics();
       // Migrate from the *canonical* device list — a synchronous snapshot — not
       // from the enriched display store, which polls every 50ms and can still
       // hold the pre-backfill (or empty) device set (review C2). Without devices
@@ -268,6 +270,7 @@
     initFormulas();
     initVariables();
     initTemplates();
+    initLogics();
     void initSettings(applySettings);
     loadViewState();
     // Registered here rather than by SvelteKit: its own call uses

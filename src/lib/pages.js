@@ -36,6 +36,7 @@ export const pages = [
     icon: "functions",
     title: "Formula Templates",
   },
+  { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
   {
     id: "/server",
     label: "Server & Security",
