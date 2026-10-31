@@ -410,7 +410,7 @@
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
-      onPrimary: r.control && r.control === primary ? togglePrimary : undefined,
+      onPrimary: actionFor(r.control),
     })),
   );
 
@@ -437,6 +437,38 @@
     });
     return byAnchor;
   });
+
+  /**
+   * A slot's icon may be its action even when no device control exists: a tile
+   * built from a raw state/variable has no device primary, but its switch or
+   * button must still be operable by tapping the icon.
+   */
+  function actionFor(control: any): (() => void) | undefined {
+    if (!control) return undefined;
+    if (primary && control === primary) return togglePrimary;
+    if (
+      control.writable !== true ||
+      (control.widget !== "switch" && control.widget !== "button")
+    ) {
+      return undefined;
+    }
+    return () => {
+      const isButton = control.widget === "button";
+      writeControl(
+        ioBroker,
+        control,
+        isButton ? true : !truthy(control.liveValue),
+        Date.now(),
+        { lockMs: isButton ? 0 : 3000 },
+      );
+      if (isButton) {
+        setTimeout(
+          () => writeControl(ioBroker, control, false, Date.now()),
+          300,
+        );
+      }
+    };
+  }
 
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
@@ -601,9 +633,7 @@
         icon={bodyIcon(r)}
         anchor={r.slot === headline}
         stack={r.slot === headline && columns < 2}
-        onPrimary={r.control && r.control === primary
-          ? togglePrimary
-          : undefined}
+        onPrimary={actionFor(r.control)}
         emphasis={r === mainValueRow ? "primary" : "secondary"}
       />
     {/each}
