@@ -40,14 +40,26 @@
     return commitLogics({ ...doc, logics });
   }
 
-  function add() {
+  function addMachine() {
     const id = uniqueId("logic");
     const logic: LogicDef = {
       id,
-      name: "New logic",
+      name: "New state machine",
       kind: "machine",
       output: { scope: "memory", name: id },
       states: { Idle: {} },
+    };
+    if (commit([...doc.logics, logic])) selectedId = id;
+  }
+
+  function addAction() {
+    const id = uniqueId("action");
+    const logic: LogicDef = {
+      id,
+      name: "New action",
+      kind: "function",
+      output: { scope: "memory", name: id },
+      expr: { const: 0 },
     };
     if (commit([...doc.logics, logic])) selectedId = id;
   }
@@ -92,25 +104,39 @@
 </svelte:head>
 
 <div class="logic-page">
-  <div class="page-header">
-    <div class="page-heading">
+  <div class="page-heading">
+    <div class="title-line">
       <h1>Logic</h1>
-      <p class="text-muted hint">
-        Automations the adapter runs: switches and sensors with timers, or a
-        computed value. A logic without an external output works inside the
-        adapter only.
-      </p>
+      <div class="page-actions">
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => (inserting = true)}
+        >
+          <span class="material-symbols-outlined">dashboard_customize</span>
+          Insert template
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={addMachine}
+        >
+          <span class="material-symbols-outlined">add</span> State machine
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={addAction}
+        >
+          <span class="material-symbols-outlined">add</span> Action
+        </button>
+      </div>
     </div>
-    <div class="page-actions">
-      <button
-        type="button"
-        class="btn btn-sm"
-        onclick={() => (inserting = true)}>Insert template</button
-      >
-      <button type="button" class="btn btn-primary btn-sm" onclick={add}
-        >New logic</button
-      >
-    </div>
+    <p class="text-muted hint">
+      Automations the adapter runs: switches and sensors with timers, or a
+      computed value. A logic without an external output works inside the
+      adapter only.
+    </p>
   </div>
 
   {#if logicsLoadKind() === "unreadable"}
@@ -223,14 +249,6 @@
     max-width: 860px;
   }
 
-  .page-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
   .page-heading {
     display: flex;
     flex-direction: column;
@@ -241,9 +259,27 @@
     margin: 0;
   }
 
+  .title-line {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .title-line h1 {
+    margin: 0;
+  }
+
   .page-actions {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+
+  .page-actions .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .hint {
