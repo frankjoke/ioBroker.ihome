@@ -87,6 +87,22 @@
     }
   }
 
+  /** Reordering changes the index a number output writes, so it is a first
+   *  class action. The current start state is pinned first, otherwise moving a
+   *  state to the top would silently make it the start. */
+  function moveState(name: string, delta: number) {
+    const from = stateNames.indexOf(name);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= stateNames.length) return;
+    const start = logic.start ?? stateNames[0];
+    const entries = Object.entries(logic.states);
+    const [entry] = entries.splice(from, 1);
+    entries.splice(to, 0, entry);
+    const states: Record<string, StateDef> = {};
+    for (const [key, value] of entries) states[key] = value;
+    patch({ states, start });
+  }
+
   function renameState(oldName: string, rawName: string) {
     const name = rawName.trim();
     if (!name || (name !== oldName && name in logic.states)) return;
@@ -282,6 +298,20 @@
               : ""}
           </span>
           <span class="spacer"></span>
+          <IconButton
+            icon="arrow_upward"
+            label={`Move ${name} up`}
+            title="Move up"
+            disabled={stateNames.indexOf(name) === 0}
+            onclick={() => moveState(name, -1)}
+          />
+          <IconButton
+            icon="arrow_downward"
+            label={`Move ${name} down`}
+            title="Move down"
+            disabled={stateNames.indexOf(name) === stateNames.length - 1}
+            onclick={() => moveState(name, 1)}
+          />
           <IconButton
             icon={openState === name ? "expand_less" : "edit"}
             label={`Edit ${name}`}

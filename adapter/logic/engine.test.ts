@@ -855,3 +855,36 @@ it("stop destroys a pending state timer", () => {
   h.clock.advance(300_000);
   expect(engine.memoryValue("light")).toBe("On"); // stopped machine does not transition
 });
+
+it("writes the state index for a number output", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "dim",
+        name: "Dim",
+        kind: "machine",
+        inputs: {
+          p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.LEVEL",
+          type: "number",
+          forward: "always",
+        },
+        start: "Dim",
+        states: { Idle: {}, Dim: {}, On: {} },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.P": false });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes.at(-1)).toEqual({
+    id: "0_userdata.0.LEVEL",
+    value: 1,
+    ack: true,
+  });
+});
