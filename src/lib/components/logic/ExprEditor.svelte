@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { Expr, FunctionExpr } from "$logic/types";
   import Self from "./ExprEditor.svelte";
 
@@ -177,15 +178,12 @@
               patch({ of });
             }}
           />
-          <button
-            type="button"
-            class="icon-btn"
-            aria-label="Remove operand"
+          <IconButton
+            icon="remove"
+            label="Remove operand"
             disabled={e.of.length <= 2}
             onclick={() => patch({ of: e.of.filter((_, i) => i !== index) })}
-          >
-            <span class="material-symbols-outlined">remove</span>
-          </button>
+          />
         </div>
       {/each}
       <button

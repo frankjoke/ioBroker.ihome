@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { LogicDef } from "$logic/types";
   import {
     commitLogics,
@@ -167,23 +168,17 @@
                 onchange={(e) => toggle(logic, e.currentTarget.checked)}
               /></label
             >
-            <button
-              type="button"
-              class="icon-btn"
-              aria-label={`Duplicate ${logic.name}`}
+            <IconButton
+              icon="content_copy"
+              label={`Duplicate ${logic.name}`}
               title="Duplicate"
               onclick={() => duplicate(logic)}
-            >
-              <span class="material-symbols-outlined">content_copy</span>
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              aria-label={`Delete ${logic.name}`}
+            />
+            <IconButton
+              icon="delete"
+              label={`Delete ${logic.name}`}
               onclick={() => (pendingDelete = logic)}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
+            />
           </div>
         </div>
       {/each}

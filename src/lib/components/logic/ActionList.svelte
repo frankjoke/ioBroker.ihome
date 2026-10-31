@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { Action, Expr } from "$logic/types";
   import StateRefField from "./StateRefField.svelte";
   import ExprEditor from "./ExprEditor.svelte";
@@ -113,14 +114,11 @@
           <option value="warn">warn</option>
         </select>
       {/if}
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Remove action"
+      <IconButton
+        icon="remove"
+        label="Remove action"
         onclick={() => onchange(actions.filter((_, i) => i !== index))}
-      >
-        <span class="material-symbols-outlined">remove</span>
-      </button>
+      />
     </div>
   {/each}
 

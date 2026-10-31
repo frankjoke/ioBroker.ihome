@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { Expr, Init, Input, LogicDef, Output } from "$logic/types";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
@@ -87,15 +88,14 @@
         onchange={(e) => patch({ enabled: e.currentTarget.checked })}
       /></label
     >
-    <button
-      type="button"
-      class="icon-btn close-btn"
-      aria-label="Close the editor"
-      title="Close"
-      onclick={onClose}
-    >
-      <span class="material-symbols-outlined">close</span>
-    </button>
+    <span class="close-slot">
+      <IconButton
+        icon="close"
+        label="Close the editor"
+        title="Close"
+        onclick={onClose}
+      />
+    </span>
   </div>
 
   <div class="card-body editor-body">
@@ -223,8 +223,9 @@
     font-weight: 600;
   }
 
-  .close-btn {
+  .close-slot {
     margin-left: auto;
+    display: inline-flex;
   }
 
   .editor-body {

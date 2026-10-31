@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { MachineLogic, OnRow, StateDef } from "$logic/types";
   import ActionList from "./ActionList.svelte";
   import ExprEditor from "./ExprEditor.svelte";
@@ -148,15 +149,12 @@
           value={name}
           onchange={(e) => renameState(name, e.currentTarget.value)}
         />
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label={`Delete ${name}`}
+        <IconButton
+          icon="delete"
+          label={`Delete ${name}`}
           disabled={stateNames.length <= 1}
           onclick={() => removeState(name)}
-        >
-          <span class="material-symbols-outlined">delete</span>
-        </button>
+        />
       </div>
 
       <div class="block">
@@ -273,14 +271,11 @@
                     })}
                 />
               {/if}
-              <button
-                type="button"
-                class="icon-btn"
-                aria-label="Remove row"
+              <IconButton
+                icon="remove"
+                label="Remove row"
                 onclick={() => removeRow(name, index)}
-              >
-                <span class="material-symbols-outlined">remove</span>
-              </button>
+              />
             </div>
 
             <div class="block">

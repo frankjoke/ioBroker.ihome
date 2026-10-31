@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import type { Input, InputSource } from "$logic/types";
   import StateRefField from "./StateRefField.svelte";
 
@@ -187,14 +188,11 @@
         <span class="hint text-muted">fires like an event</span>
       {/if}
 
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label={`Remove ${name}`}
+      <IconButton
+        icon="remove"
+        label={`Remove ${name}`}
         onclick={() => remove(name)}
-      >
-        <span class="material-symbols-outlined">remove</span>
-      </button>
+      />
     </div>
   {/each}
 
