@@ -18,15 +18,14 @@
   let selectedId = $state<string | null>(null);
   let pendingDelete = $state<LogicDef | null>(null);
   let inserting = $state(false);
+  /** The open editor, scrolled into view like the device list does. */
+  let inlineForm: HTMLElement | undefined = $state();
 
-  const selected = $derived(
-    doc.logics.find((logic) => logic.id === selectedId) ?? null,
-  );
-  const selectedIssues = $derived(
-    selected
-      ? logicIssues().filter((issue) => issue.logicId === selected.id)
-      : [],
-  );
+  $effect(() => {
+    if (selectedId && inlineForm) {
+      inlineForm.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  });
 
   function uniqueId(base: string): string {
     const taken = doc.logics.map((logic) => logic.id);
@@ -148,22 +147,7 @@
     <p class="text-muted hint">Loading the logic document…</p>
   {/if}
 
-  {#if selected}
-    <LogicEditor
-      logic={selected}
-      onchange={update}
-      onClose={() => (selectedId = null)}
-    />
-    {#if selectedIssues.length > 0}
-      <ul class="issues card">
-        {#each selectedIssues as issue (issue.path + issue.message)}
-          <li class:text-danger={issue.severity === "error"}>
-            <span class="mono">{issue.path}</span> — {issue.message}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  {:else if doc.logics.length === 0}
+  {#if doc.logics.length === 0}
     <div class="card empty-state">
       <p class="text-muted">
         No logics yet — insert a template or add an empty one.
@@ -172,17 +156,11 @@
   {:else}
     <div class="logic-list">
       {#each doc.logics as logic (logic.id)}
-        <div class="card logic-row">
+        <div class="card logic-row" class:editing={selectedId === logic.id}>
           <div class="logic-main">
-            <button
-              type="button"
-              class="logic-open"
-              onclick={() => (selectedId = logic.id)}
-            >
-              <span class="logic-name">{logic.name}</span>
-              <span class="badge badge-secondary">{logic.kind}</span>
-              <span class="mono hint text-muted">{outputLabel(logic)}</span>
-            </button>
+            <span class="logic-name">{logic.name}</span>
+            <span class="badge badge-secondary">{logic.kind}</span>
+            <span class="mono hint text-muted">{outputLabel(logic)}</span>
             {#if logic.enabled === false}
               <span class="badge badge-secondary">disabled</span>
             {/if}
@@ -196,6 +174,14 @@
               /></label
             >
             <IconButton
+              icon="edit"
+              label={`Edit ${logic.name}`}
+              title={selectedId === logic.id ? "Close" : "Edit"}
+              active={selectedId === logic.id}
+              onclick={() =>
+                (selectedId = selectedId === logic.id ? null : logic.id)}
+            />
+            <IconButton
               icon="content_copy"
               label={`Duplicate ${logic.name}`}
               title="Duplicate"
@@ -208,6 +194,25 @@
             />
           </div>
         </div>
+
+        {#if selectedId === logic.id}
+          <div class="inline-form" bind:this={inlineForm}>
+            <LogicEditor
+              {logic}
+              onchange={update}
+              onClose={() => (selectedId = null)}
+            />
+            {#if logicIssues().some((issue) => issue.logicId === logic.id)}
+              <ul class="issues card">
+                {#each logicIssues().filter((issue) => issue.logicId === logic.id) as issue (issue.path + issue.message)}
+                  <li class:text-danger={issue.severity === "error"}>
+                    <span class="mono">{issue.path}</span> — {issue.message}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -310,17 +315,15 @@
     flex-wrap: wrap;
   }
 
-  .logic-open {
+  .logic-row.editing {
+    border-color: var(--primary-color);
+  }
+
+  .inline-form {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: none;
-    border: 0;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    padding: 0;
-    text-align: left;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-left: 1rem;
   }
 
   .logic-name {
