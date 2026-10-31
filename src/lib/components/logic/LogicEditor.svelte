@@ -114,10 +114,7 @@
         />
       </div>
     {:else}
-      <div class="block">
-        <span class="label-mono">States</span>
-        <MachineEditor {logic} onchange={(next) => onchange(next)} />
-      </div>
+      <MachineEditor {logic} onchange={(next) => onchange(next)} />
     {/if}
   </div>
 </section>

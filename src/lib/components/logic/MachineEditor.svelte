@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MachineLogic, OnRow, StateDef } from "$logic/types";
+  import type { Expr, Init, MachineLogic, OnRow, StateDef } from "$logic/types";
   import ActionList from "./ActionList.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
@@ -24,6 +24,19 @@
   /** One state and one event row open at a time, like the slot lists. */
   let openState = $state<string | null>(null);
   let openRow = $state<number | null>(null);
+  /** The Options tab: $init today, $all and more later. */
+  let openOption = $state<"init" | "all" | null>(null);
+
+  const init = $derived<Init>(logic.init ?? {});
+  const canMatch = $derived(logic.output?.scope === "state");
+
+  function patchInit(update: Partial<Init>) {
+    const next: Init = { ...(logic.init ?? {}), ...update };
+    for (const key of Object.keys(next) as (keyof Init)[]) {
+      if (next[key] === undefined) delete next[key];
+    }
+    patch({ init: Object.keys(next).length > 0 ? next : undefined });
+  }
 
   function patch(update: Partial<MachineLogic>) {
     onchange({ ...logic, ...update });
@@ -150,6 +163,97 @@
 </script>
 
 <div class="machine">
+  <div class="options">
+    <div class="states-head">
+      <span class="label-mono">Options</span>
+    </div>
+    <div class="option-tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        class="option-tab"
+        class:active={openOption === "init"}
+        aria-selected={openOption === "init"}
+        onclick={() => (openOption = openOption === "init" ? null : "init")}
+        >$init</button
+      >
+      <button
+        type="button"
+        role="tab"
+        class="option-tab"
+        class:active={openOption === "all"}
+        aria-selected={openOption === "all"}
+        onclick={() => (openOption = openOption === "all" ? null : "all")}
+        >$all</button
+      >
+    </div>
+
+    {#if openOption === "init"}
+      <div class="option-body">
+        <label class="inline"
+          >take the state from the current output value
+          <input
+            type="checkbox"
+            checked={init.match === "output"}
+            disabled={!canMatch}
+            onchange={(e) =>
+              patchInit({
+                match: e.currentTarget.checked ? "output" : undefined,
+              })}
+          /></label
+        >
+        {#if !canMatch}
+          <span class="hint text-muted"> Needs an external output state. </span>
+        {/if}
+        {#if init.state !== undefined}
+          <div class="row">
+            <span class="label-mono">init state</span>
+            {#if typeof init.state === "string"}
+              <input
+                aria-label="Init state name"
+                value={init.state}
+                onchange={(e) => patchInit({ state: e.currentTarget.value })}
+              />
+            {:else}
+              <ExprEditor
+                expr={init.state as Expr}
+                onchange={(next) =>
+                  patchInit({
+                    state: "noop" in next ? undefined : next,
+                  })}
+              />
+            {/if}
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => patchInit({ state: undefined })}>Clear</button
+            >
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => patchInit({ state: { const: stateNames[0] ?? "" } })}
+            >Add init expression</button
+          >
+        {/if}
+        <label class="inline"
+          >run $init rows <input
+            type="checkbox"
+            checked={init.run === true}
+            onchange={(e) =>
+              patchInit({ run: e.currentTarget.checked || undefined })}
+          /></label
+        >
+      </div>
+    {:else if openOption === "all"}
+      <p class="hint text-muted">
+        Common rows and actions for every state — the editor follows with the
+        input/usage redesign.
+      </p>
+    {/if}
+  </div>
+
   <div class="states">
     <div class="states-head">
       <span class="label-mono">States</span>
@@ -450,6 +554,40 @@
   .states,
   .events {
     gap: 0.3rem;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .option-tabs {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .option-tab {
+    padding: 0.2rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill, 999px);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .option-tab.active {
+    color: var(--primary-color);
+    border-color: currentColor;
+  }
+
+  .option-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.3rem 0 0.3rem 0.6rem;
+    border-left: 2px solid var(--border-color);
   }
 
   .states-head,
