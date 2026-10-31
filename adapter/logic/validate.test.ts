@@ -88,3 +88,53 @@ it("rejects noop outside a function expression", () => {
     true,
   );
 });
+
+it("requires a ref and a known type on every state output", () => {
+  const bad: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "f",
+        name: "F",
+        kind: "function",
+        expr: { const: 1 },
+        output: { scope: "state" } as never,
+      },
+    ],
+  };
+  const issues = validateLogicDocument(bad);
+  expect(issues.some((i) => i.path === "output.ref")).toBe(true);
+  expect(issues.some((i) => i.path === "output.type")).toBe(true);
+});
+
+it("does not throw on malformed optional arrays", () => {
+  expect(() =>
+    validateLogicDocument({ version: 1, logics: [], memory: {} } as never),
+  ).not.toThrow();
+  expect(() =>
+    validateLogicDocument({
+      version: 1,
+      logics: [
+        { id: "x", name: "X", kind: "machine", states: { A: { on: "nope" } } },
+      ],
+    } as never),
+  ).not.toThrow();
+});
+
+it("rejects zero-length timers", () => {
+  const bad: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "z",
+        name: "Z",
+        kind: "machine",
+        inputs: { t: { from: { type: "timer", every: "0s" }, kind: "event" } },
+        states: { A: { after: { time: "0s", goto: "A" } } },
+      },
+    ],
+  };
+  const issues = validateLogicDocument(bad);
+  expect(issues.some((i) => i.path === "inputs.t.from.every")).toBe(true);
+  expect(issues.some((i) => i.path === "states.A.after.time")).toBe(true);
+});

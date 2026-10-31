@@ -3,7 +3,11 @@
 // whole-document write, a load kind that refuses to overwrite an unreadable
 // document, and an echo guard for our own write.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { parseLogicDocument } from "$logic/validate";
+import {
+  parseLogicDocument,
+  validateLogicDocument,
+  type Issue,
+} from "$logic/validate";
 import type { LogicDocument } from "$logic/types";
 
 export const LOGIC_LIST_ID = "ihome.0.config.logicList";
@@ -18,6 +22,8 @@ let saveFailed = $state(false);
 let initPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSent: string | null = null;
+/** Validation issues of the document in hand; errors block the write. */
+let issues = $state<Issue[]>([]);
 
 export function getLogicDocument(): LogicDocument {
   return logicDocument;
@@ -29,6 +35,15 @@ export function logicsLoadKind(): typeof loadKind {
 
 export function logicSaveFailed(): boolean {
   return saveFailed;
+}
+
+export function logicIssues(): Issue[] {
+  return issues;
+}
+
+/** True while the document in hand has errors, so nothing is persisted. */
+export function logicBlocked(): boolean {
+  return issues.some((issue) => issue.severity === "error");
 }
 
 /** False until the document was read, and false for an unreadable one. */
@@ -57,6 +72,19 @@ export function saveLogics(): void {
   if (saveTimer) clearTimeout(saveTimer);
   const snapshot = JSON.stringify(logicDocument);
   saveTimer = setTimeout(() => {
+    // The document may have changed under us (a newer version from another
+    // client, an unreadable one); never overwrite what we cannot read.
+    if (!isLogicsWritable()) {
+      saveFailed = true;
+      return;
+    }
+    const doc = parseLogicDocument(snapshot);
+    if (!doc) {
+      saveFailed = true;
+      return;
+    }
+    issues = validateLogicDocument(doc);
+    if (issues.some((issue) => issue.severity === "error")) return;
     // A disconnected socket resolves without sending; never report success.
     if (!ioBroker.connected) {
       saveFailed = true;
@@ -84,8 +112,9 @@ export function commitLogics(next: LogicDocument): boolean {
     return false;
   }
   logicDocument = next;
+  issues = validateLogicDocument(next);
   saveLogics();
-  return true;
+  return isLogicsWritable();
 }
 
 /** Load the document; an absent one is a valid empty document. */
@@ -109,10 +138,21 @@ export function initLogics(): Promise<void> {
       }
       st.onUpdate = (_cl: unknown, state: { val?: unknown }) => {
         const parsed = parseLogicDocument(state?.val);
-        if (!parsed) return true;
+        if (!parsed) {
+          // A newer or broken document arrived after load: stop writing.
+          if (state?.val != null && state.val !== "") {
+            loadKind = "unreadable";
+            if (saveTimer) {
+              clearTimeout(saveTimer);
+              saveTimer = null;
+            }
+          }
+          return true;
+        }
         const asString = JSON.stringify(parsed);
         if (lastSent !== null && lastSent === asString) return true;
         logicDocument = parsed;
+        issues = validateLogicDocument(parsed);
         loadKind = "loaded";
         return true;
       };
@@ -120,6 +160,7 @@ export function initLogics(): Promise<void> {
       if (parsed) {
         loadKind = "loaded";
         logicDocument = parsed;
+        issues = validateLogicDocument(parsed);
       } else if (st.value != null && st.value !== "") {
         loadKind = "unreadable";
         console.error(

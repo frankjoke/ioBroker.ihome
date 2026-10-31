@@ -1,5 +1,6 @@
 <script lang="ts">
   import { BUILTIN_TEMPLATES, instantiateTemplate } from "$logic/templates";
+  import { validateLogicDocument } from "$logic/validate";
   import type { LogicDef } from "$logic/types";
   import StateRefField from "./StateRefField.svelte";
 
@@ -41,7 +42,20 @@
 
   function insert() {
     try {
-      onInsert(instantiateTemplate(template, values, uniqueId(template.id)));
+      const logic = instantiateTemplate(
+        template,
+        values,
+        uniqueId(template.id),
+      );
+      const problem = validateLogicDocument({
+        version: 1,
+        logics: [logic],
+      }).find((issue) => issue.severity === "error");
+      if (problem) {
+        error = `${problem.path}: ${problem.message}`;
+        return;
+      }
+      onInsert(logic);
       onClose();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);

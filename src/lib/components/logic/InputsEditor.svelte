@@ -5,9 +5,12 @@
   let {
     inputs,
     onchange,
+    onRename,
   }: {
     inputs: Record<string, Input>;
     onchange: (inputs: Record<string, Input>) => void;
+    /** Rewrites every reference when the parent can (preferred). */
+    onRename?: (oldName: string, newName: string) => void;
   } = $props();
 
   function update(name: string, input: Input) {
@@ -17,6 +20,10 @@
   function rename(oldName: string, rawName: string) {
     const name = rawName.trim();
     if (!name || (name !== oldName && name in inputs)) return;
+    if (onRename) {
+      onRename(oldName, name);
+      return;
+    }
     const next: Record<string, Input> = {};
     for (const [key, value] of Object.entries(inputs)) {
       next[key === oldName ? name : key] = value;

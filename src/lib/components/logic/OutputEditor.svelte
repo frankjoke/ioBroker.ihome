@@ -16,7 +16,16 @@
 
   function setMap(state: string, raw: string) {
     if (output.scope !== "state") return;
-    const map = { ...(output.map ?? {}) };
+    const map: Record<string, string | number | boolean> = {
+      ...(output.map ?? {}),
+    };
+    // The first edit seeds every state with the value the select already
+    // shows, so the document never has a partially filled map.
+    if (!output.map) {
+      for (const name of stateNames) {
+        map[name] = output.type === "boolean" ? name.startsWith("On") : 0;
+      }
+    }
     if (raw === "") delete map[state];
     else map[state] = output.type === "boolean" ? raw === "true" : Number(raw);
     onchange({ ...output, map });

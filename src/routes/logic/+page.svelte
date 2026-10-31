@@ -3,6 +3,8 @@
   import {
     commitLogics,
     getLogicDocument,
+    logicBlocked,
+    logicIssues,
     logicSaveFailed,
     logicsLoadKind,
   } from "$lib/stores/logics.svelte";
@@ -17,6 +19,11 @@
 
   const selected = $derived(
     doc.logics.find((logic) => logic.id === selectedId) ?? null,
+  );
+  const selectedIssues = $derived(
+    selected
+      ? logicIssues().filter((issue) => issue.logicId === selected.id)
+      : [],
   );
 
   function uniqueId(base: string): string {
@@ -119,6 +126,15 @@
       onchange={update}
       onClose={() => (selectedId = null)}
     />
+    {#if selectedIssues.length > 0}
+      <ul class="issues card">
+        {#each selectedIssues as issue (issue.path + issue.message)}
+          <li class:text-danger={issue.severity === "error"}>
+            <span class="mono">{issue.path}</span> — {issue.message}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {:else if doc.logics.length === 0}
     <div class="card empty-state">
       <p class="text-muted">
@@ -170,7 +186,12 @@
     </div>
   {/if}
 
-  {#if logicSaveFailed()}
+  {#if logicBlocked()}
+    <p class="text-danger hint">
+      Not saved yet — fix the errors above. The adapter keeps the last valid
+      version.
+    </p>
+  {:else if logicSaveFailed()}
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 </div>
@@ -270,5 +291,14 @@
 
   .logic-name {
     font-weight: 600;
+  }
+
+  .issues {
+    margin: 0;
+    padding: 0.6rem 0.8rem 0.6rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: var(--body-sm);
   }
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LogicDef, Output } from "$logic/types";
+  import type { Input, LogicDef, Output } from "$logic/types";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
   import ExprEditor from "./ExprEditor.svelte";
@@ -24,6 +24,36 @@
 
   function patch(update: Partial<LogicDef>) {
     onchange({ ...logic, ...update } as LogicDef);
+  }
+
+  function renameRefs(value: unknown, from: string, to: string): unknown {
+    if (Array.isArray(value))
+      return value.map((item) => renameRefs(item, from, to));
+    if (value && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(value)) {
+        if ((key === "ref" || key === "on") && item === from) out[key] = to;
+        else out[key] = renameRefs(item, from, to);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  /** Renaming an input rewrites its rows, conditions and set targets. */
+  function renameInput(oldName: string, newName: string) {
+    const inputs = logic.inputs ?? {};
+    if (!newName || newName === oldName || newName in inputs) return;
+    const rebuilt: Record<string, Input> = {};
+    for (const [key, value] of Object.entries(inputs)) {
+      rebuilt[key === oldName ? newName : key] = value;
+    }
+    const rest = { ...logic } as Record<string, unknown>;
+    delete rest.inputs;
+    onchange({
+      ...(renameRefs(rest, oldName, newName) as object),
+      inputs: rebuilt,
+    } as LogicDef);
   }
 </script>
 
@@ -62,6 +92,7 @@
       <InputsEditor
         inputs={logic.inputs ?? {}}
         onchange={(inputs) => patch({ inputs })}
+        onRename={renameInput}
       />
     </div>
 

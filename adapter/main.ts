@@ -133,6 +133,8 @@ class IHome extends utils.Adapter {
   private logicValues = new Map<string, StateChange>();
   /** `common.type` of a referenced state, for writes. */
   private stateTypes = new Map<string, string>();
+  /** Guards overlapping reloads: only the newest may swap the engine. */
+  private logicLoad = 0;
   private heartbeat?: ReturnType<typeof setInterval>;
   private readonly startedAt = Date.now();
 
@@ -194,6 +196,7 @@ class IHome extends utils.Adapter {
    * running engine untouched.
    */
   private async loadLogics(): Promise<void> {
+    const loadId = ++this.logicLoad;
     const target = `${CONFIG_FOLDER}.logicList`;
     let doc: LogicDocument | null = { version: 1, logics: [] };
     try {
@@ -212,39 +215,47 @@ class IHome extends utils.Adapter {
       this.log.warn(`cannot read ${target}: ${error}`);
       return;
     }
+    if (loadId !== this.logicLoad) return; // a newer reload won
 
-    const next = createEngine(
-      doc,
-      {
-        read: (id) => this.logicValues.get(id)?.val,
-        write: (id, value, ack) => this.writeLogicState(id, value, ack),
-        log: (level, logicId, message) => {
-          const line = `[logic ${logicId}] ${message}`;
-          if (level === "warn") this.log.warn(line);
-          else this.log.info(line);
+    let next: Engine;
+    try {
+      next = createEngine(
+        doc,
+        {
+          read: (id) => this.logicValues.get(id)?.val,
+          write: (id, value, ack) => this.writeLogicState(id, value, ack),
+          log: (level, logicId, message) => {
+            const line = `[logic ${logicId}] ${message}`;
+            if (level === "warn") this.log.warn(line);
+            else this.log.info(line);
+          },
+          now: () => Date.now(),
+          setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+          clearTimeout: (handle) =>
+            clearTimeout(handle as unknown as ReturnType<typeof setTimeout>),
+          resolveVariable: (name) => {
+            const constant = this.variables.constants[name];
+            if (constant) return { kind: "const", value: constant.val };
+            const variable = this.variables.states[name];
+            if (variable) return { kind: "state", stateId: variable.stateId };
+            return undefined;
+          },
         },
-        now: () => Date.now(),
-        setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
-        clearTimeout: (handle) =>
-          clearTimeout(handle as unknown as NodeJS.Timeout),
-        resolveVariable: (name) => {
-          const constant = this.variables.constants[name];
-          if (constant) return { kind: "const", value: constant.val };
-          const variable = this.variables.states[name];
-          if (variable) return { kind: "state", stateId: variable.stateId };
-          return undefined;
-        },
-      },
-      { ownFrom: `system.adapter.${this.namespace}` },
-    );
+        { ownFrom: `system.adapter.${this.namespace}` },
+      );
+    } catch (error) {
+      this.log.warn(`logic engine not rebuilt: ${error}`);
+      return;
+    }
 
     const ids = next.subscriptions();
-    await this.warmLogicCache(ids);
-    const before = new Set(this.logicIds);
     const isOwn = (id: string) => id.startsWith(`${this.namespace}.`);
+    const before = new Set(this.logicIds);
     const added = ids.filter((id) => !before.has(id));
     const removed = this.logicIds.filter((id) => !ids.includes(id));
     try {
+      // Subscribe before warming: a change between the two is then delivered
+      // instead of being lost and leaving the engine on a stale value.
       const own = added.filter(isOwn);
       const foreign = added.filter((id) => !isOwn(id));
       if (own.length) await this.subscribeStatesAsync(own);
@@ -252,15 +263,40 @@ class IHome extends utils.Adapter {
       const ownGone = removed.filter(isOwn);
       const foreignGone = removed.filter((id) => !isOwn(id));
       if (ownGone.length) await this.unsubscribeStatesAsync(ownGone);
-      if (foreignGone.length) await this.unsubscribeForeignStatesAsync(foreignGone);
+      if (foreignGone.length)
+        await this.unsubscribeForeignStatesAsync(foreignGone);
     } catch (error) {
-      this.log.warn(`logic subscriptions: ${error}`);
+      // Keeping the old engine is better than running one that gets no events.
+      this.log.warn(
+        `logic subscriptions — keeping the running engine: ${error}`,
+      );
+      return;
+    }
+    if (loadId !== this.logicLoad) return;
+
+    await this.warmLogicCache(ids);
+    if (loadId !== this.logicLoad) return;
+
+    const missing = ids.filter((id) => !this.logicValues.has(id));
+    for (const id of missing) {
+      this.log.warn(
+        `logic: ${id} does not exist — the logic cannot react to it`,
+      );
+    }
+
+    try {
+      next.start();
+    } catch (error) {
+      next.stop();
+      this.log.warn(
+        `logic engine failed to start — keeping the running one: ${error}`,
+      );
+      return;
     }
 
     this.engine?.stop();
     this.logicIds = ids;
     this.engine = next;
-    next.start();
     this.log.info(
       `Logic engine: ${doc.logics.length} logic(s), ${ids.length} subscribed state(s)`,
     );
@@ -314,7 +350,8 @@ class IHome extends utils.Adapter {
     }
   }
 
-  private async onReady(): Promise<void> {    this.log.debug(
+  private async onReady(): Promise<void> {
+    this.log.debug(
       `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
     );
     for (const name of DOCS) {
@@ -407,7 +444,9 @@ class IHome extends utils.Adapter {
         // A variable edit can change what a logic ref resolves to.
         void this.loadVariables().then(() => this.loadLogics());
       } else if (id === `${this.namespace}.${CONFIG_FOLDER}.logicList`) {
-        this.log.debug(`${CONFIG_FOLDER}.logicList changed; reloading the engine`);
+        this.log.debug(
+          `${CONFIG_FOLDER}.logicList changed; reloading the engine`,
+        );
         void this.loadLogics();
       }
     });
@@ -426,6 +465,15 @@ class IHome extends utils.Adapter {
       this.engine.stop();
       this.engine = undefined;
     }
+    const ids = this.logicIds;
+    this.logicIds = [];
+    const own = ids.filter((id) => id.startsWith(`${this.namespace}.`));
+    const foreign = ids.filter((id) => !id.startsWith(`${this.namespace}.`));
+    if (own.length) void this.unsubscribeStatesAsync(own).catch(() => {});
+    if (foreign.length)
+      void this.unsubscribeForeignStatesAsync(foreign).catch(() => {});
+    this.logicValues.clear();
+    this.stateTypes.clear();
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = undefined;

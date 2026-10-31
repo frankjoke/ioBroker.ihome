@@ -55,10 +55,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: [
-      "src/**/*.{test,spec}.{js,ts}",
-      "adapter/logic/**/*.test.ts",
-    ],
+    include: ["src/**/*.{test,spec}.{js,ts}", "adapter/logic/**/*.test.ts"],
     expect: {
       requireAssertions: true,
     },

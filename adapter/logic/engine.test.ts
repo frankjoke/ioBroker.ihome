@@ -360,3 +360,97 @@ it("does not repeat an unchanged set action by default", () => {
   h.change("0_userdata.0.E", 1); // B enter sets the same value → no write
   expect(h.writes).toHaveLength(1);
 });
+
+it("fires timer inputs every interval and stops with the engine", () => {
+  const timed: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "tick",
+        name: "Tick",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "60s" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.TICK",
+          type: "number",
+          forward: "always",
+        },
+        expr: { ref: "t" },
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(timed, h.deps);
+  h.attach(engine);
+  engine.start();
+  const base = h.writes.length; // the start evaluation writes once
+  h.clock.advance(60_000);
+  expect(h.writes).toHaveLength(base + 1);
+  h.clock.advance(60_000);
+  expect(h.writes).toHaveLength(base + 2);
+  engine.stop();
+  h.clock.advance(180_000);
+  expect(h.writes).toHaveLength(base + 2);
+});
+
+it("does not emit a memory event when the value matches the seeded one", () => {
+  const seeded: LogicDocument = {
+    version: 1,
+    memory: [{ name: "x", type: "number", initial: 5 }],
+    logics: [
+      {
+        id: "keep",
+        name: "Keep",
+        kind: "function",
+        inputs: {
+          s: { from: { type: "state", ref: "0_userdata.0.S" }, kind: "event" },
+        },
+        output: { scope: "memory", name: "x" },
+        expr: { const: 5 },
+      },
+      {
+        id: "watch",
+        name: "Watch",
+        kind: "function",
+        inputs: { x: { from: { type: "memory", ref: "x" }, kind: "event" } },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.WATCH",
+          type: "number",
+          forward: "always",
+        },
+        expr: { ref: "x" },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.S": 0 });
+  const engine = createEngine(seeded, h.deps);
+  h.attach(engine);
+  engine.start();
+  // The watcher runs once at start (5). An event for the unchanged seeded
+  // value would run it again and write the same 5 a second time.
+  expect(h.writes).toEqual([{ id: "0_userdata.0.WATCH", value: 5, ack: true }]);
+});
+
+it("skips an invalid logic instead of throwing out of start", () => {
+  const broken = {
+    version: 1,
+    logics: [
+      {
+        id: "broken",
+        name: "Broken",
+        kind: "function",
+        expr: { const: 1 },
+        output: { scope: "state" },
+      },
+    ],
+  } as never;
+  const h = createHarness({});
+  const engine = createEngine(broken, h.deps);
+  h.attach(engine);
+  expect(() => engine.start()).not.toThrow();
+  expect(h.logs.some((line) => line.logicId === "broken")).toBe(true);
+});

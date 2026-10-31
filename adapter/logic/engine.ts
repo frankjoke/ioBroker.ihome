@@ -67,6 +67,8 @@ interface Runtime {
   /** Machine only: the current state and its `after` timer. */
   state?: string;
   timer?: number;
+  /** Timer inputs of this logic, by input name. */
+  timers: Map<string, number>;
 }
 
 interface Job {
@@ -147,6 +149,7 @@ export function createEngine(
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
+      timers: new Map<string, number>(),
     });
   }
 
@@ -244,7 +247,7 @@ export function createEngine(
       }
       return;
     }
-    const key = `${job.rt.def.id}|${job.input}|${JSON.stringify(job.value)}`;
+    const key = `${job.rt.def.id}|${job.rt.state ?? ""}|${job.input}|${JSON.stringify(job.value)}`;
     if (chainSeen.has(key)) {
       const warnKey = `loop:${job.rt.def.id}`;
       if (!chainWarned.has(warnKey)) {
@@ -316,7 +319,7 @@ export function createEngine(
     clearTimer(rt);
     if (!state.after) return;
     const ms = parseDuration(state.after.time);
-    if (ms === null) return;
+    if (ms === null || ms <= 0) return;
     rt.timer = deps.setTimeout(() => {
       rt.timer = undefined;
       if (rt.state === name) transition(rt, state.after!.goto, 0);
@@ -478,11 +481,11 @@ export function createEngine(
     const output = rt.output;
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
-      if (!forwardAllows(rt, value, output.forward)) return;
-      memory.set(name, value);
       rt.lastOutput = value;
       rt.hasOutput = true;
-      emitMemory(name, value, depth + 1);
+      // The stored memory value is the reference (spec §5.6), not the last
+      // write of this logic: a seeded value must not emit an event.
+      writeMemory(name, value, output.forward, depth);
       return;
     }
     const mapped = outputValue(rt, value);
@@ -490,6 +493,21 @@ export function createEngine(
     rt.lastOutput = mapped;
     rt.hasOutput = true;
     deps.write(output.ref, mapped, true);
+  }
+
+  function armTimer(rt: Runtime, input: InputRuntime): void {
+    if (input.input.from.type !== "timer") return;
+    const ms = parseDuration(input.input.from.every);
+    if (ms === null || ms <= 0) return;
+    const handle = deps.setTimeout(() => {
+      rt.timers.delete(input.name);
+      if (!started) return;
+      input.last = deps.now();
+      input.hasLast = true;
+      enqueue({ rt, input: input.name, value: input.last, depth: 0 });
+      armTimer(rt, input);
+    }, ms);
+    rt.timers.set(input.name, handle);
   }
 
   function emitMemory(name: string, value: unknown, depth: number): void {
@@ -529,9 +547,16 @@ export function createEngine(
         const start = def.start && def.states[def.start] ? def.start : first;
         if (start) transition(rt, start, 0);
       }
+      for (const rt of runtimes) {
+        for (const input of rt.inputs.values()) armTimer(rt, input);
+      }
     },
     stop() {
-      for (const rt of runtimes) clearTimer(rt);
+      for (const rt of runtimes) {
+        clearTimer(rt);
+        for (const handle of rt.timers.values()) deps.clearTimeout(handle);
+        rt.timers.clear();
+      }
       started = false;
       queue.length = 0;
       chainSeen = new Set<string>();

@@ -62,12 +62,20 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
   ) => issues.push({ logicId, path, message, severity });
 
   const seenIds = new Set<string>();
-  const memoryNames = new Set<string>((doc.memory ?? []).map((m) => m.name));
+  if (doc.memory !== undefined && !Array.isArray(doc.memory)) {
+    issues.push({
+      path: "memory",
+      message: "memory must be an array",
+      severity: "error",
+    });
+  }
+  const memoryDecls = Array.isArray(doc.memory) ? doc.memory : [];
+  const memoryNames = new Set<string>(memoryDecls.map((m) => m.name));
 
   // Memory declarations: a duplicate name with a different type is the only
   // conflict the document can express.
   const memoryTypes = new Map<string, string>();
-  for (const entry of (doc.memory ?? []) as MemoryDecl[]) {
+  for (const entry of memoryDecls as MemoryDecl[]) {
     if (typeof entry?.name !== "string" || !entry.name) {
       issues.push({
         path: "memory",
@@ -115,7 +123,8 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       if (!isRecord(source)) {
         add(id, `inputs.${name}.from`, "input without a source");
       } else if (source.type === "timer") {
-        if (parseDuration(source.every as string) === null) {
+        const every = parseDuration(source.every as string);
+        if (every === null || every <= 0) {
           add(id, `inputs.${name}.from.every`, "invalid duration");
         }
       } else if (source.type === "state" || source.type === "memory") {
@@ -147,7 +156,11 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       }
       checkOutput(id, logic.output, new Set(), add);
     } else if (logic.kind === "machine") {
-      const states = (logic.states ?? {}) as Record<string, StateDef>;
+      if (!isRecord(logic.states)) {
+        add(id, "states", "machine has no state object");
+        continue;
+      }
+      const states = logic.states as Record<string, StateDef>;
       const stateNames = Object.keys(states);
       if (stateNames.length === 0) add(id, "states", "machine has no states");
       if (logic.start !== undefined && !stateNames.includes(logic.start)) {
@@ -157,7 +170,8 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         const state = states[stateName] ?? {};
         const path = `states.${stateName}`;
         if (state.after) {
-          if (parseDuration(state.after.time) === null) {
+          const after = parseDuration(state.after.time);
+          if (after === null || after <= 0) {
             add(id, `${path}.after.time`, "invalid duration");
           }
           if (!stateNames.includes(state.after.goto)) {
@@ -186,18 +200,22 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
             add,
           ),
         );
-        (state.on ?? []).forEach((row, index) =>
-          checkRow(
-            id,
-            row,
-            `${path}.on.${index}`,
-            inputNames,
-            inputs,
-            memoryNames,
-            stateNames,
-            add,
-          ),
-        );
+        if (state.on !== undefined && !Array.isArray(state.on)) {
+          add(id, `${path}.on`, "on must be an array of rows");
+        } else {
+          (Array.isArray(state.on) ? state.on : []).forEach((row, index) =>
+            checkRow(
+              id,
+              row,
+              `${path}.on.${index}`,
+              inputNames,
+              inputs,
+              memoryNames,
+              stateNames,
+              add,
+            ),
+          );
+        }
       }
       checkOutput(id, logic.output, new Set(stateNames), add);
     } else {
@@ -225,7 +243,8 @@ function checkOutput(
   stateNames: Set<string>,
   add: Add,
 ): void {
-  if (!output || output.scope === "memory" || stateNames.size === 0) return;
+  if (!output) return;
+  if (output.scope === "memory") return;
   if (output.scope !== "state") {
     add(id, "output.scope", "unknown output scope");
     return;
@@ -233,11 +252,24 @@ function checkOutput(
   if (typeof output.ref !== "string" || !output.ref) {
     add(id, "output.ref", "output without a ref");
   }
+  if (
+    output.type !== "boolean" &&
+    output.type !== "number" &&
+    output.type !== "string"
+  ) {
+    add(id, "output.type", "unknown output type");
+  }
+  // Map rules only apply to machines, but the ref/type checks always do.
+  if (stateNames.size === 0) return;
   if (output.type === "number" && !output.map) {
     add(id, "output.map", "a number output needs a map for every state");
     return;
   }
-  if (!output.map) return;
+  if (output.map === undefined) return;
+  if (!isRecord(output.map)) {
+    add(id, "output.map", "map must be an object");
+    return;
+  }
   for (const state of stateNames) {
     if (!(state in output.map)) {
       add(id, "output.map", `no map value for state ${state}`);
