@@ -52,23 +52,6 @@
       forward: output.forward,
     });
   }
-
-  function setMap(state: string, raw: string) {
-    if (output.scope !== "state") return;
-    const map: Record<string, string | number | boolean> = {
-      ...(output.map ?? {}),
-    };
-    // The first edit seeds every state with the value the select already
-    // shows, so the document never has a partially filled map.
-    if (!output.map) {
-      for (const name of stateNames) {
-        map[name] = output.type === "boolean" ? name.startsWith("On") : 0;
-      }
-    }
-    if (raw === "") delete map[state];
-    else map[state] = output.type === "boolean" ? raw === "true" : Number(raw);
-    onchange({ ...output, map });
-  }
 </script>
 
 <div class="output">
@@ -142,32 +125,31 @@
           })}
       />
     </div>
-  {:else if output.type !== "string" && stateNames.length > 0}
-    <div class="map">
-      <span class="label-mono">Value per state</span>
-      {#each stateNames as state (state)}
-        <label class="map-row"
-          ><span class="mono">{state}</span>
-          {#if output.type === "boolean"}
-            <select
-              aria-label={`Value for ${state}`}
-              value={String(output.map?.[state] ?? state.startsWith("On"))}
-              onchange={(e) => setMap(state, e.currentTarget.value)}
-            >
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
-          {:else}
-            <input
-              type="number"
-              aria-label={`Value for ${state}`}
-              value={String(output.map?.[state] ?? "")}
-              placeholder="required"
-              onchange={(e) => setMap(state, e.currentTarget.value)}
-            />
-          {/if}
-        </label>
-      {/each}
+  {:else if output.type === "boolean"}
+    <div class="row">
+      <span class="label-mono">True for states</span>
+      <input
+        class="mono"
+        aria-label="True state pattern"
+        value={output.on ?? "On*"}
+        placeholder="On*"
+        onchange={(e) =>
+          onchange({
+            ...output,
+            on: e.currentTarget.value.trim() || "On*",
+          })}
+      />
+      <span class="hint text-muted">
+        * matches any name; every other state writes false
+      </span>
+    </div>
+  {:else if output.type === "number" && stateNames.length > 0}
+    <div class="row">
+      <span class="label-mono">Values</span>
+      <span class="hint text-muted">state index, in this order:</span>
+      <span class="mono">
+        {stateNames.map((state, index) => `${index} = ${state}`).join(" · ")}
+      </span>
     </div>
   {/if}
 </div>
@@ -180,32 +162,16 @@
   }
 
   .row,
-  .inline,
-  .map-row {
+  .inline {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: nowrap;
   }
 
-  .map {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-
-  .map-row {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
   .row input:not([type="checkbox"]) {
     flex: 1 1 auto;
     min-width: 6rem;
-  }
-
-  .map-row .mono {
-    min-width: 8rem;
   }
 
   .state-value {
