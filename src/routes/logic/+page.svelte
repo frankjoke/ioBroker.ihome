@@ -64,7 +64,7 @@
 
   function duplicate(logic: LogicDef) {
     const id = uniqueId(`${logic.id}-copy`);
-    const copy = structuredClone(logic);
+    const copy = $state.snapshot(logic) as LogicDef;
     copy.id = id;
     copy.name = `${logic.name} copy`;
     if (copy.output?.scope === "memory" && copy.output.name === logic.id) {
@@ -319,6 +319,4 @@
   .logic-name {
     font-weight: 600;
   }
-
-
 </style>

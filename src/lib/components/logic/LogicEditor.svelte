@@ -22,7 +22,7 @@
 
   /** Edits happen on a copy: the document (and the adapter) only sees them on
    *  Save, so typing does not reload the logic engine. */
-  let draft = $state(untrack(() => structuredClone(logic)));
+  let draft = $state(untrack(() => $state.snapshot(logic)));
   let askClose = $state(false);
 
   const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(logic));
@@ -80,7 +80,7 @@
   }
 
   function cancel() {
-    draft = structuredClone(logic);
+    draft = $state.snapshot(logic);
   }
 
   function close() {
