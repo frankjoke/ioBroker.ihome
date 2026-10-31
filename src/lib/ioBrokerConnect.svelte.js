@@ -36,6 +36,8 @@ export const ioBroker = $state({
   serviceWorker: navigator.serviceWorker,
   socket,
   connected: 0,
+  /** When a `*.config.*` document last changed; restarts the reload timer. */
+  configChangedAt: 0,
   /** Which client is live: "io2" (the web adapter's socket.io) or "ws" (the
    *  admin's ws-server). Shown in the settings; set on every connect. */
   transport: null,
@@ -361,6 +363,10 @@ async function connectIOBroker(options = {}) {
     });
     // Only *used* states live in the state cache and only they are updated.
     socket.on("stateChange", (stateId, state) => {
+      // Any config document write (this browser or another) restarts the wall
+      // display's reload timer, so a reload never lands mid-configuration.
+      if (stateId.startsWith(`${ioBroker.namespace}.config.`))
+        ioBroker.configChangedAt = Date.now();
       if (!getUsedStateIds().has(stateId)) return;
       state.now = Date.now();
       states.update(stateId, state);

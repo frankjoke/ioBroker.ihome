@@ -142,9 +142,10 @@
       </div>
       <p class="hint text-muted">
         For a wall display that runs for days: it reloads itself on this
-        interval, clearing a connection that died without an event. Only while
-        the page is visible, and never on a config page (its edits are only in
-        memory until Save).
+        interval, clearing a connection that died without an event. The count
+        restarts whenever a config document is saved, so configuring never meets
+        a reload — and it only runs while the page is visible, never on a config
+        page (its edits are only in memory until Save).
       </p>
     </div>
   </section>
