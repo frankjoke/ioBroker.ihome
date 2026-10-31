@@ -212,9 +212,7 @@
     confirmLabel="Delete"
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}
-  >
-    The logic is removed from the document; the adapter stops it immediately.
-  </ConfirmModal>
+  />
 {/if}
 
 <style>

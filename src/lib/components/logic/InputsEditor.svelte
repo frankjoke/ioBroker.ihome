@@ -292,9 +292,7 @@
       pendingDelete = null;
     }}
     onCancel={() => (pendingDelete = null)}
-  >
-    Rows and conditions that use this input will no longer resolve.
-  </ConfirmModal>
+  />
 {/if}
 
 <style>

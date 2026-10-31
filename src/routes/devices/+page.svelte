@@ -393,14 +393,11 @@
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}
   >
-    <p>
-      Delete <strong>{pendingDelete.name}</strong>
-      <span class="text-muted"
-        >— {pendingDelete.type}, {pendingDelete.controls?.length ?? 0} control{pendingDelete
-          .controls?.length === 1
-          ? ""
-          : "s"}</span
-      >?
+    <p class="text-muted">
+      {pendingDelete.type}, {pendingDelete.controls?.length ?? 0} control{pendingDelete
+        .controls?.length === 1
+        ? ""
+        : "s"}
     </p>
     <p class="text-muted">
       {pendingSlots} slot{pendingSlots === 1 ? "" : "s"} on the pages reference this

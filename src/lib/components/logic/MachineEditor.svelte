@@ -605,11 +605,7 @@
       pendingDelete = null;
     }}
     onCancel={() => (pendingDelete = null)}
-  >
-    {pendingDelete.kind === "state"
-      ? "The state and its events are removed from the document."
-      : "The event row is removed from this state."}
-  </ConfirmModal>
+  />
 {/if}
 
 <style>

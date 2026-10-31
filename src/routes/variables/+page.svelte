@@ -664,7 +664,6 @@
       onConfirm={confirmDelete}
       onCancel={() => (pendingDelete = null)}
     >
-      <p>The entry is removed from the variable list.</p>
       {#if pendingDelete.kind === "state" && pendingDelete.stateId}
         <p class="text-muted">
           The ioBroker state <code>{pendingDelete.stateId}</code> is left in place.
