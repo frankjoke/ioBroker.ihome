@@ -134,6 +134,9 @@ class IHome extends utils.Adapter {
   private logicValues = new Map<string, StateChange>();
   /** `common.type` of a referenced state, for writes. */
   private stateTypes = new Map<string, string>();
+  /** `common.write` of a referenced state; read-only targets are never written. */
+  private stateWritable = new Map<string, boolean>();
+  private warnedWrites = new Set<string>();
   /** Guards overlapping reloads: only the newest may swap the engine. */
   private logicLoad = 0;
   private heartbeat?: ReturnType<typeof setInterval>;
@@ -329,8 +332,11 @@ class IHome extends utils.Adapter {
           const object = isOwn(id)
             ? await this.getObjectAsync(id)
             : await this.getForeignObjectAsync(id);
-          const type = (object?.common as { type?: string } | undefined)?.type;
-          if (type) this.stateTypes.set(id, type);
+          const common = (object?.common ?? undefined) as
+            | { type?: string; write?: boolean }
+            | undefined;
+          if (common?.type) this.stateTypes.set(id, common.type);
+          if (common) this.stateWritable.set(id, common.write !== false);
         } catch {
           // a state without an object keeps its value type
         }
@@ -339,6 +345,15 @@ class IHome extends utils.Adapter {
   }
 
   private writeLogicState(id: string, value: unknown, ack: boolean): void {
+    if (this.stateWritable.get(id) === false) {
+      if (!this.warnedWrites.has(id)) {
+        this.warnedWrites.add(id);
+        this.log.warn(
+          `logic: refusing to write ${id} — the state is read-only`,
+        );
+      }
+      return;
+    }
     const state = {
       val: coerceStateValue(value, this.stateTypes.get(id)) as never,
       ack,
@@ -479,6 +494,8 @@ class IHome extends utils.Adapter {
       void this.unsubscribeForeignStatesAsync(foreign).catch(() => {});
     this.logicValues.clear();
     this.stateTypes.clear();
+    this.stateWritable.clear();
+    this.warnedWrites.clear();
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = undefined;

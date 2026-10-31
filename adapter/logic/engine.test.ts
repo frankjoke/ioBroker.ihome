@@ -977,14 +977,16 @@ it("logs state changes only when the logic enables it", () => {
   h.attach(engine);
   engine.start();
   expect(
-    h.logs.some((line) => line.message.includes('enter “Idle”')),
+    h.logs.some((line) => line.message.includes('starts in “Idle”')),
   ).toBe(true);
   h.change("0_userdata.0.M", true);
   expect(
-    h.logs.some((line) => line.message.includes('exit “Idle”')),
+    h.logs.some((line) =>
+      line.message.includes(
+        'moves from “Idle” to “On” because of event “motion”',
+      ),
+    ),
   ).toBe(true);
-  expect(h.logs.some((line) => line.message.includes('enter “On”'))).toBe(true);
-  expect(h.logs.some((line) => line.message.includes("on motion"))).toBe(true);
 
   const quiet = machine();
   const h2 = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });

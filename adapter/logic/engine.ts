@@ -191,6 +191,13 @@ export function createEngine(
 
   const warn = (logicId: string, message: string) =>
     deps.log("warn", logicId, message);
+  const warned = new Set<string>();
+  function warnOnce(logicId: string, message: string): void {
+    const key = `${logicId}|${message}`;
+    if (warned.has(key)) return;
+    warned.add(key);
+    warn(logicId, message);
+  }
 
   /** State changes are only logged for a logic with `log: true`. */
   function stateLog(rt: Runtime, message: string): void {
@@ -349,7 +356,9 @@ export function createEngine(
         }
       }
       runActions(rt, row.do ?? [], job.depth);
-      if (row.goto) transition(rt, row.goto, job.depth, `on ${job.input}`);
+      if (row.goto) {
+        transition(rt, row.goto, job.depth, `event “${job.input}”`);
+      }
       return;
     }
   }
@@ -396,7 +405,12 @@ export function createEngine(
     rt.timer = deps.setTimeout(() => {
       rt.timer = undefined;
       if (rt.state === name) {
-        transition(rt, state.after!.goto, 0, `after ${state.after!.time}`);
+        transition(
+          rt,
+          state.after!.goto,
+          0,
+          `timeout “${state.after!.time}”`,
+        );
       }
     }, ms);
   }
@@ -415,18 +429,28 @@ export function createEngine(
     }
     const same = rt.state === name;
     const previous = rt.state ? def.states[rt.state] : undefined;
-    const why = reason ? ` (${reason})` : "";
+    const oldName = rt.state;
+    const because = reason ? ` because of ${reason}` : "";
     if (same) {
-      stateLog(rt, `re-enter “${name}”${why}`);
+      stateLog(
+        rt,
+        `Logic “${def.name}” stays in “${name}”${because}`,
+      );
       clearTimer(rt);
     } else {
       if (previous) {
-        stateLog(rt, `exit “${rt.state}”${why}`);
+        stateLog(
+          rt,
+          oldName
+            ? `Logic “${def.name}” moves from “${oldName}” to “${name}”${because}`
+            : `Logic “${def.name}” starts in “${name}”${because}`,
+        );
         runActions(rt, previous.exit ?? [], depth);
+      } else {
+        stateLog(rt, `Logic “${def.name}” starts in “${name}”${because}`);
       }
       clearTimer(rt);
       rt.state = name;
-      stateLog(rt, `enter “${name}”${why}`);
       runActions(rt, next.enter ?? [], depth);
     }
     armAfter(rt, name, next);
@@ -510,7 +534,7 @@ export function createEngine(
     if (variable?.kind === "state") {
       writeState(rt, variable.stateId, value, ack, forward);
     } else {
-      warn(rt.def.id, `cannot write ${ref}: not a state or memory name`);
+      warnOnce(rt.def.id, `cannot write ${ref}: not a state or memory name`);
     }
   }
 
