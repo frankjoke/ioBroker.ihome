@@ -936,3 +936,35 @@ it("one input can listen to several states as the same event", () => {
   expect(h.writes.at(-1)?.value).toBe(1);
   expect(h.writes).toHaveLength(2);
 });
+
+it("applies the row edge instead of an input filter", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "edge",
+        name: "Edge",
+        kind: "machine",
+        inputs: {
+          b: { from: { type: "state", ref: "0_userdata.0.B" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: { on: [{ on: "b", edge: "rising", goto: "B" }] },
+          B: { on: [{ on: "b", edge: "falling", goto: "A" }] },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.B": false });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.B", true);
+  expect(engine.memoryValue("edge")).toBe("B");
+  h.change("0_userdata.0.B", true); // not falling
+  expect(engine.memoryValue("edge")).toBe("B");
+  h.change("0_userdata.0.B", false);
+  expect(engine.memoryValue("edge")).toBe("A");
+});

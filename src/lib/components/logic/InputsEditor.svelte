@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Input, InputSource } from "$logic/types";
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import MultiStateField from "./MultiStateField.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import MultiStateField from "./MultiStateField.svelte";
+  import StateRefField from "./StateRefField.svelte";
 
   let {
     inputs,
@@ -50,14 +51,17 @@
     if (editing === name) editing = null;
   }
 
-  function add() {
+  function add(kind: "variable" | "event") {
     let index = Object.keys(inputs).length + 1;
-    let name = `input${index}`;
-    while (name in inputs) name = `input${++index}`;
-    onchange({
-      ...inputs,
-      [name]: { from: { type: "state", ref: "" }, kind: "event" },
-    });
+    let name = kind === "event" ? `event${index}` : `variable${index}`;
+    while (name in inputs) {
+      name = `${kind === "event" ? "event" : "variable"}${++index}`;
+    }
+    const from: InputSource =
+      kind === "event"
+        ? { type: "state", ref: "", refs: [] }
+        : { type: "state", ref: "" };
+    onchange({ ...inputs, [name]: { from, kind } });
     editing = name;
   }
 
@@ -68,38 +72,37 @@
   }
 
   function sourceLabel(input: Input): string {
-    if (input.from.type === "state")
-      return input.from.ref || "(no state selected)";
+    if (input.from.type === "state") {
+      const all = [input.from.ref, ...(input.from.refs ?? [])].filter(Boolean);
+      if (all.length === 0) return "(no state selected)";
+      if (all.length === 1) return all[0];
+      return `${all[0]} +${all.length - 1}`;
+    }
     if (input.from.type === "memory")
       return input.from.ref || "(no memory name)";
     return `every ${input.from.every}`;
-  }
-
-  function kindLabel(input: Input): string {
-    if (input.from.type === "timer") return "event";
-    return input.kind === "event" ? "event" : "variable";
   }
 </script>
 
 <div class="inputs">
   <div class="inputs-head">
-    <span class="label-mono">Inputs &amp; events</span>
+    <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
-      <IconButton
-        icon="add"
-        label="Add input"
-        title="Add input"
-        onclick={add}
-      />
+      <button type="button" class="btn btn-sm" onclick={() => add("variable")}>
+        <span class="material-symbols-outlined">add</span> Variable
+      </button>
+      <button type="button" class="btn btn-sm" onclick={() => add("event")}>
+        <span class="material-symbols-outlined">add</span> Event
+      </button>
     </span>
   </div>
 
   {#each Object.entries(inputs) as [name, input] (name)}
-    <div class="input-row" class:open={editing === name}>
+    <div class="input-row">
       <div class="summary">
         <span class="input-name mono">{name}</span>
+        <span class="badge badge-secondary">{input.kind}</span>
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
-        <span class="badge badge-secondary">{kindLabel(input)}</span>
         <span class="spacer"></span>
         <IconButton
           icon={editing === name ? "expand_less" : "edit"}
@@ -141,94 +144,42 @@
             >
               <option value="state">State / variable</option>
               <option value="memory">Memory</option>
-              <option value="timer">Timer</option>
+              {#if input.kind === "event"}
+                <option value="timer">Timer</option>
+              {/if}
             </select>
           </label>
 
           {#if input.from.type === "state"}
             <div class="field wide">
-              <span class="label-mono">States</span>
-              <MultiStateField
-                value={[input.from.ref, ...(input.from.refs ?? [])].filter(
-                  Boolean,
-                )}
-                label={`States for ${name}`}
-                onchange={(ids) =>
-                  update(name, {
-                    ...input,
-                    from: {
-                      type: "state",
-                      ref: ids[0] ?? "",
-                      refs: ids.slice(1),
-                    },
-                  })}
-              />
+              <span class="label-mono">
+                {input.kind === "event" ? "States" : "State"}
+              </span>
+              {#if input.kind === "event"}
+                <MultiStateField
+                  value={[input.from.ref, ...(input.from.refs ?? [])].filter(
+                    Boolean,
+                  )}
+                  label={`States for ${name}`}
+                  onchange={(ids) =>
+                    update(name, {
+                      ...input,
+                      from: {
+                        type: "state",
+                        ref: ids[0] ?? "",
+                        refs: ids.slice(1),
+                      },
+                    })}
+                />
+              {:else}
+                <StateRefField
+                  value={input.from.ref}
+                  label={`State for ${name}`}
+                  onchange={(ref) =>
+                    update(name, { ...input, from: { type: "state", ref } })}
+                />
+              {/if}
             </div>
-            <label class="field"
-              ><span class="label-mono">Kind</span>
-              <select
-                aria-label={`Kind for ${name}`}
-                value={input.kind ?? "variable"}
-                onchange={(e) =>
-                  update(name, {
-                    ...input,
-                    kind: e.currentTarget.value as "variable" | "event",
-                  })}
-              >
-                <option value="variable">variable</option>
-                <option value="event">event</option>
-              </select>
-            </label>
-            {#if (input.kind ?? "variable") === "event"}
-              <label class="field"
-                ><span class="label-mono">Mode</span>
-                <select
-                  aria-label={`Mode for ${name}`}
-                  value={input.mode ?? "changed"}
-                  onchange={(e) =>
-                    update(name, {
-                      ...input,
-                      mode: e.currentTarget.value as "changed" | "any",
-                    })}
-                >
-                  <option value="changed">on change</option>
-                  <option value="any">every update</option>
-                </select>
-              </label>
-              <label class="field"
-                ><span class="label-mono">Ack</span>
-                <select
-                  aria-label={`Ack filter for ${name}`}
-                  value={input.ack ?? "any"}
-                  onchange={(e) =>
-                    update(name, {
-                      ...input,
-                      ack: e.currentTarget.value as "any" | "true" | "false",
-                    })}
-                >
-                  <option value="any">any ack</option>
-                  <option value="false">commands only</option>
-                  <option value="true">confirmations only</option>
-                </select>
-              </label>
-              <label class="field"
-                ><span class="label-mono">Source</span>
-                <select
-                  aria-label={`Source for ${name}`}
-                  value={input.source ?? "external"}
-                  onchange={(e) =>
-                    update(name, {
-                      ...input,
-                      source: e.currentTarget.value as
-                        "external" | "self" | "any",
-                    })}
-                >
-                  <option value="external">external sources</option>
-                  <option value="self">own writes</option>
-                  <option value="any">any source</option>
-                </select>
-              </label>
-            {/if}
           {:else if input.from.type === "memory"}
             <label class="field"
               ><span class="label-mono">Memory</span>
@@ -243,21 +194,6 @@
                     from: { type: "memory", ref: e.currentTarget.value.trim() },
                   })}
               />
-            </label>
-            <label class="field"
-              ><span class="label-mono">Kind</span>
-              <select
-                aria-label={`Kind for ${name}`}
-                value={input.kind ?? "variable"}
-                onchange={(e) =>
-                  update(name, {
-                    ...input,
-                    kind: e.currentTarget.value as "variable" | "event",
-                  })}
-              >
-                <option value="variable">variable</option>
-                <option value="event">event</option>
-              </select>
             </label>
           {:else}
             <label class="field"
@@ -284,7 +220,9 @@
   {/each}
 
   {#if Object.keys(inputs).length === 0}
-    <p class="hint text-muted">No inputs yet — use the + on the line above.</p>
+    <p class="hint text-muted">
+      No local variables or events yet — use the buttons above.
+    </p>
   {/if}
 </div>
 
@@ -315,11 +253,17 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .add-slot {
     margin-left: auto;
     display: inline-flex;
+    gap: 0.4rem;
+  }
+
+  .add-slot .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .input-row {

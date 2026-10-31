@@ -128,6 +128,9 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         if (every === null || every <= 0) {
           add(id, `inputs.${name}.from.every`, "invalid duration");
         }
+        if ((input.kind ?? "variable") === "variable") {
+          add(id, `inputs.${name}.from.type`, "a variable cannot be a timer");
+        }
       } else if (source.type === "state" || source.type === "memory") {
         if (typeof source.ref !== "string" || !source.ref) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
@@ -142,6 +145,18 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
               `inputs.${name}.from.refs`,
               "every extra state needs an id",
             );
+          }
+        }
+        if (
+          input.kind !== undefined &&
+          input.kind !== "variable" &&
+          input.kind !== "event"
+        ) {
+          add(id, `inputs.${name}.kind`, "unknown input kind");
+        }
+        if ((input.kind ?? "variable") === "variable") {
+          if (source.type === "state" && (source.refs?.length ?? 0) > 0) {
+            add(id, `inputs.${name}.from.refs`, "a variable has one source");
           }
         }
         if (
@@ -343,6 +358,31 @@ function checkRow(
   stateNames: string[],
   add: Add,
 ): void {
+  if (
+    row?.edge !== undefined &&
+    row.edge !== "change" &&
+    row.edge !== "rising" &&
+    row.edge !== "falling" &&
+    row.edge !== "any"
+  ) {
+    add(id, `${path}.edge`, "unknown edge");
+  }
+  if (
+    row?.ack !== undefined &&
+    row.ack !== "any" &&
+    row.ack !== "true" &&
+    row.ack !== "false"
+  ) {
+    add(id, `${path}.ack`, "unknown ack filter");
+  }
+  if (
+    row?.source !== undefined &&
+    row.source !== "external" &&
+    row.source !== "self" &&
+    row.source !== "any"
+  ) {
+    add(id, `${path}.source`, "unknown event source");
+  }
   const input = row?.on;
   if (input === "$init") {
     // The built-in start trigger (D19); only machines have rows.

@@ -17,13 +17,11 @@ export type InputSource =
 
 export interface Input {
   from: InputSource;
-  /** Default "variable": readable, never triggers. */
-  kind?: "variable" | "event";
-  /** Event + state inputs only. Default "changed". */
+  /** Variables are read-only values from one source; events trigger rows. */
+  kind: "variable" | "event";
+  /** Legacy (pre row-usage): read as the row default, no longer written. */
   mode?: "changed" | "any";
-  /** Event + state inputs only. Default "any". */
   ack?: "any" | "true" | "false";
-  /** Event inputs only: which writers may trigger. Default "external". */
   source?: "external" | "self" | "any";
 }
 
@@ -80,6 +78,13 @@ export type Action =
 export interface OnRow {
   /** An input name whose kind is "event". */
   on: string;
+  /** What counts as this row's trigger. Default "change" (legacy `mode: "any"`
+   *  on the input still means "any"). */
+  edge?: "change" | "rising" | "falling" | "any";
+  /** Ack filter for this usage; default "any". */
+  ack?: "any" | "true" | "false";
+  /** Which writers may trigger this usage; default "external". */
+  source?: "external" | "self" | "any";
   /** Test the event value; absent = any change. */
   is?: { op: Operator; value?: Json };
   /** Further condition over any ref, evaluated on the event. */

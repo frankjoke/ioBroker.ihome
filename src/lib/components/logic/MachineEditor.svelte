@@ -181,6 +181,9 @@
         row.is.value === undefined ? "" : ` ${String(row.is.value)}`;
       parts.push(`${row.is.op}${value}`);
     }
+    if (row.edge && row.edge !== "change") parts.push(row.edge);
+    if (row.source && row.source !== "external")
+      parts.push(`source ${row.source}`);
     if (row.if) parts.push("if …");
     if (row.do?.length) {
       parts.push(`${row.do.length} action${row.do.length > 1 ? "s" : ""}`);
@@ -506,6 +509,61 @@
                               })}
                           />
                         {/if}
+                      </div>
+
+                      <div class="row">
+                        <label class="field"
+                          ><span class="label-mono">Edge</span>
+                          <select
+                            aria-label="Edge"
+                            value={row.edge ?? "change"}
+                            onchange={(e) =>
+                              updateRow(name, index, {
+                                ...row,
+                                edge: e.currentTarget.value as
+                                  "change" | "rising" | "falling" | "any",
+                              })}
+                          >
+                            <option value="change">on change</option>
+                            <option value="rising">rising</option>
+                            <option value="falling">falling</option>
+                            <option value="any">every update</option>
+                          </select>
+                        </label>
+                        <label class="field"
+                          ><span class="label-mono">Ack</span>
+                          <select
+                            aria-label="Ack filter"
+                            value={row.ack ?? "any"}
+                            onchange={(e) =>
+                              updateRow(name, index, {
+                                ...row,
+                                ack: e.currentTarget.value as
+                                  "any" | "true" | "false",
+                              })}
+                          >
+                            <option value="any">any</option>
+                            <option value="false">commands</option>
+                            <option value="true">confirmations</option>
+                          </select>
+                        </label>
+                        <label class="field"
+                          ><span class="label-mono">Source</span>
+                          <select
+                            aria-label="Event source"
+                            value={row.source ?? "external"}
+                            onchange={(e) =>
+                              updateRow(name, index, {
+                                ...row,
+                                source: e.currentTarget.value as
+                                  "external" | "self" | "any",
+                              })}
+                          >
+                            <option value="external">external</option>
+                            <option value="self">own writes</option>
+                            <option value="any">any</option>
+                          </select>
+                        </label>
                       </div>
 
                       <div class="block">

@@ -9,6 +9,7 @@ import type {
   LogicDef,
   LogicDocument,
   MachineLogic,
+  OnRow,
   Output,
   StateDef,
 } from "./types";
@@ -89,6 +90,9 @@ interface Job {
   rt: Runtime;
   input: string;
   value: unknown;
+  /** The source's value before this update; rows compare edges against it. */
+  previous?: unknown;
+  hasPrevious: boolean;
   depth: number;
   meta: EventMeta;
 }
@@ -293,7 +297,25 @@ export function createEngine(
     currentMeta = job.meta;
     try {
       if (job.rt.def.kind === "function") {
-        runFunction(job.rt, job.depth);
+        const input = job.rt.inputs.get(job.input)?.input;
+        const origin =
+          input?.from.type === "state" || input?.from.type === "memory";
+        if (origin) {
+          const source = input?.source ?? "external";
+          if (
+            source === "self"
+              ? !job.meta.self
+              : job.meta.self && source === "external"
+          ) {
+            return;
+          }
+          if (!ackMatches(input?.ack, job.meta.ack)) return;
+        }
+        const isMemory = input?.from.type === "memory";
+        const unchanged = job.hasPrevious && Object.is(job.previous, job.value);
+        if (input?.mode === "any" || isMemory || !unchanged) {
+          runFunction(job.rt, job.depth);
+        }
       } else {
         handleMachine(job);
       }
@@ -307,8 +329,10 @@ export function createEngine(
     const def = rt.def as MachineLogic;
     const state = rt.state ? def.states[rt.state] : undefined;
     if (!state) return;
+    const input = rt.inputs.get(job.input);
     for (const row of state.on ?? []) {
       if (row.on !== job.input) continue;
+      if (!rowApplies(row, job, input)) continue;
       if (row.is && !matchesIs(row.is, job.value)) continue;
       if (row.if) {
         try {
@@ -430,8 +454,10 @@ export function createEngine(
     ) {
       return;
     }
+    const previous = memory.get(name);
+    const hasPrevious = memory.has(name);
     memory.set(name, value);
-    emitMemory(name, value, depth + 1, producer);
+    emitMemory(name, value, depth + 1, producer, previous, hasPrevious);
   }
 
   function writeTarget(
@@ -591,6 +617,8 @@ export function createEngine(
         rt,
         input: "$init",
         value: true,
+        previous: false,
+        hasPrevious: true,
         depth: 0,
         meta: { from: "init", self: true, ts: deps.now() },
       });
@@ -639,12 +667,15 @@ export function createEngine(
     const handle = deps.setTimeout(() => {
       rt.timers.delete(input.name);
       if (!started) return;
+      const previous = input.last;
       input.last = deps.now();
       input.hasLast = true;
       enqueue({
         rt,
         input: input.name,
         value: input.last,
+        previous,
+        hasPrevious: previous !== undefined,
         depth: 0,
         meta: { from: "timer", self: true, ts: deps.now() },
       });
@@ -658,6 +689,8 @@ export function createEngine(
     value: unknown,
     depth: number,
     producer: string,
+    previous: unknown,
+    hasPrevious: boolean,
   ): void {
     for (const rt of runtimes) {
       for (const input of rt.inputs.values()) {
@@ -668,16 +701,16 @@ export function createEngine(
         ) {
           continue;
         }
-        const self = producer === rt.def.id;
-        if (!sourceAllows(input, self)) continue;
         enqueue({
           rt,
           input: input.name,
           value,
+          previous,
+          hasPrevious,
           depth,
           meta: {
             from: `memory:${producer}`,
-            self,
+            self: producer === rt.def.id,
             ack: false,
             ts: deps.now(),
           },
@@ -686,10 +719,30 @@ export function createEngine(
     }
   }
 
-  function sourceAllows(input: InputRuntime, self: boolean): boolean {
-    const source = input.input.source ?? "external";
+  function rowApplies(
+    row: OnRow,
+    job: Job,
+    input: InputRuntime | undefined,
+  ): boolean {
+    const legacy = input?.input;
+    const edge = row.edge ?? (legacy?.mode === "any" ? "any" : "change");
+    if (
+      edge === "change" &&
+      job.hasPrevious &&
+      Object.is(job.previous, job.value)
+    ) {
+      return false;
+    }
+    // Without a previous value the first event counts as an edge from falsy.
+    if (edge === "rising" && !(!job.previous && job.value)) return false;
+    if (edge === "falling" && !(job.previous && !job.value)) return false;
+    if (!ackMatches(row.ack ?? legacy?.ack, job.meta.ack)) return false;
+    const origin =
+      input?.input.from.type === "state" || input?.input.from.type === "memory";
+    if (!origin) return true; // timers and $init have no external writer
+    const source = row.source ?? legacy?.source ?? "external";
     if (source === "any") return true;
-    return source === "self" ? self : !self;
+    return source === "self" ? job.meta.self : !job.meta.self;
   }
 
   function ackMatches(filter: Input["ack"], ack: boolean | undefined): boolean {
@@ -738,25 +791,17 @@ export function createEngine(
         for (const input of rt.inputs.values()) {
           if (!input.stateIds.includes(change.id)) continue;
           if ((input.input.kind ?? "variable") !== "event") continue;
-          if (!sourceAllows(input, self)) continue;
-          const seen = input.lastById.has(change.id);
-          if (input.input.mode === "any") {
-            // every update counts, even the same value
-          } else if (
-            seen &&
-            Object.is(input.lastById.get(change.id), change.val)
-          ) {
-            input.lastById.set(change.id, change.val);
-            continue;
-          }
+          const previous = input.lastById.get(change.id);
+          const hasPrevious = input.lastById.has(change.id);
           input.lastById.set(change.id, change.val);
-          if (!ackMatches(input.input.ack, change.ack)) continue;
           input.last = change.val;
           input.hasLast = true;
           enqueue({
             rt,
             input: input.name,
             value: change.val,
+            previous,
+            hasPrevious,
             depth: 0,
             meta: {
               from: change.from ?? "",
