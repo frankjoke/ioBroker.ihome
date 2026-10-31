@@ -120,6 +120,37 @@
 
   <section class="card">
     <div class="card-header">
+      <span class="material-symbols-outlined">autorenew</span>
+      <h2 class="card-title">Automatic reload</h2>
+    </div>
+    <div class="card-body ui-body">
+      <div class="ui-row">
+        <label class="label-mono row-label" for="reload-minutes"
+          >Reload every</label
+        >
+        <input
+          id="reload-minutes"
+          type="number"
+          min={UI_LIMITS.reloadMinutes.min}
+          max={UI_LIMITS.reloadMinutes.max}
+          step={UI_LIMITS.reloadMinutes.step}
+          value={ui.reloadMinutes}
+          onchange={(e) =>
+            set("ui.reloadMinutes", Number(e.currentTarget.value))}
+        />
+        <span class="hint text-muted">minutes — 0 = off</span>
+      </div>
+      <p class="hint text-muted">
+        For a wall display that runs for days: it reloads itself on this
+        interval, clearing a connection that died without an event. Only while
+        the page is visible, and never on a config page (its edits are only in
+        memory until Save).
+      </p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
       <span class="material-symbols-outlined">palette</span>
       <h2 class="card-title">Colours</h2>
     </div>

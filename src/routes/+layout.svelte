@@ -11,7 +11,7 @@
   } from "$lib/ioBrokerConnect.svelte.js";
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
-  import { defineStorage } from "$lib/tools.svelte";
+  import { defineStorage, onEditorPage } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
     setStateSource,
@@ -164,6 +164,19 @@
   const configLocked = $derived(configNeedsPin(isDisplay, isUnlocked()));
   /** The display defaults, published as custom properties for every component. */
   const ui = $derived(effectiveUi(getSettings()));
+
+  // A wall display stays open for days; a periodic reload clears a socket that
+  // died without an event. Visible pages only (a phone in a pocket already
+  // reloads on return) and never while editing (forms live in memory until Save).
+  $effect(() => {
+    const minutes = ui.reloadMinutes;
+    if (minutes <= 0) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible" && !onEditorPage())
+        location.reload();
+    }, minutes * 60_000);
+    return () => clearInterval(id);
+  });
 
   /**
    * The settings doc is the truth; the storage keys are its cache.

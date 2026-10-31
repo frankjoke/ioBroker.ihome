@@ -7,12 +7,18 @@ import { isHexColor } from "$lib/config/appearance";
 import type { Settings } from "$lib/config/settings-ops";
 import type { BreakpointDef } from "$lib/config/size-ops";
 
-export const UI_DEFAULTS = { primary: 0.9, secondary: 0.84, tileScale: 1 };
+export const UI_DEFAULTS = {
+  primary: 0.9,
+  secondary: 0.84,
+  tileScale: 1,
+  reloadMinutes: 0,
+};
 
 export const UI_LIMITS = {
   primary: { min: 0.7, max: 1.6, step: 0.02 },
   secondary: { min: 0.6, max: 1.4, step: 0.02 },
   tileScale: { min: 1, max: 2, step: 0.05 },
+  reloadMinutes: { min: 0, max: 1440, step: 1 },
 };
 
 export interface UiDefaults {
@@ -22,6 +28,8 @@ export interface UiDefaults {
   primary: number;
   secondary: number;
   tileScale: number;
+  /** Whole minutes between automatic reloads; 0 is off. */
+  reloadMinutes: number;
 }
 
 function colour(value: unknown): string | undefined {
@@ -57,6 +65,13 @@ export function effectiveUi(settings: Settings): UiDefaults {
       settings["ui.tileScale"],
       UI_LIMITS.tileScale,
       UI_DEFAULTS.tileScale,
+    ),
+    reloadMinutes: Math.round(
+      number(
+        settings["ui.reloadMinutes"],
+        UI_LIMITS.reloadMinutes,
+        UI_DEFAULTS.reloadMinutes,
+      ),
     ),
   };
 }

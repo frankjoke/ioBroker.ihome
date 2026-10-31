@@ -97,6 +97,15 @@ export function reloadOnReturn(lastVisible, now = Date.now()) {
   return now - lastVisible > RELOAD_AFTER_HIDDEN_MS;
 }
 
+/**
+ * A config page keeps its editor values in memory until Save, so the page must
+ * not reload under the user there.
+ * @param {string} [path]
+ */
+export function onEditorPage(path = location.pathname) {
+  return path.startsWith("/config");
+}
+
 export const currentTime = new SvelteDate();
 
 /**

@@ -5,7 +5,12 @@ import { connectPlan, loadIo2Client } from "./socket-client";
 import { resolveConnection } from "./transport";
 import { subscriptionPlan } from "./subscriptions";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
-import { getVisibility, reloadOnReturn, typeOfP } from "./tools.svelte";
+import {
+  getVisibility,
+  onEditorPage,
+  reloadOnReturn,
+  typeOfP,
+} from "./tools.svelte";
 import { setContext, getContext } from "svelte";
 import { createDeferredPromise } from "./utils";
 
@@ -254,7 +259,7 @@ document.onvisibilitychange = () => {
   // A tab that slept comes back with a dead socket that never reconnects, so
   // reload instead of waiting. Editor forms only live in memory until Save, so
   // an open config page is left alone.
-  if (reloadOnReturn(lastVisible) && !location.pathname.startsWith("/config")) {
+  if (reloadOnReturn(lastVisible) && !onEditorPage()) {
     location.reload();
     return;
   }

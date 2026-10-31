@@ -12,8 +12,14 @@ it("effectiveUi returns the shipped defaults for an empty document", () => {
     primary: 0.9,
     secondary: 0.84,
     tileScale: 1,
+    reloadMinutes: 0,
   });
-  expect(UI_DEFAULTS).toEqual({ primary: 0.9, secondary: 0.84, tileScale: 1 });
+  expect(UI_DEFAULTS).toEqual({
+    primary: 0.9,
+    secondary: 0.84,
+    tileScale: 1,
+    reloadMinutes: 0,
+  });
 });
 
 it("effectiveUi accepts only hex colours", () => {
@@ -44,6 +50,9 @@ it("effectiveUi clamps the numbers and ignores non-numbers", () => {
   expect(effectiveUi({ "ui.tileScale": 3 }).tileScale).toBe(2);
   expect(effectiveUi({ "ui.primaryText": "1.2" }).primary).toBe(0.9); // a string is not a number
   expect(effectiveUi({ "ui.primaryText": Number.NaN }).primary).toBe(0.9);
+  expect(effectiveUi({ "ui.reloadMinutes": -5 }).reloadMinutes).toBe(0);
+  expect(effectiveUi({ "ui.reloadMinutes": 9999 }).reloadMinutes).toBe(1440);
+  expect(effectiveUi({ "ui.reloadMinutes": 15.4 }).reloadMinutes).toBe(15);
 });
 
 it("uiCss emits colours only when set and always the sizes", () => {
