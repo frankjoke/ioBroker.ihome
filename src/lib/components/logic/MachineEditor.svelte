@@ -150,19 +150,6 @@
 </script>
 
 <div class="machine">
-  <div class="row">
-    <span class="label-mono">Start state</span>
-    <select
-      aria-label="Start state"
-      value={logic.start ?? stateNames[0] ?? ""}
-      onchange={(e) => patch({ start: e.currentTarget.value })}
-    >
-      {#each stateNames as name (name)}
-        <option value={name}>{name}</option>
-      {/each}
-    </select>
-  </div>
-
   <div class="states">
     <div class="states-head">
       <span class="label-mono">States</span>
@@ -180,7 +167,7 @@
       <div class="state-row">
         <div class="summary">
           <span class="state-name mono">{name}</span>
-          {#if logic.start === name}
+          {#if logic.start ? logic.start === name : stateNames[0] === name}
             <span class="badge badge-secondary">start</span>
           {/if}
           <span class="hint text-muted">

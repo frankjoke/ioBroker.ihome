@@ -1,6 +1,6 @@
 <script lang="ts">
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import type { Expr, Init, Input, LogicDef, Output } from "$logic/types";
+  import type { Input, LogicDef, Output } from "$logic/types";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
   import ExprEditor from "./ExprEditor.svelte";
@@ -22,18 +22,6 @@
   const stateNames = $derived(
     logic.kind === "machine" ? Object.keys(logic.states) : [],
   );
-  const init = $derived<Init>(logic.init ?? {});
-  const canMatch = $derived(
-    logic.output?.scope === "state" && !!logic.output.map,
-  );
-
-  function patchInit(update: Partial<Init>) {
-    const next: Init = { ...(logic.init ?? {}), ...update };
-    for (const key of Object.keys(next) as (keyof Init)[]) {
-      if (next[key] === undefined) delete next[key];
-    }
-    patch({ init: Object.keys(next).length > 0 ? next : undefined });
-  }
 
   function patch(update: Partial<LogicDef>) {
     onchange({ ...logic, ...update } as LogicDef);
@@ -114,78 +102,6 @@
         onchange={(inputs) => patch({ inputs })}
         onRename={renameInput}
       />
-    </div>
-
-    <div class="block">
-      <span class="label-mono">At start</span>
-      {#if logic.kind === "function"}
-        <label class="inline"
-          >run once at start <input
-            type="checkbox"
-            checked={init.run !== false}
-            onchange={(e) =>
-              patchInit({ run: e.currentTarget.checked ? undefined : false })}
-          /></label
-        >
-      {:else}
-        <label class="inline"
-          >take the state from the current output value
-          <input
-            type="checkbox"
-            checked={init.match === "output"}
-            disabled={!canMatch}
-            onchange={(e) =>
-              patchInit({
-                match: e.currentTarget.checked ? "output" : undefined,
-              })}
-          /></label
-        >
-        {#if !canMatch}
-          <span class="hint text-muted">
-            Needs an external output with a value map.
-          </span>
-        {/if}
-        {#if init.state !== undefined}
-          <div class="row">
-            <span class="label-mono">init state</span>
-            {#if typeof init.state === "string"}
-              <input
-                aria-label="Init state name"
-                value={init.state}
-                onchange={(e) => patchInit({ state: e.currentTarget.value })}
-              />
-            {:else}
-              <ExprEditor
-                expr={init.state as Expr}
-                onchange={(next) =>
-                  patchInit({
-                    state: "noop" in next ? undefined : next,
-                  })}
-              />
-            {/if}
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => patchInit({ state: undefined })}>Clear</button
-            >
-          </div>
-        {:else}
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={() => patchInit({ state: { const: stateNames[0] ?? "" } })}
-            >Add init expression</button
-          >
-        {/if}
-        <label class="inline"
-          >run $init rows <input
-            type="checkbox"
-            checked={init.run === true}
-            onchange={(e) =>
-              patchInit({ run: e.currentTarget.checked || undefined })}
-          /></label
-        >
-      {/if}
     </div>
 
     {#if logic.kind === "function"}
