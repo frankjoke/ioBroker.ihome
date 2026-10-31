@@ -26,6 +26,8 @@
   /** One state and one event row open at a time, like the slot lists. */
   let openState = $state<string | null>(null);
   let openRow = $state<number | null>(null);
+  /** The state's options tab: enter, exit or the timeout. */
+  let stateTab = $state<"enter" | "exit" | "timeout">("enter");
   /** The Options tab: $init today, $all and more later. */
   let openOption = $state<"init" | "all" | null>(null);
   /** Nothing disappears from the document without a confirmation. */
@@ -321,6 +323,7 @@
             onclick={() => {
               openState = openState === name ? null : name;
               openRow = null;
+              stateTab = "enter";
             }}
           />
           <IconButton
@@ -358,63 +361,91 @@
               />
             </label>
 
-            <div class="block">
-              <span class="label-mono">On enter</span>
-              <ActionList
-                actions={state.enter ?? []}
-                onchange={(enter) => updateState(name, { ...state, enter })}
-              />
-            </div>
-            <div class="block">
-              <span class="label-mono">On exit</span>
-              <ActionList
-                actions={state.exit ?? []}
-                onchange={(exit) => updateState(name, { ...state, exit })}
-              />
-            </div>
-
-            <div class="row">
-              <label class="inline"
-                >after
-                <input
-                  class="duration"
-                  aria-label={`After time for ${name}`}
-                  placeholder="2m"
-                  value={state.after?.time ?? ""}
-                  onchange={(e) =>
-                    updateState(name, {
-                      ...state,
-                      after: e.currentTarget.value.trim()
-                        ? {
-                            time: e.currentTarget.value.trim(),
-                            goto:
-                              state.after?.goto ??
-                              stateNames.find((s) => s !== name) ??
-                              name,
-                          }
-                        : undefined,
-                    })}
-                />
-              </label>
-              <label class="inline"
-                >goto
-                <select
-                  aria-label={`After target for ${name}`}
-                  value={state.after?.goto ?? ""}
-                  onchange={(e) =>
-                    updateState(name, {
-                      ...state,
-                      after: state.after
-                        ? { ...state.after, goto: e.currentTarget.value }
-                        : { time: "1m", goto: e.currentTarget.value },
-                    })}
+            <div class="state-options">
+              <div class="option-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  class="option-tab"
+                  class:active={stateTab === "enter"}
+                  aria-selected={stateTab === "enter"}
+                  onclick={() => (stateTab = "enter")}>Enter</button
                 >
-                  <option value="">— none —</option>
-                  {#each stateNames as target (target)}
-                    <option value={target}>{target}</option>
-                  {/each}
-                </select>
-              </label>
+                <button
+                  type="button"
+                  role="tab"
+                  class="option-tab"
+                  class:active={stateTab === "exit"}
+                  aria-selected={stateTab === "exit"}
+                  onclick={() => (stateTab = "exit")}>Exit</button
+                >
+                <button
+                  type="button"
+                  role="tab"
+                  class="option-tab"
+                  class:active={stateTab === "timeout"}
+                  aria-selected={stateTab === "timeout"}
+                  onclick={() => (stateTab = "timeout")}>Timeout</button
+                >
+              </div>
+
+              <div class="option-body">
+                {#if stateTab === "enter"}
+                  <ActionList
+                    actions={state.enter ?? []}
+                    onchange={(enter) => updateState(name, { ...state, enter })}
+                  />
+                {:else if stateTab === "exit"}
+                  <ActionList
+                    actions={state.exit ?? []}
+                    onchange={(exit) => updateState(name, { ...state, exit })}
+                  />
+                {:else}
+                  <div class="row">
+                    <label class="inline"
+                      >after
+                      <input
+                        class="duration"
+                        aria-label={`After time for ${name}`}
+                        placeholder="2m"
+                        value={state.after?.time ?? ""}
+                        onchange={(e) =>
+                          updateState(name, {
+                            ...state,
+                            after: e.currentTarget.value.trim()
+                              ? {
+                                  time: e.currentTarget.value.trim(),
+                                  goto:
+                                    state.after?.goto ??
+                                    stateNames.find((s) => s !== name) ??
+                                    name,
+                                }
+                              : undefined,
+                          })}
+                      />
+                    </label>
+                    <label class="inline"
+                      >goto
+                      <select
+                        aria-label={`After target for ${name}`}
+                        value={state.after?.goto ?? ""}
+                        onchange={(e) =>
+                          updateState(name, {
+                            ...state,
+                            after: state.after
+                              ? { ...state.after, goto: e.currentTarget.value }
+                              : { time: "1m", goto: e.currentTarget.value },
+                          })}
+                      >
+                        <option value="">— none —</option>
+                        {#each stateNames as target (target)}
+                          <option value={target}>{target}</option>
+                        {/each}
+                      </select>
+                    </label>
+                  </div>
+                {/if}
+              </div>
             </div>
 
             <div class="events">
