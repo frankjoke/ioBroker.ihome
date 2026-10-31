@@ -5,7 +5,7 @@ import { connectPlan, loadIo2Client } from "./socket-client";
 import { resolveConnection } from "./transport";
 import { subscriptionPlan } from "./subscriptions";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
-import { getVisibility, typeOfP } from "./tools.svelte";
+import { getVisibility, reloadOnReturn, typeOfP } from "./tools.svelte";
 import { setContext, getContext } from "svelte";
 import { createDeferredPromise } from "./utils";
 
@@ -245,9 +245,20 @@ document.onreadystatechange = () => {
   // console.log('onReadyStateChange', ioBroker.visibilityState);
 };
 
+/** Last time the page was actually on screen (see `reloadOnReturn`). */
+let lastVisible = Date.now();
+
 document.onvisibilitychange = () => {
   Object.assign(ioBroker.visibilityState, getVisibility());
-  //   ioBroker.visibilityState = visibilityState = getVisibility();
+  if (document.visibilityState !== "visible") return;
+  // A tab that slept comes back with a dead socket that never reconnects, so
+  // reload instead of waiting. Editor forms only live in memory until Save, so
+  // an open config page is left alone.
+  if (reloadOnReturn(lastVisible) && !location.pathname.startsWith("/config")) {
+    location.reload();
+    return;
+  }
+  lastVisible = Date.now();
   // console.log('onVisibilityChange', ioBroker.visibilityState);
 };
 

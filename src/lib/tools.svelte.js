@@ -83,6 +83,20 @@ export function getVisibility() {
 
 export let visibilityState = $state(getVisibility());
 
+/** Away for longer than this and the page is reloaded on return: a phone that
+ *  slept usually comes back with a dead socket that never reconnects. */
+export const RELOAD_AFTER_HIDDEN_MS = 5 * 60_000;
+
+/**
+ * Whether coming back to the page should reload it instead of reusing the
+ * likely dead connection.
+ * @param {number} lastVisible when the page was last on screen
+ * @param {number} [now]
+ */
+export function reloadOnReturn(lastVisible, now = Date.now()) {
+  return now - lastVisible > RELOAD_AFTER_HIDDEN_MS;
+}
+
 export const currentTime = new SvelteDate();
 
 /**
