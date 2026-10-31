@@ -98,6 +98,40 @@ export function deviceObjectIcon(
   return undefined;
 }
 
+/** Default glyphs for the ioBroker roles, so a tile built from a bare state has
+ *  a face instead of a blank slot. Ordered: the first match wins. */
+const ROLE_GLYPHS: [RegExp, string][] = [
+  [/switch|socket|plug|outlet/i, "power_settings_new"],
+  [/button|press/i, "touch_app"],
+  [/motion|presence/i, "directions_walk"],
+  [/door|window|contact/i, "sensor_door"],
+  [/light|lamp/i, "lightbulb"],
+  [/temperature/i, "thermostat"],
+  [/humidity|moisture/i, "water_drop"],
+  [/battery/i, "battery_full"],
+  [/power|energy|consumption/i, "bolt"],
+  [/level|dimmer|brightness/i, "brightness_6"],
+  [/color/i, "palette"],
+  [/volume|audio/i, "volume_up"],
+  [/position|blind|shutter/i, "blinds"],
+  [/lock/i, "lock"],
+  [/co2|air|quality/i, "air"],
+  [/illuminance|lux/i, "light_mode"],
+  [/pressure/i, "compress"],
+];
+
+/** The glyph a role suggests; a harmless fallback for a bare boolean. */
+export function glyphForRole(
+  role: unknown,
+  type?: unknown,
+): string | undefined {
+  const text = String(role ?? "");
+  for (const [pattern, glyph] of ROLE_GLYPHS) {
+    if (pattern.test(text)) return glyph;
+  }
+  return type === "boolean" ? "toggle_on" : undefined;
+}
+
 /** The glyph a type's preset puts on its headline slot — the tile's look icon. */
 export function presetGlyph(type: DeviceType): string | undefined {
   for (const slot of PRESETS[type]?.slots ?? []) {

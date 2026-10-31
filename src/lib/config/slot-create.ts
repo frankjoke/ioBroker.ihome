@@ -1,6 +1,6 @@
 import { localizeName } from "$lib/config/format";
 import { widgetFor } from "$lib/config/features";
-import { presetGlyph } from "$lib/config/icon-ops";
+import { glyphForRole, presetGlyph } from "$lib/config/icon-ops";
 import {
   resolveControl,
   resolveTemplate,
@@ -72,12 +72,18 @@ export function slotFromState(
   const common = object?.common ?? {};
   const options = rangeOptions(common);
   const label = localizeName(common.name);
+  const ownIcon =
+    typeof common.icon === "string" && common.icon.trim()
+      ? common.icon.trim()
+      : undefined;
+  const glyph = ownIcon ?? glyphForRole(common.role, common.type);
   return {
     kind,
     source: { kind: "state", stateId },
     ...(label ? { label } : {}),
     ...(common.unit ? { unit: common.unit } : {}),
     ...(Object.keys(options).length ? { options } : {}),
+    ...(glyph ? { icon: { glyph } } : {}),
   };
 }
 

@@ -5,6 +5,7 @@ import {
   deviceObjectIcon,
   objectIconValue,
   ownerOf,
+  glyphForRole,
   presetGlyph,
   resolveIcon,
 } from "$lib/config/icon-ops";
@@ -185,4 +186,13 @@ it("ignores page and adapter logos on the state's path", () => {
   expect(
     resolveIcon(new Map([...o].slice(0, 2)), "0_userdata.0.X"),
   ).toBeUndefined();
+});
+
+it("suggests a default glyph for a bare state's role", () => {
+  expect(glyphForRole("switch")).toBe("power_settings_new");
+  expect(glyphForRole("value.battery")).toBe("battery_full");
+  expect(glyphForRole("value.temperature")).toBe("thermostat");
+  expect(glyphForRole("button")).toBe("touch_app");
+  expect(glyphForRole("state", "boolean")).toBe("toggle_on");
+  expect(glyphForRole("state", "string")).toBeUndefined();
 });
