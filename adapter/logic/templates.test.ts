@@ -21,6 +21,13 @@ it("substitutes parameters into a valid logic", () => {
   );
   expect(JSON.stringify(logic)).not.toContain("{{");
   expect(logic.id).toBe("hallway");
+  // The light is the logic's output; the motion state only triggers it.
+  expect(logic.output).toEqual({
+    scope: "state",
+    ref: "0_userdata.0.L",
+    type: "boolean",
+    map: { On: true, Idle: false },
+  });
   expect(validateLogicDocument({ version: 1, logics: [logic] })).toEqual([]);
 });
 

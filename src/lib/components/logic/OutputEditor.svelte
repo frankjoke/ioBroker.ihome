@@ -14,6 +14,27 @@
 
   const TYPE = ["boolean", "number", "string"] as const;
 
+  const stateRef = $derived(output.scope === "state" ? output.ref : "");
+
+  /** One field: a state is the output; no state means adapter memory. */
+  function setRef(ref: string) {
+    if (!ref) {
+      onchange({
+        scope: "memory",
+        name: output.scope === "memory" ? output.name : "",
+        forward: output.forward,
+      });
+      return;
+    }
+    onchange({
+      scope: "state",
+      ref,
+      type: output.scope === "state" ? output.type : "boolean",
+      map: output.scope === "state" ? output.map : undefined,
+      forward: output.forward,
+    });
+  }
+
   function setMap(state: string, raw: string) {
     if (output.scope !== "state") return;
     const map: Record<string, string | number | boolean> = {
@@ -34,25 +55,15 @@
 
 <div class="output">
   <div class="row">
-    <span class="label-mono">Writes to</span>
-    <select
-      aria-label="Output scope"
-      value={output.scope}
-      onchange={(e) =>
-        onchange(
-          e.currentTarget.value === "memory"
-            ? { scope: "memory", name: "", forward: output.forward }
-            : {
-                scope: "state",
-                ref: "",
-                type: "boolean",
-                forward: output.forward,
-              },
-        )}
-    >
-      <option value="memory">Adapter memory (internal)</option>
-      <option value="state">ioBroker state</option>
-    </select>
+    <span class="label-mono">Output state</span>
+    <StateRefField
+      value={stateRef}
+      label="Output state"
+      onchange={(ref) => setRef(ref)}
+    />
+    {#if output.scope === "memory"}
+      <span class="hint text-muted">empty = adapter memory</span>
+    {/if}
   </div>
 
   {#if output.scope === "memory"}
@@ -81,14 +92,6 @@
       >
     </div>
   {:else}
-    <div class="row">
-      <span class="label-mono">State</span>
-      <StateRefField
-        value={output.ref}
-        label="Output state"
-        onchange={(ref) => onchange({ ...output, ref })}
-      />
-    </div>
     <div class="row">
       <span class="label-mono">Type</span>
       <select

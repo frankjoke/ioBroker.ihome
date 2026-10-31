@@ -25,21 +25,20 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
           from: { type: "state", ref: "{{switch}}" },
           kind: "event",
         },
-        light: { from: { type: "state", ref: "{{light}}" } },
       },
-      output: { scope: "memory" },
+      output: {
+        scope: "state",
+        ref: "{{light}}",
+        type: "boolean",
+        map: { On: true, Idle: false },
+      },
+      init: { match: "output" },
       start: "Idle",
       states: {
         Idle: {
           on: [{ on: "sw", is: { op: "eq", value: true }, goto: "On" }],
         },
         On: {
-          enter: [
-            { set: { target: { ref: "light" }, value: { const: true } } },
-          ],
-          exit: [
-            { set: { target: { ref: "light" }, value: { const: false } } },
-          ],
           on: [{ on: "sw", is: { op: "eq", value: true }, goto: "On" }],
           after: { time: "{{delay}}", goto: "Idle" },
         },
@@ -65,21 +64,20 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
           from: { type: "state", ref: "{{motion}}" },
           kind: "event",
         },
-        light: { from: { type: "state", ref: "{{light}}" } },
       },
-      output: { scope: "memory" },
+      output: {
+        scope: "state",
+        ref: "{{light}}",
+        type: "boolean",
+        map: { On: true, Idle: false },
+      },
+      init: { match: "output" },
       start: "Idle",
       states: {
         Idle: {
           on: [{ on: "motion", is: { op: "eq", value: true }, goto: "On" }],
         },
         On: {
-          enter: [
-            { set: { target: { ref: "light" }, value: { const: true } } },
-          ],
-          exit: [
-            { set: { target: { ref: "light" }, value: { const: false } } },
-          ],
           on: [{ on: "motion", is: { op: "eq", value: true }, goto: "On" }],
           after: { time: "{{delay}}", goto: "Idle" },
         },
