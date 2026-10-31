@@ -1,12 +1,16 @@
 import { evaluate } from "./expr";
+import { parseDuration } from "./duration";
 import { logicHasErrors, validateLogicDocument } from "./validate";
 import type {
+  Action,
   Forward,
   FunctionLogic,
   Input,
   LogicDef,
   LogicDocument,
+  MachineLogic,
   Output,
+  StateDef,
 } from "./types";
 
 export interface StateChange {
@@ -60,6 +64,9 @@ interface Runtime {
   output: Output;
   lastOutput?: unknown;
   hasOutput: boolean;
+  /** Machine only: the current state and its `after` timer. */
+  state?: string;
+  timer?: number;
 }
 
 interface Job {
@@ -249,7 +256,181 @@ export function createEngine(
     chainSeen.add(key);
     if (job.rt.def.kind === "function") {
       runFunction(job.rt, job.depth);
+    } else {
+      handleMachine(job);
     }
+  }
+
+  function handleMachine(job: Job): void {
+    const rt = job.rt;
+    const def = rt.def as MachineLogic;
+    const state = rt.state ? def.states[rt.state] : undefined;
+    if (!state) return;
+    for (const row of state.on ?? []) {
+      if (row.on !== job.input) continue;
+      if (row.is && !matchesIs(row.is, job.value)) continue;
+      if (row.if) {
+        try {
+          if (!evaluate(row.if, (ref) => resolveIn(rt, ref))) continue;
+        } catch (error) {
+          warn(rt.def.id, `condition failed: ${errorText(error)}`);
+          continue;
+        }
+      }
+      runActions(rt, row.do ?? [], job.depth);
+      if (row.goto) transition(rt, row.goto, job.depth);
+      return;
+    }
+  }
+
+  function matchesIs(
+    is: { op: string; value?: unknown },
+    value: unknown,
+  ): boolean {
+    switch (is.op) {
+      case "eq":
+        return value === is.value;
+      case "ne":
+        return value !== is.value;
+      case "gt":
+        return Number(value) > Number(is.value);
+      case "gte":
+        return Number(value) >= Number(is.value);
+      case "lt":
+        return Number(value) < Number(is.value);
+      case "lte":
+        return Number(value) <= Number(is.value);
+      default:
+        return false;
+    }
+  }
+
+  function clearTimer(rt: Runtime): void {
+    if (rt.timer !== undefined) {
+      deps.clearTimeout(rt.timer);
+      rt.timer = undefined;
+    }
+  }
+
+  function armAfter(rt: Runtime, name: string, state: StateDef): void {
+    clearTimer(rt);
+    if (!state.after) return;
+    const ms = parseDuration(state.after.time);
+    if (ms === null) return;
+    rt.timer = deps.setTimeout(() => {
+      rt.timer = undefined;
+      if (rt.state === name) transition(rt, state.after!.goto, 0);
+    }, ms);
+  }
+
+  function transition(rt: Runtime, name: string, depth: number): void {
+    const def = rt.def as MachineLogic;
+    const next = def.states[name];
+    if (!next) {
+      warn(def.id, `unknown state ${name}`);
+      return;
+    }
+    const same = rt.state === name;
+    const previous = rt.state ? def.states[rt.state] : undefined;
+    if (same) {
+      clearTimer(rt);
+    } else {
+      if (previous) runActions(rt, previous.exit ?? [], depth);
+      clearTimer(rt);
+      rt.state = name;
+      runActions(rt, next.enter ?? [], depth);
+    }
+    armAfter(rt, name, next);
+    writeOutput(rt, name, depth);
+  }
+
+  function runActions(rt: Runtime, actions: Action[], depth: number): void {
+    for (const action of actions) {
+      if ("set" in action) {
+        let value: unknown;
+        try {
+          value = evaluate(action.set.value, (ref) => resolveIn(rt, ref));
+        } catch (error) {
+          warn(rt.def.id, `set failed: ${errorText(error)}`);
+          continue;
+        }
+        writeTarget(
+          rt,
+          action.set.target.ref,
+          value,
+          action.set.ack ?? false,
+          action.set.forward,
+          depth,
+        );
+      } else if ("goto" in action) {
+        transition(rt, action.goto, depth);
+      } else if ("log" in action) {
+        deps.log(action.log.level ?? "info", rt.def.id, action.log.text);
+      }
+    }
+  }
+
+  function writeMemory(
+    name: string,
+    value: unknown,
+    forward: Forward | undefined,
+    depth: number,
+  ): void {
+    if (
+      (forward ?? "changed") === "changed" &&
+      memory.has(name) &&
+      Object.is(memory.get(name), value)
+    ) {
+      return;
+    }
+    memory.set(name, value);
+    emitMemory(name, value, depth + 1);
+  }
+
+  function writeTarget(
+    rt: Runtime,
+    ref: string,
+    value: unknown,
+    ack: boolean,
+    forward: Forward | undefined,
+    depth: number,
+  ): void {
+    const input = rt.inputs.get(ref);
+    if (input) {
+      if (input.input.from.type === "memory") {
+        writeMemory(input.input.from.ref, value, forward, depth);
+      } else if (input.stateId) {
+        writeState(input.stateId, value, ack, forward);
+      }
+      return;
+    }
+    if (declaredMemory.has(ref) || memory.has(ref)) {
+      writeMemory(ref, value, forward, depth);
+      return;
+    }
+    if (ref.includes(".")) {
+      writeState(ref, value, ack, forward);
+      return;
+    }
+    const variable = deps.resolveVariable?.(ref);
+    if (variable?.kind === "state")
+      writeState(variable.stateId, value, ack, forward);
+    else warn(rt.def.id, `cannot write ${ref}: not a state or memory name`);
+  }
+
+  function writeState(
+    id: string,
+    value: unknown,
+    ack: boolean,
+    forward: Forward | undefined,
+  ): void {
+    if (
+      (forward ?? "changed") === "changed" &&
+      Object.is(deps.read(id), value)
+    ) {
+      return;
+    }
+    deps.write(id, value, ack);
   }
 
   function runFunction(rt: Runtime, depth: number): void {
@@ -283,6 +464,16 @@ export function createEngine(
     return !rt.hasOutput || !Object.is(rt.lastOutput, value);
   }
 
+  function outputValue(rt: Runtime, value: unknown): unknown {
+    if (rt.output.scope !== "state") return value;
+    if (rt.def.kind !== "machine") return coerce(value, rt.output.type);
+    const name = String(value);
+    if (rt.output.map && name in rt.output.map) return rt.output.map[name];
+    if (rt.output.type === "boolean") return name.startsWith("On");
+    if (rt.output.type === "string") return name;
+    return coerce(name, rt.output.type);
+  }
+
   function writeOutput(rt: Runtime, value: unknown, depth: number): void {
     const output = rt.output;
     if (output.scope === "memory") {
@@ -294,11 +485,11 @@ export function createEngine(
       emitMemory(name, value, depth + 1);
       return;
     }
-    const coerced = coerce(value, output.type);
-    if (!forwardAllows(rt, coerced, output.forward)) return;
-    rt.lastOutput = coerced;
+    const mapped = outputValue(rt, value);
+    if (!forwardAllows(rt, mapped, output.forward)) return;
+    rt.lastOutput = mapped;
     rt.hasOutput = true;
-    deps.write(output.ref, coerced, true);
+    deps.write(output.ref, mapped, true);
   }
 
   function emitMemory(name: string, value: unknown, depth: number): void {
@@ -331,8 +522,16 @@ export function createEngine(
       for (const rt of runtimes) {
         if (rt.def.kind === "function") runFunction(rt, 0);
       }
+      for (const rt of runtimes) {
+        if (rt.def.kind !== "machine") continue;
+        const def = rt.def;
+        const first = Object.keys(def.states)[0];
+        const start = def.start && def.states[def.start] ? def.start : first;
+        if (start) transition(rt, start, 0);
+      }
     },
     stop() {
+      for (const rt of runtimes) clearTimer(rt);
       started = false;
       queue.length = 0;
       chainSeen = new Set<string>();

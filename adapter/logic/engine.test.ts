@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
-import type { FunctionLogic, LogicDocument } from "./types";
+import type { FunctionLogic, LogicDocument, MachineLogic } from "./types";
 
 const doc = (extra: Partial<FunctionLogic> = {}): LogicDocument => ({
   version: 1,
@@ -188,4 +188,175 @@ it("stops a memory loop with one warning", () => {
   h.change("0_userdata.0.SEED", 1);
   expect(engine.memoryValue("x")).toBe(1);
   expect(h.logs.filter((line) => line.message.includes("loop")).length).toBe(1);
+});
+
+// ------------------------------------------------------------- state machines
+
+const machine = (): LogicDocument => ({
+  version: 1,
+  logics: [
+    {
+      id: "light",
+      name: "Light",
+      kind: "machine",
+      inputs: {
+        motion: {
+          from: { type: "state", ref: "0_userdata.0.M" },
+          kind: "event",
+        },
+        lamp: { from: { type: "state", ref: "0_userdata.0.L" } },
+      },
+      output: { scope: "memory" },
+      start: "Idle",
+      states: {
+        Idle: {
+          on: [{ on: "motion", is: { op: "eq", value: true }, goto: "On" }],
+        },
+        On: {
+          enter: [
+            {
+              set: {
+                target: { ref: "lamp" },
+                value: { const: true },
+              },
+            },
+          ],
+          exit: [
+            {
+              set: {
+                target: { ref: "lamp" },
+                value: { const: false },
+              },
+            },
+          ],
+          after: { time: "2m", goto: "Idle" },
+          on: [{ on: "motion", is: { op: "eq", value: true }, goto: "On" }],
+        },
+      },
+    },
+  ],
+});
+
+it("enters the start state and runs enter actions", () => {
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const engine = createEngine(machine(), h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("light")).toBe("Idle");
+  expect(h.writes).toEqual([]); // memory output: the start write stays internal
+});
+
+it("extends the delay on re-entry without running enter again", () => {
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const d = machine();
+  (d.logics[0] as MachineLogic).inputs!.motion.mode = "any";
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.M", true);
+  expect(engine.memoryValue("light")).toBe("On");
+  expect(h.writes).toEqual([{ id: "0_userdata.0.L", value: true, ack: false }]);
+  h.clock.advance(90_000);
+  h.change("0_userdata.0.M", true);
+  expect(h.writes).toHaveLength(1); // enter did not run again
+  h.clock.advance(90_000);
+  expect(engine.memoryValue("light")).toBe("On");
+  h.clock.advance(30_000);
+  expect(engine.memoryValue("light")).toBe("Idle");
+});
+
+it("switches off after the state timer", () => {
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const engine = createEngine(machine(), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.M", true);
+  h.clock.advance(119_000);
+  expect(engine.memoryValue("light")).toBe("On");
+  h.clock.advance(1_000);
+  expect(engine.memoryValue("light")).toBe("Idle");
+  expect(h.writes.at(-1)).toEqual({
+    id: "0_userdata.0.L",
+    value: false,
+    ack: false,
+  });
+});
+
+it("maps a boolean output by the On prefix, and a map overrides it", () => {
+  const run = (map?: Record<string, boolean>) => {
+    const h = createHarness({ "0_userdata.0.M": false });
+    const d = machine();
+    const logic = d.logics[0] as MachineLogic;
+    logic.output = {
+      scope: "state",
+      ref: "0_userdata.0.B",
+      type: "boolean",
+      map,
+    };
+    delete logic.states.On.enter; // the mapped output must be the last write
+    delete logic.states.On.exit;
+    const engine = createEngine(d, h.deps);
+    h.attach(engine);
+    engine.start();
+    h.change("0_userdata.0.M", true);
+    const on = h.writes.at(-1);
+    h.clock.advance(120_000);
+    return { on, off: h.writes.at(-1) };
+  };
+  expect(run()).toEqual({
+    on: { id: "0_userdata.0.B", value: true, ack: true },
+    off: { id: "0_userdata.0.B", value: false, ack: true },
+  });
+  expect(run({ On: false, Idle: true })).toEqual({
+    on: { id: "0_userdata.0.B", value: false, ack: true },
+    off: { id: "0_userdata.0.B", value: true, ack: true },
+  });
+});
+
+it("does not repeat an unchanged set action by default", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "twice",
+        name: "Twice",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: {
+            on: [{ on: "e", goto: "B" }],
+            enter: [
+              {
+                set: {
+                  target: { ref: "0_userdata.0.D" },
+                  value: { const: true },
+                },
+              },
+            ],
+          },
+          B: {
+            enter: [
+              {
+                set: {
+                  target: { ref: "0_userdata.0.D" },
+                  value: { const: true },
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0, "0_userdata.0.D": false });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start(); // A enter writes D=true once
+  expect(h.writes).toHaveLength(1);
+  h.change("0_userdata.0.E", 1); // B enter sets the same value → no write
+  expect(h.writes).toHaveLength(1);
 });

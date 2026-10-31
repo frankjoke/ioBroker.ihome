@@ -69,7 +69,10 @@ export function createHarness(values: Record<string, unknown>): Harness {
 
   const deps: EngineDeps = {
     read: (id) => values[id],
-    write: (id, value, ack) => writes.push({ id, value, ack }),
+    write: (id, value, ack) => {
+      values[id] = value; // like the broker: a write changes the current value
+      writes.push({ id, value, ack });
+    },
     log: (level, logicId, message) => logs.push({ level, logicId, message }),
     now: () => clock.now,
     setTimeout: (fn, ms) => clock.setTimeout(fn, ms),
