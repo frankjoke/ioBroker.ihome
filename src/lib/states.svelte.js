@@ -4,6 +4,8 @@ import { getUsedStateIds } from "$lib/stores/devices";
 import { SvelteSet } from "svelte/reactivity";
 
 const loaded = new SvelteSet();
+/** Ids whose *object* was fetched: a raw slot needs `common.write` to toggle. */
+const objectsLoaded = new SvelteSet();
 let loading = false;
 let rerun = false;
 
@@ -22,6 +24,7 @@ let rerun = false;
  */
 export async function reloadUsedStates() {
   loaded.clear();
+  objectsLoaded.clear();
   return loadUsedStates();
 }
 
@@ -43,6 +46,23 @@ export async function loadUsedStates() {
         batch.map((id) =>
           Promise.resolve(ioBroker.getState(id, true)).catch(() => {
             /* ignore single state failures */
+          }),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    // Metadata of the same ids: a raw slot's writability, unit and label come
+    // from the object, not from the value. Without it a switch is read-only.
+    const objectIds = [...getUsedStateIds()].filter(
+      (id) => !objectsLoaded.has(id) && !ioBroker.objects?.has?.(id),
+    );
+    for (const id of objectIds) objectsLoaded.add(id);
+    for (let i = 0; i < objectIds.length; i += 20) {
+      const batch = objectIds.slice(i, i + 20);
+      await Promise.all(
+        batch.map((id) =>
+          Promise.resolve(ioBroker.getObject(id)).catch(() => {
+            /* ignore single object failures */
           }),
         ),
       );
