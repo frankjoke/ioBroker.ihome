@@ -452,27 +452,6 @@
     gap: 1rem;
   }
 
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill, 999px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .icon-btn:hover {
-    background: var(--surface-container);
-  }
-
-  .icon-btn .material-symbols-outlined {
-    font-size: 20px;
-  }
-
   .fields {
     display: grid;
     grid-template-columns: 1fr 1fr;

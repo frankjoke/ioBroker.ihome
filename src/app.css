@@ -485,6 +485,35 @@ textarea {
   font-size: var(--body-sm);
 }
 
+/* The one icon button: close, delete, duplicate, remove, add. Defined here so
+   no component repeats the styling; only state variants may add rules. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-pill, 999px);
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--surface-container);
+}
+
+.icon-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ------------------------------------------------------------------ *
  *  Disabled state                                                     *
  * ------------------------------------------------------------------ */
