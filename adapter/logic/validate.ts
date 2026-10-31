@@ -277,12 +277,11 @@ function checkOutput(
   ) {
     add(id, "output.type", "unknown output type");
   }
+  if (output.on !== undefined && typeof output.on !== "string") {
+    add(id, "output.on", "on must be a state-name pattern");
+  }
   // Map rules only apply to machines, but the ref/type checks always do.
   if (stateNames.size === 0) return;
-  if (output.type === "number" && !output.map) {
-    add(id, "output.map", "a number output needs a map for every state");
-    return;
-  }
   if (output.map === undefined) return;
   if (!isRecord(output.map)) {
     add(id, "output.map", "map must be an object");
@@ -305,12 +304,8 @@ function checkInit(
   if (!init) return;
   if (init.match !== undefined) {
     const output = logic.output;
-    if (init.match !== "output" || output?.scope !== "state" || !output.map) {
-      add(
-        id,
-        "init.match",
-        "match needs an external output state with a complete map",
-      );
+    if (init.match !== "output" || output?.scope !== "state") {
+      add(id, "init.match", "match needs an external output state");
     }
   }
   if (init.state !== undefined) {

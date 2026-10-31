@@ -26,7 +26,7 @@ it("substitutes parameters into a valid logic", () => {
     scope: "state",
     ref: "0_userdata.0.L",
     type: "boolean",
-    map: { On: true, Idle: false },
+    on: "On*",
   });
   expect(validateLogicDocument({ version: 1, logics: [logic] })).toEqual([]);
 });

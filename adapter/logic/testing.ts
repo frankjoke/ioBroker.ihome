@@ -16,6 +16,11 @@ export class FakeClock {
     this.#timers.delete(id);
   };
 
+  /** Timers still armed; used to prove a state really cancelled its own. */
+  get pending(): number {
+    return this.#timers.size;
+  }
+
   advance(ms: number): void {
     const target = this.now + ms;
     for (;;) {

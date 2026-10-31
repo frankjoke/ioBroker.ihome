@@ -35,7 +35,10 @@ export type Output =
       scope: "state";
       ref: string;
       type: "boolean" | "number" | "string";
-      /** Machine outputs only: state name → written value. */
+      /** Boolean only: state names matching this glob write `true`
+       *  (default "On*"). */
+      on?: string;
+      /** Legacy explicit map; still read, no longer written by the editor. */
       map?: Record<string, string | number | boolean>;
       forward?: Forward;
     };

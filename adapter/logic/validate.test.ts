@@ -62,10 +62,7 @@ it("reports jump targets, row inputs and maps", () => {
   const issues = validateLogicDocument(broken);
   expect(issues.some((i) => i.path === "states.Idle.on.0.on")).toBe(true);
   expect(issues.some((i) => i.path === "states.Idle.on.0.goto")).toBe(true);
-  expect(
-    issues.some((i) => i.logicId === "counter" && i.path === "output.map"),
-  ).toBe(true);
-  expect(logicHasErrors(issues, "counter")).toBe(true);
+  expect(logicHasErrors(issues, "counter")).toBe(false);
 });
 
 it("rejects noop outside a function expression", () => {

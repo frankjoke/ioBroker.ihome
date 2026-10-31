@@ -821,3 +821,37 @@ it("starts machines after functions, so computed memory is visible", () => {
   engine.start();
   expect(engine.memoryValue("machine-first")).toBe("On");
 });
+
+it("creates the state timer on enter and destroys it on exit", () => {
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const d = machine();
+  const logic = d.logics[0] as MachineLogic;
+  logic.states.On.on = [
+    { on: "motion", is: { op: "eq", value: true }, goto: "On" },
+    { on: "motion", is: { op: "eq", value: false }, goto: "Idle" },
+  ];
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.clock.pending).toBe(0); // Idle has no after timer
+  h.change("0_userdata.0.M", true);
+  expect(h.clock.pending).toBe(1); // On armed its after timer
+  h.change("0_userdata.0.M", false);
+  expect(engine.memoryValue("light")).toBe("Idle");
+  expect(h.clock.pending).toBe(0); // leaving On destroyed it
+  h.clock.advance(300_000);
+  expect(engine.memoryValue("light")).toBe("Idle"); // nothing fired late
+});
+
+it("stop destroys a pending state timer", () => {
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const engine = createEngine(machine(), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.M", true);
+  expect(h.clock.pending).toBe(1);
+  engine.stop();
+  expect(h.clock.pending).toBe(0);
+  h.clock.advance(300_000);
+  expect(engine.memoryValue("light")).toBe("On"); // stopped machine does not transition
+});

@@ -345,6 +345,11 @@ export function createEngine(
     }
   }
 
+  /**
+   * State-owned timers follow the state's life: armed on enter, destroyed on
+   * exit and on stop. Delays (later) use the same rule; nothing may outlive
+   * the state that created it.
+   */
   function armAfter(rt: Runtime, name: string, state: StateDef): void {
     clearTimer(rt);
     if (!state.after) return;
@@ -523,13 +528,25 @@ export function createEngine(
   }
 
   function outputValue(rt: Runtime, value: unknown): unknown {
-    if (rt.output.scope !== "state") return value;
-    if (rt.def.kind !== "machine") return coerce(value, rt.output.type);
+    const output = rt.output;
+    if (output.scope !== "state") return value;
+    if (rt.def.kind !== "machine") return coerce(value, output.type);
     const name = String(value);
-    if (rt.output.map && name in rt.output.map) return rt.output.map[name];
-    if (rt.output.type === "boolean") return name.startsWith("On");
-    if (rt.output.type === "string") return name;
-    return coerce(name, rt.output.type);
+    if (output.map && name in output.map) return output.map[name];
+    if (output.type === "boolean")
+      return matchesPattern(name, output.on ?? "On*");
+    if (output.type === "string") return name;
+    // A number output is the state's index in declaration order.
+    const index = Object.keys(rt.def.states).indexOf(name);
+    return index < 0 ? 0 : index;
+  }
+
+  function matchesPattern(name: string, pattern: string): boolean {
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".");
+    return new RegExp(`^${escaped}$`).test(name);
   }
 
   function writeOutput(rt: Runtime, value: unknown, depth: number): void {
