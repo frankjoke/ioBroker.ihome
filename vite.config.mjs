@@ -22,6 +22,11 @@ export default defineConfig({
       router: {
         type: "hash",
       },
+      // The logic engine is shared with the adapter (adapter/logic), so the SPA
+      // imports exactly the code the adapter runs.
+      alias: {
+        $logic: "adapter/logic",
+      },
       serviceWorker: {
         // registered in +layout.svelte, with updateViaCache: "none"
         register: false,
@@ -50,7 +55,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.{test,spec}.{js,ts}"],
+    include: [
+      "src/**/*.{test,spec}.{js,ts}",
+      "adapter/logic/**/*.test.ts",
+    ],
     expect: {
       requireAssertions: true,
     },

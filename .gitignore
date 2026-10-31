@@ -36,3 +36,6 @@ Thumbs.db
 
 # Session handoffs and the design record — local only, never published
 docs/
+
+# Plan-execution scratch (ledger, briefs, review packages)
+.superpowers/
