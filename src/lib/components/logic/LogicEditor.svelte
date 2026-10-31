@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import type { Input, LogicDef, Output } from "$logic/types";
   import { validateLogicDocument } from "$logic/validate";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import InputsEditor from "./InputsEditor.svelte";
@@ -45,8 +46,37 @@
     draft = { ...draft, ...update } as LogicDef;
   }
 
+  /** A state id that a global variable stands for becomes the variable's name,
+   *  so changing the variable later changes every logic that uses it. */
+  function normalizeRefs(logic: LogicDef): LogicDef {
+    const vars = getVariables().filter((v) => v.kind === "state" && v.stateId);
+    const toName = (ref: string) =>
+      vars.find((v) => v.stateId === ref)?.name ?? ref;
+    const inputs = Object.fromEntries(
+      Object.entries(logic.inputs ?? {}).map(([name, input]) => {
+        if (input.from.type !== "state") return [name, input];
+        return [
+          name,
+          {
+            ...input,
+            from: {
+              ...input.from,
+              ref: toName(input.from.ref),
+              refs: (input.from.refs ?? []).map(toName),
+            },
+          },
+        ];
+      }),
+    ) as LogicDef["inputs"];
+    const output =
+      logic.output?.scope === "state"
+        ? { ...logic.output, ref: toName(logic.output.ref) }
+        : logic.output;
+    return { ...logic, inputs, output } as LogicDef;
+  }
+
   function save() {
-    if (canSave) onchange(draft);
+    if (canSave) onchange(normalizeRefs(draft));
   }
 
   function cancel() {

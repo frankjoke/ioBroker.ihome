@@ -994,3 +994,35 @@ it("logs state changes only when the logic enables it", () => {
   h2.change("0_userdata.0.M", true);
   expect(h2.logs).toEqual([]);
 });
+
+it("resolves a global variable name used as the output ref", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "outvar",
+        name: "Out var",
+        kind: "function",
+        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        output: { scope: "state", ref: "TestState_Switch", type: "number" },
+        expr: { const: 1 },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.P": false });
+  const engine = createEngine(doc, {
+    ...h.deps,
+    resolveVariable: (name: string) =>
+      name === "TestState_Switch"
+        ? { kind: "state" as const, stateId: "ihome.0.Variables.TestState_Switch" }
+        : undefined,
+  });
+  h.attach(engine);
+  engine.start();
+  expect(engine.subscriptions()).toContain("ihome.0.Variables.TestState_Switch");
+  expect(h.writes[0]).toEqual({
+    id: "ihome.0.Variables.TestState_Switch",
+    value: 1,
+    ack: true,
+  });
+});

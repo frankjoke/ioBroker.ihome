@@ -253,7 +253,8 @@ export function createEngine(
       for (const input of rt.inputs.values()) {
         for (const id of input.stateIds) ids.add(id);
       }
-      if (rt.output.scope === "state") ids.add(rt.output.ref);
+      const target = outputTargetId(rt);
+      if (target) ids.add(target);
     }
     return [...ids];
   }
@@ -581,6 +582,13 @@ export function createEngine(
     return !rt.hasOutput || !Object.is(rt.lastOutput, value);
   }
 
+  /** The state an external output writes to; a ref may be a variable name. */
+  function outputTargetId(rt: Runtime): string | undefined {
+    const output = rt.output;
+    if (output.scope !== "state") return undefined;
+    return resolveStateId(output.ref) ?? output.ref;
+  }
+
   function outputValue(rt: Runtime, value: unknown): unknown {
     const output = rt.output;
     if (output.scope !== "state") return value;
@@ -616,10 +624,12 @@ export function createEngine(
     }
     const mapped = outputValue(rt, value);
     if (!forwardAllows(rt, mapped, output.forward)) return;
+    const target = outputTargetId(rt);
+    if (!target) return;
     rt.lastOutput = mapped;
     rt.hasOutput = true;
-    noteWrite(output.ref, mapped, rt.def.id);
-    deps.write(output.ref, mapped, true);
+    noteWrite(target, mapped, rt.def.id);
+    deps.write(target, mapped, true);
   }
 
   function startMachine(rt: Runtime): void {
@@ -655,7 +665,7 @@ export function createEngine(
       rt.output.scope === "state" &&
       rt.output.map
     ) {
-      const current = deps.read(rt.output.ref);
+      const current = deps.read(outputTargetId(rt) ?? rt.output.ref);
       for (const name of names) {
         if (Object.is(rt.output.map[name], current)) return name;
       }

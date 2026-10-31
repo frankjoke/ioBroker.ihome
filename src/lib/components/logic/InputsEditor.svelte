@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Input, InputSource } from "$logic/types";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
@@ -71,9 +72,20 @@
     update(name, { ...input, from });
   }
 
+  /** A ref may be a global variable's name or its state id; always show the
+   *  name, so the user sees what they bound and can change it in one place. */
+  function displayRef(ref: string): string {
+    const variable = getVariables().find(
+      (v) => v.kind === "state" && (v.name === ref || v.stateId === ref),
+    );
+    return variable ? variable.name : ref;
+  }
+
   function sourceLabel(input: Input): string {
     if (input.from.type === "state") {
-      const all = [input.from.ref, ...(input.from.refs ?? [])].filter(Boolean);
+      const all = [input.from.ref, ...(input.from.refs ?? [])]
+        .filter(Boolean)
+        .map(displayRef);
       if (all.length === 0) return "(no state selected)";
       if (all.length === 1) return all[0];
       return `${all[0]} +${all.length - 1}`;

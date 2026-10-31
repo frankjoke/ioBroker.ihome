@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Output } from "$logic/types";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
 
@@ -19,9 +20,23 @@
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   let picking = $state(false);
 
+  function displayRef(ref: string): string {
+    const variable = getVariables().find(
+      (v) => v.kind === "state" && (v.name === ref || v.stateId === ref),
+    );
+    return variable ? variable.name : ref;
+  }
+
+  function realId(ref: string): string {
+    return (
+      getVariables().find((v) => v.kind === "state" && v.name === ref)
+        ?.stateId ?? ref
+    );
+  }
+
   /** The selected state's declared type, so the field shows the truth. */
   function stateType(ref: string): (typeof TYPE)[number] | undefined {
-    const type = ioBroker.objects.get(ref)?.common?.type;
+    const type = ioBroker.objects.get(realId(ref))?.common?.type;
     if (type === "boolean" || type === "number" || type === "string") {
       return type;
     }
@@ -62,7 +77,7 @@
       class:mono={stateRef !== ""}
       class:text-muted={stateRef === ""}
     >
-      {stateRef || "Memory - Select if to be written"}
+      {stateRef ? displayRef(stateRef) : "Memory - Select if to be written"}
     </span>
     <IconButton
       icon={stateRef ? "close" : "search"}
