@@ -107,8 +107,7 @@
 
   function addRow(stateName: string) {
     const state = logic.states[stateName];
-    const input = eventInputs[0];
-    if (!input) return;
+    const input = eventInputs[0] ?? "$init";
     updateState(stateName, {
       ...state,
       on: [...(state.on ?? []), { on: input }],
@@ -233,6 +232,7 @@
                 onchange={(e) =>
                   updateRow(name, index, { ...row, on: e.currentTarget.value })}
               >
+                <option value="$init">$init (start)</option>
                 {#each eventInputs as input (input)}
                   <option value={input}>{input}</option>
                 {/each}
@@ -342,11 +342,8 @@
             </div>
           </div>
         {/each}
-        <button
-          type="button"
-          class="btn btn-sm"
-          disabled={eventInputs.length === 0}
-          onclick={() => addRow(name)}>Add row</button
+        <button type="button" class="btn btn-sm" onclick={() => addRow(name)}
+          >Add row</button
         >
         {#if eventInputs.length === 0}
           <p class="hint text-muted">

@@ -91,6 +91,16 @@ export interface StateDef {
   after?: { time: Duration; goto: string };
 }
 
+export interface Init {
+  /** Machine: state name or an expression that answers one. */
+  state?: string | Expr;
+  /** Machine: infer the state from the current output value. */
+  match?: "output";
+  /** Function: run the start evaluation (default true).
+   *  Machine: evaluate the `$init` rows after entering (default false). */
+  run?: boolean;
+}
+
 export interface LogicBase {
   /** Stable and unique: [a-z0-9-]. */
   id: string;
@@ -100,6 +110,8 @@ export interface LogicBase {
   inputs?: Record<string, Input>;
   /** Default { scope: "memory", name: id }. */
   output?: Output;
+  /** Startup policy (spec 5.8). */
+  init?: Init;
   /** Per-logic debug logging, default false. */
   log?: boolean;
 }

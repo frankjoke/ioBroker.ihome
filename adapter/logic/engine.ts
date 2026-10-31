@@ -69,6 +69,8 @@ interface Runtime {
   timer?: number;
   /** Timer inputs of this logic, by input name. */
   timers: Map<string, number>;
+  /** True only while this logic's start evaluation runs (D19). */
+  init: boolean;
 }
 
 interface Job {
@@ -150,6 +152,7 @@ export function createEngine(
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
       timers: new Map<string, number>(),
+      init: false,
     });
   }
 
@@ -163,6 +166,7 @@ export function createEngine(
     deps.log("warn", logicId, message);
 
   function resolveIn(rt: Runtime, ref: string): unknown {
+    if (ref === "$init") return rt.init;
     const input = rt.inputs.get(ref);
     if (input) {
       if (input.input.from.type === "memory") {
@@ -495,6 +499,46 @@ export function createEngine(
     deps.write(output.ref, mapped, true);
   }
 
+  function startMachine(rt: Runtime): void {
+    const def = rt.def as MachineLogic;
+    const names = Object.keys(def.states);
+    if (names.length === 0) return;
+    const chosen = chooseStart(rt, def, names);
+    rt.init = true;
+    transition(rt, chosen, 0);
+    if (def.init?.run === true) {
+      // The `$init` rows run after entering, with $init true.
+      handleMachine({ rt, input: "$init", value: true, depth: 0 });
+    }
+    rt.init = false;
+  }
+
+  function chooseStart(rt: Runtime, def: MachineLogic, names: string[]): string {
+    const init = def.init;
+    if (init?.match === "output" && rt.output.scope === "state" && rt.output.map) {
+      const current = deps.read(rt.output.ref);
+      for (const name of names) {
+        if (Object.is(rt.output.map[name], current)) return name;
+      }
+    }
+    if (init?.state !== undefined) {
+      let value: unknown;
+      try {
+        value =
+          typeof init.state === "string"
+            ? init.state
+            : evaluate(init.state, (ref) => resolveIn(rt, ref));
+      } catch (error) {
+        warn(def.id, `init state failed: ${errorText(error)}`);
+        value = undefined;
+      }
+      if (typeof value === "string" && def.states[value]) return value;
+      warn(def.id, `init state ${String(value)} not found, using the fallback`);
+    }
+    if (def.start && def.states[def.start]) return def.start;
+    return names[0];
+  }
+
   function armTimer(rt: Runtime, input: InputRuntime): void {
     if (input.input.from.type !== "timer") return;
     const ms = parseDuration(input.input.from.every);
@@ -537,15 +581,15 @@ export function createEngine(
       started = true;
       for (const entry of doc.memory ?? [])
         memory.set(entry.name, entry.initial);
+      // Two passes (D17): computed memory is available to machines.
       for (const rt of runtimes) {
-        if (rt.def.kind === "function") runFunction(rt, 0);
+        if (rt.def.kind !== "function") continue;
+        rt.init = true;
+        if (rt.def.init?.run !== false) runFunction(rt, 0);
+        rt.init = false;
       }
       for (const rt of runtimes) {
-        if (rt.def.kind !== "machine") continue;
-        const def = rt.def;
-        const first = Object.keys(def.states)[0];
-        const start = def.start && def.states[def.start] ? def.start : first;
-        if (start) transition(rt, start, 0);
+        if (rt.def.kind === "machine") startMachine(rt);
       }
       for (const rt of runtimes) {
         for (const input of rt.inputs.values()) armTimer(rt, input);

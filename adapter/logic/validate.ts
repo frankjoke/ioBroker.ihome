@@ -5,6 +5,7 @@ import type {
   FunctionLogic,
   Input,
   LogicDocument,
+  MachineLogic,
   MemoryDecl,
   OnRow,
   Output,
@@ -155,6 +156,9 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         );
       }
       checkOutput(id, logic.output, new Set(), add);
+      if (logic.init?.state !== undefined || logic.init?.match !== undefined) {
+        add(id, "init", "init.state/init.match are ignored for function logics", "warn");
+      }
     } else if (logic.kind === "machine") {
       if (!isRecord(logic.states)) {
         add(id, "states", "machine has no state object");
@@ -218,6 +222,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         }
       }
       checkOutput(id, logic.output, new Set(stateNames), add);
+      checkInit(id, logic, stateNames, add);
     } else {
       add(id, "kind", "unknown logic kind");
     }
@@ -277,6 +282,41 @@ function checkOutput(
   }
 }
 
+function checkInit(
+  id: string,
+  logic: MachineLogic,
+  stateNames: string[],
+  add: Add,
+): void {
+  const init = logic.init;
+  if (!init) return;
+  if (init.match !== undefined) {
+    const output = logic.output;
+    if (
+      init.match !== "output" ||
+      output?.scope !== "state" ||
+      !output.map
+    ) {
+      add(
+        id,
+        "init.match",
+        "match needs an external output state with a complete map",
+      );
+    }
+  }
+  if (init.state !== undefined) {
+    if (typeof init.state === "string") {
+      if (!stateNames.includes(init.state)) {
+        add(id, "init.state", `unknown state ${init.state}`);
+      }
+    } else {
+      walkExpr(init.state, false, (path, message) =>
+        add(id, `init.state${path ? `.${path}` : ""}`, message),
+      );
+    }
+  }
+}
+
 function checkRow(
   id: string,
   row: OnRow,
@@ -288,7 +328,9 @@ function checkRow(
   add: Add,
 ): void {
   const input = row?.on;
-  if (typeof input !== "string" || !inputNames.has(input)) {
+  if (input === "$init") {
+    // The built-in start trigger (D19); only machines have rows.
+  } else if (typeof input !== "string" || !inputNames.has(input)) {
     add(id, `${path}.on`, `unknown input ${String(input)}`);
   } else {
     const isEvent =

@@ -138,3 +138,45 @@ it("rejects zero-length timers", () => {
   expect(issues.some((i) => i.path === "inputs.t.from.every")).toBe(true);
   expect(issues.some((i) => i.path === "states.A.after.time")).toBe(true);
 });
+
+it("checks the init policy", () => {
+  const bad: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        output: { scope: "memory" },
+        init: { match: "output", state: "Nowhere" },
+        states: { A: {} },
+      },
+    ],
+  };
+  const issues = validateLogicDocument(bad);
+  expect(issues.some((i) => i.path === "init.match")).toBe(true);
+  expect(issues.some((i) => i.path === "init.state")).toBe(true);
+});
+
+it("accepts a $init row and an expression init state", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" } } },
+        init: {
+          state: { op: "if", cond: { ref: "p" }, then: { const: "A" }, else: { const: "B" } },
+          run: true,
+        },
+        states: {
+          A: { on: [{ on: "$init", goto: "B" }] },
+          B: {},
+        },
+      },
+    ],
+  };
+  expect(validateLogicDocument(doc)).toEqual([]);
+});

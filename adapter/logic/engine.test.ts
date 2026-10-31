@@ -1,7 +1,12 @@
 import { expect, it } from "vitest";
 import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
-import type { FunctionLogic, LogicDocument, MachineLogic } from "./types";
+import type {
+  FunctionLogic,
+  LogicDocument,
+  MachineLogic,
+  Output,
+} from "./types";
 
 const doc = (extra: Partial<FunctionLogic> = {}): LogicDocument => ({
   version: 1,
@@ -453,4 +458,179 @@ it("skips an invalid logic instead of throwing out of start", () => {
   h.attach(engine);
   expect(() => engine.start()).not.toThrow();
   expect(h.logs.some((line) => line.logicId === "broken")).toBe(true);
+});
+
+// ------------------------------------------------------------ startup policy
+
+function startup(output: Output, init?: MachineLogic["init"]): LogicDocument {
+  return {
+    version: 1,
+    logics: [
+      {
+        id: "start",
+        name: "Start",
+        kind: "machine",
+        inputs: {
+          power: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+        },
+        output,
+        init,
+        start: "Idle",
+        states: {
+          Idle: { on: [{ on: "power", is: { op: "eq", value: true }, goto: "On" }] },
+          On: {},
+        },
+      },
+    ],
+  };
+}
+
+it("starts in the constant init state", () => {
+  const h = createHarness({ "0_userdata.0.P": false });
+  const engine = createEngine(startup({ scope: "memory" }, { state: "On" }), h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("start")).toBe("On");
+});
+
+it("starts in the state an init expression answers", () => {
+  const h = createHarness({ "0_userdata.0.P": true });
+  const engine = createEngine(
+    startup(
+      { scope: "memory" },
+      {
+        state: {
+          op: "if",
+          cond: { ref: "power" },
+          then: { const: "On" },
+          else: { const: "Idle" },
+        },
+      },
+    ),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("start")).toBe("On");
+});
+
+it("matches the state to the current output value, first declaration wins", () => {
+  const h = createHarness({ "0_userdata.0.B": true });
+  const doc = startup(
+    {
+      scope: "state",
+      ref: "0_userdata.0.B",
+      type: "boolean",
+      map: { Idle: false, On: true },
+    },
+    { match: "output" },
+  );
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: true, ack: true }]);
+
+  const h2 = createHarness({ "0_userdata.0.B": false });
+  const engine2 = createEngine(doc, h2.deps);
+  h2.attach(engine2);
+  engine2.start();
+  expect(h2.writes).toEqual([
+    { id: "0_userdata.0.B", value: false, ack: true },
+  ]); // the start write resyncs the state
+});
+
+it("falls back when the output value matches no state", () => {
+  const h = createHarness({ "0_userdata.0.B": 99 });
+  const doc = startup(
+    {
+      scope: "state",
+      ref: "0_userdata.0.B",
+      type: "number",
+      map: { Idle: 0, On: 1 },
+    },
+    { match: "output", state: "On" },
+  );
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.B", value: 1, ack: true },
+  ]);
+});
+
+it("exposes $init only during the start evaluation", () => {
+  const h = createHarness({ "0_userdata.0.P": false, "0_userdata.0.FLAG": false });
+  const doc = startup({ scope: "memory" }, { run: true });
+  const logic = doc.logics[0] as MachineLogic;
+  logic.states.Idle.enter = [
+    { set: { target: { ref: "0_userdata.0.FLAG" }, value: { ref: "$init" }, forward: "always" } },
+  ];
+  logic.states.Idle.on = [{ on: "$init", goto: "On" }];
+  logic.states.On.on = [{ on: "power", goto: "Idle" }];
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([{ id: "0_userdata.0.FLAG", value: true, ack: false }]);
+  h.change("0_userdata.0.P", true);
+  expect(h.writes.at(-1)).toEqual({ id: "0_userdata.0.FLAG", value: false, ack: false });
+});
+
+it("runs a function once at start unless init.run is false", () => {
+  const fn = (run?: boolean): LogicDocument => ({
+    version: 1,
+    logics: [
+      {
+        id: "calc",
+        name: "Calc",
+        kind: "function",
+        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+        init: run === undefined ? undefined : { run },
+        expr: { ref: "$init" },
+      },
+    ],
+  });
+  const h = createHarness({ "0_userdata.0.P": false });
+  const engine = createEngine(fn(), h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 1, ack: true }]);
+
+  const h2 = createHarness({ "0_userdata.0.P": false });
+  const engine2 = createEngine(fn(false), h2.deps);
+  h2.attach(engine2);
+  engine2.start();
+  expect(h2.writes).toEqual([]);
+});
+
+it("starts machines after functions, so computed memory is visible", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "machine-first",
+        name: "Machine first",
+        kind: "machine",
+        inputs: {
+          m: { from: { type: "memory", ref: "computed" }, kind: "variable" },
+        },
+        output: { scope: "memory" },
+        init: { state: { ref: "m" } },
+        states: { Idle: {}, On: {} },
+      },
+      {
+        id: "function-second",
+        name: "Function second",
+        kind: "function",
+        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        output: { scope: "memory", name: "computed" },
+        expr: { const: "On" },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.P": true });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("machine-first")).toBe("On");
 });
