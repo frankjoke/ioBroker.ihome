@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Output } from "$logic/types";
-  import StateRefField from "./StateRefField.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
 
   let {
     output,
@@ -15,6 +16,7 @@
   const TYPE = ["boolean", "number", "string"] as const;
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
+  let picking = $state(false);
 
   /** One field: a state is the output; no state means adapter memory. */
   function setRef(ref: string) {
@@ -55,16 +57,36 @@
 
 <div class="output">
   <div class="row">
-    <span class="label-mono">Output state</span>
-    <StateRefField
-      value={stateRef}
-      label="Output state"
-      onchange={(ref) => setRef(ref)}
+    <span class="label-mono">State</span>
+    <span
+      class="state-value"
+      class:mono={stateRef !== ""}
+      class:text-muted={stateRef === ""}
+    >
+      {stateRef || "Memory - Select if to be written"}
+    </span>
+    <IconButton
+      icon={stateRef ? "close" : "search"}
+      label={stateRef ? "Clear the output state" : "Select the output state"}
+      title={stateRef ? "Clear the state (use memory)" : "Select a state"}
+      onclick={() => {
+        if (stateRef) setRef("");
+        else picking = true;
+      }}
     />
-    {#if output.scope === "memory"}
-      <span class="hint text-muted">empty = adapter memory</span>
-    {/if}
   </div>
+
+  {#if picking}
+    <SourcePicker
+      mode="state"
+      title="Output state"
+      onState={(id) => {
+        setRef(id);
+        picking = false;
+      }}
+      onClose={() => (picking = false)}
+    />
+  {/if}
 
   {#if output.scope === "memory"}
     <div class="row">
@@ -179,5 +201,10 @@
 
   .map-row .mono {
     min-width: 8rem;
+  }
+
+  .state-value {
+    flex: 1 1 12rem;
+    overflow-wrap: anywhere;
   }
 </style>
