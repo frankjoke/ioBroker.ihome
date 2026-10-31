@@ -1,6 +1,7 @@
 import * as utils from "@iobroker/adapter-core";
 import { createEngine, type Engine, type StateChange } from "./logic/engine";
 import { parseLogicDocument } from "./logic/validate";
+import { subscriptionDiff } from "./logic/subscriptions";
 import type { LogicDocument } from "./logic/types";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
@@ -249,22 +250,23 @@ class IHome extends utils.Adapter {
     }
 
     const ids = next.subscriptions();
-    const isOwn = (id: string) => id.startsWith(`${this.namespace}.`);
-    const before = new Set(this.logicIds);
-    const added = ids.filter((id) => !before.has(id));
-    const removed = this.logicIds.filter((id) => !ids.includes(id));
+    // Anything a removed/disabled logic or a deleted variable no longer names
+    // is unsubscribed here, so the broker stops sending it and nothing keeps
+    // running for it.
+    // Subscribe before warming: a change between the two is then delivered
+    // instead of being lost and leaving the engine on a stale value.
+    const diff = subscriptionDiff(this.logicIds, ids, this.namespace);
     try {
-      // Subscribe before warming: a change between the two is then delivered
-      // instead of being lost and leaving the engine on a stale value.
-      const own = added.filter(isOwn);
-      const foreign = added.filter((id) => !isOwn(id));
-      if (own.length) await this.subscribeStatesAsync(own);
-      if (foreign.length) await this.subscribeForeignStatesAsync(foreign);
-      const ownGone = removed.filter(isOwn);
-      const foreignGone = removed.filter((id) => !isOwn(id));
-      if (ownGone.length) await this.unsubscribeStatesAsync(ownGone);
-      if (foreignGone.length)
-        await this.unsubscribeForeignStatesAsync(foreignGone);
+      if (diff.own.add.length) await this.subscribeStatesAsync(diff.own.add);
+      if (diff.foreign.add.length) {
+        await this.subscribeForeignStatesAsync(diff.foreign.add);
+      }
+      if (diff.own.remove.length) {
+        await this.unsubscribeStatesAsync(diff.own.remove);
+      }
+      if (diff.foreign.remove.length) {
+        await this.unsubscribeForeignStatesAsync(diff.foreign.remove);
+      }
     } catch (error) {
       // Keeping the old engine is better than running one that gets no events.
       this.log.warn(
