@@ -47,6 +47,8 @@
    *  `leaf` under the fixed `Variables.` prefix. */
   let relative = $state("");
   let leaf = $state("");
+  /** The state leaf follows the variable name until the user edits it. */
+  let leafTouched = $state(false);
   let pendingDelete = $state<GlobalVariable | null>(null);
   let search = $state("");
   let sortBy = $state<"name" | "kind">("name");
@@ -111,10 +113,14 @@
     (editing?.enums ?? []).filter((e) => e.startsWith("enum.functions.")),
   );
 
-  /** The name is the reference, so it is kept id-safe while it is typed. */
+  /** The name is the reference, so it is kept id-safe while it is typed.
+   *  While creating a state it also fills the state leaf until that is edited. */
   function setEditingName(raw: string) {
     if (!editing) return;
     editing.name = restrictName(raw);
+    if (!leafTouched && stateMode === "new" && ihomeNamespace) {
+      leaf = editing.name;
+    }
     formError = "";
   }
 
@@ -174,12 +180,14 @@
     namespace = ioBroker.namespace || "ihome.0";
     relative = "";
     leaf = "";
+    leafTouched = false;
     showForm = true;
   }
 
   function startEdit(v: GlobalVariable) {
     editing = { ...v };
     formError = "";
+    leafTouched = true;
     if (v.kind === "state" && stateExists(v.stateId)) {
       stateMode = "existing";
     } else {
@@ -222,6 +230,10 @@
   function setStateMode(mode: "existing" | "new") {
     stateMode = mode;
     if (editing && !VALUE_TYPES.includes(editing.type)) editing.type = "string";
+    if (mode === "new" && !leaf && editing?.name && ihomeNamespace) {
+      leaf = editing.name;
+      leafTouched = false;
+    }
   }
 
   async function save() {
@@ -499,7 +511,11 @@
                     <code class="prefix">Variables.</code>
                     <input
                       type="text"
-                      bind:value={leaf}
+                      value={leaf}
+                      oninput={(e) => {
+                        leafTouched = true;
+                        leaf = e.currentTarget.value;
+                      }}
                       placeholder="myValue"
                     />
                   </span></label
