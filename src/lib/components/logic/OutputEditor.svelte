@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Output } from "$logic/types";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
 
@@ -18,6 +19,19 @@
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   let picking = $state(false);
 
+  /** The selected state's declared type, so the field shows the truth. */
+  function stateType(ref: string): (typeof TYPE)[number] | undefined {
+    const type = ioBroker.objects.get(ref)?.common?.type;
+    if (type === "boolean" || type === "number" || type === "string") {
+      return type;
+    }
+    return undefined;
+  }
+
+  const shownType = $derived(
+    output.scope === "state" ? (stateType(stateRef) ?? output.type) : "boolean",
+  );
+
   /** One field: a state is the output; no state means adapter memory. */
   function setRef(ref: string) {
     if (!ref) {
@@ -31,7 +45,9 @@
     onchange({
       scope: "state",
       ref,
-      type: output.scope === "state" ? output.type : "boolean",
+      // The state's own type wins; it is what the engine will write.
+      type:
+        stateType(ref) ?? (output.scope === "state" ? output.type : "boolean"),
       map: output.scope === "state" ? output.map : undefined,
       forward: output.forward,
     });
@@ -74,6 +90,30 @@
         else picking = true;
       }}
     />
+    {#if output.scope === "state"}
+      <select
+        class="type"
+        aria-label="Output type"
+        value={shownType}
+        disabled
+        title="The type comes from the selected state"
+      >
+        {#each TYPE as type (type)}
+          <option value={type}>{type}</option>
+        {/each}
+      </select>
+    {/if}
+    <label class="inline write-always"
+      >write always <input
+        type="checkbox"
+        checked={output.forward === "always"}
+        onchange={(e) =>
+          onchange({
+            ...output,
+            forward: e.currentTarget.checked ? "always" : "changed",
+          })}
+      /></label
+    >
   </div>
 
   {#if picking}
@@ -101,75 +141,34 @@
             name: e.currentTarget.value.trim() || undefined,
           })}
       />
-      <label class="inline"
-        >forward every time <input
-          type="checkbox"
-          checked={output.forward === "always"}
-          onchange={(e) =>
-            onchange({
-              ...output,
-              forward: e.currentTarget.checked ? "always" : "changed",
-            })}
-        /></label
-      >
     </div>
-  {:else}
-    <div class="row">
-      <span class="label-mono">Type</span>
-      <select
-        aria-label="Output type"
-        value={output.type}
-        onchange={(e) =>
-          onchange({
-            ...output,
-            type: e.currentTarget.value as (typeof TYPE)[number],
-            map: undefined,
-          })}
-      >
-        {#each TYPE as type (type)}
-          <option value={type}>{type}</option>
-        {/each}
-      </select>
-      <label class="inline"
-        >forward every time <input
-          type="checkbox"
-          checked={output.forward === "always"}
-          onchange={(e) =>
-            onchange({
-              ...output,
-              forward: e.currentTarget.checked ? "always" : "changed",
-            })}
-        /></label
-      >
+  {:else if output.type !== "string" && stateNames.length > 0}
+    <div class="map">
+      <span class="label-mono">Value per state</span>
+      {#each stateNames as state (state)}
+        <label class="map-row"
+          ><span class="mono">{state}</span>
+          {#if output.type === "boolean"}
+            <select
+              aria-label={`Value for ${state}`}
+              value={String(output.map?.[state] ?? state.startsWith("On"))}
+              onchange={(e) => setMap(state, e.currentTarget.value)}
+            >
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          {:else}
+            <input
+              type="number"
+              aria-label={`Value for ${state}`}
+              value={String(output.map?.[state] ?? "")}
+              placeholder="required"
+              onchange={(e) => setMap(state, e.currentTarget.value)}
+            />
+          {/if}
+        </label>
+      {/each}
     </div>
-    {#if output.type !== "string" && stateNames.length > 0}
-      <div class="map">
-        <span class="label-mono">Value per state</span>
-        {#each stateNames as state (state)}
-          <label class="map-row"
-            ><span class="mono">{state}</span>
-            {#if output.type === "boolean"}
-              <select
-                aria-label={`Value for ${state}`}
-                value={String(output.map?.[state] ?? state.startsWith("On"))}
-                onchange={(e) => setMap(state, e.currentTarget.value)}
-              >
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            {:else}
-              <input
-                type="number"
-                aria-label={`Value for ${state}`}
-                value={String(output.map?.[state] ?? "")}
-                placeholder="required"
-                onchange={(e) => setMap(state, e.currentTarget.value)}
-              />
-            {/if}
-          </label>
-        {/each}
-      </div>
-    {/if}
   {/if}
 </div>
 
@@ -186,7 +185,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .map {
@@ -197,6 +196,12 @@
 
   .map-row {
     justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .row input:not([type="checkbox"]) {
+    flex: 1 1 auto;
+    min-width: 6rem;
   }
 
   .map-row .mono {
@@ -204,7 +209,17 @@
   }
 
   .state-value {
-    flex: 1 1 12rem;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .write-always {
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .type {
+    flex: 0 0 auto;
   }
 </style>
