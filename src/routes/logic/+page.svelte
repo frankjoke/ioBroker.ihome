@@ -294,7 +294,7 @@
   .logic-list {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.25rem;
   }
 
   .logic-row {
@@ -302,7 +302,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.6rem 0.8rem;
+    padding: 0.5rem 0.75rem;
     flex-wrap: wrap;
   }
 

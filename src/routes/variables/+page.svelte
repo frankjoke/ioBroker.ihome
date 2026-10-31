@@ -748,7 +748,7 @@
   .var-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
 
   .var-row {
@@ -756,7 +756,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
     flex-wrap: wrap;
   }
 
