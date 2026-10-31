@@ -405,12 +405,7 @@ export function createEngine(
     rt.timer = deps.setTimeout(() => {
       rt.timer = undefined;
       if (rt.state === name) {
-        transition(
-          rt,
-          state.after!.goto,
-          0,
-          `timeout “${state.after!.time}”`,
-        );
+        transition(rt, state.after!.goto, 0, `timeout “${state.after!.time}”`);
       }
     }, ms);
   }
@@ -432,10 +427,7 @@ export function createEngine(
     const oldName = rt.state;
     const because = reason ? ` because of ${reason}` : "";
     if (same) {
-      stateLog(
-        rt,
-        `Logic “${def.name}” stays in “${name}”${because}`,
-      );
+      stateLog(rt, `Logic “${def.name}” stays in “${name}”${because}`);
       clearTimer(rt);
     } else {
       if (previous) {

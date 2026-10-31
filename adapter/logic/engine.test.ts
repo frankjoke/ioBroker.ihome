@@ -976,20 +976,23 @@ it("logs state changes only when the logic enables it", () => {
   const engine = createEngine(loud, h.deps);
   h.attach(engine);
   engine.start();
-  expect(
-    h.logs.some((line) => line.message.includes('starts in “Idle”')),
-  ).toBe(true);
+  expect(h.logs.some((line) => line.message.includes("starts in “Idle”"))).toBe(
+    true,
+  );
   h.change("0_userdata.0.M", true);
   expect(
     h.logs.some((line) =>
       line.message.includes(
-        'moves from “Idle” to “On” because of event “motion”',
+        "moves from “Idle” to “On” because of event “motion”",
       ),
     ),
   ).toBe(true);
 
   const quiet = machine();
-  const h2 = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const h2 = createHarness({
+    "0_userdata.0.M": false,
+    "0_userdata.0.L": false,
+  });
   const engine2 = createEngine(quiet, h2.deps);
   h2.attach(engine2);
   engine2.start();
@@ -1005,7 +1008,9 @@ it("resolves a global variable name used as the output ref", () => {
         id: "outvar",
         name: "Out var",
         kind: "function",
-        inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" } },
+        inputs: {
+          p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
+        },
         output: { scope: "state", ref: "TestState_Switch", type: "number" },
         expr: { const: 1 },
       },
@@ -1016,12 +1021,17 @@ it("resolves a global variable name used as the output ref", () => {
     ...h.deps,
     resolveVariable: (name: string) =>
       name === "TestState_Switch"
-        ? { kind: "state" as const, stateId: "ihome.0.Variables.TestState_Switch" }
+        ? {
+            kind: "state" as const,
+            stateId: "ihome.0.Variables.TestState_Switch",
+          }
         : undefined,
   });
   h.attach(engine);
   engine.start();
-  expect(engine.subscriptions()).toContain("ihome.0.Variables.TestState_Switch");
+  expect(engine.subscriptions()).toContain(
+    "ihome.0.Variables.TestState_Switch",
+  );
   expect(h.writes[0]).toEqual({
     id: "ihome.0.Variables.TestState_Switch",
     value: 1,

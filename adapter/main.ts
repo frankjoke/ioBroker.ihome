@@ -333,8 +333,7 @@ class IHome extends utils.Adapter {
             ? await this.getObjectAsync(id)
             : await this.getForeignObjectAsync(id);
           const common = (object?.common ?? undefined) as
-            | { type?: string; write?: boolean }
-            | undefined;
+            { type?: string; write?: boolean } | undefined;
           if (common?.type) this.stateTypes.set(id, common.type);
           if (common) this.stateWritable.set(id, common.write !== false);
         } catch {
