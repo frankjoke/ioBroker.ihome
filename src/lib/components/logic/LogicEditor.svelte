@@ -71,13 +71,15 @@
 
 <section class="card editor">
   <div class="card-header editor-head">
+    <label class="label-mono" for="logic-name">Name</label>
     <input
+      id="logic-name"
       class="logic-name"
-      aria-label="Logic name"
       value={logic.name}
       onchange={(e) =>
         patch({ name: e.currentTarget.value.trim() || logic.id })}
     />
+    <span class="badge badge-secondary">{logic.kind}</span>
     <label class="inline"
       >enabled <input
         type="checkbox"
@@ -85,8 +87,15 @@
         onchange={(e) => patch({ enabled: e.currentTarget.checked })}
       /></label
     >
-    <span class="badge badge-secondary">{logic.kind}</span>
-    <button type="button" class="btn btn-sm" onclick={onClose}>Close</button>
+    <button
+      type="button"
+      class="icon-btn close-btn"
+      aria-label="Close the editor"
+      title="Close"
+      onclick={onClose}
+    >
+      <span class="material-symbols-outlined">close</span>
+    </button>
   </div>
 
   <div class="card-body editor-body">
@@ -212,6 +221,10 @@
   .logic-name {
     flex: 1 1 12rem;
     font-weight: 600;
+  }
+
+  .close-btn {
+    margin-left: auto;
   }
 
   .editor-body {

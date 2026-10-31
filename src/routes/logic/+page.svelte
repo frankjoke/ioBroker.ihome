@@ -169,9 +169,13 @@
             >
             <button
               type="button"
-              class="btn btn-sm"
-              onclick={() => duplicate(logic)}>Duplicate</button
+              class="icon-btn"
+              aria-label={`Duplicate ${logic.name}`}
+              title="Duplicate"
+              onclick={() => duplicate(logic)}
             >
+              <span class="material-symbols-outlined">content_copy</span>
+            </button>
             <button
               type="button"
               class="icon-btn"
