@@ -1,6 +1,7 @@
 <script lang="ts">
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import {
     getFormulas,
     upsertFormula,
@@ -213,14 +214,12 @@
 
   {#if pendingDelete}
     <ConfirmModal
-      title="Delete template"
+      title={deleteTitle("template", pendingDelete.name)}
       confirmLabel="Delete"
       onConfirm={confirmDelete}
       onCancel={() => (pendingDelete = null)}
     >
-      <p>
-        Delete <strong>{pendingDelete.name}</strong>? Devices keep their copy.
-      </p>
+      <p>Devices keep their copy.</p>
     </ConfirmModal>
   {/if}
 </div>

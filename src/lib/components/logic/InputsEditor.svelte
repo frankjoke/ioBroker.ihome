@@ -3,16 +3,20 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import StateRefField from "./StateRefField.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
 
   let {
     inputs,
     onchange,
     onRename,
+    where = "",
   }: {
     inputs: Record<string, Input>;
     onchange: (inputs: Record<string, Input>) => void;
     /** Rewrites every reference when the parent can (preferred). */
     onRename?: (oldName: string, newName: string) => void;
+    /** The logic name, for the delete confirmation's "from …". */
+    where?: string;
   } = $props();
 
   /** The row whose fields are open; one at a time. */
@@ -277,7 +281,11 @@
 
 {#if pendingDelete}
   <ConfirmModal
-    title={`Delete input ${pendingDelete}?`}
+    title={deleteTitle(
+      "input",
+      pendingDelete,
+      where ? { kind: "logic", name: where } : undefined,
+    )}
     confirmLabel="Delete"
     onConfirm={() => {
       if (pendingDelete) remove(pendingDelete);

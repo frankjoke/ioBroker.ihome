@@ -4,6 +4,7 @@
   import ExprEditor from "./ExprEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
 
   let {
     logic,
@@ -167,6 +168,10 @@
     if (raw === "false") return false;
     const number = Number(raw);
     return raw.trim() !== "" && Number.isFinite(number) ? number : raw;
+  }
+
+  function eventName(state: string, index: number): string {
+    return logic.states[state]?.on?.[index]?.on ?? `event ${index + 1}`;
   }
 
   function rowSummary(row: OnRow): string {
@@ -579,8 +584,18 @@
 {#if pendingDelete}
   <ConfirmModal
     title={pendingDelete.kind === "state"
-      ? `Delete state ${pendingDelete.name}?`
-      : `Delete this event in ${pendingDelete.state}?`}
+      ? deleteTitle("state", pendingDelete.name, {
+          kind: "logic",
+          name: logic.name,
+        })
+      : deleteTitle(
+          "event",
+          eventName(pendingDelete.state, pendingDelete.index),
+          {
+            kind: "state",
+            name: pendingDelete.state,
+          },
+        )}
     confirmLabel="Delete"
     onConfirm={() => {
       if (pendingDelete?.kind === "state") removeState(pendingDelete.name);

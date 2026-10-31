@@ -101,6 +101,7 @@
         inputs={logic.inputs ?? {}}
         onchange={(inputs) => patch({ inputs })}
         onRename={renameInput}
+        where={logic.name}
       />
     </div>
 

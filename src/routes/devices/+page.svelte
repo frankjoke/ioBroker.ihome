@@ -16,6 +16,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import {
     roomList,
     roomsOf as roomsOfEnum,
@@ -387,7 +388,7 @@
 
 {#if pendingDelete}
   <ConfirmModal
-    title="Delete device"
+    title={deleteTitle("device", pendingDelete.name)}
     confirmLabel="Delete"
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}

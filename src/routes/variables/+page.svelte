@@ -24,6 +24,7 @@
   import { formatValue } from "$lib/config/format";
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import {
@@ -655,16 +656,15 @@
 
   {#if pendingDelete}
     <ConfirmModal
-      title={pendingDelete.kind === "state"
-        ? "Remove variable"
-        : "Delete constant"}
+      title={deleteTitle(
+        pendingDelete.kind === "state" ? "variable" : "constant",
+        pendingDelete.name,
+      )}
       confirmLabel="Remove"
       onConfirm={confirmDelete}
       onCancel={() => (pendingDelete = null)}
     >
-      <p>
-        Remove <strong>{pendingDelete.name}</strong> from the variable list?
-      </p>
+      <p>The entry is removed from the variable list.</p>
       {#if pendingDelete.kind === "state" && pendingDelete.stateId}
         <p class="text-muted">
           The ioBroker state <code>{pendingDelete.stateId}</code> is left in place.

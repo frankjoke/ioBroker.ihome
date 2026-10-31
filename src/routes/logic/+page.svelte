@@ -12,6 +12,7 @@
   import LogicEditor from "$lib/components/logic/LogicEditor.svelte";
   import TemplateInsert from "$lib/components/logic/TemplateInsert.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -207,7 +208,7 @@
 
 {#if pendingDelete}
   <ConfirmModal
-    title={`Delete ${pendingDelete.name}?`}
+    title={deleteTitle("logic", pendingDelete.name)}
     confirmLabel="Delete"
     onConfirm={confirmDelete}
     onCancel={() => (pendingDelete = null)}
