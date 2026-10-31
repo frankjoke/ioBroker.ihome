@@ -1,6 +1,9 @@
 <script lang="ts">
-  import IconButton from "$lib/components/common/IconButton.svelte";
+  import { untrack } from "svelte";
   import type { Input, LogicDef, Output } from "$logic/types";
+  import { validateLogicDocument } from "$logic/validate";
+  import IconButton from "$lib/components/common/IconButton.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
   import ExprEditor from "./ExprEditor.svelte";
@@ -16,20 +19,49 @@
     onClose: () => void;
   } = $props();
 
+  /** Edits happen on a copy: the document (and the adapter) only sees them on
+   *  Save, so typing does not reload the logic engine. */
+  let draft = $state(untrack(() => structuredClone(logic)));
+  let askClose = $state(false);
+
+  const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(logic));
+  const issues = $derived(
+    validateLogicDocument({ version: 1, logics: [draft] }).filter(
+      (issue) => issue.logicId === draft.id,
+    ),
+  );
+  const canSave = $derived(
+    dirty && !issues.some((issue) => issue.severity === "error"),
+  );
+
   const output = $derived<Output>(
-    logic.output ?? { scope: "memory", name: logic.id },
+    draft.output ?? { scope: "memory", name: draft.id },
   );
   const stateNames = $derived(
-    logic.kind === "machine" ? Object.keys(logic.states) : [],
+    draft.kind === "machine" ? Object.keys(draft.states) : [],
   );
 
   function patch(update: Partial<LogicDef>) {
-    onchange({ ...logic, ...update } as LogicDef);
+    draft = { ...draft, ...update } as LogicDef;
+  }
+
+  function save() {
+    if (canSave) onchange(draft);
+  }
+
+  function cancel() {
+    draft = structuredClone(logic);
+  }
+
+  function close() {
+    if (dirty) askClose = true;
+    else onClose();
   }
 
   function renameRefs(value: unknown, from: string, to: string): unknown {
-    if (Array.isArray(value))
+    if (Array.isArray(value)) {
       return value.map((item) => renameRefs(item, from, to));
+    }
     if (value && typeof value === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, item] of Object.entries(value)) {
@@ -43,18 +75,18 @@
 
   /** Renaming an input rewrites its rows, conditions and set targets. */
   function renameInput(oldName: string, newName: string) {
-    const inputs = logic.inputs ?? {};
+    const inputs = draft.inputs ?? {};
     if (!newName || newName === oldName || newName in inputs) return;
     const rebuilt: Record<string, Input> = {};
     for (const [key, value] of Object.entries(inputs)) {
       rebuilt[key === oldName ? newName : key] = value;
     }
-    const rest = { ...logic } as Record<string, unknown>;
+    const rest = { ...draft } as Record<string, unknown>;
     delete rest.inputs;
-    onchange({
+    draft = {
       ...(renameRefs(rest, oldName, newName) as object),
       inputs: rebuilt,
-    } as LogicDef);
+    } as LogicDef;
   }
 </script>
 
@@ -64,33 +96,43 @@
     <input
       id="logic-name"
       class="logic-name"
-      value={logic.name}
+      value={draft.name}
       onchange={(e) =>
-        patch({ name: e.currentTarget.value.trim() || logic.id })}
+        patch({ name: e.currentTarget.value.trim() || draft.id })}
     />
-    <span class="badge badge-secondary">{logic.kind}</span>
+    <span class="badge badge-secondary">{draft.kind}</span>
     <label class="inline"
       >enabled <input
         type="checkbox"
-        checked={logic.enabled !== false}
+        checked={draft.enabled !== false}
         onchange={(e) => patch({ enabled: e.currentTarget.checked })}
       /></label
     >
-    <label
-      class="inline"
-      title="Log state changes to the adapter log"
+    <label class="inline" title="Log state changes to the adapter log"
       >log <input
         type="checkbox"
-        checked={logic.log === true}
+        checked={draft.log === true}
         onchange={(e) => patch({ log: e.currentTarget.checked || undefined })}
       /></label
     >
-    <span class="close-slot">
+    <span class="actions">
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        disabled={!canSave}
+        onclick={save}>Save</button
+      >
+      <button
+        type="button"
+        class="btn btn-sm"
+        disabled={!dirty}
+        onclick={cancel}>Cancel</button
+      >
       <IconButton
         icon="close"
         label="Close the editor"
         title="Close"
-        onclick={onClose}
+        onclick={close}
       />
     </span>
   </div>
@@ -107,27 +149,50 @@
 
     <div class="block">
       <InputsEditor
-        inputs={logic.inputs ?? {}}
+        inputs={draft.inputs ?? {}}
         onchange={(inputs) => patch({ inputs })}
         onRename={renameInput}
-        where={logic.name}
+        where={draft.name}
       />
     </div>
 
-    {#if logic.kind === "function"}
+    {#if draft.kind === "function"}
       <div class="block">
         <span class="label-mono">Result expression</span>
         <ExprEditor
-          expr={logic.expr}
+          expr={draft.expr}
           allowNoop
           onchange={(expr) => patch({ expr })}
         />
       </div>
     {:else}
-      <MachineEditor {logic} onchange={(next) => onchange(next)} />
+      <MachineEditor logic={draft} onchange={(next) => (draft = next)} />
+    {/if}
+
+    {#if issues.length > 0}
+      <ul class="issues">
+        {#each issues as issue (issue.path + issue.message)}
+          <li class:text-danger={issue.severity === "error"}>
+            <span class="mono">{issue.path}</span> — {issue.message}
+          </li>
+        {/each}
+      </ul>
     {/if}
   </div>
 </section>
+
+{#if askClose}
+  <ConfirmModal
+    title="Discard unsaved changes?"
+    confirmLabel="Discard"
+    cancelLabel="Keep editing"
+    onConfirm={() => {
+      askClose = false;
+      onClose();
+    }}
+    onCancel={() => (askClose = false)}
+  />
+{/if}
 
 <style>
   .editor {
@@ -154,9 +219,12 @@
     font-weight: 600;
   }
 
-  .close-slot {
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     margin-left: auto;
-    display: inline-flex;
+    flex: 0 0 auto;
   }
 
   .editor-body {
@@ -175,5 +243,16 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+  }
+
+  .issues {
+    margin: 0;
+    padding: 0.5rem 0.75rem 0.5rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: var(--body-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md, 12px);
   }
 </style>

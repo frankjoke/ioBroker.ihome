@@ -5,7 +5,6 @@
     commitLogics,
     getLogicDocument,
     logicBlocked,
-    logicIssues,
     logicSaveFailed,
     logicsLoadKind,
   } from "$lib/stores/logics.svelte";
@@ -202,15 +201,6 @@
               onchange={update}
               onClose={() => (selectedId = null)}
             />
-            {#if logicIssues().some((issue) => issue.logicId === logic.id)}
-              <ul class="issues card">
-                {#each logicIssues().filter((issue) => issue.logicId === logic.id) as issue (issue.path + issue.message)}
-                  <li class:text-danger={issue.severity === "error"}>
-                    <span class="mono">{issue.path}</span> — {issue.message}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
           </div>
         {/if}
       {/each}
@@ -330,12 +320,5 @@
     font-weight: 600;
   }
 
-  .issues {
-    margin: 0;
-    padding: 0.6rem 0.8rem 0.6rem 1.6rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: var(--body-sm);
-  }
+
 </style>
