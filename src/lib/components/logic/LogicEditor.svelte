@@ -155,8 +155,9 @@
       <button
         type="button"
         class="btn btn-sm"
+        title="Discard the changes and stay in the editor"
         disabled={!dirty}
-        onclick={cancel}>Cancel</button
+        onclick={cancel}>Revert</button
       >
       <IconButton
         icon="close"
