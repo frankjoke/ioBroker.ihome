@@ -76,6 +76,15 @@
         onchange={(e) => patch({ enabled: e.currentTarget.checked })}
       /></label
     >
+    <label
+      class="inline"
+      title="Log state changes to the adapter log"
+      >log <input
+        type="checkbox"
+        checked={logic.log === true}
+        onchange={(e) => patch({ log: e.currentTarget.checked || undefined })}
+      /></label
+    >
     <span class="close-slot">
       <IconButton
         icon="close"

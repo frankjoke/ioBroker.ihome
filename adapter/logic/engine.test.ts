@@ -968,3 +968,29 @@ it("applies the row edge instead of an input filter", () => {
   h.change("0_userdata.0.B", false);
   expect(engine.memoryValue("edge")).toBe("A");
 });
+
+it("logs state changes only when the logic enables it", () => {
+  const loud = machine();
+  (loud.logics[0] as MachineLogic).log = true;
+  const h = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const engine = createEngine(loud, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(
+    h.logs.some((line) => line.message.includes('enter “Idle”')),
+  ).toBe(true);
+  h.change("0_userdata.0.M", true);
+  expect(
+    h.logs.some((line) => line.message.includes('exit “Idle”')),
+  ).toBe(true);
+  expect(h.logs.some((line) => line.message.includes('enter “On”'))).toBe(true);
+  expect(h.logs.some((line) => line.message.includes("on motion"))).toBe(true);
+
+  const quiet = machine();
+  const h2 = createHarness({ "0_userdata.0.M": false, "0_userdata.0.L": false });
+  const engine2 = createEngine(quiet, h2.deps);
+  h2.attach(engine2);
+  engine2.start();
+  h2.change("0_userdata.0.M", true);
+  expect(h2.logs).toEqual([]);
+});

@@ -192,6 +192,11 @@ export function createEngine(
   const warn = (logicId: string, message: string) =>
     deps.log("warn", logicId, message);
 
+  /** State changes are only logged for a logic with `log: true`. */
+  function stateLog(rt: Runtime, message: string): void {
+    if (rt.def.log === true) deps.log("info", rt.def.id, message);
+  }
+
   function resolveIn(rt: Runtime, ref: string): unknown {
     if (ref === "$init") return rt.init;
     if (ref === "$from") return currentMeta.from;
@@ -343,7 +348,7 @@ export function createEngine(
         }
       }
       runActions(rt, row.do ?? [], job.depth);
-      if (row.goto) transition(rt, row.goto, job.depth);
+      if (row.goto) transition(rt, row.goto, job.depth, `on ${job.input}`);
       return;
     }
   }
@@ -389,11 +394,18 @@ export function createEngine(
     if (ms === null || ms <= 0) return;
     rt.timer = deps.setTimeout(() => {
       rt.timer = undefined;
-      if (rt.state === name) transition(rt, state.after!.goto, 0);
+      if (rt.state === name) {
+        transition(rt, state.after!.goto, 0, `after ${state.after!.time}`);
+      }
     }, ms);
   }
 
-  function transition(rt: Runtime, name: string, depth: number): void {
+  function transition(
+    rt: Runtime,
+    name: string,
+    depth: number,
+    reason = "",
+  ): void {
     const def = rt.def as MachineLogic;
     const next = def.states[name];
     if (!next) {
@@ -402,12 +414,18 @@ export function createEngine(
     }
     const same = rt.state === name;
     const previous = rt.state ? def.states[rt.state] : undefined;
+    const why = reason ? ` (${reason})` : "";
     if (same) {
+      stateLog(rt, `re-enter “${name}”${why}`);
       clearTimer(rt);
     } else {
-      if (previous) runActions(rt, previous.exit ?? [], depth);
+      if (previous) {
+        stateLog(rt, `exit “${rt.state}”${why}`);
+        runActions(rt, previous.exit ?? [], depth);
+      }
       clearTimer(rt);
       rt.state = name;
+      stateLog(rt, `enter “${name}”${why}`);
       runActions(rt, next.enter ?? [], depth);
     }
     armAfter(rt, name, next);
@@ -433,7 +451,7 @@ export function createEngine(
           depth,
         );
       } else if ("goto" in action) {
-        transition(rt, action.goto, depth);
+        transition(rt, action.goto, depth, "action goto");
       } else if ("log" in action) {
         deps.log(action.log.level ?? "info", rt.def.id, action.log.text);
       }
@@ -610,7 +628,7 @@ export function createEngine(
     if (names.length === 0) return;
     const chosen = chooseStart(rt, def, names);
     rt.init = true;
-    transition(rt, chosen, 0);
+    transition(rt, chosen, 0, "start");
     if (def.init?.run === true) {
       // The `$init` rows run after entering, with $init true.
       handleMachine({
