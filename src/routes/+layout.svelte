@@ -58,6 +58,10 @@
     // wins once loaded; this keeps the pencil gate working before/without a
     // socket. Ships off — the editor is used a lot during installation.
     ["lockPencil", { init: false }],
+    // Testing switch: the configuration routes ask for no PIN when this is on.
+    // Cached here so a page refresh does not fall back to the prompt before the
+    // settings document has loaded.
+    ["pinDisabled", { init: false }],
     // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
     // unreachable, the app navigates to its own page on the cloud host, where
     // the browser's portal session takes over. Off by default — a wall display
@@ -162,7 +166,9 @@
    * cannot mount, so nothing in it can run. Cancelling goes back to the display.
    */
   const storedPin = $derived(effectivePin(storage.pin));
-  const configLocked = $derived(configNeedsPin(isDisplay, isUnlocked()));
+  const configLocked = $derived(
+    configNeedsPin(isDisplay, isUnlocked(), storage.pinDisabled === true),
+  );
   /** The display defaults, published as custom properties for every component. */
   const ui = $derived(effectiveUi(getSettings()));
 
@@ -190,6 +196,7 @@
     // The flag has no third state: an absent key means off (D-3), so a stale
     // cache can never claim the editor is locked.
     storage.lockPencil = s.lockPencil === true;
+    storage.pinDisabled = s.pinDisabled === true;
   }
 
   // The used set grows while the app loads (the registry and the pages arrive

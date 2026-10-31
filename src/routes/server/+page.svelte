@@ -162,6 +162,18 @@
             >Ask for the PIN before the layout editor (the pencil) opens</span
           >
         </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            bind:checked={storage.pinDisabled}
+            onchange={() =>
+              void updateSettings({ pinDisabled: storage.pinDisabled })}
+          />
+          <span
+            >Skip the PIN for the configuration pages (testing only — anyone on
+            this browser can change the setup)</span
+          >
+        </label>
         {#if settingsSaveFailed()}
           <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
         {/if}

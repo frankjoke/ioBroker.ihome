@@ -58,9 +58,15 @@ export function effectivePin(stored: unknown): string {
 }
 
 /** The layout's own entrance rule: every route but the display needs the PIN,
- *  and the session is unlocked for all of them at once. */
-export function configNeedsPin(isDisplay: boolean, unlocked: boolean): boolean {
-  return !isDisplay && !unlocked;
+ *  and the session is unlocked for all of them at once. `disabled` is the
+ *  testing switch from Server & Security (settings `pinDisabled`); it opens the
+ *  configuration without a prompt and is not a security boundary either. */
+export function configNeedsPin(
+  isDisplay: boolean,
+  unlocked: boolean,
+  disabled = false,
+): boolean {
+  return !disabled && !isDisplay && !unlocked;
 }
 
 /** A tile's own PIN guards its detail page, and only there: with no detail

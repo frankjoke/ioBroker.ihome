@@ -50,6 +50,11 @@ it("configNeedsPin gates every route but the display, until the session unlocks"
   expect(configNeedsPin(true, true)).toBe(false);
 });
 
+it("configNeedsPin can be switched off for testing", () => {
+  expect(configNeedsPin(false, false, true)).toBe(false);
+  expect(configNeedsPin(false, false, false)).toBe(true);
+});
+
 it("tileNeedsPin asks only for a valid pin on a tile that has a detail page", () => {
   expect(tileNeedsPin("1234", true)).toBe(true);
   expect(tileNeedsPin("123456", true)).toBe(true);
