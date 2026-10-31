@@ -109,7 +109,6 @@
     </div>
 
     <div class="block">
-      <span class="label-mono">Inputs &amp; events</span>
       <InputsEditor
         inputs={logic.inputs ?? {}}
         onchange={(inputs) => patch({ inputs })}

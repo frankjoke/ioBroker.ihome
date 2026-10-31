@@ -139,9 +139,7 @@
             on: e.currentTarget.value.trim() || "On*",
           })}
       />
-      <span class="hint text-muted">
-        * matches all; will be true
-      </span>
+      <span class="hint text-muted"> * matches all; will be true </span>
     </div>
   {:else if output.type === "number" && stateNames.length > 0}
     <div class="row">
