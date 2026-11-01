@@ -249,16 +249,8 @@
     return "any";
   }
 
-  /** String conditions compare as glob patterns; `*` matches anything. */
-  const STRING_OPS = [
-    { op: "eq", label: "=" },
-    { op: "ne", label: "≠" },
-    { op: "startsWith", label: "starts with" },
-    { op: "endsWith", label: "ends with" },
-    { op: "includes", label: "includes" },
-    { op: "notIncludes", label: "does not include" },
-  ];
-  const NUMBER_OPS = [
+  /** The comparisons; on a string they read both sides as numbers. */
+  const COMPARE_OPS = [
     { op: "eq", label: "=" },
     { op: "ne", label: "≠" },
     { op: "gt", label: ">" },
@@ -266,10 +258,16 @@
     { op: "lt", label: "<" },
     { op: "lte", label: "≤" },
   ];
+  /** Text conditions compare as glob patterns; `*` matches anything. */
+  const TEXT_OPS = [
+    { op: "startsWith", label: "starts with" },
+    { op: "endsWith", label: "ends with" },
+    { op: "includes", label: "includes" },
+    { op: "notIncludes", label: "does not include" },
+  ];
   function opsFor(kind: "boolean" | "number" | "string" | "any") {
-    if (kind === "number") return NUMBER_OPS;
-    if (kind === "string") return STRING_OPS;
-    return [...NUMBER_OPS, ...STRING_OPS.slice(2)];
+    if (kind === "number") return COMPARE_OPS;
+    return [...COMPARE_OPS, ...TEXT_OPS];
   }
 
   /** A boolean condition is just true / false, not "= true". */
@@ -665,13 +663,16 @@
                                   ...row,
                                   is: {
                                     op: row.is!.op,
-                                    value: parseValue(e.currentTarget.value),
+                                    value:
+                                      kind === "string"
+                                        ? e.currentTarget.value
+                                        : parseValue(e.currentTarget.value),
                                   },
                                 })}
                             />
                           </label>
                         {/if}
-                        {#if kind === "boolean" || row.edge === "rising" || row.edge === "falling"}
+                        {#if kind === "boolean"}
                           <label class="field"
                             ><span class="label-mono">Edge</span>
                             <select

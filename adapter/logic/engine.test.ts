@@ -192,6 +192,19 @@ it("compares string conditions as glob patterns", () => {
   expect(engine.memoryValue("text")).toBe("On");
 });
 
+it("compares a numeric string numerically", () => {
+  const h = createHarness({ "0_userdata.0.S": "" });
+  const engine = createEngine(textMachine({ op: "gt", value: "10" }), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.S", "hot");
+  expect(engine.memoryValue("text")).toBe("Idle");
+  h.change("0_userdata.0.S", "9");
+  expect(engine.memoryValue("text")).toBe("Idle");
+  h.change("0_userdata.0.S", "12.5");
+  expect(engine.memoryValue("text")).toBe("On");
+});
+
 it("treats a string condition's = as a glob", () => {
   const h = createHarness({ "0_userdata.0.S": "" });
   const engine = createEngine(textMachine({ op: "eq", value: "On*" }), h.deps);
