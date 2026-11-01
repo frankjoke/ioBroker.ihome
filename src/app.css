@@ -645,7 +645,7 @@ textarea {
 }
 
 .item-editor {
-  padding: 1rem;
+  padding: 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm, 6px);
   background: var(--surface-color);
