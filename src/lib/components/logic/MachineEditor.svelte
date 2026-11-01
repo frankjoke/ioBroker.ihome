@@ -721,26 +721,6 @@
     gap: 0.3rem;
   }
 
-  .option-tabs {
-    display: flex;
-    gap: 0.3rem;
-  }
-
-  .option-tab {
-    padding: 0.2rem 0.7rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill, 999px);
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font: inherit;
-  }
-
-  .option-tab.active {
-    color: var(--primary-color);
-    border-color: currentColor;
-  }
-
   .option-body {
     display: flex;
     flex-direction: column;

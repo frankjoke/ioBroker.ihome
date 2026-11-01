@@ -102,6 +102,14 @@
 
   // The preview renders at the real breakpoint, so what you see is what the
   // display will make of it.
+  /** The tile editor's groups, as a tab strip (one open at a time). */
+  const TILE_TABS = [
+    { id: "size", label: "Size" },
+    { id: "active", label: "Active state" },
+    { id: "icon", label: "Tile icon" },
+    { id: "look", label: "Look" },
+  ] as const;
+
   let width = $state(1400);
   onMount(() => {
     const onResize = () => (width = window.innerWidth);
@@ -115,6 +123,8 @@
   let activePicker = $state(false);
   /** Slot UI: which row is expanded, which rules block is open, pickers. */
   let expandedSlot = $state<number | null>(null);
+  /** The tile editor's option tab: one group open at a time, none by default. */
+  let tileTab = $state<"size" | "active" | "icon" | "look" | null>(null);
   let openRules = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   /** The state picker for an HTML slot's document. */
@@ -862,12 +872,12 @@
       />
     </div>
   {:else if selection.kind === "tile" && tile}
-    <h3>{tile.title || device?.name || "Tile"}</h3>
     <div class="field">
       <span class="label-mono">Tile title</span>
       <div class="row">
         <input
           type="text"
+          class="tile-title"
           value={tile.title ?? ""}
           placeholder={device?.name ?? "defaults to the device name"}
           disabled={tile.title === ""}
@@ -888,184 +898,206 @@
         </label>
       </div>
     </div>
-    <div class="field">
-      <span class="label-mono">Size (modules)</span>
-      <div class="row">
-        {#each ["w", "h"] as axis (axis)}
-          <label class="small">
-            <span class="label-mono">{axis}</span>
-            <input
-              type="number"
-              class="num-input"
-              min="1"
-              max={SIZE_MAX}
-              step="1"
-              aria-label={`Size ${axis}`}
-              value={String(
-                axis === "w" ? effectiveTileSpan().w : effectiveTileSpan().h,
-              )}
-              oninput={(e) => setSize(axis as "w" | "h", e.currentTarget.value)}
-            />
-          </label>
-        {/each}
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={tile.newLine === true}
-            onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
-          />
-          <span>New line start</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="field">
-      <span class="label-mono">Active when</span>
-      <div class="row">
+    <div class="option-tabs" aria-label="Tile options">
+      {#each TILE_TABS as t (t.id)}
         <button
           type="button"
-          class="btn btn-sm"
-          onclick={() => (activePicker = true)}
+          class="option-tab"
+          class:active={tileTab === t.id}
+          aria-expanded={tileTab === t.id}
+          onclick={() => (tileTab = tileTab === t.id ? null : t.id)}
         >
-          {activeCond?.source ? sourceLabel(activeCond.source) : "not set"}
+          {t.label}
         </button>
-        {#if activeCond}
-          <select
-            aria-label="Active operator"
-            value={activeCond.op}
-            onchange={(e) => setActiveOp(e.currentTarget.value as ActiveOp)}
-          >
-            {#each OPS as o (o.op)}
-              <option value={o.op}>{o.label}</option>
-            {/each}
-          </select>
-          {#if activeCond.op !== "truthy"}
+      {/each}
+    </div>
+
+    {#if tileTab === "size"}
+      <div class="field">
+        <div class="row">
+          {#each ["w", "h"] as axis (axis)}
+            <label class="small">
+              <span class="label-mono">{axis}</span>
+              <input
+                type="number"
+                class="num-input"
+                min="1"
+                max={SIZE_MAX}
+                step="1"
+                aria-label={`Size ${axis}`}
+                value={String(
+                  axis === "w" ? effectiveTileSpan().w : effectiveTileSpan().h,
+                )}
+                oninput={(e) =>
+                  setSize(axis as "w" | "h", e.currentTarget.value)}
+              />
+            </label>
+          {/each}
+          <label class="check">
             <input
-              type="text"
-              placeholder="value"
-              value={activeCond.value ?? ""}
-              oninput={(e) => setActiveValue(e.currentTarget.value)}
+              type="checkbox"
+              checked={tile.newLine === true}
+              onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
             />
-          {/if}
-          <span class="live text-muted"
-            >{activeFound ? readingText : "source not found"}</span
+            <span>New line start</span>
+          </label>
+        </div>
+      </div>
+    {/if}
+
+    {#if tileTab === "active"}
+      <div class="field">
+        <div class="row">
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => (activePicker = true)}
           >
-          <span class="row-actions end">
+            {activeCond?.source ? sourceLabel(activeCond.source) : "not set"}
+          </button>
+          {#if activeCond}
+            <select
+              aria-label="Active operator"
+              value={activeCond.op}
+              onchange={(e) => setActiveOp(e.currentTarget.value as ActiveOp)}
+            >
+              {#each OPS as o (o.op)}
+                <option value={o.op}>{o.label}</option>
+              {/each}
+            </select>
+            {#if activeCond.op !== "truthy"}
+              <input
+                type="text"
+                placeholder="value"
+                value={activeCond.value ?? ""}
+                oninput={(e) => setActiveValue(e.currentTarget.value)}
+              />
+            {/if}
+            <span class="live text-muted"
+              >{activeFound ? readingText : "source not found"}</span
+            >
+            <span class="row-actions end">
+              <button
+                type="button"
+                class="icon-btn"
+                title="Clear the active condition"
+                aria-label="Clear the active condition"
+                onclick={clearActive}
+              >
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+            </span>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    {#if tileTab === "icon"}
+      <div class="field">
+        <div class="row">
+          <button
+            type="button"
+            class="btn btn-sm glyph-pick"
+            title={tile?.tile?.icon
+              ? `Tile icon: ${tile.tile.icon} — click to change`
+              : "Choose the tile's own icon"}
+            onclick={() => (tileIconPicker = true)}
+          >
+            {#if tile?.tile?.icon}
+              <Icon value={tile.tile.icon} size={18} />
+            {:else}
+              Choose glyph…
+            {/if}
+          </button>
+          {#if tile?.tile?.icon}
             <button
               type="button"
               class="icon-btn"
-              title="Clear the active condition"
-              aria-label="Clear the active condition"
-              onclick={clearActive}
+              title="Clear tile icon"
+              aria-label="Clear tile icon"
+              onclick={() => edit((t) => ({ ...t, icon: undefined }))}
             >
               <span class="material-symbols-outlined">delete</span>
             </button>
-          </span>
-        {/if}
-      </div>
-    </div>
-
-    <div class="field">
-      <div class="row">
-        <span class="label-mono">Tile icon</span>
-        <button
-          type="button"
-          class="btn btn-sm glyph-pick"
-          title={tile?.tile?.icon
-            ? `Tile icon: ${tile.tile.icon} — click to change`
-            : "Choose the tile's own icon"}
-          onclick={() => (tileIconPicker = true)}
-        >
-          {#if tile?.tile?.icon}
-            <Icon value={tile.tile.icon} size={18} />
-          {:else}
-            Choose glyph…
           {/if}
-        </button>
-        {#if tile?.tile?.icon}
-          <button
-            type="button"
-            class="icon-btn"
-            title="Clear tile icon"
-            aria-label="Clear tile icon"
-            onclick={() => edit((t) => ({ ...t, icon: undefined }))}
-          >
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-        {/if}
-      </div>
-      <p class="note text-muted">
-        Shown before the tile name on its detail page and as the tile face
-        default. Each slot keeps its own icon; a state look glyph still wins on
-        the face.
-      </p>
-    </div>
-
-    <div class="field">
-      <span class="label-mono">Look</span>
-      {#if !activeCond}
+        </div>
         <p class="note text-muted">
-          This tile's own values — with an active condition, these become its
-          inactive state.
+          Shown before the tile name on its detail page and as the tile face
+          default. Each slot keeps its own icon; a state look glyph still wins
+          on the face.
         </p>
-      {/if}
-      <div class="look">
-        {#each lookStates as state (state)}
-          {@const lk = tile?.tile?.look?.[state] ?? {}}
-          <div class="look-block">
-            <div class="look-state">
-              <span class="look-name">{activeCond ? state : "default"}</span>
-              <button
-                type="button"
-                class="btn btn-sm glyph-pick"
-                title={lk.glyph
-                  ? `Glyph: ${lk.glyph} — click to change`
-                  : defaultGlyph
-                    ? `Default glyph: ${defaultGlyph} — click to change`
-                    : "Choose a glyph"}
-                onclick={() => (lookIconFor = state)}
+      </div>
+    {/if}
+
+    {#if tileTab === "look"}
+      <div class="field">
+        {#if !activeCond}
+          <p class="note text-muted">
+            This tile's own values — with an active condition, these become its
+            inactive state.
+          </p>
+        {/if}
+        <div class="look">
+          {#each lookStates as state (state)}
+            {@const lk = tile?.tile?.look?.[state] ?? {}}
+            <div class="look-block">
+              <div class="look-state">
+                <span class="look-name">{activeCond ? state : "default"}</span>
+                <button
+                  type="button"
+                  class="btn btn-sm glyph-pick"
+                  title={lk.glyph
+                    ? `Glyph: ${lk.glyph} — click to change`
+                    : defaultGlyph
+                      ? `Default glyph: ${defaultGlyph} — click to change`
+                      : "Choose a glyph"}
+                  onclick={() => (lookIconFor = state)}
+                >
+                  {#if lk.glyph}
+                    <Icon value={lk.glyph} size={16} />
+                  {:else if defaultGlyph}
+                    <span class="glyph-default"
+                      ><Icon value={defaultGlyph} size={16} /></span
+                    >
+                  {:else}
+                    icon…
+                  {/if}
+                </button>
+                {@render lookColor(
+                  "glow",
+                  lk.glow,
+                  `${state} glow colour`,
+                  (v) => patchLook(state, { glow: v }),
+                )}
+                {@render lookColor(
+                  "icon",
+                  lk.color,
+                  `${state} icon colour`,
+                  (v) => patchLook(state, { color: v }),
+                )}
+              </div>
+              <div
+                class="look-bg"
+                title="Tile Background"
+                aria-label="Tile Background"
               >
-                {#if lk.glyph}
-                  <Icon value={lk.glyph} size={16} />
-                {:else if defaultGlyph}
-                  <span class="glyph-default"
-                    ><Icon value={defaultGlyph} size={16} /></span
-                  >
-                {:else}
-                  icon…
-                {/if}
-              </button>
-              {@render lookColor("glow", lk.glow, `${state} glow colour`, (v) =>
-                patchLook(state, { glow: v }),
-              )}
-              {@render lookColor(
-                "icon",
-                lk.color,
-                `${state} icon colour`,
-                (v) => patchLook(state, { color: v }),
-              )}
-            </div>
-            <div
-              class="look-bg"
-              title="Tile Background"
-              aria-label="Tile Background"
-            >
-              <span class="label-mono">BG</span>
-              <div class="look-bg-body">
-                <BackgroundEditor
-                  background={lk.background ?? tile?.tile?.background}
-                  onChange={(bg) => patchLook(state, { background: bg })}
-                />
+                <span class="label-mono">BG</span>
+                <div class="look-bg-body">
+                  <BackgroundEditor
+                    background={lk.background ?? tile?.tile?.background}
+                    onChange={(bg) => patchLook(state, { background: bg })}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        </div>
+        <p class="note text-muted">
+          A value set here wins over the rules for that state;
+          <em>default</em> keeps the rules. Dimming still comes from the rules.
+        </p>
       </div>
-      <p class="note text-muted">
-        A value set here wins over the rules for that state;
-        <em>default</em> keeps the rules. Dimming still comes from the rules.
-      </p>
-    </div>
+    {/if}
 
     <!-- The detail page's own line (A47): the eye shows the page itself over
          the display — the editor never asks for the PIN — and the field sets
@@ -2175,6 +2207,12 @@
 </div>
 
 <style>
+  /* The tile's title is the panel's heading now (no separate name line). */
+  .tile-title {
+    font-size: var(--body-lg);
+    font-weight: 600;
+  }
+
   .details {
     display: flex;
     flex-direction: column;

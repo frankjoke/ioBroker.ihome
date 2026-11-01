@@ -531,6 +531,34 @@ textarea {
   color: var(--danger-color);
 }
 
+/* Small pill tabs: an option group that folds open under its tab. The
+   configuration folder tabs in AppBar are the large variant; this is the one an
+   editor uses inside a panel (UI-DESIGN §6). */
+.option-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.option-tab {
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-pill, 999px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.option-tab:hover {
+  color: var(--text-color);
+}
+
+.option-tab.active {
+  color: var(--primary-color);
+  border-color: currentColor;
+}
+
 /* ------------------------------------------------------------------ *
  *  Disabled state                                                     *
  * ------------------------------------------------------------------ */
