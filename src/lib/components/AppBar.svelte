@@ -373,26 +373,6 @@
     margin-left: auto;
   }
 
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--border-radius-pill);
-    color: var(--text-muted);
-  }
-
-  .icon-btn:hover {
-    text-decoration: none;
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
-
-  .icon-btn .material-symbols-outlined {
-    font-size: 20px;
-  }
-
   .status-btn.connected .material-symbols-outlined {
     color: var(--tertiary);
     font-variation-settings:

@@ -485,8 +485,8 @@ textarea {
   font-size: var(--body-sm);
 }
 
-/* The one icon button: close, delete, duplicate, remove, add. Defined here so
-   no component repeats the styling; only state variants may add rules. */
+/* The one icon button, everywhere (UI-DESIGN §6): 34×34, borderless, muted,
+   hover turns the glyph to the text colour. Never restyle one at a call site. */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -494,15 +494,17 @@ textarea {
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: var(--border-radius-pill, 999px);
   background: transparent;
-  color: var(--text-color);
+  color: var(--text-muted);
+  text-decoration: none;
   cursor: pointer;
 }
 
-.icon-btn:hover {
-  background: var(--surface-container);
+.icon-btn:hover:not(:disabled) {
+  color: var(--text-color);
+  text-decoration: none;
 }
 
 .icon-btn .material-symbols-outlined {
@@ -514,8 +516,19 @@ textarea {
   cursor: default;
 }
 
-.icon-btn.active {
+.icon-btn.active,
+.icon-btn.on {
   color: var(--primary-color);
+}
+
+/* A bin that asks before it deletes is red at rest and stays red on hover; a
+   bin that acts immediately keeps the normal colour (UI-DESIGN §6). */
+.icon-btn.danger {
+  color: var(--danger-color);
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  color: var(--danger-color);
 }
 
 /* ------------------------------------------------------------------ *

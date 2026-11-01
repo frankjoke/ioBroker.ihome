@@ -313,13 +313,6 @@
     min-width: 0;
   }
 
-  .icon-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
   .preview {
     display: grid;
     grid-template-columns: 1fr 1fr;

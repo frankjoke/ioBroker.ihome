@@ -551,43 +551,6 @@
     display: flex;
     gap: 0.35rem;
   }
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill, 999px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .icon-btn:hover {
-    background: var(--surface-container);
-  }
-
-  .icon-btn .material-symbols-outlined {
-    font-size: 20px;
-  }
-
-  .icon-btn.primary {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: var(--on-primary);
-  }
-
-  .icon-btn.primary:hover {
-    background: var(--primary-dark);
-    border-color: var(--primary-dark);
-  }
-
-  .icon-btn.danger:hover {
-    background: var(--danger-color, #c0392b);
-    border-color: var(--danger-color, #c0392b);
-    color: #fff;
-  }
 
   .empty-state {
     padding: 2rem;

@@ -1255,7 +1255,7 @@
                 {/if}
                 <button
                   type="button"
-                  class="icon-btn"
+                  class="icon-btn danger"
                   title={shownSlots.length <= 1
                     ? "One slot must stay — a tile is never empty"
                     : "Remove slot"}
@@ -2364,27 +2364,7 @@
     margin-left: auto;
   }
 
-  .row-actions .icon-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0 2px;
-  }
-
-  .row-actions .icon-btn:hover:not(:disabled) {
-    color: var(--text-color);
-  }
-
-  .row-actions .icon-btn:disabled {
-    color: var(--border-color);
-    cursor: default;
-  }
-
   /* A destination or visibility away from its default (A34) reads at a glance. */
-  .row-actions .icon-btn.on {
-    color: var(--primary-color);
-  }
 
   /* Normal surface inside the darker frame, so the fold-out's scope is visible:
      everything on the dark band belongs to this item, the card is its editor. */

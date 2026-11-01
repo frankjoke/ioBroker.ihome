@@ -345,17 +345,6 @@
     min-width: 6rem;
   }
 
-  .icon-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .icon-btn.active {
-    color: var(--primary-color);
-  }
-
   .err {
     color: var(--danger-color, #c0392b);
   }

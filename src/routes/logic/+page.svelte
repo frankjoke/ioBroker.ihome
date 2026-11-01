@@ -188,6 +188,7 @@
             />
             <IconButton
               icon="delete"
+              danger
               label={`Delete ${logic.name}`}
               onclick={() => (pendingDelete = logic)}
             />

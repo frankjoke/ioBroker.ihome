@@ -110,16 +110,10 @@
     color: var(--danger-color, #c0392b);
   }
 
+  /* Compact exception to the 34px icon button: this row is dense (UI-DESIGN §6). */
   .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 24px;
     height: 24px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
   }
 
   .icon-btn .material-symbols-outlined {

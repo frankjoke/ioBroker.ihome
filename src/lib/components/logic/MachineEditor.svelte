@@ -342,9 +342,9 @@
           />
           <IconButton
             icon="delete"
+            danger
             label={`Delete ${name}`}
             title="Delete"
-            color="var(--danger-color)"
             disabled={stateNames.length <= 1}
             onclick={() => (pendingDelete = { kind: "state", name })}
           />
@@ -476,9 +476,9 @@
                     />
                     <IconButton
                       icon="delete"
+                      danger
                       label={`Delete event ${index + 1} of ${name}`}
                       title="Delete"
-                      color="var(--danger-color)"
                       onclick={() =>
                         (pendingDelete = { kind: "event", state: name, index })}
                     />

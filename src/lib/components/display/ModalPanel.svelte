@@ -314,22 +314,4 @@
     max-width: none;
     height: 24px;
   }
-
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-pill);
-    background-color: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .icon-btn:hover {
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
 </style>

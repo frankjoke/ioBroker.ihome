@@ -291,12 +291,6 @@
   .modal-head h3 {
     margin: 0;
   }
-  .icon-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
   .template-bar {
     display: flex;
     align-items: flex-end;

@@ -118,9 +118,9 @@
         />
         <IconButton
           icon="delete"
+          danger
           label={`Delete ${name}`}
           title="Delete"
-          color="var(--danger-color)"
           onclick={() => (pendingDelete = name)}
         />
       </div>

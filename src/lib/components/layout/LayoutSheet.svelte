@@ -892,33 +892,4 @@
       bottom: 62vh;
     }
   }
-
-  /* The row's controls, matching the slot rows' bare icons (A71's editor). */
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0 2px;
-  }
-
-  .icon-btn:hover:not(:disabled) {
-    color: var(--text-color);
-  }
-
-  .icon-btn:disabled {
-    color: var(--border-color);
-    cursor: default;
-  }
-
-  .icon-btn.danger:hover:not(:disabled) {
-    color: var(--error-color, var(--danger-color, #b3261e));
-  }
-
-  .icon-btn.on {
-    color: var(--primary-color);
-  }
 </style>

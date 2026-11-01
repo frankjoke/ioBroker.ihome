@@ -223,13 +223,6 @@
     margin: 0;
   }
 
-  .icon-btn {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
   .tabs {
     display: flex;
     gap: 2px;
