@@ -671,24 +671,44 @@
                             />
                           </label>
                         {/if}
-                        <label class="field"
-                          ><span class="label-mono">Edge</span>
-                          <select
-                            aria-label="Edge"
-                            value={row.edge ?? "change"}
-                            onchange={(e) =>
-                              updateRow(name, index, {
-                                ...row,
-                                edge: e.currentTarget.value as
-                                  "change" | "rising" | "falling" | "any",
-                              })}
-                          >
-                            <option value="change">change</option>
-                            <option value="rising">rising</option>
-                            <option value="falling">falling</option>
-                            <option value="any">any</option>
-                          </select>
-                        </label>
+                        {#if kind === "boolean" || row.edge === "rising" || row.edge === "falling"}
+                          <label class="field"
+                            ><span class="label-mono">Edge</span>
+                            <select
+                              aria-label="Edge"
+                              value={row.edge ?? "change"}
+                              onchange={(e) =>
+                                updateRow(name, index, {
+                                  ...row,
+                                  edge: e.currentTarget.value as
+                                    "change" | "rising" | "falling" | "any",
+                                })}
+                            >
+                              <option value="change">change</option>
+                              <option value="rising">rising</option>
+                              <option value="falling">falling</option>
+                              <option value="any">any</option>
+                            </select>
+                          </label>
+                        {:else}
+                          <label class="field"
+                            ><span class="label-mono">Edge</span>
+                            <span class="check"
+                              ><input
+                                type="checkbox"
+                                aria-label="Every update"
+                                checked={row.edge === "any"}
+                                onchange={(e) =>
+                                  updateRow(name, index, {
+                                    ...row,
+                                    edge: e.currentTarget.checked
+                                      ? "any"
+                                      : "change",
+                                  })}
+                              /> any</span
+                            >
+                          </label>
+                        {/if}
                         <label class="field"
                           ><span class="label-mono">Ack</span>
                           <select
@@ -883,6 +903,15 @@
     flex-direction: column;
     gap: 0.15rem;
     min-width: 8rem;
+  }
+
+  /* A two-valued edge (change / any) is a tick, not a picker. */
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2rem;
+    font-size: var(--body-sm);
   }
 
   .duration,
