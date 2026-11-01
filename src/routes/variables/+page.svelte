@@ -216,13 +216,13 @@
     requestOpen(v);
   }
 
-  function startAdd() {
+  function startAdd(kind: "state" | "constant") {
     editing = {
       id: newId(),
       name: "",
-      kind: "constant",
+      kind,
       type: "string",
-      value: "",
+      value: kind === "constant" ? "" : undefined,
     };
     formError = "";
     stateMode = "new";
@@ -265,13 +265,6 @@
       editing.unit = String(objects.get(id)?.common?.unit ?? "");
     stateMode = "existing";
     picking = false;
-  }
-
-  /** Keep the type valid for the control the form currently shows. */
-  function switchKind(kind: string) {
-    if (!editing) return;
-    editing.kind = kind === "state" ? "state" : "constant";
-    if (!VALUE_TYPES.includes(editing.type)) editing.type = "string";
   }
 
   function setStateMode(mode: "existing" | "new") {
@@ -348,9 +341,17 @@
         type="button"
         class="btn btn-primary btn-sm"
         disabled={!!editing}
-        onclick={startAdd}
+        onclick={() => startAdd("state")}
       >
         <span class="material-symbols-outlined">add</span> Add variable
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        disabled={!!editing}
+        onclick={() => startAdd("constant")}
+      >
+        <span class="material-symbols-outlined">add</span> Add constant
       </button>
     </div>
   </div>
@@ -441,12 +442,14 @@
                   onclick={save}>Save</button
                 >
               {/if}
-              <IconButton
-                icon="delete"
-                danger
-                label={`Remove ${v.name}`}
-                onclick={() => (pendingDelete = v)}
-              />
+              {#if !(open && !storedVar)}
+                <IconButton
+                  icon="delete"
+                  danger
+                  label={`Remove ${v.name}`}
+                  onclick={() => (pendingDelete = v)}
+                />
+              {/if}
             </span>
           </div>
           {#if open && editing}
@@ -456,17 +459,6 @@
                 a formula. <code>sum</code>, <code>get</code> and
                 <code>active</code> are taken.
               </p>
-
-              <label class="field"
-                ><span class="label-mono">Type</span>
-                <select
-                  value={editing.kind}
-                  onchange={(e) => switchKind(e.currentTarget.value)}
-                >
-                  <option value="constant">Constant — kept in iHome</option>
-                  <option value="state">State — an ioBroker state</option>
-                </select></label
-              >
 
               {#if editing.kind === "constant"}
                 <div class="form-grid">
