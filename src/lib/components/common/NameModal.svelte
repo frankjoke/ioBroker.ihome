@@ -53,8 +53,14 @@
       <p class="text-danger error">{error}</p>
     {/if}
     <div class="actions">
-      <button type="button" class="btn" onclick={onCancel}>Cancel</button>
-      <button type="submit" class="btn btn-primary">{confirmLabel}</button>
+      <button type="button" class="btn" onclick={onCancel}>
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        Cancel
+      </button>
+      <button type="submit" class="btn btn-primary">
+        <span class="material-symbols-outlined" aria-hidden="true">check</span>
+        {confirmLabel}
+      </button>
     </div>
   </form>
 </div>

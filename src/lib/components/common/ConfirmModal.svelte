@@ -31,11 +31,14 @@
       <div class="modal-body">{@render children()}</div>
     {/if}
     <div class="actions">
-      <button type="button" class="btn" onclick={onCancel}>{cancelLabel}</button
-      >
-      <button type="button" class="btn btn-danger" onclick={onConfirm}
-        >{confirmLabel}</button
-      >
+      <button type="button" class="btn" onclick={onCancel}>
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        {cancelLabel}
+      </button>
+      <button type="button" class="btn btn-danger" onclick={onConfirm}>
+        <span class="material-symbols-outlined" aria-hidden="true">check</span>
+        {confirmLabel}
+      </button>
     </div>
   </div>
 </div>

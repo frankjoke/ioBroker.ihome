@@ -366,7 +366,7 @@
     >
   </div>
 
-  <div class="controls">
+  <div class="controls section-panel">
     <div class="controls-head">
       <h4>Controls</h4>
       <div class="head-actions">

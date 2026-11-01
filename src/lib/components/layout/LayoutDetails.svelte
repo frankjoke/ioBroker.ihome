@@ -834,7 +834,10 @@
         <button
           type="button"
           class="btn btn-sm"
-          onclick={() => (iconPicker = "page")}>Choose…</button
+          onclick={() => (iconPicker = "page")}
+          ><span class="material-symbols-outlined" aria-hidden="true"
+            >search</span
+          >Choose…</button
         >
         {#if page.icon}<span class="glyph"
             ><Icon value={page.icon} size={20} /></span
@@ -871,7 +874,10 @@
         <button
           type="button"
           class="btn btn-sm"
-          onclick={() => (iconPicker = "section")}>Choose…</button
+          onclick={() => (iconPicker = "section")}
+          ><span class="material-symbols-outlined" aria-hidden="true"
+            >search</span
+          >Choose…</button
         >
         {#if section.icon}<span class="glyph"
             ><Icon value={section.icon} size={20} /></span

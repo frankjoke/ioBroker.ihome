@@ -575,7 +575,11 @@
                     <button
                       type="button"
                       class="btn btn-outline"
-                      onclick={() => (picking = true)}>Choose…</button
+                      onclick={() => (picking = true)}
+                      ><span
+                        class="material-symbols-outlined"
+                        aria-hidden="true">search</span
+                      >Choose…</button
                     >
                   </div>
                   {#if editing.stateId && !stateExists(editing.stateId)}
