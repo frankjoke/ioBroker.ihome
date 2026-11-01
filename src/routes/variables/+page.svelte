@@ -50,20 +50,30 @@
   /** The state leaf follows the variable name until the user edits it. */
   let leafTouched = $state(false);
   let pendingDelete = $state<GlobalVariable | null>(null);
+  let roomFilter = $state("");
+  let functionFilter = $state("");
   let search = $state("");
   let sortBy = $state<"name" | "kind">("name");
   let sortDir = $state<"asc" | "desc">("asc");
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();
-    const list = q
-      ? variables.filter(
-          (v) =>
-            v.name.toLowerCase().includes(q) ||
-            (v.stateId ?? "").toLowerCase().includes(q) ||
-            (v.value ?? "").toLowerCase().includes(q),
+    const list = variables.filter((v) => {
+      if (
+        q &&
+        !(
+          v.name.toLowerCase().includes(q) ||
+          (v.stateId ?? "").toLowerCase().includes(q) ||
+          (v.value ?? "").toLowerCase().includes(q)
         )
-      : [...variables];
+      ) {
+        return false;
+      }
+      const enums = v.enums ?? [];
+      if (roomFilter && !enums.includes(roomFilter)) return false;
+      if (functionFilter && !enums.includes(functionFilter)) return false;
+      return true;
+    });
     const dir = sortDir === "asc" ? 1 : -1;
     const key = (v: GlobalVariable) =>
       sortBy === "name" ? v.name : v.kind === "constant" ? "constant" : "state";
@@ -331,6 +341,49 @@
   <title>Variables & Constants - iHome</title>
 </svelte:head>
 
+{#snippet orgFields()}
+  <label class="field"
+    ><span class="label-mono">Role</span>
+    <input
+      type="text"
+      list="ihome-state-roles"
+      value={editing?.role ?? ""}
+      placeholder="value"
+      oninput={(e) => {
+        if (editing) editing.role = e.currentTarget.value;
+      }}
+    /></label
+  >
+  <datalist id="ihome-state-roles">
+    {#each roleOptions as r (r)}
+      <option value={r}></option>
+    {/each}
+  </datalist>
+
+  <div class="form-grid">
+    <label class="field"
+      ><span class="label-mono">Rooms</span>
+      <MultiSelect
+        options={roomOptions}
+        selected={enumRooms}
+        enums={ioBroker.enums}
+        placeholder="No room"
+        onChange={(ids) => setEnumPart("rooms", ids)}
+      /></label
+    >
+    <label class="field"
+      ><span class="label-mono">Functions</span>
+      <MultiSelect
+        options={functionOptions}
+        selected={enumFunctions}
+        enums={ioBroker.enums}
+        placeholder="No function"
+        onChange={(ids) => setEnumPart("functions", ids)}
+      /></label
+    >
+  </div>
+{/snippet}
+
 <div class="variables-page">
   <div class="page-header">
     <div class="page-heading">
@@ -375,6 +428,18 @@
         placeholder="Search name, value or state…"
         bind:value={search}
       />
+      <select bind:value={roomFilter} aria-label="Filter by room">
+        <option value="">All rooms</option>
+        {#each roomOptions as r (r.value)}
+          <option value={r.value}>{r.label}</option>
+        {/each}
+      </select>
+      <select bind:value={functionFilter} aria-label="Filter by function">
+        <option value="">All functions</option>
+        {#each functionOptions as f (f.value)}
+          <option value={f.value}>{f.label}</option>
+        {/each}
+      </select>
       <select bind:value={sortBy} aria-label="Sort by">
         <option value="name">Name</option>
         <option value="kind">Constant / state</option>
@@ -478,6 +543,8 @@
                 <p class="hint text-muted">
                   A constant stays here — no ioBroker state is created.
                 </p>
+
+                {@render orgFields()}
               {:else}
                 <div class="seg">
                   <label class="check">
@@ -566,20 +633,7 @@
                     </select></label
                   >
 
-                  <label class="field"
-                    ><span class="label-mono">Role</span>
-                    <input
-                      type="text"
-                      list="ihome-state-roles"
-                      bind:value={editing.role}
-                      placeholder="value"
-                    /></label
-                  >
-                  <datalist id="ihome-state-roles">
-                    {#each roleOptions as r (r)}
-                      <option value={r}></option>
-                    {/each}
-                  </datalist>
+                  {@render orgFields()}
 
                   {#if editing.type === "number"}
                     <div class="form-grid three">
@@ -618,29 +672,6 @@
                       >
                     </div>
                   {/if}
-
-                  <div class="form-grid">
-                    <label class="field"
-                      ><span class="label-mono">Rooms</span>
-                      <MultiSelect
-                        options={roomOptions}
-                        selected={enumRooms}
-                        enums={ioBroker.enums}
-                        placeholder="No room"
-                        onChange={(ids) => setEnumPart("rooms", ids)}
-                      /></label
-                    >
-                    <label class="field"
-                      ><span class="label-mono">Functions</span>
-                      <MultiSelect
-                        options={functionOptions}
-                        selected={enumFunctions}
-                        enums={ioBroker.enums}
-                        placeholder="No function"
-                        onChange={(ids) => setEnumPart("functions", ids)}
-                      /></label
-                    >
-                  </div>
 
                   <p class="hint text-muted">
                     {#if previewExists}
@@ -771,8 +802,20 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr auto;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
     gap: 0.5rem;
+  }
+
+  @media (max-width: 820px) {
+    .filter-bar {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .filter-bar {
+      grid-template-columns: 1fr;
+    }
   }
 
   .filter-bar input,
