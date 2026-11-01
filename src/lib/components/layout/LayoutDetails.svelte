@@ -2280,7 +2280,7 @@
     gap: 3px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 6px);
-    padding: 3px 5px;
+    padding: 2px 5px;
   }
 
   /* The open item is the same box: its line is the header, the editor sits

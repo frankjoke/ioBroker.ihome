@@ -491,8 +491,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-pill, 999px);
