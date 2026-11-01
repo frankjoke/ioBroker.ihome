@@ -3,6 +3,7 @@
   import ActionList from "./ActionList.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
 
@@ -29,6 +30,20 @@
   /** The state's options tab: enter, exit or the timeout. */
   let stateTab = $state<"enter" | "exit" | "timeout">("enter");
   /** The Options tab: $init today, $all and more later. */
+  /** The Options strip: what the machine does on start, and the future shared rows. */
+  const OPTION_TABS = [
+    {
+      id: "init",
+      label: "$init",
+      hint: "What the machine does on start: its init state, or the current output value.",
+    },
+    {
+      id: "all",
+      label: "$all",
+      hint: "Rows that would run for every state — not editable yet.",
+    },
+  ] as const;
+
   let openOption = $state<"init" | "all" | null>(null);
   /** Nothing disappears from the document without a confirmation. */
   let pendingDelete = $state<
@@ -200,91 +215,82 @@
     <div class="states-head">
       <span class="label-mono">Options</span>
     </div>
-    <div class="option-tabs" role="tablist">
-      <button
-        type="button"
-        role="tab"
-        class="option-tab"
-        class:active={openOption === "init"}
-        aria-selected={openOption === "init"}
-        onclick={() => (openOption = openOption === "init" ? null : "init")}
-        >$init</button
-      >
-      <button
-        type="button"
-        role="tab"
-        class="option-tab"
-        class:active={openOption === "all"}
-        aria-selected={openOption === "all"}
-        onclick={() => (openOption = openOption === "all" ? null : "all")}
-        >$all</button
-      >
-    </div>
-
-    {#if openOption === "init"}
-      <div class="option-body">
-        <label class="inline"
-          >take the state from the current output value
-          <input
-            type="checkbox"
-            checked={init.match === "output"}
-            disabled={!canMatch}
-            onchange={(e) =>
-              patchInit({
-                match: e.currentTarget.checked ? "output" : undefined,
-              })}
-          /></label
-        >
-        {#if !canMatch}
-          <span class="hint text-muted"> Needs an external output state. </span>
-        {/if}
-        {#if init.state !== undefined}
-          <div class="row">
-            <span class="label-mono">init state</span>
-            {#if typeof init.state === "string"}
+    <OptionTabs
+      bind:value={openOption}
+      label="Machine options"
+      tabs={OPTION_TABS}
+    >
+      {#snippet children(id)}
+        {#if id === "init"}
+          <div class="option-body">
+            <label class="inline"
+              >take the state from the current output value
               <input
-                aria-label="Init state name"
-                value={init.state}
-                onchange={(e) => patchInit({ state: e.currentTarget.value })}
-              />
-            {:else}
-              <ExprEditor
-                expr={init.state as Expr}
-                onchange={(next) =>
+                type="checkbox"
+                checked={init.match === "output"}
+                disabled={!canMatch}
+                onchange={(e) =>
                   patchInit({
-                    state: "noop" in next ? undefined : next,
+                    match: e.currentTarget.checked ? "output" : undefined,
                   })}
-              />
+              /></label
+            >
+            {#if !canMatch}
+              <span class="hint text-muted">
+                Needs an external output state.
+              </span>
             {/if}
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => patchInit({ state: undefined })}>Clear</button
+            {#if init.state !== undefined}
+              <div class="row">
+                <span class="label-mono">init state</span>
+                {#if typeof init.state === "string"}
+                  <input
+                    aria-label="Init state name"
+                    value={init.state}
+                    onchange={(e) =>
+                      patchInit({ state: e.currentTarget.value })}
+                  />
+                {:else}
+                  <ExprEditor
+                    expr={init.state as Expr}
+                    onchange={(next) =>
+                      patchInit({
+                        state: "noop" in next ? undefined : next,
+                      })}
+                  />
+                {/if}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() => patchInit({ state: undefined })}>Clear</button
+                >
+              </div>
+            {:else}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() =>
+                  patchInit({ state: { const: stateNames[0] ?? "" } })}
+                >Add init expression</button
+              >
+            {/if}
+            <label class="inline"
+              >run $init rows <input
+                type="checkbox"
+                checked={init.run === true}
+                onchange={(e) =>
+                  patchInit({ run: e.currentTarget.checked || undefined })}
+              /></label
             >
           </div>
-        {:else}
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={() => patchInit({ state: { const: stateNames[0] ?? "" } })}
-            >Add init expression</button
-          >
+        {:else if id === "all"}
+          <p class="hint text-muted">
+            Common rows and actions for every state — the editor follows with
+            the input/usage redesign.
+          </p>
         {/if}
-        <label class="inline"
-          >run $init rows <input
-            type="checkbox"
-            checked={init.run === true}
-            onchange={(e) =>
-              patchInit({ run: e.currentTarget.checked || undefined })}
-          /></label
-        >
-      </div>
-    {:else if openOption === "all"}
-      <p class="hint text-muted">
-        Common rows and actions for every state — the editor follows with the
-        input/usage redesign.
-      </p>
-    {/if}
+      {/snippet}
+    </OptionTabs>
   </div>
 
   <div class="states">

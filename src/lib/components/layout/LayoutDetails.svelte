@@ -8,6 +8,7 @@
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { resolveSection } from "$lib/config/pages-ops";
   import {
     BREAKPOINTS,
@@ -104,11 +105,31 @@
   // display will make of it.
   /** The tile editor's groups, as a tab strip (one open at a time). */
   const TILE_TABS = [
-    { id: "size", label: "Size" },
-    { id: "view", label: "ViewState" },
-    { id: "icon", label: "Icon" },
-    { id: "look", label: "Look" },
-    { id: "pin", label: "Pin" },
+    {
+      id: "size",
+      label: "Size",
+      hint: "How many grid modules the tile spans, and whether it starts a new line.",
+    },
+    {
+      id: "view",
+      label: "ViewState",
+      hint: "What makes the tile active: a state, an operator and a value.",
+    },
+    {
+      id: "icon",
+      label: "Icon",
+      hint: "The tile's own icon, on its face and in the detail header.",
+    },
+    {
+      id: "look",
+      label: "Look",
+      hint: "Per-state glyph, glow, icon colour and background — wins over the rules.",
+    },
+    {
+      id: "pin",
+      label: "Pin",
+      hint: "A PIN that guards the tile's detail page in view mode.",
+    },
   ] as const;
 
   let width = $state(1400);
@@ -899,256 +920,254 @@
         </label>
       </div>
     </div>
-    <div class="option-tabs" aria-label="Tile options">
-      {#each TILE_TABS as t (t.id)}
-        <button
-          type="button"
-          class="option-tab"
-          class:active={tileTab === t.id}
-          aria-expanded={tileTab === t.id}
-          onclick={() => (tileTab = tileTab === t.id ? null : t.id)}
-        >
-          {t.label}
-        </button>
-      {/each}
-    </div>
-
-    {#if tileTab === "size"}
-      <div class="field">
-        <div class="row">
-          {#each ["w", "h"] as axis (axis)}
-            <label class="small">
-              <span class="label-mono">{axis}</span>
-              <input
-                type="number"
-                class="num-input"
-                min="1"
-                max={SIZE_MAX}
-                step="1"
-                aria-label={`Size ${axis}`}
-                value={String(
-                  axis === "w" ? effectiveTileSpan().w : effectiveTileSpan().h,
-                )}
-                oninput={(e) =>
-                  setSize(axis as "w" | "h", e.currentTarget.value)}
-              />
-            </label>
-          {/each}
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={tile.newLine === true}
-              onchange={(e) => setTile({ newLine: e.currentTarget.checked })}
-            />
-            <span>New line start</span>
-          </label>
-        </div>
-      </div>
-    {/if}
-
-    {#if tileTab === "view"}
-      <div class="field">
-        <div class="row">
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={() => (activePicker = true)}
-          >
-            {activeCond?.source ? sourceLabel(activeCond.source) : "not set"}
-          </button>
-          {#if activeCond}
-            <select
-              aria-label="Active operator"
-              value={activeCond.op}
-              onchange={(e) => setActiveOp(e.currentTarget.value as ActiveOp)}
-            >
-              {#each OPS as o (o.op)}
-                <option value={o.op}>{o.label}</option>
+    <OptionTabs bind:value={tileTab} label="Tile options" tabs={TILE_TABS}>
+      {#snippet children(id)}
+        {#if id === "size"}
+          <div class="field">
+            <div class="row">
+              {#each ["w", "h"] as axis (axis)}
+                <label class="small">
+                  <span class="label-mono">{axis}</span>
+                  <input
+                    type="number"
+                    class="num-input"
+                    min="1"
+                    max={SIZE_MAX}
+                    step="1"
+                    aria-label={`Size ${axis}`}
+                    value={String(
+                      axis === "w"
+                        ? effectiveTileSpan().w
+                        : effectiveTileSpan().h,
+                    )}
+                    oninput={(e) =>
+                      setSize(axis as "w" | "h", e.currentTarget.value)}
+                  />
+                </label>
               {/each}
-            </select>
-            {#if activeCond.op !== "truthy"}
-              <input
-                type="text"
-                placeholder="value"
-                value={activeCond.value ?? ""}
-                oninput={(e) => setActiveValue(e.currentTarget.value)}
-              />
-            {/if}
-            <span class="live text-muted"
-              >{activeFound ? readingText : "source not found"}</span
-            >
-            <span class="row-actions end">
+              <label class="check">
+                <input
+                  type="checkbox"
+                  checked={tile.newLine === true}
+                  onchange={(e) =>
+                    setTile({ newLine: e.currentTarget.checked })}
+                />
+                <span>New line start</span>
+              </label>
+            </div>
+          </div>
+        {/if}
+
+        {#if id === "view"}
+          <div class="field">
+            <div class="row">
               <button
                 type="button"
-                class="icon-btn"
-                title="Clear the active condition"
-                aria-label="Clear the active condition"
-                onclick={clearActive}
+                class="btn btn-sm"
+                onclick={() => (activePicker = true)}
               >
-                <span class="material-symbols-outlined">delete</span>
+                {activeCond?.source
+                  ? sourceLabel(activeCond.source)
+                  : "not set"}
               </button>
-            </span>
-          {/if}
-        </div>
-      </div>
-    {/if}
-
-    {#if tileTab === "icon"}
-      <div class="field">
-        <div class="row">
-          <button
-            type="button"
-            class="btn btn-sm glyph-pick"
-            title={tile?.tile?.icon
-              ? `Tile icon: ${tile.tile.icon} — click to change`
-              : "Choose the tile's own icon"}
-            onclick={() => (tileIconPicker = true)}
-          >
-            {#if tile?.tile?.icon}
-              <Icon value={tile.tile.icon} size={18} />
-            {:else}
-              Choose glyph…
-            {/if}
-          </button>
-          {#if tile?.tile?.icon}
-            <button
-              type="button"
-              class="icon-btn"
-              title="Clear tile icon"
-              aria-label="Clear tile icon"
-              onclick={() => edit((t) => ({ ...t, icon: undefined }))}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          {/if}
-        </div>
-        <p class="note text-muted">
-          Shown before the tile name on its detail page and as the tile face
-          default. Each slot keeps its own icon; a state look glyph still wins
-          on the face.
-        </p>
-      </div>
-    {/if}
-
-    {#if tileTab === "look"}
-      <div class="field">
-        {#if !activeCond}
-          <p class="note text-muted">
-            This tile's own values — with an active condition, these become its
-            inactive state.
-          </p>
+              {#if activeCond}
+                <select
+                  aria-label="Active operator"
+                  value={activeCond.op}
+                  onchange={(e) =>
+                    setActiveOp(e.currentTarget.value as ActiveOp)}
+                >
+                  {#each OPS as o (o.op)}
+                    <option value={o.op}>{o.label}</option>
+                  {/each}
+                </select>
+                {#if activeCond.op !== "truthy"}
+                  <input
+                    type="text"
+                    placeholder="value"
+                    value={activeCond.value ?? ""}
+                    oninput={(e) => setActiveValue(e.currentTarget.value)}
+                  />
+                {/if}
+                <span class="live text-muted"
+                  >{activeFound ? readingText : "source not found"}</span
+                >
+                <span class="row-actions end">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Clear the active condition"
+                    aria-label="Clear the active condition"
+                    onclick={clearActive}
+                  >
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </span>
+              {/if}
+            </div>
+          </div>
         {/if}
-        <div class="look">
-          {#each lookStates as state (state)}
-            {@const lk = tile?.tile?.look?.[state] ?? {}}
-            <div class="look-block">
-              <div class="look-state">
-                <span class="look-name">{activeCond ? state : "default"}</span>
+
+        {#if id === "icon"}
+          <div class="field">
+            <div class="row">
+              <button
+                type="button"
+                class="btn btn-sm glyph-pick"
+                title={tile?.tile?.icon
+                  ? `Tile icon: ${tile.tile.icon} — click to change`
+                  : "Choose the tile's own icon"}
+                onclick={() => (tileIconPicker = true)}
+              >
+                {#if tile?.tile?.icon}
+                  <Icon value={tile.tile.icon} size={18} />
+                {:else}
+                  Choose glyph…
+                {/if}
+              </button>
+              {#if tile?.tile?.icon}
                 <button
                   type="button"
-                  class="btn btn-sm glyph-pick"
-                  title={lk.glyph
-                    ? `Glyph: ${lk.glyph} — click to change`
-                    : defaultGlyph
-                      ? `Default glyph: ${defaultGlyph} — click to change`
-                      : "Choose a glyph"}
-                  onclick={() => (lookIconFor = state)}
+                  class="icon-btn"
+                  title="Clear tile icon"
+                  aria-label="Clear tile icon"
+                  onclick={() => edit((t) => ({ ...t, icon: undefined }))}
                 >
-                  {#if lk.glyph}
-                    <Icon value={lk.glyph} size={16} />
-                  {:else if defaultGlyph}
-                    <span class="glyph-default"
-                      ><Icon value={defaultGlyph} size={16} /></span
-                    >
-                  {:else}
-                    icon…
-                  {/if}
+                  <span class="material-symbols-outlined">delete</span>
                 </button>
-                {@render lookColor(
-                  "glow",
-                  lk.glow,
-                  `${state} glow colour`,
-                  (v) => patchLook(state, { glow: v }),
-                )}
-                {@render lookColor(
-                  "icon",
-                  lk.color,
-                  `${state} icon colour`,
-                  (v) => patchLook(state, { color: v }),
-                )}
-              </div>
-              <div
-                class="look-bg"
-                title="Tile Background"
-                aria-label="Tile Background"
-              >
-                <span class="label-mono">BG</span>
-                <div class="look-bg-body">
-                  <BackgroundEditor
-                    background={lk.background ?? tile?.tile?.background}
-                    onChange={(bg) => patchLook(state, { background: bg })}
-                  />
-                </div>
-              </div>
+              {/if}
             </div>
-          {/each}
-        </div>
-        <p class="note text-muted">
-          A value set here wins over the rules for that state;
-          <em>default</em> keeps the rules. Dimming still comes from the rules.
-        </p>
-      </div>
-    {/if}
-
-    {#if tileTab === "pin"}
-      <div class="field">
-        <div class="row">
-          <input
-            class="pin-input"
-            type={pinShown ? "text" : "password"}
-            inputmode="numeric"
-            autocomplete="off"
-            value={pinDraft}
-            placeholder="no PIN"
-            aria-label="Detail page PIN"
-            title="Ask for this PIN before the detail page opens (view mode). Empty = no lock."
-            disabled={!hasDetail}
-            oninput={(e) => setPin(e.currentTarget.value)}
-          />
-          <span class="row-actions">
-            <button
-              type="button"
-              class="icon-btn"
-              title={pinShown ? "Hide the PIN" : "Show the PIN"}
-              aria-label={pinShown ? "Hide the PIN" : "Show the PIN"}
-              disabled={!hasDetail || pinDraft === ""}
-              onclick={() => (pinShown = !pinShown)}
-            >
-              <span class="material-symbols-outlined"
-                >{pinShown ? "visibility" : "visibility_off"}</span
-              >
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              title="Clear the PIN — the detail page opens freely again"
-              aria-label="Clear the PIN"
-              disabled={!hasDetail || pinDraft === ""}
-              onclick={() => setPin("")}
-            >
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </span>
-        </div>
-        {#if pinInvalid}
-          <p class="note text-muted">4-6 digits, numbers only.</p>
+            <p class="note text-muted">
+              Shown before the tile name on its detail page and as the tile face
+              default. Each slot keeps its own icon; a state look glyph still
+              wins on the face.
+            </p>
+          </div>
         {/if}
-        <p class="note text-muted">
-          Ask for this PIN before the detail page opens in view mode. Empty = no
-          lock.
-        </p>
-      </div>
-    {/if}
+
+        {#if id === "look"}
+          <div class="field">
+            {#if !activeCond}
+              <p class="note text-muted">
+                This tile's own values — with an active condition, these become
+                its inactive state.
+              </p>
+            {/if}
+            <div class="look">
+              {#each lookStates as state (state)}
+                {@const lk = tile?.tile?.look?.[state] ?? {}}
+                <div class="look-block">
+                  <div class="look-state">
+                    <span class="look-name"
+                      >{activeCond ? state : "default"}</span
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-sm glyph-pick"
+                      title={lk.glyph
+                        ? `Glyph: ${lk.glyph} — click to change`
+                        : defaultGlyph
+                          ? `Default glyph: ${defaultGlyph} — click to change`
+                          : "Choose a glyph"}
+                      onclick={() => (lookIconFor = state)}
+                    >
+                      {#if lk.glyph}
+                        <Icon value={lk.glyph} size={16} />
+                      {:else if defaultGlyph}
+                        <span class="glyph-default"
+                          ><Icon value={defaultGlyph} size={16} /></span
+                        >
+                      {:else}
+                        icon…
+                      {/if}
+                    </button>
+                    {@render lookColor(
+                      "glow",
+                      lk.glow,
+                      `${state} glow colour`,
+                      (v) => patchLook(state, { glow: v }),
+                    )}
+                    {@render lookColor(
+                      "icon",
+                      lk.color,
+                      `${state} icon colour`,
+                      (v) => patchLook(state, { color: v }),
+                    )}
+                  </div>
+                  <div
+                    class="look-bg"
+                    title="Tile Background"
+                    aria-label="Tile Background"
+                  >
+                    <span class="label-mono">BG</span>
+                    <div class="look-bg-body">
+                      <BackgroundEditor
+                        background={lk.background ?? tile?.tile?.background}
+                        onChange={(bg) => patchLook(state, { background: bg })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+            <p class="note text-muted">
+              A value set here wins over the rules for that state;
+              <em>default</em> keeps the rules. Dimming still comes from the rules.
+            </p>
+          </div>
+        {/if}
+
+        {#if id === "pin"}
+          <div class="field">
+            <div class="row">
+              <input
+                class="pin-input"
+                type={pinShown ? "text" : "password"}
+                inputmode="numeric"
+                autocomplete="off"
+                value={pinDraft}
+                placeholder="no PIN"
+                aria-label="Detail page PIN"
+                title="Ask for this PIN before the detail page opens (view mode). Empty = no lock."
+                disabled={!hasDetail}
+                oninput={(e) => setPin(e.currentTarget.value)}
+              />
+              <span class="row-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title={pinShown ? "Hide the PIN" : "Show the PIN"}
+                  aria-label={pinShown ? "Hide the PIN" : "Show the PIN"}
+                  disabled={!hasDetail || pinDraft === ""}
+                  onclick={() => (pinShown = !pinShown)}
+                >
+                  <span class="material-symbols-outlined"
+                    >{pinShown ? "visibility" : "visibility_off"}</span
+                  >
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title="Clear the PIN — the detail page opens freely again"
+                  aria-label="Clear the PIN"
+                  disabled={!hasDetail || pinDraft === ""}
+                  onclick={() => setPin("")}
+                >
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </span>
+            </div>
+            {#if pinInvalid}
+              <p class="note text-muted">4-6 digits, numbers only.</p>
+            {/if}
+            <p class="note text-muted">
+              Ask for this PIN before the detail page opens in view mode. Empty
+              = no lock.
+            </p>
+          </div>
+        {/if}
+      {/snippet}
+    </OptionTabs>
 
     <!-- The detail page's own line (A47): the eye shows the page itself over
          the display — the editor never asks for the PIN — and the field sets
