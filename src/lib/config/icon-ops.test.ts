@@ -4,11 +4,11 @@ import {
   deviceFaceIcon,
   deviceObjectIcon,
   objectIconValue,
-  ownerOf,
   glyphForRole,
   presetGlyph,
   resolveIcon,
 } from "$lib/config/icon-ops";
+import { ownerOf } from "$lib/utils/icon-url";
 
 it("names the adapter and instance an id belongs to", () => {
   expect(ownerOf("alias.0.1Stock.TemperaturBad")).toEqual({

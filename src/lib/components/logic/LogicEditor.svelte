@@ -3,6 +3,7 @@
   import type { Input, LogicDef, Output } from "$logic/types";
   import { validateLogicDocument } from "$logic/validate";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { variableNameFor } from "$lib/config/variables";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import InputsEditor from "./InputsEditor.svelte";
@@ -49,9 +50,8 @@
   /** A state id that a global variable stands for becomes the variable's name,
    *  so changing the variable later changes every logic that uses it. */
   function normalizeRefs(logic: LogicDef): LogicDef {
-    const vars = getVariables().filter((v) => v.kind === "state" && v.stateId);
-    const toName = (ref: string) =>
-      vars.find((v) => v.stateId === ref)?.name ?? ref;
+    const vars = getVariables();
+    const toName = (ref: string) => variableNameFor(ref, vars);
     const inputs = Object.fromEntries(
       Object.entries(logic.inputs ?? {}).map(([name, input]) => {
         if (input.from.type !== "state") return [name, input];

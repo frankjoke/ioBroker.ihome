@@ -1,6 +1,6 @@
 import { evaluate } from "./expr";
 import { parseDuration } from "./duration";
-import { logicHasErrors, validateLogicDocument } from "./validate";
+import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   Action,
   Forward,
@@ -95,10 +95,6 @@ interface Job {
   hasPrevious: boolean;
   depth: number;
   meta: EventMeta;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isNoop(value: unknown): value is { noop: true } {

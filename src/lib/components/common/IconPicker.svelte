@@ -3,8 +3,8 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
-  import { collectDocumentIcons } from "$lib/utils/icon-url";
-  import { brokerIconPath, isImageIcon } from "$lib/config/icon-ops";
+  import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
+  import { brokerIconPath } from "$lib/config/icon-ops";
   import Icon from "$lib/components/common/Icon.svelte";
   import symbolNames from "$lib/assets/material-symbol-names.json";
 

@@ -2,6 +2,7 @@
   import type { Output } from "$logic/types";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { variableNameFor } from "$lib/config/variables";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
 
@@ -19,13 +20,6 @@
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   let picking = $state(false);
-
-  function displayRef(ref: string): string {
-    const variable = getVariables().find(
-      (v) => v.kind === "state" && (v.name === ref || v.stateId === ref),
-    );
-    return variable ? variable.name : ref;
-  }
 
   function realId(ref: string): string {
     return (
@@ -77,7 +71,9 @@
       class:mono={stateRef !== ""}
       class:text-muted={stateRef === ""}
     >
-      {stateRef ? displayRef(stateRef) : "Memory - Select if to be written"}
+      {stateRef
+        ? variableNameFor(stateRef, getVariables())
+        : "Memory - Select if to be written"}
     </span>
     <IconButton
       icon={stateRef ? "close" : "search"}

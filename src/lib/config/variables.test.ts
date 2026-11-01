@@ -16,6 +16,7 @@ import {
   validName,
   validStateId,
   variableLocals,
+  variableNameFor,
 } from "$lib/config/variables";
 
 describe("buildStateId", () => {
@@ -203,6 +204,35 @@ describe("resolveVariable", () => {
     expect(resolveVariable("no_state", list)).toBeNull();
     expect(resolveVariable("broken", list)).toBeNull();
     expect(resolveVariable("", list)).toBeNull();
+  });
+});
+
+describe("variableNameFor", () => {
+  const list = [
+    {
+      id: "a",
+      name: "outsideTemp",
+      kind: "state" as const,
+      type: "number",
+      stateId: "ihome.0.Variables.outsideTemp",
+    },
+    {
+      id: "b",
+      name: "gas_price",
+      kind: "constant" as const,
+      type: "number",
+      value: "0.35",
+    },
+  ];
+  it("shows the name for a stored state id", () => {
+    expect(variableNameFor("ihome.0.Variables.outsideTemp", list)).toBe(
+      "outsideTemp",
+    );
+  });
+  it("keeps a name, a foreign id and an empty ref as written", () => {
+    expect(variableNameFor("outsideTemp", list)).toBe("outsideTemp");
+    expect(variableNameFor("alias.0.Temp", list)).toBe("alias.0.Temp");
+    expect(variableNameFor("", list)).toBe("");
   });
 });
 

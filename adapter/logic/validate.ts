@@ -49,7 +49,7 @@ export function logicHasErrors(issues: Issue[], logicId: string): boolean {
 
 const OPS_NEEDING_VALUE = new Set(["eq", "ne", "gt", "gte", "lt", "lte"]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 

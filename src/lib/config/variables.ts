@@ -198,6 +198,22 @@ export function stateIdFor(ref: string, variables: GlobalVariable[]): string {
 }
 
 /**
+ * The name to show for a stored reference: a state variable's own name for
+ * either its name or its state id, everything else unchanged. The inverse of
+ * `stateIdFor` for display, so the user sees what they bound.
+ */
+export function variableNameFor(
+  ref: string,
+  variables: GlobalVariable[],
+): string {
+  const value = String(ref ?? "").trim();
+  const variable = variables.find(
+    (v) => v.kind === "state" && (v.name === value || v.stateId === value),
+  );
+  return variable ? variable.name : ref;
+}
+
+/**
  * The relative id a new state gets. iHome instances are pinned to their
  * `Variables` folder: everything else under `ihome.*` (the config documents,
  * …) belongs to the adapter and must never be overwritten from this form.

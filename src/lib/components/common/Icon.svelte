@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { iconSrc } from "$lib/utils/icon-url";
-  import { isImageIcon } from "$lib/config/icon-ops";
+  import { iconSrc, isImageIcon } from "$lib/utils/icon-url";
 
   let {
     value,

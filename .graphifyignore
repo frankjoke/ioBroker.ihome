@@ -1,0 +1,8 @@
+# Derived or third-party files that are not this codebase's own source.
+# .graphifyignore is merged after .gitignore and can only exclude more.
+www/
+.svelte-kit/
+graphify-out/
+.claude/
+AGENTS.md
+CLAUDE.md

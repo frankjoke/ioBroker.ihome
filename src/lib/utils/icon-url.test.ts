@@ -1,7 +1,11 @@
 import { it, expect, vi } from "vitest";
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
-import { collectDocumentIcons, iconBase, iconSrc } from "./icon-url";
-import { isImageIcon } from "$lib/config/icon-ops";
+import {
+  collectDocumentIcons,
+  iconBase,
+  iconSrc,
+  isImageIcon,
+} from "./icon-url";
 
 it("classifies symbols vs images", () => {
   expect(isImageIcon("lightbulb")).toBe(false);
