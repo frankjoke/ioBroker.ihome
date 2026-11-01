@@ -207,6 +207,15 @@ h1 {
   margin: 0 0 0.5rem;
 }
 
+/* A phone cannot hold a 32px page title with the page actions beside it; the
+   24px step still reads as the page heading and stops the long names wrapping
+   ("Variables & Constants", "Formula Templates"). Desktop is untouched. */
+@media (max-width: 640px) {
+  h1 {
+    font-size: var(--headline-md);
+  }
+}
+
 h2 {
   font-size: var(--headline-md);
   margin: 0 0 0.5rem;

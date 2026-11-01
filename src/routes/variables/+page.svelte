@@ -941,4 +941,17 @@
   .form-grid.three {
     grid-template-columns: 1fr 1fr 1fr;
   }
+
+  /* A phone stacks the page header: the name gets the full width instead of
+     wrapping to three lines beside the actions. */
+  @media (max-width: 640px) {
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .page-actions {
+      margin-left: 0;
+    }
+  }
 </style>
