@@ -270,7 +270,7 @@
   .inputs {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.25rem;
   }
 
   .inputs-head {
