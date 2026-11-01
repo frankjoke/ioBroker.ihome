@@ -463,7 +463,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 6px);
     background: var(--surface-color);
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.5rem;
   }
 
   .item.open {
