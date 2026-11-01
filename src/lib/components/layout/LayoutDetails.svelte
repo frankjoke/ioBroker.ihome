@@ -255,6 +255,12 @@
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
 
+  /** The slot kind as a word for the icon's tooltip ("history-list" -> "History list"). */
+  function kindLabel(kind: SlotKind): string {
+    const text = String(kind).replace(/-/g, " ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   const KIND_GLYPH: Record<SlotKind, string> = {
     value: "numbers",
     switch: "toggle_on",
@@ -1228,18 +1234,16 @@
                 aria-expanded={expandedSlot === i}
                 onclick={() => (expandedSlot = expandedSlot === i ? null : i)}
               >
-                <Icon value={KIND_GLYPH[slot.kind]} size={17} />
+                <span class="slot-kind-icon" title={kindLabel(slot.kind)}>
+                  <Icon value={KIND_GLYPH[slot.kind]} size={17} />
+                </span>
                 {#if slot.icon && slot.icon.enabled !== false && slot.icon.glyph}
                   <Icon value={slot.icon.glyph} size={15} />
                 {/if}
                 {#if slot.spark && slot.spark.enabled !== false}
                   <Icon value="show_chart" size={15} />
                 {/if}
-                <span
-                  class="slot-summary"
-                  title={`${slot.kind} · ${slotLabel(slot)}`}
-                >
-                  <span class="slot-kind">{slot.kind} ·</span>
+                <span class="slot-summary" title={slotLabel(slot)}>
                   <span class="slot-name">{slotLabel(slot)}</span>
                   {#if !slot.source && slot.options?.pick}
                     <span class="hint-mark text-muted">(hint)</span>
@@ -2389,7 +2393,8 @@
     min-width: 0;
   }
 
-  .slot-kind {
+  .slot-kind-icon {
+    display: inline-flex;
     flex: 0 0 auto;
   }
 
