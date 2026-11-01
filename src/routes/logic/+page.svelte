@@ -190,6 +190,19 @@
     draft = null;
   }
 
+  /** The whole line opens/closes its item — except the actions and any control
+   *  (the name input while open, the checkboxes). */
+  function onLineClick(event: MouseEvent, logic: LogicDef) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    if (selectedId === logic.id) closeEditor();
+    else select(logic);
+  }
+
   /** While the row is open these edit the draft; closed, they write at once. */
   function setEnabled(logic: LogicDef, enabled: boolean) {
     if (selectedId === logic.id) patch({ enabled });
@@ -269,7 +282,11 @@
       {#each doc.logics as logic (logic.id)}
         {@const open = selectedId === logic.id}
         <div class="item" class:open>
-          <div class="item-line">
+          <!-- The free line area is a mouse convenience: keyboard users open/close
+               with the name button and close with the ×. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(e) => onLineClick(e, logic)}>
             {#if open && draft}
               <input
                 class="name-input"
@@ -480,8 +497,13 @@
     flex-wrap: wrap;
   }
 
+  .item-line {
+    cursor: pointer;
+  }
+
   .item-actions {
     margin-left: auto;
+    cursor: default;
   }
 
   .name {
