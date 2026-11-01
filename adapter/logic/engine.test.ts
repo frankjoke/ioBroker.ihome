@@ -86,6 +86,79 @@ it("maps a machine's state names to a boolean logic output", () => {
   expect(off?.value).toBe(false);
 });
 
+const follower = (extra: Partial<MachineLogic> = {}): LogicDocument => ({
+  version: 1,
+  logics: [
+    {
+      id: "follow",
+      name: "Follow",
+      kind: "machine",
+      log: true,
+      init: { state: "Off" },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "boolean" },
+      states: { Off: {}, On: {} },
+      ...extra,
+    },
+  ],
+});
+
+it("follows an external write to its own output", () => {
+  const h = createHarness({ "0_userdata.0.OUT": false });
+  const engine = createEngine(follower(), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.logs.length = 0;
+  h.change("0_userdata.0.OUT", true, { from: "hue.0" });
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "moves from “Off” to “On” because of output changed elsewhere",
+      ),
+    ),
+  ).toBe(true);
+});
+
+it("an explicit $self row picks between states with the same value", () => {
+  const h = createHarness({ "0_userdata.0.OUT": false });
+  const engine = createEngine(
+    follower({
+      states: {
+        Off: {
+          on: [
+            {
+              on: "$self",
+              is: { op: "eq", value: true },
+              goto: "OnMotion",
+            },
+          ],
+        },
+        On: {},
+        OnMotion: {},
+      },
+    }),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.logs.length = 0;
+  h.change("0_userdata.0.OUT", true, { from: "hue.0" });
+  expect(h.logs.some((line) => line.message.includes("to “OnMotion”"))).toBe(
+    true,
+  );
+});
+
+it("stays put when the external write already matches its state", () => {
+  const h = createHarness({ "0_userdata.0.OUT": false });
+  const engine = createEngine(follower(), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.logs.length = 0;
+  h.change("0_userdata.0.OUT", false, { from: "hue.0" });
+  expect(
+    h.logs.some((line) => line.message.includes("output changed elsewhere")),
+  ).toBe(false);
+});
+
 it("honours mode any and forward always", () => {
   const d = doc({
     output: {

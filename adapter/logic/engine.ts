@@ -357,6 +357,27 @@ export function createEngine(
       }
       return;
     }
+    // No row took the event: an output change still moves the machine.
+    if (job.input === "$self") syncToOutput(rt, job.value, job.depth);
+  }
+
+  /**
+   * An external write to the output (another adapter, a user, a script) moves the
+   * machine to the state that stands for that value — first match in declaration
+   * order. Several states may share a value (two "on" states with different
+   * timeouts); an explicit `$self` row then picks the one meant. A write that
+   * already matches the current state changes nothing (D22).
+   */
+  function syncToOutput(rt: Runtime, value: unknown, depth: number): void {
+    const def = rt.def as MachineLogic;
+    const current = rt.state;
+    if (current && Object.is(outputValue(rt, current), value)) return;
+    for (const name of Object.keys(def.states)) {
+      if (Object.is(outputValue(rt, name), value)) {
+        transition(rt, name, depth, "output changed elsewhere");
+        return;
+      }
+    }
   }
 
   function matchesIs(
@@ -858,6 +879,27 @@ export function createEngine(
             meta: {
               from: change.from ?? "",
               self,
+              ack: change.ack,
+              ts: change.ts,
+            },
+          });
+        }
+        // Someone else wrote this logic's own output: the machine follows it, so
+        // a wall switch or another adapter moves the state at once (D22).
+        if (
+          rt.def.kind === "machine" &&
+          !self &&
+          outputTargetId(rt) === change.id
+        ) {
+          enqueue({
+            rt,
+            input: "$self",
+            value: change.val,
+            hasPrevious: false,
+            depth: 0,
+            meta: {
+              from: change.from ?? "",
+              self: false,
               ack: change.ack,
               ts: change.ts,
             },

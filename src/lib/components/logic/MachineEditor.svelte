@@ -538,6 +538,9 @@
                             })}
                         >
                           <option value="$init">$init (start)</option>
+                          <option value="$self">
+                            $self (output changed elsewhere)
+                          </option>
                           {#each eventInputs as input (input)}
                             <option value={input}>{input}</option>
                           {/each}
