@@ -584,4 +584,18 @@
       margin-left: 0;
     }
   }
+
+  /* Three actions do not fit one phone row: two columns, the odd one spanning,
+     instead of one lonely button on a second line. */
+  @media (max-width: 640px) {
+    .page-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+    }
+
+    .page-actions > :last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
 </style>
