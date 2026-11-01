@@ -71,6 +71,16 @@
     patch({ states: { ...logic.states, [name]: state } });
   }
 
+  function onEventLineClick(event: MouseEvent, index: number) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    openRow = openRow === index ? null : index;
+  }
+
   function toggleState(name: string) {
     openState = openState === name ? null : name;
     openRow = null;
@@ -470,7 +480,7 @@
               </div>
             </div>
 
-            <div class="events">
+            <div class="events section-panel">
               <div class="events-head">
                 <span class="label-mono">Events</span>
                 <span class="add-slot">
@@ -484,30 +494,33 @@
               </div>
 
               {#each state.on ?? [] as row, index (index)}
-                <div class="event-row">
-                  <div class="summary">
+                {@const eventOpen = openRow === index}
+                <div class="item" class:open={eventOpen}>
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div
+                    class="item-line"
+                    onclick={(e) => onEventLineClick(e, index)}
+                  >
                     <span class="event-summary mono">{rowSummary(row)}</span>
-                    <span class="spacer"></span>
-                    <IconButton
-                      icon={openRow === index ? "expand_less" : "edit"}
-                      label={`Edit event ${index + 1} of ${name}`}
-                      title={openRow === index ? "Close" : "Edit"}
-                      active={openRow === index}
-                      onclick={() =>
-                        (openRow = openRow === index ? null : index)}
-                    />
-                    <IconButton
-                      icon="delete"
-                      danger
-                      label={`Delete event ${index + 1} of ${name}`}
-                      title="Delete"
-                      onclick={() =>
-                        (pendingDelete = { kind: "event", state: name, index })}
-                    />
+                    <span class="item-actions">
+                      <IconButton
+                        icon="delete"
+                        danger
+                        label={`Delete event ${index + 1} of ${name}`}
+                        title="Delete"
+                        onclick={() =>
+                          (pendingDelete = {
+                            kind: "event",
+                            state: name,
+                            index,
+                          })}
+                      />
+                    </span>
                   </div>
 
-                  {#if openRow === index}
-                    <div class="event-body">
+                  {#if eventOpen}
+                    <div class="item-editor">
                       <div class="row">
                         <select
                           aria-label="Event input"
@@ -722,16 +735,14 @@
 <style>
   .machine,
   .states,
-  .events,
-  .event-row,
-  .event-body {
+  .events {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
   }
 
   .events {
-    gap: 0.3rem;
+    gap: 0.25rem;
   }
 
   .states {
@@ -765,32 +776,11 @@
     display: inline-flex;
   }
 
-  .summary {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
-  .event-row {
-    padding: 0.35rem 0;
-    border-bottom: 1px dashed var(--border-color);
-  }
-
   .event-summary {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
-  }
-
-  .event-body {
-    padding: 0.3rem 0 0.3rem 0.6rem;
-    border-left: 2px solid var(--border-color);
-  }
-
-  .spacer {
-    flex: 1 1 auto;
   }
 
   .row,
