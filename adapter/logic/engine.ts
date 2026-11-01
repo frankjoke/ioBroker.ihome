@@ -515,9 +515,26 @@ export function createEngine(
       } else if ("goto" in action) {
         transition(rt, action.goto, depth, "action goto");
       } else if ("log" in action) {
-        deps.log(action.log.level ?? "info", rt.def.id, action.log.text);
+        deps.log(
+          action.log.level ?? "info",
+          rt.def.id,
+          fillLog(rt, action.log.text),
+        );
       }
     }
+  }
+
+  /** `{{ref}}` in a log text is that ref's value, as the row sees it (D24). */
+  function fillLog(rt: Runtime, text: string): string {
+    return text.replace(/\{\{([^{}]+)\}\}/g, (_, name: string) => {
+      const ref = name.trim();
+      try {
+        const value = resolveIn(rt, ref);
+        return value === undefined ? "—" : String(value);
+      } catch {
+        return `{{${ref}}}`;
+      }
+    });
   }
 
   function writeMemory(

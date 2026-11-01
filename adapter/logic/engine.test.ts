@@ -192,6 +192,53 @@ it("compares string conditions as glob patterns", () => {
   expect(engine.memoryValue("text")).toBe("On");
 });
 
+it("fills {{ref}} in a log message", () => {
+  const h = createHarness({ "0_userdata.0.S": "" });
+  const engine = createEngine(
+    {
+      version: 1,
+      logics: [
+        {
+          id: "logger",
+          name: "Logger",
+          kind: "machine",
+          init: { state: "A" },
+          inputs: {
+            v: {
+              from: { type: "state", ref: "0_userdata.0.S" },
+              kind: "event",
+            },
+          },
+          states: {
+            A: {
+              on: [
+                {
+                  on: "v",
+                  do: [
+                    {
+                      log: {
+                        text: "saw {{v}} from {{$from}} (self {{$self}})",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.logs.length = 0;
+  h.change("0_userdata.0.S", "On", { from: "hue.0" });
+  expect(h.logs.map((line) => line.message)).toEqual([
+    "saw On from hue.0 (self false)",
+  ]);
+});
+
 it("compares a numeric string numerically", () => {
   const h = createHarness({ "0_userdata.0.S": "" });
   const engine = createEngine(textMachine({ op: "gt", value: "10" }), h.deps);

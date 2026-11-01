@@ -93,7 +93,7 @@
         <input
           aria-label="Log text"
           value={action.log.text}
-          placeholder="message"
+          placeholder={"message — {{ref}} for a value"}
           onchange={(e) =>
             replace(index, {
               log: { ...action.log, text: e.currentTarget.value },

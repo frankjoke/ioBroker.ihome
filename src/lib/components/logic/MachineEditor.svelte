@@ -280,7 +280,7 @@
   function addRow(stateName: string) {
     const state = logic.states[stateName];
     const on = [...(state.on ?? [])];
-    on.push({ on: eventInputs[0] ?? "$init" });
+    on.push({ on: eventInputs[0] ?? "$init", edge: "any" });
     updateState(stateName, { ...state, on });
     openRow = on.length - 1;
   }
@@ -685,10 +685,10 @@
                                     "change" | "rising" | "falling" | "any",
                                 })}
                             >
+                              <option value="any">any</option>
                               <option value="change">change</option>
                               <option value="rising">rising</option>
                               <option value="falling">falling</option>
-                              <option value="any">any</option>
                             </select>
                           </label>
                         {:else}
