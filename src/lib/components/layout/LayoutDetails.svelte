@@ -1196,14 +1196,13 @@
       {/snippet}
     </OptionTabs>
 
-    <!-- The detail page's own line (A47): the eye shows the page itself over
-         the display — the editor never asks for the PIN — and the field sets
-         the PIN that guards it in view mode. Both are the detail page's own
-         business, so both dim while the tile has none. -->
     <div class="field">
-      <div class="row">
-        <span class="label-mono">Detail page</span>
+      <div class="row between">
+        <span class="label-mono">Slots</span>
         <span class="row-actions">
+          <!-- The detail page's eye (A47) rides the slots line: it shows the page
+               over the display and never asks for the PIN; it dims when nothing of
+               this tile lives in the detail page. -->
           <button
             type="button"
             class="icon-btn"
@@ -1222,14 +1221,6 @@
           >
             <span class="material-symbols-outlined">visibility</span>
           </button>
-        </span>
-      </div>
-    </div>
-
-    <div class="field">
-      <div class="row between">
-        <span class="label-mono">Slots</span>
-        <span class="row-actions">
           <button
             type="button"
             class="icon-btn"
