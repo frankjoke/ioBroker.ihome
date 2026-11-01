@@ -14,7 +14,6 @@
   let editing = $state<FormulaTemplate | null>(null);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let search = $state("");
-  let sortBy = $state<"name" | "unit">("name");
   let sortDir = $state<"asc" | "desc">("asc");
 
   const formulas = $derived(getFormulas());
@@ -29,13 +28,7 @@
         )
       : [...formulas];
     const dir = sortDir === "asc" ? 1 : -1;
-    return list.sort(
-      (a, b) =>
-        dir *
-        String(sortBy === "name" ? a.name : (a.unit ?? "")).localeCompare(
-          String(sortBy === "name" ? b.name : (b.unit ?? "")),
-        ),
-    );
+    return list.sort((a, b) => dir * a.name.localeCompare(b.name));
   });
 
   /** The rows to draw: the filtered list, with the draft in place of its entry. */
@@ -141,10 +134,6 @@
         placeholder="Search name or expression…"
         bind:value={search}
       />
-      <select bind:value={sortBy} aria-label="Sort by">
-        <option value="name">Name</option>
-        <option value="unit">Unit</option>
-      </select>
       <button
         type="button"
         class="sort-dir"
@@ -316,12 +305,11 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr auto;
+    grid-template-columns: 1fr auto;
     gap: 0.5rem;
   }
 
-  .filter-bar input,
-  .filter-bar select {
+  .filter-bar input {
     min-width: 0;
     padding: 0.35rem;
   }
