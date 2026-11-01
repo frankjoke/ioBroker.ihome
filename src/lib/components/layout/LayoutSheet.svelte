@@ -825,7 +825,7 @@
     flex-direction: column;
     gap: 0.6rem;
     width: min(440px, 100vw);
-    padding: 0.75rem;
+    padding: 0.5rem;
     overflow-y: auto;
     background-color: var(--surface-container-lowest);
     border-left: 1px solid var(--border-color);
