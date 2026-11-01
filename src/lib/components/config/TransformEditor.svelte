@@ -79,10 +79,10 @@
 </script>
 
 <div class="transform-editor">
-  <div class="tabs">
+  <div class="option-tabs">
     <button
       type="button"
-      class="tab"
+      class="option-tab"
       class:active={dir === "read"}
       onclick={() => (dir = "read")}
     >
@@ -90,7 +90,7 @@
     </button>
     <button
       type="button"
-      class="tab"
+      class="option-tab"
       class:active={dir === "write"}
       onclick={() => (dir = "write")}
     >
@@ -249,6 +249,10 @@
 </div>
 
 <style>
+  .option-tabs {
+    --option-tab-bg: var(--surface-color);
+  }
+
   .transform-editor {
     display: flex;
     flex-direction: column;
@@ -257,25 +261,6 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
     background: var(--surface-container-low, #fafafa);
-  }
-
-  .tabs {
-    display: inline-flex;
-    gap: 2px;
-    align-self: flex-start;
-  }
-
-  .tab {
-    border: 1px solid var(--border-color);
-    background: transparent;
-    color: var(--text-muted);
-    padding: 0.25rem 0.6rem;
-    cursor: pointer;
-  }
-
-  .tab.active {
-    background: var(--primary-container);
-    color: var(--on-primary-container);
   }
 
   .field {
