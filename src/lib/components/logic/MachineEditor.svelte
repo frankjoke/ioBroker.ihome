@@ -527,66 +527,70 @@
 
                   {#if eventOpen}
                     <div class="item-editor">
-                      <div class="row">
-                        <select
-                          aria-label="Event input"
-                          value={row.on}
-                          onchange={(e) =>
-                            updateRow(name, index, {
-                              ...row,
-                              on: e.currentTarget.value,
-                            })}
-                        >
-                          <option value="$init">$init (start)</option>
-                          <option value="$self">
-                            $self (output changed elsewhere)
-                          </option>
-                          {#each eventInputs as input (input)}
-                            <option value={input}>{input}</option>
-                          {/each}
-                        </select>
-                        <select
-                          aria-label="Value test"
-                          value={row.is?.op ?? ""}
-                          onchange={(e) => {
-                            const op = e.currentTarget.value;
-                            updateRow(name, index, {
-                              ...row,
-                              is: op
-                                ? {
-                                    op: op as "eq",
-                                    value: row.is?.value ?? true,
-                                  }
-                                : undefined,
-                            });
-                          }}
-                        >
-                          <option value="">any change</option>
-                          <option value="eq">=</option>
-                          <option value="ne">≠</option>
-                          <option value="gt">&gt;</option>
-                          <option value="gte">≥</option>
-                          <option value="lt">&lt;</option>
-                          <option value="lte">≤</option>
-                        </select>
-                        {#if row.is}
-                          <input
-                            class="is-value"
-                            aria-label="Compare value"
-                            value={String(row.is.value ?? "")}
+                      <div class="row event-options">
+                        <label class="field"
+                          ><span class="label-mono">On</span>
+                          <select
+                            aria-label="Event input"
+                            value={row.on}
                             onchange={(e) =>
                               updateRow(name, index, {
                                 ...row,
-                                is: {
-                                  op: row.is!.op,
-                                  value: parseValue(e.currentTarget.value),
-                                },
+                                on: e.currentTarget.value,
                               })}
-                          />
+                          >
+                            <option value="$init">$init (start)</option>
+                            <option value="$self">$self (target state)</option>
+                            {#each eventInputs as input (input)}
+                              <option value={input}>{input}</option>
+                            {/each}
+                          </select>
+                        </label>
+                        <label class="field"
+                          ><span class="label-mono">Condition</span>
+                          <select
+                            aria-label="Condition"
+                            value={row.is?.op ?? ""}
+                            onchange={(e) => {
+                              const op = e.currentTarget.value;
+                              updateRow(name, index, {
+                                ...row,
+                                is: op
+                                  ? {
+                                      op: op as "eq",
+                                      value: row.is?.value ?? true,
+                                    }
+                                  : undefined,
+                              });
+                            }}
+                          >
+                            <option value="">*</option>
+                            <option value="eq">=</option>
+                            <option value="ne">≠</option>
+                            <option value="gt">&gt;</option>
+                            <option value="gte">≥</option>
+                            <option value="lt">&lt;</option>
+                            <option value="lte">≤</option>
+                          </select>
+                        </label>
+                        {#if row.is}
+                          <label class="field"
+                            ><span class="label-mono">Value</span>
+                            <input
+                              class="is-value"
+                              aria-label="Compare value"
+                              value={String(row.is.value ?? "")}
+                              onchange={(e) =>
+                                updateRow(name, index, {
+                                  ...row,
+                                  is: {
+                                    op: row.is!.op,
+                                    value: parseValue(e.currentTarget.value),
+                                  },
+                                })}
+                            />
+                          </label>
                         {/if}
-                      </div>
-
-                      <div class="row">
                         <label class="field"
                           ><span class="label-mono">Edge</span>
                           <select
@@ -599,10 +603,10 @@
                                   "change" | "rising" | "falling" | "any",
                               })}
                           >
-                            <option value="change">on change</option>
+                            <option value="change">change</option>
                             <option value="rising">rising</option>
                             <option value="falling">falling</option>
-                            <option value="any">every update</option>
+                            <option value="any">any</option>
                           </select>
                         </label>
                         <label class="field"
@@ -618,25 +622,8 @@
                               })}
                           >
                             <option value="any">any</option>
-                            <option value="false">commands</option>
-                            <option value="true">confirmations</option>
-                          </select>
-                        </label>
-                        <label class="field"
-                          ><span class="label-mono">Source</span>
-                          <select
-                            aria-label="Event source"
-                            value={row.source ?? "external"}
-                            onchange={(e) =>
-                              updateRow(name, index, {
-                                ...row,
-                                source: e.currentTarget.value as
-                                  "external" | "self" | "any",
-                              })}
-                          >
-                            <option value="external">external</option>
-                            <option value="self">own writes</option>
-                            <option value="any">any</option>
+                            <option value="false">false</option>
+                            <option value="true">true</option>
                           </select>
                         </label>
                       </div>
@@ -790,6 +777,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+  }
+
+  .event-options {
+    align-items: flex-end;
   }
 
   .row,
