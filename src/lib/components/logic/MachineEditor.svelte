@@ -1,11 +1,21 @@
 <script lang="ts">
-  import type { Expr, Init, MachineLogic, OnRow, StateDef } from "$logic/types";
+  import type {
+    Expr,
+    Init,
+    MachineLogic,
+    OnRow,
+    Operator,
+    StateDef,
+  } from "$logic/types";
   import ActionList from "./ActionList.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import { stateIdFor } from "$lib/config/variables";
 
   let {
     logic,
@@ -216,6 +226,57 @@
       on: (state.on ?? []).filter((_, i) => i !== index),
     });
     if (openRow === index) openRow = null;
+  }
+
+  /** The event's value type, so the condition offers only what fits it (D23). */
+  function conditionKind(row: OnRow): "boolean" | "number" | "string" | "any" {
+    if (row.on === "$init") return "boolean";
+    if (row.on === "$self") {
+      const output = logic.output;
+      return output && output.scope !== "memory" ? output.type : "any";
+    }
+    const input = logic.inputs?.[row.on];
+    if (!input || input.from.type !== "state") return "any";
+    const variables = getVariables();
+    for (const ref of [input.from.ref, ...(input.from.refs ?? [])]) {
+      if (!ref) continue;
+      const type = ioBroker.objects.get(stateIdFor(ref, variables))?.common
+        ?.type;
+      if (type === "boolean" || type === "number" || type === "string") {
+        return type;
+      }
+    }
+    return "any";
+  }
+
+  /** String conditions compare as glob patterns; `*` matches anything. */
+  const STRING_OPS = [
+    { op: "eq", label: "=" },
+    { op: "ne", label: "≠" },
+    { op: "startsWith", label: "starts with" },
+    { op: "endsWith", label: "ends with" },
+    { op: "includes", label: "includes" },
+    { op: "notIncludes", label: "does not include" },
+  ];
+  const NUMBER_OPS = [
+    { op: "eq", label: "=" },
+    { op: "ne", label: "≠" },
+    { op: "gt", label: ">" },
+    { op: "gte", label: "≥" },
+    { op: "lt", label: "<" },
+    { op: "lte", label: "≤" },
+  ];
+  function opsFor(kind: "boolean" | "number" | "string" | "any") {
+    if (kind === "number") return NUMBER_OPS;
+    if (kind === "string") return STRING_OPS;
+    return [...NUMBER_OPS, ...STRING_OPS.slice(2)];
+  }
+
+  /** A boolean condition is just true / false, not "= true". */
+  function setBoolCondition(row: OnRow, raw: string) {
+    return raw === ""
+      ? undefined
+      : { op: "eq" as const, value: raw === "true" };
   }
 
   function addRow(stateName: string) {
@@ -526,6 +587,7 @@
                   </div>
 
                   {#if eventOpen}
+                    {@const kind = conditionKind(row)}
                     <div class="item-editor">
                       <div class="row event-options">
                         <label class="field"
@@ -548,32 +610,50 @@
                         </label>
                         <label class="field"
                           ><span class="label-mono">Condition</span>
-                          <select
-                            aria-label="Condition"
-                            value={row.is?.op ?? ""}
-                            onchange={(e) => {
-                              const op = e.currentTarget.value;
-                              updateRow(name, index, {
-                                ...row,
-                                is: op
-                                  ? {
-                                      op: op as "eq",
-                                      value: row.is?.value ?? true,
-                                    }
-                                  : undefined,
-                              });
-                            }}
-                          >
-                            <option value="">*</option>
-                            <option value="eq">=</option>
-                            <option value="ne">≠</option>
-                            <option value="gt">&gt;</option>
-                            <option value="gte">≥</option>
-                            <option value="lt">&lt;</option>
-                            <option value="lte">≤</option>
-                          </select>
+                          {#if kind === "boolean"}
+                            <select
+                              aria-label="Condition"
+                              value={row.is
+                                ? String(row.is.value === true)
+                                : ""}
+                              onchange={(e) =>
+                                updateRow(name, index, {
+                                  ...row,
+                                  is: setBoolCondition(
+                                    row,
+                                    e.currentTarget.value,
+                                  ),
+                                })}
+                            >
+                              <option value="">*</option>
+                              <option value="true">true</option>
+                              <option value="false">false</option>
+                            </select>
+                          {:else}
+                            <select
+                              aria-label="Condition"
+                              value={row.is?.op ?? ""}
+                              onchange={(e) => {
+                                const op = e.currentTarget.value;
+                                updateRow(name, index, {
+                                  ...row,
+                                  is: op
+                                    ? {
+                                        op: op as Operator,
+                                        value: row.is?.value ?? "",
+                                      }
+                                    : undefined,
+                                });
+                              }}
+                            >
+                              <option value="">*</option>
+                              {#each opsFor(kind) as o (o.op)}
+                                <option value={o.op}>{o.label}</option>
+                              {/each}
+                            </select>
+                          {/if}
                         </label>
-                        {#if row.is}
+                        {#if row.is && kind !== "boolean"}
                           <label class="field"
                             ><span class="label-mono">Value</span>
                             <input

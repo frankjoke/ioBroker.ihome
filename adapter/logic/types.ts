@@ -8,7 +8,31 @@ export type Json = string | number | boolean | null;
 /** Whole seconds, minutes or hours as written in the document: "90s", "2m". */
 export type Duration = string;
 
-export type Operator = "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+export type Operator =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "startsWith"
+  | "endsWith"
+  | "includes"
+  | "notIncludes";
+
+/** Every operator, and the ones that need a value (all of them). */
+export const OPERATORS: readonly Operator[] = [
+  "eq",
+  "ne",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "startsWith",
+  "endsWith",
+  "includes",
+  "notIncludes",
+];
 
 export type InputSource =
   | { type: "state"; ref: string; refs?: string[] }

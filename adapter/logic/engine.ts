@@ -380,15 +380,35 @@ export function createEngine(
     }
   }
 
+  /** A glob (`*`, `?`) as a regular-expression source; everything else literal. */
+  function globSource(pattern: string): string {
+    return pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".");
+  }
+
+  /**
+   * A row condition against the event value. Numbers compare numerically; a
+   * string value compares as a glob pattern (`*` and `?`), so "On*", "*light"
+   * and "*motion*" are one line each (D23).
+   */
   function matchesIs(
     is: { op: string; value?: unknown },
     value: unknown,
   ): boolean {
+    const pattern = typeof is.value === "string" ? is.value : undefined;
+    const text = String(value ?? "");
+    const test = (source: string) => new RegExp(source).test(text);
     switch (is.op) {
       case "eq":
-        return value === is.value;
+        return pattern !== undefined
+          ? test(`^${globSource(pattern)}$`)
+          : Object.is(value, is.value);
       case "ne":
-        return value !== is.value;
+        return pattern !== undefined
+          ? !test(`^${globSource(pattern)}$`)
+          : !Object.is(value, is.value);
       case "gt":
         return Number(value) > Number(is.value);
       case "gte":
@@ -397,6 +417,14 @@ export function createEngine(
         return Number(value) < Number(is.value);
       case "lte":
         return Number(value) <= Number(is.value);
+      case "startsWith":
+        return test(`^${globSource(String(is.value ?? ""))}`);
+      case "endsWith":
+        return test(`${globSource(String(is.value ?? ""))}$`);
+      case "includes":
+        return test(globSource(String(is.value ?? "")));
+      case "notIncludes":
+        return !test(globSource(String(is.value ?? "")));
       default:
         return false;
     }
@@ -641,11 +669,7 @@ export function createEngine(
   }
 
   function matchesPattern(name: string, pattern: string): boolean {
-    const escaped = pattern
-      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*")
-      .replace(/\?/g, ".");
-    return new RegExp(`^${escaped}$`).test(name);
+    return new RegExp(`^${globSource(pattern)}$`).test(name);
   }
 
   function writeOutput(rt: Runtime, value: unknown, depth: number): void {

@@ -159,6 +159,50 @@ it("stays put when the external write already matches its state", () => {
   ).toBe(false);
 });
 
+const textMachine = (is: { op: string; value?: unknown }): LogicDocument => ({
+  version: 1,
+  logics: [
+    {
+      id: "text",
+      name: "Text",
+      kind: "machine",
+      init: { state: "Idle" },
+      inputs: {
+        v: { from: { type: "state", ref: "0_userdata.0.S" }, kind: "event" },
+      },
+      states: {
+        Idle: { on: [{ on: "v", is: is as never, goto: "On" }] },
+        On: {},
+      },
+    },
+  ],
+});
+
+it("compares string conditions as glob patterns", () => {
+  const h = createHarness({ "0_userdata.0.S": "" });
+  const engine = createEngine(
+    textMachine({ op: "includes", value: "*Motion*" }),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.S", "KitchenLightOn");
+  expect(engine.memoryValue("text")).toBe("Idle");
+  h.change("0_userdata.0.S", "KitchenMotionOn");
+  expect(engine.memoryValue("text")).toBe("On");
+});
+
+it("treats a string condition's = as a glob", () => {
+  const h = createHarness({ "0_userdata.0.S": "" });
+  const engine = createEngine(textMachine({ op: "eq", value: "On*" }), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.S", "Off");
+  expect(engine.memoryValue("text")).toBe("Idle");
+  h.change("0_userdata.0.S", "OnMotion");
+  expect(engine.memoryValue("text")).toBe("On");
+});
+
 it("honours mode any and forward always", () => {
   const d = doc({
     output: {

@@ -1,4 +1,5 @@
 import { parseDuration } from "./duration";
+import { OPERATORS } from "./types";
 import type {
   Action,
   Expr,
@@ -47,7 +48,7 @@ export function logicHasErrors(issues: Issue[], logicId: string): boolean {
   );
 }
 
-const OPS_NEEDING_VALUE = new Set(["eq", "ne", "gt", "gte", "lt", "lte"]);
+const OPS_NEEDING_VALUE = new Set<string>(OPERATORS);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -413,7 +414,9 @@ function checkRow(
   if (row?.is) {
     if (!isRecord(row.is) || !row.is.op) {
       add(id, `${path}.is`, "is without an operator");
-    } else if (OPS_NEEDING_VALUE.has(row.is.op) && row.is.value === undefined) {
+    } else if (!OPS_NEEDING_VALUE.has(row.is.op)) {
+      add(id, `${path}.is.op`, `unknown operator ${String(row.is.op)}`);
+    } else if (row.is.value === undefined) {
       add(id, `${path}.is.value`, `operator ${row.is.op} needs a value`);
     } else if (isRecord(row.is.value)) {
       add(id, `${path}.is.value`, "is.value must be a plain value");

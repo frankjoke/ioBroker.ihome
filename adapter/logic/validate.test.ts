@@ -155,6 +155,34 @@ it("checks the init policy", () => {
   expect(issues.some((i) => i.path === "init.state")).toBe(true);
 });
 
+it("accepts the string operators and rejects an unknown one", () => {
+  const doc = (op: string): LogicDocument => ({
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        inputs: {
+          p: {
+            from: { type: "state", ref: "0_userdata.0.P" },
+            kind: "event",
+          },
+        },
+        init: { state: "A" },
+        states: {
+          A: { on: [{ on: "p", is: { op: op as never, value: "On*" } }] },
+          B: {},
+        },
+      },
+    ],
+  });
+  expect(validateLogicDocument(doc("startsWith"))).toEqual([]);
+  expect(validateLogicDocument(doc("nope")).map((i) => i.message)).toEqual([
+    "unknown operator nope",
+  ]);
+});
+
 it("accepts a $init row and an expression init state", () => {
   const doc: LogicDocument = {
     version: 1,
