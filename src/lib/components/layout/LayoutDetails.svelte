@@ -1154,7 +1154,11 @@
       </div>
       <div class="slot-list">
         {#each shownSlots as slot, i (i)}
-          <div class="slot-row" class:not-now={!slotVisible(slot, tileActive)}>
+          <div
+            class="slot-row"
+            class:not-now={!slotVisible(slot, tileActive)}
+            class:open={expandedSlot === i}
+          >
             <div class="slot-line">
               <button
                 type="button"
@@ -2279,6 +2283,14 @@
     padding: 3px 5px;
   }
 
+  /* The open item is the same box: its line is the header, the editor sits
+     inside it. A darker frame plus the accent, so an open item never reads as
+     a hovered row (hover uses --row-hover too). */
+  .slot-row.open {
+    background: var(--row-hover);
+    border-color: var(--primary-color);
+  }
+
   /* De-emphasis by colour, never opacity (house rule). */
   .slot-row.not-now .slot-summary {
     color: var(--text-muted);
@@ -2374,12 +2386,16 @@
     color: var(--primary-color);
   }
 
+  /* Normal surface inside the darker frame, so the fold-out's scope is visible:
+     everything on the dark band belongs to this item, the card is its editor. */
   .slot-editor {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    padding: 2px 0 2px 0.5rem;
-    border-left: 2px solid var(--border-color);
+    padding: 0.5rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 6px);
   }
 
   .slot-editor .small input,
