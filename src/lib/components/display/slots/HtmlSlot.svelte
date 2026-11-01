@@ -20,7 +20,7 @@
    *
    * When the slot names a state, that state's string value is the document and
    * wins over the inline text; an empty/missing state falls back to the text.
-   * `{{name}}` placeholders read Global Variables (or raw dotted state ids)
+   * `{{name}}` placeholders read Variables & Constants (or raw dotted state ids)
    * before the document is handed to the frame.
    */
   let { slot }: { slot: Slot } = $props();

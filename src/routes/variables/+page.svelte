@@ -25,6 +25,7 @@
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import {
@@ -38,7 +39,6 @@
   const namespaces = $derived(namespaceOptions(objects, ioBroker.namespace));
 
   let editing = $state<GlobalVariable | null>(null);
-  let showForm = $state(false);
   let picking = $state(false);
   let formError = $state("");
   let stateMode = $state<"existing" | "new">("new");
@@ -167,6 +167,55 @@
     return formatValue(st.value, unit);
   }
 
+  /** The rows to draw: the filtered list, with the draft in place of its entry. */
+  const rows = $derived.by(() => {
+    if (!editing) return shown;
+    const list = shown.map((v) => (v.id === editing.id ? editing : v));
+    return shown.some((v) => v.id === editing.id) ? list : [editing, ...list];
+  });
+  const storedVar = $derived(
+    editing ? (variables.find((v) => v.id === editing.id) ?? null) : null,
+  );
+  const dirty = $derived(
+    !!editing &&
+      (!storedVar || JSON.stringify(editing) !== JSON.stringify(storedVar)),
+  );
+  /** A row picked while the open draft was dirty. */
+  let pendingVar = $state<GlobalVariable | null>(null);
+  let askClose = $state(false);
+
+  function requestOpen(v: GlobalVariable) {
+    if (editing?.id === v.id) {
+      requestClose();
+      return;
+    }
+    if (dirty) {
+      pendingVar = v;
+      askClose = true;
+      return;
+    }
+    startEdit(v);
+  }
+
+  function requestClose() {
+    if (dirty) {
+      pendingVar = null;
+      askClose = true;
+      return;
+    }
+    editing = null;
+  }
+
+  function onLineClick(event: MouseEvent, v: GlobalVariable) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    requestOpen(v);
+  }
+
   function startAdd() {
     editing = {
       id: newId(),
@@ -181,7 +230,6 @@
     relative = "";
     leaf = "";
     leafTouched = false;
-    showForm = true;
   }
 
   function startEdit(v: GlobalVariable) {
@@ -197,7 +245,6 @@
       relative = split.relative;
       leaf = split.relative.replace(/^Variables\./, "");
     }
-    showForm = true;
   }
 
   /** Switching namespace keeps what was typed: the leaf follows the prefix. */
@@ -275,7 +322,6 @@
       formError = err;
       return;
     }
-    showForm = false;
     editing = null;
   }
 
@@ -289,24 +335,22 @@
 </script>
 
 <svelte:head>
-  <title>Global Variables - iHome</title>
+  <title>Variables & Constants - iHome</title>
 </svelte:head>
 
 <div class="variables-page">
   <div class="page-header">
     <div class="page-heading">
-      <h1>Global Variables</h1>
+      <h1>Variables & Constants</h1>
     </div>
     <div class="page-actions">
       <button
         type="button"
-        class="icon-btn primary"
-        title="Add variable"
-        aria-label="Add variable"
-        disabled={showForm}
+        class="btn btn-primary btn-sm"
+        disabled={!!editing}
         onclick={startAdd}
       >
-        <span class="material-symbols-outlined">add</span>
+        <span class="material-symbols-outlined">add</span> Add variable
       </button>
     </div>
   </div>
@@ -354,310 +398,295 @@
     {/if}
 
     <div class="var-list">
-      {#each shown as v (v.id)}
-        <div class="card var-row">
-          <div class="var-main">
-            <span class="var-title">
-              <span class="var-name">{v.name}</span>
-              <span class="badge badge-secondary"
-                >{v.kind === "constant" ? "constant" : "state"}</span
-              >
-              {#if v.unit}<span class="text-muted">{v.unit}</span>{/if}
-            </span>
+      {#each rows as v (v.id)}
+        {@const open = editing?.id === v.id}
+        <div class="item" class:open>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(e) => onLineClick(e, v)}>
+            {#if open && editing}
+              <input
+                class="name-input"
+                value={editing.name}
+                placeholder="New variable"
+                aria-label="Variable name"
+                oninput={(e) => setEditingName(e.currentTarget.value)}
+              />
+            {:else}
+              <button type="button" class="name" onclick={() => requestOpen(v)}>
+                {v.name || "(unnamed)"}
+              </button>
+            {/if}
+            <span class="badge badge-secondary"
+              >{v.kind === "constant" ? "constant" : "state"}</span
+            >
+            {#if v.unit}<span class="text-muted">{v.unit}</span>{/if}
             {#if v.kind === "constant"}
               <code class="var-value">{v.value}</code>
             {:else}
-              <code class="var-value">{v.stateId ?? "no state"}</code>
+              {#if !open}
+                <code class="var-value">{v.stateId ?? "no state"}</code>
+              {/if}
               <span class="var-live" class:missing={!stateExists(v.stateId)}
                 >{stateLabel(v)}</span
               >
             {/if}
             {#if v.notes}<span class="hint text-muted">{v.notes}</span>{/if}
-          </div>
-          <div class="var-actions">
-            <button
-              type="button"
-              class="icon-btn"
-              title="Edit"
-              aria-label="Edit"
-              onclick={() => startEdit(v)}
-            >
-              <span class="material-symbols-outlined">edit</span>
-            </button>
-            <button
-              type="button"
-              class="icon-btn danger"
-              title="Remove"
-              aria-label="Remove"
-              onclick={() => (pendingDelete = v)}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  {#if showForm && editing}
-    <div
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Global variable"
-    >
-      <div class="modal-card card">
-        <h3>{editing.name ? "Edit variable" : "New variable"}</h3>
-
-        <label class="field"
-          ><span class="label-mono">Name</span>
-          <input
-            type="text"
-            value={editing.name}
-            oninput={(e) => setEditingName(e.currentTarget.value)}
-          /></label
-        >
-        <p class="hint text-muted">
-          No dots or spaces — the name <em>is</em> the reference, e.g. in a
-          formula. <code>sum</code>, <code>get</code> and <code>active</code> are
-          taken.
-        </p>
-
-        <label class="field"
-          ><span class="label-mono">Type</span>
-          <select
-            value={editing.kind}
-            onchange={(e) => switchKind(e.currentTarget.value)}
-          >
-            <option value="constant">Constant — kept in iHome</option>
-            <option value="state">State — an ioBroker state</option>
-          </select></label
-        >
-
-        {#if editing.kind === "constant"}
-          <div class="form-grid">
-            <label class="field"
-              ><span class="label-mono">Value</span>
-              <input type="text" bind:value={editing.value} /></label
-            >
-            <label class="field"
-              ><span class="label-mono">Value type</span>
-              <select bind:value={editing.type}>
-                <option value="string">Text</option>
-                <option value="number">Number</option>
-                <option value="boolean">True / false</option>
-              </select></label
-            >
-          </div>
-          <p class="hint text-muted">
-            A constant stays here — no ioBroker state is created.
-          </p>
-        {:else}
-          <div class="seg">
-            <label class="check">
-              <input
-                type="radio"
-                name="state-mode"
-                checked={stateMode === "existing"}
-                onchange={() => setStateMode("existing")}
-              />
-              <span>Existing state</span>
-            </label>
-            <label class="check">
-              <input
-                type="radio"
-                name="state-mode"
-                checked={stateMode === "new"}
-                onchange={() => setStateMode("new")}
-              />
-              <span>New state</span>
-            </label>
-          </div>
-
-          {#if stateMode === "existing"}
-            <div class="state-row">
-              <code class="var-value"
-                >{editing.stateId || "no state chosen"}</code
-              >
-              <button
-                type="button"
-                class="btn btn-outline"
-                onclick={() => (picking = true)}>Choose…</button
-              >
-            </div>
-            {#if editing.stateId && !stateExists(editing.stateId)}
-              <p class="hint error">
-                That state does not exist — choose another one, or create it as
-                a new state.
-              </p>
-            {/if}
-          {:else}
-            <div class="form-grid">
-              <label class="field"
-                ><span class="label-mono">Namespace</span>
-                <select
-                  value={namespace}
-                  onchange={(e) => setNamespace(e.currentTarget.value)}
+            <span class="item-actions">
+              {#if open}
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={!dirty}
+                  onclick={save}>Save</button
                 >
-                  {#each namespaces as ns (ns)}
-                    <option value={ns}>{ns}</option>
-                  {/each}
+              {/if}
+              <IconButton
+                icon="delete"
+                danger
+                label={`Remove ${v.name}`}
+                onclick={() => (pendingDelete = v)}
+              />
+            </span>
+          </div>
+          {#if open && editing}
+            <div class="item-editor">
+              <p class="hint text-muted">
+                No dots or spaces — the name <em>is</em> the reference, e.g. in
+                a formula. <code>sum</code>, <code>get</code> and
+                <code>active</code> are taken.
+              </p>
+
+              <label class="field"
+                ><span class="label-mono">Type</span>
+                <select
+                  value={editing.kind}
+                  onchange={(e) => switchKind(e.currentTarget.value)}
+                >
+                  <option value="constant">Constant — kept in iHome</option>
+                  <option value="state">State — an ioBroker state</option>
                 </select></label
               >
-              {#if ihomeNamespace}
-                <label class="field"
-                  ><span class="label-mono">State name</span>
-                  <span class="prefix-row">
-                    <code class="prefix">Variables.</code>
+
+              {#if editing.kind === "constant"}
+                <div class="form-grid">
+                  <label class="field"
+                    ><span class="label-mono">Value</span>
+                    <input type="text" bind:value={editing.value} /></label
+                  >
+                  <label class="field"
+                    ><span class="label-mono">Value type</span>
+                    <select bind:value={editing.type}>
+                      <option value="string">Text</option>
+                      <option value="number">Number</option>
+                      <option value="boolean">True / false</option>
+                    </select></label
+                  >
+                </div>
+                <p class="hint text-muted">
+                  A constant stays here — no ioBroker state is created.
+                </p>
+              {:else}
+                <div class="seg">
+                  <label class="check">
+                    <input
+                      type="radio"
+                      name="state-mode"
+                      checked={stateMode === "existing"}
+                      onchange={() => setStateMode("existing")}
+                    />
+                    <span>Existing state</span>
+                  </label>
+                  <label class="check">
+                    <input
+                      type="radio"
+                      name="state-mode"
+                      checked={stateMode === "new"}
+                      onchange={() => setStateMode("new")}
+                    />
+                    <span>New state</span>
+                  </label>
+                </div>
+
+                {#if stateMode === "existing"}
+                  <div class="state-row">
+                    <code class="var-value"
+                      >{editing.stateId || "no state chosen"}</code
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline"
+                      onclick={() => (picking = true)}>Choose…</button
+                    >
+                  </div>
+                  {#if editing.stateId && !stateExists(editing.stateId)}
+                    <p class="hint error">
+                      That state does not exist — choose another one, or create
+                      it as a new state.
+                    </p>
+                  {/if}
+                {:else}
+                  <div class="form-grid">
+                    <label class="field"
+                      ><span class="label-mono">Namespace</span>
+                      <select
+                        value={namespace}
+                        onchange={(e) => setNamespace(e.currentTarget.value)}
+                      >
+                        {#each namespaces as ns (ns)}
+                          <option value={ns}>{ns}</option>
+                        {/each}
+                      </select></label
+                    >
+                    {#if ihomeNamespace}
+                      <label class="field"
+                        ><span class="label-mono">State name</span>
+                        <span class="prefix-row">
+                          <code class="prefix">Variables.</code>
+                          <input
+                            type="text"
+                            value={leaf}
+                            oninput={(e) => {
+                              leafTouched = true;
+                              leaf = e.currentTarget.value;
+                            }}
+                            placeholder="myValue"
+                          />
+                        </span></label
+                      >
+                    {:else}
+                      <label class="field"
+                        ><span class="label-mono">Relative id</span>
+                        <input
+                          type="text"
+                          bind:value={relative}
+                          placeholder="myValue"
+                        /></label
+                      >
+                    {/if}
+                  </div>
+                  <label class="field narrow"
+                    ><span class="label-mono">Value type</span>
+                    <select bind:value={editing.type}>
+                      <option value="string">Text</option>
+                      <option value="number">Number</option>
+                      <option value="boolean">True / false</option>
+                    </select></label
+                  >
+
+                  <label class="field"
+                    ><span class="label-mono">Role</span>
                     <input
                       type="text"
-                      value={leaf}
-                      oninput={(e) => {
-                        leafTouched = true;
-                        leaf = e.currentTarget.value;
-                      }}
-                      placeholder="myValue"
-                    />
-                  </span></label
-                >
-              {:else}
-                <label class="field"
-                  ><span class="label-mono">Relative id</span>
-                  <input
-                    type="text"
-                    bind:value={relative}
-                    placeholder="myValue"
-                  /></label
-                >
+                      list="ihome-state-roles"
+                      bind:value={editing.role}
+                      placeholder="value"
+                    /></label
+                  >
+                  <datalist id="ihome-state-roles">
+                    {#each roleOptions as r (r)}
+                      <option value={r}></option>
+                    {/each}
+                  </datalist>
+
+                  {#if editing.type === "number"}
+                    <div class="form-grid three">
+                      <label class="field"
+                        ><span class="label-mono">Min</span>
+                        <input
+                          type="number"
+                          value={editing.min ?? ""}
+                          oninput={(e) =>
+                            (editing.min = numberOrUndefined(
+                              e.currentTarget.value,
+                            ))}
+                        /></label
+                      >
+                      <label class="field"
+                        ><span class="label-mono">Max</span>
+                        <input
+                          type="number"
+                          value={editing.max ?? ""}
+                          oninput={(e) =>
+                            (editing.max = numberOrUndefined(
+                              e.currentTarget.value,
+                            ))}
+                        /></label
+                      >
+                      <label class="field"
+                        ><span class="label-mono">Step</span>
+                        <input
+                          type="number"
+                          value={editing.step ?? ""}
+                          oninput={(e) =>
+                            (editing.step = numberOrUndefined(
+                              e.currentTarget.value,
+                            ))}
+                        /></label
+                      >
+                    </div>
+                  {/if}
+
+                  <div class="form-grid">
+                    <label class="field"
+                      ><span class="label-mono">Rooms</span>
+                      <MultiSelect
+                        options={roomOptions}
+                        selected={enumRooms}
+                        enums={ioBroker.enums}
+                        placeholder="No room"
+                        onChange={(ids) => setEnumPart("rooms", ids)}
+                      /></label
+                    >
+                    <label class="field"
+                      ><span class="label-mono">Functions</span>
+                      <MultiSelect
+                        options={functionOptions}
+                        selected={enumFunctions}
+                        enums={ioBroker.enums}
+                        placeholder="No function"
+                        onChange={(ids) => setEnumPart("functions", ids)}
+                      /></label
+                    >
+                  </div>
+
+                  <p class="hint text-muted">
+                    {#if previewExists}
+                      <code>{previewId}</code> already exists — it is used as it is.
+                    {:else if previewId}
+                      <code>{previewId}</code> is created when you save.
+                    {/if}
+                    {#if ihomeNamespace}
+                      iHome states live in <code>{ioBroker.namespace}</code
+                      >.<code>Variables</code>, so nothing else of this adapter
+                      can be overwritten.
+                    {:else}
+                      States under <code>ihome.0</code> disappear if the adapter
+                      is removed; put it elsewhere (e.g.
+                      <code>0_userdata.0</code>) to keep it.
+                    {/if}
+                  </p>
+                {/if}
               {/if}
-            </div>
-            <label class="field narrow"
-              ><span class="label-mono">Value type</span>
-              <select bind:value={editing.type}>
-                <option value="string">Text</option>
-                <option value="number">Number</option>
-                <option value="boolean">True / false</option>
-              </select></label
-            >
 
-            <label class="field"
-              ><span class="label-mono">Role</span>
-              <input
-                type="text"
-                list="ihome-state-roles"
-                bind:value={editing.role}
-                placeholder="value"
-              /></label
-            >
-            <datalist id="ihome-state-roles">
-              {#each roleOptions as r (r)}
-                <option value={r}></option>
-              {/each}
-            </datalist>
-
-            {#if editing.type === "number"}
-              <div class="form-grid three">
+              <div class="form-grid">
                 <label class="field"
-                  ><span class="label-mono">Min</span>
-                  <input
-                    type="number"
-                    value={editing.min ?? ""}
-                    oninput={(e) =>
-                      (editing.min = numberOrUndefined(e.currentTarget.value))}
-                  /></label
+                  ><span class="label-mono">Unit</span>
+                  <input type="text" bind:value={editing.unit} /></label
                 >
                 <label class="field"
-                  ><span class="label-mono">Max</span>
-                  <input
-                    type="number"
-                    value={editing.max ?? ""}
-                    oninput={(e) =>
-                      (editing.max = numberOrUndefined(e.currentTarget.value))}
-                  /></label
-                >
-                <label class="field"
-                  ><span class="label-mono">Step</span>
-                  <input
-                    type="number"
-                    value={editing.step ?? ""}
-                    oninput={(e) =>
-                      (editing.step = numberOrUndefined(e.currentTarget.value))}
-                  /></label
+                  ><span class="label-mono">Notes</span>
+                  <input type="text" bind:value={editing.notes} /></label
                 >
               </div>
-            {/if}
 
-            <div class="form-grid">
-              <label class="field"
-                ><span class="label-mono">Rooms</span>
-                <MultiSelect
-                  options={roomOptions}
-                  selected={enumRooms}
-                  enums={ioBroker.enums}
-                  placeholder="No room"
-                  onChange={(ids) => setEnumPart("rooms", ids)}
-                /></label
-              >
-              <label class="field"
-                ><span class="label-mono">Functions</span>
-                <MultiSelect
-                  options={functionOptions}
-                  selected={enumFunctions}
-                  enums={ioBroker.enums}
-                  placeholder="No function"
-                  onChange={(ids) => setEnumPart("functions", ids)}
-                /></label
-              >
+              {#if formError}
+                <p class="hint error">{formError}</p>
+              {/if}
             </div>
-
-            <p class="hint text-muted">
-              {#if previewExists}
-                <code>{previewId}</code> already exists — it is used as it is.
-              {:else if previewId}
-                <code>{previewId}</code> is created when you save.
-              {/if}
-              {#if ihomeNamespace}
-                iHome states live in <code>{ioBroker.namespace}</code>.<code
-                  >Variables</code
-                >, so nothing else of this adapter can be overwritten.
-              {:else}
-                States under <code>ihome.0</code> disappear if the adapter is
-                removed; put it elsewhere (e.g. <code>0_userdata.0</code>) to
-                keep it.
-              {/if}
-            </p>
           {/if}
-        {/if}
-
-        <div class="form-grid">
-          <label class="field"
-            ><span class="label-mono">Unit</span>
-            <input type="text" bind:value={editing.unit} /></label
-          >
-          <label class="field"
-            ><span class="label-mono">Notes</span>
-            <input type="text" bind:value={editing.notes} /></label
-          >
         </div>
-
-        {#if formError}
-          <p class="hint error">{formError}</p>
-        {/if}
-
-        <div class="actions">
-          <button
-            type="button"
-            class="btn"
-            onclick={() => {
-              showForm = false;
-              editing = null;
-            }}>Cancel</button
-          >
-          <button type="button" class="btn btn-primary" onclick={save}
-            >Save</button
-          >
-        </div>
-      </div>
+      {/each}
     </div>
   {/if}
 
@@ -667,6 +696,25 @@
       title="Choose a state"
       onState={(id) => pickState(id)}
       onClose={() => (picking = false)}
+    />
+  {/if}
+
+  {#if askClose}
+    <ConfirmModal
+      title="Discard unsaved changes?"
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      onConfirm={() => {
+        askClose = false;
+        const next = pendingVar;
+        pendingVar = null;
+        if (next) startEdit(next);
+        else editing = null;
+      }}
+      onCancel={() => {
+        askClose = false;
+        pendingVar = null;
+      }}
     />
   {/if}
 
@@ -767,33 +815,6 @@
     gap: 0.25rem;
   }
 
-  .var-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.5rem 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .var-main {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-
-  .var-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-  }
-
-  .var-name {
-    font-weight: 600;
-  }
-
   .var-value {
     font-family: var(--font-mono);
     font-size: var(--body-sm);
@@ -811,39 +832,9 @@
     color: var(--warning-color);
   }
 
-  .var-actions {
-    display: flex;
-    gap: 0.35rem;
-  }
-
   .empty-state {
     padding: 2rem;
     text-align: center;
-  }
-
-  .modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 900;
-    padding: 1rem;
-  }
-
-  .modal-card {
-    width: min(560px, 100%);
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-
-  .modal-card h3 {
-    margin: 0;
   }
 
   .field {
@@ -910,11 +901,5 @@
 
   .form-grid.three {
     grid-template-columns: 1fr 1fr 1fr;
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
   }
 </style>

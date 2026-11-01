@@ -20,9 +20,9 @@ export const pages = [
   { id: "/devices", label: "Devices", icon: "devices", title: "Devices" },
   {
     id: "/variables",
-    label: "Global Variables",
+    label: "Variables & Constants",
     icon: "data_object",
-    title: "Global Variables",
+    title: "Variables & Constants",
   },
   {
     id: "/formulas",
