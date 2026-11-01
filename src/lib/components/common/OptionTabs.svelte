@@ -8,6 +8,7 @@
     tabs,
     value = $bindable(null),
     label,
+    collapsible = true,
     children,
   }: {
     tabs: readonly { id: T; label: string; hint: string }[];
@@ -15,6 +16,8 @@
     value?: T | null;
     /** Accessible name of the strip. */
     label: string;
+    /** True: clicking the open tab closes it. False: one tab is always open. */
+    collapsible?: boolean;
     /** The open group's body, called with the open id. */
     children?: Snippet<[T | null]>;
   } = $props();
@@ -32,7 +35,8 @@
         class:active={value === t.id}
         aria-expanded={value === t.id}
         title={t.hint}
-        onclick={() => (value = value === t.id ? null : t.id)}
+        onclick={() =>
+          (value = value === t.id ? (collapsible ? null : value) : t.id)}
       >
         {t.label}
       </button>

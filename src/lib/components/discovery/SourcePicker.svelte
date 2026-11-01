@@ -506,13 +506,13 @@
     </div>
 
     {#if tabs.length > 1}
-      <div class="tabs" role="tablist">
+      <div class="option-tabs" role="tablist" aria-label="Pick from">
         {#each tabs as t (t.id)}
           <button
             type="button"
             role="tab"
             aria-selected={tab === t.id}
-            class="tab"
+            class="option-tab"
             class:active={tab === t.id}
             onclick={() => (tab = t.id)}>{t.label}</button
           >
@@ -907,32 +907,8 @@
     margin: 0;
   }
 
-  .tabs {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    flex-wrap: wrap;
-  }
-
-  .tab {
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 12px;
-    border-radius: var(--border-radius-pill);
-    cursor: pointer;
-  }
-
-  .tab:hover {
-    background-color: var(--surface-container);
-    color: var(--text-color);
-  }
-
-  .tab.active {
-    background-color: var(--primary-container);
-    color: var(--on-primary-container);
+  .option-tabs {
+    --option-tab-bg: var(--surface-color);
   }
 
   .kind {
