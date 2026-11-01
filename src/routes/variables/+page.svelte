@@ -53,7 +53,7 @@
   let roomFilter = $state("");
   let functionFilter = $state("");
   let search = $state("");
-  let sortBy = $state<"name" | "kind">("name");
+  let kindFilter = $state<"" | "state" | "constant">("");
   let sortDir = $state<"asc" | "desc">("asc");
 
   const shown = $derived.by(() => {
@@ -69,15 +69,14 @@
       ) {
         return false;
       }
+      if (kindFilter && v.kind !== kindFilter) return false;
       const enums = v.enums ?? [];
       if (roomFilter && !enums.includes(roomFilter)) return false;
       if (functionFilter && !enums.includes(functionFilter)) return false;
       return true;
     });
     const dir = sortDir === "asc" ? 1 : -1;
-    const key = (v: GlobalVariable) =>
-      sortBy === "name" ? v.name : v.kind === "constant" ? "constant" : "state";
-    return list.sort((a, b) => dir * key(a).localeCompare(key(b)));
+    return list.sort((a, b) => dir * a.name.localeCompare(b.name));
   });
 
   const rooms = $derived(roomList(ioBroker.enums));
@@ -440,9 +439,10 @@
           <option value={f.value}>{f.label}</option>
         {/each}
       </select>
-      <select bind:value={sortBy} aria-label="Sort by">
-        <option value="name">Name</option>
-        <option value="kind">Constant / state</option>
+      <select bind:value={kindFilter} aria-label="Filter by kind">
+        <option value="">Everything</option>
+        <option value="state">States</option>
+        <option value="constant">Constants</option>
       </select>
       <button
         type="button"
