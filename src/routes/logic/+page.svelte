@@ -12,6 +12,10 @@
   import TemplateInsert from "$lib/components/logic/TemplateInsert.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { validateLogicDocument } from "$logic/validate";
+  import type { Issue } from "$logic/validate";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import { variableNameFor } from "$lib/config/variables";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -47,7 +51,7 @@
       output: { scope: "memory", name: id },
       states: { Idle: {} },
     };
-    if (commit([...doc.logics, logic])) selectedId = id;
+    if (commit([...doc.logics, logic])) select(logic);
   }
 
   function addAction() {
@@ -59,7 +63,7 @@
       output: { scope: "memory", name: id },
       expr: { const: 0 },
     };
-    if (commit([...doc.logics, logic])) selectedId = id;
+    if (commit([...doc.logics, logic])) select(logic);
   }
 
   function duplicate(logic: LogicDef) {
@@ -70,7 +74,7 @@
     if (copy.output?.scope === "memory" && copy.output.name === logic.id) {
       copy.output.name = id;
     }
-    if (commit([...doc.logics, copy])) selectedId = id;
+    if (commit([...doc.logics, copy])) select(copy);
   }
 
   function update(next: LogicDef) {
@@ -87,6 +91,114 @@
       if (selectedId === pendingDelete.id) selectedId = null;
     }
     pendingDelete = null;
+  }
+
+  /** The row being edited: edits happen on a copy, so the adapter only sees them
+   *  on Save (the same draft model as the tile editor). */
+  let draft = $state<LogicDef | null>(null);
+  let askClose = $state(false);
+  /** The row the user picked while the draft was dirty. */
+  let pendingSelect = $state<LogicDef | null>(null);
+
+  const selectedLogic = $derived(
+    doc.logics.find((logic) => logic.id === selectedId) ?? null,
+  );
+  const dirty = $derived(
+    !!draft &&
+      !!selectedLogic &&
+      JSON.stringify(draft) !== JSON.stringify(selectedLogic),
+  );
+  const issues = $derived.by((): Issue[] => {
+    const current = draft;
+    if (!current) return [];
+    return validateLogicDocument({ version: 1, logics: [current] }).filter(
+      (issue) => issue.logicId === current.id,
+    );
+  });
+  const canSave = $derived(
+    dirty && !issues.some((issue) => issue.severity === "error"),
+  );
+
+  /** The row's name opens it; clicking another row asks first when the draft is
+   *  dirty, so an edit is never dropped silently. */
+  function select(logic: LogicDef) {
+    if (dirty) {
+      pendingSelect = logic;
+      askClose = true;
+      return;
+    }
+    openLogic(logic);
+  }
+
+  function openLogic(logic: LogicDef) {
+    const stored = doc.logics.find((item) => item.id === logic.id) ?? logic;
+    selectedId = stored.id;
+    draft = $state.snapshot(stored) as LogicDef;
+    askClose = false;
+    pendingSelect = null;
+  }
+
+  function patch(update: Partial<LogicDef>) {
+    if (draft) draft = { ...draft, ...update } as LogicDef;
+  }
+
+  /** A state id that a global variable stands for becomes the variable's name,
+   *  so changing the variable later changes every logic that uses it. */
+  function normalizeRefs(logic: LogicDef): LogicDef {
+    const vars = getVariables();
+    const toName = (ref: string) => variableNameFor(ref, vars);
+    const inputs = Object.fromEntries(
+      Object.entries(logic.inputs ?? {}).map(([name, input]) => {
+        if (input.from.type !== "state") return [name, input];
+        return [
+          name,
+          {
+            ...input,
+            from: {
+              ...input.from,
+              ref: toName(input.from.ref),
+              refs: (input.from.refs ?? []).map(toName),
+            },
+          },
+        ];
+      }),
+    ) as LogicDef["inputs"];
+    const output =
+      logic.output?.scope === "state"
+        ? { ...logic.output, ref: toName(logic.output.ref) }
+        : logic.output;
+    return { ...logic, inputs, output } as LogicDef;
+  }
+
+  function save() {
+    if (!canSave || !draft) return;
+    const next = normalizeRefs(draft);
+    update(next);
+    draft = $state.snapshot(next) as LogicDef;
+  }
+
+  function revert() {
+    if (selectedLogic) draft = $state.snapshot(selectedLogic) as LogicDef;
+  }
+
+  function closeEditor() {
+    if (dirty) {
+      askClose = true;
+      return;
+    }
+    selectedId = null;
+    draft = null;
+  }
+
+  /** While the row is open these edit the draft; closed, they write at once. */
+  function setEnabled(logic: LogicDef, enabled: boolean) {
+    if (selectedId === logic.id) patch({ enabled });
+    else toggle(logic, enabled);
+  }
+
+  function setLog(logic: LogicDef, log: boolean) {
+    if (selectedId === logic.id) patch({ log: log || undefined });
+    else update({ ...logic, log: log || undefined });
   }
 
   function outputLabel(logic: LogicDef): string {
@@ -155,55 +267,87 @@
   {:else}
     <div class="logic-list">
       {#each doc.logics as logic (logic.id)}
-        <div class="card logic-row" class:editing={selectedId === logic.id}>
-          <div class="logic-main">
-            <span class="logic-name">{logic.name}</span>
+        {@const open = selectedId === logic.id}
+        <div class="item" class:open>
+          <div class="item-line">
+            {#if open && draft}
+              <input
+                class="name-input"
+                value={draft.name}
+                aria-label="Logic name"
+                onchange={(e) =>
+                  patch({ name: e.currentTarget.value.trim() || draft.id })}
+              />
+            {:else}
+              <button type="button" class="name" onclick={() => select(logic)}>
+                {logic.name}
+              </button>
+            {/if}
             <span class="badge badge-secondary">{logic.kind}</span>
             <span class="mono hint text-muted">{outputLabel(logic)}</span>
             {#if logic.enabled === false}
               <span class="badge badge-secondary">disabled</span>
             {/if}
+            <span class="item-actions">
+              <label class="inline"
+                >enabled <input
+                  type="checkbox"
+                  checked={open && draft
+                    ? draft.enabled !== false
+                    : logic.enabled !== false}
+                  onchange={(e) => setEnabled(logic, e.currentTarget.checked)}
+                /></label
+              >
+              <label class="inline" title="Log state changes to the adapter log"
+                >log <input
+                  type="checkbox"
+                  checked={open && draft
+                    ? draft.log === true
+                    : logic.log === true}
+                  onchange={(e) => setLog(logic, e.currentTarget.checked)}
+                /></label
+              >
+              {#if open}
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={!canSave}
+                  onclick={save}>Save</button
+                >
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  title="Discard the changes and stay in the editor"
+                  disabled={!dirty}
+                  onclick={revert}>Revert</button
+                >
+                <IconButton
+                  icon="close"
+                  label="Close the editor"
+                  title="Close"
+                  onclick={closeEditor}
+                />
+              {/if}
+              <IconButton
+                icon="content_copy"
+                label={`Duplicate ${logic.name}`}
+                title="Duplicate"
+                onclick={() => duplicate(logic)}
+              />
+              <IconButton
+                icon="delete"
+                danger
+                label={`Delete ${logic.name}`}
+                onclick={() => (pendingDelete = logic)}
+              />
+            </span>
           </div>
-          <div class="logic-actions">
-            <label class="inline"
-              >enabled <input
-                type="checkbox"
-                checked={logic.enabled !== false}
-                onchange={(e) => toggle(logic, e.currentTarget.checked)}
-              /></label
-            >
-            <IconButton
-              icon="edit"
-              label={`Edit ${logic.name}`}
-              title={selectedId === logic.id ? "Close" : "Edit"}
-              active={selectedId === logic.id}
-              onclick={() =>
-                (selectedId = selectedId === logic.id ? null : logic.id)}
-            />
-            <IconButton
-              icon="content_copy"
-              label={`Duplicate ${logic.name}`}
-              title="Duplicate"
-              onclick={() => duplicate(logic)}
-            />
-            <IconButton
-              icon="delete"
-              danger
-              label={`Delete ${logic.name}`}
-              onclick={() => (pendingDelete = logic)}
-            />
-          </div>
+          {#if open && draft}
+            <div class="item-editor" bind:this={inlineForm}>
+              <LogicEditor bind:draft {issues} />
+            </div>
+          {/if}
         </div>
-
-        {#if selectedId === logic.id}
-          <div class="inline-form" bind:this={inlineForm}>
-            <LogicEditor
-              {logic}
-              onchange={update}
-              onClose={() => (selectedId = null)}
-            />
-          </div>
-        {/if}
       {/each}
     </div>
   {/if}
@@ -222,9 +366,31 @@
   <TemplateInsert
     taken={doc.logics.map((logic) => logic.id)}
     onInsert={(logic) => {
-      if (commit([...doc.logics, logic])) selectedId = logic.id;
+      if (commit([...doc.logics, logic])) select(logic);
     }}
     onClose={() => (inserting = false)}
+  />
+{/if}
+
+{#if askClose}
+  <ConfirmModal
+    title="Discard unsaved changes?"
+    confirmLabel="Discard"
+    cancelLabel="Keep editing"
+    onConfirm={() => {
+      askClose = false;
+      const next = pendingSelect;
+      pendingSelect = null;
+      if (next) openLogic(next);
+      else {
+        selectedId = null;
+        draft = null;
+      }
+    }}
+    onCancel={() => {
+      askClose = false;
+      pendingSelect = null;
+    }}
   />
 {/if}
 
@@ -288,17 +454,24 @@
     gap: 0.25rem;
   }
 
-  .logic-row {
+  /* One item is one box: the line is its header, the editor sits inside it
+     (UI-DESIGN §5.1/§5.3). */
+  .item {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    flex-direction: column;
+    gap: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 6px);
     padding: 0.5rem 0.75rem;
-    flex-wrap: wrap;
   }
 
-  .logic-main,
-  .logic-actions,
+  .item.open {
+    background: var(--row-hover);
+    border-color: var(--primary-color);
+  }
+
+  .item-line,
+  .item-actions,
   .inline {
     display: flex;
     align-items: center;
@@ -306,18 +479,36 @@
     flex-wrap: wrap;
   }
 
-  .logic-row.editing {
-    border-color: var(--primary-color);
+  .item-actions {
+    margin-left: auto;
   }
 
-  .inline-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    padding-left: 1rem;
-  }
-
-  .logic-name {
+  .name {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text-color);
+    font: inherit;
     font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .name:hover {
+    color: var(--primary-color);
+  }
+
+  .name-input {
+    flex: 1 1 14rem;
+    min-width: 10rem;
+    font-size: var(--body-lg);
+    font-weight: 600;
+  }
+
+  .item-editor {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 6px);
+    padding: 1rem;
   }
 </style>

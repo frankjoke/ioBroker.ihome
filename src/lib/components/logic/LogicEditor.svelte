@@ -1,40 +1,20 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import type { Input, LogicDef, Output } from "$logic/types";
-  import { validateLogicDocument } from "$logic/validate";
-  import { getVariables } from "$lib/stores/variables.svelte";
-  import { variableNameFor } from "$lib/config/variables";
-  import IconButton from "$lib/components/common/IconButton.svelte";
-  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import type { Issue } from "$logic/validate";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import MachineEditor from "./MachineEditor.svelte";
 
+  /** The logic's body only. Its identity, save and close live on the list line
+   *  that opened it, so nothing is shown twice (UI-DESIGN §5.3). */
   let {
-    logic,
-    onchange,
-    onClose,
+    draft = $bindable(),
+    issues = [],
   }: {
-    logic: LogicDef;
-    onchange: (logic: LogicDef) => void;
-    onClose: () => void;
+    draft: LogicDef;
+    issues: Issue[];
   } = $props();
-
-  /** Edits happen on a copy: the document (and the adapter) only sees them on
-   *  Save, so typing does not reload the logic engine. */
-  let draft = $state(untrack(() => $state.snapshot(logic)));
-  let askClose = $state(false);
-
-  const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(logic));
-  const issues = $derived(
-    validateLogicDocument({ version: 1, logics: [draft] }).filter(
-      (issue) => issue.logicId === draft.id,
-    ),
-  );
-  const canSave = $derived(
-    dirty && !issues.some((issue) => issue.severity === "error"),
-  );
 
   const output = $derived<Output>(
     draft.output ?? { scope: "memory", name: draft.id },
@@ -45,47 +25,6 @@
 
   function patch(update: Partial<LogicDef>) {
     draft = { ...draft, ...update } as LogicDef;
-  }
-
-  /** A state id that a global variable stands for becomes the variable's name,
-   *  so changing the variable later changes every logic that uses it. */
-  function normalizeRefs(logic: LogicDef): LogicDef {
-    const vars = getVariables();
-    const toName = (ref: string) => variableNameFor(ref, vars);
-    const inputs = Object.fromEntries(
-      Object.entries(logic.inputs ?? {}).map(([name, input]) => {
-        if (input.from.type !== "state") return [name, input];
-        return [
-          name,
-          {
-            ...input,
-            from: {
-              ...input.from,
-              ref: toName(input.from.ref),
-              refs: (input.from.refs ?? []).map(toName),
-            },
-          },
-        ];
-      }),
-    ) as LogicDef["inputs"];
-    const output =
-      logic.output?.scope === "state"
-        ? { ...logic.output, ref: toName(logic.output.ref) }
-        : logic.output;
-    return { ...logic, inputs, output } as LogicDef;
-  }
-
-  function save() {
-    if (canSave) onchange(normalizeRefs(draft));
-  }
-
-  function cancel() {
-    draft = $state.snapshot(logic);
-  }
-
-  function close() {
-    if (dirty) askClose = true;
-    else onClose();
   }
 
   function renameRefs(value: unknown, from: string, to: string): unknown {
@@ -120,144 +59,50 @@
   }
 </script>
 
-<section class="card editor">
-  <div class="card-header editor-head">
-    <label class="label-mono" for="logic-name">Name</label>
-    <input
-      id="logic-name"
-      class="logic-name"
-      value={draft.name}
-      onchange={(e) =>
-        patch({ name: e.currentTarget.value.trim() || draft.id })}
+<div class="editor-body">
+  <div class="block">
+    <span class="label-mono">Output</span>
+    <OutputEditor
+      {output}
+      {stateNames}
+      onchange={(next) => patch({ output: next })}
     />
-    <span class="badge badge-secondary">{draft.kind}</span>
-    <label class="inline"
-      >enabled <input
-        type="checkbox"
-        checked={draft.enabled !== false}
-        onchange={(e) => patch({ enabled: e.currentTarget.checked })}
-      /></label
-    >
-    <label class="inline" title="Log state changes to the adapter log"
-      >log <input
-        type="checkbox"
-        checked={draft.log === true}
-        onchange={(e) => patch({ log: e.currentTarget.checked || undefined })}
-      /></label
-    >
-    <span class="actions">
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        disabled={!canSave}
-        onclick={save}>Save</button
-      >
-      <button
-        type="button"
-        class="btn btn-sm"
-        title="Discard the changes and stay in the editor"
-        disabled={!dirty}
-        onclick={cancel}>Revert</button
-      >
-      <IconButton
-        icon="close"
-        label="Close the editor"
-        title="Close"
-        onclick={close}
-      />
-    </span>
   </div>
 
-  <div class="card-body editor-body">
-    <div class="block">
-      <span class="label-mono">Output</span>
-      <OutputEditor
-        {output}
-        {stateNames}
-        onchange={(next) => patch({ output: next })}
-      />
-    </div>
-
-    <div class="block">
-      <InputsEditor
-        inputs={draft.inputs ?? {}}
-        onchange={(inputs) => patch({ inputs })}
-        onRename={renameInput}
-        where={draft.name}
-      />
-    </div>
-
-    {#if draft.kind === "function"}
-      <div class="block">
-        <span class="label-mono">Result expression</span>
-        <ExprEditor
-          expr={draft.expr}
-          allowNoop
-          onchange={(expr) => patch({ expr })}
-        />
-      </div>
-    {:else}
-      <MachineEditor logic={draft} onchange={(next) => (draft = next)} />
-    {/if}
-
-    {#if issues.length > 0}
-      <ul class="issues">
-        {#each issues as issue (issue.path + issue.message)}
-          <li class:text-danger={issue.severity === "error"}>
-            <span class="mono">{issue.path}</span> — {issue.message}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+  <div class="block">
+    <InputsEditor
+      inputs={draft.inputs ?? {}}
+      onchange={(inputs) => patch({ inputs })}
+      onRename={renameInput}
+      where={draft.name}
+    />
   </div>
-</section>
 
-{#if askClose}
-  <ConfirmModal
-    title="Discard unsaved changes?"
-    confirmLabel="Discard"
-    cancelLabel="Keep editing"
-    onConfirm={() => {
-      askClose = false;
-      onClose();
-    }}
-    onCancel={() => (askClose = false)}
-  />
-{/if}
+  {#if draft.kind === "function"}
+    <div class="block">
+      <span class="label-mono">Result expression</span>
+      <ExprEditor
+        expr={draft.expr}
+        allowNoop
+        onchange={(expr) => patch({ expr })}
+      />
+    </div>
+  {:else}
+    <MachineEditor logic={draft} onchange={(next) => (draft = next)} />
+  {/if}
+
+  {#if issues.length > 0}
+    <ul class="issues">
+      {#each issues as issue (issue.path + issue.message)}
+        <li class:text-danger={issue.severity === "error"}>
+          <span class="mono">{issue.path}</span> — {issue.message}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</div>
 
 <style>
-  .editor {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .editor-head {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: nowrap;
-  }
-
-  .editor-head .badge,
-  .editor-head .inline,
-  .editor-head .label-mono {
-    flex: 0 0 auto;
-  }
-
-  .logic-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-weight: 600;
-  }
-
-  .actions {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-left: auto;
-    flex: 0 0 auto;
-  }
-
   .editor-body {
     display: flex;
     flex-direction: column;
@@ -267,12 +112,6 @@
   .block {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .inline {
-    display: flex;
-    align-items: center;
     gap: 0.4rem;
   }
 
