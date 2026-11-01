@@ -5,6 +5,9 @@
   import OutputEditor from "./OutputEditor.svelte";
   import ExprEditor from "./ExprEditor.svelte";
   import MachineEditor from "./MachineEditor.svelte";
+  import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { roomList, enumLabelFromObject } from "$lib/config/rooms";
 
   /** The logic's body only. Its identity, save and close live on the list line
    *  that opened it, so nothing is shown twice (UI-DESIGN §5.3). */
@@ -22,6 +25,33 @@
   const stateNames = $derived(
     draft.kind === "machine" ? Object.keys(draft.states) : [],
   );
+
+  const roomOptions = $derived(
+    roomList(ioBroker.enums).map((r) => ({
+      value: r.id,
+      label: r.label,
+      icon: r.icon,
+    })),
+  );
+  const functionOptions = $derived(
+    (((ioBroker.enums as any)?.getList("functions") as any[]) ?? []).map(
+      (e: any) => ({ value: e._id, label: enumLabelFromObject(e) }),
+    ),
+  );
+  const ownRooms = $derived(
+    (draft.enums ?? []).filter((e) => e.startsWith("enum.rooms.")),
+  );
+  const ownFunctions = $derived(
+    (draft.enums ?? []).filter((e) => e.startsWith("enum.functions.")),
+  );
+
+  /** A part with no entries inherits from the output state. */
+  function setOrg(part: "rooms" | "functions", ids: string[]) {
+    const keep = (draft.enums ?? []).filter(
+      (e) => !e.startsWith(`enum.${part}.`),
+    );
+    patch({ enums: keep.length || ids.length ? [...keep, ...ids] : undefined });
+  }
 
   function patch(update: Partial<LogicDef>) {
     draft = { ...draft, ...update } as LogicDef;
@@ -67,6 +97,28 @@
       {stateNames}
       onchange={(next) => patch({ output: next })}
     />
+    <div class="form-grid">
+      <label class="field"
+        ><span class="label-mono">Rooms</span>
+        <MultiSelect
+          options={roomOptions}
+          selected={ownRooms}
+          enums={ioBroker.enums}
+          placeholder="Inherit from the output"
+          onChange={(ids) => setOrg("rooms", ids)}
+        /></label
+      >
+      <label class="field"
+        ><span class="label-mono">Functions</span>
+        <MultiSelect
+          options={functionOptions}
+          selected={ownFunctions}
+          enums={ioBroker.enums}
+          placeholder="Inherit from the output"
+          onChange={(ids) => setOrg("functions", ids)}
+        /></label
+      >
+    </div>
   </div>
 
   <div class="block">
@@ -107,6 +159,12 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
 
   .block {

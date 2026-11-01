@@ -124,6 +124,9 @@ export interface LogicBase {
   init?: Init;
   /** Per-logic debug logging, default false. */
   log?: boolean;
+  /** Enum overrides (`enum.rooms.*`, `enum.functions.*`). Empty inherits from the
+   *  output state's own members. */
+  enums?: string[];
 }
 
 export interface FunctionLogic extends LogicBase {

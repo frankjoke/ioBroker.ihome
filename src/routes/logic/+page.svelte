@@ -16,6 +16,14 @@
   import type { Issue } from "$logic/validate";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { variableNameFor } from "$lib/config/variables";
+  import { stateIdFor } from "$lib/config/variables";
+  import {
+    roomList,
+    roomsOf,
+    functionsOf,
+    enumLabelFromObject,
+  } from "$lib/config/rooms";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -100,6 +108,58 @@
   /** The row the user picked while the draft was dirty. */
   let pendingSelect = $state<LogicDef | null>(null);
 
+  let search = $state("");
+  let kindFilter = $state<"" | "machine" | "function">("");
+  let roomFilter = $state("");
+  let functionFilter = $state("");
+
+  const roomOptions = $derived(
+    roomList(ioBroker.enums).map((r) => ({
+      value: r.id,
+      label: r.label,
+      icon: r.icon,
+    })),
+  );
+  const functionOptions = $derived(
+    (((ioBroker.enums as any)?.getList("functions") as any[]) ?? []).map(
+      (e: any) => ({ value: e._id, label: enumLabelFromObject(e) }),
+    ),
+  );
+
+  /** A logic's organisation: its own override per part, else the output state's. */
+  function logicEnums(logic: LogicDef): string[] {
+    const own = logic.enums ?? [];
+    const stateId =
+      logic.output?.scope === "state" && logic.output.ref
+        ? stateIdFor(logic.output.ref, getVariables())
+        : undefined;
+    const rooms = own.some((e) => e.startsWith("enum.rooms."))
+      ? own.filter((e) => e.startsWith("enum.rooms."))
+      : stateId
+        ? roomsOf(ioBroker.enums, stateId)
+        : [];
+    const functions = own.some((e) => e.startsWith("enum.functions."))
+      ? own.filter((e) => e.startsWith("enum.functions."))
+      : stateId
+        ? functionsOf(ioBroker.enums, stateId)
+        : [];
+    return [...rooms, ...functions];
+  }
+
+  const shownLogics = $derived.by(() => {
+    const q = search.trim().toLowerCase();
+    return doc.logics.filter((logic) => {
+      if (q && !logic.name.toLowerCase().includes(q)) return false;
+      if (kindFilter && logic.kind !== kindFilter) return false;
+      if (roomFilter || functionFilter) {
+        const enums = logicEnums(logic);
+        if (roomFilter && !enums.includes(roomFilter)) return false;
+        if (functionFilter && !enums.includes(functionFilter)) return false;
+      }
+      return true;
+    });
+  });
+
   const selectedLogic = $derived(
     doc.logics.find((logic) => logic.id === selectedId) ?? null,
   );
@@ -177,10 +237,6 @@
     draft = $state.snapshot(next) as LogicDef;
   }
 
-  function revert() {
-    if (selectedLogic) draft = $state.snapshot(selectedLogic) as LogicDef;
-  }
-
   function closeEditor() {
     if (dirty) {
       askClose = true;
@@ -244,14 +300,14 @@
           class="btn btn-primary btn-sm"
           onclick={addMachine}
         >
-          <span class="material-symbols-outlined">add</span> State machine
+          <span class="material-symbols-outlined">add</span> Add state machine
         </button>
         <button
           type="button"
           class="btn btn-primary btn-sm"
           onclick={addAction}
         >
-          <span class="material-symbols-outlined">add</span> Action
+          <span class="material-symbols-outlined">add</span> Add action
         </button>
       </div>
     </div>
@@ -278,8 +334,35 @@
       </p>
     </div>
   {:else}
+    <div class="filter-bar">
+      <input type="search" placeholder="Search logic…" bind:value={search} />
+      <select bind:value={kindFilter} aria-label="Filter by kind">
+        <option value="">Everything</option>
+        <option value="machine">State machines</option>
+        <option value="function">Actions</option>
+      </select>
+      <select bind:value={roomFilter} aria-label="Filter by room">
+        <option value="">All rooms</option>
+        {#each roomOptions as r (r.value)}
+          <option value={r.value}>{r.label}</option>
+        {/each}
+      </select>
+      <select bind:value={functionFilter} aria-label="Filter by function">
+        <option value="">All functions</option>
+        {#each functionOptions as f (f.value)}
+          <option value={f.value}>{f.label}</option>
+        {/each}
+      </select>
+    </div>
+
+    {#if shownLogics.length === 0}
+      <div class="card empty-state">
+        <p class="text-muted">No logics match the filters.</p>
+      </div>
+    {/if}
+
     <div class="logic-list">
-      {#each doc.logics as logic (logic.id)}
+      {#each shownLogics as logic (logic.id)}
         {@const open = selectedId === logic.id}
         <div class="item" class:open>
           <!-- The free line area is a mouse convenience: keyboard users open/close
@@ -331,19 +414,6 @@
                   disabled={!canSave}
                   onclick={save}>Save</button
                 >
-                <button
-                  type="button"
-                  class="btn btn-sm"
-                  title="Discard the changes and stay in the editor"
-                  disabled={!dirty}
-                  onclick={revert}>Revert</button
-                >
-                <IconButton
-                  icon="close"
-                  label="Close the editor"
-                  title="Close"
-                  onclick={closeEditor}
-                />
               {/if}
               <IconButton
                 icon="content_copy"
@@ -463,6 +533,30 @@
 
   .hint {
     font-size: var(--body-sm);
+  }
+
+  .filter-bar {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .filter-bar input,
+  .filter-bar select {
+    min-width: 0;
+    padding: 0.35rem;
+  }
+
+  @media (max-width: 820px) {
+    .filter-bar {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .filter-bar {
+      grid-template-columns: 1fr;
+    }
   }
 
   .logic-list {
