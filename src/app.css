@@ -608,7 +608,7 @@ textarea {
 .item-line .item-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   margin-left: auto;
   flex-wrap: wrap;
   cursor: default;
