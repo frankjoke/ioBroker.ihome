@@ -41,6 +41,7 @@
     rooms,
     devices = [],
     showHead = true,
+    dirty = $bindable(false),
     onSave,
     onCancel,
   }: {
@@ -50,6 +51,8 @@
     rooms: { id: string; label: string; icon?: string }[];
     devices?: Device[];
     showHead?: boolean;
+    /** True while the form differs from the device it opened with. */
+    dirty?: boolean;
     onSave: (d: Device) => void;
     onCancel: () => void;
   } = $props();
@@ -256,7 +259,8 @@
     autoOpenId = id;
   }
 
-  function save() {
+  /** Save lives on the item's line when embedded, so the host calls this. */
+  export function save() {
     // This form edits the legacy fields only. The display fields (template,
     // size, slots, watch, tags, functions, favorites) and each control's rules
     // belong to the page/template editors, so they are carried over untouched —
@@ -287,6 +291,22 @@
       }),
     );
   }
+  const isDirty = $derived(
+    !init ||
+      name !== (init.name ?? "") ||
+      title !== (init.title ?? "") ||
+      type !== (init.type ?? "Custom") ||
+      room !== (init.room ?? "") ||
+      section !== (init.section ?? "") ||
+      panel !== (init.panel ?? "") ||
+      icon !== (init.icon ?? "") ||
+      JSON.stringify($state.snapshot(controls)) !==
+        JSON.stringify(init.controls ?? []),
+  );
+
+  $effect(() => {
+    dirty = isDirty;
+  });
 </script>
 
 <div class="device-form">
@@ -411,10 +431,12 @@
     {/if}
   </div>
 
-  <div class="actions">
-    <button type="button" class="btn" onclick={onCancel}>Cancel</button>
-    <button type="button" class="btn btn-primary" onclick={save}>Save</button>
-  </div>
+  {#if showHead}
+    <div class="actions">
+      <button type="button" class="btn" onclick={onCancel}>Cancel</button>
+      <button type="button" class="btn btn-primary" onclick={save}>Save</button>
+    </div>
+  {/if}
 </div>
 
 {#if showPicker || replaceIndex !== null}

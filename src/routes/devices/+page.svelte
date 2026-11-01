@@ -37,6 +37,12 @@
   import type { Device, EnrichedControl } from "$lib/types/device";
 
   let editing = $state<Device | null>(null);
+  /** The embedded form: its save, and whether it has unsaved changes. */
+  let formEl = $state<{ save: () => void } | undefined>();
+  let formDirty = $state(false);
+  /** A row picked while the open form was dirty. */
+  let pendingOpen = $state<Device | null>(null);
+  let askClose = $state(false);
   let showForm = $state(false);
   /** The inline form's card, scrolled into view when an edit opens. */
   let inlineForm = $state<HTMLDivElement | null>(null);
@@ -143,6 +149,7 @@
   }
 
   function editDevice(d: Device) {
+    formDirty = false;
     editing = d;
     showForm = true;
     // The editor sits under the device; bring it into view so a device far
@@ -152,10 +159,28 @@
     );
   }
 
-  /** The line toggles the device; its editor never does. */
+  /** The line toggles the device; its editor never does. A dirty form asks. */
   function toggleDevice(d: Device) {
-    if (editing?.id === d.id) onCancel();
-    else editDevice(d);
+    if (editing?.id === d.id) requestClose();
+    else requestOpen(d);
+  }
+
+  function requestOpen(d: Device) {
+    if (formDirty) {
+      pendingOpen = d;
+      askClose = true;
+      return;
+    }
+    editDevice(d);
+  }
+
+  function requestClose() {
+    if (formDirty) {
+      pendingOpen = null;
+      askClose = true;
+      return;
+    }
+    onCancel();
   }
 
   function onLineClick(event: MouseEvent, d: Device) {
@@ -217,6 +242,7 @@
   }
 
   function onCancel() {
+    formDirty = false;
     showForm = false;
     editing = null;
   }
@@ -352,6 +378,14 @@
               <HistorySummary control={c} />
             {/each}
             <span class="item-actions">
+              {#if open}
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={!formDirty}
+                  onclick={() => formEl?.save()}>Save</button
+                >
+              {/if}
               <IconButton
                 icon="content_copy"
                 label={`Duplicate ${d.name}`}
@@ -370,6 +404,8 @@
             <div class="item-editor" bind:this={inlineForm}>
               {#key editing.id}
                 <DeviceForm
+                  bind:this={formEl}
+                  bind:dirty={formDirty}
                   device={editing}
                   {objects}
                   {roomsOf}
@@ -387,6 +423,25 @@
     </div>
   {/if}
 </div>
+
+{#if askClose}
+  <ConfirmModal
+    title="Discard unsaved changes?"
+    confirmLabel="Discard"
+    cancelLabel="Keep editing"
+    onConfirm={() => {
+      askClose = false;
+      const next = pendingOpen;
+      pendingOpen = null;
+      if (next) editDevice(next);
+      else onCancel();
+    }}
+    onCancel={() => {
+      askClose = false;
+      pendingOpen = null;
+    }}
+  />
+{/if}
 
 {#if pendingDelete}
   <ConfirmModal
