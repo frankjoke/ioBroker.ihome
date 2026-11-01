@@ -407,7 +407,7 @@
   .logic-page {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.75rem;
     max-width: 860px;
   }
 
@@ -462,6 +462,7 @@
     gap: 0.6rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 6px);
+    background: var(--surface-color);
     padding: 0.5rem 0.75rem;
   }
 
