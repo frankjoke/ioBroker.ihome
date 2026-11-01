@@ -18,6 +18,9 @@
     /** The open group's body, called with the open id. */
     children?: Snippet<[T | null]>;
   } = $props();
+
+  /** The open tab's hint, also readable on touch where a tooltip cannot open. */
+  const openHint = $derived(tabs.find((t) => t.id === value)?.hint);
 </script>
 
 <div class="option-tabs-shell">
@@ -35,6 +38,9 @@
       </button>
     {/each}
   </div>
+  {#if openHint}
+    <p class="option-tab-hint touch-only">{openHint}</p>
+  {/if}
   {@render children?.(value)}
 </div>
 
@@ -43,5 +49,11 @@
      host's gap separates them like any other field. */
   .option-tabs-shell {
     display: contents;
+  }
+
+  .option-tab-hint {
+    margin: 0;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 </style>

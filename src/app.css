@@ -286,6 +286,18 @@ button {
   color: var(--text-muted) !important;
 }
 
+/* Hover is not a channel on a touch screen. Text that a `title` tooltip already
+   carries is hidden while the pointer can hover, and shown when it cannot. */
+.touch-only {
+  display: none;
+}
+
+@media (hover: none) {
+  .touch-only {
+    display: block;
+  }
+}
+
 .text-primary {
   color: var(--primary-color) !important;
 }
