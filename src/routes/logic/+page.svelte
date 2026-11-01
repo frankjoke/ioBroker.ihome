@@ -274,6 +274,7 @@
     const output = logic.output;
     if (!output) return `memory: ${logic.id}`;
     if (output.scope === "memory") return `memory: ${output.name ?? logic.id}`;
+    if (output.scope === "logic") return `Logic.${logic.id}`;
     return output.ref || "(no state)";
   }
 </script>

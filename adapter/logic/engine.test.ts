@@ -49,6 +49,43 @@ it("runs on change only by default and writes only on change", () => {
   expect(h.writes).toHaveLength(base + 1);
 });
 
+it("writes a logic output to the adapter-created state", () => {
+  const d = doc({ output: { scope: "logic", type: "number" } });
+  const { h, engine } = engineWith(d);
+  engine.start();
+  const write = h.writes.find(
+    (w) => w.id === "system.adapter.ihome.0.Logic.calc",
+  );
+  expect(write?.value).toBe(6);
+  expect(write?.ack).toBe(false);
+});
+
+it("maps a machine's state names to a boolean logic output", () => {
+  const machine: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "lift",
+        name: "Lift",
+        kind: "machine",
+        init: { state: "Off" },
+        output: { scope: "logic", type: "boolean" },
+        states: { Off: {}, On: {} },
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(machine, h.deps, {
+    ownFrom: "system.adapter.ihome.0",
+  });
+  h.attach(engine);
+  engine.start();
+  const off = h.writes.find(
+    (w) => w.id === "system.adapter.ihome.0.Logic.lift",
+  );
+  expect(off?.value).toBe(false);
+});
+
 it("honours mode any and forward always", () => {
   const d = doc({
     output: {

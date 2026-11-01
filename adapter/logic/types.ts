@@ -30,6 +30,17 @@ export type Forward = "changed" | "always";
 export type Output =
   | { scope: "memory"; name?: string; forward?: Forward }
   | {
+      /** A state the adapter creates at `<namespace>.Logic.<logic id>`: a logic
+       *  state is a command (writable), hence level.switch / level.state. */
+      scope: "logic";
+      type: "boolean" | "number" | "string";
+      /** Boolean only: state names matching this glob write `true`. */
+      on?: string;
+      /** Legacy explicit map; still read. */
+      map?: Record<string, string | number | boolean>;
+      forward?: Forward;
+    }
+  | {
       scope: "state";
       ref: string;
       type: "boolean" | "number" | "string";

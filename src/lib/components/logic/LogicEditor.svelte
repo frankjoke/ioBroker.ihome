@@ -95,6 +95,7 @@
     <OutputEditor
       {output}
       {stateNames}
+      logicId={draft.id}
       onchange={(next) => patch({ output: next })}
     />
     <div class="form-grid">

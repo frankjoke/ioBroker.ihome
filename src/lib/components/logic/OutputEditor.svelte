@@ -9,17 +9,56 @@
   let {
     output,
     stateNames,
+    logicId,
     onchange,
   }: {
     output: Output;
     stateNames: string[];
+    /** The logic id, for the derived logic-state id. */
+    logicId: string;
     onchange: (output: Output) => void;
   } = $props();
 
   const TYPE = ["boolean", "number", "string"] as const;
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
+  const logicStateId = $derived(`${ioBroker.namespace}.Logic.${logicId}`);
   let picking = $state(false);
+
+  /** The three kinds of output target. */
+  function setTarget(scope: "memory" | "logic" | "state") {
+    if (scope === "memory") {
+      onchange({
+        scope: "memory",
+        name: output.scope === "memory" ? output.name : "",
+        forward: output.forward,
+      });
+      return;
+    }
+    if (scope === "logic") {
+      onchange({
+        scope: "logic",
+        type: output.scope === "memory" ? "boolean" : output.type,
+        on: output.scope === "memory" ? undefined : output.on,
+        map: output.scope === "memory" ? undefined : output.map,
+        forward: output.forward,
+      });
+      return;
+    }
+    // An existing state needs a ref: keep the current one, else pick.
+    if (stateRef) {
+      onchange({
+        scope: "state",
+        ref: stateRef,
+        type: output.scope === "memory" ? "boolean" : output.type,
+        on: output.scope === "memory" ? undefined : output.on,
+        map: output.scope === "memory" ? undefined : output.map,
+        forward: output.forward,
+      });
+      return;
+    }
+    picking = true;
+  }
 
   function realId(ref: string): string {
     return (
@@ -65,38 +104,17 @@
 
 <div class="output">
   <div class="row">
-    <span class="label-mono">State</span>
-    <span
-      class="state-value"
-      class:mono={stateRef !== ""}
-      class:text-muted={stateRef === ""}
+    <span class="label-mono">Target</span>
+    <select
+      aria-label="Output target"
+      value={output.scope}
+      onchange={(e) =>
+        setTarget(e.currentTarget.value as "memory" | "logic" | "state")}
     >
-      {stateRef
-        ? variableNameFor(stateRef, getVariables())
-        : "Memory - Select if to be written"}
-    </span>
-    <IconButton
-      icon={stateRef ? "close" : "search"}
-      label={stateRef ? "Clear the output state" : "Select the output state"}
-      title={stateRef ? "Clear the state (use memory)" : "Select a state"}
-      onclick={() => {
-        if (stateRef) setRef("");
-        else picking = true;
-      }}
-    />
-    {#if output.scope === "state"}
-      <select
-        class="type"
-        aria-label="Output type"
-        value={shownType}
-        disabled
-        title="The type comes from the selected state"
-      >
-        {#each TYPE as type (type)}
-          <option value={type}>{type}</option>
-        {/each}
-      </select>
-    {/if}
+      <option value="logic">Logic state (created for you)</option>
+      <option value="state">Existing state</option>
+      <option value="memory">Memory</option>
+    </select>
     <label class="inline write-always"
       >write always <input
         type="checkbox"
@@ -109,6 +127,62 @@
       /></label
     >
   </div>
+
+  {#if output.scope === "logic"}
+    <div class="row">
+      <span class="label-mono">State</span>
+      <span class="mono text-muted">{logicStateId}</span>
+      <select
+        class="type"
+        aria-label="Output type"
+        value={output.type}
+        onchange={(e) =>
+          onchange({
+            ...output,
+            type: e.currentTarget.value as "boolean" | "number" | "string",
+          })}
+      >
+        {#each TYPE as type (type)}
+          <option value={type}>{type}</option>
+        {/each}
+      </select>
+    </div>
+  {:else}
+    <div class="row">
+      <span class="label-mono">State</span>
+      <span
+        class="state-value"
+        class:mono={stateRef !== ""}
+        class:text-muted={stateRef === ""}
+      >
+        {stateRef
+          ? variableNameFor(stateRef, getVariables())
+          : "Memory - Select if to be written"}
+      </span>
+      <IconButton
+        icon={stateRef ? "close" : "search"}
+        label={stateRef ? "Clear the output state" : "Select the output state"}
+        title={stateRef ? "Clear the state (use memory)" : "Select a state"}
+        onclick={() => {
+          if (stateRef) setRef("");
+          else picking = true;
+        }}
+      />
+      {#if output.scope === "state"}
+        <select
+          class="type"
+          aria-label="Output type"
+          value={shownType}
+          disabled
+          title="The type comes from the selected state"
+        >
+          {#each TYPE as type (type)}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
+      {/if}
+    </div>
+  {/if}
 
   {#if picking}
     <SourcePicker

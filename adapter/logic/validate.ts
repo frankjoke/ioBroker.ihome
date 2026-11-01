@@ -290,6 +290,20 @@ function checkOutput(
 ): void {
   if (!output) return;
   if (output.scope === "memory") return;
+  if (output.scope === "logic") {
+    // The adapter creates and names the state; only the type and mapping matter.
+    if (
+      output.type !== "boolean" &&
+      output.type !== "number" &&
+      output.type !== "string"
+    ) {
+      add(id, "output.type", "unknown output type");
+    }
+    if (output.on !== undefined && typeof output.on !== "string") {
+      add(id, "output.on", "on must be a state-name pattern");
+    }
+    return;
+  }
   if (output.scope !== "state") {
     add(id, "output.scope", "unknown output scope");
     return;
@@ -331,7 +345,10 @@ function checkInit(
   if (!init) return;
   if (init.match !== undefined) {
     const output = logic.output;
-    if (init.match !== "output" || output?.scope !== "state") {
+    if (
+      init.match !== "output" ||
+      (output?.scope !== "state" && output?.scope !== "logic")
+    ) {
       add(id, "init.match", "match needs an external output state");
     }
   }

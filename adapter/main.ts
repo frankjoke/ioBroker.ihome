@@ -2,7 +2,7 @@ import * as utils from "@iobroker/adapter-core";
 import { createEngine, type Engine, type StateChange } from "./logic/engine";
 import { parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
-import type { LogicDocument } from "./logic/types";
+import type { LogicDef, LogicDocument } from "./logic/types";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -22,6 +22,14 @@ const DOCS = [
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
 const LEGACY_PREFIX = "0_userdata.0.Test.AiHome.";
+
+/** A machine's states as `{ "0": "Off", "1": "On" }`, for a number output. */
+function numberStatesOf(def: LogicDef): Record<string, string> | undefined {
+  if (def.kind !== "machine") return undefined;
+  const names = Object.keys(def.states ?? {});
+  if (names.length === 0) return undefined;
+  return Object.fromEntries(names.map((name, index) => [String(index), name]));
+}
 
 /** How often the adapter logs that it is still alive. */
 const HEARTBEAT_MS = 10 * 60 * 1000;
@@ -194,6 +202,92 @@ class IHome extends utils.Adapter {
   }
 
   /**
+   * The logic states the adapter owns: `<namespace>.Logic.<logic id>`. Created
+   * on demand and kept in step with the document; never deleted (a deleted logic
+   * leaves its state, like a variable does). A logic output is a command, so the
+   * role is level.switch (binary) or level.state — never `value`, which the
+   * ecosystem reserves for read-only sensor readings.
+   */
+  private async ensureLogicStates(doc: LogicDocument): Promise<void> {
+    const own = doc.logics.filter((def) => def.output?.scope === "logic");
+    if (own.length === 0) return;
+    try {
+      await this.setObjectNotExistsAsync("Logic", {
+        type: "folder",
+        common: { name: "Logic" },
+        native: {},
+      });
+    } catch (error) {
+      this.log.warn(`logic: cannot ensure the Logic folder: ${error}`);
+    }
+
+    for (const def of own) {
+      const output = def.output as Extract<
+        NonNullable<LogicDef["output"]>,
+        { scope: "logic" }
+      >;
+      const id = `Logic.${def.id}`;
+      const states = output.type === "number" ? numberStatesOf(def) : undefined;
+      const common = {
+        name: def.name,
+        type: output.type,
+        role: output.type === "boolean" ? "level.switch" : "level.state",
+        read: true,
+        write: true,
+        def:
+          output.type === "boolean" ? false : output.type === "number" ? 0 : "",
+        ...(states ? { states } : {}),
+      };
+      try {
+        await this.setObjectNotExistsAsync(id, {
+          type: "state",
+          common,
+          native: {},
+        });
+        // The document is the truth: keep the name, type and state labels in step.
+        await this.extendObjectAsync(id, { common });
+      } catch (error) {
+        this.log.warn(`logic: cannot ensure ${this.namespace}.${id}: ${error}`);
+      }
+    }
+
+    // A foreign number target gets the state labels too — only when it has none,
+    // the owner's object is never overwritten.
+    for (const def of doc.logics) {
+      const output = def.output;
+      if (output?.scope !== "state" || output.type !== "number") continue;
+      const states = numberStatesOf(def);
+      if (!states) continue;
+      const id = output.ref.includes(".")
+        ? output.ref
+        : this.variables.states[output.ref]?.stateId;
+      if (!id) continue;
+      const isOwn = id.startsWith(`${this.namespace}.`);
+      try {
+        if (isOwn) {
+          const obj = await this.getObjectAsync(id);
+          if (
+            !obj ||
+            (obj.common?.states && Object.keys(obj.common.states).length > 0)
+          )
+            continue;
+          await this.extendObjectAsync(id, { common: { states } });
+        } else {
+          const obj = await this.getForeignObjectAsync(id);
+          if (
+            !obj ||
+            (obj.common?.states && Object.keys(obj.common.states).length > 0)
+          )
+            continue;
+          await this.extendForeignObjectAsync(id, { common: { states } });
+        }
+      } catch (error) {
+        this.log.warn(`logic: cannot publish states for ${id}: ${error}`);
+      }
+    }
+  }
+
+  /**
    * The logic engine (spec 2026-10-31). Reads its document, subscribes exactly
    * the refs it names, then swaps engines so a reload never leaves a gap with
    * the old timers still armed. An unreadable or newer document leaves the
@@ -220,6 +314,8 @@ class IHome extends utils.Adapter {
       return;
     }
     if (loadId !== this.logicLoad) return; // a newer reload won
+
+    await this.ensureLogicStates(doc);
 
     let next: Engine;
     try {

@@ -594,16 +594,20 @@ export function createEngine(
     return !rt.hasOutput || !Object.is(rt.lastOutput, value);
   }
 
-  /** The state an external output writes to; a ref may be a variable name. */
+  /** The state an external output writes to; a ref may be a variable name. A
+   *  "logic" output is the adapter-created state at <namespace>.Logic.<id>. */
   function outputTargetId(rt: Runtime): string | undefined {
     const output = rt.output;
+    if (output.scope === "logic") {
+      return ownFrom ? `${ownFrom}.Logic.${rt.def.id}` : undefined;
+    }
     if (output.scope !== "state") return undefined;
     return resolveStateId(output.ref) ?? output.ref;
   }
 
   function outputValue(rt: Runtime, value: unknown): unknown {
     const output = rt.output;
-    if (output.scope !== "state") return value;
+    if (output.scope === "memory") return value;
     if (rt.def.kind !== "machine") return coerce(value, output.type);
     const name = String(value);
     if (output.map && name in output.map) return output.map[name];
@@ -682,10 +686,10 @@ export function createEngine(
     const init = def.init;
     if (
       init?.match === "output" &&
-      rt.output.scope === "state" &&
+      rt.output.scope !== "memory" &&
       rt.output.map
     ) {
-      const current = deps.read(outputTargetId(rt) ?? rt.output.ref);
+      const current = deps.read(outputTargetId(rt) ?? "");
       for (const name of names) {
         if (Object.is(rt.output.map[name], current)) return name;
       }
