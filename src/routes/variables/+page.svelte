@@ -395,7 +395,7 @@
         disabled={!!editing}
         onclick={() => startAdd("state")}
       >
-        <span class="material-symbols-outlined">add</span> Add variable
+        <span class="material-symbols-outlined">add</span> Variable
       </button>
       <button
         type="button"
@@ -403,7 +403,7 @@
         disabled={!!editing}
         onclick={() => startAdd("constant")}
       >
-        <span class="material-symbols-outlined">add</span> Add constant
+        <span class="material-symbols-outlined">add</span> Constant
       </button>
     </div>
   </div>
@@ -777,12 +777,17 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 1rem;
+    /* No forced stacking: when the title and the actions do not fit on one line,
+       the actions move down as a block and the title keeps its full width. */
+    flex-wrap: wrap;
   }
 
   .page-heading {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    flex: 1 1 14rem;
+    min-width: 0;
   }
 
   .page-header h1 {
@@ -940,18 +945,5 @@
 
   .form-grid.three {
     grid-template-columns: 1fr 1fr 1fr;
-  }
-
-  /* Below the tablet breakpoint the header stacks: the name gets the full width
-     instead of wrapping beside the actions. */
-  @media (max-width: 820px) {
-    .page-header {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .page-actions {
-      margin-left: 0;
-    }
   }
 </style>

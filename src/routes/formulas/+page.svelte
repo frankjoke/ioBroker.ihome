@@ -118,7 +118,7 @@
         disabled={!!editing}
         onclick={startAdd}
       >
-        <span class="material-symbols-outlined">add</span> Add template
+        <span class="material-symbols-outlined">add</span> Template
       </button>
     </div>
   </div>
@@ -285,12 +285,17 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 1rem;
+    /* No forced stacking: when the title and the actions do not fit on one line,
+       the actions move down as a block and the title keeps its full width. */
+    flex-wrap: wrap;
   }
 
   .page-heading {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    flex: 1 1 14rem;
+    min-width: 0;
   }
 
   .page-header h1 {
@@ -376,18 +381,5 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
-  }
-
-  /* A phone stacks the page header: the name gets the full width instead of
-     wrapping to three lines beside the actions. */
-  @media (max-width: 820px) {
-    .page-header {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .page-actions {
-      margin-left: 0;
-    }
   }
 </style>

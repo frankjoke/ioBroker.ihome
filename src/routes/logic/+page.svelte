@@ -300,14 +300,14 @@
           class="btn btn-primary btn-sm"
           onclick={addMachine}
         >
-          <span class="material-symbols-outlined">add</span> Add state machine
+          <span class="material-symbols-outlined">add</span> State machine
         </button>
         <button
           type="button"
           class="btn btn-primary btn-sm"
           onclick={addAction}
         >
-          <span class="material-symbols-outlined">add</span> Add action
+          <span class="material-symbols-outlined">add</span> Action
         </button>
       </div>
     </div>
@@ -572,30 +572,11 @@
     flex-wrap: wrap;
   }
 
-  /* Below the tablet breakpoint the header stacks: the name gets the full width
-     instead of wrapping beside the actions. */
+  /* "Logic" is short, so the buttons share its line and wrap one by one at their
+     own width — the title never drops to a line of its own and no button stretches. */
   @media (max-width: 820px) {
-    .title-line {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
     .page-actions {
-      margin-left: 0;
-    }
-  }
-
-  /* Three actions do not fit one phone row: two columns, the odd one spanning,
-     instead of one lonely button on a second line. */
-  @media (max-width: 640px) {
-    .page-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      width: 100%;
-    }
-
-    .page-actions > :last-child:nth-child(odd) {
-      grid-column: 1 / -1;
+      display: contents;
     }
   }
 </style>
