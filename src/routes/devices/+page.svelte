@@ -552,9 +552,9 @@
     text-align: center;
   }
 
-  /* A phone stacks the page header: the name gets the full width instead of
-     wrapping to three lines beside the actions. */
-  @media (max-width: 640px) {
+  /* Below the tablet breakpoint the header stacks: the name gets the full width
+     instead of wrapping beside the actions. */
+  @media (max-width: 820px) {
     .page-header {
       flex-direction: column;
       align-items: stretch;

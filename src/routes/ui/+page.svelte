@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { BREAKPOINTS } from "$lib/config/size-ops";
+  import { onMount } from "svelte";
+  import { BREAKPOINTS, breakpointFor } from "$lib/config/size-ops";
   import {
     UI_DEFAULTS,
     UI_LIMITS,
@@ -12,6 +13,43 @@
     updateSettings,
   } from "$lib/stores/settings.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
+
+  /** What this device's browser reports — a probe for choosing breakpoints from
+   *  the phone that is actually in your hand. */
+  let viewport = $state({
+    w: 0,
+    h: 0,
+    cw: 0,
+    ch: 0,
+    dpr: 0,
+    noHover: false,
+  });
+
+  function measureViewport() {
+    const root = document.documentElement;
+    viewport = {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      cw: root.clientWidth,
+      ch: root.clientHeight,
+      dpr: Math.round(window.devicePixelRatio * 100) / 100,
+      noHover: window.matchMedia("(hover: none)").matches,
+    };
+  }
+
+  onMount(() => {
+    measureViewport();
+    window.addEventListener("resize", measureViewport);
+    window.addEventListener("orientationchange", measureViewport);
+    return () => {
+      window.removeEventListener("resize", measureViewport);
+      window.removeEventListener("orientationchange", measureViewport);
+    };
+  });
+
+  const activeBreakpoint = $derived(
+    viewport.w ? breakpointFor(viewport.w) : "…",
+  );
 
   const ui = $derived(effectiveUi(getSettings()));
   const hidePencil = $derived(getSettings().hidePencil === true);
@@ -74,6 +112,22 @@
       </p>
     </div>
   </div>
+
+  <section class="card">
+    <div class="card-header">
+      <span class="material-symbols-outlined">aspect_ratio</span>
+      <h2 class="card-title">This device</h2>
+    </div>
+    <div class="card-body viewport">
+      <span class="mono">window {viewport.w} × {viewport.h}</span>
+      <span class="mono text-muted">layout {viewport.cw} × {viewport.ch}</span>
+      <span class="mono text-muted">dpr {viewport.dpr}</span>
+      <span class="mono text-muted"
+        >{viewport.noHover ? "touch" : "pointer"}</span
+      >
+      <span class="mono text-primary">{activeBreakpoint}</span>
+    </div>
+  </section>
 
   <section class="card">
     <div class="card-header">
@@ -381,10 +435,17 @@
 
   /* A phone stacks the page header: the name gets the full width instead of
      wrapping to three lines beside the actions. */
-  @media (max-width: 640px) {
+  @media (max-width: 820px) {
     .page-header {
       flex-direction: column;
       align-items: stretch;
     }
+  }
+
+  .viewport {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: var(--body-sm);
   }
 </style>
