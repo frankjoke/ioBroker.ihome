@@ -24,7 +24,7 @@
     roomName,
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
-  import { sortDevices, type SortKey, type SortDir } from "$lib/config/sort";
+  import { sortDevices, type SortDir } from "$lib/config/sort";
   import { slotsReferencingDevice } from "$lib/config/layout-ops";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { onMount, tick } from "svelte";
@@ -49,7 +49,6 @@
   let roomFilter = $state<string[]>([]);
   let typeFilter = $state<string[]>([]);
   let search = $state("");
-  let sortBy = $state<SortKey>("name");
   let sortDir = $state<SortDir>("asc");
   let pendingDelete = $state<Device | null>(null);
   /** The slots that will go unavailable when the device is deleted. */
@@ -119,7 +118,7 @@
   );
 
   const sortedDevices = $derived(
-    sortDevices(filteredDevices, sortBy, sortDir, (d) =>
+    sortDevices(filteredDevices, "name", sortDir, (d) =>
       roomName(ioBroker.enums, d.room ?? ""),
     ),
   );
@@ -322,11 +321,6 @@
         placeholder="All types"
         onChange={(v) => (typeFilter = v)}
       />
-      <select bind:value={sortBy} aria-label="Sort by">
-        <option value="name">Name</option>
-        <option value="room">Room</option>
-        <option value="type">Type</option>
-      </select>
       <button
         type="button"
         class="sort-dir"
@@ -467,7 +461,7 @@
   .devices-page {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.75rem;
   }
 
   .page-header {
@@ -495,12 +489,11 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr auto auto;
+    grid-template-columns: 2fr 1fr 1fr auto;
     gap: 0.5rem;
   }
 
-  .filter-bar input,
-  .filter-bar select {
+  .filter-bar input {
     min-width: 0;
     padding: 0.35rem;
   }
