@@ -17,6 +17,7 @@
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import {
     roomList,
     roomsOf as roomsOfEnum,
@@ -151,6 +152,22 @@
     );
   }
 
+  /** The line toggles the device; its editor never does. */
+  function toggleDevice(d: Device) {
+    if (editing?.id === d.id) onCancel();
+    else editDevice(d);
+  }
+
+  function onLineClick(event: MouseEvent, d: Device) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggleDevice(d);
+  }
+
   function duplicateDevice(d: Device) {
     const copy = JSON.parse(JSON.stringify(d)) as Device;
     copy.id = newId();
@@ -234,13 +251,11 @@
       {/if}
       <button
         type="button"
-        class="icon-btn primary"
-        title="Add device"
-        aria-label="Add device"
+        class="btn btn-primary btn-sm"
         disabled={showForm}
         onclick={addDevice}
       >
-        <span class="material-symbols-outlined">add</span>
+        <span class="material-symbols-outlined">add</span> Add device
       </button>
     </div>
   </div>
@@ -309,78 +324,65 @@
       {#each sortedDevices as d (d.id)}
         {@const seen = lastUpdate(d)}
         {@const icon = enrichedById.get(d.id)?.objectIcon}
-        <div class="card device-row" class:editing={editing?.id === d.id}>
-          <div class="device-main">
-            <span class="device-title">
-              {#if icon}
-                <Icon value={icon} size={18} />
-              {/if}
-              <span class="device-name">{d.name}</span>
-            </span>
-            <span class="device-meta text-muted">
-              <span class="badge badge-secondary">{d.type}</span>
-              {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
-              <span class="device-values">{summaries(d)}</span>
-              {#if seen !== undefined}
-                <span
-                  class="device-updated"
-                  title={new Date(seen).toLocaleString()}
-                >
-                  <span class="material-symbols-outlined" aria-hidden="true"
-                    >schedule</span
-                  >{agoLabel(seen)}</span
-                >
-              {/if}
-            </span>
+        {@const open = editing?.id === d.id}
+        <div class="item" class:open>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(e) => onLineClick(e, d)}>
+            {#if icon}
+              <Icon value={icon} size={18} />
+            {/if}
+            <button type="button" class="name" onclick={() => toggleDevice(d)}>
+              {d.name}
+            </button>
+            <span class="badge badge-secondary">{d.type}</span>
+            {#if d.room}<EnumBadge id={d.room} enums={ioBroker.enums} />{/if}
+            <span class="device-values mono text-muted">{summaries(d)}</span>
+            {#if seen !== undefined}
+              <span
+                class="device-updated text-muted"
+                title={new Date(seen).toLocaleString()}
+              >
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >schedule</span
+                >{agoLabel(seen)}</span
+              >
+            {/if}
             {#each (d.controls ?? []).filter((c) => c.history && c.stateId) as c (c.id)}
               <HistorySummary control={c} />
             {/each}
-          </div>
-          <div class="device-actions">
-            <button
-              type="button"
-              class="icon-btn"
-              title="Edit"
-              aria-label="Edit"
-              onclick={() => editDevice(d)}
-            >
-              <span class="material-symbols-outlined">edit</span>
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              title="Duplicate"
-              aria-label="Duplicate"
-              onclick={() => duplicateDevice(d)}
-            >
-              <span class="material-symbols-outlined">content_copy</span>
-            </button>
-            <button
-              type="button"
-              class="icon-btn danger"
-              title="Delete"
-              aria-label="Delete"
-              onclick={() => deleteDevice(d)}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        {#if editing?.id === d.id}
-          <div class="card form-card inline-form" bind:this={inlineForm}>
-            {#key editing.id}
-              <DeviceForm
-                device={editing}
-                {objects}
-                {roomsOf}
-                {rooms}
-                {devices}
-                {onSave}
-                {onCancel}
+            <span class="item-actions">
+              <IconButton
+                icon="content_copy"
+                label={`Duplicate ${d.name}`}
+                title="Duplicate"
+                onclick={() => duplicateDevice(d)}
               />
-            {/key}
+              <IconButton
+                icon="delete"
+                danger
+                label={`Delete ${d.name}`}
+                onclick={() => deleteDevice(d)}
+              />
+            </span>
           </div>
-        {/if}
+          {#if open}
+            <div class="item-editor" bind:this={inlineForm}>
+              {#key editing.id}
+                <DeviceForm
+                  device={editing}
+                  {objects}
+                  {roomsOf}
+                  {rooms}
+                  {devices}
+                  {onSave}
+                  {onCancel}
+                  showHead={false}
+                />
+              {/key}
+            </div>
+          {/if}
+        </div>
       {/each}
     </div>
   {/if}
@@ -484,57 +486,7 @@
     gap: 0.25rem;
   }
 
-  .device-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.5rem 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  /* The device whose editor is open below it. */
-  .device-row.editing {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 1px var(--primary-color);
-  }
-
   /* Leave room for the sticky app bar when the editor scrolls into view. */
-  .inline-form {
-    scroll-margin-top: 56px;
-  }
-
-  .device-main {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  .device-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-  }
-
-  /* The device's own face (A67): the glyph keeps its size. */
-  .device-title :global(img),
-  .device-title :global(.material-symbols-outlined) {
-    flex: 0 0 auto;
-  }
-
-  .device-name {
-    font-weight: 600;
-  }
-
-  .device-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: var(--body-sm);
-    flex-wrap: wrap;
-  }
-
   .device-updated {
     display: inline-flex;
     align-items: center;
@@ -545,11 +497,6 @@
 
   .device-updated .material-symbols-outlined {
     font-size: 1em;
-  }
-
-  .device-actions {
-    display: flex;
-    gap: 0.35rem;
   }
 
   .empty-state {
