@@ -255,6 +255,21 @@
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
 
+  function toggleSlot(i: number) {
+    expandedSlot = expandedSlot === i ? null : i;
+  }
+
+  /** The whole slot line toggles it, except the actions and any control. */
+  function onSlotLineClick(event: MouseEvent, i: number) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggleSlot(i);
+  }
+
   /** The slot kind as a word for the icon's tooltip ("history-list" -> "History list"). */
   function kindLabel(kind: SlotKind): string {
     const text = String(kind).replace(/-/g, " ");
@@ -1223,16 +1238,18 @@
       <div class="slot-list">
         {#each shownSlots as slot, i (i)}
           <div
-            class="slot-row"
+            class="item slot-item"
             class:not-now={!slotVisible(slot, tileActive)}
             class:open={expandedSlot === i}
           >
-            <div class="slot-line">
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="item-line" onclick={(e) => onSlotLineClick(e, i)}>
               <button
                 type="button"
-                class="slot-head"
+                class="name slot-head"
                 aria-expanded={expandedSlot === i}
-                onclick={() => (expandedSlot = expandedSlot === i ? null : i)}
+                onclick={() => toggleSlot(i)}
               >
                 <span class="slot-kind-icon" title={kindLabel(slot.kind)}>
                   <Icon value={KIND_GLYPH[slot.kind]} size={17} />
@@ -1257,7 +1274,7 @@
                   >
                 {/if}
               </button>
-              <span class="row-actions">
+              <span class="item-actions">
                 <WhereButton
                   where={slotWhere(slot)}
                   title={whereTitle(slot)}
@@ -1351,7 +1368,7 @@
               </div>
             {/if}
             {#if expandedSlot === i}
-              <div class="slot-editor">
+              <div class="item-editor slot-editor">
                 <div class="row">
                   <label class="small">
                     <span class="label-mono">Kind</span>
@@ -2343,25 +2360,15 @@
     gap: 3px;
   }
 
-  .slot-row {
-    display: flex;
-    flex-direction: column;
+  /* The slot list is the dense variant of the shared .item shell (UI-DESIGN
+     §5.1): same box, line and editor, tighter padding and gap. */
+  .slot-item {
     gap: 3px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 6px);
     padding: 2px 5px;
   }
 
-  /* The open item is the same box: its line is the header, the editor sits
-     inside it. A darker frame plus the accent, so an open item never reads as
-     a hovered row (hover uses --row-hover too). */
-  .slot-row.open {
-    background: var(--row-hover);
-    border-color: var(--primary-color);
-  }
-
   /* De-emphasis by colour, never opacity (house rule). */
-  .slot-row.not-now .slot-summary {
+  .slot-item.not-now .name {
     color: var(--text-muted);
   }
 
@@ -2372,17 +2379,13 @@
     min-width: 0;
   }
 
+  /* Shrink to the free space instead of forcing the actions onto a second line;
+     the slot name ellipsizes (its tail stays visible, see .slot-name). */
   .slot-head {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
     min-width: 0;
   }
 
@@ -2442,10 +2445,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    padding: 0.5rem;
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 6px);
   }
 
   .slot-editor .small input,
