@@ -2,6 +2,7 @@
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import {
     getFormulas,
     upsertFormula,
@@ -11,7 +12,6 @@
   import type { FormulaTemplate } from "$lib/types/device";
 
   let editing = $state<FormulaTemplate | null>(null);
-  let showForm = $state(false);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let search = $state("");
   let sortBy = $state<"name" | "unit">("name");
@@ -38,19 +38,66 @@
     );
   });
 
+  /** The rows to draw: the filtered list, with the draft in place of its entry. */
+  const rows = $derived.by(() => {
+    if (!editing) return shown;
+    const list = shown.map((t) => (t.id === editing.id ? editing : t));
+    return shown.some((t) => t.id === editing.id) ? list : [editing, ...list];
+  });
+  const storedTemplate = $derived(
+    editing ? (formulas.find((t) => t.id === editing.id) ?? null) : null,
+  );
+  const dirty = $derived(
+    !!editing &&
+      (!storedTemplate ||
+        JSON.stringify(editing) !== JSON.stringify(storedTemplate)),
+  );
+  /** A row picked while the open draft was dirty. */
+  let pendingTemplate = $state<FormulaTemplate | null>(null);
+  let askClose = $state(false);
+
+  function requestOpen(t: FormulaTemplate) {
+    if (editing?.id === t.id) {
+      requestClose();
+      return;
+    }
+    if (dirty) {
+      pendingTemplate = t;
+      askClose = true;
+      return;
+    }
+    startEdit(t);
+  }
+
+  function requestClose() {
+    if (dirty) {
+      pendingTemplate = null;
+      askClose = true;
+      return;
+    }
+    editing = null;
+  }
+
+  function onLineClick(event: MouseEvent, t: FormulaTemplate) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    requestOpen(t);
+  }
+
   function startAdd() {
     editing = { id: newId(), name: "", expr: "" };
-    showForm = true;
   }
   function startEdit(t: FormulaTemplate) {
     editing = { ...t };
-    showForm = true;
   }
   function save() {
     if (!editing) return;
     upsertFormula({ ...editing, name: editing.name.trim() || "Untitled" });
     saveFormulas();
-    showForm = false;
     editing = null;
   }
   function confirmDelete() {
@@ -74,13 +121,11 @@
     <div class="page-actions">
       <button
         type="button"
-        class="icon-btn primary"
-        title="Add template"
-        aria-label="Add template"
-        disabled={showForm}
+        class="btn btn-primary btn-sm"
+        disabled={!!editing}
         onclick={startAdd}
       >
-        <span class="material-symbols-outlined">add</span>
+        <span class="material-symbols-outlined">add</span> Add template
       </button>
     </div>
   </div>
@@ -119,97 +164,111 @@
       </div>
     {:else}
       <div class="formula-list">
-        {#each shown as t (t.id)}
-          <div class="card formula-row">
-            <div class="formula-main">
-              <span class="formula-name">{t.name}</span>
-              <code class="formula-expr">{t.expr}</code>
+        {#each rows as t (t.id)}
+          {@const open = editing?.id === t.id}
+          <div class="item" class:open>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="item-line" onclick={(e) => onLineClick(e, t)}>
+              {#if open && editing}
+                <input
+                  class="name-input"
+                  value={editing.name}
+                  placeholder="New template"
+                  aria-label="Template name"
+                  oninput={(e) => {
+                    if (editing) editing.name = e.currentTarget.value;
+                  }}
+                />
+              {:else}
+                <button
+                  type="button"
+                  class="name"
+                  onclick={() => requestOpen(t)}
+                >
+                  {t.name}
+                </button>
+              {/if}
+              {#if !open}
+                <code class="formula-expr">{t.expr}</code>
+              {/if}
               {#if t.unit}<span class="text-muted">{t.unit}</span>{/if}
               {#if t.notes}<span class="hint text-muted">{t.notes}</span>{/if}
+              <span class="item-actions">
+                {#if open}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={!dirty}
+                    onclick={save}>Save</button
+                  >
+                {/if}
+                {#if !(open && !storedTemplate)}
+                  <IconButton
+                    icon="delete"
+                    danger
+                    label={`Delete ${t.name}`}
+                    onclick={() => (pendingDelete = t)}
+                  />
+                {/if}
+              </span>
             </div>
-            <div class="formula-actions">
-              <button
-                type="button"
-                class="icon-btn"
-                title="Edit"
-                aria-label="Edit"
-                onclick={() => startEdit(t)}
-              >
-                <span class="material-symbols-outlined">edit</span>
-              </button>
-              <button
-                type="button"
-                class="icon-btn danger"
-                title="Delete"
-                aria-label="Delete"
-                onclick={() => (pendingDelete = t)}
-              >
-                <span class="material-symbols-outlined">delete</span>
-              </button>
-            </div>
+            {#if open && editing}
+              <div class="item-editor">
+                <label class="field"
+                  ><span class="label-mono">Expression</span>
+                  <textarea rows="3" class="mono" bind:value={editing.expr}
+                  ></textarea></label
+                >
+                <div class="form-grid">
+                  <label class="field"
+                    ><span class="label-mono">Unit</span>
+                    <input type="text" bind:value={editing.unit} /></label
+                  >
+                  <label class="field"
+                    ><span class="label-mono">Precision</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={editing.precision ?? ""}
+                      oninput={(e) =>
+                        (editing.precision =
+                          e.currentTarget.value === ""
+                            ? undefined
+                            : Number(e.currentTarget.value))}
+                    /></label
+                  >
+                </div>
+                <label class="field"
+                  ><span class="label-mono">Notes</span>
+                  <input type="text" bind:value={editing.notes} /></label
+                >
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
     {/if}
   {/if}
 
-  {#if showForm && editing}
-    <div
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Formula template"
-    >
-      <div class="modal-card card">
-        <h3>{editing.name ? "Edit template" : "New template"}</h3>
-        <label class="field"
-          ><span class="label-mono">Name</span>
-          <input type="text" bind:value={editing.name} /></label
-        >
-        <label class="field"
-          ><span class="label-mono">Expression</span>
-          <textarea rows="3" class="mono" bind:value={editing.expr}
-          ></textarea></label
-        >
-        <div class="form-grid">
-          <label class="field"
-            ><span class="label-mono">Unit</span>
-            <input type="text" bind:value={editing.unit} /></label
-          >
-          <label class="field"
-            ><span class="label-mono">Precision</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={editing.precision ?? ""}
-              oninput={(e) =>
-                (editing.precision =
-                  e.currentTarget.value === ""
-                    ? undefined
-                    : Number(e.currentTarget.value))}
-            /></label
-          >
-        </div>
-        <label class="field"
-          ><span class="label-mono">Notes</span>
-          <input type="text" bind:value={editing.notes} /></label
-        >
-        <div class="actions">
-          <button
-            type="button"
-            class="btn"
-            onclick={() => {
-              showForm = false;
-              editing = null;
-            }}>Cancel</button
-          >
-          <button type="button" class="btn btn-primary" onclick={save}
-            >Save</button
-          >
-        </div>
-      </div>
-    </div>
+  {#if askClose}
+    <ConfirmModal
+      title="Discard unsaved changes?"
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      onConfirm={() => {
+        askClose = false;
+        const next = pendingTemplate;
+        pendingTemplate = null;
+        if (next) startEdit(next);
+        else editing = null;
+      }}
+      onCancel={() => {
+        askClose = false;
+        pendingTemplate = null;
+      }}
+    />
   {/if}
 
   {#if pendingDelete}
@@ -228,7 +287,7 @@
   .formulas-page {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     max-width: 640px;
   }
 
@@ -293,26 +352,6 @@
     gap: 0.25rem;
   }
 
-  .formula-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.5rem 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .formula-main {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-
-  .formula-name {
-    font-weight: 600;
-  }
-
   .formula-expr {
     font-family: var(--font-mono);
     font-size: var(--body-sm);
@@ -327,37 +366,9 @@
     font-size: var(--body-sm);
   }
 
-  .formula-actions {
-    display: flex;
-    gap: 0.35rem;
-  }
-
   .empty-state {
     padding: 2rem;
     text-align: center;
-  }
-
-  .modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-  }
-
-  .modal-card {
-    width: min(520px, 100%);
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .modal-card h3 {
-    margin: 0;
   }
 
   .field {
@@ -376,12 +387,6 @@
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
     gap: 0.5rem;
   }
 </style>
