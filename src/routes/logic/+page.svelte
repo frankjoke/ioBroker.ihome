@@ -471,67 +471,10 @@
     gap: 0.25rem;
   }
 
-  /* One item is one box: the line is its header, the editor sits inside it
-     (UI-DESIGN §5.1/§5.3). */
-  .item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 6px);
-    background: var(--surface-color);
-    padding: 0.25rem 0.5rem;
-  }
-
-  .item.open {
-    background: var(--row-hover);
-    border-color: var(--primary-color);
-  }
-
-  .item-line,
-  .item-actions,
   .inline {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-  }
-
-  .item-line {
-    cursor: pointer;
-  }
-
-  .item-actions {
-    margin-left: auto;
-    cursor: default;
-  }
-
-  .name {
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--text-color);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .name:hover {
-    color: var(--primary-color);
-  }
-
-  .name-input {
-    flex: 1 1 14rem;
-    min-width: 10rem;
-    font-size: var(--body-lg);
-    font-weight: 600;
-  }
-
-  .item-editor {
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 6px);
-    padding: 1rem;
   }
 </style>

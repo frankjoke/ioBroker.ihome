@@ -53,6 +53,21 @@
     if (editing === name) editing = null;
   }
 
+  function toggle(name: string) {
+    editing = editing === name ? null : name;
+  }
+
+  /** The whole line opens the row, except its actions and controls. */
+  function onLineClick(event: MouseEvent, name: string) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggle(name);
+  }
+
   function add(kind: "variable" | "event") {
     let index = Object.keys(inputs).length + 1;
     let name = kind === "event" ? `event${index}` : `variable${index}`;
@@ -103,122 +118,126 @@
   </div>
 
   {#each Object.entries(inputs) as [name, input] (name)}
-    <div class="input-row">
-      <div class="summary">
-        <span class="input-name mono">{name}</span>
+    {@const open = editing === name}
+    <div class="item" class:open>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, name)}>
+        {#if open}
+          <input
+            class="name-input"
+            value={name}
+            aria-label={`Name for ${name}`}
+            onchange={(e) => rename(name, e.currentTarget.value)}
+          />
+        {:else}
+          <button type="button" class="name" onclick={() => toggle(name)}>
+            {name}
+          </button>
+        {/if}
         <span class="badge badge-secondary">{input.kind}</span>
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
-        <span class="spacer"></span>
-        <IconButton
-          icon={editing === name ? "expand_less" : "edit"}
-          label={`Edit ${name}`}
-          title={editing === name ? "Close" : "Edit"}
-          active={editing === name}
-          onclick={() => (editing = editing === name ? null : name)}
-        />
-        <IconButton
-          icon="delete"
-          danger
-          label={`Delete ${name}`}
-          title="Delete"
-          onclick={() => (pendingDelete = name)}
-        />
+        <span class="item-actions">
+          <IconButton
+            icon="delete"
+            danger
+            label={`Delete ${name}`}
+            title="Delete"
+            onclick={() => (pendingDelete = name)}
+          />
+        </span>
       </div>
-
-      {#if editing === name}
-        <div class="fields">
-          <label class="field"
-            ><span class="label-mono">Name</span>
-            <input
-              value={name}
-              aria-label={`Name for ${name}`}
-              onchange={(e) => rename(name, e.currentTarget.value)}
-            />
-          </label>
-          <label class="field"
-            ><span class="label-mono">Source</span>
-            <select
-              aria-label={`Source type for ${name}`}
-              value={input.from.type}
-              onchange={(e) =>
-                setSource(
-                  name,
-                  input,
-                  e.currentTarget.value as InputSource["type"],
-                )}
-            >
-              <option value="state">State / variable</option>
-              <option value="memory">Memory</option>
-              {#if input.kind === "event"}
-                <option value="timer">Timer</option>
-              {/if}
-            </select>
-          </label>
-
-          {#if input.from.type === "state"}
-            <div class="field wide">
-              <span class="label-mono">
-                {input.kind === "event" ? "States" : "State"}
-              </span>
-              {#if input.kind === "event"}
-                <MultiStateField
-                  value={[input.from.ref, ...(input.from.refs ?? [])].filter(
-                    Boolean,
+      {#if open}
+        <div class="item-editor">
+          <div class="fields">
+            <label class="field"
+              ><span class="label-mono">Source</span>
+              <select
+                aria-label={`Source type for ${name}`}
+                value={input.from.type}
+                onchange={(e) =>
+                  setSource(
+                    name,
+                    input,
+                    e.currentTarget.value as InputSource["type"],
                   )}
-                  label={`States for ${name}`}
-                  onchange={(ids) =>
+              >
+                <option value="state">State / variable</option>
+                <option value="memory">Memory</option>
+                {#if input.kind === "event"}
+                  <option value="timer">Timer</option>
+                {/if}
+              </select>
+            </label>
+
+            {#if input.from.type === "state"}
+              <div class="field wide">
+                <span class="label-mono">
+                  {input.kind === "event" ? "States" : "State"}
+                </span>
+                {#if input.kind === "event"}
+                  <MultiStateField
+                    value={[input.from.ref, ...(input.from.refs ?? [])].filter(
+                      Boolean,
+                    )}
+                    label={`States for ${name}`}
+                    onchange={(ids) =>
+                      update(name, {
+                        ...input,
+                        from: {
+                          type: "state",
+                          ref: ids[0] ?? "",
+                          refs: ids.slice(1),
+                        },
+                      })}
+                  />
+                {:else}
+                  <StateRefField
+                    value={input.from.ref}
+                    label={`State for ${name}`}
+                    onchange={(ref) =>
+                      update(name, { ...input, from: { type: "state", ref } })}
+                  />
+                {/if}
+              </div>
+            {:else if input.from.type === "memory"}
+              <label class="field"
+                ><span class="label-mono">Memory</span>
+                <input
+                  class="mono"
+                  aria-label={`Memory name for ${name}`}
+                  placeholder="memory name"
+                  value={input.from.ref}
+                  onchange={(e) =>
                     update(name, {
                       ...input,
                       from: {
-                        type: "state",
-                        ref: ids[0] ?? "",
-                        refs: ids.slice(1),
+                        type: "memory",
+                        ref: e.currentTarget.value.trim(),
                       },
                     })}
                 />
-              {:else}
-                <StateRefField
-                  value={input.from.ref}
-                  label={`State for ${name}`}
-                  onchange={(ref) =>
-                    update(name, { ...input, from: { type: "state", ref } })}
+              </label>
+            {:else}
+              <label class="field"
+                ><span class="label-mono">Every</span>
+                <input
+                  class="mono"
+                  aria-label={`Every for ${name}`}
+                  placeholder="30s / 2m / 1h"
+                  value={input.from.every}
+                  onchange={(e) =>
+                    update(name, {
+                      ...input,
+                      from: {
+                        type: "timer",
+                        every: e.currentTarget.value.trim(),
+                      },
+                    })}
                 />
-              {/if}
-            </div>
-          {:else if input.from.type === "memory"}
-            <label class="field"
-              ><span class="label-mono">Memory</span>
-              <input
-                class="mono"
-                aria-label={`Memory name for ${name}`}
-                placeholder="memory name"
-                value={input.from.ref}
-                onchange={(e) =>
-                  update(name, {
-                    ...input,
-                    from: { type: "memory", ref: e.currentTarget.value.trim() },
-                  })}
-              />
-            </label>
-          {:else}
-            <label class="field"
-              ><span class="label-mono">Every</span>
-              <input
-                class="mono"
-                aria-label={`Every for ${name}`}
-                placeholder="30s / 2m / 1h"
-                value={input.from.every}
-                onchange={(e) =>
-                  update(name, {
-                    ...input,
-                    from: {
-                      type: "timer",
-                      every: e.currentTarget.value.trim(),
-                    },
-                  })}
-              />
-            </label>
-          {/if}
+              </label>
+            {/if}
+          </div>
         </div>
       {/if}
     </div>
@@ -271,34 +290,11 @@
     font-size: 18px;
   }
 
-  .input-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.35rem 0;
-    border-bottom: 1px dashed var(--border-color);
-  }
-
-  .summary {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
-  .input-name {
-    font-weight: 600;
-  }
-
   .input-source {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
-  }
-
-  .spacer {
-    flex: 1 1 auto;
   }
 
   .fields {

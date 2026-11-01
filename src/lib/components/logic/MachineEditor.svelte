@@ -71,6 +71,23 @@
     patch({ states: { ...logic.states, [name]: state } });
   }
 
+  function toggleState(name: string) {
+    openState = openState === name ? null : name;
+    openRow = null;
+    stateTab = "enter";
+  }
+
+  /** The whole state line opens it, except its actions and controls. */
+  function onLineClick(event: MouseEvent, name: string) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggleState(name);
+  }
+
   function addState() {
     let index = stateNames.length + 1;
     let name = `State${index}`;
@@ -307,9 +324,27 @@
     </div>
 
     {#each Object.entries(logic.states) as [name, state] (name)}
-      <div class="state-row">
-        <div class="summary">
-          <span class="state-name mono">{name}</span>
+      {@const stateOpen = openState === name}
+      <div class="item" class:open={stateOpen}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onLineClick(e, name)}>
+          {#if stateOpen}
+            <input
+              class="name-input"
+              value={name}
+              aria-label={`Name for ${name}`}
+              onchange={(e) => renameState(name, e.currentTarget.value)}
+            />
+          {:else}
+            <button
+              type="button"
+              class="name"
+              onclick={() => toggleState(name)}
+            >
+              {name}
+            </button>
+          {/if}
           {#if logic.start ? logic.start === name : stateNames[0] === name}
             <span class="badge badge-secondary">start</span>
           {/if}
@@ -320,53 +355,34 @@
               ? ` · after ${state.after.time} → ${state.after.goto}`
               : ""}
           </span>
-          <span class="spacer"></span>
-          <IconButton
-            icon={openState === name ? "expand_less" : "edit"}
-            label={`Edit ${name}`}
-            title={openState === name ? "Close" : "Edit"}
-            active={openState === name}
-            onclick={() => {
-              openState = openState === name ? null : name;
-              openRow = null;
-              stateTab = "enter";
-            }}
-          />
-          <IconButton
-            icon="arrow_upward"
-            label={`Move ${name} up`}
-            title="Move up"
-            disabled={stateNames.indexOf(name) === 0}
-            onclick={() => moveState(name, -1)}
-          />
-          <IconButton
-            icon="arrow_downward"
-            label={`Move ${name} down`}
-            title="Move down"
-            disabled={stateNames.indexOf(name) === stateNames.length - 1}
-            onclick={() => moveState(name, 1)}
-          />
-          <IconButton
-            icon="delete"
-            danger
-            label={`Delete ${name}`}
-            title="Delete"
-            disabled={stateNames.length <= 1}
-            onclick={() => (pendingDelete = { kind: "state", name })}
-          />
+          <span class="item-actions">
+            <IconButton
+              icon="arrow_upward"
+              label={`Move ${name} up`}
+              title="Move up"
+              disabled={stateNames.indexOf(name) === 0}
+              onclick={() => moveState(name, -1)}
+            />
+            <IconButton
+              icon="arrow_downward"
+              label={`Move ${name} down`}
+              title="Move down"
+              disabled={stateNames.indexOf(name) === stateNames.length - 1}
+              onclick={() => moveState(name, 1)}
+            />
+            <IconButton
+              icon="delete"
+              danger
+              label={`Delete ${name}`}
+              title="Delete"
+              disabled={stateNames.length <= 1}
+              onclick={() => (pendingDelete = { kind: "state", name })}
+            />
+          </span>
         </div>
 
-        {#if openState === name}
-          <div class="state-body">
-            <label class="field"
-              ><span class="label-mono">Name</span>
-              <input
-                value={name}
-                aria-label={`Name for ${name}`}
-                onchange={(e) => renameState(name, e.currentTarget.value)}
-              />
-            </label>
-
+        {#if stateOpen}
+          <div class="item-editor">
             <div class="state-options">
               <div class="option-tabs" role="tablist">
                 <button
@@ -707,9 +723,7 @@
   .machine,
   .states,
   .events,
-  .state-row,
   .event-row,
-  .state-body,
   .event-body {
     display: flex;
     flex-direction: column;
@@ -755,14 +769,9 @@
     min-width: 0;
   }
 
-  .state-row,
   .event-row {
     padding: 0.35rem 0;
     border-bottom: 1px dashed var(--border-color);
-  }
-
-  .state-name {
-    font-weight: 600;
   }
 
   .event-summary {
@@ -770,11 +779,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
-  }
-
-  .state-body {
-    padding: 0.3rem 0 0.4rem 0.6rem;
-    border-left: 2px solid var(--border-color);
   }
 
   .event-body {
