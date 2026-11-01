@@ -310,7 +310,7 @@
     </OptionTabs>
   </div>
 
-  <div class="states">
+  <div class="states section-panel">
     <div class="states-head">
       <span class="label-mono">States</span>
       <span class="add-slot">
@@ -730,9 +730,12 @@
     gap: 0.45rem;
   }
 
-  .states,
   .events {
     gap: 0.3rem;
+  }
+
+  .states {
+    gap: 0.25rem;
   }
 
   .options {

@@ -636,6 +636,14 @@ textarea {
   font-weight: 600;
 }
 
+/* A list section inside an editor: one step off the card, so the items on
+   --surface-color pop out (UI-DESIGN §5.1). */
+.section-panel {
+  padding: 0.5rem;
+  border-radius: var(--border-radius-sm, 6px);
+  background: var(--row-hover);
+}
+
 .item-editor {
   padding: 1rem;
   border: 1px solid var(--border-color);

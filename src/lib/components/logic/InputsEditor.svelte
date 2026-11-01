@@ -104,7 +104,7 @@
   }
 </script>
 
-<div class="inputs">
+<div class="inputs section-panel">
   <div class="inputs-head">
     <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
