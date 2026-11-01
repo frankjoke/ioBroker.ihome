@@ -17,12 +17,6 @@ import { parseLayoutRef } from "$lib/config/layout-ops";
 
 /** @type {Page[]} */
 export const pages = [
-  {
-    id: "/ui",
-    label: "User Interface",
-    icon: "palette",
-    title: "User Interface",
-  },
   { id: "/devices", label: "Devices", icon: "devices", title: "Devices" },
   {
     id: "/variables",
@@ -37,6 +31,12 @@ export const pages = [
     title: "Formula Templates",
   },
   { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
+  {
+    id: "/ui",
+    label: "User Interface",
+    icon: "palette",
+    title: "User Interface",
+  },
   {
     id: "/server",
     label: "Server & Security",
