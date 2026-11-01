@@ -706,7 +706,8 @@
                                       ? "any"
                                       : "change",
                                   })}
-                              /> any</span
+                              />
+                              {row.edge === "any" ? "any" : "change"}</span
                             >
                           </label>
                         {/if}
