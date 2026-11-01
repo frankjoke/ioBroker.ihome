@@ -35,7 +35,19 @@
   let showTransform = $state(false);
   let showFormula = $state(false);
   let showHistory = $state(false);
-  let showMeta = $state(false);
+  /** The row's fold-out: label/unit, metadata and the editors live in it. */
+  let open = $state(false);
+
+  /** The line toggles the row; its actions and fields never do. */
+  function onLineClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    open = !open;
+  }
 
   const isVirtual = $derived(control.kind === "virtual");
   const canHistory = $derived(
@@ -46,7 +58,10 @@
   );
 
   $effect(() => {
-    if (autoOpen) showFormula = true;
+    if (autoOpen) {
+      open = true;
+      showFormula = true;
+    }
   });
 
   function live() {
@@ -113,8 +128,10 @@
   });
 </script>
 
-<div class="control-row">
-  <div class="line">
+<div class="item" class:open>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="item-line" onclick={onLineClick}>
     <span class="kind-badge">{isVirtual ? "Formula" : "State"}</span>
 
     {#if isVirtual}
@@ -135,7 +152,10 @@
         class="icon-btn"
         title="Edit formula"
         aria-label="Edit formula"
-        onclick={() => (showFormula = true)}
+        onclick={() => {
+          open = true;
+          showFormula = true;
+        }}
       >
         <span class="material-symbols-outlined">edit</span>
       </button>
@@ -175,7 +195,10 @@
           class:active={!!control.history}
           title="History"
           aria-label="History"
-          onclick={() => (showHistory = true)}
+          onclick={() => {
+            open = true;
+            showHistory = true;
+          }}
         >
           <span class="material-symbols-outlined">history</span>
         </button>
@@ -187,97 +210,88 @@
         class:active={showTransform}
         title="Transform"
         aria-label="Toggle transform"
-        onclick={() => (showTransform = !showTransform)}
+        onclick={() => {
+          open = true;
+          showTransform = !showTransform;
+        }}
       >
         <span class="material-symbols-outlined">functions</span>
       </button>
+    {/if}
 
+    <span class="item-actions">
       <button
         type="button"
         class="icon-btn"
-        class:active={showMeta}
-        title="Metadata"
-        aria-label="Toggle metadata"
-        onclick={() => (showMeta = !showMeta)}
+        title="Remove"
+        aria-label="Remove control"
+        onclick={onRemove}
       >
-        <span class="material-symbols-outlined">tune</span>
+        <span class="material-symbols-outlined">delete</span>
       </button>
-    {/if}
-
-    <button
-      type="button"
-      class="icon-btn"
-      title="Remove"
-      aria-label="Remove control"
-      onclick={onRemove}
-    >
-      <span class="material-symbols-outlined">delete</span>
-    </button>
+    </span>
   </div>
 
-  <div class="line">
-    <label class="field"
-      ><span class="label-mono">Label</span>
-      <input
-        type="text"
-        value={control.label ?? ""}
-        oninput={(e) => onChange({ ...control, label: e.currentTarget.value })}
-      /></label
-    >
-    <label class="field"
-      ><span class="label-mono">Unit</span>
-      <input
-        type="text"
-        value={control.unit ?? ""}
-        oninput={(e) => onChange({ ...control, unit: e.currentTarget.value })}
-      /></label
-    >
-  </div>
+  {#if open}
+    <div class="item-editor">
+      <div class="line">
+        <label class="field"
+          ><span class="label-mono">Label</span>
+          <input
+            type="text"
+            value={control.label ?? ""}
+            oninput={(e) =>
+              onChange({ ...control, label: e.currentTarget.value })}
+          /></label
+        >
+        <label class="field"
+          ><span class="label-mono">Unit</span>
+          <input
+            type="text"
+            value={control.unit ?? ""}
+            oninput={(e) =>
+              onChange({ ...control, unit: e.currentTarget.value })}
+          /></label
+        >
+      </div>
 
-  {#if showMeta && !isVirtual}
-    <ControlMetaEditor {control} onChange={(c) => onChange(c)} />
-  {/if}
+      {#if !isVirtual}
+        <ControlMetaEditor {control} onChange={(c) => onChange(c)} />
+      {/if}
 
-  {#if !isVirtual && control.history && control.stateId}
-    <HistorySummary {control} />
-  {/if}
+      {#if !isVirtual && control.history && control.stateId}
+        <HistorySummary {control} />
+      {/if}
 
-  {#if isVirtual}
-    {#if showFormula}
-      <VirtualEditor
-        {control}
-        {siblings}
-        onClose={() => (showFormula = false)}
-        onChange={(c) => onChange(c)}
-      />
-    {/if}
-  {:else if showTransform}
-    <TransformEditor
-      transform={control.transform}
-      sampleValue={live()?.val}
-      onChange={(t) => onChange({ ...control, transform: t })}
-    />
-  {/if}
+      {#if isVirtual}
+        {#if showFormula}
+          <VirtualEditor
+            {control}
+            {siblings}
+            onClose={() => (showFormula = false)}
+            onChange={(c) => onChange(c)}
+          />
+        {/if}
+      {:else if showTransform}
+        <TransformEditor
+          transform={control.transform}
+          sampleValue={live()?.val}
+          onChange={(t) => onChange({ ...control, transform: t })}
+        />
+      {/if}
 
-  {#if showHistory}
-    <HistoryEditor
-      {control}
-      onChange={(c) => onChange(c)}
-      onClose={() => (showHistory = false)}
-    />
+      {#if showHistory}
+        <HistoryEditor
+          {control}
+          onChange={(c) => onChange(c)}
+          onClose={() => (showHistory = false)}
+        />
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
-  .control-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-  }
-
   .line {
     display: flex;
     align-items: center;
