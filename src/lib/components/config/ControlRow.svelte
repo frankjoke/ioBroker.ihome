@@ -38,6 +38,36 @@
   /** The row's fold-out: label/unit, metadata and the editors live in it. */
   let open = $state(false);
 
+  /** The metadata keys a control may override on top of the broker object. */
+  const OVERRIDE_KEYS = [
+    "role",
+    "type",
+    "states",
+    "hideUnit",
+    "min",
+    "max",
+    "step",
+    "read",
+    "write",
+    "room",
+    "functions",
+    "common",
+  ] as const;
+
+  const hasOverrides = $derived(
+    OVERRIDE_KEYS.some(
+      (key) =>
+        (control as unknown as Record<string, unknown>)[key] !== undefined,
+    ),
+  );
+
+  /** Clears this control's overrides only — the broker object stays as it is. */
+  function resetOverrides() {
+    const next = { ...control } as unknown as Record<string, unknown>;
+    for (const key of OVERRIDE_KEYS) delete next[key];
+    onChange(next as unknown as Control);
+  }
+
   /** The line toggles the row; its actions and fields never do. */
   function onLineClick(event: MouseEvent) {
     const target = event.target as HTMLElement;
@@ -128,6 +158,25 @@
   });
 </script>
 
+{#snippet resetButton()}
+  <!-- The title sits on the wrapper: a disabled button does not fire hover, so
+       its own tooltip would never appear exactly when it is worth reading. -->
+  <span
+    class="tip"
+    title="Reset this control's metadata overrides (this control only — the broker object is untouched)"
+  >
+    <button
+      type="button"
+      class="icon-btn"
+      aria-label="Reset metadata overrides"
+      disabled={!hasOverrides}
+      onclick={resetOverrides}
+    >
+      <span class="material-symbols-outlined">undo</span>
+    </button>
+  </span>
+{/snippet}
+
 <div class="item" class:open>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -158,7 +207,7 @@
         }}
       >
         <span class="material-symbols-outlined">edit</span>
-      </button>
+      </button>{@render resetButton()}
     {:else}
       <div class="state">
         <span class="state-id mono" title={control.stateId ?? ""}
@@ -177,7 +226,7 @@
         onclick={onChangeState}
       >
         <span class="material-symbols-outlined">edit</span>
-      </button>
+      </button>{@render resetButton()}
 
       <label class="check"
         ><input
@@ -292,6 +341,10 @@
 </div>
 
 <style>
+  .tip {
+    display: inline-flex;
+  }
+
   .line {
     display: flex;
     align-items: center;

@@ -81,27 +81,6 @@
     newValue = "";
     newLabel = "";
   }
-
-  function reset(): void {
-    const next = { ...control };
-    for (const key of [
-      "role",
-      "type",
-      "states",
-      "hideUnit",
-      "min",
-      "max",
-      "step",
-      "read",
-      "write",
-      "room",
-      "functions",
-      "common",
-    ] as const) {
-      delete (next as any)[key];
-    }
-    onChange(next);
-  }
 </script>
 
 <div class="meta">
@@ -265,14 +244,10 @@
     {/if}
   </div>
 
-  <div class="row">
-    <button type="button" class="btn small" onclick={reset}>
-      Reset overrides
-    </button>
-    <span class="hint text-muted">
-      A set field wins over the broker object; empty inherits.
-    </span>
-  </div>
+  <p class="hint text-muted">
+    A set field wins over the broker object; empty inherits. The reset is the ↺
+    on the control's line (this control only).
+  </p>
 </div>
 
 <style>
@@ -331,10 +306,5 @@
 
   .hint {
     font-size: 0.8rem;
-  }
-
-  .btn.small {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.85rem;
   }
 </style>
