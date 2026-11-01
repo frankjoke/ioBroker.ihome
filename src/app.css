@@ -531,19 +531,22 @@ textarea {
   color: var(--danger-color);
 }
 
-/* Small pill tabs: an option group that folds open under its tab. The
-   configuration folder tabs in AppBar are the large variant; this is the one an
-   editor uses inside a panel (UI-DESIGN §6). */
+/* Menu-bar tabs: rounded on top, flat on the bottom, all on one baseline. The
+   open tab paints over that baseline and joins the panel below it, so the host
+   sets `--option-tab-bg` to its own background. */
 .option-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .option-tab {
-  padding: 0.2rem 0.7rem;
+  padding: 0.25rem 0.7rem;
+  margin-bottom: -1px;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-pill, 999px);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -556,7 +559,8 @@ textarea {
 
 .option-tab.active {
   color: var(--primary-color);
-  border-color: currentColor;
+  background: var(--option-tab-bg, var(--surface-color));
+  border-bottom: 1px solid var(--option-tab-bg, var(--surface-color));
 }
 
 /* ------------------------------------------------------------------ *

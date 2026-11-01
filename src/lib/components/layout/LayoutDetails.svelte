@@ -105,9 +105,10 @@
   /** The tile editor's groups, as a tab strip (one open at a time). */
   const TILE_TABS = [
     { id: "size", label: "Size" },
-    { id: "active", label: "Active state" },
-    { id: "icon", label: "Tile icon" },
+    { id: "view", label: "ViewState" },
+    { id: "icon", label: "Icon" },
     { id: "look", label: "Look" },
+    { id: "pin", label: "Pin" },
   ] as const;
 
   let width = $state(1400);
@@ -124,7 +125,7 @@
   /** Slot UI: which row is expanded, which rules block is open, pickers. */
   let expandedSlot = $state<number | null>(null);
   /** The tile editor's option tab: one group open at a time, none by default. */
-  let tileTab = $state<"size" | "active" | "icon" | "look" | null>(null);
+  let tileTab = $state<"size" | "view" | "icon" | "look" | "pin" | null>(null);
   let openRules = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   /** The state picker for an HTML slot's document. */
@@ -945,7 +946,7 @@
       </div>
     {/if}
 
-    {#if tileTab === "active"}
+    {#if tileTab === "view"}
       <div class="field">
         <div class="row">
           <button
@@ -1099,6 +1100,56 @@
       </div>
     {/if}
 
+    {#if tileTab === "pin"}
+      <div class="field">
+        <div class="row">
+          <input
+            class="pin-input"
+            type={pinShown ? "text" : "password"}
+            inputmode="numeric"
+            autocomplete="off"
+            value={pinDraft}
+            placeholder="no PIN"
+            aria-label="Detail page PIN"
+            title="Ask for this PIN before the detail page opens (view mode). Empty = no lock."
+            disabled={!hasDetail}
+            oninput={(e) => setPin(e.currentTarget.value)}
+          />
+          <span class="row-actions">
+            <button
+              type="button"
+              class="icon-btn"
+              title={pinShown ? "Hide the PIN" : "Show the PIN"}
+              aria-label={pinShown ? "Hide the PIN" : "Show the PIN"}
+              disabled={!hasDetail || pinDraft === ""}
+              onclick={() => (pinShown = !pinShown)}
+            >
+              <span class="material-symbols-outlined"
+                >{pinShown ? "visibility" : "visibility_off"}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              title="Clear the PIN — the detail page opens freely again"
+              aria-label="Clear the PIN"
+              disabled={!hasDetail || pinDraft === ""}
+              onclick={() => setPin("")}
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </span>
+        </div>
+        {#if pinInvalid}
+          <p class="note text-muted">4-6 digits, numbers only.</p>
+        {/if}
+        <p class="note text-muted">
+          Ask for this PIN before the detail page opens in view mode. Empty = no
+          lock.
+        </p>
+      </div>
+    {/if}
+
     <!-- The detail page's own line (A47): the eye shows the page itself over
          the display — the editor never asks for the PIN — and the field sets
          the PIN that guards it in view mode. Both are the detail page's own
@@ -1126,47 +1177,7 @@
             <span class="material-symbols-outlined">visibility</span>
           </button>
         </span>
-        <span class="label-mono pin-label">PIN</span>
-        <input
-          class="pin-input"
-          type={pinShown ? "text" : "password"}
-          inputmode="numeric"
-          autocomplete="off"
-          value={pinDraft}
-          placeholder="no PIN"
-          aria-label="Detail page PIN"
-          title="Ask for this PIN before the detail page opens (view mode). Empty = no lock."
-          disabled={!hasDetail}
-          oninput={(e) => setPin(e.currentTarget.value)}
-        />
-        <span class="row-actions">
-          <button
-            type="button"
-            class="icon-btn"
-            title={pinShown ? "Hide the PIN" : "Show the PIN"}
-            aria-label={pinShown ? "Hide the PIN" : "Show the PIN"}
-            disabled={!hasDetail || pinDraft === ""}
-            onclick={() => (pinShown = !pinShown)}
-          >
-            <span class="material-symbols-outlined"
-              >{pinShown ? "visibility" : "visibility_off"}</span
-            >
-          </button>
-          <button
-            type="button"
-            class="icon-btn"
-            title="Clear the PIN — the detail page opens freely again"
-            aria-label="Clear the PIN"
-            disabled={!hasDetail || pinDraft === ""}
-            onclick={() => setPin("")}
-          >
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </span>
       </div>
-      {#if pinInvalid}
-        <p class="note text-muted">4-6 digits, numbers only.</p>
-      {/if}
     </div>
 
     <div class="field">
@@ -2214,6 +2225,8 @@
   }
 
   .details {
+    /* the sheet's own background, so the open tab joins it */
+    --option-tab-bg: var(--surface-container-lowest);
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
@@ -2273,12 +2286,7 @@
     justify-content: space-between;
   }
 
-  /* The detail page's line: the PIN group sits at the far end, and the field
-     is only as wide as its six digits. */
-  .pin-label {
-    margin-left: auto;
-  }
-
+  /* The detail page's PIN field is only as wide as its six digits. */
   .row input.pin-input {
     flex: 0 0 auto;
     width: 8ch;

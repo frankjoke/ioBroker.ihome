@@ -716,6 +716,7 @@
   }
 
   .options {
+    --option-tab-bg: var(--surface-color);
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
