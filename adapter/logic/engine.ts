@@ -195,9 +195,16 @@ export function createEngine(
     warn(logicId, message);
   }
 
+  /** A machine logs as `<logic id>.<state>`, so a line says where it happened. */
+  function logId(rt: Runtime): string {
+    return rt.def.kind === "machine" && rt.state
+      ? `${rt.def.id}.${rt.state}`
+      : rt.def.id;
+  }
+
   /** State changes are only logged for a logic with `log: true`. */
   function stateLog(rt: Runtime, message: string): void {
-    if (rt.def.log === true) deps.log("info", rt.def.id, message);
+    if (rt.def.log === true) deps.log("info", logId(rt), message);
   }
 
   function resolveIn(rt: Runtime, ref: string): unknown {
@@ -288,7 +295,7 @@ export function createEngine(
       const key = `depth:${job.rt.def.id}`;
       if (!chainWarned.has(key)) {
         chainWarned.add(key);
-        warn(job.rt.def.id, `cascade deeper than ${maxDepth}, event dropped`);
+        warn(logId(job.rt), `cascade deeper than ${maxDepth}, event dropped`);
       }
       return;
     }
@@ -297,7 +304,7 @@ export function createEngine(
       const warnKey = `loop:${job.rt.def.id}`;
       if (!chainWarned.has(warnKey)) {
         chainWarned.add(warnKey);
-        warn(job.rt.def.id, "possible loop, event dropped");
+        warn(logId(job.rt), "possible loop, event dropped");
       }
       return;
     }
@@ -347,7 +354,7 @@ export function createEngine(
         try {
           if (!evaluate(row.if, (ref) => resolveIn(rt, ref))) continue;
         } catch (error) {
-          warn(rt.def.id, `condition failed: ${errorText(error)}`);
+          warn(logId(rt), `condition failed: ${errorText(error)}`);
           continue;
         }
       }
@@ -464,7 +471,7 @@ export function createEngine(
     const def = rt.def as MachineLogic;
     const next = def.states[name];
     if (!next) {
-      warn(def.id, `unknown state ${name}`);
+      warn(logId(rt), `unknown state ${name}`);
       return;
     }
     const same = rt.state === name;
@@ -501,7 +508,7 @@ export function createEngine(
         try {
           value = evaluate(action.set.value, (ref) => resolveIn(rt, ref));
         } catch (error) {
-          warn(rt.def.id, `set failed: ${errorText(error)}`);
+          warn(logId(rt), `set failed: ${errorText(error)}`);
           continue;
         }
         writeTarget(
@@ -517,7 +524,7 @@ export function createEngine(
       } else if ("log" in action) {
         deps.log(
           action.log.level ?? "info",
-          rt.def.id,
+          logId(rt),
           fillLog(rt, action.log.text),
         );
       }
@@ -588,7 +595,7 @@ export function createEngine(
     if (variable?.kind === "state") {
       writeState(rt, variable.stateId, value, ack, forward);
     } else {
-      warnOnce(rt.def.id, `cannot write ${ref}: not a state or memory name`);
+      warnOnce(logId(rt), `cannot write ${ref}: not a state or memory name`);
     }
   }
 

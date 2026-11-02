@@ -237,6 +237,8 @@ it("fills {{ref}} in a log message", () => {
   expect(h.logs.map((line) => line.message)).toEqual([
     "saw On from hue.0 (self false)",
   ]);
+  // A machine logs as `<logic id>.<state>` (D25).
+  expect(h.logs[0].logicId).toBe("logger.A");
 });
 
 it("compares a numeric string numerically", () => {

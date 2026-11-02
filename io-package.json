@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "news": {
+      "0.1.5": {
+        "en": "Logic log lines of a state machine are tagged with the state: [logic Light.On] instead of [logic Light].",
+        "de": "Log-Zeilen einer Zustandsmaschine tragen den Zustand: [logic Light.On] statt [logic Light]."
+      },
       "0.1.4": {
         "en": "Logic: an external write to a machine's output moves the machine ($self), string conditions compare as glob patterns, row conditions and the edge follow the event's type, log messages can carry {{ref}} values, and event options sit on one labelled line. The UI lists are unified: one bordered box per item with the editor inside.",
         "de": "Logik: ein externer Schreibzugriff auf die Ausgabe einer Maschine verschiebt die Maschine ($self), String-Bedingungen vergleichen als Glob-Muster, Zeilenbedingungen und Flanke folgen dem Typ des Events, Log-Meldungen können Werte per {{ref}} enthalten, und die Event-Optionen stehen in einer beschrifteten Zeile. Die UI-Listen sind vereinheitlicht: ein Rahmen pro Eintrag, Editor darin."
