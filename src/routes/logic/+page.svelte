@@ -11,7 +11,9 @@
   import LogicEditor from "$lib/components/logic/LogicEditor.svelte";
   import TemplateInsert from "$lib/components/logic/TemplateInsert.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import NameModal from "$lib/components/common/NameModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { renameMemoryRefs } from "$lib/config/logic-rename";
   import { validateLogicDocument } from "$logic/validate";
   import type { Issue } from "$logic/validate";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -29,6 +31,10 @@
   let selectedId = $state<string | null>(null);
   let pendingDelete = $state<LogicDef | null>(null);
   let inserting = $state(false);
+  /** Which new logic the name dialog is creating. */
+  let pendingCreate = $state<"machine" | "action" | null>(null);
+  /** Why the open row's name was rejected, if it was. */
+  let nameError = $state("");
   /** The open editor, scrolled into view like the device list does. */
   let inlineForm: HTMLElement | undefined = $state();
 
@@ -46,29 +52,41 @@
     return id;
   }
 
+  /** Logic names are state/memory identifiers: no spaces, unique. */
+  const NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+  function nameProblem(name: string, exceptId?: string): string | null {
+    if (!NAME_PATTERN.test(name)) {
+      return "Use letters, digits, _ or - (no spaces).";
+    }
+    if (
+      doc.logics.some((logic) => logic.id === name && logic.id !== exceptId)
+    ) {
+      return "That name is already used.";
+    }
+    return null;
+  }
+
   function commit(logics: LogicDef[]): boolean {
     return commitLogics({ ...doc, logics });
   }
 
-  function addMachine() {
-    const id = uniqueId("logic");
+  function addMachine(name: string) {
     const logic: LogicDef = {
-      id,
-      name: "New state machine",
+      id: name,
+      name,
       kind: "machine",
-      output: { scope: "memory", name: id },
+      output: { scope: "memory", name },
       states: { Idle: {} },
     };
     if (commit([...doc.logics, logic])) select(logic);
   }
 
-  function addAction() {
-    const id = uniqueId("action");
+  function addAction(name: string) {
     const logic: LogicDef = {
-      id,
-      name: "New action",
+      id: name,
+      name,
       kind: "function",
-      output: { scope: "memory", name: id },
+      output: { scope: "memory", name },
       expr: { const: 0 },
     };
     if (commit([...doc.logics, logic])) select(logic);
@@ -78,7 +96,7 @@
     const id = uniqueId(`${logic.id}-copy`);
     const copy = $state.snapshot(logic) as LogicDef;
     copy.id = id;
-    copy.name = `${logic.name} copy`;
+    copy.name = id;
     if (copy.output?.scope === "memory" && copy.output.name === logic.id) {
       copy.output.name = id;
     }
@@ -196,6 +214,7 @@
     draft = $state.snapshot(stored) as LogicDef;
     askClose = false;
     pendingSelect = null;
+    nameError = "";
   }
 
   function patch(update: Partial<LogicDef>) {
@@ -230,11 +249,66 @@
     return { ...logic, inputs, output } as LogicDef;
   }
 
+  /** The name is the id (a state/memory identifier), so one edit renames both.
+   *  Spaces and duplicates are refused; the caller resets its input. */
+  function renameLogic(raw: string): boolean {
+    if (!draft) return false;
+    const name = raw.trim();
+    const problem = nameProblem(name, draft.id);
+    if (problem) {
+      nameError = problem;
+      return false;
+    }
+    nameError = "";
+    const oldId = draft.id;
+    const followsId =
+      draft.output?.scope === "memory" &&
+      (draft.output.name ?? oldId) === oldId;
+    draft = (
+      followsId
+        ? { ...draft, id: name, name, output: { ...draft.output, name } }
+        : { ...draft, id: name, name }
+    ) as LogicDef;
+    return true;
+  }
+
   function save() {
     if (!canSave || !draft) return;
     const next = normalizeRefs(draft);
-    update(next);
-    draft = $state.snapshot(next) as LogicDef;
+    const old = selectedLogic;
+    if (old && old.id !== next.id) {
+      const problem = nameProblem(next.id, old.id);
+      if (problem) {
+        nameError = problem;
+        return;
+      }
+    }
+    const oldMemory =
+      old?.output?.scope === "memory" ? (old.output.name ?? old.id) : undefined;
+    const newMemory =
+      next.output?.scope === "memory"
+        ? (next.output.name ?? next.id)
+        : undefined;
+    const memoryRenamed = !!(oldMemory && newMemory && oldMemory !== newMemory);
+    // Even the renamed logic may read its own old memory name.
+    const saved = memoryRenamed
+      ? renameMemoryRefs(next, oldMemory!, newMemory!)
+      : next;
+    if (old && old.id !== next.id) {
+      // A rename is document-wide: the logic takes the new id, and every
+      // memory reference to the old name follows.
+      const logs = doc.logics.map((logic) => {
+        if (logic.id === old.id) return saved;
+        return memoryRenamed
+          ? renameMemoryRefs(logic, oldMemory!, newMemory!)
+          : logic;
+      });
+      if (!commit(logs)) return;
+    } else {
+      update(saved);
+    }
+    draft = $state.snapshot(saved) as LogicDef;
+    selectedId = saved.id;
   }
 
   function closeEditor() {
@@ -299,14 +373,14 @@
         <button
           type="button"
           class="btn btn-primary btn-sm"
-          onclick={addMachine}
+          onclick={() => (pendingCreate = "machine")}
         >
           <span class="material-symbols-outlined">add</span> State machine
         </button>
         <button
           type="button"
           class="btn btn-primary btn-sm"
-          onclick={addAction}
+          onclick={() => (pendingCreate = "action")}
         >
           <span class="material-symbols-outlined">add</span> Action
         </button>
@@ -376,8 +450,11 @@
                 class="name-input"
                 value={draft.name}
                 aria-label="Logic name"
-                onchange={(e) =>
-                  patch({ name: e.currentTarget.value.trim() || draft.id })}
+                onchange={(e) => {
+                  if (!renameLogic(e.currentTarget.value)) {
+                    e.currentTarget.value = draft?.name ?? "";
+                  }
+                }}
               />
             {:else}
               <button type="button" class="name" onclick={() => select(logic)}>
@@ -430,6 +507,9 @@
               />
             </span>
           </div>
+          {#if open && nameError}
+            <p class="text-danger hint">{nameError}</p>
+          {/if}
           {#if open && draft}
             <div class="item-editor" bind:this={inlineForm}>
               <LogicEditor bind:draft {issues} />
@@ -449,6 +529,21 @@
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 </div>
+
+{#if pendingCreate}
+  <NameModal
+    title={pendingCreate === "machine" ? "New state machine" : "New action"}
+    confirmLabel="Create"
+    validate={(name) => nameProblem(name)}
+    onSubmit={(name) => {
+      const kind = pendingCreate;
+      pendingCreate = null;
+      if (kind === "machine") addMachine(name);
+      else addAction(name);
+    }}
+    onCancel={() => (pendingCreate = null)}
+  />
+{/if}
 
 {#if inserting}
   <TemplateInsert

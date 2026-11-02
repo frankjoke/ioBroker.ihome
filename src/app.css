@@ -721,7 +721,7 @@ textarea {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   color: var(--text-color);
   transition:
     border-color var(--transition-fast),

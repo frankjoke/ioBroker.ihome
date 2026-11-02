@@ -7,7 +7,14 @@
   import MachineEditor from "./MachineEditor.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { roomList, enumLabelFromObject } from "$lib/config/rooms";
+  import {
+    roomList,
+    enumLabelFromObject,
+    roomsOf,
+    functionsOf,
+  } from "$lib/config/rooms";
+  import { stateIdFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
 
   /** The logic's body only. Its identity, save and close live on the list line
    *  that opened it, so nothing is shown twice (UI-DESIGN §5.3). */
@@ -43,6 +50,23 @@
   );
   const ownFunctions = $derived(
     (draft.enums ?? []).filter((e) => e.startsWith("enum.functions.")),
+  );
+
+  /** A state output's own organisation: shown until the logic overrides a part. */
+  const inherited = $derived.by(() => {
+    const out = draft.output;
+    if (out?.scope !== "state" || !out.ref) {
+      return { rooms: [] as string[], functions: [] as string[] };
+    }
+    const id = stateIdFor(out.ref, getVariables());
+    return {
+      rooms: roomsOf(ioBroker.enums, id),
+      functions: functionsOf(ioBroker.enums, id),
+    };
+  });
+  const shownRooms = $derived(ownRooms.length ? ownRooms : inherited.rooms);
+  const shownFunctions = $derived(
+    ownFunctions.length ? ownFunctions : inherited.functions,
   );
 
   /** A part with no entries inherits from the output state. */
@@ -103,9 +127,9 @@
         ><span class="label-mono">Rooms</span>
         <MultiSelect
           options={roomOptions}
-          selected={ownRooms}
+          selected={shownRooms}
           enums={ioBroker.enums}
-          placeholder="Inherit from the output"
+          placeholder="Select…"
           onChange={(ids) => setOrg("rooms", ids)}
         /></label
       >
@@ -113,9 +137,9 @@
         ><span class="label-mono">Functions</span>
         <MultiSelect
           options={functionOptions}
-          selected={ownFunctions}
+          selected={shownFunctions}
           enums={ioBroker.enums}
-          placeholder="Inherit from the output"
+          placeholder="Select…"
           onChange={(ids) => setOrg("functions", ids)}
         /></label
       >

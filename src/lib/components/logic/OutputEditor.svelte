@@ -115,6 +115,34 @@
       <option value="state">Existing state</option>
       <option value="memory">Memory</option>
     </select>
+    {#if output.scope === "logic"}
+      <select
+        class="type"
+        aria-label="Output type"
+        value={output.type}
+        onchange={(e) =>
+          onchange({
+            ...output,
+            type: e.currentTarget.value as "boolean" | "number" | "string",
+          })}
+      >
+        {#each TYPE as type (type)}
+          <option value={type}>{type}</option>
+        {/each}
+      </select>
+    {:else if output.scope === "state"}
+      <select
+        class="type"
+        aria-label="Output type"
+        value={shownType}
+        disabled
+        title="The type comes from the selected state"
+      >
+        {#each TYPE as type (type)}
+          <option value={type}>{type}</option>
+        {/each}
+      </select>
+    {/if}
     <label class="inline write-always"
       >write always <input
         type="checkbox"
@@ -132,55 +160,19 @@
     <div class="row">
       <span class="label-mono">State</span>
       <span class="mono text-muted">{logicStateId}</span>
-      <select
-        class="type"
-        aria-label="Output type"
-        value={output.type}
-        onchange={(e) =>
-          onchange({
-            ...output,
-            type: e.currentTarget.value as "boolean" | "number" | "string",
-          })}
-      >
-        {#each TYPE as type (type)}
-          <option value={type}>{type}</option>
-        {/each}
-      </select>
     </div>
-  {:else}
+  {:else if output.scope === "state"}
     <div class="row">
       <span class="label-mono">State</span>
-      <span
-        class="state-value"
-        class:mono={stateRef !== ""}
-        class:text-muted={stateRef === ""}
+      <span class="state-value mono"
+        >{variableNameFor(stateRef, getVariables())}</span
       >
-        {stateRef
-          ? variableNameFor(stateRef, getVariables())
-          : "Memory - Select if to be written"}
-      </span>
       <IconButton
-        icon={stateRef ? "close" : "search"}
-        label={stateRef ? "Clear the output state" : "Select the output state"}
-        title={stateRef ? "Clear the state (use memory)" : "Select a state"}
-        onclick={() => {
-          if (stateRef) setRef("");
-          else picking = true;
-        }}
+        icon="close"
+        label="Clear the output state"
+        title="Clear the state (use memory)"
+        onclick={() => setRef("")}
       />
-      {#if output.scope === "state"}
-        <select
-          class="type"
-          aria-label="Output type"
-          value={shownType}
-          disabled
-          title="The type comes from the selected state"
-        >
-          {#each TYPE as type (type)}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
-      {/if}
     </div>
   {/if}
 
