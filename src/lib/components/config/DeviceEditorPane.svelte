@@ -62,8 +62,12 @@
           onclick={() => onDelete?.(device)}
         />
       {/if}
-      <button type="button" class="btn btn-sm" onclick={onCancel}>Cancel</button
-      >
+      <IconButton
+        icon="close"
+        label="Cancel"
+        title="Cancel"
+        onclick={onCancel}
+      />
     </span>
   </div>
   <div class="item-editor">
