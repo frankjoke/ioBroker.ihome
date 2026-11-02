@@ -1756,75 +1756,79 @@
                   </div>
                 {/if}
                 {#if ICON_KINDS.includes(slot.kind)}
-                  <div class="row">
-                    <label
-                      class="check"
-                      title="Off keeps the glyph and its rules but renders nothing"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={slot.icon !== undefined &&
-                          slot.icon.enabled !== false}
-                        onchange={(e) =>
-                          e.currentTarget.checked
-                            ? setIcon(i, { enabled: true })
-                            : setIcon(i, { enabled: false })}
-                      />
-                      <span>Icon</span>
-                    </label>
-                    {#if slot.icon}
-                      <button
-                        type="button"
-                        class="btn btn-sm glyph-pick"
-                        title={slot.icon.glyph
-                          ? `Glyph: ${slot.icon.glyph} — click to change`
-                          : "Choose a glyph"}
-                        onclick={() => (iconPickerFor = i)}
-                      >
-                        {#if slot.icon.glyph}
-                          <Icon value={slot.icon.glyph} size={18} />
-                        {:else}
-                          Choose glyph…
-                        {/if}
-                      </button>
-                      <WhereButton
-                        where={slot.icon.where ?? "both"}
-                        title={iconWhereTitle(i)}
-                        active={slot.icon.where !== undefined}
-                        onCycle={() =>
-                          edit((t) =>
-                            patchIcon(t, i, {
-                              where:
-                                nextIconWhere(i) === "both"
-                                  ? undefined
-                                  : nextIconWhere(i),
-                            }),
-                          )}
-                      />
-                    {/if}
-                    {#if VALUE_KINDS.includes(slot.kind)}
+                  <div class="row slot-settings">
+                    <span class="setting-group">
                       <label
                         class="check"
-                        title="Off hides the value or widget; the slot and its icon stay"
+                        title="Off keeps the glyph and its rules but renders nothing"
                       >
                         <input
                           type="checkbox"
-                          checked={slot.options?.hideValue !== true}
+                          checked={slot.icon !== undefined &&
+                            slot.icon.enabled !== false}
                           onchange={(e) =>
-                            patchOptions(i, {
-                              hideValue: e.currentTarget.checked
-                                ? undefined
-                                : true,
-                            })}
+                            e.currentTarget.checked
+                              ? setIcon(i, { enabled: true })
+                              : setIcon(i, { enabled: false })}
                         />
-                        <span>Value</span>
+                        <span>Icon</span>
                       </label>
-                      <WhereButton
-                        where={valueWhereOf(slot)}
-                        title={valueWhereTitle(slot)}
-                        active={valueWhereOf(slot) !== "both"}
-                        onCycle={() => cycleValueWhere(i, slot)}
-                      />
+                      {#if slot.icon}
+                        <button
+                          type="button"
+                          class="btn btn-sm glyph-pick"
+                          title={slot.icon.glyph
+                            ? `Glyph: ${slot.icon.glyph} — click to change`
+                            : "Choose a glyph"}
+                          onclick={() => (iconPickerFor = i)}
+                        >
+                          {#if slot.icon.glyph}
+                            <Icon value={slot.icon.glyph} size={18} />
+                          {:else}
+                            Choose glyph…
+                          {/if}
+                        </button>
+                        <WhereButton
+                          where={slot.icon.where ?? "both"}
+                          title={iconWhereTitle(i)}
+                          active={slot.icon.where !== undefined}
+                          onCycle={() =>
+                            edit((t) =>
+                              patchIcon(t, i, {
+                                where:
+                                  nextIconWhere(i) === "both"
+                                    ? undefined
+                                    : nextIconWhere(i),
+                              }),
+                            )}
+                        />
+                      {/if}
+                    </span>
+                    {#if VALUE_KINDS.includes(slot.kind)}
+                      <span class="setting-group value-group">
+                        <label
+                          class="check"
+                          title="Off hides the value or widget; the slot and its icon stay"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={slot.options?.hideValue !== true}
+                            onchange={(e) =>
+                              patchOptions(i, {
+                                hideValue: e.currentTarget.checked
+                                  ? undefined
+                                  : true,
+                              })}
+                          />
+                          <span>Value</span>
+                        </label>
+                        <WhereButton
+                          where={valueWhereOf(slot)}
+                          title={valueWhereTitle(slot)}
+                          active={valueWhereOf(slot) !== "both"}
+                          onCycle={() => cycleValueWhere(i, slot)}
+                        />
+                      </span>
                     {/if}
                   </div>
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
@@ -2325,6 +2329,25 @@
     align-items: center;
     gap: 0.4rem;
     min-width: 0;
+  }
+
+  /* Icon and value each get their own group: the value's sits right and is
+     fenced off, so a home button clearly belongs to its own switch. */
+  .slot-settings {
+    flex-wrap: wrap;
+  }
+
+  .setting-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .value-group {
+    margin-left: auto;
+    padding-left: 0.6rem;
+    border-left: 1px solid var(--border-color);
   }
 
   .row input[type="text"] {
