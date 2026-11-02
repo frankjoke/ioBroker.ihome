@@ -42,8 +42,8 @@
           ? (timer.offset ?? 0)
           : 0,
       at: cron?.at ?? "07:30",
-      allDays: !cron || cron.days === undefined || cron.days === "*",
-      days: cron && Array.isArray(cron.days) ? cron.days : [],
+      days:
+        cron && Array.isArray(cron.days) ? cron.days : [0, 1, 2, 3, 4, 5, 6],
     };
   });
   let kind = $state<Kind | null>(initial.kind);
@@ -51,12 +51,11 @@
   let astroEvent = $state<AstroEvent>(initial.astroEvent);
   let offset = $state(initial.offset);
   let at = $state(initial.at);
-  let allDays = $state(initial.allDays);
   const days = new SvelteSet<number>(initial.days);
 
   const everyOk = $derived((parseDuration(every) ?? 0) > 0);
   const atOk = $derived(parseCronAt(at) !== undefined);
-  const daysOk = $derived(allDays || days.size > 0);
+  const daysOk = $derived(days.size > 0);
   const canSave = $derived(
     kind === "every" ? everyOk : kind === "astro" ? true : atOk && daysOk,
   );
@@ -81,7 +80,7 @@
     onSave({
       kind: "cron",
       at: at.trim(),
-      days: allDays ? "*" : [...days].sort((a, b) => a - b),
+      days: days.size === 7 ? "*" : [...days].sort((a, b) => a - b),
     });
   }
 </script>
@@ -144,24 +143,18 @@
           </div>
           <div class="field">
             <span class="label-mono">Days</span>
-            <label class="check">
-              <input type="checkbox" bind:checked={allDays} />
-              <span>Every day (*)</span>
-            </label>
-            {#if !allDays}
-              <div class="days">
-                {#each DAY_NAMES as label, day (label)}
-                  <label class="check">
-                    <input
-                      type="checkbox"
-                      checked={days.has(day)}
-                      onchange={() => toggleDay(day)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                {/each}
-              </div>
-            {/if}
+            <div class="days">
+              {#each DAY_NAMES as label, day (label)}
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    checked={days.has(day)}
+                    onchange={() => toggleDay(day)}
+                  />
+                  <span>{label}</span>
+                </label>
+              {/each}
+            </div>
           </div>
         {/if}
       {/snippet}
