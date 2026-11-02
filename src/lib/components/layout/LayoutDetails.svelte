@@ -1822,7 +1822,7 @@
                       <WhereButton
                         where={labelWhereOf(slot)}
                         title={labelWhereTitle(slot)}
-                        active={slot.labelWhere !== undefined}
+                        active={labelWhereOf(slot) !== "modal"}
                         onCycle={() => cycleLabelWhere(i, slot)}
                       />
                     </span>

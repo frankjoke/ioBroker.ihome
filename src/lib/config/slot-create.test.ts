@@ -7,6 +7,7 @@ import {
   tileSeed,
 } from "$lib/config/slot-create";
 import { PRESETS } from "$lib/config/presets";
+import { labelShown } from "$lib/config/tile-parts";
 import type { Control, Device } from "$lib/types/device";
 
 const ctl = (
@@ -42,6 +43,17 @@ it("copies label/min/max/step into the slot, not the unit", () => {
   });
   // The resolver returns the effective unit; the slot only overrides it.
   expect(slot.unit).toBeUndefined();
+});
+
+it("starts a new slot's name in the detail view", () => {
+  const slot = slotFromControl(
+    device(),
+    ctl("c1", "brightness", { label: "Brightness" }),
+  );
+  // No stored home: the detail row owns the name, never the tile face.
+  expect(slot.labelWhere).toBeUndefined();
+  expect(labelShown(slot, "tile")).toBe(false);
+  expect(labelShown(slot, "modal")).toBe(true);
 });
 
 it("lets the control correction decide the slot kind, not the object", () => {
