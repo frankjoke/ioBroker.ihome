@@ -25,6 +25,18 @@
   const logicStateId = $derived(`${ioBroker.namespace}.Logic.${logicId}`);
   let picking = $state(false);
 
+  /** Selecting "Existing state" must not change the target until a state is
+   *  actually picked: the picker opens and the select keeps the real target. */
+  function chooseScope(select: HTMLSelectElement): void {
+    const scope = select.value as "memory" | "logic" | "state";
+    if (scope === "state" && !stateRef) {
+      picking = true;
+      select.value = output.scope;
+      return;
+    }
+    setTarget(scope);
+  }
+
   /** The three kinds of output target. */
   function setTarget(scope: "memory" | "logic" | "state") {
     if (scope === "memory") {
@@ -108,14 +120,14 @@
     <select
       aria-label="Output target"
       value={output.scope}
-      onchange={(e) =>
-        setTarget(e.currentTarget.value as "memory" | "logic" | "state")}
+      onchange={(e) => chooseScope(e.currentTarget)}
     >
-      <option value="logic">Logic state (created for you)</option>
+      <option value="logic">ihome state</option>
       <option value="state">Existing state</option>
       <option value="memory">Memory</option>
     </select>
     {#if output.scope === "logic"}
+      <span class="state-name mono" title={logicStateId}>{logicStateId}</span>
       <select
         class="type"
         aria-label="Output type"
@@ -131,6 +143,17 @@
         {/each}
       </select>
     {:else if output.scope === "state"}
+      <span
+        class="state-name mono"
+        title={variableNameFor(stateRef, getVariables())}
+        >{variableNameFor(stateRef, getVariables())}</span
+      >
+      <IconButton
+        icon="close"
+        label="Clear the output state"
+        title="Clear the state (use memory)"
+        onclick={() => setRef("")}
+      />
       <select
         class="type"
         aria-label="Output type"
@@ -156,26 +179,6 @@
     >
   </div>
 
-  {#if output.scope === "logic"}
-    <div class="row">
-      <span class="label-mono">State</span>
-      <span class="mono text-muted">{logicStateId}</span>
-    </div>
-  {:else if output.scope === "state"}
-    <div class="row">
-      <span class="label-mono">State</span>
-      <span class="state-value mono"
-        >{variableNameFor(stateRef, getVariables())}</span
-      >
-      <IconButton
-        icon="close"
-        label="Clear the output state"
-        title="Clear the state (use memory)"
-        onclick={() => setRef("")}
-      />
-    </div>
-  {/if}
-
   {#if picking}
     <SourcePicker
       mode="state"
@@ -188,21 +191,7 @@
     />
   {/if}
 
-  {#if output.scope === "memory"}
-    <div class="row">
-      <span class="label-mono">Memory name</span>
-      <input
-        aria-label="Memory name"
-        value={output.name ?? ""}
-        placeholder="defaults to the logic id"
-        onchange={(e) =>
-          onchange({
-            ...output,
-            name: e.currentTarget.value.trim() || undefined,
-          })}
-      />
-    </div>
-  {:else if output.type === "boolean"}
+  {#if output.scope !== "memory" && output.type === "boolean"}
     <div class="row">
       <span class="label-mono">True for states</span>
       <input
@@ -218,7 +207,7 @@
       />
       <span class="hint text-muted"> * matches all; will be true </span>
     </div>
-  {:else if output.type === "number" && stateNames.length > 0}
+  {:else if output.scope !== "memory" && output.type === "number" && stateNames.length > 0}
     <div class="row">
       <span class="label-mono">Values</span>
       <span class="hint text-muted">state index, in this order:</span>
@@ -249,10 +238,12 @@
     min-width: 6rem;
   }
 
-  .state-value {
+  .state-name {
     flex: 1 1 auto;
     min-width: 0;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .write-always {
