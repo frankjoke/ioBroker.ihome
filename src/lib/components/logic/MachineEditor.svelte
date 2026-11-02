@@ -75,8 +75,8 @@
     },
   ] as const;
 
-  /** The Options strip: what the machine does on start, and the future shared rows. */
-  const OPTION_TABS = [
+  /** The Options strip: what the machine does on start, and the shared rows. */
+  const optionTabs = $derived([
     {
       id: "init",
       label: "$init",
@@ -84,10 +84,10 @@
     },
     {
       id: "all",
-      label: "$all",
-      hint: "Rows that would run for every state — not editable yet.",
+      label: `$all (${logic.all?.on?.length ?? 0})`,
+      hint: "Rows appended after every state's own rows.",
     },
-  ] as const;
+  ]);
 
   let openOption = $state<"init" | "all" | null>(null);
   /** Nothing disappears from the document without a confirmation. */
@@ -376,7 +376,7 @@
 {#snippet eventList(name: string, state: StateDef)}
   <div class="events section-panel">
     <div class="events-head">
-      <span class="label-mono">Events</span>
+      <span class="label-mono">Events ({state.on?.length ?? 0})</span>
       <span class="add-slot">
         <IconButton
           icon="add"
@@ -676,7 +676,7 @@
     <OptionTabs
       bind:value={openOption}
       label="Machine options"
-      tabs={OPTION_TABS}
+      tabs={optionTabs}
     >
       {#snippet children(id)}
         {#if id === "init"}
@@ -746,7 +746,7 @@
 
   <div class="states section-panel">
     <div class="states-head">
-      <span class="label-mono">States</span>
+      <span class="label-mono">States ({stateNames.length})</span>
       <span class="add-slot">
         <IconButton
           icon="add"
