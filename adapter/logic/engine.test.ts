@@ -1502,3 +1502,38 @@ it("emits a logic output as a $logic event source", () => {
   expect(engine.memoryValue("source")).toBe("On");
   expect(engine.memoryValue("sink")).toBe("Hit");
 });
+
+it("uses a global state variable directly as an event source", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "watch",
+        name: "Watch",
+        kind: "machine",
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: {
+            on: [
+              { on: "$var.Alarm", is: { op: "eq", value: true }, goto: "On" },
+            ],
+          },
+          On: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.FLAG": false });
+  h.deps.resolveVariable = (name) =>
+    name === "Alarm"
+      ? { kind: "state", stateId: "0_userdata.0.FLAG" }
+      : undefined;
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.subscriptions()).toContain("0_userdata.0.FLAG");
+  expect(engine.memoryValue("watch")).toBe("Idle");
+  h.change("0_userdata.0.FLAG", true);
+  expect(engine.memoryValue("watch")).toBe("On");
+});

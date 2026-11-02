@@ -36,6 +36,12 @@
       .filter((other) => other.id !== logic.id)
       .map((other) => ({ id: other.id, name: other.name || other.id })),
   );
+  /** Global state variables: they change, so they are event sources (D30). */
+  const globalVariables = $derived(
+    getVariables()
+      .filter((variable) => variable.kind === "state")
+      .map((variable) => ({ name: variable.name, type: variable.type })),
+  );
   const eventInputs = $derived(
     Object.entries(logic.inputs ?? {})
       .filter(
@@ -252,6 +258,16 @@
   /** The event's value type, so the condition offers only what fits it (D23). */
   function conditionKind(row: OnRow): "boolean" | "number" | "string" | "any" {
     if (row.on === "$init" || row.on === "$start") return "boolean";
+    if (row.on.startsWith("$var.")) {
+      const variable = getVariables().find(
+        (item) =>
+          item.kind === "state" && item.name === row.on.slice("$var.".length),
+      );
+      const type = variable?.type;
+      return type === "boolean" || type === "number" || type === "string"
+        ? type
+        : "any";
+    }
     if (row.on.startsWith("$logic.")) {
       const source = logics.find(
         (other) => other.id === row.on.slice("$logic.".length),
@@ -638,6 +654,9 @@
                             <option value="$start"
                               >$start (after all logics)</option
                             >
+                            {#each eventInputs as input (input)}
+                              <option value={input}>{input}</option>
+                            {/each}
                             {#if sourceLogics.length}
                               <optgroup label="Logics">
                                 {#each sourceLogics as source (source.id)}
@@ -647,9 +666,15 @@
                                 {/each}
                               </optgroup>
                             {/if}
-                            {#each eventInputs as input (input)}
-                              <option value={input}>{input}</option>
-                            {/each}
+                            {#if globalVariables.length}
+                              <optgroup label="Global variables">
+                                {#each globalVariables as variable (variable.name)}
+                                  <option value={`$var.${variable.name}`}
+                                    >{variable.name}</option
+                                  >
+                                {/each}
+                              </optgroup>
+                            {/if}
                           </select>
                         </label>
                         <label class="field"

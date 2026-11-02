@@ -409,6 +409,11 @@ function checkRow(
   const input = row?.on;
   if (input === "$init" || input === "$self" || input === "$start") {
     // Built-in machine triggers (D19, D22, D28); only machines have rows.
+  } else if (typeof input === "string" && input.startsWith("$var.")) {
+    // A global state variable (D30); resolved and subscribed at load.
+    if (!input.slice("$var.".length).trim()) {
+      add(id, `${path}.on`, "empty variable name");
+    }
   } else if (typeof input === "string" && input.startsWith("$logic.")) {
     // Another logic's output (D29): it must still exist.
     const source = input.slice("$logic.".length);

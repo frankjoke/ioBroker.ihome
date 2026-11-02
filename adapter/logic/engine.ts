@@ -163,6 +163,32 @@ export function createEngine(
         hasLast: false,
       });
     }
+    // `$var.<name>` rows use a global state variable as an event source (D30);
+    // resolving it to its state makes the normal input path deliver it.
+    if (def.kind === "machine") {
+      const unknown = new Set<string>();
+      for (const state of Object.values(def.states ?? {})) {
+        for (const row of state.on ?? []) {
+          if (!row.on.startsWith("$var.") || inputs.has(row.on)) continue;
+          const name = row.on.slice("$var.".length);
+          const variable = deps.resolveVariable?.(name);
+          if (!variable || variable.kind !== "state") {
+            if (!unknown.has(name)) {
+              unknown.add(name);
+              deps.log("warn", def.id, `variable “${name}” is not a state`);
+            }
+            continue;
+          }
+          inputs.set(row.on, {
+            name: row.on,
+            input: { from: { type: "state", ref: name }, kind: "event" },
+            stateIds: [variable.stateId],
+            lastById: new Map<string, unknown>(),
+            hasLast: false,
+          });
+        }
+      }
+    }
     runtimes.push({
       def,
       inputs,

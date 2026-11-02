@@ -315,3 +315,19 @@ it("accepts a $logic trigger and rejects an unknown logic", () => {
     ),
   ).toBe(true);
 });
+
+it("accepts a global $var trigger", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "v",
+        name: "v",
+        kind: "machine",
+        output: { scope: "memory" },
+        states: { Idle: { on: [{ on: "$var.Alarm" }] } },
+      },
+    ],
+  };
+  expect(validateLogicDocument(d)).toEqual([]);
+});
