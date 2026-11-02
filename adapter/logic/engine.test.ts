@@ -69,21 +69,25 @@ it("maps a machine's state names to a boolean logic output", () => {
         name: "Lift",
         kind: "machine",
         init: { state: "Off" },
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
         output: { scope: "logic", type: "boolean" },
-        states: { Off: {}, On: {} },
+        states: { Off: { on: [{ on: "e", goto: "On" }] }, On: {} },
       },
     ],
   };
-  const h = createHarness({});
+  const h = createHarness({ "0_userdata.0.E": 0 });
   const engine = createEngine(machine, h.deps, {
     ownFrom: "system.adapter.ihome.0",
   });
   h.attach(engine);
   engine.start();
-  const off = h.writes.find(
-    (w) => w.id === "system.adapter.ihome.0.Logic.lift",
-  );
-  expect(off?.value).toBe(false);
+  // Silent adoption writes nothing; the mapping shows on the transition.
+  expect(h.writes).toEqual([]);
+  h.change("0_userdata.0.E", 1);
+  const on = h.writes.find((w) => w.id === "system.adapter.ihome.0.Logic.lift");
+  expect(on?.value).toBe(true);
 });
 
 const follower = (extra: Partial<MachineLogic> = {}): LogicDocument => ({
@@ -392,17 +396,23 @@ it("source self sees only this logic's writes", () => {
         },
         output: { scope: "memory" },
         start: "A",
+        init: { run: true },
         states: {
           A: {
-            enter: [
+            on: [
               {
-                set: {
-                  target: { ref: "0_userdata.0.W" },
-                  value: { const: true },
-                },
+                on: "$init",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.W" },
+                      value: { const: true },
+                    },
+                  },
+                ],
               },
+              { on: "v", if: { ref: "$self" }, goto: "B" },
             ],
-            on: [{ on: "v", if: { ref: "$self" }, goto: "B" }],
           },
           B: {},
         },
@@ -412,7 +422,7 @@ it("source self sees only this logic's writes", () => {
   const h = createHarness({ "0_userdata.0.W": false });
   const engine = createEngine(self, h.deps, { ownFrom: "ihome.0" });
   h.attach(engine);
-  engine.start(); // A's enter writes W=true
+  engine.start(); // the $init row writes W=true
   h.change("0_userdata.0.W", false, { from: "hh.0" }); // external: ignored
   expect(engine.memoryValue("self")).toBe("A");
   h.change("0_userdata.0.W", true, { from: "ihome.0" }); // own write
@@ -722,6 +732,7 @@ it("does not repeat an unchanged set action by default", () => {
             ],
           },
           B: {
+            on: [{ on: "e", goto: "A" }],
             enter: [
               {
                 set: {
@@ -738,9 +749,11 @@ it("does not repeat an unchanged set action by default", () => {
   const h = createHarness({ "0_userdata.0.E": 0, "0_userdata.0.D": false });
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
-  engine.start(); // A enter writes D=true once
+  engine.start(); // silent: A's enter does not run
+  expect(h.writes).toHaveLength(0);
+  h.change("0_userdata.0.E", 1); // B enter writes D=true once
   expect(h.writes).toHaveLength(1);
-  h.change("0_userdata.0.E", 1); // B enter sets the same value → no write
+  h.change("0_userdata.0.E", 2); // A enter sets the same value → no write
   expect(h.writes).toHaveLength(1);
 });
 
@@ -903,7 +916,6 @@ it("starts in the state an init expression answers", () => {
 });
 
 it("matches the state to the current output value, first declaration wins", () => {
-  const h = createHarness({ "0_userdata.0.B": true });
   const doc = startup(
     {
       scope: "state",
@@ -913,22 +925,55 @@ it("matches the state to the current output value, first declaration wins", () =
     },
     { match: "output" },
   );
+  (doc.logics[0] as MachineLogic).log = true;
+
+  const h = createHarness({ "0_userdata.0.B": true });
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: true, ack: false }]);
+  // Adopting is silent: no write, only the state choice.
+  expect(h.writes).toEqual([]);
+  expect(h.logs.some((l) => l.message.includes("starts in “On”"))).toBe(true);
 
   const h2 = createHarness({ "0_userdata.0.B": false });
   const engine2 = createEngine(doc, h2.deps);
   h2.attach(engine2);
   engine2.start();
-  expect(h2.writes).toEqual([
-    { id: "0_userdata.0.B", value: false, ack: false },
-  ]); // the start write resyncs the state
+  expect(h2.writes).toEqual([]);
+  expect(h2.logs.some((l) => l.message.includes("starts in “Idle”"))).toBe(
+    true,
+  );
+});
+
+it("adopts a boolean output by its On prefix without writing or entering", () => {
+  const doc = startup(
+    { scope: "state", ref: "0_userdata.0.B", type: "boolean" },
+    undefined,
+  );
+  const logic = doc.logics[0] as MachineLogic;
+  logic.log = true;
+  logic.states.On.enter = [
+    {
+      set: {
+        target: { ref: "0_userdata.0.FLAG" },
+        value: { const: true },
+      },
+    },
+  ];
+  logic.states.On.after = { time: "1m", goto: "Idle" };
+  const h = createHarness({
+    "0_userdata.0.B": true,
+    "0_userdata.0.FLAG": false,
+  });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([]); // no output write and no enter action
+  expect(h.clock.pending).toBe(0); // and no `after` timer
+  expect(h.logs.some((l) => l.message.includes("starts in “On”"))).toBe(true);
 });
 
 it("falls back when the output value matches no state", () => {
-  const h = createHarness({ "0_userdata.0.B": 99 });
   const doc = startup(
     {
       scope: "state",
@@ -938,10 +983,13 @@ it("falls back when the output value matches no state", () => {
     },
     { match: "output", state: "On" },
   );
+  (doc.logics[0] as MachineLogic).log = true;
+  const h = createHarness({ "0_userdata.0.B": 99 });
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([{ id: "0_userdata.0.B", value: 1, ack: false }]);
+  expect(h.writes).toEqual([]);
+  expect(h.logs.some((l) => l.message.includes("starts in “On”"))).toBe(true);
 });
 
 it("exposes $init only during the start evaluation", () => {
@@ -965,9 +1013,9 @@ it("exposes $init only during the start evaluation", () => {
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  expect(h.writes).toEqual([
-    { id: "0_userdata.0.FLAG", value: true, ack: false },
-  ]);
+  // Adopting Idle is silent (its enter action must not run); the $init row's
+  // goto to On is the start action.
+  expect(h.writes).toEqual([]);
   h.change("0_userdata.0.P", true);
   expect(h.writes.at(-1)).toEqual({
     id: "0_userdata.0.FLAG",
@@ -1091,8 +1139,12 @@ it("writes the state index for a number output", () => {
           type: "number",
           forward: "always",
         },
-        start: "Dim",
-        states: { Idle: {}, Dim: {}, On: {} },
+        start: "Idle",
+        states: {
+          Idle: { on: [{ on: "p", goto: "Dim" }] },
+          Dim: {},
+          On: {},
+        },
       },
     ],
   };
@@ -1100,6 +1152,9 @@ it("writes the state index for a number output", () => {
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
+  // A number output has no implicit mapping, so start is silent and unwritten.
+  expect(h.writes).toEqual([]);
+  h.change("0_userdata.0.P", true);
   expect(h.writes.at(-1)).toEqual({
     id: "0_userdata.0.LEVEL",
     value: 1,

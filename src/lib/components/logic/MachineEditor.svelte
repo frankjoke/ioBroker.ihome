@@ -82,7 +82,6 @@
   >(null);
 
   const init = $derived<Init>(logic.init ?? {});
-  const canMatch = $derived(logic.output?.scope === "state");
 
   function patchInit(update: Partial<Init>) {
     const next: Init = { ...(logic.init ?? {}), ...update };
@@ -340,23 +339,12 @@
       {#snippet children(id)}
         {#if id === "init"}
           <div class="option-body">
-            <label class="inline"
-              >take the state from the current output value
-              <input
-                type="checkbox"
-                checked={init.match === "output"}
-                disabled={!canMatch}
-                onchange={(e) =>
-                  patchInit({
-                    match: e.currentTarget.checked ? "output" : undefined,
-                  })}
-              /></label
-            >
-            {#if !canMatch}
-              <span class="hint text-muted">
-                Needs an external output state.
-              </span>
-            {/if}
+            <p class="hint text-muted">
+              Starts in the state whose value matches the current output (a
+              boolean's <code>On*</code> or an explicit map); otherwise in the
+              first state. Adopting is silent: no enter actions, no timer, no
+              output write. Use an init state or a <code>$init</code> row to act.
+            </p>
             {#if init.state !== undefined}
               <div class="row">
                 <span class="label-mono">init state</span>

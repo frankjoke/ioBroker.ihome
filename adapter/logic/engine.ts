@@ -742,9 +742,25 @@ export function createEngine(
     if (names.length === 0) return;
     const chosen = chooseStart(rt, def, names);
     rt.init = true;
-    transition(rt, chosen, 0, "start");
+    // Silent adoption (D27): set the state and nothing else — no exit/enter, no
+    // `after` timer, no output command. Only an explicit `$init` goto acts.
+    rt.state = chosen;
+    const output = rt.output;
+    if (output.scope === "memory") {
+      // The machine's own state readout, stored without emitting an event.
+      memory.set(output.name ?? def.id, chosen);
+    } else {
+      const target = outputTargetId(rt);
+      // Remember what the output holds, so the first transition writes only a
+      // real change (`forward: "changed"`), not the value it already sees.
+      if (target) {
+        rt.lastOutput = deps.read(target);
+        rt.hasOutput = true;
+      }
+    }
+    stateLog(rt, `Logic “${def.name}” starts in “${chosen}” because of start`);
     if (def.init?.run === true) {
-      // The `$init` rows run after entering, with $init true.
+      // The `$init` rows run after adopting, with $init true.
       handleMachine({
         rt,
         input: "$init",
@@ -764,14 +780,19 @@ export function createEngine(
     names: string[],
   ): string {
     const init = def.init;
-    if (
-      init?.match === "output" &&
+    // A defined mapping (an explicit `map`, or a boolean's implicit `On*`) makes
+    // matching the current output the default; a number/string output without a
+    // map has no mapping to trust, so it falls through to init.state/start.
+    const mappable =
       rt.output.scope !== "memory" &&
-      rt.output.map
+      (!!rt.output.map || rt.output.type === "boolean");
+    if (
+      rt.output.scope !== "memory" &&
+      (init?.match === "output" || mappable)
     ) {
       const current = deps.read(outputTargetId(rt) ?? "");
       for (const name of names) {
-        if (Object.is(rt.output.map[name], current)) return name;
+        if (Object.is(outputValue(rt, name), current)) return name;
       }
     }
     if (init?.state !== undefined) {
