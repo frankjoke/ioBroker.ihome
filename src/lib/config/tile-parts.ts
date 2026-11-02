@@ -260,14 +260,13 @@ export function valueShown(
 }
 
 /** Does the slot's name draw in `home`? Its own `labelWhere` wins; absent keeps
- *  today's split: the detail row for a reading, both for a frame/html caption. */
+ *  every name in the detail view — only the tile's own title shows on the tile
+ *  by default. */
 export function labelShown(
   slot: Pick<Slot, "kind" | "labelWhere">,
   home: "tile" | "modal",
 ): boolean {
-  const fallback =
-    slot.kind === "frame" || slot.kind === "html" ? "both" : "modal";
-  const where = slot.labelWhere ?? fallback;
+  const where = slot.labelWhere ?? "modal";
   return where === "both" || where === home;
 }
 

@@ -664,13 +664,9 @@
     setValueWhere(i, next === "both" ? undefined : next);
   }
 
-  /** The name's homes; absent keeps today's split: the detail row for a
-   *  reading, the caption on both for a frame/html. */
+  /** The name's homes; absent puts every name in the detail view. */
   function labelWhereOf(slot: Slot): "tile" | "both" | "modal" {
-    return (
-      slot.labelWhere ??
-      (slot.kind === "frame" || slot.kind === "html" ? "both" : "modal")
-    );
+    return slot.labelWhere ?? "modal";
   }
 
   function nextLabelWhere(slot: Slot): "tile" | "both" | "modal" {
@@ -686,10 +682,8 @@
 
   function cycleLabelWhere(i: number, slot: Slot): void {
     const next = nextLabelWhere(slot);
-    const fallback =
-      slot.kind === "frame" || slot.kind === "html" ? "both" : "modal";
     edit((t) =>
-      patchSlot(t, i, { labelWhere: next === fallback ? undefined : next }),
+      patchSlot(t, i, { labelWhere: next === "modal" ? undefined : next }),
     );
   }
 

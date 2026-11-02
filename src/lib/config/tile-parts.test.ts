@@ -663,12 +663,13 @@ it("hides the slot's value off, or moves it by its own home", () => {
 });
 
 it("draws a slot's name where its labelWhere says", () => {
-  // Today's split: a reading's name only in the detail row, a frame caption both.
+  // Absent puts every name in the detail view: only the tile's title is on the
+  // face. A frame's caption is a slot name too, so it waits for an explicit home.
   expect(labelShown({ kind: "value" }, "modal")).toBe(true);
   expect(labelShown({ kind: "value" }, "tile")).toBe(false);
-  expect(labelShown({ kind: "frame" }, "tile")).toBe(true);
+  expect(labelShown({ kind: "frame" }, "tile")).toBe(false);
   expect(labelShown({ kind: "frame" }, "modal")).toBe(true);
-  expect(labelShown({ kind: "html" }, "tile")).toBe(true);
+  expect(labelShown({ kind: "html" }, "tile")).toBe(false);
   // An explicit home wins on either side.
   expect(labelShown({ kind: "value", labelWhere: "tile" }, "tile")).toBe(true);
   expect(labelShown({ kind: "value", labelWhere: "tile" }, "modal")).toBe(
@@ -678,10 +679,8 @@ it("draws a slot's name where its labelWhere says", () => {
   expect(labelShown({ kind: "value", labelWhere: "modal" }, "modal")).toBe(
     true,
   );
-  // A frame can be narrowed too.
-  expect(labelShown({ kind: "frame", labelWhere: "modal" }, "tile")).toBe(
-    false,
-  );
+  // A frame caption can go on the face too.
+  expect(labelShown({ kind: "frame", labelWhere: "both" }, "tile")).toBe(true);
 });
 
 it("the tile icon is separate from the headline slot icon", () => {
