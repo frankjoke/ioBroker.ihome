@@ -1320,9 +1320,6 @@
                 {/if}
                 <span class="slot-summary" title={slotLabel(slot)}>
                   <span class="slot-name">{slotLabel(slot)}</span>
-                  {#if !slot.source && slot.options?.pick}
-                    <span class="hint-mark text-muted">(hint)</span>
-                  {/if}
                 </span>
                 {#if slot === headlineSlot(shownSlots)}
                   <span
@@ -1562,65 +1559,51 @@
                     />
                   </label>
                 </div>
-                {#if slot.kind !== "frame" && slot.kind !== "html"}
+                {#if slot.kind === "value"}
                   <div class="row">
-                    <label class="small grow">
-                      <span class="label-mono">Hint</span>
+                    <label class="small">
+                      <span class="label-mono">index</span>
                       <input
-                        type="text"
-                        placeholder="e.g. temperature"
-                        value={String(slot.options?.pick ?? "")}
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.index ?? "")}
                         oninput={(e) =>
                           patchOptions(i, {
-                            pick: e.currentTarget.value.trim() || undefined,
+                            index: num(e.currentTarget.value),
                           })}
                       />
                     </label>
-                    {#if slot.kind === "value"}
-                      <label class="small">
-                        <span class="label-mono">index</span>
-                        <input
-                          type="number"
-                          class="num-input"
-                          value={String(slot.options?.index ?? "")}
-                          oninput={(e) =>
-                            patchOptions(i, {
-                              index: num(e.currentTarget.value),
-                            })}
-                        />
-                      </label>
-                      <label class="small">
-                        <span class="label-mono">decimals</span>
-                        <input
-                          type="number"
-                          class="num-input"
-                          value={String(slot.options?.decimals ?? "")}
-                          oninput={(e) =>
-                            patchOptions(i, {
-                              decimals: num(e.currentTarget.value),
-                            })}
-                        />
-                      </label>
-                      <label class="check" title="Hide the unit to save width">
-                        <input
-                          type="checkbox"
-                          checked={slot.options?.hideUnit !== true}
-                          onchange={(e) =>
-                            patchOptions(i, {
-                              hideUnit: e.currentTarget.checked
-                                ? undefined
-                                : true,
-                            })}
-                        />
-                        <span>unit</span>
-                      </label>
-                      <WhereButton
-                        where={slotWhere(slot)}
-                        title={whereTitle(slot)}
-                        active={slotWhere(slot) !== "tile"}
-                        onCycle={() => cycleWhere(i, slot)}
+                    <label class="small">
+                      <span class="label-mono">decimals</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.decimals ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            decimals: num(e.currentTarget.value),
+                          })}
                       />
-                    {/if}
+                    </label>
+                    <label class="check" title="Hide the unit to save width">
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.hideUnit !== true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            hideUnit: e.currentTarget.checked
+                              ? undefined
+                              : true,
+                          })}
+                      />
+                      <span>unit</span>
+                    </label>
+                    <WhereButton
+                      where={slotWhere(slot)}
+                      title={whereTitle(slot)}
+                      active={slotWhere(slot) !== "tile"}
+                      onCycle={() => cycleWhere(i, slot)}
+                    />
                   </div>
                 {/if}
                 {#if slot.kind === "level"}
@@ -2500,11 +2483,6 @@
     white-space: nowrap;
     direction: rtl;
     text-align: left;
-  }
-
-  /* Its own gap: the svelte compiler trims the space before an inline element. */
-  .hint-mark {
-    margin-left: 0.25rem;
   }
 
   .hint-badge {
