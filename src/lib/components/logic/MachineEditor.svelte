@@ -30,11 +30,6 @@
   } = $props();
 
   const stateNames = $derived(Object.keys(logic.states));
-  /** Real states, then the pseudo `$all` whose rows are appended to each. */
-  const stateEntries = $derived([
-    ...Object.entries(logic.states),
-    ["$all", (logic.all ?? {}) as StateDef],
-  ] as [string, StateDef][]);
   /** The other logics, as `$logic.<id>` event sources. */
   const sourceLogics = $derived(
     logics
@@ -356,7 +351,7 @@
   }
 
   function eventName(state: string, index: number): string {
-    return logic.states[state]?.on?.[index]?.on ?? `event ${index + 1}`;
+    return stateOf(state).on?.[index]?.on ?? `event ${index + 1}`;
   }
 
   function rowSummary(row: OnRow): string {
@@ -377,6 +372,301 @@
     return parts.join(" · ");
   }
 </script>
+
+{#snippet eventList(name: string, state: StateDef)}
+  <div class="events section-panel">
+    <div class="events-head">
+      <span class="label-mono">Events</span>
+      <span class="add-slot">
+        <IconButton
+          icon="add"
+          label={`Add event to ${name}`}
+          title="Add event"
+          onclick={() => addRow(name)}
+        />
+      </span>
+    </div>
+
+    {#each state.on ?? [] as row, index (index)}
+      {@const eventOpen = openRow === index}
+      <div class="item" class:open={eventOpen}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onEventLineClick(e, index)}>
+          <span class="event-summary mono">{rowSummary(row)}</span>
+          <span class="item-actions">
+            <IconButton
+              icon="arrow_upward"
+              label={`Move event ${index + 1} of ${name} up`}
+              title="Move up"
+              disabled={index === 0}
+              onclick={() => moveRow(name, index, index - 1)}
+            />
+            <IconButton
+              icon="arrow_downward"
+              label={`Move event ${index + 1} of ${name} down`}
+              title="Move down"
+              disabled={index === (state.on?.length ?? 0) - 1}
+              onclick={() => moveRow(name, index, index + 1)}
+            />
+            <IconButton
+              icon="delete"
+              danger
+              label={`Delete event ${index + 1} of ${name}`}
+              title="Delete"
+              onclick={() =>
+                (pendingDelete = {
+                  kind: "event",
+                  state: name,
+                  index,
+                })}
+            />
+          </span>
+        </div>
+
+        {#if eventOpen}
+          {@const kind = conditionKind(row)}
+          <div class="item-editor">
+            <div class="row event-options">
+              <label class="field"
+                ><span class="label-mono">On</span>
+                <select
+                  aria-label="Event input"
+                  value={row.on}
+                  onchange={(e) =>
+                    updateRow(name, index, {
+                      ...row,
+                      on: e.currentTarget.value,
+                    })}
+                >
+                  <option value="$init">$init (start)</option>
+                  <option value="$self">$self (target state)</option>
+                  <option value="$start">$start (after all logics)</option>
+                  {#each eventInputs as input (input)}
+                    <option value={input}>{input}</option>
+                  {/each}
+                  {#if sourceLogics.length}
+                    <optgroup label="Logics">
+                      {#each sourceLogics as source (source.id)}
+                        <option value={`$logic.${source.id}`}
+                          >{source.name}</option
+                        >
+                      {/each}
+                    </optgroup>
+                  {/if}
+                  {#if globalVariables.length}
+                    <optgroup label="Global variables">
+                      {#each globalVariables as variable (variable.name)}
+                        <option value={`$var.${variable.name}`}
+                          >{variable.name}</option
+                        >
+                      {/each}
+                    </optgroup>
+                  {/if}
+                </select>
+              </label>
+              <label class="field"
+                ><span class="label-mono">Condition</span>
+                {#if kind === "boolean"}
+                  <select
+                    aria-label="Condition"
+                    value={row.is ? String(row.is.value === true) : ""}
+                    onchange={(e) =>
+                      updateRow(name, index, {
+                        ...row,
+                        is: setBoolCondition(row, e.currentTarget.value),
+                      })}
+                  >
+                    <option value="">*</option>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                {:else}
+                  <select
+                    aria-label="Condition"
+                    value={row.is?.op ?? ""}
+                    onchange={(e) => {
+                      const op = e.currentTarget.value;
+                      updateRow(name, index, {
+                        ...row,
+                        is: op
+                          ? {
+                              op: op as Operator,
+                              value: row.is?.value ?? "",
+                            }
+                          : undefined,
+                      });
+                    }}
+                  >
+                    <option value="">*</option>
+                    {#each opsFor(kind) as o (o.op)}
+                      <option value={o.op}>{o.label}</option>
+                    {/each}
+                  </select>
+                {/if}
+              </label>
+              {#if row.is && kind !== "boolean"}
+                <label class="field"
+                  ><span class="label-mono">Value</span>
+                  <input
+                    class="is-value"
+                    aria-label="Compare value"
+                    value={String(row.is.value ?? "")}
+                    onchange={(e) =>
+                      updateRow(name, index, {
+                        ...row,
+                        is: {
+                          op: row.is!.op,
+                          value:
+                            kind === "string"
+                              ? e.currentTarget.value
+                              : parseValue(e.currentTarget.value),
+                        },
+                      })}
+                  />
+                </label>
+              {/if}
+              {#if kind === "boolean"}
+                <label class="field"
+                  ><span class="label-mono">Edge</span>
+                  <select
+                    aria-label="Edge"
+                    value={row.edge ?? "change"}
+                    onchange={(e) =>
+                      updateRow(name, index, {
+                        ...row,
+                        edge: e.currentTarget.value as
+                          "change" | "rising" | "falling" | "any",
+                      })}
+                  >
+                    <option value="any">any</option>
+                    <option value="change">change</option>
+                    <option value="rising">rising</option>
+                    <option value="falling">falling</option>
+                  </select>
+                </label>
+              {:else}
+                <label class="field"
+                  ><span class="label-mono">Edge</span>
+                  <span class="check"
+                    ><input
+                      type="checkbox"
+                      aria-label="Every update"
+                      checked={row.edge === "any"}
+                      onchange={(e) =>
+                        updateRow(name, index, {
+                          ...row,
+                          edge: e.currentTarget.checked ? "any" : "change",
+                        })}
+                    />
+                    {row.edge === "any" ? "any" : "change"}</span
+                  >
+                </label>
+              {/if}
+              <label class="field"
+                ><span class="label-mono">Ack</span>
+                <select
+                  aria-label="Ack filter"
+                  value={row.ack ?? "any"}
+                  onchange={(e) =>
+                    updateRow(name, index, {
+                      ...row,
+                      ack: e.currentTarget.value as "any" | "true" | "false",
+                    })}
+                >
+                  <option value="any">any</option>
+                  <option value="false">false</option>
+                  <option value="true">true</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="block">
+              {#if row.if}
+                <div class="row">
+                  <span class="label-mono">if</span>
+                  <ExprEditor
+                    expr={row.if}
+                    onchange={(next) => {
+                      if ("noop" in next) return;
+                      updateRow(name, index, { ...row, if: next });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() =>
+                      updateRow(name, index, {
+                        ...row,
+                        if: undefined,
+                      })}>Remove condition</button
+                  >
+                </div>
+              {:else}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() =>
+                    updateRow(name, index, {
+                      ...row,
+                      if: { ref: "" },
+                    })}>Add condition</button
+                >
+              {/if}
+            </div>
+
+            <div class="block">
+              <span class="label-mono">Then</span>
+              <ActionList
+                actions={row.do ?? []}
+                {stateNames}
+                onchange={(actions) =>
+                  updateRow(name, index, { ...row, do: actions })}
+              />
+            </div>
+
+            <div class="row">
+              <span class="label-mono">goto</span>
+              <select
+                aria-label="Target state"
+                value={row.goto ?? ""}
+                onchange={(e) =>
+                  updateRow(name, index, {
+                    ...row,
+                    goto: e.currentTarget.value || undefined,
+                  })}
+              >
+                <option value="">— stay —</option>
+                {#each stateNames as target (target)}
+                  <option value={target}>{target}</option>
+                {/each}
+              </select>
+              <label
+                class="check"
+                title={row.goto || (row.do ?? []).some((a) => "goto" in a)
+                  ? "A goto ends this event — clear it to continue with the next row"
+                  : "After this row's actions, keep checking the next rows for the same event"}
+              >
+                <input
+                  type="checkbox"
+                  checked={row.continue === true}
+                  disabled={!!row.goto ||
+                    (row.do ?? []).some((a) => "goto" in a)}
+                  onchange={(e) =>
+                    updateRow(name, index, {
+                      ...row,
+                      continue: e.currentTarget.checked || undefined,
+                    })}
+                />
+                <span>continue</span>
+              </label>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/snippet}
 
 <div class="machine">
   <div class="options">
@@ -441,10 +731,14 @@
             >
           </div>
         {:else if id === "all"}
-          <p class="hint text-muted">
-            Common rows and actions for every state — the editor follows with
-            the input/usage redesign.
-          </p>
+          <div class="option-body">
+            <p class="hint text-muted">
+              Rows appended after every state's own rows: a <code>continue</code
+              >
+              row falls through into them, a terminal state match does not.
+            </p>
+            {@render eventList("$all", logic.all ?? {})}
+          </div>
         {/if}
       {/snippet}
     </OptionTabs>
@@ -463,13 +757,13 @@
       </span>
     </div>
 
-    {#each stateEntries as [name, state] (name)}
+    {#each Object.entries(logic.states) as [name, state] (name)}
       {@const stateOpen = openState === name}
       <div class="item" class:open={stateOpen}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="item-line" onclick={(e) => onLineClick(e, name)}>
-          {#if stateOpen && name !== "$all"}
+          {#if stateOpen}
             <input
               class="name-input"
               value={name}
@@ -485,435 +779,122 @@
               {name}
             </button>
           {/if}
-          {#if name === "$all"}
-            <span class="badge badge-secondary">all states</span>
-          {:else if logic.start ? logic.start === name : stateNames[0] === name}
+          {#if logic.start ? logic.start === name : stateNames[0] === name}
             <span class="badge badge-secondary">start</span>
           {/if}
           <span class="hint text-muted">
             {(state.on ?? []).length} event{(state.on ?? []).length === 1
               ? ""
-              : "s"}{name === "$all"
-              ? " · appended to every state"
-              : state.after
-                ? ` · after ${state.after.time} → ${state.after.goto}`
-                : ""}
+              : "s"}{state.after
+              ? ` · after ${state.after.time} → ${state.after.goto}`
+              : ""}
           </span>
-          {#if name !== "$all"}
-            <span class="item-actions">
-              <IconButton
-                icon="arrow_upward"
-                label={`Move ${name} up`}
-                title="Move up"
-                disabled={stateNames.indexOf(name) === 0}
-                onclick={() => moveState(name, -1)}
-              />
-              <IconButton
-                icon="arrow_downward"
-                label={`Move ${name} down`}
-                title="Move down"
-                disabled={stateNames.indexOf(name) === stateNames.length - 1}
-                onclick={() => moveState(name, 1)}
-              />
-              <IconButton
-                icon="delete"
-                danger
-                label={`Delete ${name}`}
-                title="Delete"
-                disabled={stateNames.length <= 1}
-                onclick={() => (pendingDelete = { kind: "state", name })}
-              />
-            </span>
-          {/if}
+          <span class="item-actions">
+            <IconButton
+              icon="arrow_upward"
+              label={`Move ${name} up`}
+              title="Move up"
+              disabled={stateNames.indexOf(name) === 0}
+              onclick={() => moveState(name, -1)}
+            />
+            <IconButton
+              icon="arrow_downward"
+              label={`Move ${name} down`}
+              title="Move down"
+              disabled={stateNames.indexOf(name) === stateNames.length - 1}
+              onclick={() => moveState(name, 1)}
+            />
+            <IconButton
+              icon="delete"
+              danger
+              label={`Delete ${name}`}
+              title="Delete"
+              disabled={stateNames.length <= 1}
+              onclick={() => (pendingDelete = { kind: "state", name })}
+            />
+          </span>
         </div>
 
         {#if stateOpen}
           <div class="item-editor">
-            {#if name !== "$all"}
-              <div class="state-options">
-                <OptionTabs
-                  bind:value={stateTab}
-                  label="State options"
-                  tabs={STATE_TABS}
-                  collapsible={false}
-                >
-                  {#snippet children(id)}
-                    <div class="option-body">
-                      {#if id === "enter"}
-                        <ActionList
-                          actions={state.enter ?? []}
-                          onchange={(enter) =>
-                            updateState(name, { ...state, enter })}
-                        />
-                      {:else if id === "exit"}
-                        <ActionList
-                          actions={state.exit ?? []}
-                          onchange={(exit) =>
-                            updateState(name, { ...state, exit })}
-                        />
-                      {:else}
-                        <div class="row">
-                          <label class="inline"
-                            >after
-                            <input
-                              class="duration"
-                              aria-label={`After time for ${name}`}
-                              placeholder="2m"
-                              value={state.after?.time ?? ""}
-                              onchange={(e) =>
-                                updateState(name, {
-                                  ...state,
-                                  after: e.currentTarget.value.trim()
-                                    ? {
-                                        time: e.currentTarget.value.trim(),
-                                        goto:
-                                          state.after?.goto ??
-                                          stateNames.find((s) => s !== name) ??
-                                          name,
-                                      }
-                                    : undefined,
-                                })}
-                            />
-                          </label>
-                          <label class="inline"
-                            >goto
-                            <select
-                              aria-label={`After target for ${name}`}
-                              value={state.after?.goto ?? ""}
-                              onchange={(e) =>
-                                updateState(name, {
-                                  ...state,
-                                  after: state.after
-                                    ? {
-                                        ...state.after,
-                                        goto: e.currentTarget.value,
-                                      }
-                                    : {
-                                        time: "1m",
-                                        goto: e.currentTarget.value,
-                                      },
-                                })}
-                            >
-                              <option value="">— none —</option>
-                              {#each stateNames as target (target)}
-                                <option value={target}>{target}</option>
-                              {/each}
-                            </select>
-                          </label>
-                        </div>
-                      {/if}
-                    </div>
-                  {/snippet}
-                </OptionTabs>
-              </div>
-            {/if}
-
-            <div class="events section-panel">
-              <div class="events-head">
-                <span class="label-mono">Events</span>
-                <span class="add-slot">
-                  <IconButton
-                    icon="add"
-                    label={`Add event to ${name}`}
-                    title="Add event"
-                    onclick={() => addRow(name)}
-                  />
-                </span>
-              </div>
-
-              {#each state.on ?? [] as row, index (index)}
-                {@const eventOpen = openRow === index}
-                <div class="item" class:open={eventOpen}>
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div
-                    class="item-line"
-                    onclick={(e) => onEventLineClick(e, index)}
-                  >
-                    <span class="event-summary mono">{rowSummary(row)}</span>
-                    <span class="item-actions">
-                      <IconButton
-                        icon="arrow_upward"
-                        label={`Move event ${index + 1} of ${name} up`}
-                        title="Move up"
-                        disabled={index === 0}
-                        onclick={() => moveRow(name, index, index - 1)}
+            <div class="state-options">
+              <OptionTabs
+                bind:value={stateTab}
+                label="State options"
+                tabs={STATE_TABS}
+                collapsible={false}
+              >
+                {#snippet children(id)}
+                  <div class="option-body">
+                    {#if id === "enter"}
+                      <ActionList
+                        actions={state.enter ?? []}
+                        onchange={(enter) =>
+                          updateState(name, { ...state, enter })}
                       />
-                      <IconButton
-                        icon="arrow_downward"
-                        label={`Move event ${index + 1} of ${name} down`}
-                        title="Move down"
-                        disabled={index === (state.on?.length ?? 0) - 1}
-                        onclick={() => moveRow(name, index, index + 1)}
+                    {:else if id === "exit"}
+                      <ActionList
+                        actions={state.exit ?? []}
+                        onchange={(exit) =>
+                          updateState(name, { ...state, exit })}
                       />
-                      <IconButton
-                        icon="delete"
-                        danger
-                        label={`Delete event ${index + 1} of ${name}`}
-                        title="Delete"
-                        onclick={() =>
-                          (pendingDelete = {
-                            kind: "event",
-                            state: name,
-                            index,
-                          })}
-                      />
-                    </span>
-                  </div>
-
-                  {#if eventOpen}
-                    {@const kind = conditionKind(row)}
-                    <div class="item-editor">
-                      <div class="row event-options">
-                        <label class="field"
-                          ><span class="label-mono">On</span>
-                          <select
-                            aria-label="Event input"
-                            value={row.on}
-                            onchange={(e) =>
-                              updateRow(name, index, {
-                                ...row,
-                                on: e.currentTarget.value,
-                              })}
-                          >
-                            <option value="$init">$init (start)</option>
-                            <option value="$self">$self (target state)</option>
-                            <option value="$start"
-                              >$start (after all logics)</option
-                            >
-                            {#each eventInputs as input (input)}
-                              <option value={input}>{input}</option>
-                            {/each}
-                            {#if sourceLogics.length}
-                              <optgroup label="Logics">
-                                {#each sourceLogics as source (source.id)}
-                                  <option value={`$logic.${source.id}`}
-                                    >{source.name}</option
-                                  >
-                                {/each}
-                              </optgroup>
-                            {/if}
-                            {#if globalVariables.length}
-                              <optgroup label="Global variables">
-                                {#each globalVariables as variable (variable.name)}
-                                  <option value={`$var.${variable.name}`}
-                                    >{variable.name}</option
-                                  >
-                                {/each}
-                              </optgroup>
-                            {/if}
-                          </select>
-                        </label>
-                        <label class="field"
-                          ><span class="label-mono">Condition</span>
-                          {#if kind === "boolean"}
-                            <select
-                              aria-label="Condition"
-                              value={row.is
-                                ? String(row.is.value === true)
-                                : ""}
-                              onchange={(e) =>
-                                updateRow(name, index, {
-                                  ...row,
-                                  is: setBoolCondition(
-                                    row,
-                                    e.currentTarget.value,
-                                  ),
-                                })}
-                            >
-                              <option value="">*</option>
-                              <option value="true">true</option>
-                              <option value="false">false</option>
-                            </select>
-                          {:else}
-                            <select
-                              aria-label="Condition"
-                              value={row.is?.op ?? ""}
-                              onchange={(e) => {
-                                const op = e.currentTarget.value;
-                                updateRow(name, index, {
-                                  ...row,
-                                  is: op
-                                    ? {
-                                        op: op as Operator,
-                                        value: row.is?.value ?? "",
-                                      }
-                                    : undefined,
-                                });
-                              }}
-                            >
-                              <option value="">*</option>
-                              {#each opsFor(kind) as o (o.op)}
-                                <option value={o.op}>{o.label}</option>
-                              {/each}
-                            </select>
-                          {/if}
-                        </label>
-                        {#if row.is && kind !== "boolean"}
-                          <label class="field"
-                            ><span class="label-mono">Value</span>
-                            <input
-                              class="is-value"
-                              aria-label="Compare value"
-                              value={String(row.is.value ?? "")}
-                              onchange={(e) =>
-                                updateRow(name, index, {
-                                  ...row,
-                                  is: {
-                                    op: row.is!.op,
-                                    value:
-                                      kind === "string"
-                                        ? e.currentTarget.value
-                                        : parseValue(e.currentTarget.value),
-                                  },
-                                })}
-                            />
-                          </label>
-                        {/if}
-                        {#if kind === "boolean"}
-                          <label class="field"
-                            ><span class="label-mono">Edge</span>
-                            <select
-                              aria-label="Edge"
-                              value={row.edge ?? "change"}
-                              onchange={(e) =>
-                                updateRow(name, index, {
-                                  ...row,
-                                  edge: e.currentTarget.value as
-                                    "change" | "rising" | "falling" | "any",
-                                })}
-                            >
-                              <option value="any">any</option>
-                              <option value="change">change</option>
-                              <option value="rising">rising</option>
-                              <option value="falling">falling</option>
-                            </select>
-                          </label>
-                        {:else}
-                          <label class="field"
-                            ><span class="label-mono">Edge</span>
-                            <span class="check"
-                              ><input
-                                type="checkbox"
-                                aria-label="Every update"
-                                checked={row.edge === "any"}
-                                onchange={(e) =>
-                                  updateRow(name, index, {
-                                    ...row,
-                                    edge: e.currentTarget.checked
-                                      ? "any"
-                                      : "change",
-                                  })}
-                              />
-                              {row.edge === "any" ? "any" : "change"}</span
-                            >
-                          </label>
-                        {/if}
-                        <label class="field"
-                          ><span class="label-mono">Ack</span>
-                          <select
-                            aria-label="Ack filter"
-                            value={row.ack ?? "any"}
-                            onchange={(e) =>
-                              updateRow(name, index, {
-                                ...row,
-                                ack: e.currentTarget.value as
-                                  "any" | "true" | "false",
-                              })}
-                          >
-                            <option value="any">any</option>
-                            <option value="false">false</option>
-                            <option value="true">true</option>
-                          </select>
-                        </label>
-                      </div>
-
-                      <div class="block">
-                        {#if row.if}
-                          <div class="row">
-                            <span class="label-mono">if</span>
-                            <ExprEditor
-                              expr={row.if}
-                              onchange={(next) => {
-                                if ("noop" in next) return;
-                                updateRow(name, index, { ...row, if: next });
-                              }}
-                            />
-                            <button
-                              type="button"
-                              class="btn btn-sm"
-                              onclick={() =>
-                                updateRow(name, index, {
-                                  ...row,
-                                  if: undefined,
-                                })}>Remove condition</button
-                            >
-                          </div>
-                        {:else}
-                          <button
-                            type="button"
-                            class="btn btn-sm"
-                            onclick={() =>
-                              updateRow(name, index, {
-                                ...row,
-                                if: { ref: "" },
-                              })}>Add condition</button
-                          >
-                        {/if}
-                      </div>
-
-                      <div class="block">
-                        <span class="label-mono">Then</span>
-                        <ActionList
-                          actions={row.do ?? []}
-                          {stateNames}
-                          onchange={(actions) =>
-                            updateRow(name, index, { ...row, do: actions })}
-                        />
-                      </div>
-
+                    {:else}
                       <div class="row">
-                        <span class="label-mono">goto</span>
-                        <select
-                          aria-label="Target state"
-                          value={row.goto ?? ""}
-                          onchange={(e) =>
-                            updateRow(name, index, {
-                              ...row,
-                              goto: e.currentTarget.value || undefined,
-                            })}
-                        >
-                          <option value="">— stay —</option>
-                          {#each stateNames as target (target)}
-                            <option value={target}>{target}</option>
-                          {/each}
-                        </select>
-                        <label
-                          class="check"
-                          title={row.goto ||
-                          (row.do ?? []).some((a) => "goto" in a)
-                            ? "A goto ends this event — clear it to continue with the next row"
-                            : "After this row's actions, keep checking the next rows for the same event"}
-                        >
+                        <label class="inline"
+                          >after
                           <input
-                            type="checkbox"
-                            checked={row.continue === true}
-                            disabled={!!row.goto ||
-                              (row.do ?? []).some((a) => "goto" in a)}
+                            class="duration"
+                            aria-label={`After time for ${name}`}
+                            placeholder="2m"
+                            value={state.after?.time ?? ""}
                             onchange={(e) =>
-                              updateRow(name, index, {
-                                ...row,
-                                continue: e.currentTarget.checked || undefined,
+                              updateState(name, {
+                                ...state,
+                                after: e.currentTarget.value.trim()
+                                  ? {
+                                      time: e.currentTarget.value.trim(),
+                                      goto:
+                                        state.after?.goto ??
+                                        stateNames.find((s) => s !== name) ??
+                                        name,
+                                    }
+                                  : undefined,
                               })}
                           />
-                          <span>continue</span>
+                        </label>
+                        <label class="inline"
+                          >goto
+                          <select
+                            aria-label={`After target for ${name}`}
+                            value={state.after?.goto ?? ""}
+                            onchange={(e) =>
+                              updateState(name, {
+                                ...state,
+                                after: state.after
+                                  ? {
+                                      ...state.after,
+                                      goto: e.currentTarget.value,
+                                    }
+                                  : {
+                                      time: "1m",
+                                      goto: e.currentTarget.value,
+                                    },
+                              })}
+                          >
+                            <option value="">— none —</option>
+                            {#each stateNames as target (target)}
+                              <option value={target}>{target}</option>
+                            {/each}
+                          </select>
                         </label>
                       </div>
-                    </div>
-                  {/if}
-                </div>
-              {/each}
+                    {/if}
+                  </div>
+                {/snippet}
+              </OptionTabs>
             </div>
+
+            {@render eventList(name, state)}
           </div>
         {/if}
       </div>
