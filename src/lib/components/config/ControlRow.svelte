@@ -157,10 +157,11 @@
       : { head: id, tail: "" };
   });
   /** The control's own name, shown before the value only when it says more than
-   *  the state id already does (the raw states almost always do). */
+   *  the state id already does (the raw states almost always do). Compared
+   *  exactly: `TEMPERATURE` vs `Temperature` is a different label. */
   const rowLabel = $derived(control.label?.trim() ?? "");
   const labelDiffers = $derived(
-    !!rowLabel && rowLabel.toLowerCase() !== stateParts.tail.toLowerCase(),
+    !!rowLabel && rowLabel !== stateParts.tail.trim(),
   );
 </script>
 
