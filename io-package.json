@@ -1,8 +1,12 @@
 {
     "common": {
         "name": "ihome",
-        "version": "0.1.3",
+        "version": "0.1.4",
         "news": {
+            "0.1.4": {
+                "en": "Logic v1 grows up: an event combines state sources with repeating timers (an interval, a SunCalc astro time from the system location with a minute offset, or cron HH:MM[:SS] on selected weekdays), $logic.<id> triggers another logic, $var.<name> listens to a global variable, $all and $start are pseudo-states, and startup adopts the current state silently instead of replaying it. The timer type is the app's tab strip and all weekdays start checked; the tile editor adds a value/name home, rule lists, an inline device editor and a tabbed source picker with variables and logic.",
+                "de": "Logik v1 wächst: Ein Event kombiniert State-Quellen mit wiederkehrenden Timern (Intervall, SunCalc-Astrozeit aus dem System-Standort mit Minuten-Offset oder Cron HH:MM[:SS] an ausgewählten Wochentagen), $logic.<id> stößt eine andere Logik an, $var.<name> hört auf eine globale Variable, $all und $start sind Pseudo-States, und der Start übernimmt den aktuellen Zustand still statt ihn nachzuspielen. Der Timer-Typ ist die Tab-Leiste der App und alle Wochentage sind vorausgewählt; der Kachel-Editor ergänzt eine Wert-/Namens-Ansicht, Regellisten, einen eingebetteten Geräte-Editor und einen getabbten Quellen-Picker mit Variablen und Logik."
+            },
             "0.1.3": {
                 "en": "Device controls can now correct a badly decorated state: role, type, value labels (states), unit and hide-unit, min/max/step, read/write, room and functions. The correction wins over the broker object and drives the widget choice, value formatting, badges, device list and slot creation. Both selectors filter by room and function (the device picker also by name/control), every slot kind has its own icon, the tile has a separate icon before its name, duplicate control labels are numbered, and deleting a slot or tile asks first.",
                 "de": "Geräte-Controls können einen schlecht dekorierten State jetzt korrigieren: Rolle, Typ, Wertelabels (states), Einheit und Einheit ausblenden, Min/Max/Step, Lesen/Schreiben, Raum und Funktionen. Die Korrektur gewinnt über das Broker-Objekt und steuert Widget-Wahl, Wertformatierung, Badges, Geräteliste und Slot-Erzeugung. Beide Auswahlen filtern nach Raum und Funktion (die Geräteauswahl auch nach Name/Control), jeder Slot-Typ hat sein eigenes Icon, die Kachel hat ein eigenes Icon vor ihrem Namen, doppelte Control-Namen werden nummeriert, und das Löschen eines Slots oder einer Kachel fragt vorher nach."
