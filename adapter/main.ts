@@ -210,46 +210,58 @@ class IHome extends utils.Adapter {
    */
   private async ensureLogicStates(doc: LogicDocument): Promise<void> {
     const own = doc.logics.filter((def) => def.output?.scope === "logic");
-    if (own.length === 0) return;
-    try {
-      await this.setObjectNotExistsAsync("Logic", {
-        type: "folder",
-        common: { name: "Logic" },
-        native: {},
-      });
-    } catch (error) {
-      this.log.warn(`logic: cannot ensure the Logic folder: ${error}`);
-    }
-
-    for (const def of own) {
-      const output = def.output as Extract<
-        NonNullable<LogicDef["output"]>,
-        { scope: "logic" }
-      >;
-      const id = `Logic.${def.id}`;
-      const states = output.type === "number" ? numberStatesOf(def) : undefined;
-      const common = {
-        name: def.name,
-        type: output.type,
-        role: output.type === "boolean" ? "level.switch" : "level.state",
-        read: true,
-        write: true,
-        def:
-          output.type === "boolean" ? false : output.type === "number" ? 0 : "",
-        ...(states ? { states } : {}),
-      };
+    if (own.length > 0) {
       try {
-        await this.setObjectNotExistsAsync(id, {
-          type: "state",
-          common,
+        await this.setObjectNotExistsAsync("Logic", {
+          type: "folder",
+          common: { name: "Logic" },
           native: {},
         });
-        // The document is the truth: keep the name, type and state labels in step.
-        await this.extendObjectAsync(id, { common });
       } catch (error) {
-        this.log.warn(`logic: cannot ensure ${this.namespace}.${id}: ${error}`);
+        this.log.warn(`logic: cannot ensure the Logic folder: ${error}`);
+      }
+
+      for (const def of own) {
+        const output = def.output as Extract<
+          NonNullable<LogicDef["output"]>,
+          { scope: "logic" }
+        >;
+        const id = `Logic.${def.id}`;
+        const states =
+          output.type === "number" ? numberStatesOf(def) : undefined;
+        const common = {
+          name: def.name,
+          type: output.type,
+          role: output.type === "boolean" ? "level.switch" : "level.state",
+          read: true,
+          write: true,
+          def:
+            output.type === "boolean"
+              ? false
+              : output.type === "number"
+                ? 0
+                : "",
+          ...(states ? { states } : {}),
+        };
+        try {
+          await this.setObjectNotExistsAsync(id, {
+            type: "state",
+            common,
+            native: {},
+          });
+          // The document is the truth: keep the name, type and state labels in step.
+          await this.extendObjectAsync(id, { common });
+        } catch (error) {
+          this.log.warn(
+            `logic: cannot ensure ${this.namespace}.${id}: ${error}`,
+          );
+        }
       }
     }
+
+    // A logic that was deleted, renamed or switched away from an ihome state
+    // leaves its old state behind; remove those, the folder is ours (D21).
+    await this.pruneLogicStates(new Set(own.map((def) => `Logic.${def.id}`)));
 
     // A foreign number target gets the state labels too — only when it has none,
     // the owner's object is never overwritten.
@@ -283,6 +295,40 @@ class IHome extends utils.Adapter {
         }
       } catch (error) {
         this.log.warn(`logic: cannot publish states for ${id}: ${error}`);
+      }
+    }
+  }
+
+  /** Remove direct state children of the Logic folder that no logic owns. */
+  private async pruneLogicStates(keep: Set<string>): Promise<void> {
+    let rows: { id: string; value?: { type?: string } }[] = [];
+    try {
+      const list = await this.getObjectListAsync({
+        startkey: "Logic.",
+        endkey: "Logic.\u9999",
+      });
+      rows = (list.rows ?? []).map((row) => ({
+        id: row.id,
+        value: row.value as { type?: string },
+      }));
+    } catch (error) {
+      this.log.warn(`logic: cannot list the Logic folder: ${error}`);
+      return;
+    }
+    for (const row of rows) {
+      if (keep.has(row.id)) continue;
+      if (row.id.split(".").length !== 2) continue; // direct children only
+      if (row.value?.type !== "state") continue;
+      try {
+        await this.delStateAsync(row.id).catch(() => undefined);
+        await this.delObjectAsync(row.id);
+        this.log.info(
+          `logic: removed orphan state ${this.namespace}.${row.id}`,
+        );
+      } catch (error) {
+        this.log.warn(
+          `logic: cannot remove ${this.namespace}.${row.id}: ${error}`,
+        );
       }
     }
   }

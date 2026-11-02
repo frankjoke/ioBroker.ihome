@@ -1671,3 +1671,43 @@ it("lets a continue row fall through into $all", () => {
     "0_userdata.0.ALL",
   ]);
 });
+
+it("$start carries the start timestamp and exposes it as a ref", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "stamp",
+        name: "Stamp",
+        kind: "machine",
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: {
+            on: [
+              {
+                on: "$start",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.SEEN" },
+                      value: { ref: "$start" },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.SEEN": 0 });
+  h.clock.now = 123456;
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.SEEN", value: 123456, ack: false },
+  ]);
+});

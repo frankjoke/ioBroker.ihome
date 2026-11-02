@@ -75,6 +75,8 @@ interface Runtime {
   timers: Map<string, number>;
   /** True only while this logic's start evaluation runs (D19). */
   init: boolean;
+  /** The `$start` timestamp while that event is being handled (D28). */
+  starting?: number;
 }
 
 interface EventMeta {
@@ -235,6 +237,7 @@ export function createEngine(
 
   function resolveIn(rt: Runtime, ref: string): unknown {
     if (ref === "$init") return rt.init;
+    if (ref === "$start") return rt.starting;
     if (ref === "$from") return currentMeta.from;
     if (ref === "$self") return currentMeta.self;
     if (ref === "$ack") return currentMeta.ack;
@@ -336,6 +339,10 @@ export function createEngine(
     }
     chainSeen.add(key);
     const previousMeta = currentMeta;
+    const previousStarting = job.rt.starting;
+    if (job.input === "$start") {
+      job.rt.starting = typeof job.value === "number" ? job.value : deps.now();
+    }
     currentMeta = job.meta;
     try {
       if (job.rt.def.kind === "function") {
@@ -363,6 +370,7 @@ export function createEngine(
       }
     } finally {
       currentMeta = previousMeta;
+      job.rt.starting = previousStarting;
     }
   }
 
@@ -1007,21 +1015,23 @@ export function createEngine(
       for (const rt of runtimes) {
         if (rt.def.kind === "machine") startMachine(rt);
       }
+      // The shared start instant: timers and `$start` measure from it (D28).
+      const startedAt = deps.now();
       for (const rt of runtimes) {
         for (const input of rt.inputs.values()) armTimer(rt, input);
       }
       // `$start` (D28): after every logic is up, each machine sees one event in
-      // the state it adopted, so cross-logic start actions are possible.
+      // the state it adopted, carrying the start timestamp.
       for (const rt of runtimes) {
         if (rt.def.kind !== "machine") continue;
         enqueue({
           rt,
           input: "$start",
-          value: true,
-          previous: false,
-          hasPrevious: true,
+          value: startedAt,
+          previous: 0,
+          hasPrevious: false,
           depth: 0,
-          meta: { from: "start", self: true, ts: deps.now() },
+          meta: { from: "start", self: true, ts: startedAt },
         });
       }
     },

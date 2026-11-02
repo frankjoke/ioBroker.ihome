@@ -268,7 +268,8 @@
 
   /** The event's value type, so the condition offers only what fits it (D23). */
   function conditionKind(row: OnRow): "boolean" | "number" | "string" | "any" {
-    if (row.on === "$init" || row.on === "$start") return "boolean";
+    if (row.on === "$init") return "boolean";
+    if (row.on === "$start") return "number";
     if (row.on.startsWith("$var.")) {
       const variable = getVariables().find(
         (item) =>
