@@ -1256,3 +1256,105 @@ it("resolves a global variable name used as the output ref", () => {
     ack: false,
   });
 });
+
+const chain = (over: Partial<MachineLogic> = {}): LogicDocument => ({
+  version: 1,
+  logics: [
+    {
+      id: "chain",
+      name: "Chain",
+      kind: "machine",
+      inputs: {
+        value: {
+          from: { type: "state", ref: "0_userdata.0.V" },
+          kind: "event",
+        },
+        low: { from: { type: "state", ref: "0_userdata.0.LOW" } },
+        high: { from: { type: "state", ref: "0_userdata.0.HIGH" } },
+      },
+      output: { scope: "memory" },
+      start: "Idle",
+      states: {
+        Idle: {
+          on: [
+            {
+              on: "value",
+              is: { op: "gt", value: 10 },
+              do: [{ set: { target: { ref: "low" }, value: { const: true } } }],
+              continue: true,
+            },
+            {
+              on: "value",
+              is: { op: "gt", value: 20 },
+              do: [
+                { set: { target: { ref: "high" }, value: { const: true } } },
+              ],
+            },
+          ],
+        },
+      },
+      ...over,
+    },
+  ],
+});
+
+it("a continue row lets later rows react to the same event", () => {
+  const h = createHarness({
+    "0_userdata.0.V": 0,
+    "0_userdata.0.LOW": false,
+    "0_userdata.0.HIGH": false,
+  });
+  const engine = createEngine(chain(), h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+
+  h.change("0_userdata.0.V", 25);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.LOW", value: true, ack: false },
+    { id: "0_userdata.0.HIGH", value: true, ack: false },
+  ]);
+
+  // Only the first threshold is crossed: the second row does not run.
+  h.writes.length = 0;
+  h.change("0_userdata.0.V", 15);
+  expect(h.writes.some((w) => w.id === "0_userdata.0.HIGH")).toBe(false);
+});
+
+it("without continue the first matching row ends the event", () => {
+  const d = chain();
+  delete (d.logics[0] as MachineLogic).states.Idle.on![0].continue;
+  const h = createHarness({
+    "0_userdata.0.V": 0,
+    "0_userdata.0.LOW": false,
+    "0_userdata.0.HIGH": false,
+  });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.V", 25);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.LOW", value: true, ack: false },
+  ]);
+});
+
+it("a goto ends the event even on a continue row", () => {
+  const d = chain();
+  (d.logics[0] as MachineLogic).states.Idle.on![0].goto = "Done";
+  (d.logics[0] as MachineLogic).states.Done = {};
+  const h = createHarness({
+    "0_userdata.0.V": 0,
+    "0_userdata.0.LOW": false,
+    "0_userdata.0.HIGH": false,
+  });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.V", 25);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.LOW", value: true, ack: false },
+  ]);
+  expect(engine.memoryValue("chain")).toBe("Done");
+});

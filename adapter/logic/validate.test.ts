@@ -234,3 +234,35 @@ it("rejects an unknown event source", () => {
     validateLogicDocument(bad).some((i) => i.path === "inputs.e.source"),
   ).toBe(true);
 });
+
+it("warns that continue cannot outlive a goto", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "c",
+        name: "C",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        states: {
+          A: {
+            on: [
+              { on: "e", continue: true, goto: "B" },
+              { on: "e", continue: true, do: [{ goto: "B" }] },
+              { on: "e", continue: true },
+            ],
+          },
+          B: {},
+        },
+      },
+    ],
+  };
+  const issues = validateLogicDocument(d);
+  expect(
+    issues.filter((i) => i.path.endsWith(".continue")).map((i) => i.path),
+  ).toEqual(["states.A.on.0.continue", "states.A.on.1.continue"]);
+  expect(issues.every((i) => i.severity === "warn")).toBe(true);
+  expect(logicHasErrors(issues, "c")).toBe(false);
+});

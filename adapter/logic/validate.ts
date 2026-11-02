@@ -441,6 +441,17 @@ function checkRow(
   if (row?.goto !== undefined && !stateNames.includes(row.goto)) {
     add(id, `${path}.goto`, `unknown state ${row.goto}`);
   }
+  if (
+    row?.continue === true &&
+    (row.goto !== undefined || (row.do ?? []).some((a) => "goto" in a))
+  ) {
+    add(
+      id,
+      `${path}.continue`,
+      "a goto ends the event; continue has no effect",
+      "warn",
+    );
+  }
 }
 
 function checkAction(

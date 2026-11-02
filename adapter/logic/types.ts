@@ -127,6 +127,10 @@ export interface OnRow {
   do?: Action[];
   /** Absent = stay in the state (no output write). */
   goto?: string;
+  /** After this row's `do`, keep checking the following rows of the same state
+   *  for the same event. A row that transitions (`goto`, or a `goto` action)
+   *  still ends the event. */
+  continue?: boolean;
 }
 
 export interface StateDef {

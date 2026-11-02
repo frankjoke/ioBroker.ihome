@@ -790,6 +790,26 @@
                             <option value={target}>{target}</option>
                           {/each}
                         </select>
+                        <label
+                          class="check"
+                          title={row.goto ||
+                          (row.do ?? []).some((a) => "goto" in a)
+                            ? "A goto ends this event — clear it to continue with the next row"
+                            : "After this row's actions, keep checking the next rows for the same event"}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={row.continue === true}
+                            disabled={!!row.goto ||
+                              (row.do ?? []).some((a) => "goto" in a)}
+                            onchange={(e) =>
+                              updateRow(name, index, {
+                                ...row,
+                                continue: e.currentTarget.checked || undefined,
+                              })}
+                          />
+                          <span>continue</span>
+                        </label>
                       </div>
                     </div>
                   {/if}

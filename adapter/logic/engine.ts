@@ -346,6 +346,7 @@ export function createEngine(
     const state = rt.state ? def.states[rt.state] : undefined;
     if (!state) return;
     const input = rt.inputs.get(job.input);
+    let handled = false;
     for (const row of state.on ?? []) {
       if (row.on !== job.input) continue;
       if (!rowApplies(row, job, input)) continue;
@@ -358,14 +359,19 @@ export function createEngine(
           continue;
         }
       }
-      runActions(rt, row.do ?? [], job.depth);
+      handled = true;
+      const jumped = runActions(rt, row.do ?? [], job.depth);
       if (row.goto) {
         transition(rt, row.goto, job.depth, `event “${job.input}”`);
+        return;
       }
-      return;
+      // A `continue` row leaves the state untouched and lets the rows below
+      // react to the same event; a goto (row or action) always ends it.
+      if (jumped || row.continue !== true) return;
     }
     // No row took the event: an output change still moves the machine.
-    if (job.input === "$self") syncToOutput(rt, job.value, job.depth);
+    if (!handled && job.input === "$self")
+      syncToOutput(rt, job.value, job.depth);
   }
 
   /**
@@ -501,7 +507,10 @@ export function createEngine(
     writeOutput(rt, name, depth);
   }
 
-  function runActions(rt: Runtime, actions: Action[], depth: number): void {
+  /** Runs an action list; true when it contained a `goto` (the state changed
+   *  or was re-entered), which ends the current event. */
+  function runActions(rt: Runtime, actions: Action[], depth: number): boolean {
+    let jumped = false;
     for (const action of actions) {
       if ("set" in action) {
         let value: unknown;
@@ -521,6 +530,7 @@ export function createEngine(
         );
       } else if ("goto" in action) {
         transition(rt, action.goto, depth, "action goto");
+        jumped = true;
       } else if ("log" in action) {
         deps.log(
           action.log.level ?? "info",
@@ -529,6 +539,7 @@ export function createEngine(
         );
       }
     }
+    return jumped;
   }
 
   /** `{{ref}}` in a log text is that ref's value, as the row sees it (D24). */
