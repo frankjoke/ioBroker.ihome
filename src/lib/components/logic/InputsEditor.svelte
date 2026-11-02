@@ -221,7 +221,7 @@
               type="button"
               class="btn btn-sm"
               title="Add a repeating timer (every …)"
-              onclick={() => addTimer(name)}>+ timer</button
+              onclick={() => addTimer(name)}>+ Timer</button
             >
           {/if}
           <IconButton
@@ -239,14 +239,14 @@
             {#if input.from.type === "state"}
               <div class="field wide">
                 <span class="label-mono">
-                  {input.kind === "event" ? "States" : "State"}
+                  {input.kind === "event" ? "Sources" : "State"}
                 </span>
                 {#if input.kind === "event"}
                   <MultiStateField
                     value={[input.from.ref, ...(input.from.refs ?? [])].filter(
                       Boolean,
                     )}
-                    label={`States for ${name}`}
+                    label={`Sources for ${name}`}
                     {logics}
                     {selfId}
                     hideAdd
