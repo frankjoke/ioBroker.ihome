@@ -43,6 +43,8 @@ export interface Input {
   from: InputSource;
   /** Variables are read-only values from one source; events trigger rows. */
   kind: "variable" | "event";
+  /** Event only: extra repeating triggers beside `from` (D32). */
+  timers?: Duration[];
   /** Legacy (pre row-usage): read as the row default, no longer written. */
   mode?: "changed" | "any";
   ack?: "any" | "true" | "false";

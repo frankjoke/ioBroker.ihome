@@ -125,6 +125,26 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
     const inputNames = new Set(Object.keys(inputs));
     for (const [name, input] of Object.entries(inputs)) {
       const source = input?.from;
+      const timers = input?.timers;
+      if (timers !== undefined) {
+        if ((input.kind ?? "variable") !== "event") {
+          add(
+            id,
+            `inputs.${name}.timers`,
+            "only an event can repeat on a timer",
+          );
+        }
+        if (!Array.isArray(timers)) {
+          add(id, `inputs.${name}.timers`, "timers must be an array");
+        } else {
+          timers.forEach((every, index) => {
+            const ms = parseDuration(every);
+            if (ms === null || ms <= 0) {
+              add(id, `inputs.${name}.timers.${index}`, "invalid duration");
+            }
+          });
+        }
+      }
       if (!isRecord(source)) {
         add(id, `inputs.${name}.from`, "input without a source");
       } else if (source.type === "timer") {
@@ -136,7 +156,11 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
           add(id, `inputs.${name}.from.type`, "a variable cannot be a timer");
         }
       } else if (source.type === "state" || source.type === "memory") {
-        if (typeof source.ref !== "string" || !source.ref) {
+        const hasTimers =
+          input.kind === "event" &&
+          Array.isArray(input.timers) &&
+          input.timers.length > 0;
+        if (typeof source.ref !== "string" || (!source.ref && !hasTimers)) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
         }
         if (source.type === "state" && source.refs !== undefined) {

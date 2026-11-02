@@ -11,6 +11,7 @@
     onchange,
     logics = [],
     selfId = "",
+    hideAdd = false,
   }: {
     value: string[];
     label: string;
@@ -18,6 +19,8 @@
     /** Other logics, selectable as `$logic.<id>` sources. */
     logics?: LogicDef[];
     selfId?: string;
+    /** The host renders its own add control (the event line). */
+    hideAdd?: boolean;
   } = $props();
 
   let picking = $state(false);
@@ -57,12 +60,14 @@
       </button>
     </span>
   {/each}
-  <IconButton
-    icon="add"
-    label={`Add a state or logic to ${label}`}
-    title="Add state or logic"
-    onclick={() => (picking = true)}
-  />
+  {#if !hideAdd}
+    <IconButton
+      icon="add"
+      label={`Add a state or logic to ${label}`}
+      title="Add state or logic"
+      onclick={() => (picking = true)}
+    />
+  {/if}
 </div>
 
 {#if picking}

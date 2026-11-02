@@ -8,6 +8,7 @@
   import MultiStateField from "./MultiStateField.svelte";
   import StateRefField from "./StateRefField.svelte";
   import VariableModal from "./VariableModal.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
 
@@ -37,12 +38,64 @@
   let pendingDelete = $state<string | null>(null);
   /** The add-variable dialog: name and source in one step. */
   let addingVariable = $state(false);
+  /** The event whose + State opens the picker. */
+  let sourceFor = $state<string | null>(null);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
   const otherLogics = $derived(logics.filter((logic) => logic.id !== selfId));
 
   function update(name: string, input: Input) {
     onchange({ ...inputs, [name]: input });
+  }
+
+  /** + State on an event line: add the picked state/logic to its source list. */
+  function addSource(name: string, id: string) {
+    const input = inputs[name];
+    if (!input) return;
+    const state =
+      input.from.type === "state"
+        ? input.from
+        : { type: "state" as const, ref: "", refs: [] };
+    const refs = [state.ref, ...(state.refs ?? [])].filter(Boolean);
+    if (!refs.includes(id)) refs.push(id);
+    const timers =
+      input.from.type === "timer"
+        ? [input.from.every, ...(input.timers ?? [])]
+        : input.timers;
+    update(name, {
+      ...input,
+      from: { type: "state", ref: refs[0] ?? "", refs: refs.slice(1) },
+      ...(timers?.length ? { timers } : {}),
+    });
+  }
+
+  /** + timer on an event line: one more repeating trigger (every …). */
+  function addTimer(name: string) {
+    const input = inputs[name];
+    if (!input) return;
+    const timers = [...(input.timers ?? [])];
+    if (input.from.type === "timer") timers.unshift(input.from.every);
+    timers.push("5m");
+    const from =
+      input.from.type === "state"
+        ? input.from
+        : { type: "state" as const, ref: "", refs: [] };
+    update(name, { ...input, from, timers });
+  }
+
+  function setTimer(name: string, index: number, every: string) {
+    const input = inputs[name];
+    if (!input) return;
+    const timers = [...(input.timers ?? [])];
+    timers[index] = every.trim() || "5m";
+    update(name, { ...input, timers });
+  }
+
+  function removeTimer(name: string, index: number) {
+    const input = inputs[name];
+    if (!input) return;
+    const timers = (input.timers ?? []).filter((_, i) => i !== index);
+    update(name, { ...input, timers: timers.length ? timers : undefined });
   }
 
   function rename(oldName: string, rawName: string) {
@@ -96,16 +149,10 @@
     editing = name;
   }
 
-  function setSource(name: string, input: Input, type: InputSource["type"]) {
-    const from: InputSource =
-      type === "timer" ? { type: "timer", every: "30s" } : { type, ref: "" };
-    update(name, { ...input, from });
-  }
-
   function sourceLabel(input: Input): string {
     if (input.from.type === "state") {
       const variables = getVariables();
-      const all = [input.from.ref, ...(input.from.refs ?? [])]
+      const states = [input.from.ref, ...(input.from.refs ?? [])]
         .filter(Boolean)
         .map((ref) => {
           if (!ref.startsWith("$logic."))
@@ -113,7 +160,9 @@
           const sourceId = ref.slice("$logic.".length);
           return logics.find((source) => source.id === sourceId)?.name ?? ref;
         });
-      if (all.length === 0) return "(no state selected)";
+      const timers = (input.timers ?? []).map((every) => `every ${every}`);
+      const all = [...states, ...timers];
+      if (all.length === 0) return "(no source)";
       if (all.length === 1) return all[0];
       return `${all[0]} +${all.length - 1}`;
     }
@@ -161,6 +210,20 @@
         <span class="badge badge-secondary">{input.kind}</span>
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
         <span class="item-actions">
+          {#if input.kind === "event"}
+            <button
+              type="button"
+              class="btn btn-sm"
+              title="Add a state, variable or logic event"
+              onclick={() => (sourceFor = name)}>+ State</button
+            >
+            <button
+              type="button"
+              class="btn btn-sm"
+              title="Add a repeating timer (every …)"
+              onclick={() => addTimer(name)}>+ timer</button
+            >
+          {/if}
           <IconButton
             icon="delete"
             danger
@@ -173,30 +236,6 @@
       {#if open}
         <div class="item-editor">
           <div class="fields">
-            {#if input.kind === "event" || input.from.type === "memory"}
-              <label class="field"
-                ><span class="label-mono">Source</span>
-                <select
-                  aria-label={`Source type for ${name}`}
-                  value={input.from.type}
-                  onchange={(e) =>
-                    setSource(
-                      name,
-                      input,
-                      e.currentTarget.value as InputSource["type"],
-                    )}
-                >
-                  <option value="state">State / variable</option>
-                  {#if input.kind === "event"}
-                    <option value="timer">Timer</option>
-                  {/if}
-                  {#if input.from.type === "memory"}
-                    <option value="memory">Memory (legacy)</option>
-                  {/if}
-                </select>
-              </label>
-            {/if}
-
             {#if input.from.type === "state"}
               <div class="field wide">
                 <span class="label-mono">
@@ -210,6 +249,7 @@
                     label={`States for ${name}`}
                     {logics}
                     {selfId}
+                    hideAdd
                     onchange={(ids) =>
                       update(name, {
                         ...input,
@@ -268,6 +308,28 @@
               </label>
             {/if}
           </div>
+          {#if input.kind === "event" && input.timers?.length}
+            <div class="row timers">
+              <span class="label-mono">Timers</span>
+              {#each input.timers as every, ti (ti)}
+                <span class="timer-chip">
+                  <span class="hint text-muted">every</span>
+                  <input
+                    class="duration"
+                    value={every}
+                    aria-label={`Timer ${ti + 1} for ${name}`}
+                    onchange={(e) => setTimer(name, ti, e.currentTarget.value)}
+                  />
+                  <IconButton
+                    icon="close"
+                    label={`Remove timer ${ti + 1}`}
+                    title="Remove"
+                    onclick={() => removeTimer(name, ti)}
+                  />
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -279,6 +341,20 @@
     </p>
   {/if}
 </div>
+
+{#if sourceFor}
+  <SourcePicker
+    mode="state"
+    title={`Add a source to ${sourceFor}`}
+    logics={otherLogics}
+    logicPick="trigger"
+    onState={(id) => {
+      addSource(sourceFor!, id);
+      sourceFor = null;
+    }}
+    onClose={() => (sourceFor = null)}
+  />
+{/if}
 
 {#if addingVariable}
   <VariableModal
@@ -365,8 +441,27 @@
     flex: 1 1 18rem;
   }
 
-  .field input,
-  .field select {
+  .field input {
     width: 100%;
+  }
+
+  .timers {
+    flex-wrap: wrap;
+    padding-top: 0.2rem;
+  }
+
+  .timer-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill, 999px);
+    background: var(--surface-container);
+    font-size: var(--body-sm);
+  }
+
+  .timer-chip .duration {
+    width: 4.5rem;
   }
 </style>

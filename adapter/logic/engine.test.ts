@@ -1762,3 +1762,53 @@ it("a local event can combine a state and a logic output", () => {
   h.change("0_userdata.0.E", 1); // the source logic writes -> combo again
   expect(engine.memoryValue("sink")).toBe("Idle");
 });
+
+it("an event can combine states and a repeating timer", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "combo",
+        name: "Combo",
+        kind: "machine",
+        inputs: {
+          combo: {
+            from: { type: "state", ref: "0_userdata.0.E", refs: [] },
+            kind: "event",
+            timers: ["1m"],
+          },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: {
+            on: [
+              {
+                on: "combo",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.HIT" },
+                      value: { ref: "combo" },
+                      forward: "always",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0, "0_userdata.0.HIT": 0 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+
+  h.change("0_userdata.0.E", 1); // the state source
+  expect(h.writes.at(-1)?.value).toBe(1);
+
+  h.clock.advance(60_000); // the repeating timer
+  expect(h.writes.at(-1)?.value).toBe(60_000);
+});

@@ -389,3 +389,36 @@ it("rejects an unknown logic in a local event's sources", () => {
     ),
   ).toBe(true);
 });
+
+it("accepts a timer-only event and rejects timers on a variable", () => {
+  const ok: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "t",
+        name: "t",
+        kind: "machine",
+        inputs: {
+          tick: {
+            from: { type: "state", ref: "", refs: [] },
+            kind: "event",
+            timers: ["5m"],
+          },
+        },
+        output: { scope: "memory" },
+        states: { Idle: {} },
+      },
+    ],
+  };
+  expect(validateLogicDocument(ok)).toEqual([]);
+
+  const bad = structuredClone(ok);
+  (
+    bad.logics[0] as { inputs: Record<string, { kind: string }> }
+  ).inputs.tick.kind = "variable";
+  expect(
+    validateLogicDocument(bad).some((i) =>
+      i.message.includes("only an event can repeat on a timer"),
+    ),
+  ).toBe(true);
+});

@@ -3,6 +3,7 @@ import { parseDuration } from "./duration";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   Action,
+  Duration,
   Forward,
   FunctionLogic,
   Input,
@@ -96,6 +97,8 @@ interface Job {
   previous?: unknown;
   hasPrevious: boolean;
   depth: number;
+  /** A repeating timer of an event input: no external writer. */
+  fromTimer?: boolean;
   meta: EventMeta;
 }
 
@@ -348,7 +351,8 @@ export function createEngine(
       if (job.rt.def.kind === "function") {
         const input = job.rt.inputs.get(job.input)?.input;
         const origin =
-          input?.from.type === "state" || input?.from.type === "memory";
+          !job.fromTimer &&
+          (input?.from.type === "state" || input?.from.type === "memory");
         if (origin) {
           const source = input?.source ?? "external";
           if (
@@ -874,11 +878,24 @@ export function createEngine(
   }
 
   function armTimer(rt: Runtime, input: InputRuntime): void {
-    if (input.input.from.type !== "timer") return;
-    const ms = parseDuration(input.input.from.every);
+    if (input.input.from.type === "timer") {
+      armOneTimer(rt, input, input.input.from.every, input.name);
+    }
+    (input.input.timers ?? []).forEach((every, index) =>
+      armOneTimer(rt, input, every, `${input.name}#${index}`),
+    );
+  }
+
+  function armOneTimer(
+    rt: Runtime,
+    input: InputRuntime,
+    every: Duration,
+    key: string,
+  ): void {
+    const ms = parseDuration(every);
     if (ms === null || ms <= 0) return;
     const handle = deps.setTimeout(() => {
-      rt.timers.delete(input.name);
+      rt.timers.delete(key);
       if (!started) return;
       const previous = input.last;
       input.last = deps.now();
@@ -890,11 +907,12 @@ export function createEngine(
         previous,
         hasPrevious: previous !== undefined,
         depth: 0,
+        fromTimer: true,
         meta: { from: "timer", self: true, ts: deps.now() },
       });
-      armTimer(rt, input);
+      armOneTimer(rt, input, every, key);
     }, ms);
-    rt.timers.set(input.name, handle);
+    rt.timers.set(key, handle);
   }
 
   function emitMemory(
@@ -1008,7 +1026,9 @@ export function createEngine(
     if (edge === "falling" && !(job.previous && !job.value)) return false;
     if (!ackMatches(row.ack ?? legacy?.ack, job.meta.ack)) return false;
     const origin =
-      input?.input.from.type === "state" || input?.input.from.type === "memory";
+      !job.fromTimer &&
+      (input?.input.from.type === "state" ||
+        input?.input.from.type === "memory");
     if (!origin) return true; // timers and $init have no external writer
     const source = row.source ?? legacy?.source ?? "external";
     if (source === "any") return true;
