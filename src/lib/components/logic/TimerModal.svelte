@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { parseDuration } from "$logic/duration";
   import { ASTRO_EVENTS, DAY_NAMES, parseCronAt } from "$logic/timer-ops";
   import type { AstroEvent, TimerSpec } from "$logic/types";
@@ -16,6 +17,15 @@
   } = $props();
 
   type Kind = "every" | "cron" | "astro";
+  const TIMER_TABS = [
+    { id: "every", label: "Every", hint: "A repeating interval, e.g. 5m." },
+    { id: "cron", label: "Cron", hint: "A time of day on selected weekdays." },
+    {
+      id: "astro",
+      label: "Astro",
+      hint: "A sun time from the system location.",
+    },
+  ] as const;
   const initial = untrack(() => {
     const cron =
       timer && typeof timer !== "string" && timer.kind === "cron"
@@ -36,7 +46,7 @@
       days: cron && Array.isArray(cron.days) ? cron.days : [],
     };
   });
-  let kind = $state<Kind>(initial.kind);
+  let kind = $state<Kind | null>(initial.kind);
   let every = $state(initial.every);
   let astroEvent = $state<AstroEvent>(initial.astroEvent);
   let offset = $state(initial.offset);
@@ -67,6 +77,7 @@
       onSave({ kind: "astro", event: astroEvent, offset: Number(offset) || 0 });
       return;
     }
+    if (kind !== "cron") return;
     onSave({
       kind: "cron",
       at: at.trim(),
@@ -84,73 +95,77 @@
 <div class="modal" role="dialog" aria-modal="true" aria-label="Timer">
   <form class="modal-card card" onsubmit={submit}>
     <h3>{timer ? "Edit timer" : "New timer"}</h3>
-    <label class="field">
-      <span class="label-mono">Type</span>
-      <select bind:value={kind}>
-        <option value="every">Every …</option>
-        <option value="cron">Cron</option>
-        <option value="astro">Astro</option>
-      </select>
-    </label>
-
-    {#if kind === "every"}
-      <label class="field">
-        <span class="label-mono">Every</span>
-        <input class="mono" bind:value={every} placeholder="30s / 5m / 1h" />
-      </label>
-    {:else if kind === "astro"}
-      <div class="row">
-        <label class="field grow">
-          <span class="label-mono">Astro time</span>
-          <select bind:value={astroEvent}>
-            {#each ASTRO_EVENTS as event (event)}
-              <option value={event}>{event}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field small">
-          <span class="label-mono">Offset (min)</span>
-          <input class="num-input" type="number" bind:value={offset} />
-        </label>
-      </div>
-      <p class="hint text-muted">
-        Local astro time from the system latitude/longitude; the offset may be
-        negative.
-      </p>
-    {:else}
-      <div class="row">
-        <label class="field grow">
-          <span class="label-mono">Time (HH:MM[:SS])</span>
-          <input
-            class="mono"
-            bind:value={at}
-            placeholder="07:30 / *:30 / 07:*:15"
-          />
-        </label>
-        <span class="hint text-muted">* = every</span>
-      </div>
-      <div class="field">
-        <span class="label-mono">Days</span>
-        <label class="check">
-          <input type="checkbox" bind:checked={allDays} />
-          <span>Every day (*)</span>
-        </label>
-        {#if !allDays}
-          <div class="days">
-            {#each DAY_NAMES as label, day (label)}
-              <label class="check">
-                <input
-                  type="checkbox"
-                  checked={days.has(day)}
-                  onchange={() => toggleDay(day)}
-                />
-                <span>{label}</span>
-              </label>
-            {/each}
+    <OptionTabs
+      bind:value={kind}
+      label="Timer type"
+      tabs={TIMER_TABS}
+      collapsible={false}
+    >
+      {#snippet children(id)}
+        {#if id === "every"}
+          <label class="field">
+            <span class="label-mono">Every</span>
+            <input
+              class="mono"
+              bind:value={every}
+              placeholder="30s / 5m / 1h"
+            />
+          </label>
+        {:else if id === "astro"}
+          <div class="row">
+            <label class="field grow">
+              <span class="label-mono">Astro time</span>
+              <select bind:value={astroEvent}>
+                {#each ASTRO_EVENTS as event (event)}
+                  <option value={event}>{event}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="field small">
+              <span class="label-mono">Offset (min)</span>
+              <input class="num-input" type="number" bind:value={offset} />
+            </label>
+          </div>
+          <p class="hint text-muted">
+            Local astro time from the system latitude/longitude; the offset may
+            be negative.
+          </p>
+        {:else}
+          <div class="row">
+            <label class="field grow">
+              <span class="label-mono">Time (HH:MM[:SS])</span>
+              <input
+                class="mono"
+                bind:value={at}
+                placeholder="07:30 / *:30 / 07:*:15"
+              />
+            </label>
+            <span class="hint text-muted">* = every</span>
+          </div>
+          <div class="field">
+            <span class="label-mono">Days</span>
+            <label class="check">
+              <input type="checkbox" bind:checked={allDays} />
+              <span>Every day (*)</span>
+            </label>
+            {#if !allDays}
+              <div class="days">
+                {#each DAY_NAMES as label, day (label)}
+                  <label class="check">
+                    <input
+                      type="checkbox"
+                      checked={days.has(day)}
+                      onchange={() => toggleDay(day)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
           </div>
         {/if}
-      </div>
-    {/if}
+      {/snippet}
+    </OptionTabs>
 
     {#if !canSave}
       <p class="text-danger error">
