@@ -24,3 +24,28 @@ export function renameMemoryRefs(
   };
   return walk(logic) as LogicDef;
 }
+
+/**
+ * Rewrite every `$logic.<from>` row trigger to `<to>`, so renaming a logic
+ * keeps the logics that listen to its output attached.
+ */
+export function renameLogicRefs(
+  logic: LogicDef,
+  from: string,
+  to: string,
+): LogicDef {
+  const old = `$logic.${from}`;
+  const next = `$logic.${to}`;
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(value)) {
+        out[key] = key === "on" && item === old ? next : walk(item);
+      }
+      return out;
+    }
+    return value;
+  };
+  return walk(logic) as LogicDef;
+}

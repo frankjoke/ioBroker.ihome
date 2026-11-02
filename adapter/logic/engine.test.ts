@@ -1464,3 +1464,41 @@ it("fires $start after every logic started, in the adopted state", () => {
     { id: "0_userdata.0.OUT", value: false, ack: false },
   ]);
 });
+
+it("emits a logic output as a $logic event source", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "source",
+        name: "Source",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: { Idle: { on: [{ on: "e", goto: "On" }] }, On: {} },
+      },
+      {
+        id: "sink",
+        name: "Sink",
+        kind: "machine",
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: { on: [{ on: "$logic.source", goto: "Hit" }] },
+          Hit: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("sink")).toBe("Idle");
+  h.change("0_userdata.0.E", 1);
+  expect(engine.memoryValue("source")).toBe("On");
+  expect(engine.memoryValue("sink")).toBe("Hit");
+});

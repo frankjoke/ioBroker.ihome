@@ -13,7 +13,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
-  import { renameMemoryRefs } from "$lib/config/logic-rename";
+  import { renameMemoryRefs, renameLogicRefs } from "$lib/config/logic-rename";
   import { validateLogicDocument } from "$logic/validate";
   import type { Issue } from "$logic/validate";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -290,18 +290,23 @@
         ? (next.output.name ?? next.id)
         : undefined;
     const memoryRenamed = !!(oldMemory && newMemory && oldMemory !== newMemory);
-    // Even the renamed logic may read its own old memory name.
-    const saved = memoryRenamed
+    const idRenamed = !!old && old.id !== next.id;
+    // Even the renamed logic may read its own old memory name or listen to an
+    // old `$logic.<id>`.
+    let saved = memoryRenamed
       ? renameMemoryRefs(next, oldMemory!, newMemory!)
       : next;
-    if (old && old.id !== next.id) {
+    if (idRenamed) saved = renameLogicRefs(saved, old!.id, next.id);
+    if (idRenamed) {
       // A rename is document-wide: the logic takes the new id, and every
-      // memory reference to the old name follows.
+      // memory reference and `$logic.<old>` trigger follows.
       const logs = doc.logics.map((logic) => {
-        if (logic.id === old.id) return saved;
-        return memoryRenamed
+        if (logic.id === old!.id) return saved;
+        let item = memoryRenamed
           ? renameMemoryRefs(logic, oldMemory!, newMemory!)
           : logic;
+        if (idRenamed) item = renameLogicRefs(item, old!.id, next.id);
+        return item;
       });
       if (!commit(logs)) return;
     } else {
@@ -512,7 +517,7 @@
           {/if}
           {#if open && draft}
             <div class="item-editor" bind:this={inlineForm}>
-              <LogicEditor bind:draft {issues} />
+              <LogicEditor bind:draft {issues} logics={doc.logics} />
             </div>
           {/if}
         </div>

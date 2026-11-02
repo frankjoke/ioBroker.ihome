@@ -284,3 +284,34 @@ it("accepts $start as a built-in trigger", () => {
   };
   expect(validateLogicDocument(d)).toEqual([]);
 });
+
+it("accepts a $logic trigger and rejects an unknown logic", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "a",
+        name: "a",
+        kind: "machine",
+        output: { scope: "memory" },
+        states: { Idle: {} },
+      },
+      {
+        id: "b",
+        name: "b",
+        kind: "machine",
+        output: { scope: "memory" },
+        states: { Idle: { on: [{ on: "$logic.a" }] } },
+      },
+    ],
+  };
+  expect(validateLogicDocument(d)).toEqual([]);
+  (
+    d.logics[1] as never as { states: { Idle: { on: { on: string }[] } } }
+  ).states.Idle.on[0].on = "$logic.ghost";
+  expect(
+    validateLogicDocument(d).some((i) =>
+      i.message.includes("unknown logic ghost"),
+    ),
+  ).toBe(true);
+});

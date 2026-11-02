@@ -64,6 +64,9 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
   ) => issues.push({ logicId, path, message, severity });
 
   const seenIds = new Set<string>();
+  const logicIds = new Set<string>(
+    (Array.isArray(doc.logics) ? doc.logics : []).map((logic) => logic.id),
+  );
   if (doc.memory !== undefined && !Array.isArray(doc.memory)) {
     issues.push({
       path: "memory",
@@ -257,6 +260,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
               inputs,
               memoryNames,
               stateNames,
+              logicIds,
               add,
             ),
           );
@@ -374,6 +378,7 @@ function checkRow(
   inputs: Record<string, Input>,
   memoryNames: Set<string>,
   stateNames: string[],
+  logicIds: Set<string>,
   add: Add,
 ): void {
   if (
@@ -404,6 +409,12 @@ function checkRow(
   const input = row?.on;
   if (input === "$init" || input === "$self" || input === "$start") {
     // Built-in machine triggers (D19, D22, D28); only machines have rows.
+  } else if (typeof input === "string" && input.startsWith("$logic.")) {
+    // Another logic's output (D29): it must still exist.
+    const source = input.slice("$logic.".length);
+    if (!logicIds.has(source)) {
+      add(id, `${path}.on`, `unknown logic ${source}`);
+    }
   } else if (typeof input !== "string" || !inputNames.has(input)) {
     add(id, `${path}.on`, `unknown input ${String(input)}`);
   } else {

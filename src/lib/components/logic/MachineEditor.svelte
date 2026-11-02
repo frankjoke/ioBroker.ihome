@@ -2,6 +2,7 @@
   import type {
     Expr,
     Init,
+    LogicDef,
     MachineLogic,
     OnRow,
     Operator,
@@ -19,13 +20,22 @@
 
   let {
     logic,
+    logics = [],
     onchange,
   }: {
     logic: MachineLogic;
+    /** Every logic in the document: their outputs are event sources (D29). */
+    logics?: LogicDef[];
     onchange: (logic: MachineLogic) => void;
   } = $props();
 
   const stateNames = $derived(Object.keys(logic.states));
+  /** The other logics, as `$logic.<id>` event sources. */
+  const sourceLogics = $derived(
+    logics
+      .filter((other) => other.id !== logic.id)
+      .map((other) => ({ id: other.id, name: other.name || other.id })),
+  );
   const eventInputs = $derived(
     Object.entries(logic.inputs ?? {})
       .filter(
@@ -241,7 +251,17 @@
 
   /** The event's value type, so the condition offers only what fits it (D23). */
   function conditionKind(row: OnRow): "boolean" | "number" | "string" | "any" {
-    if (row.on === "$init") return "boolean";
+    if (row.on === "$init" || row.on === "$start") return "boolean";
+    if (row.on.startsWith("$logic.")) {
+      const source = logics.find(
+        (other) => other.id === row.on.slice("$logic.".length),
+      );
+      if (!source?.output) return "any";
+      if (source.output.scope === "memory") {
+        return source.kind === "machine" ? "string" : "any";
+      }
+      return source.output.type ?? "any";
+    }
     if (row.on === "$self") {
       const output = logic.output;
       return output && output.scope !== "memory" ? output.type : "any";
@@ -618,6 +638,15 @@
                             <option value="$start"
                               >$start (after all logics)</option
                             >
+                            {#if sourceLogics.length}
+                              <optgroup label="Logics">
+                                {#each sourceLogics as source (source.id)}
+                                  <option value={`$logic.${source.id}`}
+                                    >{source.name}</option
+                                  >
+                                {/each}
+                              </optgroup>
+                            {/if}
                             {#each eventInputs as input (input)}
                               <option value={input}>{input}</option>
                             {/each}

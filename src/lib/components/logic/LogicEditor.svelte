@@ -21,9 +21,12 @@
   let {
     draft = $bindable(),
     issues = [],
+    logics = [],
   }: {
     draft: LogicDef;
     issues: Issue[];
+    /** The whole document's logics: their outputs are event sources (D29). */
+    logics?: LogicDef[];
   } = $props();
 
   const output = $derived<Output>(
@@ -165,7 +168,7 @@
       />
     </div>
   {:else}
-    <MachineEditor logic={draft} onchange={(next) => (draft = next)} />
+    <MachineEditor logic={draft} {logics} onchange={(next) => (draft = next)} />
   {/if}
 
   {#if issues.length > 0}

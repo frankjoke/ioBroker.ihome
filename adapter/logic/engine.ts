@@ -555,24 +555,27 @@ export function createEngine(
     });
   }
 
+  /** Stores a memory value and emits its event; true when it actually wrote
+   *  (a `changed` write of the same value does not). */
   function writeMemory(
     name: string,
     value: unknown,
     forward: Forward | undefined,
     depth: number,
     producer: string,
-  ): void {
+  ): boolean {
     if (
       (forward ?? "changed") === "changed" &&
       memory.has(name) &&
       Object.is(memory.get(name), value)
     ) {
-      return;
+      return false;
     }
     const previous = memory.get(name);
     const hasPrevious = memory.has(name);
     memory.set(name, value);
     emitMemory(name, value, depth + 1, producer, previous, hasPrevious);
+    return true;
   }
 
   function writeTarget(
@@ -711,11 +714,16 @@ export function createEngine(
     const output = rt.output;
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
+      const previous = memory.get(name);
+      const hasPrevious = memory.has(name);
       rt.lastOutput = value;
       rt.hasOutput = true;
       // The stored memory value is the reference (spec §5.6), not the last
       // write of this logic: a seeded value must not emit an event.
-      writeMemory(name, value, output.forward, depth, rt.def.id);
+      const wrote = writeMemory(name, value, output.forward, depth, rt.def.id);
+      if (wrote) {
+        emitLogicOutput(rt, value, depth + 1, previous, hasPrevious);
+      }
       return;
     }
     const mapped = outputValue(rt, value);
@@ -728,12 +736,15 @@ export function createEngine(
       );
       return;
     }
+    const previous = rt.lastOutput;
+    const hasPrevious = rt.hasOutput;
     rt.lastOutput = mapped;
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
     stateLog(rt, `writes “${String(mapped)}” to “${target}”`);
     // A command, not a confirmation: devices act on ack=false only.
     deps.write(target, mapped, false);
+    emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);
   }
 
   function startMachine(rt: Runtime): void {
@@ -869,6 +880,40 @@ export function createEngine(
           },
         });
       }
+    }
+  }
+
+  /**
+   * A logic's output is also an event source (D29): every machine whose current
+   * state has a `$logic.<id>` row is enqueued with the written value. The
+   * emitting logic decides with `forward` whether an equal value re-fires.
+   */
+  function emitLogicOutput(
+    producer: Runtime,
+    value: unknown,
+    depth: number,
+    previous: unknown,
+    hasPrevious: boolean,
+  ): void {
+    const input = `$logic.${producer.def.id}`;
+    for (const rt of runtimes) {
+      if (rt.def.kind !== "machine" || !rt.state) continue;
+      const rows = (rt.def as MachineLogic).states[rt.state]?.on ?? [];
+      if (!rows.some((row) => row.on === input)) continue;
+      enqueue({
+        rt,
+        input,
+        value,
+        previous,
+        hasPrevious,
+        depth,
+        meta: {
+          from: `logic:${producer.def.id}`,
+          self: rt === producer,
+          ack: false,
+          ts: deps.now(),
+        },
+      });
     }
   }
 
