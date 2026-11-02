@@ -664,6 +664,35 @@
     setValueWhere(i, next === "both" ? undefined : next);
   }
 
+  /** The name's homes; absent keeps today's split: the detail row for a
+   *  reading, the caption on both for a frame/html. */
+  function labelWhereOf(slot: Slot): "tile" | "both" | "modal" {
+    return (
+      slot.labelWhere ??
+      (slot.kind === "frame" || slot.kind === "html" ? "both" : "modal")
+    );
+  }
+
+  function nextLabelWhere(slot: Slot): "tile" | "both" | "modal" {
+    const cur = labelWhereOf(slot);
+    return cur === "modal" ? "both" : cur === "both" ? "tile" : "modal";
+  }
+
+  function labelWhereTitle(slot: Slot): string {
+    return `Name shows: ${WHERE_LABEL[labelWhereOf(slot)]} — click for ${
+      WHERE_LABEL[nextLabelWhere(slot)]
+    }`;
+  }
+
+  function cycleLabelWhere(i: number, slot: Slot): void {
+    const next = nextLabelWhere(slot);
+    const fallback =
+      slot.kind === "frame" || slot.kind === "html" ? "both" : "modal";
+    edit((t) =>
+      patchSlot(t, i, { labelWhere: next === fallback ? undefined : next }),
+    );
+  }
+
   /** A badge's source kind decides what it can show: a control/state reads a
    *  value or its age, a device reports offline or its age. */
   function isDeviceBadge(slot: Slot): boolean {
@@ -1804,8 +1833,17 @@
                         />
                       {/if}
                     </span>
+                    <span class="setting-group name-group">
+                      <span class="label-mono">Name</span>
+                      <WhereButton
+                        where={labelWhereOf(slot)}
+                        title={labelWhereTitle(slot)}
+                        active={slot.labelWhere !== undefined}
+                        onCycle={() => cycleLabelWhere(i, slot)}
+                      />
+                    </span>
                     {#if VALUE_KINDS.includes(slot.kind)}
-                      <span class="setting-group value-group">
+                      <span class="setting-group">
                         <label
                           class="check"
                           title="Off hides the value or widget; the slot and its icon stay"
@@ -2344,10 +2382,14 @@
     min-width: 0;
   }
 
-  .value-group {
-    margin-left: auto;
-    padding-left: 0.6rem;
+  /* The name sits between the icon and the value, fenced on both sides; its
+     auto margins centre it in the free space, which also keeps the value at
+     the row's right end. */
+  .name-group {
+    margin-inline: auto;
+    padding-inline: 0.6rem;
     border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
   }
 
   .row input[type="text"] {

@@ -259,6 +259,18 @@ export function valueShown(
   return where === "tile" || where === "modal" ? where === home : true;
 }
 
+/** Does the slot's name draw in `home`? Its own `labelWhere` wins; absent keeps
+ *  today's split: the detail row for a reading, both for a frame/html caption. */
+export function labelShown(
+  slot: Pick<Slot, "kind" | "labelWhere">,
+  home: "tile" | "modal",
+): boolean {
+  const fallback =
+    slot.kind === "frame" || slot.kind === "html" ? "both" : "modal";
+  const where = slot.labelWhere ?? fallback;
+  return where === "both" || where === home;
+}
+
 // ------------------------------------------------------------------ charts
 
 /** The series colours, in assignment order (A61): theme tokens, so the chart

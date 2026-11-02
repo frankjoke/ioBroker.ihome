@@ -5,6 +5,7 @@
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
   import type { ChartSeries } from "$lib/config/tile-parts";
+  import { labelShown } from "$lib/config/tile-parts";
   import BadgeChip from "./BadgeChip.svelte";
   import type { EnrichedDevice, SlotControl } from "$lib/types/device";
   import type { Background, Slot } from "$lib/types/display";
@@ -102,14 +103,14 @@
     >
       {#each rows as r, i (i)}
         {#if r.slot.kind === "frame" || r.slot.kind === "html"}
-          {#if r.icon || r.slot.label}
+          {#if r.icon || (r.slot.label && labelShown(r.slot, "modal"))}
             <div class="row frame-cap">
               {#if r.icon}
                 <span class="row-icon" style:color={r.icon.color}>
                   <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
                 </span>
               {/if}
-              {#if r.slot.label}
+              {#if r.slot.label && labelShown(r.slot, "modal")}
                 <span class="frame-label">{r.slot.label}</span>
               {/if}
             </div>
@@ -151,13 +152,15 @@
                 </span>
               {/if}
             {/if}
-            <span class="row-label"
-              >{r.slot.label ||
-                r.control?.label ||
-                r.control?.feature ||
-                r.slot.source ||
-                r.slot.kind}</span
-            >
+            {#if labelShown(r.slot, "modal")}
+              <span class="row-label"
+                >{r.slot.label ||
+                  r.control?.label ||
+                  r.control?.feature ||
+                  r.slot.source ||
+                  r.slot.kind}</span
+              >
+            {/if}
             {#if r.spark}
               <div class="row-chart"><TileChart series={[r.spark]} /></div>
             {/if}

@@ -197,6 +197,9 @@ export interface Slot {
   rules?: Rule[];
   /** Render only while the tile is active / inactive (A30); absent = both. */
   showWhen?: "active" | "inactive";
+  /** Where the row's name shows: the tile, the detail row, or both. Absent =
+   *  the detail row (frame/html captions have always shown on both). */
+  labelWhere?: "tile" | "both" | "modal";
   /** Where the slot lives (A34): the tile (default), the modal, or both. */
   where?: "tile" | "both" | "modal";
   /** The slot's own icon (A51); absent = no icon. */

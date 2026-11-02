@@ -6,6 +6,7 @@
   import FrameSlot from "./slots/FrameSlot.svelte";
   import HtmlSlot from "./slots/HtmlSlot.svelte";
   import type { Slot } from "$lib/types/display";
+  import { labelShown } from "$lib/config/tile-parts";
   import type {
     EnrichedControl,
     EnrichedDevice,
@@ -51,6 +52,10 @@
       slot.kind === "history-list",
   );
   const show = $derived(!needsControl || !!control);
+  /** The tile's caption: the slot's name on the face, when its home allows it.
+   *  The detail row's name is its own label, drawn by the panel. */
+  const name = $derived(slot.label ?? control?.label);
+  const showName = $derived(home === "tile" && labelShown(slot, "tile"));
 </script>
 
 {#snippet content()}
@@ -83,7 +88,7 @@
          detail page. Beside it they would squeeze the frame out of the tile
          (an iframe cannot shrink below its width: 100%). -->
     <div class="slot-frame">
-      {#if icon || slot.label}
+      {#if icon || (showName && slot.label)}
         <div class="slot-cap">
           {#if icon}
             <span class="slot-icon" style:color={icon.color}>
@@ -94,7 +99,9 @@
               />
             </span>
           {/if}
-          {#if slot.label}<span class="slot-label">{slot.label}</span>{/if}
+          {#if showName && slot.label}<span class="slot-label"
+              >{slot.label}</span
+            >{/if}
         </div>
       {/if}
       {@render content()}
@@ -130,6 +137,12 @@
         </span>
       {/if}
       {@render content()}
+      {#if showName && name}<span class="slot-name">{name}</span>{/if}
+    </div>
+  {:else if showName && name}
+    <div class="slot-cluster" class:stack>
+      {@render content()}
+      <span class="slot-name">{name}</span>
     </div>
   {:else}
     {@render content()}
@@ -170,6 +183,14 @@
     gap: 0.35rem;
     font-size: var(--body-sm);
     font-weight: 600;
+  }
+
+  /* The slot's name on the tile face: quiet, under or beside the reading. */
+  .slot-name {
+    font-size: var(--body-sm);
+    color: var(--text-muted);
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .slot-frame :global(iframe) {

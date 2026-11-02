@@ -5,6 +5,7 @@ import {
   faceGlyph,
   headerIcon,
   headlineSlot,
+  labelShown,
   rowIcon,
   rowSpark,
   stateLook,
@@ -659,6 +660,28 @@ it("hides the slot's value off, or moves it by its own home", () => {
   expect(valueShown(opts({ valueWhere: "modal" }), "tile")).toBe(false);
   expect(valueShown(opts({ valueWhere: "modal" }), "modal")).toBe(true);
   expect(valueShown(opts({ valueWhere: "elsewhere" }), "tile")).toBe(true);
+});
+
+it("draws a slot's name where its labelWhere says", () => {
+  // Today's split: a reading's name only in the detail row, a frame caption both.
+  expect(labelShown({ kind: "value" }, "modal")).toBe(true);
+  expect(labelShown({ kind: "value" }, "tile")).toBe(false);
+  expect(labelShown({ kind: "frame" }, "tile")).toBe(true);
+  expect(labelShown({ kind: "frame" }, "modal")).toBe(true);
+  expect(labelShown({ kind: "html" }, "tile")).toBe(true);
+  // An explicit home wins on either side.
+  expect(labelShown({ kind: "value", labelWhere: "tile" }, "tile")).toBe(true);
+  expect(labelShown({ kind: "value", labelWhere: "tile" }, "modal")).toBe(
+    false,
+  );
+  expect(labelShown({ kind: "value", labelWhere: "both" }, "tile")).toBe(true);
+  expect(labelShown({ kind: "value", labelWhere: "modal" }, "modal")).toBe(
+    true,
+  );
+  // A frame can be narrowed too.
+  expect(labelShown({ kind: "frame", labelWhere: "modal" }, "tile")).toBe(
+    false,
+  );
 });
 
 it("the tile icon is separate from the headline slot icon", () => {
