@@ -722,6 +722,13 @@
     edit((t) => patchIcon(t, i, patch));
   }
 
+  /** Enabling an icon with no glyph asks for one first: no glyph, no icon, so
+   *  the checkbox never sits checked on an empty descriptor. */
+  function enableIcon(i: number): void {
+    if (shownSlots[i]?.icon?.glyph) setIcon(i, { enabled: true });
+    else iconPickerFor = i;
+  }
+
   function setSpark(i: number, patch: Partial<SlotSpark>): void {
     edit((t) => patchSpark(t, i, patch));
   }
@@ -1774,12 +1781,12 @@
                             slot.icon.enabled !== false}
                           onchange={(e) =>
                             e.currentTarget.checked
-                              ? setIcon(i, { enabled: true })
+                              ? enableIcon(i)
                               : setIcon(i, { enabled: false })}
                         />
                         <span>Icon</span>
                       </label>
-                      {#if slot.icon}
+                      {#if slot.icon && slot.icon.enabled !== false}
                         <button
                           type="button"
                           class="btn btn-sm glyph-pick"
@@ -1846,7 +1853,7 @@
                       </span>
                     {/if}
                   </div>
-                  {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
+                  {#if slot.icon && slot.icon.enabled !== false && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
                     <p class="note text-muted">
                       No glyph yet — choose one, or let a rule supply it.
                     </p>
@@ -2257,7 +2264,10 @@
         if (target === null) return;
         const glyph = value.trim();
         edit((t) => {
-          const next = patchIcon(t, target, { glyph: glyph || undefined });
+          const next = patchIcon(t, target, {
+            glyph: glyph || undefined,
+            enabled: glyph ? true : false,
+          });
           // A chosen glyph is the face the user wants; a rule's glyph would hide
           // it, so the rules lose theirs (colours and `disabled` stay).
           return glyph ? clearRuleIcons(next, target) : next;
