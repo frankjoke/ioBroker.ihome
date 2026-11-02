@@ -93,6 +93,21 @@ export function saveRegistry() {
   }, 250);
 }
 
+/** Insert a device or replace the one with the same id, and persist. The one
+ *  write path for the device editors, including the pickers' inline form. */
+export function upsertDevice(device) {
+  const reg = getCanonicalRegistry();
+  const known = (reg.devices ?? []).some((d) => d.id === device.id);
+  setCanonicalRegistry({
+    version: (reg.version ?? 0) + 1,
+    updatedAt: Date.now(),
+    devices: known
+      ? reg.devices.map((d) => (d.id === device.id ? device : d))
+      : [...(reg.devices ?? []), device],
+  });
+  saveRegistry();
+}
+
 export function initRegistry() {
   if (!initPromise) {
     initPromise = (async () => {

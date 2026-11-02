@@ -10,11 +10,6 @@
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
-    getCanonicalRegistry,
-    setCanonicalRegistry,
-  } from "$lib/stores/devices.svelte.js";
-  import { saveRegistry } from "$lib/registry.svelte.js";
-  import {
     addPage,
     addSection,
     appendTile,
@@ -44,7 +39,6 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
-  import type { Device } from "$lib/types/device";
   import type { PageRegistry, Slot } from "$lib/types/display";
 
   let {
@@ -347,22 +341,6 @@
     commitLayout(next);
     pickerFor = null;
     selection = { kind: "tile", pageId, sectionId, placementId: added.id };
-  }
-
-  /** Persist a device created from the slot picker; it is not placed by itself
-   *  (S9: the picker only returns it as the selected source collection). */
-  function saveNewDevice(d: Device): void {
-    const reg = getCanonicalRegistry();
-    const idx = reg.devices.findIndex((x) => x.id === d.id);
-    setCanonicalRegistry({
-      version: (reg.version ?? 0) + 1,
-      updatedAt: Date.now(),
-      devices:
-        idx >= 0
-          ? reg.devices.map((x) => (x.id === d.id ? d : x))
-          : [...reg.devices, d],
-    });
-    saveRegistry();
   }
 
   function confirmDelete(): void {
@@ -755,7 +733,6 @@
         addSlotsTo(target.anchor, slots, target.at);
       }
     }}
-    onSaveDevice={saveNewDevice}
     onClose={() => (pickerFor = null)}
   />
 {/if}

@@ -10,6 +10,7 @@
   import { effectiveFunctions, effectiveRoom } from "$lib/config/state-meta";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
   import DeviceForm from "$lib/components/config/DeviceForm.svelte";
+  import { upsertDevice } from "$lib/registry.svelte.js";
   import {
     slotFromControl,
     slotFromState,
@@ -48,7 +49,6 @@
     onSource,
     onControls,
     onState,
-    onSaveDevice,
     onClose,
   }: {
     mode: PickerMode;
@@ -66,8 +66,6 @@
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
     onState?: (stateId: string) => void;
-    /** Persist a device created here; the picker then selects it. */
-    onSaveDevice?: (device: Device) => void;
     onClose: () => void;
   } = $props();
 
@@ -108,7 +106,11 @@
   let badgeControlId = $state("");
   /** A badge may read any state, not only a control of the chosen device. */
   let badgeState = $state("");
-  let creatingDevice = $state(false);
+  /** The inline device form: a new device (`device: null`) or one being edited. */
+  let deviceForm = $state<{ device: Device | null } | null>(null);
+  /** The device editors fold out only where a device is picked, not inside the
+   *  device form's own control picker. */
+  const canEditDevices = $derived(mode === "slot" || mode === "source");
   /** A device saved in this picker before the store's list caught up. */
   let createdDevice = $state<Device | null>(null);
 
@@ -477,15 +479,18 @@
   }
 
   function saveDevice(d: Device): void {
-    onSaveDevice?.(d);
+    const wasNew = deviceForm?.device == null;
+    upsertDevice(d);
     createdDevice = d;
-    selectedDeviceId = d.id;
-    selectedControls.clear();
-    creatingDevice = false;
+    if (wasNew) {
+      selectedDeviceId = d.id;
+      selectedControls.clear();
+    }
+    deviceForm = null;
   }
 
   function onKey(event: KeyboardEvent): void {
-    if (event.key === "Escape" && !creatingDevice) onClose();
+    if (event.key === "Escape" && !deviceForm) onClose();
   }
 </script>
 
@@ -664,17 +669,18 @@
               <option value={f.value}>{f.label}</option>
             {/each}
           </select>
-          {#if onSaveDevice}
+          {#if canEditDevices}
             <button
               type="button"
               class="btn btn-sm"
-              onclick={() => (creatingDevice = true)}>New device…</button
+              onclick={() => (deviceForm = { device: null })}
+              >New device…</button
             >
           {/if}
         </div>
         <ul class="list device-list">
           {#each filtered as d (d.id)}
-            <li>
+            <li class="device-row">
               <button
                 type="button"
                 class="row"
@@ -684,15 +690,43 @@
                 <span class="name">{d.name || d.id}</span>
                 <span class="meta text-muted">{d.type}</span>
               </button>
+              {#if canEditDevices}
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title={`Edit ${d.name || d.id}`}
+                  aria-label={`Edit ${d.name || d.id}`}
+                  onclick={() => (deviceForm = { device: d })}
+                >
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
+              {/if}
             </li>
           {/each}
           {#if filtered.length === 0}
             <li class="empty text-muted">No device matches.</li>
           {/if}
         </ul>
+        {#if deviceForm}
+          <div class="inline-device-form">
+            <!-- Keyed: DeviceForm reads its device once at init, so switching
+                 from one device's editor to another must rebuild it. -->
+            {#key deviceForm.device?.id ?? "new"}
+              <DeviceForm
+                device={deviceForm.device}
+                objects={ioBroker.objects}
+                {roomsOf}
+                {rooms}
+                devices={allDevices}
+                onSave={saveDevice}
+                onCancel={() => (deviceForm = null)}
+              />
+            {/key}
+          </div>
+        {/if}
       </div>
 
-      {#if selectedDevice && tab === "device"}
+      {#if selectedDevice && tab === "device" && !deviceForm}
         <div class="results">
           {#if controls.length === 0}
             <p class="empty text-muted">
@@ -852,22 +886,6 @@
   </div>
 </div>
 
-{#if creatingDevice && onSaveDevice}
-  <div class="modal" role="dialog" aria-modal="true" aria-label="New device">
-    <div class="modal-content device-modal">
-      <DeviceForm
-        device={null}
-        objects={ioBroker.objects}
-        {roomsOf}
-        {rooms}
-        devices={allDevices}
-        onSave={saveDevice}
-        onCancel={() => (creatingDevice = false)}
-      />
-    </div>
-  </div>
-{/if}
-
 <style>
   .modal {
     position: fixed;
@@ -893,8 +911,27 @@
     gap: 0.75rem;
   }
 
-  .device-modal {
-    width: min(680px, 100%);
+  /* One device row: the pick target, then its pencil. */
+  .device-row {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .device-row .row {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .device-row .icon-btn {
+    flex: 0 0 auto;
+  }
+
+  /* The device form folds out under the list, inside the picker's scroll. */
+  .inline-device-form {
+    border-top: 1px dashed var(--border-color);
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
   }
 
   .modal-head {
