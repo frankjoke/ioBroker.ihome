@@ -672,10 +672,13 @@
           {#if canEditDevices}
             <button
               type="button"
-              class="btn btn-sm"
+              class="icon-btn"
+              title="Add device"
+              aria-label="Add device"
               onclick={() => (deviceForm = { device: null })}
-              >New device…</button
             >
+              <span class="material-symbols-outlined">add</span>
+            </button>
           {/if}
         </div>
         <ul class="list device-list">
