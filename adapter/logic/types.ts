@@ -39,12 +39,39 @@ export type InputSource =
   | { type: "memory"; ref: string }
   | { type: "timer"; every: Duration };
 
+export type AstroEvent =
+  | "nightEnd"
+  | "nauticalDawn"
+  | "dawn"
+  | "sunrise"
+  | "sunriseEnd"
+  | "goldenHourEnd"
+  | "solarNoon"
+  | "goldenHour"
+  | "sunsetStart"
+  | "sunset"
+  | "dusk"
+  | "nauticalDusk"
+  | "night"
+  | "nadir";
+
+/** A repeating trigger of an event: an interval, a daily cron or an astro time. */
+export type TimerSpec =
+  | Duration
+  | { kind: "astro"; event: AstroEvent; offset?: number }
+  | {
+      kind: "cron";
+      /** `HH:MM[:SS]`; each part may be `*`, but not all of them. */
+      at: string;
+      days?: number[] | "*";
+    };
+
 export interface Input {
   from: InputSource;
   /** Variables are read-only values from one source; events trigger rows. */
   kind: "variable" | "event";
-  /** Event only: extra repeating triggers beside `from` (D32). */
-  timers?: Duration[];
+  /** Event only: repeating triggers beside `from` (D32). */
+  timers?: TimerSpec[];
   /** Legacy (pre row-usage): read as the row default, no longer written. */
   mode?: "changed" | "any";
   ack?: "any" | "true" | "false";

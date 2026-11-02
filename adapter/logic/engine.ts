@@ -1,8 +1,10 @@
 import { evaluate } from "./expr";
 import { parseDuration } from "./duration";
+import { nextCron } from "./timer-ops";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   Action,
+  AstroEvent,
   Duration,
   Forward,
   FunctionLogic,
@@ -13,6 +15,7 @@ import type {
   OnRow,
   Output,
   StateDef,
+  TimerSpec,
 } from "./types";
 
 export interface StateChange {
@@ -36,6 +39,12 @@ export interface EngineDeps {
     | { kind: "const"; value: unknown }
     | { kind: "state"; stateId: string }
     | undefined;
+  /** The next astro time after `from`, in ms; undefined when no location. */
+  nextAstro?(
+    event: AstroEvent,
+    offset: number,
+    from: number,
+  ): number | undefined;
 }
 
 export interface EngineOptions {
@@ -881,9 +890,32 @@ export function createEngine(
     if (input.input.from.type === "timer") {
       armOneTimer(rt, input, input.input.from.every, input.name);
     }
-    (input.input.timers ?? []).forEach((every, index) =>
-      armOneTimer(rt, input, every, `${input.name}#${index}`),
-    );
+    (input.input.timers ?? []).forEach((timer, index) => {
+      const key = `${input.name}#${index}`;
+      if (typeof timer === "string") {
+        armOneTimer(rt, input, timer, key);
+      } else if (timer.kind === "astro") {
+        armAstroTimer(rt, input, timer, key);
+      } else {
+        armCronTimer(rt, input, timer, key);
+      }
+    });
+  }
+
+  function fireInputTimer(rt: Runtime, input: InputRuntime): void {
+    const previous = input.last;
+    input.last = deps.now();
+    input.hasLast = true;
+    enqueue({
+      rt,
+      input: input.name,
+      value: input.last,
+      previous,
+      hasPrevious: previous !== undefined,
+      depth: 0,
+      fromTimer: true,
+      meta: { from: "timer", self: true, ts: deps.now() },
+    });
   }
 
   function armOneTimer(
@@ -897,21 +929,57 @@ export function createEngine(
     const handle = deps.setTimeout(() => {
       rt.timers.delete(key);
       if (!started) return;
-      const previous = input.last;
-      input.last = deps.now();
-      input.hasLast = true;
-      enqueue({
-        rt,
-        input: input.name,
-        value: input.last,
-        previous,
-        hasPrevious: previous !== undefined,
-        depth: 0,
-        fromTimer: true,
-        meta: { from: "timer", self: true, ts: deps.now() },
-      });
+      fireInputTimer(rt, input);
       armOneTimer(rt, input, every, key);
     }, ms);
+    rt.timers.set(key, handle);
+  }
+
+  function armAstroTimer(
+    rt: Runtime,
+    input: InputRuntime,
+    timer: Extract<TimerSpec, { kind: "astro" }>,
+    key: string,
+  ): void {
+    const from = deps.now();
+    const next = deps.nextAstro?.(timer.event, timer.offset ?? 0, from);
+    if (next === undefined) {
+      warnOnce(
+        rt.def.id,
+        "astro timers need the system latitude/longitude — skipped",
+      );
+      return;
+    }
+    const handle = deps.setTimeout(
+      () => {
+        rt.timers.delete(key);
+        if (!started) return;
+        fireInputTimer(rt, input);
+        armAstroTimer(rt, input, timer, key);
+      },
+      Math.max(0, next - from),
+    );
+    rt.timers.set(key, handle);
+  }
+
+  function armCronTimer(
+    rt: Runtime,
+    input: InputRuntime,
+    timer: Extract<TimerSpec, { kind: "cron" }>,
+    key: string,
+  ): void {
+    const from = deps.now();
+    const next = nextCron(timer, from);
+    if (next === undefined) return;
+    const handle = deps.setTimeout(
+      () => {
+        rt.timers.delete(key);
+        if (!started) return;
+        fireInputTimer(rt, input);
+        armCronTimer(rt, input, timer, key);
+      },
+      Math.max(0, next - from),
+    );
     rt.timers.set(key, handle);
   }
 

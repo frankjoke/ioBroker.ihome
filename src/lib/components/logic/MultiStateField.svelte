@@ -1,7 +1,8 @@
 <script lang="ts">
   import IconButton from "$lib/components/common/IconButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
-  import type { LogicDef } from "$logic/types";
+  import { timerLabel } from "$logic/timer-ops";
+  import type { LogicDef, TimerSpec } from "$logic/types";
 
   /** Several states bound to one input name: a button in the corridor and one
    *  by the door both arrive as the same local event. */
@@ -14,6 +15,7 @@
     hideAdd = false,
     timers = [],
     onTimers = undefined,
+    onEditTimer = undefined,
   }: {
     value: string[];
     label: string;
@@ -24,8 +26,10 @@
     /** The host renders its own add control (the event line). */
     hideAdd?: boolean;
     /** Repeating triggers shown in the same source list (D32). */
-    timers?: string[];
-    onTimers?: (timers: string[]) => void;
+    timers?: TimerSpec[];
+    onTimers?: (timers: TimerSpec[]) => void;
+    /** Opens the timer editor for a chip. */
+    onEditTimer?: (index: number) => void;
   } = $props();
 
   let picking = $state(false);
@@ -40,12 +44,6 @@
 
   function add(id: string) {
     if (!value.includes(id)) onchange([...value, id]);
-  }
-
-  function setTimer(index: number, every: string) {
-    const next = [...timers];
-    next[index] = every.trim() || "5m";
-    onTimers?.(next);
   }
 
   function removeTimer(index: number) {
@@ -76,15 +74,16 @@
     </span>
   {/each}
   {#if onTimers}
-    {#each timers as every, index (index)}
+    {#each timers as timer, index (index)}
       <span class="chip timer">
-        <span class="hint text-muted">every</span>
-        <input
-          class="duration"
-          value={every}
-          aria-label={`Timer ${index + 1} of ${label}`}
-          onchange={(e) => setTimer(index, e.currentTarget.value)}
-        />
+        <button
+          type="button"
+          class="timer-open"
+          title="Edit timer"
+          onclick={() => onEditTimer?.(index)}
+        >
+          {timerLabel(timer)}
+        </button>
         <button
           type="button"
           class="chip-x"
@@ -163,7 +162,13 @@
     font-size: 1rem;
   }
 
-  .chip.timer .duration {
-    width: 4.5rem;
+  .chip.timer .timer-open {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--body-sm);
+    cursor: pointer;
   }
 </style>

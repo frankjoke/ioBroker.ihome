@@ -1,8 +1,9 @@
 import * as utils from "@iobroker/adapter-core";
+import * as SunCalc from "suncalc";
 import { createEngine, type Engine, type StateChange } from "./logic/engine";
 import { parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
-import type { LogicDef, LogicDocument } from "./logic/types";
+import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -147,6 +148,8 @@ class IHome extends utils.Adapter {
   private warnedWrites = new Set<string>();
   /** Guards overlapping reloads: only the newest may swap the engine. */
   private logicLoad = 0;
+  /** The system location for astro timers, read once. */
+  private astroConfig?: { lat: number; lon: number };
   private heartbeat?: ReturnType<typeof setInterval>;
   private readonly startedAt = Date.now();
 
@@ -333,6 +336,46 @@ class IHome extends utils.Adapter {
     }
   }
 
+  /** Read the system latitude/longitude once; astro timers need both. */
+  private async ensureAstroConfig(): Promise<void> {
+    if (this.astroConfig) return;
+    try {
+      const config = await this.getForeignObjectAsync("system.config");
+      const lat = Number(config?.common?.latitude);
+      const lon = Number(config?.common?.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        this.astroConfig = { lat, lon };
+      } else {
+        this.log.warn(
+          "logic: system.config has no latitude/longitude — astro timers are skipped",
+        );
+      }
+    } catch (error) {
+      this.log.warn(`logic: cannot read system.config for astro: ${error}`);
+    }
+  }
+
+  /** The next occurrence of an astro time (local) after `from`, plus offset. */
+  private nextAstro(
+    event: AstroEvent,
+    offset: number,
+    from: number,
+  ): number | undefined {
+    if (!this.astroConfig) return undefined;
+    const { lat, lon } = this.astroConfig;
+    const day = new Date(from);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const times = SunCalc.getTimes(day, lat, lon);
+      const at = times[event] as Date | undefined;
+      if (at && Number.isFinite(at.getTime())) {
+        const target = at.getTime() + offset * 60_000;
+        if (target > from) return target;
+      }
+      day.setDate(day.getDate() + 1);
+    }
+    return undefined;
+  }
+
   /**
    * The logic engine (spec 2026-10-31). Reads its document, subscribes exactly
    * the refs it names, then swaps engines so a reload never leaves a gap with
@@ -361,6 +404,7 @@ class IHome extends utils.Adapter {
     }
     if (loadId !== this.logicLoad) return; // a newer reload won
 
+    await this.ensureAstroConfig();
     await this.ensureLogicStates(doc);
 
     let next: Engine;
@@ -386,6 +430,8 @@ class IHome extends utils.Adapter {
             if (variable) return { kind: "state", stateId: variable.stateId };
             return undefined;
           },
+          nextAstro: (event, offset, from) =>
+            this.nextAstro(event, offset, from),
         },
         { ownFrom: this.namespace },
       );

@@ -1,4 +1,5 @@
 import { parseDuration } from "./duration";
+import { isAstroEvent, parseCronAt } from "./timer-ops";
 import { OPERATORS } from "./types";
 import type {
   Action,
@@ -137,10 +138,48 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         if (!Array.isArray(timers)) {
           add(id, `inputs.${name}.timers`, "timers must be an array");
         } else {
-          timers.forEach((every, index) => {
-            const ms = parseDuration(every);
-            if (ms === null || ms <= 0) {
-              add(id, `inputs.${name}.timers.${index}`, "invalid duration");
+          timers.forEach((timer, index) => {
+            const path = `inputs.${name}.timers.${index}`;
+            if (typeof timer === "string") {
+              const ms = parseDuration(timer);
+              if (ms === null || ms <= 0) add(id, path, "invalid duration");
+              return;
+            }
+            if (!isRecord(timer)) {
+              add(id, path, "invalid timer");
+              return;
+            }
+            if (timer.kind === "astro") {
+              if (!isAstroEvent(String(timer.event))) {
+                add(id, `${path}.event`, `unknown astro event`);
+              }
+              if (
+                timer.offset !== undefined &&
+                !Number.isFinite(timer.offset)
+              ) {
+                add(id, `${path}.offset`, "offset must be minutes");
+              }
+            } else if (timer.kind === "cron") {
+              if (typeof timer.at !== "string" || !parseCronAt(timer.at)) {
+                add(
+                  id,
+                  `${path}.at`,
+                  "time is HH:MM[:SS]; * is allowed per part, but not all",
+                );
+              }
+              const days = timer.days;
+              if (
+                days !== undefined &&
+                days !== "*" &&
+                (!Array.isArray(days) ||
+                  days.some(
+                    (day) => !Number.isInteger(day) || day < 0 || day > 6,
+                  ))
+              ) {
+                add(id, `${path}.days`, "days are 0-6 or *");
+              }
+            } else {
+              add(id, path, "unknown timer kind");
             }
           });
         }

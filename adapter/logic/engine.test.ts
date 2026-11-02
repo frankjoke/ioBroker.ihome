@@ -1812,3 +1812,103 @@ it("an event can combine states and a repeating timer", () => {
   h.clock.advance(60_000); // the repeating timer
   expect(h.writes.at(-1)?.value).toBe(60_000);
 });
+
+it("fires an astro timer at the computed time", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "astro",
+        name: "Astro",
+        kind: "machine",
+        inputs: {
+          tick: {
+            from: { type: "state", ref: "", refs: [] },
+            kind: "event",
+            timers: [{ kind: "astro", event: "sunrise", offset: 10 }],
+          },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: {
+            on: [
+              {
+                on: "tick",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.HIT" },
+                      value: { ref: "tick" },
+                      forward: "always",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.HIT": 0 });
+  h.clock.now = 1_000;
+  h.deps.nextAstro = (_event, _offset, from) => from + 60_000;
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(59_999);
+  expect(h.writes).toHaveLength(0);
+  h.clock.advance(1);
+  expect(h.writes.at(-1)?.value).toBe(61_000);
+});
+
+it("fires a cron timer at the next matching minute", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "cron",
+        name: "Cron",
+        kind: "machine",
+        inputs: {
+          tick: {
+            from: { type: "state", ref: "", refs: [] },
+            kind: "event",
+            timers: [{ kind: "cron", at: "08:00", days: "*" }],
+          },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: {
+            on: [
+              {
+                on: "tick",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.HIT" },
+                      value: { ref: "tick" },
+                      forward: "always",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.HIT": 0 });
+  const at = new Date(2026, 10, 3, 7, 30, 0).getTime();
+  h.clock.now = at;
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(30 * 60_000 - 1);
+  expect(h.writes).toHaveLength(0);
+  h.clock.advance(1);
+  expect(h.writes.at(-1)?.value).toBe(new Date(2026, 10, 3, 8, 0, 0).getTime());
+});

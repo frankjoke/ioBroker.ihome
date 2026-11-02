@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Input, InputSource, LogicDef } from "$logic/types";
+  import type { Input, InputSource, LogicDef, TimerSpec } from "$logic/types";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { variableNameFor } from "$lib/config/variables";
   import IconButton from "$lib/components/common/IconButton.svelte";
@@ -8,7 +8,9 @@
   import MultiStateField from "./MultiStateField.svelte";
   import StateRefField from "./StateRefField.svelte";
   import VariableModal from "./VariableModal.svelte";
+  import TimerModal from "./TimerModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import { timerLabel } from "$logic/timer-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
 
@@ -40,6 +42,8 @@
   let addingVariable = $state(false);
   /** The event whose + State opens the picker. */
   let sourceFor = $state<string | null>(null);
+  /** The timer being added/edited (index null = new). */
+  let timerEdit = $state<{ name: string; index: number | null } | null>(null);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
   const otherLogics = $derived(logics.filter((logic) => logic.id !== selfId));
@@ -67,20 +71,6 @@
       from: { type: "state", ref: refs[0] ?? "", refs: refs.slice(1) },
       ...(timers?.length ? { timers } : {}),
     });
-  }
-
-  /** + timer on an event line: one more repeating trigger (every …). */
-  function addTimer(name: string) {
-    const input = inputs[name];
-    if (!input) return;
-    const timers = [...(input.timers ?? [])];
-    if (input.from.type === "timer") timers.unshift(input.from.every);
-    timers.push("5m");
-    const from =
-      input.from.type === "state"
-        ? input.from
-        : { type: "state" as const, ref: "", refs: [] };
-    update(name, { ...input, from, timers });
   }
 
   function rename(oldName: string, rawName: string) {
@@ -145,7 +135,7 @@
           const sourceId = ref.slice("$logic.".length);
           return logics.find((source) => source.id === sourceId)?.name ?? ref;
         });
-      const timers = (input.timers ?? []).map((every) => `every ${every}`);
+      const timers = (input.timers ?? []).map((timer) => timerLabel(timer));
       const all = [...states, ...timers];
       if (all.length === 0) return "(no source)";
       if (all.length === 1) return all[0];
@@ -206,7 +196,8 @@
               type="button"
               class="btn btn-sm"
               title="Add a repeating timer (every …)"
-              onclick={() => addTimer(name)}>+ Timer</button
+              onclick={() => (timerEdit = { name, index: null })}
+              >+ Timer</button
             >
           {/if}
           <IconButton
@@ -241,6 +232,7 @@
                         ...input,
                         timers: timers.length ? timers : undefined,
                       })}
+                    onEditTimer={(index) => (timerEdit = { name, index })}
                     onchange={(ids) =>
                       update(name, {
                         ...input,
@@ -322,6 +314,31 @@
       sourceFor = null;
     }}
     onClose={() => (sourceFor = null)}
+  />
+{/if}
+
+{#if timerEdit}
+  <TimerModal
+    timer={timerEdit.index === null
+      ? null
+      : (inputs[timerEdit.name]?.timers?.[timerEdit.index] ?? null)}
+    onSave={(timer) => {
+      const target = timerEdit;
+      const input = target ? inputs[target.name] : undefined;
+      if (target && input) {
+        let base = input;
+        const timers = [...(input.timers ?? [])];
+        if (target.index === null && input.from.type === "timer") {
+          timers.unshift(input.from.every);
+          base = { ...input, from: { type: "state", ref: "", refs: [] } };
+        }
+        if (target.index === null) timers.push(timer);
+        else timers[target.index] = timer;
+        update(target.name, { ...base, timers });
+      }
+      timerEdit = null;
+    }}
+    onCancel={() => (timerEdit = null)}
   />
 {/if}
 
