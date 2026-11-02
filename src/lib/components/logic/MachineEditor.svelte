@@ -615,6 +615,9 @@
                           >
                             <option value="$init">$init (start)</option>
                             <option value="$self">$self (target state)</option>
+                            <option value="$start"
+                              >$start (after all logics)</option
+                            >
                             {#each eventInputs as input (input)}
                               <option value={input}>{input}</option>
                             {/each}

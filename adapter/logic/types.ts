@@ -111,7 +111,9 @@ export type Action =
   | { log: { text: string; level?: "info" | "warn" } };
 
 export interface OnRow {
-  /** An input name whose kind is "event". */
+  /** An input name whose kind is "event", or a built-in trigger: `$init` (this
+   *  logic's start), `$self` (a write to its output), `$start` (after every
+   *  logic has started). */
   on: string;
   /** What counts as this row's trigger. Default "change" (legacy `mode: "any"`
    *  on the input still means "any"). */

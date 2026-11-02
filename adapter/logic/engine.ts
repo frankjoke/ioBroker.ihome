@@ -924,6 +924,20 @@ export function createEngine(
       for (const rt of runtimes) {
         for (const input of rt.inputs.values()) armTimer(rt, input);
       }
+      // `$start` (D28): after every logic is up, each machine sees one event in
+      // the state it adopted, so cross-logic start actions are possible.
+      for (const rt of runtimes) {
+        if (rt.def.kind !== "machine") continue;
+        enqueue({
+          rt,
+          input: "$start",
+          value: true,
+          previous: false,
+          hasPrevious: true,
+          depth: 0,
+          meta: { from: "start", self: true, ts: deps.now() },
+        });
+      }
     },
     stop() {
       for (const rt of runtimes) {

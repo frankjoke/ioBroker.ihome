@@ -266,3 +266,21 @@ it("warns that continue cannot outlive a goto", () => {
   expect(issues.every((i) => i.severity === "warn")).toBe(true);
   expect(logicHasErrors(issues, "c")).toBe(false);
 });
+
+it("accepts $start as a built-in trigger", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "s",
+        name: "S",
+        kind: "machine",
+        states: {
+          A: { on: [{ on: "$start", goto: "B" }] },
+          B: {},
+        },
+      },
+    ],
+  };
+  expect(validateLogicDocument(d)).toEqual([]);
+});

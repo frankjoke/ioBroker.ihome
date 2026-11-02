@@ -1413,3 +1413,54 @@ it("a goto ends the event even on a continue row", () => {
   ]);
   expect(engine.memoryValue("chain")).toBe("Done");
 });
+
+it("fires $start after every logic started, in the adopted state", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "prep",
+        name: "Prep",
+        kind: "function",
+        inputs: {},
+        output: { scope: "memory", name: "ready" },
+        expr: { const: true },
+      },
+      {
+        id: "late",
+        name: "Late",
+        kind: "machine",
+        inputs: {
+          ready: { from: { type: "memory", ref: "ready" }, kind: "variable" },
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "boolean",
+        },
+        init: { state: "Idle" },
+        states: {
+          Idle: {
+            // Only fires when the function above already computed its memory.
+            on: [{ on: "$start", if: { ref: "ready" }, goto: "On" }],
+          },
+          On: { on: [{ on: "e", goto: "Idle" }] },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.OUT": false, "0_userdata.0.E": 0 });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.OUT", value: true, ack: false },
+  ]);
+  // A later event leaves On; $start does not fire again.
+  h.writes.length = 0;
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.OUT", value: false, ack: false },
+  ]);
+});

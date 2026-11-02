@@ -402,8 +402,8 @@ function checkRow(
     add(id, `${path}.source`, "unknown event source");
   }
   const input = row?.on;
-  if (input === "$init" || input === "$self") {
-    // Built-in machine triggers (D19, D22); only machines have rows.
+  if (input === "$init" || input === "$self" || input === "$start") {
+    // Built-in machine triggers (D19, D22, D28); only machines have rows.
   } else if (typeof input !== "string" || !inputNames.has(input)) {
     add(id, `${path}.on`, `unknown input ${String(input)}`);
   } else {
