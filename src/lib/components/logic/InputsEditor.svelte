@@ -83,21 +83,6 @@
     update(name, { ...input, from, timers });
   }
 
-  function setTimer(name: string, index: number, every: string) {
-    const input = inputs[name];
-    if (!input) return;
-    const timers = [...(input.timers ?? [])];
-    timers[index] = every.trim() || "5m";
-    update(name, { ...input, timers });
-  }
-
-  function removeTimer(name: string, index: number) {
-    const input = inputs[name];
-    if (!input) return;
-    const timers = (input.timers ?? []).filter((_, i) => i !== index);
-    update(name, { ...input, timers: timers.length ? timers : undefined });
-  }
-
   function rename(oldName: string, rawName: string) {
     const name = rawName.trim();
     if (!name || (name !== oldName && name in inputs)) return;
@@ -250,6 +235,12 @@
                     {logics}
                     {selfId}
                     hideAdd
+                    timers={input.timers ?? []}
+                    onTimers={(timers) =>
+                      update(name, {
+                        ...input,
+                        timers: timers.length ? timers : undefined,
+                      })}
                     onchange={(ids) =>
                       update(name, {
                         ...input,
@@ -308,28 +299,6 @@
               </label>
             {/if}
           </div>
-          {#if input.kind === "event" && input.timers?.length}
-            <div class="row timers">
-              <span class="label-mono">Timers</span>
-              {#each input.timers as every, ti (ti)}
-                <span class="timer-chip">
-                  <span class="hint text-muted">every</span>
-                  <input
-                    class="duration"
-                    value={every}
-                    aria-label={`Timer ${ti + 1} for ${name}`}
-                    onchange={(e) => setTimer(name, ti, e.currentTarget.value)}
-                  />
-                  <IconButton
-                    icon="close"
-                    label={`Remove timer ${ti + 1}`}
-                    title="Remove"
-                    onclick={() => removeTimer(name, ti)}
-                  />
-                </span>
-              {/each}
-            </div>
-          {/if}
         </div>
       {/if}
     </div>
@@ -443,25 +412,5 @@
 
   .field input {
     width: 100%;
-  }
-
-  .timers {
-    flex-wrap: wrap;
-    padding-top: 0.2rem;
-  }
-
-  .timer-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.1rem 0.2rem 0.1rem 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-pill, 999px);
-    background: var(--surface-container);
-    font-size: var(--body-sm);
-  }
-
-  .timer-chip .duration {
-    width: 4.5rem;
   }
 </style>

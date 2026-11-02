@@ -12,6 +12,8 @@
     logics = [],
     selfId = "",
     hideAdd = false,
+    timers = [],
+    onTimers = undefined,
   }: {
     value: string[];
     label: string;
@@ -21,6 +23,9 @@
     selfId?: string;
     /** The host renders its own add control (the event line). */
     hideAdd?: boolean;
+    /** Repeating triggers shown in the same source list (D32). */
+    timers?: string[];
+    onTimers?: (timers: string[]) => void;
   } = $props();
 
   let picking = $state(false);
@@ -35,6 +40,16 @@
 
   function add(id: string) {
     if (!value.includes(id)) onchange([...value, id]);
+  }
+
+  function setTimer(index: number, every: string) {
+    const next = [...timers];
+    next[index] = every.trim() || "5m";
+    onTimers?.(next);
+  }
+
+  function removeTimer(index: number) {
+    onTimers?.(timers.filter((_, i) => i !== index));
   }
 
   /** A logic source reads by name; a state keeps its id. */
@@ -60,6 +75,28 @@
       </button>
     </span>
   {/each}
+  {#if onTimers}
+    {#each timers as every, index (index)}
+      <span class="chip timer">
+        <span class="hint text-muted">every</span>
+        <input
+          class="duration"
+          value={every}
+          aria-label={`Timer ${index + 1} of ${label}`}
+          onchange={(e) => setTimer(index, e.currentTarget.value)}
+        />
+        <button
+          type="button"
+          class="chip-x"
+          aria-label={`Remove timer ${index + 1}`}
+          title="Remove"
+          onclick={() => removeTimer(index)}
+        >
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </span>
+    {/each}
+  {/if}
   {#if !hideAdd}
     <IconButton
       icon="add"
@@ -124,5 +161,9 @@
 
   .chip-x .material-symbols-outlined {
     font-size: 1rem;
+  }
+
+  .chip.timer .duration {
+    width: 4.5rem;
   }
 </style>
