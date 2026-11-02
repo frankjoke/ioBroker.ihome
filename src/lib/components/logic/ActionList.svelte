@@ -115,8 +115,8 @@
         </select>
       {/if}
       <IconButton
-        icon="remove"
-        label="Remove action"
+        icon="delete"
+        label="Delete action"
         onclick={() => onchange(actions.filter((_, i) => i !== index))}
       />
     </div>
