@@ -156,6 +156,12 @@
       ? { head: id.slice(0, cut + 1), tail: id.slice(cut + 1) }
       : { head: id, tail: "" };
   });
+  /** The control's own name, shown before the value only when it says more than
+   *  the state id already does (the raw states almost always do). */
+  const rowLabel = $derived(control.label?.trim() ?? "");
+  const labelDiffers = $derived(
+    !!rowLabel && rowLabel.toLowerCase() !== stateParts.tail.toLowerCase(),
+  );
 </script>
 
 {#snippet resetButton()}
@@ -215,7 +221,10 @@
             >{stateParts.tail}</span
           ></span
         >
-        <span class="state-val">{valueLabel}</span>
+        <span class="state-val"
+          >{#if labelDiffers}<strong class="state-label">{rowLabel}:</strong
+            >{/if}{valueLabel}</span
+        >
       </div>
 
       <button
@@ -391,6 +400,13 @@
   .state-val {
     font-size: 0.75rem;
     color: var(--text-muted);
+  }
+
+  /* The control's name when the state id does not already say it. */
+  .state-label {
+    color: var(--text-color);
+    font-weight: 700;
+    margin-right: 0.3em;
   }
 
   .mono {

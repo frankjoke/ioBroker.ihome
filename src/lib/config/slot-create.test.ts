@@ -56,6 +56,23 @@ it("starts a new slot's name in the detail view", () => {
   expect(labelShown(slot, "modal")).toBe(true);
 });
 
+it("gives a control slot its role's glyph, like a raw state does", () => {
+  const light = slotFromControl(
+    device(),
+    ctl("c1", "power", { role: "switch.light" }),
+  );
+  expect(light.icon).toEqual({ glyph: "power_settings_new" });
+  // A role-less boolean still gets a face.
+  expect(
+    slotFromControl(device(), ctl("c2", "x", { role: "", type: "boolean" }))
+      .icon,
+  ).toEqual({ glyph: "toggle_on" });
+  // A role with no mapping and no boolean type stays bare.
+  expect(
+    slotFromControl(device(), ctl("c3", "x", { role: "value.string" })).icon,
+  ).toBeUndefined();
+});
+
 it("lets the control correction decide the slot kind, not the object", () => {
   const device = { id: "d", type: "Switch", controls: [] } as any;
   const slot = slotFromControl(device, {

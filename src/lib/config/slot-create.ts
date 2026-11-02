@@ -54,12 +54,20 @@ export function slotFromControl(
   );
   const options = rangeOptions(meta);
   const label = control.label ?? meta.name;
+  // The same role fallback the raw-state path uses: a control slot gets its
+  // switch/light/… badge instead of a blank face, unless the object names one.
+  const ownIcon =
+    typeof meta.icon === "string" && meta.icon.trim()
+      ? meta.icon.trim()
+      : undefined;
+  const glyph = ownIcon ?? glyphForRole(meta.role, meta.type);
   // No unit copy: the resolver returns the effective unit (and hideUnit).
   return {
     kind: slotKindForWidget(w),
     source: { kind: "control", device: device.id, control: control.id },
     ...(label ? { label } : {}),
     ...(Object.keys(options).length ? { options } : {}),
+    ...(glyph ? { icon: { glyph } } : {}),
   };
 }
 
