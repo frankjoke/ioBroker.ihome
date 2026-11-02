@@ -945,24 +945,47 @@ export function createEngine(
     hasPrevious: boolean,
   ): void {
     const input = `$logic.${producer.def.id}`;
+    const meta = {
+      from: `logic:${producer.def.id}`,
+      self: false,
+      ack: false,
+      ts: deps.now(),
+    };
     for (const rt of runtimes) {
-      if (rt.def.kind !== "machine" || !rt.state) continue;
-      const rows = (rt.def as MachineLogic).states[rt.state]?.on ?? [];
-      if (!rows.some((row) => row.on === input)) continue;
-      enqueue({
-        rt,
-        input,
-        value,
-        previous,
-        hasPrevious,
-        depth,
-        meta: {
-          from: `logic:${producer.def.id}`,
-          self: rt === producer,
-          ack: false,
-          ts: deps.now(),
-        },
-      });
+      const self = rt === producer;
+      // A row naming the logic directly, in the state it is in.
+      if (rt.def.kind === "machine" && rt.state) {
+        const rows = (rt.def as MachineLogic).states[rt.state]?.on ?? [];
+        if (rows.some((row) => row.on === input)) {
+          enqueue({
+            rt,
+            input,
+            value,
+            previous,
+            hasPrevious,
+            depth,
+            meta: { ...meta, self },
+          });
+        }
+      }
+      // A local event input may name the logic output among its states.
+      for (const source of rt.inputs.values()) {
+        if (source.input.kind !== "event") continue;
+        if (source.input.from.type !== "state") continue;
+        const refs = [source.input.from.ref, ...(source.input.from.refs ?? [])];
+        if (!refs.includes(input)) continue;
+        source.last = value;
+        source.hasLast = true;
+        enqueue({
+          rt,
+          input: source.name,
+          value,
+          previous,
+          hasPrevious,
+          depth,
+          meta: { ...meta, self },
+        });
+      }
     }
   }
 

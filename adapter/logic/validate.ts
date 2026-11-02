@@ -151,6 +151,18 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
             );
           }
         }
+        if (source.type === "state" && input.kind === "event") {
+          const refs = [source.ref, ...(source.refs ?? [])];
+          for (const ref of refs) {
+            if (typeof ref !== "string" || !ref.startsWith("$logic.")) {
+              continue;
+            }
+            const sourceId = ref.slice("$logic.".length);
+            if (!logicIds.has(sourceId)) {
+              add(id, `inputs.${name}.from.ref`, `unknown logic ${sourceId}`);
+            }
+          }
+        }
         if (
           input.kind !== undefined &&
           input.kind !== "variable" &&

@@ -359,3 +359,33 @@ it("validates $all rows and refuses $all as a goto target", () => {
     ),
   ).toBe(true);
 });
+
+it("rejects an unknown logic in a local event's sources", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "v",
+        name: "v",
+        kind: "machine",
+        inputs: {
+          combo: {
+            from: {
+              type: "state",
+              ref: "0_userdata.0.B",
+              refs: ["$logic.ghost"],
+            },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory" },
+        states: { Idle: {} },
+      },
+    ],
+  };
+  expect(
+    validateLogicDocument(d).some((i) =>
+      i.message.includes("unknown logic ghost"),
+    ),
+  ).toBe(true);
+});

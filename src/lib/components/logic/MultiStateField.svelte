@@ -8,13 +8,21 @@
     value,
     label,
     onchange,
+    logics = [],
+    selfId = "",
   }: {
     value: string[];
     label: string;
     onchange: (ids: string[]) => void;
+    /** Other logics, selectable as `$logic.<id>` sources (D29). */
+    logics?: { id: string; name: string }[];
+    selfId?: string;
   } = $props();
 
   let picking = $state(false);
+  const logicOptions = $derived(
+    logics.filter((source) => source.id !== selfId),
+  );
 
   function remove(id: string) {
     onchange(value.filter((entry) => entry !== id));
@@ -46,6 +54,23 @@
     title="Add state"
     onclick={() => (picking = true)}
   />
+  {#if logicOptions.length}
+    <select
+      class="logic-add"
+      aria-label={`Add a logic event to ${label}`}
+      value=""
+      onchange={(e) => {
+        const id = e.currentTarget.value;
+        if (id) add(id);
+        e.currentTarget.value = "";
+      }}
+    >
+      <option value="">+ logic event</option>
+      {#each logicOptions as source (source.id)}
+        <option value={`$logic.${source.id}`}>{source.name}</option>
+      {/each}
+    </select>
+  {/if}
 </div>
 
 {#if picking}
@@ -96,6 +121,11 @@
   .chip-x:hover {
     background: var(--surface-container-high);
     color: var(--text-color);
+  }
+
+  .logic-add {
+    max-width: 12rem;
+    font-size: var(--body-sm);
   }
 
   .chip-x .material-symbols-outlined {

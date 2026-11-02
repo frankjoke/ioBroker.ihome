@@ -155,6 +155,8 @@
       onchange={(inputs) => patch({ inputs })}
       onRename={renameInput}
       where={draft.name}
+      {logics}
+      selfId={draft.id}
     />
   </div>
 

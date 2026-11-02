@@ -13,6 +13,8 @@
     onchange,
     onRename,
     where = "",
+    logics = [],
+    selfId = "",
   }: {
     inputs: Record<string, Input>;
     onchange: (inputs: Record<string, Input>) => void;
@@ -20,6 +22,10 @@
     onRename?: (oldName: string, newName: string) => void;
     /** The logic name, for the delete confirmation's "from …". */
     where?: string;
+    /** Every logic: its output can be a source of a local event (D29). */
+    logics?: { id: string; name: string }[];
+    /** The logic being edited, excluded from its own event sources. */
+    selfId?: string;
   } = $props();
 
   /** The row whose fields are open; one at a time. */
@@ -181,6 +187,8 @@
                       Boolean,
                     )}
                     label={`States for ${name}`}
+                    {logics}
+                    {selfId}
                     onchange={(ids) =>
                       update(name, {
                         ...input,

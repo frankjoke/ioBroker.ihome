@@ -1711,3 +1711,54 @@ it("$start carries the start timestamp and exposes it as a ref", () => {
     { id: "0_userdata.0.SEEN", value: 123456, ack: false },
   ]);
 });
+
+it("a local event can combine a state and a logic output", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "source",
+        name: "Source",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: { Idle: { on: [{ on: "e", goto: "On" }] }, On: {} },
+      },
+      {
+        id: "sink",
+        name: "Sink",
+        kind: "machine",
+        inputs: {
+          combo: {
+            from: {
+              type: "state",
+              ref: "0_userdata.0.B",
+              refs: ["$logic.source"],
+            },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory" },
+        start: "Idle",
+        states: {
+          Idle: { on: [{ on: "combo", goto: "Hit" }] },
+          Hit: { on: [{ on: "combo", goto: "Idle" }] },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.B": false, "0_userdata.0.E": 0 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("sink")).toBe("Idle");
+
+  h.change("0_userdata.0.B", true); // the state source
+  expect(engine.memoryValue("sink")).toBe("Hit");
+
+  h.change("0_userdata.0.E", 1); // the source logic writes -> combo again
+  expect(engine.memoryValue("sink")).toBe("Idle");
+});
