@@ -9,7 +9,7 @@
   } from "$lib/config/rooms";
   import { effectiveFunctions, effectiveRoom } from "$lib/config/state-meta";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
-  import DeviceForm from "$lib/components/config/DeviceForm.svelte";
+  import DeviceEditorPane from "$lib/components/config/DeviceEditorPane.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import {
     slotFromControl,
@@ -712,19 +712,15 @@
         </ul>
         {#if deviceForm}
           <div class="inline-device-form">
-            <!-- Keyed: DeviceForm reads its device once at init, so switching
-                 from one device's editor to another must rebuild it. -->
-            {#key deviceForm.device?.id ?? "new"}
-              <DeviceForm
-                device={deviceForm.device}
-                objects={ioBroker.objects}
-                {roomsOf}
-                {rooms}
-                devices={allDevices}
-                onSave={saveDevice}
-                onCancel={() => (deviceForm = null)}
-              />
-            {/key}
+            <DeviceEditorPane
+              device={deviceForm.device}
+              objects={ioBroker.objects}
+              {roomsOf}
+              {rooms}
+              devices={allDevices}
+              onSave={saveDevice}
+              onCancel={() => (deviceForm = null)}
+            />
           </div>
         {/if}
       </div>
@@ -930,11 +926,9 @@
     flex: 0 0 auto;
   }
 
-  /* The device form folds out under the list, inside the picker's scroll. */
+  /* The shared editor item folds out under the list, inside the picker's scroll. */
   .inline-device-form {
-    border-top: 1px dashed var(--border-color);
-    padding-top: 0.5rem;
-    margin-top: 0.25rem;
+    margin-top: 0.35rem;
   }
 
   .modal-head {
