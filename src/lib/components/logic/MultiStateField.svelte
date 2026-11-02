@@ -1,6 +1,7 @@
 <script lang="ts">
   import IconButton from "$lib/components/common/IconButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import type { LogicDef } from "$logic/types";
 
   /** Several states bound to one input name: a button in the corridor and one
    *  by the door both arrive as the same local event. */
@@ -14,13 +15,14 @@
     value: string[];
     label: string;
     onchange: (ids: string[]) => void;
-    /** Other logics, selectable as `$logic.<id>` sources (D29). */
-    logics?: { id: string; name: string }[];
+    /** Other logics, selectable as `$logic.<id>` sources. */
+    logics?: LogicDef[];
     selfId?: string;
   } = $props();
 
   let picking = $state(false);
-  const logicOptions = $derived(
+  /** The other logics, offered by the picker's Logic tab as event sources. */
+  const logicSources = $derived(
     logics.filter((source) => source.id !== selfId),
   );
 
@@ -57,33 +59,18 @@
   {/each}
   <IconButton
     icon="add"
-    label={`Add a state to ${label}`}
-    title="Add state"
+    label={`Add a state or logic to ${label}`}
+    title="Add state or logic"
     onclick={() => (picking = true)}
   />
-  {#if logicOptions.length}
-    <select
-      class="logic-add"
-      aria-label={`Add a logic event to ${label}`}
-      value=""
-      onchange={(e) => {
-        const id = e.currentTarget.value;
-        if (id) add(id);
-        e.currentTarget.value = "";
-      }}
-    >
-      <option value="">+ logic event</option>
-      {#each logicOptions as source (source.id)}
-        <option value={`$logic.${source.id}`}>{source.name}</option>
-      {/each}
-    </select>
-  {/if}
 </div>
 
 {#if picking}
   <SourcePicker
     mode="state"
     title={label}
+    logics={logicSources}
+    logicPick="trigger"
     onState={(id) => {
       add(id);
       picking = false;
@@ -128,11 +115,6 @@
   .chip-x:hover {
     background: var(--surface-container-high);
     color: var(--text-color);
-  }
-
-  .logic-add {
-    max-width: 12rem;
-    font-size: var(--body-sm);
   }
 
   .chip-x .material-symbols-outlined {

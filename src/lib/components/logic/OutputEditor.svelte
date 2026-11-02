@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Output } from "$logic/types";
+  import type { LogicDef } from "$logic/types";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { variableNameFor } from "$lib/config/variables";
@@ -10,12 +11,15 @@
     output,
     stateNames,
     logicId,
+    logics = [],
     onchange,
   }: {
     output: Output;
     stateNames: string[];
     /** The logic id, for the derived logic-state id. */
     logicId: string;
+    /** The document's logics, for the picker's Logic tab. */
+    logics?: LogicDef[];
     onchange: (output: Output) => void;
   } = $props();
 
@@ -23,6 +27,8 @@
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   const logicStateId = $derived(`${ioBroker.namespace}.Logic.${logicId}`);
+  /** A logic cannot target its own output state. */
+  const otherLogics = $derived(logics.filter((logic) => logic.id !== logicId));
   let picking = $state(false);
 
   /** Selecting "Existing state" must not change the target until a state is
@@ -183,6 +189,8 @@
     <SourcePicker
       mode="state"
       title="Output state"
+      logics={otherLogics}
+      logicPick="state"
       onState={(id) => {
         setRef(id);
         picking = false;

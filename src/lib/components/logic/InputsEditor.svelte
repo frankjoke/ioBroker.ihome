@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Input, InputSource } from "$logic/types";
+  import type { Input, InputSource, LogicDef } from "$logic/types";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { variableNameFor } from "$lib/config/variables";
   import IconButton from "$lib/components/common/IconButton.svelte";
@@ -7,6 +7,9 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import MultiStateField from "./MultiStateField.svelte";
   import StateRefField from "./StateRefField.svelte";
+  import VariableModal from "./VariableModal.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
 
   let {
     inputs,
@@ -22,8 +25,8 @@
     onRename?: (oldName: string, newName: string) => void;
     /** The logic name, for the delete confirmation's "from …". */
     where?: string;
-    /** Every logic: its output can be a source of a local event (D29). */
-    logics?: { id: string; name: string }[];
+    /** Every logic: its output can be a source of a local event. */
+    logics?: LogicDef[];
     /** The logic being edited, excluded from its own event sources. */
     selfId?: string;
   } = $props();
@@ -32,6 +35,11 @@
   let editing = $state<string | null>(null);
   /** Deleting an input always asks first. */
   let pendingDelete = $state<string | null>(null);
+  /** The add-variable dialog: name and source in one step. */
+  let addingVariable = $state(false);
+  const rooms = $derived(roomList(ioBroker.enums));
+  const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
+  const otherLogics = $derived(logics.filter((logic) => logic.id !== selfId));
 
   function update(name: string, input: Input) {
     onchange({ ...inputs, [name]: input });
@@ -119,7 +127,11 @@
   <div class="inputs-head">
     <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
-      <button type="button" class="btn btn-sm" onclick={() => add("variable")}>
+      <button
+        type="button"
+        class="btn btn-sm"
+        onclick={() => (addingVariable = true)}
+      >
         <span class="material-symbols-outlined">add</span> Variable
       </button>
       <button type="button" class="btn btn-sm" onclick={() => add("event")}>
@@ -212,6 +224,7 @@
                   <StateRefField
                     value={input.from.ref}
                     label={`State for ${name}`}
+                    logics={otherLogics}
                     onchange={(ref) =>
                       update(name, { ...input, from: { type: "state", ref } })}
                   />
@@ -266,6 +279,26 @@
     </p>
   {/if}
 </div>
+
+{#if addingVariable}
+  <VariableModal
+    objects={ioBroker.objects}
+    {rooms}
+    {roomsOf}
+    enums={ioBroker.enums}
+    logics={otherLogics}
+    existing={Object.keys(inputs)}
+    onCreate={(name, ref) => {
+      onchange({
+        ...inputs,
+        [name]: { from: { type: "state", ref }, kind: "variable" },
+      });
+      editing = name;
+      addingVariable = false;
+    }}
+    onCancel={() => (addingVariable = false)}
+  />
+{/if}
 
 {#if pendingDelete}
   <ConfirmModal

@@ -123,6 +123,7 @@
       {output}
       {stateNames}
       logicId={draft.id}
+      {logics}
       onchange={(next) => patch({ output: next })}
     />
     <div class="form-grid">

@@ -4,15 +4,19 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import { variableNameFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import type { LogicDef } from "$logic/types";
 
   let {
     value,
     label = "State",
     onchange,
+    logics = [],
   }: {
     value: string;
     label?: string;
     onchange: (id: string) => void;
+    /** The document's logics, for the picker's Logic tab. */
+    logics?: LogicDef[];
   } = $props();
 
   let picking = $state(false);
@@ -43,6 +47,8 @@
   <SourcePicker
     mode="state"
     title={label}
+    {logics}
+    logicPick="state"
     onState={(id) => {
       onchange(id);
       picking = false;

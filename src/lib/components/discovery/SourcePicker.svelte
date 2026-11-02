@@ -26,6 +26,7 @@
   import { defaultUnit } from "$lib/config/units";
   import { newId } from "$lib/utils/ids";
   import type { Control, Device, DeviceType } from "$lib/types/device";
+  import type { LogicDef } from "$logic/types";
   import type {
     Slot,
     SlotKind,
@@ -50,6 +51,8 @@
     onControls,
     onState,
     onClose,
+    logics = [],
+    logicPick = undefined,
   }: {
     mode: PickerMode;
     title: string;
@@ -66,6 +69,10 @@
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
     onState?: (stateId: string) => void;
+    /** The document's logics, for the picker's Logic tab. */
+    logics?: LogicDef[];
+    /** What a logic selection means: an event trigger or its output state. */
+    logicPick?: "trigger" | "state";
     onClose: () => void;
   } = $props();
 
@@ -552,6 +559,8 @@
           enums={ioBroker.enums}
           selection={pickedStates}
           onToggle={togglePickedState}
+          {logics}
+          {logicPick}
         />
       {:else}
         <StateBrowser
@@ -560,6 +569,8 @@
           {rooms}
           enums={ioBroker.enums}
           onPick={pickRawState}
+          {logics}
+          {logicPick}
         />
       {/if}
     {:else if tab === "page"}
