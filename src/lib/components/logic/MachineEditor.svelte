@@ -228,6 +228,18 @@
     if (openRow === index) openRow = null;
   }
 
+  /** Row order is the match order, so the arrows move the row itself. */
+  function moveRow(stateName: string, from: number, to: number) {
+    const state = logic.states[stateName];
+    const on = [...(state.on ?? [])];
+    if (to < 0 || to >= on.length) return;
+    const [row] = on.splice(from, 1);
+    on.splice(to, 0, row);
+    updateState(stateName, { ...state, on });
+    if (openRow === from) openRow = to;
+    else if (openRow === to) openRow = from;
+  }
+
   /** The event's value type, so the condition offers only what fits it (D23). */
   function conditionKind(row: OnRow): "boolean" | "number" | "string" | "any" {
     if (row.on === "$init") return "boolean";
@@ -569,6 +581,20 @@
                   >
                     <span class="event-summary mono">{rowSummary(row)}</span>
                     <span class="item-actions">
+                      <IconButton
+                        icon="arrow_upward"
+                        label={`Move event ${index + 1} of ${name} up`}
+                        title="Move up"
+                        disabled={index === 0}
+                        onclick={() => moveRow(name, index, index - 1)}
+                      />
+                      <IconButton
+                        icon="arrow_downward"
+                        label={`Move event ${index + 1} of ${name} down`}
+                        title="Move down"
+                        disabled={index === (state.on?.length ?? 0) - 1}
+                        onclick={() => moveRow(name, index, index + 1)}
+                      />
                       <IconButton
                         icon="delete"
                         danger
