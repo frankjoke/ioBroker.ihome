@@ -143,11 +143,12 @@
   let iconPicker = $state<null | "page" | "section">(null);
   /** The source picker for the tile's active condition. */
   let activePicker = $state(false);
-  /** Slot UI: which row is expanded, which rules block is open, pickers. */
+  /** Slot UI: which row is expanded, which rule is open, pickers. */
   let expandedSlot = $state<number | null>(null);
   /** The tile editor's option tab: one group open at a time, none by default. */
   let tileTab = $state<"size" | "view" | "icon" | "look" | "pin" | null>(null);
-  let openRules = $state<number | null>(null);
+  /** The open rule, by slot and rule index. */
+  let openRule = $state<{ slot: number; rule: number } | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   /** The state picker for an HTML slot's document. */
   let htmlSourceFor = $state<number | null>(null);
@@ -303,6 +304,18 @@
     "history-list",
     "frame",
     "html",
+  ];
+
+  /** The kinds whose body the Value toggle can hide. A frame/html is a surface
+   *  and a badge is its own chip — neither has a reading or a widget. */
+  const VALUE_KINDS: SlotKind[] = [
+    "value",
+    "switch",
+    "level",
+    "color",
+    "enum",
+    "button",
+    "history-list",
   ];
 
   /** The three homes a slot can have (A34), in click order, and their icons. */
@@ -608,7 +621,7 @@
     return Number.isFinite(value) ? value : undefined;
   }
 
-  /** The level readout's homes; a detail home needs the slot in the modal. */
+  /** The slot value's homes; widening the slot keeps a detail home reachable. */
   function setValueWhere(
     i: number,
     where: "tile" | "both" | "modal" | undefined,
@@ -627,7 +640,7 @@
     });
   }
 
-  /** The level readout's three homes, in click order. */
+  /** The slot value's three homes, in click order. */
   function valueWhereOf(slot: Slot): "tile" | "both" | "modal" {
     return slot.options?.valueWhere === "tile" ||
       slot.options?.valueWhere === "modal"
@@ -755,7 +768,51 @@
   function removeSlotAt(slotIndex: number): void {
     edit((t) => removeSlot(t, slotIndex));
     if (expandedSlot === slotIndex) expandedSlot = null;
-    if (openRules === slotIndex) openRules = null;
+    if (openRule?.slot === slotIndex) openRule = null;
+  }
+
+  /** Append a rule and open it, the way every other list's + does. */
+  function addRuleAt(slotIndex: number): void {
+    const at = shownSlots[slotIndex]?.rules?.length ?? 0;
+    edit((t) => addRule(t, slotIndex, { when: "active" }));
+    openRule = { slot: slotIndex, rule: at };
+  }
+
+  function toggleRule(slotIndex: number, ruleIndex: number): void {
+    const open = openRule?.slot === slotIndex && openRule.rule === ruleIndex;
+    openRule = open ? null : { slot: slotIndex, rule: ruleIndex };
+  }
+
+  /** Moving or deleting keeps the open editor on the rule it was on. */
+  function moveRuleAt(slotIndex: number, from: number, to: number): void {
+    edit((t) => moveRule(t, slotIndex, from, to));
+    if (openRule?.slot === slotIndex && openRule.rule === from) {
+      openRule = { slot: slotIndex, rule: to };
+    }
+  }
+
+  function removeRuleAt(slotIndex: number, ruleIndex: number): void {
+    edit((t) => removeRule(t, slotIndex, ruleIndex));
+    if (openRule?.slot !== slotIndex) return;
+    if (openRule.rule === ruleIndex) openRule = null;
+    else if (openRule.rule > ruleIndex) {
+      openRule = { slot: slotIndex, rule: openRule.rule - 1 };
+    }
+  }
+
+  /** The whole rule line opens the rule, except its actions and editor. */
+  function onRuleLineClick(
+    event: MouseEvent,
+    slotIndex: number,
+    ruleIndex: number,
+  ): void {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggleRule(slotIndex, ruleIndex);
   }
 
   function slotDeleteTitle(index: number): string {
@@ -1064,22 +1121,11 @@
                 </button>
               {/if}
             </div>
-            <p class="note text-muted">
-              Shown before the tile name on its detail page and as the tile face
-              default. Each slot keeps its own icon; a state look glyph still
-              wins on the face.
-            </p>
           </div>
         {/if}
 
         {#if id === "look"}
           <div class="field">
-            {#if !activeCond}
-              <p class="note text-muted">
-                This tile's own values — with an active condition, these become
-                its inactive state.
-              </p>
-            {/if}
             <div class="look">
               {#each lookStates as state (state)}
                 {@const lk = tile?.tile?.look?.[state] ?? {}}
@@ -1137,10 +1183,6 @@
                 </div>
               {/each}
             </div>
-            <p class="note text-muted">
-              A value set here wins over the rules for that state;
-              <em>default</em> keeps the rules. Dimming still comes from the rules.
-            </p>
           </div>
         {/if}
 
@@ -1187,10 +1229,6 @@
             {#if pinInvalid}
               <p class="note text-muted">4-6 digits, numbers only.</p>
             {/if}
-            <p class="note text-muted">
-              Ask for this PIN before the detail page opens in view mode. Empty
-              = no lock.
-            </p>
           </div>
         {/if}
       {/snippet}
@@ -1198,7 +1236,7 @@
 
     <div class="field">
       <div class="row between">
-        <span class="label-mono">Slots</span>
+        <span class="label-mono">Slots ({shownSlots.length})</span>
         <span class="row-actions">
           <!-- The detail page's eye (A47) rides the slots line: it shows the page
                over the display and never asks for the PIN; it dims when nothing of
@@ -1454,13 +1492,6 @@
                           </button>
                         {/if}
                       </div>
-                      <p class="note text-muted">
-                        A state's string value wins over the inline HTML; empty
-                        or missing falls back to it.
-                        &#123;&#123;NAME&#125;&#125; reads a Global Variable (or
-                        a dotted state id); scripts can call
-                        <code>ihome.setState(id, value)</code>.
-                      </p>
                     </div>
                   {:else}
                     <div class="small grow">
@@ -1568,12 +1599,6 @@
                       />
                     {/if}
                   </div>
-                  <p class="note text-muted">
-                    A hint pins no control: the display looks up the control
-                    whose name, role or unit matches while it renders, so one
-                    template fits every device. Picking a Source pins one
-                    control and drops the hint.
-                  </p>
                 {/if}
                 {#if slot.kind === "level"}
                   <div class="row">
@@ -1609,30 +1634,6 @@
                           })}
                       />
                     </label>
-                  </div>
-                  <div class="row">
-                    <label
-                      class="check"
-                      title="Hide the current value and unit; only the slider remains"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={slot.options?.hideValue !== true}
-                        onchange={(e) =>
-                          patchOptions(i, {
-                            hideValue: e.currentTarget.checked
-                              ? undefined
-                              : true,
-                          })}
-                      />
-                      <span>show value</span>
-                    </label>
-                    <WhereButton
-                      where={valueWhereOf(slot)}
-                      title={valueWhereTitle(slot)}
-                      active={valueWhereOf(slot) !== "both"}
-                      onCycle={() => cycleValueWhere(i, slot)}
-                    />
                   </div>
                 {/if}
                 {#if slot.kind === "badge"}
@@ -1801,16 +1802,34 @@
                           )}
                       />
                     {/if}
+                    {#if VALUE_KINDS.includes(slot.kind)}
+                      <label
+                        class="check"
+                        title="Off hides the value or widget; the slot and its icon stay"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={slot.options?.hideValue !== true}
+                          onchange={(e) =>
+                            patchOptions(i, {
+                              hideValue: e.currentTarget.checked
+                                ? undefined
+                                : true,
+                            })}
+                        />
+                        <span>Value</span>
+                      </label>
+                      <WhereButton
+                        where={valueWhereOf(slot)}
+                        title={valueWhereTitle(slot)}
+                        active={valueWhereOf(slot) !== "both"}
+                        onCycle={() => cycleValueWhere(i, slot)}
+                      />
+                    {/if}
                   </div>
                   {#if slot.icon && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
                     <p class="note text-muted">
                       No glyph yet — choose one, or let a rule supply it.
-                    </p>
-                  {:else if (slot.rules ?? []).some((r) => r.icon)}
-                    <p class="note text-muted">
-                      A rule's glyph wins while it matches, so the tile may show
-                      that one instead of this. Picking a glyph here drops the
-                      rules' glyphs (their colours and states stay) — see Rules.
                     </p>
                   {/if}
                 {/if}
@@ -1895,226 +1914,240 @@
                   {/if}
                 {/if}
                 <div class="slot-rules">
-                  <button
-                    type="button"
-                    class="rules-toggle"
-                    onclick={() => (openRules = openRules === i ? null : i)}
-                  >
-                    Rules ({slot.rules?.length ?? 0})
-                  </button>
-                  {#if openRules === i}
-                    <p class="note text-muted">
-                      Last match wins. <code>active</code> (the tile's active
-                      state) is available in <code>when</code>. A rule's
-                      <code>icon</code> swaps the slot icon's glyph (only while the
-                      icon is enabled).
-                    </p>
-                    {#each slot.rules ?? [] as rule, ri (ri)}
-                      <div class="rule-row">
-                        <div class="rule-line">
-                          <span
-                            class="dot"
-                            class:true={ruleDot(rule.when) === "true"}
-                            class:error={ruleDot(rule.when) === "error"}
-                            title="Live result of this expression"
-                          ></span>
-                          <input
-                            type="text"
-                            class="when"
-                            placeholder="when… e.g. power == 1"
-                            value={rule.when}
-                            oninput={(e) =>
-                              edit((t) =>
-                                patchRule(t, i, ri, {
-                                  when: e.currentTarget.value,
-                                }),
-                              )}
-                          />
-                          <span class="row-actions">
-                            <button
-                              type="button"
-                              class="icon-btn"
-                              title="Move up"
-                              aria-label="Move rule up"
-                              disabled={ri === 0}
-                              onclick={() =>
-                                edit((t) => moveRule(t, i, ri, ri - 1))}
-                            >
-                              <span class="material-symbols-outlined"
-                                >arrow_upward</span
-                              >
-                            </button>
-                            <button
-                              type="button"
-                              class="icon-btn"
-                              title="Move down"
-                              aria-label="Move rule down"
-                              disabled={ri === (slot.rules?.length ?? 0) - 1}
-                              onclick={() =>
-                                edit((t) => moveRule(t, i, ri, ri + 1))}
-                            >
-                              <span class="material-symbols-outlined"
-                                >arrow_downward</span
-                              >
-                            </button>
-                            <button
-                              type="button"
-                              class="icon-btn"
-                              title="Remove rule"
-                              aria-label="Remove rule"
-                              onclick={() => edit((t) => removeRule(t, i, ri))}
-                            >
-                              <span class="material-symbols-outlined"
-                                >delete</span
-                              >
-                            </button>
-                          </span>
-                        </div>
-                        <div class="rule-line">
+                  <div class="row between">
+                    <span class="label-mono"
+                      >Rules ({slot.rules?.length ?? 0})</span
+                    >
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      title="Add rule"
+                      aria-label="Add rule"
+                      onclick={() => addRuleAt(i)}
+                    >
+                      <span class="material-symbols-outlined">add</span>
+                    </button>
+                  </div>
+                  {#each slot.rules ?? [] as rule, ri (ri)}
+                    {@const ruleOpen =
+                      openRule?.slot === i && openRule.rule === ri}
+                    <div class="item" class:open={ruleOpen}>
+                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <div
+                        class="item-line"
+                        onclick={(e) => onRuleLineClick(e, i, ri)}
+                      >
+                        <span
+                          class="dot"
+                          class:true={ruleDot(rule.when) === "true"}
+                          class:error={ruleDot(rule.when) === "error"}
+                          title="Live result of this expression"
+                        ></span>
+                        <button
+                          type="button"
+                          class="name rule-when"
+                          aria-expanded={ruleOpen}
+                          onclick={() => toggleRule(i, ri)}
+                        >
+                          {rule.when || "(no condition)"}
+                        </button>
+                        <span class="item-actions">
                           <button
                             type="button"
-                            class="btn btn-sm"
-                            onclick={() =>
-                              (ruleIconFor = { slot: i, rule: ri })}
+                            class="icon-btn"
+                            title="Move up"
+                            aria-label="Move rule up"
+                            disabled={ri === 0}
+                            onclick={() => moveRuleAt(i, ri, ri - 1)}
                           >
-                            {rule.icon || "icon…"}
+                            <span class="material-symbols-outlined"
+                              >arrow_upward</span
+                            >
                           </button>
-                          {#if rule.icon}
-                            <button
-                              type="button"
-                              class="btn btn-sm"
-                              onclick={() =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, { icon: undefined }),
-                                )}>clear</button
-                            >
-                          {/if}
-                          <input
-                            type="color"
-                            class="color-input"
-                            aria-label="Rule colour"
-                            value={isHexColor(rule.color)
-                              ? rule.color
-                              : "#000000"}
-                            oninput={(e) =>
-                              edit((t) =>
-                                patchRule(t, i, ri, {
-                                  color: e.currentTarget.value,
-                                }),
-                              )}
-                          />
-                          {#if rule.color}
-                            <button
-                              type="button"
-                              class="btn btn-sm"
-                              onclick={() =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, { color: undefined }),
-                                )}>clear</button
-                            >
-                          {/if}
-                          <label class="check">
-                            <input
-                              type="checkbox"
-                              checked={rule.glow === true}
-                              onchange={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    glow: e.currentTarget.checked || undefined,
-                                  }),
-                                )}
-                            />
-                            <span>glow</span>
-                          </label>
-                          <label class="check">
-                            <input
-                              type="checkbox"
-                              checked={rule.hidden === true}
-                              onchange={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    hidden:
-                                      e.currentTarget.checked || undefined,
-                                  }),
-                                )}
-                            />
-                            <span>hidden</span>
-                          </label>
-                          <label
-                            class="check"
-                            title="Show the slot only while this rule matches"
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            title="Move down"
+                            aria-label="Move rule down"
+                            disabled={ri === (slot.rules?.length ?? 0) - 1}
+                            onclick={() => moveRuleAt(i, ri, ri + 1)}
                           >
-                            <input
-                              type="checkbox"
-                              checked={rule.only === true}
-                              onchange={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    only: e.currentTarget.checked || undefined,
-                                  }),
-                                )}
-                            />
-                            <span>only</span>
-                          </label>
-                          <label class="check">
-                            <input
-                              type="checkbox"
-                              checked={rule.disabled === true}
-                              onchange={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    disabled:
-                                      e.currentTarget.checked || undefined,
-                                  }),
-                                )}
-                            />
-                            <span>disabled</span>
-                          </label>
-                        </div>
-                        <div class="rule-line">
-                          <label class="small grow">
-                            <span class="label-mono">background</span>
+                            <span class="material-symbols-outlined"
+                              >arrow_downward</span
+                            >
+                          </button>
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            title="Remove rule"
+                            aria-label="Remove rule"
+                            onclick={() => removeRuleAt(i, ri)}
+                          >
+                            <span class="material-symbols-outlined">delete</span
+                            >
+                          </button>
+                        </span>
+                      </div>
+                      {#if ruleOpen}
+                        <div class="item-editor">
+                          <div class="rule-line">
                             <input
                               type="text"
-                              value={rule.background ?? ""}
+                              class="when"
+                              placeholder="when… e.g. power == 1"
+                              value={rule.when}
+                              aria-label="Rule condition"
                               oninput={(e) =>
                                 edit((t) =>
                                   patchRule(t, i, ri, {
-                                    background:
-                                      e.currentTarget.value.trim() || undefined,
+                                    when: e.currentTarget.value,
                                   }),
                                 )}
                             />
-                          </label>
-                          <label class="small">
-                            <span class="label-mono">tone</span>
-                            <select
-                              value={rule.tone ?? ""}
-                              onchange={(e) =>
+                          </div>
+                          <div class="rule-line">
+                            <button
+                              type="button"
+                              class="btn btn-sm"
+                              onclick={() =>
+                                (ruleIconFor = { slot: i, rule: ri })}
+                            >
+                              {rule.icon || "icon…"}
+                            </button>
+                            {#if rule.icon}
+                              <button
+                                type="button"
+                                class="btn btn-sm"
+                                onclick={() =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, { icon: undefined }),
+                                  )}>clear</button
+                              >
+                            {/if}
+                            <input
+                              type="color"
+                              class="color-input"
+                              aria-label="Rule colour"
+                              value={isHexColor(rule.color)
+                                ? rule.color
+                                : "#000000"}
+                              oninput={(e) =>
                                 edit((t) =>
                                   patchRule(t, i, ri, {
-                                    tone: e.currentTarget.value || undefined,
+                                    color: e.currentTarget.value,
                                   }),
                                 )}
+                            />
+                            {#if rule.color}
+                              <button
+                                type="button"
+                                class="btn btn-sm"
+                                onclick={() =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, { color: undefined }),
+                                  )}>clear</button
+                              >
+                            {/if}
+                            <label class="check">
+                              <input
+                                type="checkbox"
+                                checked={rule.glow === true}
+                                onchange={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      glow:
+                                        e.currentTarget.checked || undefined,
+                                    }),
+                                  )}
+                              />
+                              <span>glow</span>
+                            </label>
+                            <label class="check">
+                              <input
+                                type="checkbox"
+                                checked={rule.hidden === true}
+                                onchange={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      hidden:
+                                        e.currentTarget.checked || undefined,
+                                    }),
+                                  )}
+                              />
+                              <span>hidden</span>
+                            </label>
+                            <label
+                              class="check"
+                              title="Show the slot only while this rule matches"
                             >
-                              <option value="">—</option>
-                              <option value="info">info</option>
-                              <option value="ok">ok</option>
-                              <option value="warn">warn</option>
-                              <option value="danger">danger</option>
-                            </select>
-                          </label>
+                              <input
+                                type="checkbox"
+                                checked={rule.only === true}
+                                onchange={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      only:
+                                        e.currentTarget.checked || undefined,
+                                    }),
+                                  )}
+                              />
+                              <span>only</span>
+                            </label>
+                            <label class="check">
+                              <input
+                                type="checkbox"
+                                checked={rule.disabled === true}
+                                onchange={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      disabled:
+                                        e.currentTarget.checked || undefined,
+                                    }),
+                                  )}
+                              />
+                              <span>disabled</span>
+                            </label>
+                          </div>
+                          <div class="rule-line">
+                            <label class="small grow">
+                              <span class="label-mono">background</span>
+                              <input
+                                type="text"
+                                value={rule.background ?? ""}
+                                oninput={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      background:
+                                        e.currentTarget.value.trim() ||
+                                        undefined,
+                                    }),
+                                  )}
+                              />
+                            </label>
+                            <label class="small">
+                              <span class="label-mono">tone</span>
+                              <select
+                                value={rule.tone ?? ""}
+                                onchange={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      tone: e.currentTarget.value || undefined,
+                                    }),
+                                  )}
+                              >
+                                <option value="">—</option>
+                                <option value="info">info</option>
+                                <option value="ok">ok</option>
+                                <option value="warn">warn</option>
+                                <option value="danger">danger</option>
+                              </select>
+                            </label>
+                          </div>
                         </div>
-                      </div>
-                    {/each}
-                    <button
-                      type="button"
-                      class="btn btn-sm"
-                      onclick={() =>
-                        edit((t) => addRule(t, i, { when: "active" }))}
-                      >Add rule</button
-                    >
-                  {/if}
+                      {/if}
+                    </div>
+                  {/each}
                 </div>
               </div>
             {/if}
@@ -2490,29 +2523,18 @@
   .slot-rules {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 0.35rem;
   }
 
-  .rules-toggle {
-    align-self: flex-start;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .rules-toggle:hover {
-    color: var(--text-color);
-  }
-
-  .rule-row {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    border-top: 1px dashed var(--border-color);
-    padding-top: 3px;
+  .rule-when {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+    font-weight: 400;
   }
 
   .rule-line {

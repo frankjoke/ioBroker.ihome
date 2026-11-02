@@ -58,7 +58,7 @@
        device control or the pseudo-control of a raw state), so the cast to the
        full enriched shape is safe. -->
   {#if slot.kind === "value"}
-    <ValueSlot {slot} {control} {onPrimary} {emphasis} />
+    <ValueSlot {slot} {control} {onPrimary} {emphasis} {home} />
   {:else if slot.kind === "history-list" && control}
     <HistoryListSlot
       control={control as EnrichedControl}

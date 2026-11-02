@@ -4,6 +4,7 @@
   import { splitReading } from "$lib/config/format";
   import { normalizeStates, unitFor } from "$lib/config/state-meta";
   import { levelRange } from "$lib/config/features";
+  import { valueShown } from "$lib/config/tile-parts";
   import type { EnrichedControl } from "$lib/types/device";
 
   let {
@@ -58,16 +59,8 @@
     );
     return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
   }
-  /** The readout's own homes; absent = both. `hideValue` turns it off entirely. */
-  const valueWhere = $derived(
-    options.valueWhere === "tile" || options.valueWhere === "modal"
-      ? options.valueWhere
-      : "both",
-  );
-  const showValue = $derived(
-    options.hideValue !== true &&
-      (valueWhere === "both" || valueWhere === home),
-  );
+  /** The body's own homes; absent = both. `hideValue` turns it off entirely. */
+  const showValue = $derived(valueShown(options, home));
 
   // Keep a drag on a slider from reaching the tile underneath it.
   function stop(e: Event) {
@@ -77,7 +70,7 @@
 
 {#if !control.available && control.kind !== "virtual"}
   <span class="text-muted">unavailable</span>
-{:else if control.widget === "switch"}
+{:else if showValue && control.widget === "switch"}
   <button
     type="button"
     class="btn"
@@ -107,7 +100,7 @@
       <span class="mono">{readout()}</span>
     {/if}
   </div>
-{:else if control.widget === "color"}
+{:else if showValue && control.widget === "color"}
   <input
     class="color"
     type="color"
@@ -118,7 +111,7 @@
     onclick={stop}
     onchange={(e) => write(e.currentTarget.value)}
   />
-{:else if control.widget === "enum"}
+{:else if showValue && control.widget === "enum"}
   <select
     aria-label={control.label || control.feature}
     value={String(control.liveValue ?? "")}
@@ -131,7 +124,7 @@
       <option value={opt.value}>{opt.label}</option>
     {/each}
   </select>
-{:else if control.widget === "button"}
+{:else if showValue && control.widget === "button"}
   <button
     type="button"
     class="btn"
@@ -146,7 +139,7 @@
   >
     Press
   </button>
-{:else}
+{:else if showValue}
   <span class="mono">{readout()}</span>
 {/if}
 

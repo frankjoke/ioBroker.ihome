@@ -10,6 +10,7 @@ import {
   stateLook,
   tileParts,
   tileSeries,
+  valueShown,
 } from "$lib/config/tile-parts";
 import type {
   EnrichedControl,
@@ -640,6 +641,24 @@ it("reads a tile's state look, the inactive one as its default (A71)", () => {
   expect(stateLook(undefined, true)).toEqual({});
   // The state without its own entry keeps the rules.
   expect(stateLook(on({ look: { active: look.active } }), false)).toEqual({});
+});
+
+it("hides the slot's value off, or moves it by its own home", () => {
+  const opts = (over: Record<string, unknown> = {}) => ({ ...over });
+  // Absent = both.
+  expect(valueShown(undefined, "tile")).toBe(true);
+  expect(valueShown(opts(), "modal")).toBe(true);
+  // The off switch wins over any home.
+  expect(valueShown(opts({ hideValue: true }), "tile")).toBe(false);
+  expect(
+    valueShown(opts({ hideValue: true, valueWhere: "modal" }), "modal"),
+  ).toBe(false);
+  // Home: tile-only and modal-only; unknown values fall back to both.
+  expect(valueShown(opts({ valueWhere: "tile" }), "tile")).toBe(true);
+  expect(valueShown(opts({ valueWhere: "tile" }), "modal")).toBe(false);
+  expect(valueShown(opts({ valueWhere: "modal" }), "tile")).toBe(false);
+  expect(valueShown(opts({ valueWhere: "modal" }), "modal")).toBe(true);
+  expect(valueShown(opts({ valueWhere: "elsewhere" }), "tile")).toBe(true);
 });
 
 it("the tile icon is separate from the headline slot icon", () => {

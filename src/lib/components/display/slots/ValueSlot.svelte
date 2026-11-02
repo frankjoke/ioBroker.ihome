@@ -1,6 +1,7 @@
 <script lang="ts">
   import { splitReading } from "$lib/config/format";
   import { normalizeStates, unitFor } from "$lib/config/state-meta";
+  import { valueShown } from "$lib/config/tile-parts";
   import type { Slot } from "$lib/types/display";
   import type { SlotControl } from "$lib/types/device";
 
@@ -9,6 +10,7 @@
     control,
     onPrimary,
     emphasis = "primary",
+    home = "tile",
   }: {
     slot: Slot;
     control?: SlotControl;
@@ -16,7 +18,11 @@
     onPrimary?: () => void;
     /** The tile's main reading is bold; the rest are quieter. */
     emphasis?: "primary" | "secondary";
+    /** Which surface renders this value: the tile or the detail page. */
+    home?: "tile" | "modal";
   } = $props();
+
+  const shown = $derived(valueShown(slot.options, home));
 
   const decimals = $derived(
     typeof slot.options?.decimals === "number"
@@ -41,24 +47,26 @@
   );
 </script>
 
-{#if onPrimary}
-  <button
-    type="button"
-    class="value mono action"
-    class:secondary={emphasis === "secondary"}
-    title="Toggle"
-    onclick={(e) => {
-      e.stopPropagation();
-      onPrimary();
-    }}
-    >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
-      >{/if}</button
-  >
-{:else}
-  <span class="value mono" class:secondary={emphasis === "secondary"}
-    >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
-      >{/if}</span
-  >
+{#if shown}
+  {#if onPrimary}
+    <button
+      type="button"
+      class="value mono action"
+      class:secondary={emphasis === "secondary"}
+      title="Toggle"
+      onclick={(e) => {
+        e.stopPropagation();
+        onPrimary();
+      }}
+      >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
+        >{/if}</button
+    >
+  {:else}
+    <span class="value mono" class:secondary={emphasis === "secondary"}
+      >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
+        >{/if}</span
+    >
+  {/if}
 {/if}
 
 <style>

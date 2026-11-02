@@ -247,6 +247,18 @@ export function rowIcon(
     : undefined;
 }
 
+/** Does the slot's reading/control draw in `home`? `hideValue` turns the body
+ *  off, else its own `valueWhere` (absent = both) decides — independent of the
+ *  slot's `where`, so an icon can stay on the tile while its value moves. */
+export function valueShown(
+  options: Record<string, unknown> | undefined,
+  home: "tile" | "modal",
+): boolean {
+  if (options?.hideValue === true) return false;
+  const where = options?.valueWhere;
+  return where === "tile" || where === "modal" ? where === home : true;
+}
+
 // ------------------------------------------------------------------ charts
 
 /** The series colours, in assignment order (A61): theme tokens, so the chart
