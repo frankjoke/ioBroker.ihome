@@ -161,25 +161,29 @@
       {#if open}
         <div class="item-editor">
           <div class="fields">
-            <label class="field"
-              ><span class="label-mono">Source</span>
-              <select
-                aria-label={`Source type for ${name}`}
-                value={input.from.type}
-                onchange={(e) =>
-                  setSource(
-                    name,
-                    input,
-                    e.currentTarget.value as InputSource["type"],
-                  )}
-              >
-                <option value="state">State / variable</option>
-                <option value="memory">Memory</option>
-                {#if input.kind === "event"}
-                  <option value="timer">Timer</option>
-                {/if}
-              </select>
-            </label>
+            {#if input.kind === "event" || input.from.type === "memory"}
+              <label class="field"
+                ><span class="label-mono">Source</span>
+                <select
+                  aria-label={`Source type for ${name}`}
+                  value={input.from.type}
+                  onchange={(e) =>
+                    setSource(
+                      name,
+                      input,
+                      e.currentTarget.value as InputSource["type"],
+                    )}
+                >
+                  <option value="state">State / variable</option>
+                  {#if input.kind === "event"}
+                    <option value="timer">Timer</option>
+                  {/if}
+                  {#if input.from.type === "memory"}
+                    <option value="memory">Memory (legacy)</option>
+                  {/if}
+                </select>
+              </label>
+            {/if}
 
             {#if input.from.type === "state"}
               <div class="field wide">

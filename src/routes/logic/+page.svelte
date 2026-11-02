@@ -189,7 +189,13 @@
   const issues = $derived.by((): Issue[] => {
     const current = draft;
     if (!current) return [];
-    return validateLogicDocument({ version: 1, logics: [current] }).filter(
+    // Validate against the whole document: a `$logic.<id>` or a local event
+    // naming another logic must see that logic, not just this draft.
+    const logs = doc.logics.map((logic) =>
+      logic.id === current.id ? current : logic,
+    );
+    if (!logs.some((logic) => logic.id === current.id)) logs.push(current);
+    return validateLogicDocument({ version: 1, logics: logs }).filter(
       (issue) => issue.logicId === current.id,
     );
   });

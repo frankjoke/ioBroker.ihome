@@ -1,5 +1,9 @@
 <script lang="ts">
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
+  import { variableNameFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
 
   let {
     value,
@@ -12,19 +16,27 @@
   } = $props();
 
   let picking = $state(false);
+  const shown = $derived(value ? variableNameFor(value, getVariables()) : "");
 </script>
 
 <div class="ref-field">
-  <input
-    class="mono"
-    {value}
-    placeholder="state id or variable name"
-    aria-label={label}
-    onchange={(e) => onchange(e.currentTarget.value.trim())}
-  />
-  <button type="button" class="btn btn-sm" onclick={() => (picking = true)}>
-    Browse
+  <button
+    type="button"
+    class="btn btn-sm source-pick"
+    title={value ? `Source: ${value} — click to change` : "Choose a state"}
+    onclick={() => (picking = true)}
+  >
+    <Icon value="edit" size={15} />
+    <span class="source-name">{shown || "Select…"}</span>
   </button>
+  {#if value}
+    <IconButton
+      icon="close"
+      label={`Clear ${label}`}
+      title="Clear"
+      onclick={() => onchange("")}
+    />
+  {/if}
 </div>
 
 {#if picking}
@@ -45,10 +57,18 @@
     align-items: center;
     gap: 0.4rem;
     flex: 1 1 240px;
+    min-width: 0;
   }
 
-  .ref-field input {
+  .source-pick {
     flex: 1 1 auto;
-    min-width: 120px;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .source-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>
