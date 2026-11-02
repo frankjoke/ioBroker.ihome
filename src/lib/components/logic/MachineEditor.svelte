@@ -30,6 +30,11 @@
   } = $props();
 
   const stateNames = $derived(Object.keys(logic.states));
+  /** Real states, then the pseudo `$all` whose rows are appended to each. */
+  const stateEntries = $derived([
+    ...Object.entries(logic.states),
+    ["$all", (logic.all ?? {}) as StateDef],
+  ] as [string, StateDef][]);
   /** The other logics, as `$logic.<id>` event sources. */
   const sourceLogics = $derived(
     logics
@@ -111,7 +116,15 @@
     onchange({ ...logic, ...update });
   }
 
+  function stateOf(name: string): StateDef {
+    return name === "$all" ? (logic.all ?? {}) : (logic.states[name] ?? {});
+  }
+
   function updateState(name: string, state: StateDef) {
+    if (name === "$all") {
+      patch({ all: { on: state.on ?? [] } });
+      return;
+    }
     patch({ states: { ...logic.states, [name]: state } });
   }
 
@@ -152,7 +165,7 @@
   }
 
   function removeState(name: string) {
-    if (stateNames.length <= 1) return;
+    if (name === "$all" || stateNames.length <= 1) return;
     const states = { ...logic.states };
     delete states[name];
     const fallback = Object.keys(states)[0];
@@ -187,6 +200,7 @@
    *  class action. The current start state is pinned first, otherwise moving a
    *  state to the top would silently make it the start. */
   function moveState(name: string, delta: number) {
+    if (name === "$all") return;
     const from = stateNames.indexOf(name);
     const to = from + delta;
     if (from < 0 || to < 0 || to >= stateNames.length) return;
@@ -200,8 +214,10 @@
   }
 
   function renameState(oldName: string, rawName: string) {
+    if (oldName === "$all") return;
     const name = rawName.trim();
-    if (!name || (name !== oldName && name in logic.states)) return;
+    if (!name || name.startsWith("$")) return;
+    if (name !== oldName && name in logic.states) return;
     const states: Record<string, StateDef> = {};
     for (const [key, state] of Object.entries(logic.states)) {
       const nextName = key === oldName ? name : key;
@@ -228,14 +244,14 @@
   }
 
   function updateRow(stateName: string, index: number, row: OnRow) {
-    const state = logic.states[stateName];
+    const state = stateOf(stateName);
     const on = [...(state.on ?? [])];
     on[index] = row;
     updateState(stateName, { ...state, on });
   }
 
   function removeRow(stateName: string, index: number) {
-    const state = logic.states[stateName];
+    const state = stateOf(stateName);
     updateState(stateName, {
       ...state,
       on: (state.on ?? []).filter((_, i) => i !== index),
@@ -245,7 +261,7 @@
 
   /** Row order is the match order, so the arrows move the row itself. */
   function moveRow(stateName: string, from: number, to: number) {
-    const state = logic.states[stateName];
+    const state = stateOf(stateName);
     const on = [...(state.on ?? [])];
     if (to < 0 || to >= on.length) return;
     const [row] = on.splice(from, 1);
@@ -325,7 +341,7 @@
   }
 
   function addRow(stateName: string) {
-    const state = logic.states[stateName];
+    const state = stateOf(stateName);
     const on = [...(state.on ?? [])];
     on.push({ on: eventInputs[0] ?? "$init", edge: "any" });
     updateState(stateName, { ...state, on });
@@ -447,13 +463,13 @@
       </span>
     </div>
 
-    {#each Object.entries(logic.states) as [name, state] (name)}
+    {#each stateEntries as [name, state] (name)}
       {@const stateOpen = openState === name}
       <div class="item" class:open={stateOpen}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="item-line" onclick={(e) => onLineClick(e, name)}>
-          {#if stateOpen}
+          {#if stateOpen && name !== "$all"}
             <input
               class="name-input"
               value={name}
@@ -469,117 +485,128 @@
               {name}
             </button>
           {/if}
-          {#if logic.start ? logic.start === name : stateNames[0] === name}
+          {#if name === "$all"}
+            <span class="badge badge-secondary">all states</span>
+          {:else if logic.start ? logic.start === name : stateNames[0] === name}
             <span class="badge badge-secondary">start</span>
           {/if}
           <span class="hint text-muted">
             {(state.on ?? []).length} event{(state.on ?? []).length === 1
               ? ""
-              : "s"}{state.after
-              ? ` · after ${state.after.time} → ${state.after.goto}`
-              : ""}
+              : "s"}{name === "$all"
+              ? " · appended to every state"
+              : state.after
+                ? ` · after ${state.after.time} → ${state.after.goto}`
+                : ""}
           </span>
-          <span class="item-actions">
-            <IconButton
-              icon="arrow_upward"
-              label={`Move ${name} up`}
-              title="Move up"
-              disabled={stateNames.indexOf(name) === 0}
-              onclick={() => moveState(name, -1)}
-            />
-            <IconButton
-              icon="arrow_downward"
-              label={`Move ${name} down`}
-              title="Move down"
-              disabled={stateNames.indexOf(name) === stateNames.length - 1}
-              onclick={() => moveState(name, 1)}
-            />
-            <IconButton
-              icon="delete"
-              danger
-              label={`Delete ${name}`}
-              title="Delete"
-              disabled={stateNames.length <= 1}
-              onclick={() => (pendingDelete = { kind: "state", name })}
-            />
-          </span>
+          {#if name !== "$all"}
+            <span class="item-actions">
+              <IconButton
+                icon="arrow_upward"
+                label={`Move ${name} up`}
+                title="Move up"
+                disabled={stateNames.indexOf(name) === 0}
+                onclick={() => moveState(name, -1)}
+              />
+              <IconButton
+                icon="arrow_downward"
+                label={`Move ${name} down`}
+                title="Move down"
+                disabled={stateNames.indexOf(name) === stateNames.length - 1}
+                onclick={() => moveState(name, 1)}
+              />
+              <IconButton
+                icon="delete"
+                danger
+                label={`Delete ${name}`}
+                title="Delete"
+                disabled={stateNames.length <= 1}
+                onclick={() => (pendingDelete = { kind: "state", name })}
+              />
+            </span>
+          {/if}
         </div>
 
         {#if stateOpen}
           <div class="item-editor">
-            <div class="state-options">
-              <OptionTabs
-                bind:value={stateTab}
-                label="State options"
-                tabs={STATE_TABS}
-                collapsible={false}
-              >
-                {#snippet children(id)}
-                  <div class="option-body">
-                    {#if id === "enter"}
-                      <ActionList
-                        actions={state.enter ?? []}
-                        onchange={(enter) =>
-                          updateState(name, { ...state, enter })}
-                      />
-                    {:else if id === "exit"}
-                      <ActionList
-                        actions={state.exit ?? []}
-                        onchange={(exit) =>
-                          updateState(name, { ...state, exit })}
-                      />
-                    {:else}
-                      <div class="row">
-                        <label class="inline"
-                          >after
-                          <input
-                            class="duration"
-                            aria-label={`After time for ${name}`}
-                            placeholder="2m"
-                            value={state.after?.time ?? ""}
-                            onchange={(e) =>
-                              updateState(name, {
-                                ...state,
-                                after: e.currentTarget.value.trim()
-                                  ? {
-                                      time: e.currentTarget.value.trim(),
-                                      goto:
-                                        state.after?.goto ??
-                                        stateNames.find((s) => s !== name) ??
-                                        name,
-                                    }
-                                  : undefined,
-                              })}
-                          />
-                        </label>
-                        <label class="inline"
-                          >goto
-                          <select
-                            aria-label={`After target for ${name}`}
-                            value={state.after?.goto ?? ""}
-                            onchange={(e) =>
-                              updateState(name, {
-                                ...state,
-                                after: state.after
-                                  ? {
-                                      ...state.after,
-                                      goto: e.currentTarget.value,
-                                    }
-                                  : { time: "1m", goto: e.currentTarget.value },
-                              })}
-                          >
-                            <option value="">— none —</option>
-                            {#each stateNames as target (target)}
-                              <option value={target}>{target}</option>
-                            {/each}
-                          </select>
-                        </label>
-                      </div>
-                    {/if}
-                  </div>
-                {/snippet}
-              </OptionTabs>
-            </div>
+            {#if name !== "$all"}
+              <div class="state-options">
+                <OptionTabs
+                  bind:value={stateTab}
+                  label="State options"
+                  tabs={STATE_TABS}
+                  collapsible={false}
+                >
+                  {#snippet children(id)}
+                    <div class="option-body">
+                      {#if id === "enter"}
+                        <ActionList
+                          actions={state.enter ?? []}
+                          onchange={(enter) =>
+                            updateState(name, { ...state, enter })}
+                        />
+                      {:else if id === "exit"}
+                        <ActionList
+                          actions={state.exit ?? []}
+                          onchange={(exit) =>
+                            updateState(name, { ...state, exit })}
+                        />
+                      {:else}
+                        <div class="row">
+                          <label class="inline"
+                            >after
+                            <input
+                              class="duration"
+                              aria-label={`After time for ${name}`}
+                              placeholder="2m"
+                              value={state.after?.time ?? ""}
+                              onchange={(e) =>
+                                updateState(name, {
+                                  ...state,
+                                  after: e.currentTarget.value.trim()
+                                    ? {
+                                        time: e.currentTarget.value.trim(),
+                                        goto:
+                                          state.after?.goto ??
+                                          stateNames.find((s) => s !== name) ??
+                                          name,
+                                      }
+                                    : undefined,
+                                })}
+                            />
+                          </label>
+                          <label class="inline"
+                            >goto
+                            <select
+                              aria-label={`After target for ${name}`}
+                              value={state.after?.goto ?? ""}
+                              onchange={(e) =>
+                                updateState(name, {
+                                  ...state,
+                                  after: state.after
+                                    ? {
+                                        ...state.after,
+                                        goto: e.currentTarget.value,
+                                      }
+                                    : {
+                                        time: "1m",
+                                        goto: e.currentTarget.value,
+                                      },
+                                })}
+                            >
+                              <option value="">— none —</option>
+                              {#each stateNames as target (target)}
+                                <option value={target}>{target}</option>
+                              {/each}
+                            </select>
+                          </label>
+                        </div>
+                      {/if}
+                    </div>
+                  {/snippet}
+                </OptionTabs>
+              </div>
+            {/if}
 
             <div class="events section-panel">
               <div class="events-head">

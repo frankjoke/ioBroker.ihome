@@ -1537,3 +1537,137 @@ it("uses a global state variable directly as an event source", () => {
   h.change("0_userdata.0.FLAG", true);
   expect(engine.memoryValue("watch")).toBe("On");
 });
+
+it("appends the $all rows after the state's rows", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "all",
+        name: "All",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: {
+            on: [
+              {
+                on: "e",
+                is: { op: "eq", value: 1 },
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.OWN" },
+                      value: { const: true },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        all: {
+          on: [
+            {
+              on: "e",
+              do: [
+                {
+                  set: {
+                    target: { ref: "0_userdata.0.ALL" },
+                    value: { const: true },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.OWN": false,
+    "0_userdata.0.ALL": false,
+  });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+
+  // The state row wins: $all does not run.
+  h.writes.length = 0;
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes.map((w) => w.id)).toEqual(["0_userdata.0.OWN"]);
+
+  // No state row applies: $all handles the same event.
+  h.writes.length = 0;
+  h.change("0_userdata.0.E", 2);
+  expect(h.writes.map((w) => w.id)).toEqual(["0_userdata.0.ALL"]);
+});
+
+it("lets a continue row fall through into $all", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "flow",
+        name: "Flow",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        start: "A",
+        states: {
+          A: {
+            on: [
+              {
+                on: "e",
+                continue: true,
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.OWN" },
+                      value: { const: true },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        all: {
+          on: [
+            {
+              on: "e",
+              do: [
+                {
+                  set: {
+                    target: { ref: "0_userdata.0.ALL" },
+                    value: { const: true },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.OWN": false,
+    "0_userdata.0.ALL": false,
+  });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes.map((w) => w.id)).toEqual([
+    "0_userdata.0.OWN",
+    "0_userdata.0.ALL",
+  ]);
+});

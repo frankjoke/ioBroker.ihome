@@ -372,8 +372,25 @@ export function createEngine(
     const state = rt.state ? def.states[rt.state] : undefined;
     if (!state) return;
     const input = rt.inputs.get(job.input);
-    let handled = false;
-    for (const row of state.on ?? []) {
+    // The state's own rows first; `$all` is appended after them (D31).
+    const own = runRows(rt, state.on ?? [], job, input);
+    if (own.stopped) return;
+    const all = runRows(rt, def.all?.on ?? [], job, input);
+    // No row took the event: an output change still moves the machine.
+    if (!own.matched && !all.matched && job.input === "$self") {
+      syncToOutput(rt, job.value, job.depth);
+    }
+  }
+
+  /** Runs one row list; `stopped` means a terminal match ended the event. */
+  function runRows(
+    rt: Runtime,
+    rows: OnRow[],
+    job: Job,
+    input: InputRuntime | undefined,
+  ): { matched: boolean; stopped: boolean } {
+    let matched = false;
+    for (const row of rows) {
       if (row.on !== job.input) continue;
       if (!rowApplies(row, job, input)) continue;
       if (row.is && !matchesIs(row.is, job.value)) continue;
@@ -385,19 +402,17 @@ export function createEngine(
           continue;
         }
       }
-      handled = true;
+      matched = true;
       const jumped = runActions(rt, row.do ?? [], job.depth);
       if (row.goto) {
         transition(rt, row.goto, job.depth, `event “${job.input}”`);
-        return;
+        return { matched, stopped: true };
       }
       // A `continue` row leaves the state untouched and lets the rows below
       // react to the same event; a goto (row or action) always ends it.
-      if (jumped || row.continue !== true) return;
+      if (jumped || row.continue !== true) return { matched, stopped: true };
     }
-    // No row took the event: an output change still moves the machine.
-    if (!handled && job.input === "$self")
-      syncToOutput(rt, job.value, job.depth);
+    return { matched, stopped: false };
   }
 
   /**

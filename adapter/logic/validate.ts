@@ -266,6 +266,34 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
           );
         }
       }
+      const all = logic.all;
+      if (all !== undefined) {
+        if (!isRecord(all)) {
+          add(id, "all", "all must be an object");
+        } else {
+          const extra = all as unknown as Partial<StateDef>;
+          if (extra.enter || extra.exit || extra.after) {
+            add(id, "all", "$all has no enter/exit/after", "warn");
+          }
+          if (all.on !== undefined && !Array.isArray(all.on)) {
+            add(id, "all.on", "on must be an array of rows");
+          } else {
+            (Array.isArray(all.on) ? all.on : []).forEach((row, index) =>
+              checkRow(
+                id,
+                row,
+                `all.on.${index}`,
+                inputNames,
+                inputs,
+                memoryNames,
+                stateNames,
+                logicIds,
+                add,
+              ),
+            );
+          }
+        }
+      }
       checkOutput(id, logic.output, new Set(stateNames), add);
       checkInit(id, logic, stateNames, add);
     } else {

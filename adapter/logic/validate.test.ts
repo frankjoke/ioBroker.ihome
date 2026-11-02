@@ -331,3 +331,31 @@ it("accepts a global $var trigger", () => {
   };
   expect(validateLogicDocument(d)).toEqual([]);
 });
+
+it("validates $all rows and refuses $all as a goto target", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "a",
+        name: "a",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: { Idle: { on: [{ on: "e", goto: "All" }] }, All: {} },
+        all: { on: [{ on: "$self" }] },
+      },
+    ],
+  };
+  expect(validateLogicDocument(d)).toEqual([]);
+  (
+    d.logics[0] as { states: { Idle: { on: { goto: string }[] } } }
+  ).states.Idle.on[0].goto = "$all";
+  expect(
+    validateLogicDocument(d).some((i) =>
+      i.message.includes("unknown state $all"),
+    ),
+  ).toBe(true);
+});

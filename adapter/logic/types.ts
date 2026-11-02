@@ -180,6 +180,9 @@ export interface MachineLogic extends LogicBase {
   /** Default: the first state key. */
   start?: string;
   states: Record<string, StateDef>;
+  /** Rows appended after every state's own rows (D31); never entered or a
+   *  goto target. Only `on` exists — no enter/exit/after. */
+  all?: { on?: OnRow[] };
 }
 
 export type LogicDef = FunctionLogic | MachineLogic;
