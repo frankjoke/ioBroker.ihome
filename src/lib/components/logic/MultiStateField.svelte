@@ -31,12 +31,19 @@
   function add(id: string) {
     if (!value.includes(id)) onchange([...value, id]);
   }
+
+  /** A logic source reads by name; a state keeps its id. */
+  function chipLabel(id: string): string {
+    if (!id.startsWith("$logic.")) return id;
+    const sourceId = id.slice("$logic.".length);
+    return logics.find((source) => source.id === sourceId)?.name ?? sourceId;
+  }
 </script>
 
 <div class="multi-state">
   {#each value as id (id)}
     <span class="chip">
-      <span class="mono">{id}</span>
+      <span class="mono" title={id}>{chipLabel(id)}</span>
       <button
         type="button"
         class="chip-x"

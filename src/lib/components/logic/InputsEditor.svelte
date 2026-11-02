@@ -99,7 +99,12 @@
       const variables = getVariables();
       const all = [input.from.ref, ...(input.from.refs ?? [])]
         .filter(Boolean)
-        .map((ref) => variableNameFor(ref, variables));
+        .map((ref) => {
+          if (!ref.startsWith("$logic."))
+            return variableNameFor(ref, variables);
+          const sourceId = ref.slice("$logic.".length);
+          return logics.find((source) => source.id === sourceId)?.name ?? ref;
+        });
       if (all.length === 0) return "(no state selected)";
       if (all.length === 1) return all[0];
       return `${all[0]} +${all.length - 1}`;
