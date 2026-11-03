@@ -470,6 +470,16 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="item-line" onclick={(e) => onLineClick(e, v)}>
+            <span
+              class="kind text-muted"
+              role="img"
+              aria-label={v.kind === "constant" ? "Constant" : "State"}
+              title={v.kind === "constant" ? "Constant" : "State"}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{v.kind === "constant" ? "push_pin" : "sensors"}</span
+              >
+            </span>
             {#if open && editing}
               <input
                 class="name-input"
@@ -483,9 +493,6 @@
                 {v.name || "(unnamed)"}
               </button>
             {/if}
-            <span class="badge badge-secondary"
-              >{v.kind === "constant" ? "constant" : "state"}</span
-            >
             {#if v.unit}<span class="text-muted">{v.unit}</span>{/if}
             {#if v.kind === "constant"}
               <code class="var-value">{v.value}</code>
@@ -858,6 +865,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .kind {
+    display: inline-flex;
+  }
+
+  .kind .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .var-value {

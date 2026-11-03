@@ -29,7 +29,11 @@
     enumLabelFromObject,
   } from "$lib/config/rooms";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { formatValue } from "$lib/config/format";
+  import { formatAge, formatValue } from "$lib/config/format";
+  import {
+    fetchPickerValues,
+    getPickerValue,
+  } from "$lib/picker-values.svelte.js";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -378,8 +382,12 @@
   }
 
   onMount(() => {
-    void fetchReadings();
-    const timer = setInterval(fetchReadings, 2000);
+    const tick = () => {
+      void fetchReadings();
+      void fetchPickerValues(outputStateIds());
+    };
+    tick();
+    const timer = setInterval(tick, 2000);
     return () => clearInterval(timer);
   });
 
@@ -392,6 +400,28 @@
   function setLog(logic: LogicDef, log: boolean) {
     if (selectedId === logic.id) patch({ log: log || undefined });
     else update({ ...logic, log: log || undefined });
+  }
+
+  /** The output state behind a logic, when it has one (memory has none). */
+  function outputStateId(logic: LogicDef): string | null {
+    const output = logic.output;
+    if (output?.scope === "logic") {
+      return `${ioBroker.namespace}.Logic.${logic.id}`;
+    }
+    if (output?.scope === "state" && output.ref) {
+      return stateIdFor(output.ref, getVariables());
+    }
+    return null;
+  }
+
+  /** The output states the age column reads. */
+  function outputStateIds(): string[] {
+    const ids: string[] = [];
+    for (const logic of doc.logics) {
+      const id = outputStateId(logic);
+      if (id) ids.push(id);
+    }
+    return ids;
   }
 
   /** The machine's state or the action's value, with its unit when it has one. */
@@ -412,16 +442,23 @@
     return formatValue(reading.value, unit);
   }
 
+  /** How long ago the output state last changed, like the device list. */
+  function agoText(logic: LogicDef): string {
+    if (logic.enabled === false) return "";
+    const id = outputStateId(logic);
+    // A memory output has no state, so the engine's report time is the only age.
+    const ts = id ? getPickerValue(id)?.ts : readings[logic.id]?.ts;
+    if (typeof ts !== "number") return "";
+    const age = formatAge(ts);
+    return age === "now" ? "just now" : `${age} ago`;
+  }
+
   function outputLabel(logic: LogicDef): string {
     const output = logic.output;
-    let label: string;
-    if (!output) label = `memory: ${logic.id}`;
-    else if (output.scope === "memory")
-      label = `memory: ${output.name ?? logic.id}`;
-    else if (output.scope === "logic") label = `Logic.${logic.id}`;
-    else label = output.ref || "(no state)";
-    const reading = readingText(logic);
-    return reading ? `${label} · ${reading}` : label;
+    if (!output) return `memory: ${logic.id}`;
+    if (output.scope === "memory") return `memory: ${output.name ?? logic.id}`;
+    if (output.scope === "logic") return `Logic.${logic.id}`;
+    return output.ref || "(no state)";
   }
 </script>
 
@@ -515,12 +552,24 @@
     <div class="logic-list">
       {#each shownLogics as logic (logic.id)}
         {@const open = selectedId === logic.id}
+        {@const reading = readingText(logic)}
+        {@const ago = agoText(logic)}
         <div class="item" class:open>
           <!-- The free line area is a mouse convenience: keyboard users open/close
                with the name button and close with the ×. -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="item-line" onclick={(e) => onLineClick(e, logic)}>
+            <span
+              class="kind text-muted"
+              role="img"
+              aria-label={logic.kind === "machine" ? "State machine" : "Action"}
+              title={logic.kind === "machine" ? "State machine" : "Action"}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{logic.kind === "machine" ? "account_tree" : "calculate"}</span
+              >
+            </span>
             {#if open && draft}
               <input
                 class="name-input"
@@ -537,10 +586,16 @@
                 {logic.name}
               </button>
             {/if}
-            <span class="badge badge-secondary">{logic.kind}</span>
             <span class="mono hint text-muted">{outputLabel(logic)}</span>
-            {#if logic.enabled === false}
-              <span class="badge badge-secondary">disabled</span>
+            {#if reading}
+              <span class="mono text-muted">{reading}</span>
+            {/if}
+            {#if ago}
+              <span class="updated text-muted">
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >schedule</span
+                >{ago}</span
+              >
             {/if}
             <span class="item-actions">
               <label class="inline"
@@ -749,6 +804,27 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--body-sm);
+  }
+
+  .updated .material-symbols-outlined {
+    font-size: 1em;
+  }
+
+  .kind {
+    display: inline-flex;
+  }
+
+  .kind .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .inline {
