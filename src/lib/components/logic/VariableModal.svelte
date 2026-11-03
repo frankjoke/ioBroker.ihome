@@ -114,6 +114,8 @@
   .modal-card {
     width: min(720px, 100%);
     max-height: 90vh;
+    /* `dvh` follows the visual viewport while a tablet keyboard is open. */
+    max-height: 90dvh;
     overflow: auto;
     padding: 1.25rem;
     display: flex;
@@ -138,6 +140,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+    min-height: 0;
+    max-height: 45vh;
+    max-height: 45dvh;
+    overflow: auto;
   }
 
   .error {
