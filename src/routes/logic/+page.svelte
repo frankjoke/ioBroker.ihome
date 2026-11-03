@@ -588,7 +588,7 @@
             {/if}
             <span class="mono hint text-muted">{outputLabel(logic)}</span>
             {#if reading}
-              <span class="mono text-muted">{reading}</span>
+              <span class="reading mono">{reading}</span>
             {/if}
             {#if ago}
               <span class="updated text-muted">
@@ -825,6 +825,11 @@
 
   .kind .material-symbols-outlined {
     font-size: 18px;
+  }
+
+  /* The reading is the row's answer; the name, the output and the age are context. */
+  .reading {
+    font-weight: 500;
   }
 
   .inline {

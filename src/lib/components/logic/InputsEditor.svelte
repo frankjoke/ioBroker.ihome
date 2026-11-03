@@ -144,14 +144,17 @@
       const timers = (input.timers ?? []).map((timer) => timerLabel(timer));
       const all = [...states, ...timers];
       if (all.length === 0) return "(no source)";
-      const label = all.length === 1 ? all[0] : `${all[0]} +${all.length - 1}`;
-      // The first source's current reading, like the state picker shows it.
-      const reading = input.from.ref ? liveReading(input.from.ref) : "";
-      return reading ? `${label} · ${reading}` : label;
+      return all.length === 1 ? all[0] : `${all[0]} +${all.length - 1}`;
     }
     if (input.from.type === "memory")
       return input.from.ref || "(no memory name)";
     return `every ${input.from.every}`;
+  }
+
+  /** The first source's current reading, like the state picker shows it. */
+  function sourceReading(input: Input): string {
+    if (input.from.type !== "state" || !input.from.ref) return "";
+    return liveReading(input.from.ref);
   }
 
   /** The current value and unit of a state ref, empty until it is fetched. */
@@ -227,6 +230,9 @@
         {/if}
         <span class="badge badge-secondary">{input.kind}</span>
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
+        {#if sourceReading(input)}
+          <span class="input-reading mono">{sourceReading(input)}</span>
+        {/if}
         <span class="item-actions">
           {#if input.kind === "event"}
             <button
