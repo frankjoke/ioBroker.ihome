@@ -27,7 +27,17 @@
     warn: 3,
     error: 4,
   };
-  let minLevel = $state<Level>("all");
+  /** The instance's configured level (`common.loglevel`), as a selector value. */
+  function configuredLevel(): Level {
+    const obj = ioBroker.objects.get(`system.adapter.${ioBroker.namespace}`) as
+      { common?: { loglevel?: string } } | undefined;
+    const level = String(obj?.common?.loglevel ?? "info").toLowerCase();
+    if (level === "silly") return "all";
+    return (LEVELS as readonly string[]).includes(level)
+      ? (level as Level)
+      : "info";
+  }
+  let minLevel = $state<Level>(configuredLevel());
   const shown = $derived(
     minLevel === "all"
       ? lines
