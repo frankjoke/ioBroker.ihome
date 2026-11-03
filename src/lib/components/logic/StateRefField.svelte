@@ -62,7 +62,10 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    flex: 1 1 240px;
+    /* A column field (InputsEditor, ActionList) must not turn 240px into a
+       height — the button stays one line and the row fills the width. */
+    flex: 0 1 auto;
+    width: 100%;
     min-width: 0;
   }
 
