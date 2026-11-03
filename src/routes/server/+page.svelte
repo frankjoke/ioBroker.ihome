@@ -255,6 +255,7 @@
     flex-direction: column;
     gap: 1.5rem;
     max-width: 640px;
+    margin: 0 auto;
   }
 
   /* The cards, as one all-or-nothing group: `disabled` on the fieldset reaches

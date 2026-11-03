@@ -277,6 +277,7 @@
     flex-direction: column;
     gap: 1.25rem;
     max-width: 720px;
+    margin: 0 auto;
   }
 
   .page-header {
