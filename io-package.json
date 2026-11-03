@@ -42,46 +42,6 @@
       "0.0.28": {
         "en": "A slot added in the tile editor from Any state now shows its live value right away, and after a reload: the state behind a raw slot is subscribed and fetched like a device control (it used to stay “—” until the same state was also added to the device)",
         "de": "Ein im Kachel-Editor unter „Any state“ hinzugefügter Slot zeigt seinen Live-Wert jetzt sofort und auch nach einem Neuladen: Der State hinter einem rohen Slot wird wie ein Geräte-Control abonniert und gelesen (bisher blieb er bei „—“ , bis derselbe State auch am Gerät hing)"
-      },
-      "0.0.27": {
-        "en": "A device's icon ignores page and adapter logos on its state's path (the 0_userdata page icon, the iHome adapter icon): when nothing on that path carries a real icon, the device type's glyph is used — the same one the tile look and the slots show (device_thermostat for a Thermometer, touch_app for a Button)",
-        "de": "Das Icon eines Geräts ignoriert Seiten- und Adapter-Logos auf dem Pfad seines States (das 0_userdata-Seitenicon, das iHome-Adaptericon): Trägt nichts auf diesem Pfad ein echtes Icon, wird das Glyph des Gerätetyps verwendet — dasselbe, das Look und Slots zeigen (device_thermostat für ein Thermometer, touch_app für einen Button)"
-      },
-      "0.0.26": {
-        "en": "A device created from a variable now shows its type's icon — the same glyph the tile's look shows (touch_app for a Button, lightbulb for a Light) — instead of the adapter logo when the state has no icon of its own. A press button writes true and releases the state to false after 300 ms, so momentary button states no longer stick on",
-        "de": "Ein aus einer Variable erzeugtes Gerät zeigt jetzt das Icon seines Typs — dasselbe Glyph wie im Look der Kachel (touch_app für einen Button, lightbulb für ein Licht) — statt des Adapter-Logos, wenn der State kein eigenes Icon hat. Eine Drucktaste schreibt true und setzt den State nach 300 ms wieder auf false, sodass momentane Tastenzustände nicht mehr hängen bleiben"
-      },
-      "0.0.25": {
-        "en": "A control's feature is kept in line with its device type: a device created from a state now gets the feature its final type defines (a Button gets press, not the generic boolean power), and existing controls with a feature the type does not have are repaired on load — the affected button tiles render again. A device also inherits the room and the adapter icon from the variable's state",
-        "de": "Das Feature eines Controls bleibt mit dem Gerätetyp im Einklang: Ein aus einem State erzeugtes Gerät bekommt das Feature seines endgültigen Typs (ein Button erhält press, nicht das generische Boolean-power), und vorhandene Controls mit einem Feature, das der Typ nicht kennt, werden beim Laden repariert — die betroffenen Button-Kacheln erscheinen wieder. Ein Gerät übernimmt außerdem Raum und Adapter-Icon vom State der Variable"
-      },
-      "0.0.24": {
-        "en": "The state picker always opens with an empty search, showing the full state tree; it no longer prefills the control's current state or the new device's name (the adapter/room/type/role filters are still remembered)",
-        "de": "Der State-Picker öffnet immer mit leerer Suche und zeigt den vollständigen State-Baum; er füllt weder den aktuellen State des Controls noch den Namen des neuen Geräts vor (Adapter-/Raum-/Typ-/Rollenfilter bleiben gemerkt)"
-      },
-      "0.0.23": {
-        "en": "Editing a device opens the form directly under its row — highlighted and scrolled into view — instead of at the top of the page; new devices still use the top form. The tile editor's device action is now Replace this tile's device: it never deletes the device, Cancel changes nothing, and deleting a device on the Devices page removes its tiles and says how many",
-        "de": "Das Bearbeiten eines Geräts öffnet das Formular direkt unter seiner Zeile — hervorgehoben und in den Blick gescrollt — statt oben auf der Seite; neue Geräte nutzen weiter das Formular oben. Die Geräte-Aktion im Kachel-Editor heißt jetzt „Replace this tile's device“: Sie löscht nie das Gerät, Abbrechen ändert nichts, und das Löschen eines Geräts auf der Geräte-Seite entfernt seine Kacheln und nennt deren Anzahl"
-      },
-      "0.0.22": {
-        "en": "Global state variables appear in the state picker as the first _Variables group: pick one and the control stores the variable name — shown as the state — while role, unit, writability and the room/type suggestion come from the real state behind it",
-        "de": "Globale Zustandsvariablen erscheinen im State-Picker als erste Gruppe _Variables: Wählt man eine, speichert das Control den Variablennamen — angezeigt als State —, während Rolle, Einheit, Schreibbarkeit sowie Raum-/Typ-Vorschlag vom dahinterliegenden echten State kommen"
-      },
-      "0.0.21": {
-        "en": "Page links are readable: a new page's address is the slug of its name (#/p/wohnzimmer) instead of a random id; pages created before this update are renamed once, and the link stays as created when the page is renamed later",
-        "de": "Seitenlinks sind lesbar: Die Adresse einer neuen Seite ist der Slug ihres Namens (#/p/wohnzimmer) statt einer Zufalls-ID; vor diesem Update angelegte Seiten werden einmalig umbenannt, und der Link bleibt beim späteren Umbenennen der Seite erhalten"
-      },
-      "0.0.20": {
-        "en": "New pages and sections ask for a name before they are created: a duplicate name is refused, Cancel creates nothing, and the new page or section is selected right away — no more silent rooms and sections behind the current one",
-        "de": "Neue Seiten und Abschnitte fragen vor dem Anlegen nach einem Namen: ein doppelter Name wird abgelehnt, Abbrechen legt nichts an, und die neue Seite bzw. der neue Abschnitt ist sofort ausgewählt — keine stillen Seiten und Abschnitte mehr hinter der aktuellen"
-      },
-      "0.0.19": {
-        "en": "A User Interface page (the first cog page in a session) sets the installation's defaults: page, section and tile background colours, the tile name and value text sizes, and the 1×1 tile scale up to 200 % — shared by every device; the cog returns to the last config page a tab visited",
-        "de": "Eine Seite „User Interface“ (die erste Zahnrad-Seite einer Sitzung) legt die Standardwerte der Installation fest: Hintergrundfarben für Seite, Abschnitt und Tile, die Textgrößen von Tile-Name und -Wert sowie die Größe eines 1×1-Tiles bis 200 % — geteilt von allen Geräten; das Zahnrad kehrt zur zuletzt besuchten Konfigurationsseite eines Tabs zurück"
-      },
-      "0.0.18": {
-        "en": "The PIN and the layout editor's lock are shared settings now: they live in ihome.0.config.settings, a missing PIN is seeded there as the default 4321, and every device follows a change. The pencil lock ships off, so the layout editor stays quick during installation, while every configuration page still requires the PIN",
-        "de": "PIN und Sperre des Layout-Editors sind jetzt geteilte Einstellungen: Sie liegen in ihome.0.config.settings, eine fehlende PIN wird dort als Standard 4321 angelegt, und jedes Gerät folgt einer Änderung. Die Stift-Sperre ist standardmäßig aus, damit der Layout-Editor bei der Installation schnell bleibt, während jede Konfigurationsseite weiterhin die PIN verlangt"
       }
     },
     "titleLang": {
