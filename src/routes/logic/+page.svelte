@@ -9,6 +9,7 @@
     logicsLoadKind,
   } from "$lib/stores/logics.svelte";
   import LogicEditor from "$lib/components/logic/LogicEditor.svelte";
+  import LogSheet from "$lib/components/logic/LogSheet.svelte";
   import TemplateInsert from "$lib/components/logic/TemplateInsert.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
@@ -31,6 +32,14 @@
   let selectedId = $state<string | null>(null);
   let pendingDelete = $state<LogicDef | null>(null);
   let inserting = $state(false);
+  /** The adapter log drawer, opened from the title line. */
+  let showLog = $state(false);
+
+  // The layout gives the page the space the drawer leaves (see +layout.svelte).
+  $effect(() => {
+    document.body.classList.toggle("log-open", showLog);
+    return () => document.body.classList.remove("log-open");
+  });
   /** Which new logic the name dialog is creating. */
   let pendingCreate = $state<"machine" | "action" | null>(null);
   /** Why the open row's name was rejected, if it was. */
@@ -373,6 +382,10 @@
     <div class="title-line">
       <h1>Logic</h1>
       <div class="page-actions">
+        <label class="check" title="Show the adapter log">
+          <input type="checkbox" bind:checked={showLog} />
+          Show log
+        </label>
         <button
           type="button"
           class="btn btn-sm"
@@ -597,12 +610,18 @@
   />
 {/if}
 
+{#if showLog}
+  <LogSheet onClose={() => (showLog = false)} />
+{/if}
+
 <style>
   .logic-page {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     max-width: 860px;
+    /* Centered in the page — and, with the drawer open, in the leftover. */
+    margin: 0 auto;
   }
 
   .page-heading {
@@ -636,6 +655,14 @@
 
   .page-actions .material-symbols-outlined {
     font-size: 18px;
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--body-sm);
+    white-space: nowrap;
   }
 
   .hint {

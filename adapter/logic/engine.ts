@@ -247,6 +247,20 @@ export function createEngine(
     if (rt.def.log === true) deps.log("info", logId(rt), message);
   }
 
+  /** The writer behind a job's event; init/start/timer are not a person. */
+  function eventWriter(job: Job): string {
+    const from = job.meta.from;
+    return from && from !== "init" && from !== "start" && from !== "timer"
+      ? from
+      : "";
+  }
+
+  /** `event “input” from writer` — what a transition and its write say. */
+  function eventCause(job: Job): string {
+    const writer = eventWriter(job);
+    return `event “${job.input}”${writer ? ` from ${writer}` : ""}`;
+  }
+
   function resolveIn(rt: Runtime, ref: string): unknown {
     if (ref === "$init") return rt.init;
     if (ref === "$start") return rt.starting;
@@ -376,7 +390,7 @@ export function createEngine(
         const isMemory = input?.from.type === "memory";
         const unchanged = job.hasPrevious && Object.is(job.previous, job.value);
         if (input?.mode === "any" || isMemory || !unchanged) {
-          runFunction(job.rt, job.depth);
+          runFunction(job.rt, job.depth, eventCause(job));
         }
       } else {
         handleMachine(job);
@@ -399,7 +413,7 @@ export function createEngine(
     const all = runRows(rt, def.all?.on ?? [], job, input);
     // No row took the event: an output change still moves the machine.
     if (!own.matched && !all.matched && job.input === "$self") {
-      syncToOutput(rt, job.value, job.depth);
+      syncToOutput(rt, job.value, job.depth, job.meta.from);
     }
   }
 
@@ -412,8 +426,10 @@ export function createEngine(
   ): { matched: boolean; stopped: boolean } {
     let matched = false;
     for (const row of rows) {
-      if (row.on !== job.input) continue;
-      if (!rowApplies(row, job, input)) continue;
+      const always = row.on === "$always";
+      if (!always && row.on !== job.input) continue;
+      // `$always` rides every job; edge/ack/source describe one concrete source.
+      if (!always && !rowApplies(row, job, input)) continue;
       if (row.is && !matchesIs(row.is, job.value)) continue;
       if (row.if) {
         try {
@@ -423,10 +439,11 @@ export function createEngine(
           continue;
         }
       }
-      matched = true;
+      // A hook, not a handler: it must not swallow the `$self` output sync.
+      if (!always) matched = true;
       const jumped = runActions(rt, row.do ?? [], job.depth);
       if (row.goto) {
-        transition(rt, row.goto, job.depth, `event “${job.input}”`);
+        transition(rt, row.goto, job.depth, eventCause(job));
         return { matched, stopped: true };
       }
       // A `continue` row leaves the state untouched and lets the rows below
@@ -443,13 +460,23 @@ export function createEngine(
    * timeouts); an explicit `$self` row then picks the one meant. A write that
    * already matches the current state changes nothing (D22).
    */
-  function syncToOutput(rt: Runtime, value: unknown, depth: number): void {
+  function syncToOutput(
+    rt: Runtime,
+    value: unknown,
+    depth: number,
+    from: string,
+  ): void {
     const def = rt.def as MachineLogic;
     const current = rt.state;
     if (current && Object.is(outputValue(rt, current), value)) return;
     for (const name of Object.keys(def.states)) {
       if (Object.is(outputValue(rt, name), value)) {
-        transition(rt, name, depth, "output changed elsewhere");
+        transition(
+          rt,
+          name,
+          depth,
+          from ? `output changed by ${from}` : "output changed elsewhere",
+        );
         return;
       }
     }
@@ -566,7 +593,7 @@ export function createEngine(
       runActions(rt, next.enter ?? [], depth);
     }
     armAfter(rt, name, next);
-    writeOutput(rt, name, depth);
+    writeOutput(rt, name, depth, reason);
   }
 
   /** Runs an action list; true when it contained a `goto` (the state changed
@@ -712,7 +739,7 @@ export function createEngine(
     deps.write(id, value, ack);
   }
 
-  function runFunction(rt: Runtime, depth: number): void {
+  function runFunction(rt: Runtime, depth: number, cause = ""): void {
     const def = rt.def as FunctionLogic;
     if (isNoop(def.expr)) return;
     let value: unknown;
@@ -722,7 +749,7 @@ export function createEngine(
       warn(def.id, `expression failed: ${errorText(error)}`);
       return;
     }
-    writeOutput(rt, value, depth);
+    writeOutput(rt, value, depth, cause);
   }
 
   function coerce(
@@ -772,7 +799,13 @@ export function createEngine(
     return new RegExp(`^${globSource(pattern)}$`).test(name);
   }
 
-  function writeOutput(rt: Runtime, value: unknown, depth: number): void {
+  function writeOutput(
+    rt: Runtime,
+    value: unknown,
+    depth: number,
+    cause = "",
+  ): void {
+    const because = cause ? ` because of ${cause}` : "";
     const output = rt.output;
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
@@ -794,7 +827,7 @@ export function createEngine(
     if (!forwardAllows(rt, mapped, output.forward)) {
       stateLog(
         rt,
-        `skips writing “${target}” — value “${String(mapped)}” is unchanged`,
+        `skips writing “${target}” — value “${String(mapped)}” is unchanged${because}`,
       );
       return;
     }
@@ -803,7 +836,7 @@ export function createEngine(
     rt.lastOutput = mapped;
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
-    stateLog(rt, `writes “${String(mapped)}” to “${target}”`);
+    stateLog(rt, `writes “${String(mapped)}” to “${target}”${because}`);
     // A command, not a confirmation: devices act on ack=false only.
     deps.write(target, mapped, false);
     emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);

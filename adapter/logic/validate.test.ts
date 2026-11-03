@@ -211,6 +211,22 @@ it("accepts a $init row and an expression init state", () => {
   expect(validateLogicDocument(doc)).toEqual([]);
 });
 
+it("accepts an $always row", () => {
+  const doc: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        inputs: { e: { from: { type: "state", ref: "0_userdata.0.E" } } },
+        states: { A: { on: [{ on: "$always", goto: "B" }] }, B: {} },
+      },
+    ],
+  };
+  expect(validateLogicDocument(doc)).toEqual([]);
+});
+
 it("rejects an unknown event source", () => {
   const bad: LogicDocument = {
     version: 1,

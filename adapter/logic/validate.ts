@@ -510,8 +510,13 @@ function checkRow(
     add(id, `${path}.source`, "unknown event source");
   }
   const input = row?.on;
-  if (input === "$init" || input === "$self" || input === "$start") {
-    // Built-in machine triggers (D19, D22, D28); only machines have rows.
+  if (
+    input === "$init" ||
+    input === "$self" ||
+    input === "$start" ||
+    input === "$always"
+  ) {
+    // Built-in machine triggers (D19, D22, D28, $always); only machines have rows.
   } else if (typeof input === "string" && input.startsWith("$var.")) {
     // A global state variable (D30); resolved and subscribed at load.
     if (!input.slice("$var.".length).trim()) {

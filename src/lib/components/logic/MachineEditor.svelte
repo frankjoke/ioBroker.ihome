@@ -443,6 +443,7 @@
                   <option value="$init">$init (start)</option>
                   <option value="$self">$self (target state)</option>
                   <option value="$start">$start (after all logics)</option>
+                  <option value="$always">$always (any event)</option>
                   {#each eventInputs as input (input)}
                     <option value={input}>{input}</option>
                   {/each}
@@ -527,59 +528,61 @@
                   />
                 </label>
               {/if}
-              {#if kind === "boolean"}
-                <label class="field"
-                  ><span class="label-mono">Edge</span>
-                  <select
-                    aria-label="Edge"
-                    value={row.edge ?? "change"}
-                    onchange={(e) =>
-                      updateRow(name, index, {
-                        ...row,
-                        edge: e.currentTarget.value as
-                          "change" | "rising" | "falling" | "any",
-                      })}
-                  >
-                    <option value="any">any</option>
-                    <option value="change">change</option>
-                    <option value="rising">rising</option>
-                    <option value="falling">falling</option>
-                  </select>
-                </label>
-              {:else}
-                <label class="field"
-                  ><span class="label-mono">Edge</span>
-                  <span class="check"
-                    ><input
-                      type="checkbox"
-                      aria-label="Every update"
-                      checked={row.edge === "any"}
+              {#if row.on !== "$always"}
+                {#if kind === "boolean"}
+                  <label class="field"
+                    ><span class="label-mono">Edge</span>
+                    <select
+                      aria-label="Edge"
+                      value={row.edge ?? "change"}
                       onchange={(e) =>
                         updateRow(name, index, {
                           ...row,
-                          edge: e.currentTarget.checked ? "any" : "change",
+                          edge: e.currentTarget.value as
+                            "change" | "rising" | "falling" | "any",
                         })}
-                    />
-                    {row.edge === "any" ? "any" : "change"}</span
+                    >
+                      <option value="any">any</option>
+                      <option value="change">change</option>
+                      <option value="rising">rising</option>
+                      <option value="falling">falling</option>
+                    </select>
+                  </label>
+                {:else}
+                  <label class="field"
+                    ><span class="label-mono">Edge</span>
+                    <span class="check"
+                      ><input
+                        type="checkbox"
+                        aria-label="Every update"
+                        checked={row.edge === "any"}
+                        onchange={(e) =>
+                          updateRow(name, index, {
+                            ...row,
+                            edge: e.currentTarget.checked ? "any" : "change",
+                          })}
+                      />
+                      {row.edge === "any" ? "any" : "change"}</span
+                    >
+                  </label>
+                {/if}
+                <label class="field"
+                  ><span class="label-mono">Ack</span>
+                  <select
+                    aria-label="Ack filter"
+                    value={row.ack ?? "any"}
+                    onchange={(e) =>
+                      updateRow(name, index, {
+                        ...row,
+                        ack: e.currentTarget.value as "any" | "true" | "false",
+                      })}
                   >
+                    <option value="any">any</option>
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                  </select>
                 </label>
               {/if}
-              <label class="field"
-                ><span class="label-mono">Ack</span>
-                <select
-                  aria-label="Ack filter"
-                  value={row.ack ?? "any"}
-                  onchange={(e) =>
-                    updateRow(name, index, {
-                      ...row,
-                      ack: e.currentTarget.value as "any" | "true" | "false",
-                    })}
-                >
-                  <option value="any">any</option>
-                  <option value="false">false</option>
-                  <option value="true">true</option>
-                </select>
-              </label>
             </div>
 
             <div class="block">

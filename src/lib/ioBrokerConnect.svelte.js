@@ -495,10 +495,9 @@ export function emitAsync(event, ...data) {
 export function emitAsyncNoErr(event, ...data) {
   // console.log('emitAsync', event, data);
   const now = -Date.now();
-  const timeout =
-    typeof data.slice(-1)[0] === "number" && typeof data.slice(-1)[0] > 5000
-      ? data.pop()
-      : 30000;
+  // A trailing number > 5 s is the call's timeout, not a message argument.
+  const last = data.slice(-1)[0];
+  const timeout = typeof last === "number" && last > 5000 ? data.pop() : 30000;
 
   if (!ioBroker.connected) {
     console.warn(

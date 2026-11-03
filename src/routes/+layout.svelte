@@ -390,6 +390,16 @@
     padding: 8px;
   }
 
+  /* The logic log drawer is a split view only where it leaves enough page. */
+  @media (min-width: 1180px) {
+    :global(body.log-open) .app-main {
+      width: auto;
+      max-width: none;
+      margin-left: 0;
+      margin-right: 560px;
+    }
+  }
+
   .app-shell.display .app-main {
     max-width: none;
     margin: 0;

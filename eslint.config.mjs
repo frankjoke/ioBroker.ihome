@@ -34,7 +34,8 @@ export default [
       parser: typescriptParser,
       ecmaVersion: 2020,
       sourceType: "module",
-      globals: globals.node,
+      // `ioBroker` is the type namespace @iobroker/types declares globally.
+      globals: { ...globals.node, ioBroker: "readonly" },
     },
     plugins: {
       prettier,

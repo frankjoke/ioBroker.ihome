@@ -4,6 +4,7 @@ import { createEngine, type Engine, type StateChange } from "./logic/engine";
 import { parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
 import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
+import { createLogBuffer } from "./log-buffer";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -152,11 +153,54 @@ class IHome extends utils.Adapter {
   private astroConfig?: { lat: number; lon: number };
   private heartbeat?: ReturnType<typeof setInterval>;
   private readonly startedAt = Date.now();
+  /** The adapter's recent log lines, published as `info.log`. */
+  private readonly logs = createLogBuffer();
+  private logStateTimer?: ReturnType<typeof setTimeout>;
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
+    this.on("log", (entry: ioBroker.LogMessage) => this.onLog(entry));
+  }
+
+  /**
+   * Adapter lines from the controller. Logic lines are pushed where they are
+   * produced (deps.log), so they are skipped here. A log transporter sees its
+   * own lines with the `ihome.0 ` prefix and, on some versions, no `from`.
+   */
+  private onLog(entry: ioBroker.LogMessage): void {
+    const message = String(entry.message ?? "");
+    const own =
+      entry.from === this.namespace ||
+      entry.from === `system.adapter.${this.namespace}` ||
+      message.startsWith(`${this.namespace} `);
+    if (!own || message.includes("[logic ")) return;
+    this.logs.push({
+      ts: Number(entry.ts) || Date.now(),
+      from: this.namespace,
+      severity: String(entry.severity ?? "info"),
+      message: message.replace(
+        new RegExp(`^${this.namespace} (?:\\(\\d+\\) )?`),
+        "",
+      ),
+    });
+    this.scheduleLogState();
+  }
+
+  /**
+   * Publish the ring as a state (debounced). `getState` works on every
+   * transport; `sendTo` replies did not.
+   */
+  private scheduleLogState(): void {
+    if (this.logStateTimer) return;
+    this.logStateTimer = setTimeout(() => {
+      this.logStateTimer = undefined;
+      void this.setStateAsync("info.log", {
+        val: JSON.stringify(this.logs.slice(0, 200)),
+        ack: true,
+      }).catch(() => {});
+    }, 500);
   }
 
   /**
@@ -416,6 +460,13 @@ class IHome extends utils.Adapter {
           write: (id, value, ack) => this.writeLogicState(id, value, ack),
           log: (level, logicId, message) => {
             const line = `[logic ${logicId}] ${message}`;
+            this.logs.push({
+              ts: Date.now(),
+              from: this.namespace,
+              severity: level,
+              message: line,
+            });
+            this.scheduleLogState();
             if (level === "warn") this.log.warn(line);
             else this.log.info(line);
           },
@@ -559,6 +610,36 @@ class IHome extends utils.Adapter {
   }
 
   private async onReady(): Promise<void> {
+    if (this.requireLog) {
+      try {
+        await this.requireLog(true);
+      } catch (error) {
+        this.log.warn(`log feed not available: ${String(error)}`);
+      }
+    }
+    await this.setObjectNotExistsAsync("info.log", {
+      type: "state",
+      common: {
+        name: "iHome log feed",
+        type: "string",
+        role: "json",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync("info.logClear", {
+      type: "state",
+      common: {
+        name: "Clear the iHome log",
+        type: "boolean",
+        role: "button",
+        read: true,
+        write: true,
+      },
+      native: {},
+    });
+    this.subscribeStates("info.logClear");
     this.log.debug(
       `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
     );
@@ -647,7 +728,16 @@ class IHome extends utils.Adapter {
         from: state.from,
         ts: state.ts,
       });
-      if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList`) {
+      if (id === `${this.namespace}.info.logClear`) {
+        if (state.val === true) {
+          this.logs.clear();
+          this.scheduleLogState();
+          void this.setStateAsync("info.logClear", {
+            val: false,
+            ack: true,
+          }).catch(() => {});
+        }
+      } else if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList`) {
         this.log.debug(`${CONFIG_FOLDER}.variableList changed; reloading`);
         // A variable edit can change what a logic ref resolves to.
         void this.loadVariables().then(() => this.loadLogics());
@@ -669,6 +759,17 @@ class IHome extends utils.Adapter {
 
   private onUnload(callback: () => void): void {
     this.log.debug("Unload: stopping the heartbeat and the logic engine");
+    if (this.logStateTimer) {
+      clearTimeout(this.logStateTimer);
+      this.logStateTimer = undefined;
+    }
+    if (this.requireLog) {
+      try {
+        void this.requireLog(false);
+      } catch {
+        // unload must never throw on the log feed
+      }
+    }
     if (this.engine) {
       this.engine.stop();
       this.engine = undefined;

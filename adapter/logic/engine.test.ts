@@ -2,9 +2,11 @@ import { expect, it } from "vitest";
 import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
 import type {
+  Action,
   FunctionLogic,
   LogicDocument,
   MachineLogic,
+  OnRow,
   Output,
 } from "./types";
 
@@ -116,7 +118,67 @@ it("follows an external write to its own output", () => {
   expect(
     h.logs.some((line) =>
       line.message.includes(
-        "moves from “Off” to “On” because of output changed elsewhere",
+        "moves from “Off” to “On” because of output changed by hue.0",
+      ),
+    ),
+  ).toBe(true);
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "writes “true” to “0_userdata.0.OUT” because of output changed by hue.0",
+      ),
+    ),
+  ).toBe(true);
+});
+
+it("names the event writer on a row transition and its write", () => {
+  const h = createHarness({
+    "0_userdata.0.OUT": false,
+    "0_userdata.0.E": false,
+  });
+  const engine = createEngine(
+    follower({
+      inputs: {
+        e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+      },
+      states: {
+        Off: { on: [{ on: "e", goto: "On" }] },
+        On: {},
+      },
+    }),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.logs.length = 0;
+
+  h.change("0_userdata.0.E", true, { from: "hue.0" });
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "moves from “Off” to “On” because of event “e” from hue.0",
+      ),
+    ),
+  ).toBe(true);
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "writes “true” to “0_userdata.0.OUT” because of event “e” from hue.0",
+      ),
+    ),
+  ).toBe(true);
+});
+
+it("names the event writer when a function writes its output", () => {
+  const { h, engine } = engineWith(doc({ log: true }));
+  engine.start();
+  h.logs.length = 0;
+
+  h.change("0_userdata.0.T", 4, { from: "hue.0" });
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "writes “8” to “0_userdata.0.OUT” because of event “temp” from hue.0",
       ),
     ),
   ).toBe(true);
@@ -159,7 +221,7 @@ it("stays put when the external write already matches its state", () => {
   h.logs.length = 0;
   h.change("0_userdata.0.OUT", false, { from: "hue.0" });
   expect(
-    h.logs.some((line) => line.message.includes("output changed elsewhere")),
+    h.logs.some((line) => line.message.includes("output changed by hue.0")),
   ).toBe(false);
 });
 
@@ -1669,6 +1731,185 @@ it("lets a continue row fall through into $all", () => {
   expect(h.writes.map((w) => w.id)).toEqual([
     "0_userdata.0.OWN",
     "0_userdata.0.ALL",
+  ]);
+});
+
+const alwaysMachine = (
+  on: OnRow[],
+  extra: Partial<MachineLogic> = {},
+): LogicDocument => ({
+  version: 1,
+  logics: [
+    {
+      id: "always",
+      name: "Always",
+      kind: "machine",
+      inputs: {
+        e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+      },
+      output: { scope: "memory" },
+      start: "A",
+      states: { A: { on } },
+      ...extra,
+    },
+  ],
+});
+
+const setTrue = (ref: string): Action => ({
+  set: { target: { ref }, value: { const: true } },
+});
+
+it("an $always row fires on a named input event", () => {
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.FLAG": false,
+  });
+  const engine = createEngine(
+    alwaysMachine([{ on: "$always", do: [setTrue("0_userdata.0.FLAG")] }]),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  // The $start job already ran the row; clear the flag it wrote.
+  h.change("0_userdata.0.FLAG", false);
+  h.writes.length = 0;
+
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: true, ack: false },
+  ]);
+});
+
+it("an $always row fires on $init", () => {
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.FLAG": false,
+  });
+  const engine = createEngine(
+    alwaysMachine(
+      [
+        {
+          on: "$always",
+          if: { ref: "$init" },
+          do: [setTrue("0_userdata.0.FLAG")],
+        },
+      ],
+      { init: { state: "A", run: true } },
+    ),
+    h.deps,
+  );
+  h.attach(engine);
+
+  engine.start();
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: true, ack: false },
+  ]);
+});
+
+it("an $always row fires on $start", () => {
+  const h = createHarness({ "0_userdata.0.FLAG": false });
+  const engine = createEngine(
+    alwaysMachine([{ on: "$always", do: [setTrue("0_userdata.0.FLAG")] }]),
+    h.deps,
+  );
+  h.attach(engine);
+
+  engine.start();
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: true, ack: false },
+  ]);
+});
+
+it("a continue $always row falls through to the rows below", () => {
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.LOW": false,
+    "0_userdata.0.HIGH": false,
+  });
+  const engine = createEngine(
+    alwaysMachine([
+      {
+        on: "$always",
+        continue: true,
+        do: [setTrue("0_userdata.0.LOW")],
+      },
+      { on: "e", do: [setTrue("0_userdata.0.HIGH")] },
+    ]),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.LOW", false);
+  h.writes.length = 0;
+
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes.map((w) => w.id)).toEqual([
+    "0_userdata.0.LOW",
+    "0_userdata.0.HIGH",
+  ]);
+});
+
+it("without continue an $always row ends the event", () => {
+  const h = createHarness({
+    "0_userdata.0.E": 0,
+    "0_userdata.0.LOW": false,
+    "0_userdata.0.HIGH": false,
+  });
+  const engine = createEngine(
+    alwaysMachine([
+      { on: "$always", do: [setTrue("0_userdata.0.LOW")] },
+      { on: "e", do: [setTrue("0_userdata.0.HIGH")] },
+    ]),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.LOW", false);
+  h.writes.length = 0;
+
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes.map((w) => w.id)).toEqual(["0_userdata.0.LOW"]);
+});
+
+it("an $always row does not swallow the $self output sync", () => {
+  const h = createHarness({
+    "0_userdata.0.OUT": false,
+    "0_userdata.0.FLAG": false,
+  });
+  const engine = createEngine(
+    follower({
+      states: {
+        Off: {
+          on: [
+            {
+              on: "$always",
+              continue: true,
+              do: [setTrue("0_userdata.0.FLAG")],
+            },
+          ],
+        },
+        On: {},
+      },
+    }),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.FLAG", false);
+  h.logs.length = 0;
+  h.writes.length = 0;
+
+  h.change("0_userdata.0.OUT", true, { from: "hue.0" });
+  expect(
+    h.logs.some((line) =>
+      line.message.includes(
+        "moves from “Off” to “On” because of output changed by hue.0",
+      ),
+    ),
+  ).toBe(true);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: true, ack: false },
+    { id: "0_userdata.0.OUT", value: true, ack: false },
   ]);
 });
 
