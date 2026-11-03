@@ -438,3 +438,31 @@ it("accepts a timer-only event and rejects timers on a variable", () => {
     ),
   ).toBe(true);
 });
+
+it("accepts a string output unit and rejects another type", () => {
+  const d: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "u",
+        name: "U",
+        kind: "function",
+        inputs: {
+          t: {
+            from: { type: "state", ref: "0_userdata.0.T" },
+            kind: "event",
+          },
+        },
+        output: { scope: "logic", type: "number", unit: "°C" },
+        expr: { const: 1 },
+      },
+    ],
+  };
+  expect(validateLogicDocument(d)).toEqual([]);
+
+  const bad = structuredClone(d);
+  (bad.logics[0].output as { unit: unknown }).unit = 5;
+  expect(validateLogicDocument(bad).some((i) => i.path === "output.unit")).toBe(
+    true,
+  );
+});

@@ -26,6 +26,15 @@ export interface StateChange {
   ts?: number;
 }
 
+/** The live readout of one logic, for the logic list. */
+export interface LogicReading {
+  /** A machine's current state name. */
+  state?: string;
+  /** A function's last written value. */
+  value?: unknown;
+  ts: number;
+}
+
 export interface EngineDeps {
   read(id: string): unknown;
   write(id: string, value: unknown, ack: boolean): void;
@@ -33,6 +42,8 @@ export interface EngineDeps {
   now(): number;
   setTimeout(fn: () => void, ms: number): number;
   clearTimeout(handle: number): void;
+  /** Publish a logic's live readout for the logic list. */
+  report?(logicId: string, reading: LogicReading): void;
   resolveVariable?(
     name: string,
   ):
@@ -592,6 +603,7 @@ export function createEngine(
       rt.state = name;
       runActions(rt, next.enter ?? [], depth);
     }
+    deps.report?.(def.id, { state: rt.state ?? name, ts: deps.now() });
     armAfter(rt, name, next);
     writeOutput(rt, name, depth, reason);
   }
@@ -813,6 +825,9 @@ export function createEngine(
       const hasPrevious = memory.has(name);
       rt.lastOutput = value;
       rt.hasOutput = true;
+      if (rt.def.kind === "function") {
+        deps.report?.(rt.def.id, { value, ts: deps.now() });
+      }
       // The stored memory value is the reference (spec §5.6), not the last
       // write of this logic: a seeded value must not emit an event.
       const wrote = writeMemory(name, value, output.forward, depth, rt.def.id);
@@ -822,6 +837,9 @@ export function createEngine(
       return;
     }
     const mapped = outputValue(rt, value);
+    if (rt.def.kind === "function") {
+      deps.report?.(rt.def.id, { value: mapped, ts: deps.now() });
+    }
     const target = outputTargetId(rt);
     if (!target) return;
     if (!forwardAllows(rt, mapped, output.forward)) {
@@ -851,6 +869,7 @@ export function createEngine(
     // Silent adoption (D27): set the state and nothing else — no exit/enter, no
     // `after` timer, no output command. Only an explicit `$init` goto acts.
     rt.state = chosen;
+    deps.report?.(def.id, { state: chosen, ts: deps.now() });
     const output = rt.output;
     if (output.scope === "memory") {
       // The machine's own state readout, stored without emitting an event.

@@ -410,6 +410,9 @@ function checkOutput(
     if (output.on !== undefined && typeof output.on !== "string") {
       add(id, "output.on", "on must be a state-name pattern");
     }
+    if (output.unit !== undefined && typeof output.unit !== "string") {
+      add(id, "output.unit", "unit must be a string");
+    }
     return;
   }
   if (output.scope !== "state") {

@@ -98,6 +98,11 @@
     output.scope === "state" ? (stateType(stateRef) ?? output.type) : "boolean",
   );
 
+  /** The selected state's unit; a foreign state is never written to. */
+  function stateUnit(ref: string): string {
+    return String(ioBroker.objects.get(realId(ref))?.common?.unit ?? "");
+  }
+
   /** One field: a state is the output; no state means adapter memory. */
   function setRef(ref: string) {
     if (!ref) {
@@ -148,6 +153,19 @@
           <option value={type}>{type}</option>
         {/each}
       </select>
+      {#if output.type === "number"}
+        <input
+          class="unit"
+          aria-label="Output unit"
+          placeholder="unit"
+          value={output.unit ?? ""}
+          onchange={(e) =>
+            onchange({
+              ...output,
+              unit: e.currentTarget.value.trim() || undefined,
+            })}
+        />
+      {/if}
     {:else if output.scope === "state"}
       <span
         class="state-name mono"
@@ -171,6 +189,15 @@
           <option value={type}>{type}</option>
         {/each}
       </select>
+      {#if shownType === "number"}
+        <input
+          class="unit"
+          aria-label="Output unit"
+          value={stateUnit(stateRef)}
+          disabled
+          title="The unit comes from the selected state"
+        />
+      {/if}
     {/if}
     <label class="inline write-always"
       >write always <input
@@ -199,7 +226,7 @@
     />
   {/if}
 
-  {#if output.scope !== "memory" && output.type === "boolean"}
+  {#if output.scope !== "memory" && output.type === "boolean" && stateNames.length > 0}
     <div class="row">
       <span class="label-mono">True for states</span>
       <input
@@ -261,5 +288,10 @@
 
   .type {
     flex: 0 0 auto;
+  }
+
+  .row input.unit {
+    flex: 0 0 5rem;
+    min-width: 5rem;
   }
 </style>

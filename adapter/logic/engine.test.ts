@@ -2153,3 +2153,54 @@ it("fires a cron timer at the next matching minute", () => {
   h.clock.advance(1);
   expect(h.writes.at(-1)?.value).toBe(new Date(2026, 10, 3, 8, 0, 0).getTime());
 });
+
+it("reports a machine's state at start and on every transition", () => {
+  const machine: LogicDocument = {
+    version: 1,
+    logics: [
+      {
+        id: "lift",
+        name: "Lift",
+        kind: "machine",
+        init: { state: "Off" },
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: { Off: { on: [{ on: "e", goto: "On" }] }, On: {} },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0 });
+  const readings: Array<{ id: string; reading: unknown }> = [];
+  h.deps.report = (id, reading) => readings.push({ id, reading });
+  const engine = createEngine(machine, h.deps);
+  h.attach(engine);
+
+  engine.start();
+  expect(readings).toEqual([{ id: "lift", reading: { state: "Off", ts: 0 } }]);
+  h.change("0_userdata.0.E", 1);
+  expect(readings.at(-1)).toEqual({
+    id: "lift",
+    reading: { state: "On", ts: 0 },
+  });
+});
+
+it("reports a function's value on every write, memory included", () => {
+  const h = createHarness({ "0_userdata.0.T": 3 });
+  const readings: Array<{ id: string; reading: unknown }> = [];
+  h.deps.report = (id, reading) => readings.push({ id, reading });
+  const engine = createEngine(
+    doc({ output: { scope: "memory", name: "calcOut" } }),
+    h.deps,
+  );
+  h.attach(engine);
+
+  engine.start();
+  expect(readings).toEqual([{ id: "calc", reading: { value: 6, ts: 0 } }]);
+  h.change("0_userdata.0.T", 4);
+  expect(readings.at(-1)).toEqual({
+    id: "calc",
+    reading: { value: 8, ts: 0 },
+  });
+});

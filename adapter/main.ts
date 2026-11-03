@@ -1,6 +1,11 @@
 import * as utils from "@iobroker/adapter-core";
 import * as SunCalc from "suncalc";
-import { createEngine, type Engine, type StateChange } from "./logic/engine";
+import {
+  createEngine,
+  type Engine,
+  type LogicReading,
+  type StateChange,
+} from "./logic/engine";
 import { parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
 import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
@@ -156,6 +161,9 @@ class IHome extends utils.Adapter {
   /** The adapter's recent log lines, published as `info.log`. */
   private readonly logs = createLogBuffer();
   private logStateTimer?: ReturnType<typeof setTimeout>;
+  /** The live readout per logic, published as `info.logic`. */
+  private readonly logicInfo = new Map<string, LogicReading>();
+  private logicStateTimer?: ReturnType<typeof setTimeout>;
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
@@ -198,6 +206,21 @@ class IHome extends utils.Adapter {
       this.logStateTimer = undefined;
       void this.setStateAsync("info.log", {
         val: JSON.stringify(this.logs.slice(0, 200)),
+        ack: true,
+      }).catch(() => {});
+    }, 500);
+  }
+
+  /** Publish the live logic readout as a state (debounced, like `info.log`). */
+  private scheduleLogicState(): void {
+    if (this.logicStateTimer) return;
+    this.logicStateTimer = setTimeout(() => {
+      this.logicStateTimer = undefined;
+      void this.setStateAsync("info.logic", {
+        val: JSON.stringify({
+          ts: Date.now(),
+          logics: Object.fromEntries(this.logicInfo),
+        }),
         ack: true,
       }).catch(() => {});
     }, 500);
@@ -288,6 +311,7 @@ class IHome extends utils.Adapter {
               : output.type === "number"
                 ? 0
                 : "",
+          unit: output.type === "number" ? (output.unit ?? "") : "",
           ...(states ? { states } : {}),
         };
         try {
@@ -474,6 +498,10 @@ class IHome extends utils.Adapter {
           setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
           clearTimeout: (handle) =>
             clearTimeout(handle as unknown as ReturnType<typeof setTimeout>),
+          report: (logicId, reading) => {
+            this.logicInfo.set(logicId, reading);
+            this.scheduleLogicState();
+          },
           resolveVariable: (name) => {
             const constant = this.variables.constants[name];
             if (constant) return { kind: "const", value: constant.val };
@@ -529,7 +557,9 @@ class IHome extends utils.Adapter {
     }
 
     try {
+      this.logicInfo.clear();
       next.start();
+      this.scheduleLogicState();
     } catch (error) {
       next.stop();
       this.log.warn(
@@ -621,6 +651,17 @@ class IHome extends utils.Adapter {
       type: "state",
       common: {
         name: "iHome log feed",
+        type: "string",
+        role: "json",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync("info.logic", {
+      type: "state",
+      common: {
+        name: "iHome logic readout",
         type: "string",
         role: "json",
         read: true,
@@ -763,6 +804,10 @@ class IHome extends utils.Adapter {
       clearTimeout(this.logStateTimer);
       this.logStateTimer = undefined;
     }
+    if (this.logicStateTimer) {
+      clearTimeout(this.logicStateTimer);
+      this.logicStateTimer = undefined;
+    }
     if (this.requireLog) {
       try {
         void this.requireLog(false);
@@ -785,6 +830,7 @@ class IHome extends utils.Adapter {
     this.stateTypes.clear();
     this.stateWritable.clear();
     this.warnedWrites.clear();
+    this.logicInfo.clear();
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = undefined;

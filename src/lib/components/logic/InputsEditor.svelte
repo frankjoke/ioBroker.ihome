@@ -1,7 +1,13 @@
 <script lang="ts">
   import type { Input, InputSource, LogicDef, TimerSpec } from "$logic/types";
+  import { onMount } from "svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
-  import { variableNameFor } from "$lib/config/variables";
+  import { stateIdFor, variableNameFor } from "$lib/config/variables";
+  import { formatValue } from "$lib/config/format";
+  import {
+    fetchPickerValues,
+    getPickerValue,
+  } from "$lib/picker-values.svelte.js";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
@@ -138,13 +144,50 @@
       const timers = (input.timers ?? []).map((timer) => timerLabel(timer));
       const all = [...states, ...timers];
       if (all.length === 0) return "(no source)";
-      if (all.length === 1) return all[0];
-      return `${all[0]} +${all.length - 1}`;
+      const label = all.length === 1 ? all[0] : `${all[0]} +${all.length - 1}`;
+      // The first source's current reading, like the state picker shows it.
+      const reading = input.from.ref ? liveReading(input.from.ref) : "";
+      return reading ? `${label} · ${reading}` : label;
     }
     if (input.from.type === "memory")
       return input.from.ref || "(no memory name)";
     return `every ${input.from.every}`;
   }
+
+  /** The current value and unit of a state ref, empty until it is fetched. */
+  function liveReading(ref: string): string {
+    const id = ref.startsWith("$logic.")
+      ? `${ioBroker.namespace}.Logic.${ref.slice("$logic.".length)}`
+      : stateIdFor(ref, getVariables());
+    const reading = getPickerValue(id);
+    if (!reading) return "";
+    return formatValue(reading.val, ioBroker.objects.get(id)?.common?.unit);
+  }
+
+  /** The source states the line readings need, as broker ids. */
+  function sourceStateIds(): string[] {
+    const variables = getVariables();
+    const ids: string[] = [];
+    for (const input of Object.values(inputs)) {
+      if (input.from.type !== "state") continue;
+      for (const ref of [input.from.ref, ...(input.from.refs ?? [])]) {
+        if (!ref) continue;
+        ids.push(
+          ref.startsWith("$logic.")
+            ? `${ioBroker.namespace}.Logic.${ref.slice("$logic.".length)}`
+            : stateIdFor(ref, variables),
+        );
+      }
+    }
+    return ids;
+  }
+
+  onMount(() => {
+    const tick = () => void fetchPickerValues(sourceStateIds());
+    tick();
+    const timer = setInterval(tick, 2000);
+    return () => clearInterval(timer);
+  });
 </script>
 
 <div class="inputs section-panel">

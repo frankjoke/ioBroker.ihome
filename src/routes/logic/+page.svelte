@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import type { LogicDef } from "$logic/types";
+  import type { LogicReading } from "$logic/engine";
   import {
     commitLogics,
     getLogicDocument,
@@ -27,6 +29,7 @@
     enumLabelFromObject,
   } from "$lib/config/rooms";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { formatValue } from "$lib/config/format";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -353,6 +356,33 @@
     else select(logic);
   }
 
+  // The adapter publishes each logic's live readout as `info.logic`; the list
+  // polls it (a subscribed state would need a per-logic subscription plan).
+  const LOGIC_STATE = `${ioBroker.namespace}.info.logic`;
+  let readings = $state<Record<string, LogicReading>>({});
+  let readingBusy = false;
+
+  async function fetchReadings(): Promise<void> {
+    if (readingBusy) return;
+    readingBusy = true;
+    try {
+      const state = await ioBroker.getState(LOGIC_STATE, true);
+      const raw = state?.val;
+      const page = typeof raw === "string" && raw ? JSON.parse(raw) : null;
+      if (page && typeof page.logics === "object") readings = page.logics;
+    } catch {
+      // No feed (older adapter): the list just shows no reading.
+    } finally {
+      readingBusy = false;
+    }
+  }
+
+  onMount(() => {
+    void fetchReadings();
+    const timer = setInterval(fetchReadings, 2000);
+    return () => clearInterval(timer);
+  });
+
   /** While the row is open these edit the draft; closed, they write at once. */
   function setEnabled(logic: LogicDef, enabled: boolean) {
     if (selectedId === logic.id) patch({ enabled });
@@ -364,12 +394,34 @@
     else update({ ...logic, log: log || undefined });
   }
 
+  /** The machine's state or the action's value, with its unit when it has one. */
+  function readingText(logic: LogicDef): string {
+    if (logic.enabled === false) return "";
+    const reading = readings[logic.id];
+    if (!reading) return "";
+    if (logic.kind === "machine") return reading.state ?? "";
+    if (reading.value === undefined) return "";
+    const output = logic.output;
+    let unit = "";
+    if (output?.scope === "logic" && output.type === "number") {
+      unit = output.unit ?? "";
+    } else if (output?.scope === "state" && output.type === "number") {
+      const id = stateIdFor(output.ref, getVariables());
+      unit = String(ioBroker.objects.get(id)?.common?.unit ?? "");
+    }
+    return formatValue(reading.value, unit);
+  }
+
   function outputLabel(logic: LogicDef): string {
     const output = logic.output;
-    if (!output) return `memory: ${logic.id}`;
-    if (output.scope === "memory") return `memory: ${output.name ?? logic.id}`;
-    if (output.scope === "logic") return `Logic.${logic.id}`;
-    return output.ref || "(no state)";
+    let label: string;
+    if (!output) label = `memory: ${logic.id}`;
+    else if (output.scope === "memory")
+      label = `memory: ${output.name ?? logic.id}`;
+    else if (output.scope === "logic") label = `Logic.${logic.id}`;
+    else label = output.ref || "(no state)";
+    const reading = readingText(logic);
+    return reading ? `${label} · ${reading}` : label;
   }
 </script>
 

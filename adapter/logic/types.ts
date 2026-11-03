@@ -87,6 +87,8 @@ export type Output =
        *  state is a command (writable), hence level.switch / level.state. */
       scope: "logic";
       type: "boolean" | "number" | "string";
+      /** Number only: the created state's `common.unit`. */
+      unit?: string;
       /** Boolean only: state names matching this glob write `true`. */
       on?: string;
       /** Legacy explicit map; still read. */
