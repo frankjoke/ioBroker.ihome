@@ -71,6 +71,11 @@ it("helpers cannot be overwritten", () => {
   expect(runtime.run('(get = 1, get("a"))', 0)).toBe(4);
 });
 
+it("does not expose console", () => {
+  const { runtime } = runtimeFor("typeof console");
+  expect(runtime.run("typeof console", 0)).toBe("undefined");
+});
+
 it("the context persists between runs", () => {
   const source = "globalThis.n = (globalThis.n ?? 0) + 1";
   const { runtime } = runtimeFor(source);

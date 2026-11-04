@@ -1,4 +1,4 @@
-import { createContext, Script } from "node:vm";
+import { createContext, runInContext, Script } from "node:vm";
 import { wrapExpression } from "./expr-code";
 import type { Expr, LogicDef } from "./types";
 
@@ -98,6 +98,16 @@ export function createLogicRuntime(
   def: LogicDef,
   hooks: RuntimeHooks,
 ): LogicRuntime {
+  const depths: number[] = [];
+  const currentDepth = (): number => depths[depths.length - 1] ?? 0;
+
+  const sandbox = Object.create(null);
+  const context = createContext(sandbox, {
+    codeGeneration: { strings: false, wasm: false },
+  });
+  // Node injects a console into every new context; the expression API has none.
+  runInContext("delete globalThis.console", context);
+
   const scripts = new Map<string, Script>();
   forEachExpression(def, (code, path) => {
     if (scripts.has(code)) return;
@@ -113,13 +123,6 @@ export function createLogicRuntime(
     }
   });
 
-  const depths: number[] = [];
-  const currentDepth = (): number => depths[depths.length - 1] ?? 0;
-
-  const sandbox = Object.create(null);
-  const context = createContext(sandbox, {
-    codeGeneration: { strings: false, wasm: false },
-  });
   const define = (name: string, value: unknown): void => {
     Object.defineProperty(sandbox, name, {
       value,

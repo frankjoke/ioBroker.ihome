@@ -891,6 +891,8 @@ export function createEngine(
     }
     if (isNoop(value)) return;
     if (value && typeof (value as { then?: unknown }).then === "function") {
+      // Consume a rejection: an unhandled one would terminate the adapter.
+      void Promise.resolve(value).catch(() => {});
       warn(def.id, "expression failed: async is not supported");
       return;
     }

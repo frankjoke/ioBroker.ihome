@@ -2257,6 +2257,97 @@ it("a timing-out expression does not stop the neighbour", () => {
   engine.start();
   h.change("0_userdata.0.T", 4);
   expect(h.logs.some((line) => line.message.includes("timed out"))).toBe(true);
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 8,
+    ack: false,
+  });
+});
+
+it("consumes a rejected promise result without crashing", async () => {
+  const { h, engine } = engineWith(
+    doc({ expr: code('Promise.reject(new Error("boom"))') }),
+  );
+  engine.start();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(h.writes.some((write) => write.id === "0_userdata.0.OUT")).toBe(false);
+  expect(
+    h.logs.some((line) => line.message.includes("async is not supported")),
+  ).toBe(true);
+});
+
+it("state() exposes readState metadata for a dotted state", () => {
+  const h = createHarness({ "0_userdata.0.T": 1 });
+  h.deps.readState = (id) =>
+    id === "0_userdata.0.X"
+      ? { id, val: 4, ack: true, from: "hue.0", ts: 123, changed: true }
+      : undefined;
+  const engine = createEngine(
+    doc({
+      expr: code(
+        'JSON.stringify([state("0_userdata.0.X").value, state("0_userdata.0.X").ack, state("0_userdata.0.X").from, state("0_userdata.0.X").ts, state("0_userdata.0.X").changed])',
+      ),
+      output: { scope: "memory", name: "meta" },
+    }),
+    h.deps,
+  );
+  h.attach(engine);
+  engine.start();
+  expect(engine.memoryValue("meta")).toBe('[4,true,"hue.0",123,true]');
+});
+
+it("set() in an expression writes through the normal target path", () => {
+  const stateHarness = createHarness({ "0_userdata.0.T": 1 });
+  const stateEngine = createEngine(
+    doc({
+      expr: code('set("0_userdata.0.OUT", 9)'),
+      output: { scope: "memory", name: "calcOut" },
+    }),
+    stateHarness.deps,
+  );
+  stateHarness.attach(stateEngine);
+  stateEngine.start();
+  expect(stateHarness.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 9,
+    ack: false,
+  });
+
+  const memoryDocument: LogicDocument = {
+    version: 2,
+    memory: [{ name: "m", type: "number", initial: 1 }],
+    logics: [
+      {
+        id: "calc",
+        name: "Calc",
+        kind: "function",
+        output: { scope: "memory", name: "calcOut" },
+        expr: code('set("m", 7)'),
+      },
+    ],
+  };
+  const memoryHarness = createHarness({});
+  const memoryEngine = createEngine(memoryDocument, memoryHarness.deps);
+  memoryHarness.attach(memoryEngine);
+  memoryEngine.start();
+  expect(memoryEngine.memoryValue("m")).toBe(7);
+
+  const constantHarness = createHarness({ "0_userdata.0.T": 1 });
+  constantHarness.deps.resolveVariable = (name) =>
+    name === "C" ? { kind: "const", value: 5 } : undefined;
+  const constantEngine = createEngine(
+    doc({
+      expr: code('set("C", 1)'),
+      output: { scope: "memory", name: "calcOut" },
+    }),
+    constantHarness.deps,
+  );
+  constantHarness.attach(constantEngine);
+  constantEngine.start();
+  expect(constantHarness.writes).toEqual([]);
+  expect(
+    constantHarness.logs.some((line) => line.message.includes("not writable")),
+  ).toBe(true);
 });
 
 it("state().changed is value-based, not ack-based", () => {
