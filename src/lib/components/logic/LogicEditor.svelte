@@ -175,6 +175,7 @@
         placeholder={RESULT_PLACEHOLDER}
         allowNoop
         {logics}
+        inputs={draft.inputs}
         onchange={(code) => patch({ expr: { code } })}
       />
     </div>

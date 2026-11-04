@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { checkExpression, highlightCode } from "$logic/expr-code";
-  import type { LogicDef } from "$logic/types";
+  import type { Input, LogicDef } from "$logic/types";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { insertAtCaret } from "./code-field";
 
@@ -13,6 +13,7 @@
     minRows = 2,
     allowNoop = false,
     logics = [],
+    inputs = {},
   }: {
     code: string;
     onchange: (code: string) => void;
@@ -22,6 +23,8 @@
     allowNoop?: boolean;
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
+    /** The logic's own variables/events, as quick-insert badges. */
+    inputs?: Record<string, Input>;
   } = $props();
 
   let editor = $state<HTMLDivElement>();
@@ -29,12 +32,15 @@
   let highlight = $state<HTMLPreElement>();
   let picking = $state(false);
   let composing = $state(false);
-  /** The caret to insert at: captured before the picker takes focus. */
+  /** The caret to insert at: captured before the picker or a badge takes focus. */
   let start = $state(0);
   let end = $state(0);
+  /** Whether the textarea had focus when the insert button was pressed. */
+  let focusedBeforePress = $state(false);
 
   const problem = $derived(checkExpression(code));
   const spans = $derived(highlightCode(code));
+  const inputEntries = $derived(Object.entries(inputs));
   const errorId = $props.id();
 
   /** Grow between the rows minimum and the CSS max-height. */
@@ -76,19 +82,25 @@
 
   function rememberSelection() {
     if (!textarea) return;
+    focusedBeforePress = document.activeElement === textarea;
     start = textarea.selectionStart;
     end = textarea.selectionEnd;
   }
 
-  async function insertState(id: string) {
+  async function insertReference(name: string) {
     picking = false;
-    const next = insertAtCaret(code, start, end, `get(${JSON.stringify(id)})`);
+    const insert = `get(${JSON.stringify(name)})`;
+    // A badge pressed without a focused field appends instead of inserting at 0.
+    const from = focusedBeforePress ? start : code.length;
+    const to = focusedBeforePress ? end : code.length;
+    const next = insertAtCaret(code, from, to, insert);
     onchange(next.text);
     await tick();
     textarea?.focus();
     textarea?.setSelectionRange(next.caret, next.caret);
     start = next.caret;
     end = next.caret;
+    focusedBeforePress = true;
   }
 </script>
 
@@ -108,6 +120,22 @@
         title="Leave the output unchanged"
         onclick={() => onchange("noop()")}>No update</button
       >
+    {/if}
+    {#if inputEntries.length > 0}
+      <div class="badges">
+        {#each inputEntries as [name, input] (name)}
+          <button
+            type="button"
+            class="badge {input.kind === 'event'
+              ? 'badge-primary'
+              : 'badge-secondary'} badge-button"
+            title={`Insert get(${JSON.stringify(name)})`}
+            aria-label={`Insert get(${JSON.stringify(name)})`}
+            onmousedown={rememberSelection}
+            onclick={() => insertReference(name)}>{name}</button
+          >
+        {/each}
+      </div>
     {/if}
   </div>
 
@@ -155,7 +183,7 @@
     title="Insert state reference"
     {logics}
     logicPick="state"
-    onState={insertState}
+    onState={insertReference}
     onClose={() => (picking = false)}
   />
 {/if}
@@ -170,7 +198,30 @@
 
   .code-head {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 0.3rem;
+  }
+
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .badge-button {
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+    max-width: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .badge-button:hover {
+    filter: brightness(0.95);
   }
 
   .editor {

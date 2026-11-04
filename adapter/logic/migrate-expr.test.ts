@@ -168,3 +168,26 @@ it("prints edge cases as valid JavaScript", () => {
   expect(printExpr({ op: "and", of: [] })).toBe("true");
   expect(printExpr({ op: "or", of: [] })).toBe("false");
 });
+
+it("prints the value-semantics changes of §5.3", () => {
+  // Non-empty and/or keep their operands: `&&`/`||` return a value, not a bool.
+  expect(printExpr({ op: "and", of: [ref("a"), ref("b")] })).toBe(
+    'get("a") && get("b")',
+  );
+  expect(printExpr({ op: "or", of: [ref("a"), ref("b")] })).toBe(
+    'get("a") || get("b")',
+  );
+  // Division and modulo by zero are JavaScript, so Infinity/NaN instead of an error.
+  expect(printExpr({ op: "div", left: ref("a"), right: num(0) })).toBe(
+    'get("a") / 0',
+  );
+  expect(printExpr({ op: "mod", left: ref("a"), right: num(0) })).toBe(
+    'get("a") % 0',
+  );
+  // `len` of a number prints its undefined `.length`, not a helper call.
+  expect(printExpr({ op: "len", of: num(5) })).toBe("(5).length");
+  // A string compared with a number uses JavaScript coercion.
+  expect(printExpr({ op: "gt", left: ref("s"), right: num(9) })).toBe(
+    'get("s") > 9',
+  );
+});

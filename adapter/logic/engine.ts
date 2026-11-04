@@ -95,6 +95,11 @@ interface InputRuntime {
   /** Value-based `changed` of the last update of this input. */
   lastChanged?: boolean;
   lastTs?: number;
+  /** The state the last event came from, when it was one of `stateIds`. */
+  lastStateId?: string;
+  /** Writer and ack of the last event, which may be a timer or `$logic`. */
+  lastFrom?: string;
+  lastAck?: boolean;
 }
 
 interface Runtime {
@@ -332,18 +337,22 @@ export function createEngine(
     if (input.input.from.type === "timer") {
       return {
         value: input.last,
-        ack: true,
+        ack: input.lastAck ?? true,
+        from: input.lastFrom,
         ts: input.lastTs ?? deps.now(),
-        changed: true,
+        changed: input.lastChanged ?? false,
         writable: false,
       };
     }
-    const id = input.stateIds[0];
+    const id =
+      input.lastStateId && input.stateIds.includes(input.lastStateId)
+        ? input.lastStateId
+        : input.stateIds[0];
     const cached = id ? deps.readState?.(id) : undefined;
     return {
       value: input.hasLast ? input.last : id ? deps.read(id) : undefined,
-      ack: cached?.ack ?? true,
-      from: cached?.from,
+      ack: input.lastAck ?? cached?.ack ?? true,
+      from: input.lastFrom ?? cached?.from,
       ts: input.lastTs ?? cached?.ts ?? deps.now(),
       changed: input.lastChanged ?? cached?.changed ?? false,
       writable: true,
@@ -1098,6 +1107,9 @@ export function createEngine(
     input.hasLast = true;
     input.lastChanged = true;
     input.lastTs = now;
+    input.lastStateId = undefined;
+    input.lastFrom = "timer";
+    input.lastAck = true;
     enqueue({
       rt,
       input: input.name,
@@ -1256,6 +1268,9 @@ export function createEngine(
         source.hasLast = true;
         source.lastChanged = hasPrevious ? !Object.is(previous, value) : true;
         source.lastTs = meta.ts;
+        source.lastStateId = input;
+        source.lastFrom = meta.from;
+        source.lastAck = meta.ack;
         enqueue({
           rt,
           input: source.name,
@@ -1373,6 +1388,9 @@ export function createEngine(
           input.lastChanged =
             change.changed ?? !Object.is(previous, change.val);
           input.lastTs = change.ts ?? deps.now();
+          input.lastStateId = change.id;
+          input.lastFrom = change.from;
+          input.lastAck = change.ack;
           enqueue({
             rt,
             input: input.name,

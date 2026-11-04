@@ -1,6 +1,6 @@
 <script lang="ts">
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import type { Action, Expr } from "$logic/types";
+  import type { Action, Expr, Input, LogicDef } from "$logic/types";
   import StateRefField from "./StateRefField.svelte";
   import CodeField from "./CodeField.svelte";
 
@@ -9,14 +9,21 @@
     onchange,
     allowGoto = false,
     stateNames = [],
+    logics = [],
+    inputs = {},
   }: {
     actions: Action[];
     onchange: (actions: Action[]) => void;
     allowGoto?: boolean;
     stateNames?: string[];
+    /** The document's logics, for the picker's Logic tab. */
+    logics?: LogicDef[];
+    /** The logic's own variables/events, as quick-insert badges. */
+    inputs?: Record<string, Input>;
   } = $props();
 
   const SET_VALUE: Expr = { code: "true" };
+  const SET_VALUE_PLACEHOLDER = 'get("temp")';
 
   function replace(index: number, action: Action) {
     const next = [...actions];
@@ -50,7 +57,10 @@
         <CodeField
           code={action.set.value.code}
           label="Set value"
+          placeholder={SET_VALUE_PLACEHOLDER}
           minRows={1}
+          {logics}
+          {inputs}
           onchange={(code) =>
             replace(index, { set: { ...action.set, value: { code } } })}
         />

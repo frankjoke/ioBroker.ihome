@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
+import { parseLogicDocument } from "./validate";
 import type {
   Action,
   Expr,
@@ -2243,7 +2244,7 @@ it("rejects a promise result without writing", () => {
 
 it("a timing-out expression does not stop the neighbour", () => {
   const d = doc();
-  d.logics.push({
+  d.logics.unshift({
     id: "slow",
     name: "Slow",
     kind: "function",
@@ -2254,12 +2255,172 @@ it("a timing-out expression does not stop the neighbour", () => {
     expr: code("(() => { for (;;); })()"),
   });
   const { h, engine } = engineWith(d);
-  engine.start();
+  engine.start(); // the slow logic runs first and already times out here
   h.change("0_userdata.0.T", 4);
   expect(h.logs.some((line) => line.message.includes("timed out"))).toBe(true);
   expect(h.writes).toContainEqual({
     id: "0_userdata.0.OUT",
     value: 8,
+    ack: false,
+  });
+});
+
+it("starts a valid logic while an invalid one is skipped", () => {
+  const d = doc();
+  d.logics.push({
+    id: "bad",
+    name: "Bad",
+    kind: "function",
+    output: { scope: "memory" },
+    expr: code("1 +"),
+  });
+  const { h, engine } = engineWith(d);
+  engine.start();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 6,
+    ack: false,
+  });
+  expect(
+    h.logs.some(
+      (line) =>
+        line.logicId === "bad" &&
+        line.message.includes("not started") &&
+        line.message.includes("expression failed to compile"),
+    ),
+  ).toBe(true);
+});
+
+it("runs a migrated v1 document end to end", () => {
+  const v1 = {
+    version: 1,
+    logics: [
+      {
+        id: "divzero",
+        name: "DivZero",
+        kind: "function",
+        output: { scope: "memory", name: "divzero" },
+        expr: { op: "div", left: { const: 1 }, right: { const: 0 } },
+      },
+      {
+        id: "orval",
+        name: "OrVal",
+        kind: "function",
+        output: { scope: "memory", name: "orval" },
+        expr: {
+          op: "or",
+          of: [{ const: 0 }, { const: "x" }],
+        },
+      },
+      {
+        id: "andval",
+        name: "AndVal",
+        kind: "function",
+        output: { scope: "memory", name: "andval" },
+        expr: {
+          op: "and",
+          of: [{ const: 0 }, { const: "x" }],
+        },
+      },
+      {
+        id: "lenval",
+        name: "LenVal",
+        kind: "function",
+        output: { scope: "state", ref: "0_userdata.0.LEN", type: "string" },
+        expr: { op: "len", of: { const: 5 } },
+      },
+      {
+        id: "cmpval",
+        name: "CmpVal",
+        kind: "function",
+        inputs: {
+          s: {
+            from: { type: "state", ref: "0_userdata.0.S" },
+            kind: "variable",
+          },
+        },
+        output: { scope: "memory", name: "cmp" },
+        expr: { op: "gt", left: { ref: "s" }, right: { const: 9 } },
+      },
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: {
+          state: {
+            op: "if",
+            cond: { ref: "on" },
+            then: { const: "On" },
+            else: { const: "Off" },
+          },
+        },
+        inputs: {
+          on: {
+            from: { type: "state", ref: "0_userdata.0.ON" },
+            kind: "variable",
+          },
+          e: {
+            from: { type: "state", ref: "0_userdata.0.E" },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory" },
+        states: {
+          On: {
+            on: [
+              {
+                on: "e",
+                if: { op: "gt", left: { ref: "e" }, right: { const: 1 } },
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.MOUT" },
+                      value: {
+                        op: "add",
+                        left: { ref: "e" },
+                        right: { const: 1 },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          Off: {},
+        },
+      },
+    ],
+  };
+
+  const migrated = parseLogicDocument(v1);
+  expect(migrated).not.toBeNull();
+  expect(migrated!.version).toBe(2);
+  const h = createHarness({
+    "0_userdata.0.LEN": "unset",
+    "0_userdata.0.S": "10",
+    "0_userdata.0.ON": true,
+    "0_userdata.0.E": 0,
+  });
+  const engine = createEngine(migrated!, h.deps);
+  h.attach(engine);
+  engine.start();
+
+  // §5.3: JavaScript value semantics after migration.
+  expect(engine.memoryValue("divzero")).toBe(Infinity);
+  expect(engine.memoryValue("orval")).toBe("x");
+  expect(engine.memoryValue("andval")).toBe(0);
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.LEN",
+    value: "undefined",
+    ack: false,
+  });
+  expect(engine.memoryValue("cmp")).toBe(true);
+
+  // init.state chose On, so the row runs; its `if` gates and `set.value` adds.
+  h.change("0_userdata.0.E", 3);
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.MOUT",
+    value: 4,
     ack: false,
   });
 });
@@ -2400,4 +2561,54 @@ it("state() reports changed true on a timer tick", () => {
   engine.start();
   h.clock.advance(1000);
   expect(h.writes.some((write) => write.id === "0_userdata.0.OUT")).toBe(true);
+});
+
+it("a timer input reports changed false before the first tick", () => {
+  const d: LogicDocument = {
+    version: 2,
+    logics: [
+      {
+        id: "timer",
+        name: "Timer",
+        kind: "function",
+        inputs: { t: { from: { type: "timer", every: "1s" }, kind: "event" } },
+        output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+        expr: code('state("t").changed ? 1 : 0'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  const values = () =>
+    h.writes
+      .filter((write) => write.id === "0_userdata.0.OUT")
+      .map((w) => w.value);
+  expect(values()).toEqual([0]);
+  h.clock.advance(1000);
+  expect(values()).toEqual([0, 1]);
+});
+
+it("state() reports the metadata of the state that last changed", () => {
+  const d = doc({
+    inputs: {
+      input: {
+        from: {
+          type: "state",
+          ref: "0_userdata.0.A",
+          refs: ["0_userdata.0.B"],
+        },
+        kind: "event",
+      },
+    },
+    output: { scope: "memory", name: "meta" },
+    expr: code('JSON.stringify([state("input").from, state("input").ack])'),
+  });
+  const h = createHarness({ "0_userdata.0.A": 1, "0_userdata.0.B": 1 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.B", 2, { from: "hue.0", ack: true });
+  expect(engine.memoryValue("meta")).toBe('["hue.0",true]');
 });

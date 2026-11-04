@@ -593,6 +593,7 @@
                   <CodeField
                     code={row.if.code}
                     {logics}
+                    inputs={logic.inputs}
                     label="Row condition"
                     placeholder={ROW_IF_PLACEHOLDER}
                     onchange={(code) =>
@@ -626,6 +627,8 @@
               <ActionList
                 actions={row.do ?? []}
                 {stateNames}
+                {logics}
+                inputs={logic.inputs}
                 onchange={(actions) =>
                   updateRow(name, index, { ...row, do: actions })}
               />
@@ -707,6 +710,7 @@
                   <CodeField
                     code={init.state.code}
                     {logics}
+                    inputs={logic.inputs}
                     label="Init state expression"
                     placeholder={INIT_STATE_PLACEHOLDER}
                     onchange={(code) => patchInit({ state: { code } })}
@@ -836,12 +840,16 @@
                     {#if id === "enter"}
                       <ActionList
                         actions={state.enter ?? []}
+                        {logics}
+                        inputs={logic.inputs}
                         onchange={(enter) =>
                           updateState(name, { ...state, enter })}
                       />
                     {:else if id === "exit"}
                       <ActionList
                         actions={state.exit ?? []}
+                        {logics}
+                        inputs={logic.inputs}
                         onchange={(exit) =>
                           updateState(name, { ...state, exit })}
                       />
