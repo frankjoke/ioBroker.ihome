@@ -127,35 +127,52 @@ function quoted(quote: string, value: string): string {
 
 /** Rewrite literal get/state/set state names from `from` to `to`. */
 export function renameCodeRefs(code: string, from: string, to: string): string {
-  let root: unknown;
+  let root: Node | null = null;
   try {
-    root = parseExpressionAt(code, 0, { ecmaVersion: "latest" });
-  } catch {
-    // A half-tied expression is still worth renaming: use the text pattern.
-    const pattern = /\b(get|state|set)(\(\s*)(["'])([^"'\\]*)\3/g;
-    return code.replace(
-      pattern,
-      (match, fn: string, open: string, quote: string, name: string) =>
-        name === from ? `${fn}${open}${quoted(quote, to)}` : match,
-    );
-  }
-
-  const ranges: Array<{ start: number; end: number; quote: string }> = [];
-  walk(root, (node) => {
-    const ref = refLiteral(node);
-    if (ref && ref.name === from) {
-      ranges.push({ ...ref, quote: code[ref.start] });
+    const program = parse(wrapExpression(code), {
+      ecmaVersion: "latest",
+      sourceType: "script",
+    });
+    if (
+      program.body.length === 1 &&
+      program.body[0].type === "ExpressionStatement"
+    ) {
+      root = program;
     }
-  });
-
-  let out = code;
-  for (const range of ranges.sort((a, b) => b.start - a.start)) {
-    out =
-      out.slice(0, range.start) +
-      quoted(range.quote, to) +
-      out.slice(range.end);
+  } catch {
+    // syntax error: rename textually below
   }
-  return out;
+
+  if (root) {
+    const ranges: Array<{ start: number; end: number; quote: string }> = [];
+    walk(root, (node) => {
+      const ref = refLiteral(node);
+      if (ref && ref.name === from) {
+        // wrapExpression prepends "(", so shift AST offsets back into `code`
+        const start = ref.start - 1;
+        const end = ref.end - 1;
+        ranges.push({ start, end, quote: code[start] });
+      }
+    });
+
+    let out = code;
+    for (const range of ranges.sort((a, b) => b.start - a.start)) {
+      out =
+        out.slice(0, range.start) +
+        quoted(range.quote, to) +
+        out.slice(range.end);
+    }
+    return out;
+  }
+
+  // shortcut: the fallback can match inside comments, strings or `obj.set`;
+  // the save stays blocked until the syntax is fixed.
+  const pattern = /\b(get|state|set)(\(\s*)(["'])([^"'\\]*)\3/g;
+  return code.replace(
+    pattern,
+    (match, fn: string, open: string, quote: string, name: string) =>
+      name === from ? `${fn}${open}${quoted(quote, to)}` : match,
+  );
 }
 
 function tokenKind(token: Token, code: string): CodeSpanKind {
@@ -165,7 +182,7 @@ function tokenKind(token: Token, code: string): CodeSpanKind {
       ? "function"
       : "plain";
   }
-  if (["num", "string", "regexp", "`"].includes(token.type.label)) {
+  if (["num", "string", "regexp", "template", "`"].includes(token.type.label)) {
     return "literal";
   }
   return "plain";

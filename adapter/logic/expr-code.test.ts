@@ -24,6 +24,9 @@ describe("checkExpression", () => {
     expect(checkExpression('get("x"')).toContain(
       "expression failed to compile",
     );
+    expect(checkExpression('get("x)')).toContain(
+      "expression failed to compile",
+    );
   });
 
   it("wraps the code so a trailing comment is safe", () => {
@@ -42,6 +45,14 @@ describe("extractRefs", () => {
 
   it("ignores dynamic names", () => {
     expect(extractRefs("get(name) + get(`tpl`)")).toEqual([]);
+  });
+
+  it("walks nested calls", () => {
+    expect(extractRefs('set("out", get("in1") + get("in2"))')).toEqual([
+      "out",
+      "in1",
+      "in2",
+    ]);
   });
 });
 
@@ -62,6 +73,20 @@ describe("renameCodeRefs", () => {
   it("falls back on invalid code", () => {
     expect(renameCodeRefs('get("old"', "old", "new")).toBe('get("new"');
   });
+
+  it("falls back when trailing content breaks the expression", () => {
+    expect(renameCodeRefs('get("old") get("old")', "old", "new")).toBe(
+      'get("new") get("new")',
+    );
+    expect(renameCodeRefs('foo; get("old")', "old", "new")).toBe(
+      'foo; get("new")',
+    );
+  });
+
+  it("escapes quotes in renamed names", () => {
+    expect(renameCodeRefs('get("a\\"b")', 'a"b', 'c"d')).toBe('get("c\\"d")');
+    expect(renameCodeRefs("get('a\\'b')", "a'b", "c'd")).toBe("get('c\\'d')");
+  });
 });
 
 describe("highlightCode", () => {
@@ -80,5 +105,20 @@ describe("highlightCode", () => {
   it("keeps the valid prefix when code is incomplete", () => {
     const spans = highlightCode('get("x"');
     expect(spans.map((span) => span.text).join("")).toBe('get("x"');
+  });
+
+  it("paints template literal text", () => {
+    const code = "`a ${get('b')} c`";
+    const spans = highlightCode(code);
+    expect(spans.map((span) => span.text).join("")).toBe(code);
+    expect(spans.find((span) => span.text === "a ")?.kind).toBe("literal");
+    expect(spans.find((span) => span.text === " c")?.kind).toBe("literal");
+    expect(spans.find((span) => span.text === "get")?.kind).toBe("function");
+    expect(spans.find((span) => span.text === "'b'")?.kind).toBe("literal");
+  });
+
+  it("keeps everything visible when the tokenizer throws", () => {
+    const spans = highlightCode('get("x');
+    expect(spans.map((span) => span.text).join("")).toBe('get("x');
   });
 });
