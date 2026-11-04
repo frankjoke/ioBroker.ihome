@@ -2,7 +2,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import type { Action, Expr } from "$logic/types";
   import StateRefField from "./StateRefField.svelte";
-  import ExprEditor from "./ExprEditor.svelte";
+  import CodeField from "./CodeField.svelte";
 
   let {
     actions,
@@ -16,7 +16,7 @@
     stateNames?: string[];
   } = $props();
 
-  const SET_VALUE: Expr = { const: true };
+  const SET_VALUE: Expr = { code: "true" };
 
   function replace(index: number, action: Action) {
     const next = [...actions];
@@ -47,12 +47,12 @@
               set: { ...action.set, target: { ref } },
             })}
         />
-        <ExprEditor
-          expr={action.set.value}
-          onchange={(value) => {
-            if ("noop" in value) return;
-            replace(index, { set: { ...action.set, value } });
-          }}
+        <CodeField
+          code={action.set.value.code}
+          label="Set value"
+          minRows={1}
+          onchange={(code) =>
+            replace(index, { set: { ...action.set, value: { code } } })}
         />
         <label class="inline"
           >ack <input

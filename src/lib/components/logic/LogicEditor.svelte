@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Input, LogicDef, Output } from "$logic/types";
   import type { Issue } from "$logic/validate";
+  import { renameCodeRefs } from "$logic/expr-code";
   import InputsEditor from "./InputsEditor.svelte";
   import OutputEditor from "./OutputEditor.svelte";
-  import ExprEditor from "./ExprEditor.svelte";
+  import CodeField from "./CodeField.svelte";
   import MachineEditor from "./MachineEditor.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -32,6 +33,7 @@
   const output = $derived<Output>(
     draft.output ?? { scope: "memory", name: draft.id },
   );
+  const RESULT_PLACEHOLDER = 'get("temp") > 20 ? "On" : "Off"';
   const stateNames = $derived(
     draft.kind === "machine" ? Object.keys(draft.states) : [],
   );
@@ -91,8 +93,11 @@
     if (value && typeof value === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, item] of Object.entries(value)) {
-        if ((key === "ref" || key === "on") && item === from) out[key] = to;
-        else out[key] = renameRefs(item, from, to);
+        if (key === "code" && typeof item === "string") {
+          out[key] = renameCodeRefs(item, from, to);
+        } else if ((key === "ref" || key === "on") && item === from) {
+          out[key] = to;
+        } else out[key] = renameRefs(item, from, to);
       }
       return out;
     }
@@ -164,10 +169,13 @@
   {#if draft.kind === "function"}
     <div class="block">
       <span class="label-mono">Result expression</span>
-      <ExprEditor
-        expr={draft.expr}
+      <CodeField
+        code={draft.expr.code}
+        label="Result expression"
+        placeholder={RESULT_PLACEHOLDER}
         allowNoop
-        onchange={(expr) => patch({ expr })}
+        {logics}
+        onchange={(code) => patch({ expr: { code } })}
       />
     </div>
   {:else}

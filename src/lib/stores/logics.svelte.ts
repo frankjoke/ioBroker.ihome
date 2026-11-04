@@ -12,7 +12,7 @@ import type { LogicDocument } from "$logic/types";
 
 export const LOGIC_LIST_ID = "ihome.0.config.logicList";
 
-const emptyDocument = (): LogicDocument => ({ version: 1, logics: [] });
+const emptyDocument = (): LogicDocument => ({ version: 2, logics: [] });
 
 let logicDocument = $state<LogicDocument>(emptyDocument());
 let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(

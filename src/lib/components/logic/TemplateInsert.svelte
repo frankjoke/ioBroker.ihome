@@ -48,7 +48,7 @@
         uniqueId(template.id),
       );
       const problem = validateLogicDocument({
-        version: 1,
+        version: 2,
         logics: [logic],
       }).find((issue) => issue.severity === "error");
       if (problem) {

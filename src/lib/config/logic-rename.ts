@@ -1,10 +1,12 @@
 import type { LogicDef } from "$logic/types";
+import { renameCodeRefs } from "$logic/expr-code";
 
 /**
  * Rewrite every memory reference to `from` as `to` in one logic. A memory is
- * named by a bare ref (`from: {type: "memory", ref}`, an expression `ref`, a
- * `set` target); state and variable refs are dotted or distinct names, so only
- * refs that are exactly the memory name are touched.
+ * named by a bare ref (`from: {type: "memory", ref}`, a `set` target) or by a
+ * literal `get/state/set` call in an expression's code; state and variable refs
+ * are dotted or distinct names, so only refs that are exactly the memory name
+ * are touched.
  */
 export function renameMemoryRefs(
   logic: LogicDef,
@@ -16,7 +18,11 @@ export function renameMemoryRefs(
     if (value && typeof value === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, item] of Object.entries(value)) {
-        out[key] = key === "ref" && item === from ? to : walk(item);
+        if (key === "code" && typeof item === "string") {
+          out[key] = renameCodeRefs(item, from, to);
+        } else {
+          out[key] = key === "ref" && item === from ? to : walk(item);
+        }
       }
       return out;
     }

@@ -103,7 +103,7 @@
       name,
       kind: "function",
       output: { scope: "memory", name },
-      expr: { const: 0 },
+      expr: { code: "0" },
     };
     if (commit([...doc.logics, logic])) select(logic);
   }
@@ -211,7 +211,7 @@
       logic.id === current.id ? current : logic,
     );
     if (!logs.some((logic) => logic.id === current.id)) logs.push(current);
-    return validateLogicDocument({ version: 1, logics: logs }).filter(
+    return validateLogicDocument({ version: 2, logics: logs }).filter(
       (issue) => issue.logicId === current.id,
     );
   });

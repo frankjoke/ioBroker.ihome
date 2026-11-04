@@ -1,6 +1,5 @@
 <script lang="ts">
   import type {
-    Expr,
     Init,
     LogicDef,
     MachineLogic,
@@ -9,7 +8,7 @@
     StateDef,
   } from "$logic/types";
   import ActionList from "./ActionList.svelte";
-  import ExprEditor from "./ExprEditor.svelte";
+  import CodeField from "./CodeField.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
@@ -30,6 +29,8 @@
   } = $props();
 
   const stateNames = $derived(Object.keys(logic.states));
+  const ROW_IF_PLACEHOLDER = 'get("motion") === true';
+  const INIT_STATE_PLACEHOLDER = 'get("mode") === "auto" ? "Auto" : "Manual"';
   /** The other logics, as `$logic.<id>` event sources. */
   const sourceLogics = $derived(
     logics
@@ -589,12 +590,13 @@
               {#if row.if}
                 <div class="row">
                   <span class="label-mono">if</span>
-                  <ExprEditor
-                    expr={row.if}
-                    onchange={(next) => {
-                      if ("noop" in next) return;
-                      updateRow(name, index, { ...row, if: next });
-                    }}
+                  <CodeField
+                    code={row.if.code}
+                    {logics}
+                    label="Row condition"
+                    placeholder={ROW_IF_PLACEHOLDER}
+                    onchange={(code) =>
+                      updateRow(name, index, { ...row, if: { code } })}
                   />
                   <button
                     type="button"
@@ -613,7 +615,7 @@
                   onclick={() =>
                     updateRow(name, index, {
                       ...row,
-                      if: { ref: "" },
+                      if: { code: "true" },
                     })}>Add condition</button
                 >
               {/if}
@@ -702,12 +704,12 @@
                       patchInit({ state: e.currentTarget.value })}
                   />
                 {:else}
-                  <ExprEditor
-                    expr={init.state as Expr}
-                    onchange={(next) =>
-                      patchInit({
-                        state: "noop" in next ? undefined : next,
-                      })}
+                  <CodeField
+                    code={init.state.code}
+                    {logics}
+                    label="Init state expression"
+                    placeholder={INIT_STATE_PLACEHOLDER}
+                    onchange={(code) => patchInit({ state: { code } })}
                   />
                 {/if}
                 <button
@@ -721,8 +723,9 @@
                 type="button"
                 class="btn btn-sm"
                 onclick={() =>
-                  patchInit({ state: { const: stateNames[0] ?? "" } })}
-                >Add init expression</button
+                  patchInit({
+                    state: { code: JSON.stringify(stateNames[0] ?? "") },
+                  })}>Add init expression</button
               >
             {/if}
             <label class="inline"
