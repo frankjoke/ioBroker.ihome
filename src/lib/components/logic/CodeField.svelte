@@ -3,6 +3,7 @@
   import { checkExpression, highlightCode } from "$logic/expr-code";
   import type { Input, LogicDef } from "$logic/types";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import { insertAtCaret } from "./code-field";
 
   let {
@@ -108,15 +109,18 @@
   <div class="code-head">
     <button
       type="button"
-      class="btn btn-sm"
+      class="btn btn-sm btn-outline"
       title="Insert a state reference at the caret"
       onmousedown={rememberSelection}
-      onclick={() => (picking = true)}>Insert state</button
+      onclick={() => (picking = true)}
     >
+      <Icon value="add" size={14} />
+      <span>State</span>
+    </button>
     {#if allowNoop}
       <button
         type="button"
-        class="btn btn-sm"
+        class="btn btn-sm btn-outline"
         title="Leave the output unchanged"
         onclick={() => onchange("noop()")}>No update</button
       >
