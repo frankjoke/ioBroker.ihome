@@ -5,7 +5,7 @@ import { createHarness } from "./testing";
 import type { LogicDocument } from "./types";
 
 const logicDoc = (ref: string): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "watch",
@@ -13,7 +13,7 @@ const logicDoc = (ref: string): LogicDocument => ({
       kind: "function",
       inputs: { v: { from: { type: "state", ref }, kind: "event" } },
       output: { scope: "memory" },
-      expr: { ref: "v" },
+      expr: { code: 'get("v")' },
     },
   ],
 });
@@ -37,7 +37,7 @@ it("drops a deleted logic's states from the subscription set", () => {
   const before = engine.subscriptions();
   expect(before).toEqual(["0_userdata.0.X"]);
 
-  const empty = createEngine({ version: 1, logics: [] }, h.deps);
+  const empty = createEngine({ version: 2, logics: [] }, h.deps);
   expect(empty.subscriptions()).toEqual([]);
   expect(subscriptionDiff(before, empty.subscriptions(), "ihome.0")).toEqual({
     own: { add: [], remove: [] },

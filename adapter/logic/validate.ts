@@ -1,9 +1,10 @@
 import { parseDuration } from "./duration";
+import { checkExpression } from "./expr-code";
+import { migrateDocument } from "./migrate-expr";
 import { isAstroEvent, parseCronAt } from "./timer-ops";
 import { OPERATORS } from "./types";
 import type {
   Action,
-  Expr,
   FunctionLogic,
   Input,
   LogicDocument,
@@ -23,8 +24,9 @@ export interface Issue {
 
 /**
  * The document as the adapter and the SPA may use it, or null when it is not
- * one: not JSON, not an object, not `version: 1`, or no `logics` array. A null
- * is never a reason to write: the caller leaves the stored document alone.
+ * one: not JSON, not an object, not `version: 1`/`2`, or no `logics` array. A
+ * v1 document is migrated in memory. A null is never a reason to write: the
+ * caller leaves the stored document alone.
  */
 export function parseLogicDocument(raw: unknown): LogicDocument | null {
   let value = raw;
@@ -38,9 +40,18 @@ export function parseLogicDocument(raw: unknown): LogicDocument | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  const doc = value as Partial<LogicDocument>;
-  if (doc.version !== 1 || !Array.isArray(doc.logics)) return null;
-  return doc as LogicDocument;
+  const doc = value as { version?: unknown; logics?: unknown };
+  if (doc.version === 2 && Array.isArray(doc.logics)) {
+    return doc as LogicDocument;
+  }
+  if (doc.version === 1 && Array.isArray(doc.logics)) {
+    try {
+      return migrateDocument(value);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export function logicHasErrors(issues: Issue[], logicId: string): boolean {
@@ -256,7 +267,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       if (!("expr" in fn) || fn.expr == null) {
         add(id, "expr", "function logic without an expression");
       } else {
-        walkExpr(fn.expr, true, (path, message) => add(id, path, message));
+        checkExpr(fn.expr, (path, message) => add(id, path, message), "expr");
       }
       const hasEvent = Object.values(inputs).some(
         (input) => input?.kind === "event" || input?.from?.type === "timer",
@@ -469,7 +480,7 @@ function checkInit(
         add(id, "init.state", `unknown state ${init.state}`);
       }
     } else {
-      walkExpr(init.state, false, (path, message) =>
+      checkExpr(init.state, (path, message) =>
         add(id, `init.state${path ? `.${path}` : ""}`, message),
       );
     }
@@ -550,7 +561,7 @@ function checkRow(
     }
   }
   if (row?.if) {
-    walkExpr(row.if, false, (p, message) =>
+    checkExpr(row.if, (p, message) =>
       add(id, `${path}.if${p ? `.${p}` : ""}`, message),
     );
   }
@@ -616,7 +627,7 @@ function checkAction(
     }
     if (!set.value) add(id, `${path}.set.value`, "set without a value");
     else
-      walkExpr(set.value, false, (p, message) =>
+      checkExpr(set.value, (p, message) =>
         add(id, `${path}.set.value${p ? `.${p}` : ""}`, message),
       );
   } else if ("goto" in action) {
@@ -632,41 +643,15 @@ function checkAction(
   }
 }
 
-function walkExpr(
-  expr: Expr | { noop: true } | undefined,
-  allowNoop: boolean,
+function checkExpr(
+  expr: unknown,
   add: (path: string, message: string) => void,
   path = "",
 ): void {
-  if (!isRecord(expr)) {
-    add(path, "expression is not an object");
+  if (!isRecord(expr) || typeof expr.code !== "string") {
+    add(path, "expression has no code");
     return;
   }
-  if ("noop" in expr) {
-    if (!allowNoop) add(path, "noop is only allowed in a function expression");
-    return;
-  }
-  if ("const" in expr || "ref" in expr) return;
-  const op = (expr as { op?: string }).op;
-  if (!op) {
-    add(path, "expression without an operator");
-    return;
-  }
-  if (op === "if") {
-    const conditional = expr as Extract<Expr, { op: "if" }>;
-    walkExpr(conditional.cond, false, add, `${path}.cond`);
-    walkExpr(conditional.then, allowNoop, add, `${path}.then`);
-    walkExpr(conditional.else, allowNoop, add, `${path}.else`);
-    return;
-  }
-  const binary = expr as { left?: Expr; right?: Expr; of?: Expr | Expr[] };
-  if (binary.left) walkExpr(binary.left, false, add, `${path}.left`);
-  if (binary.right) walkExpr(binary.right, false, add, `${path}.right`);
-  if (Array.isArray(binary.of)) {
-    binary.of.forEach((item, index) =>
-      walkExpr(item, false, add, `${path}.of.${index}`),
-    );
-  } else if (binary.of) {
-    walkExpr(binary.of, false, add, `${path}.of`);
-  }
+  const message = checkExpression(expr.code);
+  if (message) add(path, message);
 }

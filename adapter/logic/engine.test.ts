@@ -3,6 +3,7 @@ import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
 import type {
   Action,
+  Expr,
   FunctionLogic,
   LogicDocument,
   MachineLogic,
@@ -10,8 +11,10 @@ import type {
   Output,
 } from "./types";
 
+const code = (source: string): Expr => ({ code: source });
+
 const doc = (extra: Partial<FunctionLogic> = {}): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "calc",
@@ -24,7 +27,7 @@ const doc = (extra: Partial<FunctionLogic> = {}): LogicDocument => ({
         },
       },
       output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
-      expr: { op: "mul", left: { ref: "temp" }, right: { const: 2 } },
+      expr: code('get("temp") * 2'),
       ...extra,
     },
   ],
@@ -64,7 +67,7 @@ it("writes a logic output to the adapter-created state", () => {
 
 it("maps a machine's state names to a boolean logic output", () => {
   const machine: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "lift",
@@ -93,7 +96,7 @@ it("maps a machine's state names to a boolean logic output", () => {
 });
 
 const follower = (extra: Partial<MachineLogic> = {}): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "follow",
@@ -226,7 +229,7 @@ it("stays put when the external write already matches its state", () => {
 });
 
 const textMachine = (is: { op: string; value?: unknown }): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "text",
@@ -262,7 +265,7 @@ it("fills {{ref}} in a log message", () => {
   const h = createHarness({ "0_userdata.0.S": "" });
   const engine = createEngine(
     {
-      version: 1,
+      version: 2,
       logics: [
         {
           id: "logger",
@@ -363,7 +366,7 @@ it("honours the ack filter", () => {
 
 it("ignores its own output echo by default", () => {
   const echo: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "echo",
@@ -378,7 +381,7 @@ it("ignores its own output echo by default", () => {
           type: "number",
           forward: "always",
         },
-        expr: { const: 1 },
+        expr: code("1"),
       },
     ],
   };
@@ -395,7 +398,7 @@ it("ignores its own output echo by default", () => {
 
 it("lets another logic's write be an external event", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "writer",
@@ -410,7 +413,7 @@ it("lets another logic's write be an external event", () => {
           type: "number",
           forward: "always",
         },
-        expr: { const: 1 },
+        expr: code("1"),
       },
       {
         id: "reader",
@@ -428,7 +431,7 @@ it("lets another logic's write be an external event", () => {
           type: "number",
           forward: "always",
         },
-        expr: { const: 1 },
+        expr: code("1"),
       },
     ],
   };
@@ -443,7 +446,7 @@ it("lets another logic's write be an external event", () => {
 
 it("source self sees only this logic's writes", () => {
   const self: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "self",
@@ -468,12 +471,12 @@ it("source self sees only this logic's writes", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.W" },
-                      value: { const: true },
+                      value: code("true"),
                     },
                   },
                 ],
               },
-              { on: "v", if: { ref: "$self" }, goto: "B" },
+              { on: "v", if: code('get("$self")'), goto: "B" },
             ],
           },
           B: {},
@@ -493,7 +496,7 @@ it("source self sees only this logic's writes", () => {
 
 it("exposes $from and $self to rows", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "meta",
@@ -509,11 +512,7 @@ it("exposes $from and $self to rows", () => {
             on: [
               {
                 on: "e",
-                if: {
-                  op: "eq",
-                  left: { ref: "$from" },
-                  right: { const: "hue.0" },
-                },
+                if: code('get("$from") === "hue.0"'),
                 goto: "B",
               },
             ],
@@ -532,7 +531,7 @@ it("exposes $from and $self to rows", () => {
 });
 
 it("noop writes nothing", () => {
-  const { h, engine } = engineWith(doc({ expr: { noop: true } }));
+  const { h, engine } = engineWith(doc({ expr: code("noop()") }));
   engine.start();
   h.change("0_userdata.0.T", 6);
   expect(h.writes).toHaveLength(0);
@@ -545,7 +544,7 @@ it("writes a function result once at start", () => {
 });
 
 const memoryDoc = (forward: "changed" | "always"): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "a",
@@ -559,7 +558,7 @@ const memoryDoc = (forward: "changed" | "always"): LogicDocument => ({
         },
       },
       output: { scope: "memory", name: "x", forward },
-      expr: { op: "add", left: { ref: "x" }, right: { const: 1 } },
+      expr: code('get("x") + 1'),
     },
     {
       id: "b",
@@ -574,7 +573,7 @@ const memoryDoc = (forward: "changed" | "always"): LogicDocument => ({
         type: "number",
         forward: "always",
       },
-      expr: { op: "add", left: { ref: "mx" }, right: { const: 10 } },
+      expr: code('get("mx") + 10'),
     },
   ],
 });
@@ -604,7 +603,7 @@ it("repeats a memory event when forward is always", () => {
 
 it("stops a memory loop with one warning", () => {
   const looping: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "seed",
@@ -617,7 +616,7 @@ it("stops a memory loop with one warning", () => {
           },
         },
         output: { scope: "memory", name: "x", forward: "always" },
-        expr: { const: 1 },
+        expr: code("1"),
       },
       {
         id: "echo",
@@ -631,7 +630,7 @@ it("stops a memory loop with one warning", () => {
           },
         },
         output: { scope: "memory", name: "x", forward: "always" },
-        expr: { const: 1 },
+        expr: code("1"),
       },
     ],
   };
@@ -648,7 +647,7 @@ it("stops a memory loop with one warning", () => {
 // ------------------------------------------------------------- state machines
 
 const machine = (): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "light",
@@ -672,7 +671,7 @@ const machine = (): LogicDocument => ({
             {
               set: {
                 target: { ref: "lamp" },
-                value: { const: true },
+                value: code("true"),
               },
             },
           ],
@@ -680,7 +679,7 @@ const machine = (): LogicDocument => ({
             {
               set: {
                 target: { ref: "lamp" },
-                value: { const: false },
+                value: code("false"),
               },
             },
           ],
@@ -770,7 +769,7 @@ it("maps a boolean output by the On prefix, and a map overrides it", () => {
 
 it("does not repeat an unchanged set action by default", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "twice",
@@ -788,7 +787,7 @@ it("does not repeat an unchanged set action by default", () => {
               {
                 set: {
                   target: { ref: "0_userdata.0.D" },
-                  value: { const: true },
+                  value: code("true"),
                 },
               },
             ],
@@ -799,7 +798,7 @@ it("does not repeat an unchanged set action by default", () => {
               {
                 set: {
                   target: { ref: "0_userdata.0.D" },
-                  value: { const: true },
+                  value: code("true"),
                 },
               },
             ],
@@ -821,7 +820,7 @@ it("does not repeat an unchanged set action by default", () => {
 
 it("fires timer inputs every interval and stops with the engine", () => {
   const timed: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "tick",
@@ -836,7 +835,7 @@ it("fires timer inputs every interval and stops with the engine", () => {
           type: "number",
           forward: "always",
         },
-        expr: { ref: "t" },
+        expr: code('get("t")'),
       },
     ],
   };
@@ -856,7 +855,7 @@ it("fires timer inputs every interval and stops with the engine", () => {
 
 it("does not emit a memory event when the value matches the seeded one", () => {
   const seeded: LogicDocument = {
-    version: 1,
+    version: 2,
     memory: [{ name: "x", type: "number", initial: 5 }],
     logics: [
       {
@@ -867,7 +866,7 @@ it("does not emit a memory event when the value matches the seeded one", () => {
           s: { from: { type: "state", ref: "0_userdata.0.S" }, kind: "event" },
         },
         output: { scope: "memory", name: "x" },
-        expr: { const: 5 },
+        expr: code("5"),
       },
       {
         id: "watch",
@@ -880,7 +879,7 @@ it("does not emit a memory event when the value matches the seeded one", () => {
           type: "number",
           forward: "always",
         },
-        expr: { ref: "x" },
+        expr: code('get("x")'),
       },
     ],
   };
@@ -897,13 +896,13 @@ it("does not emit a memory event when the value matches the seeded one", () => {
 
 it("skips an invalid logic instead of throwing out of start", () => {
   const broken = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "broken",
         name: "Broken",
         kind: "function",
-        expr: { const: 1 },
+        expr: code("1"),
         output: { scope: "state" },
       },
     ],
@@ -919,7 +918,7 @@ it("skips an invalid logic instead of throwing out of start", () => {
 
 function startup(output: Output, init?: MachineLogic["init"]): LogicDocument {
   return {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "start",
@@ -961,14 +960,7 @@ it("starts in the state an init expression answers", () => {
   const engine = createEngine(
     startup(
       { scope: "memory" },
-      {
-        state: {
-          op: "if",
-          cond: { ref: "power" },
-          then: { const: "On" },
-          else: { const: "Idle" },
-        },
-      },
+      { state: { code: 'get("power") ? "On" : "Idle"' } },
     ),
     h.deps,
   );
@@ -1018,7 +1010,7 @@ it("adopts a boolean output by its On prefix without writing or entering", () =>
     {
       set: {
         target: { ref: "0_userdata.0.FLAG" },
-        value: { const: true },
+        value: code("true"),
       },
     },
   ];
@@ -1065,7 +1057,7 @@ it("exposes $init only during the start evaluation", () => {
     {
       set: {
         target: { ref: "0_userdata.0.FLAG" },
-        value: { ref: "$init" },
+        value: code('get("$init")'),
         forward: "always",
       },
     },
@@ -1088,7 +1080,7 @@ it("exposes $init only during the start evaluation", () => {
 
 it("runs a function once at start unless init.run is false", () => {
   const fn = (run?: boolean): LogicDocument => ({
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "calc",
@@ -1099,7 +1091,7 @@ it("runs a function once at start unless init.run is false", () => {
         },
         output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
         init: run === undefined ? undefined : { run },
-        expr: { ref: "$init" },
+        expr: code('get("$init")'),
       },
     ],
   });
@@ -1118,7 +1110,7 @@ it("runs a function once at start unless init.run is false", () => {
 
 it("starts machines after functions, so computed memory is visible", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "machine-first",
@@ -1128,7 +1120,7 @@ it("starts machines after functions, so computed memory is visible", () => {
           m: { from: { type: "memory", ref: "computed" }, kind: "variable" },
         },
         output: { scope: "memory" },
-        init: { state: { ref: "m" } },
+        init: { state: { code: 'get("m")' } },
         states: { Idle: {}, On: {} },
       },
       {
@@ -1139,7 +1131,7 @@ it("starts machines after functions, so computed memory is visible", () => {
           p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
         },
         output: { scope: "memory", name: "computed" },
-        expr: { const: "On" },
+        expr: code('"On"'),
       },
     ],
   };
@@ -1186,7 +1178,7 @@ it("stop destroys a pending state timer", () => {
 
 it("writes the state index for a number output", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "dim",
@@ -1226,7 +1218,7 @@ it("writes the state index for a number output", () => {
 
 it("one input can listen to several states as the same event", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "buttons",
@@ -1248,7 +1240,7 @@ it("one input can listen to several states as the same event", () => {
           type: "number",
           forward: "always",
         },
-        expr: { ref: "b" },
+        expr: code('get("b")'),
       },
     ],
   };
@@ -1274,7 +1266,7 @@ it("one input can listen to several states as the same event", () => {
 
 it("applies the row edge instead of an input filter", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "edge",
@@ -1337,7 +1329,7 @@ it("logs state changes only when the logic enables it", () => {
 
 it("resolves a global variable name used as the output ref", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "outvar",
@@ -1347,7 +1339,7 @@ it("resolves a global variable name used as the output ref", () => {
           p: { from: { type: "state", ref: "0_userdata.0.P" }, kind: "event" },
         },
         output: { scope: "state", ref: "TestState_Switch", type: "number" },
-        expr: { const: 1 },
+        expr: code("1"),
       },
     ],
   };
@@ -1375,7 +1367,7 @@ it("resolves a global variable name used as the output ref", () => {
 });
 
 const chain = (over: Partial<MachineLogic> = {}): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "chain",
@@ -1397,15 +1389,13 @@ const chain = (over: Partial<MachineLogic> = {}): LogicDocument => ({
             {
               on: "value",
               is: { op: "gt", value: 10 },
-              do: [{ set: { target: { ref: "low" }, value: { const: true } } }],
+              do: [{ set: { target: { ref: "low" }, value: code("true") } }],
               continue: true,
             },
             {
               on: "value",
               is: { op: "gt", value: 20 },
-              do: [
-                { set: { target: { ref: "high" }, value: { const: true } } },
-              ],
+              do: [{ set: { target: { ref: "high" }, value: code("true") } }],
             },
           ],
         },
@@ -1478,7 +1468,7 @@ it("a goto ends the event even on a continue row", () => {
 
 it("fires $start after every logic started, in the adopted state", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "prep",
@@ -1486,7 +1476,7 @@ it("fires $start after every logic started, in the adopted state", () => {
         kind: "function",
         inputs: {},
         output: { scope: "memory", name: "ready" },
-        expr: { const: true },
+        expr: code("true"),
       },
       {
         id: "late",
@@ -1505,7 +1495,7 @@ it("fires $start after every logic started, in the adopted state", () => {
         states: {
           Idle: {
             // Only fires when the function above already computed its memory.
-            on: [{ on: "$start", if: { ref: "ready" }, goto: "On" }],
+            on: [{ on: "$start", if: code('get("ready")'), goto: "On" }],
           },
           On: { on: [{ on: "e", goto: "Idle" }] },
         },
@@ -1529,7 +1519,7 @@ it("fires $start after every logic started, in the adopted state", () => {
 
 it("emits a logic output as a $logic event source", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "source",
@@ -1567,7 +1557,7 @@ it("emits a logic output as a $logic event source", () => {
 
 it("uses a global state variable directly as an event source", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "watch",
@@ -1602,7 +1592,7 @@ it("uses a global state variable directly as an event source", () => {
 
 it("appends the $all rows after the state's rows", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "all",
@@ -1623,7 +1613,7 @@ it("appends the $all rows after the state's rows", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.OWN" },
-                      value: { const: true },
+                      value: code("true"),
                     },
                   },
                 ],
@@ -1639,7 +1629,7 @@ it("appends the $all rows after the state's rows", () => {
                 {
                   set: {
                     target: { ref: "0_userdata.0.ALL" },
-                    value: { const: true },
+                    value: code("true"),
                   },
                 },
               ],
@@ -1671,7 +1661,7 @@ it("appends the $all rows after the state's rows", () => {
 
 it("lets a continue row fall through into $all", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "flow",
@@ -1692,7 +1682,7 @@ it("lets a continue row fall through into $all", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.OWN" },
-                      value: { const: true },
+                      value: code("true"),
                     },
                   },
                 ],
@@ -1708,7 +1698,7 @@ it("lets a continue row fall through into $all", () => {
                 {
                   set: {
                     target: { ref: "0_userdata.0.ALL" },
-                    value: { const: true },
+                    value: code("true"),
                   },
                 },
               ],
@@ -1738,7 +1728,7 @@ const alwaysMachine = (
   on: OnRow[],
   extra: Partial<MachineLogic> = {},
 ): LogicDocument => ({
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "always",
@@ -1756,7 +1746,7 @@ const alwaysMachine = (
 });
 
 const setTrue = (ref: string): Action => ({
-  set: { target: { ref }, value: { const: true } },
+  set: { target: { ref }, value: code("true") },
 });
 
 it("an $always row fires on a named input event", () => {
@@ -1790,7 +1780,7 @@ it("an $always row fires on $init", () => {
       [
         {
           on: "$always",
-          if: { ref: "$init" },
+          if: code('get("$init")'),
           do: [setTrue("0_userdata.0.FLAG")],
         },
       ],
@@ -1915,7 +1905,7 @@ it("an $always row does not swallow the $self output sync", () => {
 
 it("$start carries the start timestamp and exposes it as a ref", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "stamp",
@@ -1932,7 +1922,7 @@ it("$start carries the start timestamp and exposes it as a ref", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.SEEN" },
-                      value: { ref: "$start" },
+                      value: code('get("$start")'),
                     },
                   },
                 ],
@@ -1955,7 +1945,7 @@ it("$start carries the start timestamp and exposes it as a ref", () => {
 
 it("a local event can combine a state and a logic output", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "source",
@@ -2006,7 +1996,7 @@ it("a local event can combine a state and a logic output", () => {
 
 it("an event can combine states and a repeating timer", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "combo",
@@ -2030,7 +2020,7 @@ it("an event can combine states and a repeating timer", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.HIT" },
-                      value: { ref: "combo" },
+                      value: code('get("combo")'),
                       forward: "always",
                     },
                   },
@@ -2056,7 +2046,7 @@ it("an event can combine states and a repeating timer", () => {
 
 it("fires an astro timer at the computed time", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "astro",
@@ -2080,7 +2070,7 @@ it("fires an astro timer at the computed time", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.HIT" },
-                      value: { ref: "tick" },
+                      value: code('get("tick")'),
                       forward: "always",
                     },
                   },
@@ -2106,7 +2096,7 @@ it("fires an astro timer at the computed time", () => {
 
 it("fires a cron timer at the next matching minute", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "cron",
@@ -2130,7 +2120,7 @@ it("fires a cron timer at the next matching minute", () => {
                   {
                     set: {
                       target: { ref: "0_userdata.0.HIT" },
-                      value: { ref: "tick" },
+                      value: code('get("tick")'),
                       forward: "always",
                     },
                   },
@@ -2156,7 +2146,7 @@ it("fires a cron timer at the next matching minute", () => {
 
 it("reports a machine's state at start and on every transition", () => {
   const machine: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "lift",
@@ -2203,4 +2193,120 @@ it("reports a function's value on every write, memory included", () => {
     id: "calc",
     reading: { value: 8, ts: 0 },
   });
+});
+
+it("subscribes to a literal get() ref outside the inputs", () => {
+  const d: LogicDocument = {
+    version: 2,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        log: true,
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: {
+          A: {
+            on: [
+              {
+                on: "e",
+                if: code('get("0_userdata.0.EXT") === 5'),
+                goto: "B",
+              },
+            ],
+          },
+          B: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0, "0_userdata.0.EXT": 5 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(engine.subscriptions()).toContain("0_userdata.0.EXT");
+  h.change("0_userdata.0.E", 1);
+  expect(h.logs.some((line) => line.message.includes("moves"))).toBe(true);
+});
+
+it("rejects a promise result without writing", () => {
+  const { h, engine } = engineWith(doc({ expr: code("Promise.resolve(1)") }));
+  engine.start();
+  expect(h.writes.some((write) => write.id === "0_userdata.0.OUT")).toBe(false);
+  expect(
+    h.logs.some((line) => line.message.includes("async is not supported")),
+  ).toBe(true);
+});
+
+it("a timing-out expression does not stop the neighbour", () => {
+  const d = doc();
+  d.logics.push({
+    id: "slow",
+    name: "Slow",
+    kind: "function",
+    inputs: {
+      t: { from: { type: "state", ref: "0_userdata.0.T" }, kind: "event" },
+    },
+    output: { scope: "memory" },
+    expr: code("(() => { for (;;); })()"),
+  });
+  const { h, engine } = engineWith(d);
+  engine.start();
+  h.change("0_userdata.0.T", 4);
+  expect(h.logs.some((line) => line.message.includes("timed out"))).toBe(true);
+});
+
+it("state().changed is value-based, not ack-based", () => {
+  const d = doc({ expr: code('state("temp").changed ? 1 : 0') });
+  (d.logics[0].inputs!.temp as { mode?: string }).mode = "any";
+  const { h, engine } = engineWith(d);
+  engine.start(); // writes 0
+  h.change("0_userdata.0.T", 4); // value changed -> 1
+  h.change("0_userdata.0.T", 4, { ack: true }); // ack only -> 0
+  const values = h.writes
+    .filter((write) => write.id === "0_userdata.0.OUT")
+    .map((write) => write.value);
+  expect(values).toEqual([0, 1, 0]);
+});
+
+it("state() reports changed true on a timer tick", () => {
+  const d: LogicDocument = {
+    version: 2,
+    logics: [
+      {
+        id: "timer",
+        name: "Timer",
+        kind: "machine",
+        inputs: { t: { from: { type: "timer", every: "1s" }, kind: "event" } },
+        output: { scope: "memory" },
+        states: {
+          A: {
+            on: [
+              {
+                on: "t",
+                if: code('state("t").changed'),
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.OUT" },
+                      value: code("true"),
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(1000);
+  expect(h.writes.some((write) => write.id === "0_userdata.0.OUT")).toBe(true);
 });

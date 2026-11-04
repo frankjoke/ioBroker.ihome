@@ -7,7 +7,7 @@ import {
 import type { LogicDocument } from "./types";
 
 const doc: LogicDocument = {
-  version: 1,
+  version: 2,
   logics: [
     {
       id: "hallway",
@@ -33,9 +33,26 @@ const doc: LogicDocument = {
 it("parses a JSON string or object and rejects everything else", () => {
   expect(parseLogicDocument(JSON.stringify(doc))?.logics).toHaveLength(1);
   expect(parseLogicDocument(doc)?.logics).toHaveLength(1);
-  for (const bad of [null, "", "{bad", "[1,2]", { version: 2, logics: [] }]) {
+  for (const bad of [null, "", "{bad", "[1,2]", { version: 3, logics: [] }]) {
     expect(parseLogicDocument(bad)).toBeNull();
   }
+});
+
+it("migrates a v1 document in memory", () => {
+  const v1 = {
+    version: 1,
+    logics: [
+      {
+        id: "f",
+        name: "F",
+        kind: "function",
+        expr: { op: "add", left: { ref: "a" }, right: { const: 1 } },
+      },
+    ],
+  };
+  const parsed = parseLogicDocument(v1);
+  expect(parsed?.version).toBe(2);
+  expect(parsed?.logics[0]).toMatchObject({ expr: { code: 'get("a") + 1' } });
 });
 
 it("accepts the valid document", () => {
@@ -44,7 +61,7 @@ it("accepts the valid document", () => {
 
 it("reports jump targets, row inputs and maps", () => {
   const broken: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         ...doc.logics[0],
@@ -65,36 +82,30 @@ it("reports jump targets, row inputs and maps", () => {
   expect(logicHasErrors(issues, "counter")).toBe(false);
 });
 
-it("rejects noop outside a function expression", () => {
-  const bad: LogicDocument = {
-    version: 1,
-    logics: [
-      {
-        id: "x",
-        name: "X",
-        kind: "machine",
-        states: {
-          A: {
-            on: [{ on: "e", is: { op: "eq", value: { noop: true } as never } }],
-          },
-        },
-      },
-    ],
-  };
-  expect(validateLogicDocument(bad).some((i) => i.severity === "error")).toBe(
-    true,
-  );
+it("rejects an expression without code, empty code or broken code", () => {
+  const make = (expr: unknown): LogicDocument =>
+    ({
+      version: 2,
+      logics: [{ id: "x", name: "X", kind: "function", expr }],
+    }) as never;
+  const errors = (expr: unknown) =>
+    validateLogicDocument(make(expr))
+      .filter((issue) => issue.severity === "error")
+      .map((issue) => issue.message);
+  expect(errors({})).toEqual(["expression has no code"]);
+  expect(errors({ code: "" })).toEqual(["expression is empty"]);
+  expect(errors({ code: "1 +" })[0]).toMatch(/^expression failed to compile:/);
 });
 
 it("requires a ref and a known type on every state output", () => {
   const bad: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "f",
         name: "F",
         kind: "function",
-        expr: { const: 1 },
+        expr: { code: "1" },
         output: { scope: "state" } as never,
       },
     ],
@@ -106,11 +117,11 @@ it("requires a ref and a known type on every state output", () => {
 
 it("does not throw on malformed optional arrays", () => {
   expect(() =>
-    validateLogicDocument({ version: 1, logics: [], memory: {} } as never),
+    validateLogicDocument({ version: 2, logics: [], memory: {} } as never),
   ).not.toThrow();
   expect(() =>
     validateLogicDocument({
-      version: 1,
+      version: 2,
       logics: [
         { id: "x", name: "X", kind: "machine", states: { A: { on: "nope" } } },
       ],
@@ -120,7 +131,7 @@ it("does not throw on malformed optional arrays", () => {
 
 it("rejects zero-length timers", () => {
   const bad: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "z",
@@ -138,7 +149,7 @@ it("rejects zero-length timers", () => {
 
 it("checks the init policy", () => {
   const bad: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "m",
@@ -157,7 +168,7 @@ it("checks the init policy", () => {
 
 it("accepts the string operators and rejects an unknown one", () => {
   const doc = (op: string): LogicDocument => ({
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "m",
@@ -185,7 +196,7 @@ it("accepts the string operators and rejects an unknown one", () => {
 
 it("accepts a $init row and an expression init state", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "m",
@@ -193,12 +204,7 @@ it("accepts a $init row and an expression init state", () => {
         kind: "machine",
         inputs: { p: { from: { type: "state", ref: "0_userdata.0.P" } } },
         init: {
-          state: {
-            op: "if",
-            cond: { ref: "p" },
-            then: { const: "A" },
-            else: { const: "B" },
-          },
+          state: { code: 'get("p") ? "A" : "B"' },
           run: true,
         },
         states: {
@@ -213,7 +219,7 @@ it("accepts a $init row and an expression init state", () => {
 
 it("accepts an $always row", () => {
   const doc: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "m",
@@ -229,7 +235,7 @@ it("accepts an $always row", () => {
 
 it("rejects an unknown event source", () => {
   const bad: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "s",
@@ -253,7 +259,7 @@ it("rejects an unknown event source", () => {
 
 it("warns that continue cannot outlive a goto", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "c",
@@ -285,7 +291,7 @@ it("warns that continue cannot outlive a goto", () => {
 
 it("accepts $start as a built-in trigger", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "s",
@@ -303,7 +309,7 @@ it("accepts $start as a built-in trigger", () => {
 
 it("accepts a $logic trigger and rejects an unknown logic", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "a",
@@ -334,7 +340,7 @@ it("accepts a $logic trigger and rejects an unknown logic", () => {
 
 it("accepts a global $var trigger", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "v",
@@ -350,7 +356,7 @@ it("accepts a global $var trigger", () => {
 
 it("validates $all rows and refuses $all as a goto target", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "a",
@@ -378,7 +384,7 @@ it("validates $all rows and refuses $all as a goto target", () => {
 
 it("rejects an unknown logic in a local event's sources", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "v",
@@ -408,7 +414,7 @@ it("rejects an unknown logic in a local event's sources", () => {
 
 it("accepts a timer-only event and rejects timers on a variable", () => {
   const ok: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "t",
@@ -441,7 +447,7 @@ it("accepts a timer-only event and rejects timers on a variable", () => {
 
 it("accepts a string output unit and rejects another type", () => {
   const d: LogicDocument = {
-    version: 1,
+    version: 2,
     logics: [
       {
         id: "u",
@@ -454,7 +460,7 @@ it("accepts a string output unit and rejects another type", () => {
           },
         },
         output: { scope: "logic", type: "number", unit: "°C" },
-        expr: { const: 1 },
+        expr: { code: "1" },
       },
     ],
   };

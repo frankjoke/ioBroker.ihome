@@ -2,7 +2,9 @@
 // plain JavaScript, the migrator walks the document explicitly (never a generic
 // "looks like an Expr" walk) and copies it, so the stored document is untouched.
 
-export type Json = string | number | boolean | null;
+import type { LogicDocument } from "./types";
+
+type Json = string | number | boolean | null;
 
 /** The expression tree of a version 1 document. */
 export type OldExpr =
@@ -65,7 +67,7 @@ function print(expr: OldFunctionExpr, min: number): string {
   if ("ref" in expr) return wrap(`get(${JSON.stringify(expr.ref)})`, CALL, min);
 
   const op = expr.op;
-  const binary = BINARY[op];
+  const binary = Object.hasOwn(BINARY, op) ? BINARY[op] : undefined;
   if (binary) {
     const node = expr as { left: OldExpr; right: OldExpr };
     return wrap(
@@ -203,12 +205,12 @@ function migrateTemplate(value: unknown): unknown {
 }
 
 /** Convert a v1 document to the v2 shape without touching the input. */
-export function migrateDocument(doc: unknown): Record<string, unknown> {
+export function migrateDocument(doc: unknown): LogicDocument {
   if (!isRecord(doc)) throw new Error("migrate: document is not an object");
   const out: Record<string, unknown> = { ...doc, version: 2 };
   if (Array.isArray(doc.logics)) out.logics = doc.logics.map(migrateLogic);
   if (Array.isArray(doc.templates)) {
     out.templates = doc.templates.map(migrateTemplate);
   }
-  return out;
+  return out as unknown as LogicDocument;
 }

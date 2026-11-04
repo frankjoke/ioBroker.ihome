@@ -453,7 +453,7 @@ class IHome extends utils.Adapter {
   private async loadLogics(): Promise<void> {
     const loadId = ++this.logicLoad;
     const target = `${CONFIG_FOLDER}.logicList`;
-    let doc: LogicDocument | null = { version: 1, logics: [] };
+    let doc: LogicDocument | null = { version: 2, logics: [] };
     try {
       const stored = await this.getStateAsync(target);
       const raw = stored?.val;
@@ -471,6 +471,7 @@ class IHome extends utils.Adapter {
       return;
     }
     if (loadId !== this.logicLoad) return; // a newer reload won
+    if (!doc) return;
 
     await this.ensureAstroConfig();
     await this.ensureLogicStates(doc);
@@ -481,6 +482,7 @@ class IHome extends utils.Adapter {
         doc,
         {
           read: (id) => this.logicValues.get(id)?.val,
+          readState: (id) => this.logicValues.get(id),
           write: (id, value, ack) => this.writeLogicState(id, value, ack),
           log: (level, logicId, message) => {
             const line = `[logic ${logicId}] ${message}`;
@@ -593,6 +595,7 @@ class IHome extends utils.Adapter {
               ack: state.ack,
               from: state.from,
               ts: state.ts,
+              changed: false,
             });
           }
         } catch (error) {
@@ -755,12 +758,17 @@ class IHome extends utils.Adapter {
     this.subscribeStates(`${CONFIG_FOLDER}.logicList`);
     this.on("stateChange", (id, state) => {
       if (!state) return;
+      // Compare against the cached value before overwriting it: ack-only
+      // updates are not a change (D6).
+      const previous = this.logicValues.get(id)?.val;
+      const changed = !Object.is(previous, state.val);
       this.logicValues.set(id, {
         id,
         val: state.val,
         ack: state.ack,
         from: state.from,
         ts: state.ts,
+        changed,
       });
       this.engine?.onStateChange({
         id,
@@ -768,6 +776,7 @@ class IHome extends utils.Adapter {
         ack: state.ack,
         from: state.from,
         ts: state.ts,
+        changed,
       });
       if (id === `${this.namespace}.info.logClear`) {
         if (state.val === true) {

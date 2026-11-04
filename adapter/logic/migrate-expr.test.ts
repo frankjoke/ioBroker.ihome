@@ -105,8 +105,62 @@ it("migrates a whole v1 document, including templates", () => {
   expect((v1.logics[0].expr as any).op).toBe("add");
 });
 
-it("throws on an unknown op", () => {
+it("prints every comparison and arithmetic operator", () => {
+  const binary = (op: string, left: OldExpr, right: OldExpr): string =>
+    printExpr({ op, left, right } as OldExpr);
+  expect(binary("eq", ref("a"), num(1))).toBe('get("a") === 1');
+  expect(binary("ne", ref("a"), num(1))).toBe('get("a") !== 1');
+  expect(binary("gt", ref("a"), num(1))).toBe('get("a") > 1');
+  expect(binary("gte", ref("a"), num(1))).toBe('get("a") >= 1');
+  expect(binary("lt", ref("a"), num(1))).toBe('get("a") < 1');
+  expect(binary("lte", ref("a"), num(1))).toBe('get("a") <= 1');
+  expect(binary("div", ref("a"), num(2))).toBe('get("a") / 2');
+  expect(binary("mod", ref("a"), num(2))).toBe('get("a") % 2');
+  expect(printExpr({ op: "round", of: ref("a") })).toBe('Math.round(get("a"))');
+  expect(printExpr({ op: "abs", of: ref("a") })).toBe('Math.abs(get("a"))');
+  expect(printExpr({ op: "min", of: [ref("a"), num(1)] })).toBe(
+    'Math.min(get("a"), 1)',
+  );
+  expect(printExpr({ op: "max", of: [ref("a"), num(1)] })).toBe(
+    'Math.max(get("a"), 1)',
+  );
+});
+
+it("throws on an unknown op, including prototype keys", () => {
   expect(() => printExpr({ op: "nope" } as never)).toThrow();
+  expect(() => printExpr({ op: "constructor" } as never)).toThrow();
+  expect(() => printExpr({ op: "__proto__" } as never)).toThrow();
+});
+
+it("keeps goto and log actions, and migrates exit values", () => {
+  const v1 = {
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        states: {
+          A: {
+            exit: [{ set: { target: { ref: "out" }, value: num(1) } }],
+            on: [
+              {
+                on: "e",
+                do: [{ goto: "B" }, { log: { text: "hi" } }],
+              },
+            ],
+          },
+          B: {},
+        },
+      },
+    ],
+  };
+  const v2 = migrateDocument(v1) as any;
+  expect(v2.logics[0].states.A.exit[0].set.value).toEqual({ code: "1" });
+  expect(v2.logics[0].states.A.on[0].do).toEqual([
+    { goto: "B" },
+    { log: { text: "hi" } },
+  ]);
 });
 
 it("prints edge cases as valid JavaScript", () => {

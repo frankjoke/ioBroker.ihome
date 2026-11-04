@@ -1,11 +1,19 @@
-import { evaluate } from "./expr";
+import { extractRefs } from "./expr-code";
 import { parseDuration } from "./duration";
+import {
+  createLogicRuntime,
+  forEachExpression,
+  isNoop,
+  type LogicRuntime,
+  type NameInfo,
+} from "./runtime";
 import { nextCron } from "./timer-ops";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   Action,
   AstroEvent,
   Duration,
+  Expr,
   Forward,
   FunctionLogic,
   Input,
@@ -24,6 +32,7 @@ export interface StateChange {
   ack?: boolean;
   from?: string;
   ts?: number;
+  changed?: boolean;
 }
 
 /** The live readout of one logic, for the logic list. */
@@ -37,6 +46,8 @@ export interface LogicReading {
 
 export interface EngineDeps {
   read(id: string): unknown;
+  /** The cached state with its metadata; falls back to `read` when absent. */
+  readState?(id: string): StateChange | undefined;
   write(id: string, value: unknown, ack: boolean): void;
   log(level: "info" | "warn", logicId: string, message: string): void;
   now(): number;
@@ -81,6 +92,9 @@ interface InputRuntime {
   lastById: Map<string, unknown>;
   last?: unknown;
   hasLast: boolean;
+  /** Value-based `changed` of the last update of this input. */
+  lastChanged?: boolean;
+  lastTs?: number;
 }
 
 interface Runtime {
@@ -98,6 +112,8 @@ interface Runtime {
   init: boolean;
   /** The `$start` timestamp while that event is being handled (D28). */
   starting?: number;
+  /** Assigned once the hooks that close over this runtime exist. */
+  vm?: LogicRuntime;
 }
 
 interface EventMeta {
@@ -122,10 +138,6 @@ interface Job {
   meta: EventMeta;
 }
 
-function isNoop(value: unknown): value is { noop: true } {
-  return isRecord(value) && "noop" in value;
-}
-
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -143,6 +155,11 @@ export function createEngine(
   const ownFrom = options.ownFrom;
   const maxDepth = options.maxDepth ?? 32;
   const memory = new Map<string, unknown>();
+  /** Write time, writer and value-based `changed` of every memory value. */
+  const memoryMeta = new Map<
+    string,
+    { ts: number; from: string; changed: boolean }
+  >();
   const issues = validateLogicDocument(doc);
   const declaredMemory = new Set<string>(
     (doc.memory ?? []).map((entry) => entry.name),
@@ -214,14 +231,26 @@ export function createEngine(
         }
       }
     }
-    runtimes.push({
+    const rt: Runtime = {
       def,
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
       timers: new Map<string, number>(),
       init: false,
-    });
+    };
+    try {
+      rt.vm = createLogicRuntime(def, {
+        describe: (name) => describeName(rt, name),
+        write: (name, value, ack, depth) =>
+          writeTarget(rt, name, value, ack, undefined, depth),
+        now: () => deps.now(),
+      });
+    } catch (error) {
+      deps.log("warn", def.id, errorText(error));
+      continue;
+    }
+    runtimes.push(rt);
   }
 
   const queue: Job[] = [];
@@ -272,29 +301,123 @@ export function createEngine(
     return `event “${job.input}”${writer ? ` from ${writer}` : ""}`;
   }
 
-  function resolveIn(rt: Runtime, ref: string): unknown {
-    if (ref === "$init") return rt.init;
-    if (ref === "$start") return rt.starting;
-    if (ref === "$from") return currentMeta.from;
-    if (ref === "$self") return currentMeta.self;
-    if (ref === "$ack") return currentMeta.ack;
-    if (ref === "$ts") return currentMeta.ts;
-    const input = rt.inputs.get(ref);
-    if (input) {
-      if (input.input.from.type === "memory") {
-        return memory.get(input.input.from.ref);
-      }
-      if (input.input.from.type === "timer") return input.last;
-      if (input.hasLast) return input.last;
-      return input.stateIds[0] ? deps.read(input.stateIds[0]) : undefined;
+  function memoryInfo(name: string): NameInfo {
+    const meta = memoryMeta.get(name);
+    return {
+      value: memory.get(name),
+      ack: true,
+      from: meta?.from,
+      ts: meta?.ts ?? deps.now(),
+      changed: meta?.changed ?? false,
+      writable: true,
+    };
+  }
+
+  function externalInfo(id: string): NameInfo {
+    const cached = deps.readState?.(id);
+    return {
+      value: cached ? cached.val : deps.read(id),
+      ack: cached?.ack ?? true,
+      from: cached?.from,
+      ts: cached?.ts ?? deps.now(),
+      changed: cached?.changed ?? false,
+      writable: true,
+    };
+  }
+
+  function inputInfo(input: InputRuntime): NameInfo {
+    if (input.input.from.type === "memory") {
+      return memoryInfo(input.input.from.ref);
     }
-    if (memory.has(ref) || declaredMemory.has(ref)) return memory.get(ref);
-    if (ref.includes(".")) return deps.read(ref);
+    if (input.input.from.type === "timer") {
+      return {
+        value: input.last,
+        ack: true,
+        ts: input.lastTs ?? deps.now(),
+        changed: true,
+        writable: false,
+      };
+    }
+    const id = input.stateIds[0];
+    const cached = id ? deps.readState?.(id) : undefined;
+    return {
+      value: input.hasLast ? input.last : id ? deps.read(id) : undefined,
+      ack: cached?.ack ?? true,
+      from: cached?.from,
+      ts: input.lastTs ?? cached?.ts ?? deps.now(),
+      changed: input.lastChanged ?? cached?.changed ?? false,
+      writable: true,
+    };
+  }
+
+  function pseudoInfo(rt: Runtime, ref: string): NameInfo {
+    const value =
+      ref === "$init"
+        ? rt.init
+        : ref === "$start"
+          ? rt.starting
+          : ref === "$from"
+            ? currentMeta.from
+            : ref === "$self"
+              ? currentMeta.self
+              : ref === "$ack"
+                ? currentMeta.ack
+                : currentMeta.ts;
+    return {
+      value,
+      ack: currentMeta.ack ?? true,
+      from: currentMeta.from,
+      ts: currentMeta.ts ?? deps.now(),
+      changed: false,
+      writable: false,
+    };
+  }
+
+  function describeName(rt: Runtime, ref: string): NameInfo {
+    if (
+      ref === "$init" ||
+      ref === "$start" ||
+      ref === "$from" ||
+      ref === "$self" ||
+      ref === "$ack" ||
+      ref === "$ts"
+    ) {
+      return pseudoInfo(rt, ref);
+    }
+    const input = rt.inputs.get(ref);
+    if (input) return inputInfo(input);
+    if (memory.has(ref) || declaredMemory.has(ref)) return memoryInfo(ref);
+    if (ref.includes(".")) return externalInfo(ref);
     const variable = deps.resolveVariable?.(ref);
-    if (!variable) return undefined;
-    return variable.kind === "const"
-      ? variable.value
-      : deps.read(variable.stateId);
+    if (!variable) {
+      return {
+        value: undefined,
+        ack: true,
+        ts: deps.now(),
+        changed: false,
+        writable: true,
+      };
+    }
+    if (variable.kind === "const") {
+      return {
+        value: variable.value,
+        ack: true,
+        from: "variable",
+        ts: deps.now(),
+        changed: false,
+        writable: false,
+      };
+    }
+    return externalInfo(variable.stateId);
+  }
+
+  function resolveIn(rt: Runtime, ref: string): unknown {
+    return describeName(rt, ref).value;
+  }
+
+  function runExpr(rt: Runtime, expr: Expr, depth: number): unknown {
+    if (!rt.vm) throw new Error("expression not compiled");
+    return rt.vm.run(expr.code, depth);
   }
 
   function externalId(ref: string, rt: Runtime): string | undefined {
@@ -322,6 +445,7 @@ export function createEngine(
     for (const rt of runtimes) {
       const refs: string[] = [];
       collectRefs(rt.def, refs);
+      forEachExpression(rt.def, (code) => refs.push(...extractRefs(code)));
       for (const ref of refs) {
         const id = externalId(ref, rt);
         if (id) ids.add(id);
@@ -444,7 +568,7 @@ export function createEngine(
       if (row.is && !matchesIs(row.is, job.value)) continue;
       if (row.if) {
         try {
-          if (!evaluate(row.if, (ref) => resolveIn(rt, ref))) continue;
+          if (!runExpr(rt, row.if, job.depth)) continue;
         } catch (error) {
           warn(logId(rt), `condition failed: ${errorText(error)}`);
           continue;
@@ -616,7 +740,7 @@ export function createEngine(
       if ("set" in action) {
         let value: unknown;
         try {
-          value = evaluate(action.set.value, (ref) => resolveIn(rt, ref));
+          value = runExpr(rt, action.set.value, depth);
         } catch (error) {
           warn(logId(rt), `set failed: ${errorText(error)}`);
           continue;
@@ -675,6 +799,11 @@ export function createEngine(
     const previous = memory.get(name);
     const hasPrevious = memory.has(name);
     memory.set(name, value);
+    memoryMeta.set(name, {
+      ts: deps.now(),
+      from: producer,
+      changed: !hasPrevious || !Object.is(previous, value),
+    });
     emitMemory(name, value, depth + 1, producer, previous, hasPrevious);
     return true;
   }
@@ -753,12 +882,16 @@ export function createEngine(
 
   function runFunction(rt: Runtime, depth: number, cause = ""): void {
     const def = rt.def as FunctionLogic;
-    if (isNoop(def.expr)) return;
     let value: unknown;
     try {
-      value = evaluate(def.expr, (ref) => resolveIn(rt, ref));
+      value = runExpr(rt, def.expr, depth);
     } catch (error) {
       warn(def.id, `expression failed: ${errorText(error)}`);
+      return;
+    }
+    if (isNoop(value)) return;
+    if (value && typeof (value as { then?: unknown }).then === "function") {
+      warn(def.id, "expression failed: async is not supported");
       return;
     }
     writeOutput(rt, value, depth, cause);
@@ -873,7 +1006,9 @@ export function createEngine(
     const output = rt.output;
     if (output.scope === "memory") {
       // The machine's own state readout, stored without emitting an event.
-      memory.set(output.name ?? def.id, chosen);
+      const name = output.name ?? def.id;
+      memory.set(name, chosen);
+      memoryMeta.set(name, { ts: deps.now(), from: "init", changed: false });
     } else {
       const target = outputTargetId(rt);
       // Remember what the output holds, so the first transition writes only a
@@ -926,7 +1061,7 @@ export function createEngine(
         value =
           typeof init.state === "string"
             ? init.state
-            : evaluate(init.state, (ref) => resolveIn(rt, ref));
+            : runExpr(rt, init.state, 0);
       } catch (error) {
         warn(def.id, `init state failed: ${errorText(error)}`);
         value = undefined;
@@ -956,17 +1091,20 @@ export function createEngine(
 
   function fireInputTimer(rt: Runtime, input: InputRuntime): void {
     const previous = input.last;
-    input.last = deps.now();
+    const now = deps.now();
+    input.last = now;
     input.hasLast = true;
+    input.lastChanged = true;
+    input.lastTs = now;
     enqueue({
       rt,
       input: input.name,
-      value: input.last,
+      value: now,
       previous,
       hasPrevious: previous !== undefined,
       depth: 0,
       fromTimer: true,
-      meta: { from: "timer", self: true, ts: deps.now() },
+      meta: { from: "timer", self: true, ts: now },
     });
   }
 
@@ -1114,6 +1252,8 @@ export function createEngine(
         if (!refs.includes(input)) continue;
         source.last = value;
         source.hasLast = true;
+        source.lastChanged = hasPrevious ? !Object.is(previous, value) : true;
+        source.lastTs = meta.ts;
         enqueue({
           rt,
           input: source.name,
@@ -1166,8 +1306,14 @@ export function createEngine(
     start() {
       if (started) return;
       started = true;
-      for (const entry of doc.memory ?? [])
+      for (const entry of doc.memory ?? []) {
         memory.set(entry.name, entry.initial);
+        memoryMeta.set(entry.name, {
+          ts: deps.now(),
+          from: "init",
+          changed: false,
+        });
+      }
       // Two passes (D17): computed memory is available to machines.
       for (const rt of runtimes) {
         if (rt.def.kind !== "function") continue;
@@ -1222,6 +1368,9 @@ export function createEngine(
           input.lastById.set(change.id, change.val);
           input.last = change.val;
           input.hasLast = true;
+          input.lastChanged =
+            change.changed ?? !Object.is(previous, change.val);
+          input.lastTs = change.ts ?? deps.now();
           enqueue({
             rt,
             input: input.name,

@@ -105,11 +105,7 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
         },
       },
       output: { scope: "state", ref: "{{target}}", type: "number" },
-      expr: {
-        op: "mul",
-        left: { ref: "value" },
-        right: { const: "{{factor}}" },
-      },
+      expr: { code: 'get("value") * {{factor}}' },
     },
   },
 ];

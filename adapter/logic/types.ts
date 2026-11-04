@@ -1,7 +1,9 @@
 // The logic document as stored in ihome.0.config.logicList. Every field the
-// engine, the validator and the editor share lives here; the spec
-// (docs/superpowers/specs/2026-10-31-ihome-logic-design.md, section 4) is the
-// authority when a comment and this file disagree.
+// engine, the validator and the editor share lives here; the expression spec
+// (docs/superpowers/specs/2026-11-04-logic-code-expressions-design.md) is the
+// authority for Expr, the logic spec
+// (docs/superpowers/specs/2026-10-31-ihome-logic-design.md, section 4) for the
+// rest.
 
 export type Json = string | number | boolean | null;
 
@@ -111,21 +113,8 @@ export interface Ref {
   ref: string;
 }
 
-export type Expr =
-  | { const: Json }
-  | { ref: string }
-  | { op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte"; left: Expr; right: Expr }
-  | { op: "and" | "or"; of: Expr[] }
-  | { op: "not"; of: Expr }
-  | { op: "add" | "sub" | "mul" | "div" | "mod"; left: Expr; right: Expr }
-  | { op: "neg" | "round" | "abs"; of: Expr }
-  | { op: "min" | "max"; of: Expr[] }
-  | { op: "clamp"; of: Expr; min: number; max: number }
-  | { op: "len"; of: Expr }
-  | { op: "if"; cond: Expr; then: Expr; else: Expr };
-
-/** A function logic answers a value, or "no update" (D15). */
-export type FunctionExpr = Expr | { noop: true };
+/** A bare JavaScript expression; "no update" is the runtime value of noop(). */
+export type Expr = { code: string };
 
 export type Action =
   | {
@@ -203,7 +192,7 @@ export interface LogicBase {
 
 export interface FunctionLogic extends LogicBase {
   kind: "function";
-  expr: FunctionExpr;
+  expr: Expr;
 }
 
 export interface MachineLogic extends LogicBase {
@@ -241,7 +230,7 @@ export interface LogicTemplate {
 }
 
 export interface LogicDocument {
-  version: 1;
+  version: 2;
   /** Shared values not tied to a logic output. */
   memory?: MemoryDecl[];
   logics: LogicDef[];
