@@ -24,6 +24,7 @@
     logics?: LogicDef[];
   } = $props();
 
+  let editor = $state<HTMLDivElement>();
   let textarea = $state<HTMLTextAreaElement>();
   let highlight = $state<HTMLPreElement>();
   let picking = $state(false);
@@ -47,6 +48,19 @@
   $effect(() => {
     code;
     grow();
+  });
+
+  $effect(() => {
+    if (!editor) return;
+    let width = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width === width) return;
+      width = entry.contentRect.width;
+      grow();
+    });
+    observer.observe(editor);
+    document.fonts?.ready.then(grow);
+    return () => observer.disconnect();
   });
 
   function syncScroll() {
@@ -97,7 +111,12 @@
     {/if}
   </div>
 
-  <div class="editor" class:composing class:invalid={problem}>
+  <div
+    bind:this={editor}
+    class="editor"
+    class:composing
+    class:invalid={problem}
+  >
     <!-- prettier-ignore -->
     <pre bind:this={highlight} class="highlight" aria-hidden="true">{#each spans as span, index (index)}<span class={span.kind}>{span.text}</span>{/each}</pre>
     <textarea
@@ -186,6 +205,9 @@
     white-space: pre-wrap;
     overflow-wrap: break-word;
     tab-size: 4;
+    /* Reserve the same gutter in both layers so a classic scrollbar never
+       narrows the textarea relative to the overlay. */
+    scrollbar-gutter: stable;
   }
 
   .code {
