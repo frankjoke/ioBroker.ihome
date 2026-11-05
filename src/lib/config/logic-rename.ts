@@ -1,5 +1,5 @@
 import type { LogicDef } from "$logic/types";
-import { renameCodeRefs } from "$logic/expr-code";
+import { renameCodeRefs, renameGotoRefs } from "$logic/expr-code";
 
 /**
  * Rewrite every memory reference to `from` as `to` in one logic. A memory is
@@ -48,6 +48,39 @@ export function renameLogicRefs(
       const out: Record<string, unknown> = {};
       for (const [key, item] of Object.entries(value)) {
         out[key] = key === "on" && item === old ? next : walk(item);
+      }
+      return out;
+    }
+    return value;
+  };
+  return walk(logic) as LogicDef;
+}
+
+/**
+ * Rewrite every reference to machine state `from` as `to`: `start`, `after.goto`,
+ * row `goto`, a string `init.state` and literal `goto("from")` calls. Dynamic
+ * gotos and expression init states are left alone.
+ */
+export function renameStateRefs(
+  logic: LogicDef,
+  from: string,
+  to: string,
+): LogicDef {
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(value)) {
+        if (key === "code" && typeof item === "string") {
+          out[key] = renameGotoRefs(item, from, to);
+        } else if (
+          (key === "goto" || key === "start" || key === "state") &&
+          item === from
+        ) {
+          out[key] = to;
+        } else {
+          out[key] = walk(item);
+        }
       }
       return out;
     }

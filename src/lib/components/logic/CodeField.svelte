@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { checkExpression, highlightCode } from "$logic/expr-code";
+  import { checkExpression, checkStatement, highlightCode } from "$logic/expr-code";
   import type { Input, LogicDef } from "$logic/types";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -13,6 +13,8 @@
     placeholder,
     minRows = 2,
     allowNoop = false,
+    mode = "expression",
+    allowGoto = false,
     logics = [],
     inputs = {},
   }: {
@@ -22,16 +24,23 @@
     placeholder?: string;
     minRows?: number;
     allowNoop?: boolean;
+    /** A single expression, or a block of statements. */
+    mode?: "expression" | "statements";
+    /** Offer the Goto insert (statement blocks). */
+    allowGoto?: boolean;
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
   } = $props();
 
+  const STATEMENT_PLACEHOLDER = 'set("light", true)\nlog("motion on")\ngoto("On")';
+
   let editor = $state<HTMLDivElement>();
   let textarea = $state<HTMLTextAreaElement>();
   let highlight = $state<HTMLPreElement>();
   let picking = $state(false);
+  let pickingGoto = $state(false);
   let composing = $state(false);
   /** The caret to insert at: captured before the picker or a badge takes focus. */
   let start = $state(0);
@@ -39,7 +48,9 @@
   /** Whether the textarea had focus when the insert button was pressed. */
   let focusedBeforePress = $state(false);
 
-  const problem = $derived(checkExpression(code));
+  const problem = $derived(
+    mode === "statements" ? checkStatement(code) : checkExpression(code),
+  );
   const spans = $derived(highlightCode(code));
   const inputEntries = $derived(Object.entries(inputs));
   const errorId = $props.id();
@@ -88,13 +99,13 @@
     end = textarea.selectionEnd;
   }
 
-  async function insertReference(name: string) {
+  async function insertText(text: string) {
     picking = false;
-    const insert = `get(${JSON.stringify(name)})`;
-    // A badge pressed without a focused field appends instead of inserting at 0.
+    pickingGoto = false;
+    // A button pressed without a focused field appends instead of inserting at 0.
     const from = focusedBeforePress ? start : code.length;
     const to = focusedBeforePress ? end : code.length;
-    const next = insertAtCaret(code, from, to, insert);
+    const next = insertAtCaret(code, from, to, text);
     onchange(next.text);
     await tick();
     textarea?.focus();
@@ -102,6 +113,10 @@
     start = next.caret;
     end = next.caret;
     focusedBeforePress = true;
+  }
+
+  function insertReference(name: string) {
+    return insertText(`get(${JSON.stringify(name)})`);
   }
 </script>
 
@@ -117,12 +132,22 @@
       <Icon value="add" size={14} />
       <span>State</span>
     </button>
-    {#if allowNoop}
+    {#if allowGoto}
+      <button
+        type="button"
+        class="btn btn-sm btn-outline"
+        title="Insert a goto at the caret"
+        onmousedown={rememberSelection}
+        onclick={() => (pickingGoto = true)}>Goto</button
+      >
+    {/if}
+    {#if allowNoop && mode === "expression"}
       <button
         type="button"
         class="btn btn-sm btn-outline"
         title="Leave the output unchanged"
-        onclick={() => onchange("noop()")}>No update</button
+        onmousedown={rememberSelection}
+        onclick={() => insertText("noop()")}>No update</button
       >
     {/if}
     {#if inputEntries.length > 0}
@@ -158,7 +183,10 @@
       aria-label={label}
       aria-invalid={problem ? "true" : undefined}
       aria-describedby={problem ? errorId : undefined}
-      {placeholder}
+      placeholder={placeholder ??
+        (mode === "statements"
+          ? STATEMENT_PLACEHOLDER
+          : undefined)}
       rows={minRows}
       spellcheck="false"
       autocapitalize="off"
@@ -189,6 +217,19 @@
     logicPick="state"
     onState={insertReference}
     onClose={() => (picking = false)}
+  />
+{/if}
+
+{#if pickingGoto}
+  <SourcePicker
+    mode="state"
+    title="Insert goto target"
+    allowStay
+    {logics}
+    logicPick="state"
+    onState={(id) => insertText(`goto(${JSON.stringify(id)})`)}
+    onStay={() => insertText("goto()")}
+    onClose={() => (pickingGoto = false)}
   />
 {/if}
 

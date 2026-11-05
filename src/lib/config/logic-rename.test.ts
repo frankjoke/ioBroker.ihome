@@ -1,6 +1,10 @@
 import { it, expect } from "vitest";
 import type { LogicDef } from "$logic/types";
-import { renameLogicRefs, renameMemoryRefs } from "$lib/config/logic-rename";
+import {
+  renameLogicRefs,
+  renameMemoryRefs,
+  renameStateRefs,
+} from "$lib/config/logic-rename";
 
 it("rewrites bare memory refs, not states or the output name", () => {
   const logic = {
@@ -60,4 +64,56 @@ it("rewrites $logic triggers, and only the renamed one", () => {
     .states.A.on;
   expect(rows[0].on).toBe("$logic.new");
   expect(rows[1].on).toBe("$logic.other");
+});
+
+it("rewrites state references in code and structured fields", () => {
+  const logic = {
+    id: "m",
+    name: "M",
+    kind: "machine",
+    start: "old",
+    init: { state: "old" },
+    states: {
+      old: {
+        after: { time: "1m", goto: "old" },
+        on: [
+          {
+            on: "e",
+            mode: "function",
+            do: { code: 'goto("old")\nif (get("x")) goto("old")' },
+          },
+          { on: "e", goto: "old" },
+        ],
+      },
+    },
+  } as const;
+  const next = renameStateRefs(logic as never, "old", "new") as any;
+  expect(next.start).toBe("new");
+  expect(next.init.state).toBe("new");
+  expect(next.states.old.after.goto).toBe("new");
+  expect(next.states.old.on[0].do.code).toBe(
+    'goto("new")\nif (get("x")) goto("new")',
+  );
+  expect(next.states.old.on[1].goto).toBe("new");
+});
+
+it("rewrites memory refs inside statement code", () => {
+  const logic = {
+    id: "m",
+    name: "M",
+    kind: "machine",
+    states: {
+      A: {
+        on: [
+          {
+            on: "e",
+            mode: "function",
+            do: { code: 'set("old", 1)\nget("old")' },
+          },
+        ],
+      },
+    },
+  } as const;
+  const next = renameMemoryRefs(logic as never, "old", "new") as any;
+  expect(next.states.A.on[0].do.code).toBe('set("new", 1)\nget("new")');
 });

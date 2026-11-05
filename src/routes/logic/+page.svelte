@@ -211,7 +211,7 @@
       logic.id === current.id ? current : logic,
     );
     if (!logs.some((logic) => logic.id === current.id)) logs.push(current);
-    return validateLogicDocument({ version: 2, logics: logs }).filter(
+    return validateLogicDocument({ version: 3, logics: logs }).filter(
       (issue) => issue.logicId === current.id,
     );
   });

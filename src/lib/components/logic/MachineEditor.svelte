@@ -7,8 +7,8 @@
     Operator,
     StateDef,
   } from "$logic/types";
-  import ActionList from "./ActionList.svelte";
   import CodeField from "./CodeField.svelte";
+  import RowActions from "./RowActions.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
@@ -16,6 +16,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { stateIdFor } from "$lib/config/variables";
+  import { renameStateRefs } from "$lib/config/logic-rename";
 
   let {
     logic,
@@ -162,30 +163,10 @@
 
   function removeState(name: string) {
     if (name === "$all" || stateNames.length <= 1) return;
-    const states = { ...logic.states };
-    delete states[name];
-    const fallback = Object.keys(states)[0];
-    const rewritten: Record<string, StateDef> = {};
-    for (const [key, state] of Object.entries(states)) {
-      rewritten[key] = {
-        ...state,
-        after: state.after
-          ? {
-              ...state.after,
-              goto: state.after.goto === name ? fallback : state.after.goto,
-            }
-          : undefined,
-        on: state.on?.map((row) => ({
-          ...row,
-          goto: row.goto === name ? fallback : row.goto,
-        })),
-      };
-    }
-    onchange({
-      ...logic,
-      start: logic.start === name ? fallback : logic.start,
-      states: rewritten,
-    });
+    const fallback = stateNames.find((key) => key !== name) as string;
+    const rewritten = renameStateRefs(logic, name, fallback) as MachineLogic;
+    delete rewritten.states[name];
+    onchange(rewritten);
     if (openState === name) {
       openState = null;
       openRow = null;
@@ -216,26 +197,11 @@
     if (name !== oldName && name in logic.states) return;
     const states: Record<string, StateDef> = {};
     for (const [key, state] of Object.entries(logic.states)) {
-      const nextName = key === oldName ? name : key;
-      states[nextName] = {
-        ...state,
-        after: state.after
-          ? {
-              ...state.after,
-              goto: state.after.goto === oldName ? name : state.after.goto,
-            }
-          : undefined,
-        on: state.on?.map((row) => ({
-          ...row,
-          goto: row.goto === oldName ? name : row.goto,
-        })),
-      };
+      states[key === oldName ? name : key] = state;
     }
-    onchange({
-      ...logic,
-      start: logic.start === oldName ? name : logic.start,
-      states,
-    });
+    onchange(
+      renameStateRefs({ ...logic, states }, oldName, name) as MachineLogic,
+    );
     if (openState === oldName) openState = name;
   }
 
@@ -367,10 +333,11 @@
     if (row.source && row.source !== "external")
       parts.push(`source ${row.source}`);
     if (row.if) parts.push("if …");
-    if (row.do?.length) {
-      parts.push(`${row.do.length} action${row.do.length > 1 ? "s" : ""}`);
-    }
-    if (row.goto) parts.push(`→ ${row.goto}`);
+    if (row.log?.level) parts.push(`log ${row.log.level}`);
+    if ((row.mode ?? "goto") === "function") {
+      if (row.do?.code.trim()) parts.push("function");
+    } else if (row.goto) parts.push(`→ ${row.goto}`);
+    if (row.continue) parts.push("continue");
     return parts.join(" · ");
   }
 </script>
@@ -622,54 +589,13 @@
               {/if}
             </div>
 
-            <div class="block">
-              <span class="label-mono">Then</span>
-              <ActionList
-                actions={row.do ?? []}
-                {stateNames}
-                {logics}
-                inputs={logic.inputs}
-                onchange={(actions) =>
-                  updateRow(name, index, { ...row, do: actions })}
-              />
-            </div>
-
-            <div class="row">
-              <span class="label-mono">goto</span>
-              <select
-                aria-label="Target state"
-                value={row.goto ?? ""}
-                onchange={(e) =>
-                  updateRow(name, index, {
-                    ...row,
-                    goto: e.currentTarget.value || undefined,
-                  })}
-              >
-                <option value="">— stay —</option>
-                {#each stateNames as target (target)}
-                  <option value={target}>{target}</option>
-                {/each}
-              </select>
-              <label
-                class="check"
-                title={row.goto || (row.do ?? []).some((a) => "goto" in a)
-                  ? "A goto ends this event — clear it to continue with the next row"
-                  : "After this row's actions, keep checking the next rows for the same event"}
-              >
-                <input
-                  type="checkbox"
-                  checked={row.continue === true}
-                  disabled={!!row.goto ||
-                    (row.do ?? []).some((a) => "goto" in a)}
-                  onchange={(e) =>
-                    updateRow(name, index, {
-                      ...row,
-                      continue: e.currentTarget.checked || undefined,
-                    })}
-                />
-                <span>continue</span>
-              </label>
-            </div>
+            <RowActions
+              {row}
+              {stateNames}
+              {logics}
+              inputs={logic.inputs}
+              onchange={(next) => updateRow(name, index, next)}
+            />
           </div>
         {/if}
       </div>
@@ -838,20 +764,34 @@
                 {#snippet children(id)}
                   <div class="option-body">
                     {#if id === "enter"}
-                      <ActionList
-                        actions={state.enter ?? []}
+                      <CodeField
+                        code={state.enter?.code ?? ""}
+                        mode="statements"
+                        label="On enter"
+                        minRows={3}
+                        allowGoto
                         {logics}
                         inputs={logic.inputs}
-                        onchange={(enter) =>
-                          updateState(name, { ...state, enter })}
+                        onchange={(code) =>
+                          updateState(name, {
+                            ...state,
+                            enter: code.trim() ? { code } : undefined,
+                          })}
                       />
                     {:else if id === "exit"}
-                      <ActionList
-                        actions={state.exit ?? []}
+                      <CodeField
+                        code={state.exit?.code ?? ""}
+                        mode="statements"
+                        label="On exit"
+                        minRows={3}
+                        allowGoto
                         {logics}
                         inputs={logic.inputs}
-                        onchange={(exit) =>
-                          updateState(name, { ...state, exit })}
+                        onchange={(code) =>
+                          updateState(name, {
+                            ...state,
+                            exit: code.trim() ? { code } : undefined,
+                          })}
                       />
                     {:else}
                       <div class="row">
