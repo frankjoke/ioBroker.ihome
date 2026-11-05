@@ -64,8 +64,18 @@ export function notificationOptions(
     body: message.showBody ? message.body : "New notification",
     tag: message.tag,
     requireInteraction: message.level === "error",
-    data: { url: message.url ?? "/" },
+    data: { url: message.url ?? "" },
   };
+}
+
+/** Resolve a notification target inside the app; other origins fall back. */
+export function notificationTarget(
+  url: string | undefined,
+  scope: string,
+): string {
+  const base = new URL(scope);
+  const target = new URL((url ?? "").replace(/^\/+/, ""), base);
+  return target.origin === base.origin ? target.href : base.href;
 }
 
 export function base64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {

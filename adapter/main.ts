@@ -21,7 +21,9 @@ import {
   validPhoneName,
 } from "./logic/phone-ops";
 import {
-  shouldDropSubscription,
+  normalizePushPayload,
+  sendPushes,
+  upsertPushSubscription,
   validPushPayload,
   validPushSubscription,
   type PushPayload,
@@ -284,8 +286,9 @@ class IHome extends utils.Adapter {
     title: string,
     body: string,
   ): void {
-    this.pushLogicLog(level, logicId, body || title);
-    void this.sendPush({ title, body, level }).catch((error) => {
+    const payload = normalizePushPayload({ title, body, level });
+    this.pushLogicLog(level, logicId, payload.body || payload.title);
+    void this.sendPush(payload).catch((error) => {
       this.log.warn(`push notify failed: ${String(error)}`);
     });
   }
@@ -855,6 +858,13 @@ class IHome extends utils.Adapter {
     } catch {
       // already gone
     }
+    const before = this.pushSubscriptions.length;
+    this.pushSubscriptions = this.pushSubscriptions.filter(
+      (entry) => entry.deviceId !== deviceId,
+    );
+    if (this.pushSubscriptions.length !== before) {
+      await this.writePushSubscriptions();
+    }
   }
 
   /** Write the phone fields the SPA sent; validation rejects bad values. */
@@ -1073,12 +1083,10 @@ class IHome extends utils.Adapter {
           reply({ ok: false, error: "invalid subscription" });
           return;
         }
-        this.pushSubscriptions = [
-          ...this.pushSubscriptions.filter(
-            (entry) => entry.deviceId !== deviceId,
-          ),
+        this.pushSubscriptions = upsertPushSubscription(
+          this.pushSubscriptions,
           subscription,
-        ];
+        );
         await this.writePushSubscriptions();
         reply({ ok: true, deviceId });
       } else if (obj.message.action === "unsubscribe") {
@@ -1163,42 +1171,41 @@ class IHome extends utils.Adapter {
     payload: PushPayload,
     deviceId?: string,
   ): Promise<{ sent: number; removed: number }> {
+    const safe = validPushPayload(payload);
+    if (!safe) {
+      this.log.warn("push payload rejected: title or body out of range");
+      return { sent: 0, removed: 0 };
+    }
     const targets = deviceId
       ? this.pushSubscriptions.filter((entry) => entry.deviceId === deviceId)
       : this.pushSubscriptions;
     if (!this.pushPublicKey || !this.pushPrivateKey || targets.length === 0) {
       return { sent: 0, removed: 0 };
     }
-    let sent = 0;
-    let removed = 0;
-    const dropped = new Set<string>();
-    for (const entry of targets) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: entry.endpoint, keys: entry.keys },
-          JSON.stringify(payload),
-        );
-        sent += 1;
-      } catch (error) {
-        const statusCode =
-          isRecord(error) && typeof error.statusCode === "number"
-            ? error.statusCode
-            : 0;
-        if (shouldDropSubscription(statusCode)) {
-          dropped.add(entry.deviceId);
-          removed += 1;
-        } else {
-          this.log.warn(`push to ${entry.deviceId} failed: ${String(error)}`);
-        }
-      }
+    const result = await sendPushes(targets, safe, (entry) =>
+      webpush.sendNotification(
+        { endpoint: entry.endpoint, keys: entry.keys },
+        JSON.stringify(safe),
+      ),
+    );
+    for (const error of result.errors) {
+      this.log.warn(
+        `push to ${error.deviceId} failed (${error.statusCode || "network"}): ${error.error}`,
+      );
     }
-    if (dropped.size) {
+    const kept = new Set(result.subscriptions.map((entry) => entry.deviceId));
+    const gone = new Set(
+      targets
+        .filter((entry) => !kept.has(entry.deviceId))
+        .map((entry) => entry.deviceId),
+    );
+    if (gone.size) {
       this.pushSubscriptions = this.pushSubscriptions.filter(
-        (entry) => !dropped.has(entry.deviceId),
+        (entry) => !gone.has(entry.deviceId),
       );
       await this.writePushSubscriptions();
     }
-    return { sent, removed };
+    return { sent: result.sent, removed: result.removed };
   }
 
   private async onReady(): Promise<void> {

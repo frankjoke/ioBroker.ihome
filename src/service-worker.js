@@ -8,6 +8,7 @@ import { base, build, files, prerendered, version } from "$service-worker";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import {
   notificationOptions,
+  notificationTarget,
   notificationTitle,
   parsePushMessage,
 } from "$lib/push-ops";
@@ -59,21 +60,26 @@ self.addEventListener("push", (event) => {
   } catch {
     message = null;
   }
-  if (!message) return;
   event.waitUntil(
-    self.registration.showNotification(
-      notificationTitle(message),
-      notificationOptions(message),
-    ),
+    message
+      ? self.registration.showNotification(
+          notificationTitle(message),
+          notificationOptions(message),
+        )
+      : // iOS may revoke a subscription after silent pushes; never drop one.
+        self.registration.showNotification("iHome", {
+          body: "New notification",
+          data: { url: "" },
+        }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(
-    event.notification.data?.url ?? "/",
+  const target = notificationTarget(
+    event.notification.data?.url,
     self.registration.scope,
-  ).href;
+  );
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({

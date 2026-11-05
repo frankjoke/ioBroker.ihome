@@ -50,6 +50,20 @@ async function serviceWorker(): Promise<ServiceWorkerRegistration> {
   return registration;
 }
 
+async function registerSubscription(
+  subscription: PushSubscription,
+): Promise<void> {
+  const result = (await ioBroker.sendTo(ioBroker.namespace, "push", {
+    action: "subscribe",
+    deviceId: phone.deviceId,
+    name: phone.name,
+    subscription: subscription.toJSON(),
+  })) as { ok?: boolean; error?: string } | undefined;
+  if (!result?.ok) {
+    throw new Error(result?.error ?? "The adapter rejected the subscription.");
+  }
+}
+
 export function initPush(): void {
   if (initialized) return;
   initialized = true;
@@ -62,7 +76,13 @@ export function initPush(): void {
   if (!push.supported) return;
   void serviceWorker()
     .then(async (reg) => {
-      push.subscribed = Boolean(await reg.pushManager.getSubscription());
+      const subscription = await reg.pushManager.getSubscription();
+      push.subscribed = Boolean(subscription);
+      if (subscription && Notification.permission === "granted") {
+        // Reconcile: the adapter may have lost the record or the browser may
+        // have rotated the endpoint while the app was closed.
+        await registerSubscription(subscription);
+      }
     })
     .catch(() => {
       // The worker is not ready yet; the toggle still works later.
@@ -99,17 +119,7 @@ export async function enablePush(): Promise<void> {
         userVisibleOnly: true,
         applicationServerKey: base64ToUint8Array(key),
       }));
-    const result = (await ioBroker.sendTo(ioBroker.namespace, "push", {
-      action: "subscribe",
-      deviceId: phone.deviceId,
-      name: phone.name,
-      subscription: subscription.toJSON(),
-    })) as { ok?: boolean; error?: string } | undefined;
-    if (!result?.ok) {
-      throw new Error(
-        result?.error ?? "The adapter rejected the subscription.",
-      );
-    }
+    await registerSubscription(subscription);
     push.subscribed = true;
   } catch (error) {
     push.error = errorText(error);

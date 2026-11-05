@@ -120,6 +120,31 @@ it("enables push and sends the subscription to the adapter", async () => {
   expect(push.error).toBe("");
 });
 
+it("re-registers an existing subscription with the adapter", async () => {
+  installSupport();
+  h.pushManager.getSubscription.mockResolvedValue(h.subscription);
+  h.notification.permission = "granted";
+  const { initPush } = await load();
+
+  initPush();
+  await vi.waitFor(() => expect(h.sent).toHaveLength(1));
+
+  expect(h.sent).toEqual([
+    {
+      command: "push",
+      payload: {
+        action: "subscribe",
+        deviceId: "phone-1",
+        name: "Kitchen",
+        subscription: {
+          endpoint: "https://push.example/1",
+          keys: { p256dh: "a", auth: "b" },
+        },
+      },
+    },
+  ]);
+});
+
 it("disables push and removes the subscription", async () => {
   installSupport();
   h.pushManager.getSubscription.mockResolvedValue(h.subscription);

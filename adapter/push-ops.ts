@@ -86,6 +86,96 @@ export function validPushPayload(value: unknown): PushPayload | null {
   };
 }
 
+export function normalizePushPayload(value: unknown): PushPayload {
+  const record = isRecord(value) ? value : {};
+  const title =
+    (typeof record.title === "string" ? record.title.trim() : "").slice(
+      0,
+      TITLE_MAX,
+    ) || "iHome";
+  const body = (
+    typeof record.body === "string" ? record.body.trim() : ""
+  ).slice(0, BODY_MAX);
+  const rawLevel = record.level;
+  const level =
+    rawLevel === "warn" || rawLevel === "warning"
+      ? "warn"
+      : rawLevel === "error"
+        ? "error"
+        : "info";
+  const tag = optionalText(record.tag, 64);
+  const url = optionalText(record.url, 512);
+  return {
+    title,
+    body,
+    level,
+    ...(tag ? { tag } : {}),
+    ...(url ? { url } : {}),
+    ...(record.showBody === true ? { showBody: true } : {}),
+  };
+}
+
+export function upsertPushSubscription(
+  subscriptions: PushSubscriptionRecord[],
+  record: PushSubscriptionRecord,
+): PushSubscriptionRecord[] {
+  return [
+    ...subscriptions.filter(
+      (entry) =>
+        entry.deviceId !== record.deviceId &&
+        entry.endpoint !== record.endpoint,
+    ),
+    record,
+  ];
+}
+
+export interface PushSendError {
+  deviceId: string;
+  statusCode: number;
+  error: string;
+}
+
+export interface PushSendResult {
+  sent: number;
+  removed: number;
+  subscriptions: PushSubscriptionRecord[];
+  errors: PushSendError[];
+}
+
+export async function sendPushes(
+  subscriptions: PushSubscriptionRecord[],
+  payload: PushPayload,
+  send: (entry: PushSubscriptionRecord) => Promise<unknown>,
+): Promise<PushSendResult> {
+  const kept: PushSubscriptionRecord[] = [];
+  const errors: PushSendError[] = [];
+  let sent = 0;
+  let removed = 0;
+  for (const entry of subscriptions) {
+    try {
+      await send(entry);
+      sent += 1;
+      kept.push(entry);
+    } catch (error) {
+      const statusCode =
+        isRecord(error) && typeof error.statusCode === "number"
+          ? error.statusCode
+          : 0;
+      if (shouldDropSubscription(statusCode)) {
+        removed += 1;
+      } else {
+        kept.push(entry);
+        errors.push({
+          deviceId: entry.deviceId,
+          statusCode,
+          error: String(error),
+        });
+      }
+    }
+  }
+  return { sent, removed, subscriptions: kept, errors };
+}
+
 export function shouldDropSubscription(statusCode: number): boolean {
   return statusCode === 404 || statusCode === 410;
 }
