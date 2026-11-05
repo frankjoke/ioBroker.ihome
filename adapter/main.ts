@@ -6,10 +6,19 @@ import {
   type LogicReading,
   type StateChange,
 } from "./logic/engine";
-import { parseLogicDocument } from "./logic/validate";
+import { isRecord, parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
 import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
+import {
+  locationText,
+  mapUrl,
+  normalizeConnection,
+  validDeviceId,
+  validHome,
+  validLocation,
+  validPhoneName,
+} from "./logic/phone-ops";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -173,6 +182,7 @@ class IHome extends utils.Adapter {
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
     this.on("log", (entry: ioBroker.LogMessage) => this.onLog(entry));
+    this.on("message", (obj) => void this.onPhoneMessage(obj));
   }
 
   /**
@@ -686,6 +696,268 @@ class IHome extends utils.Adapter {
     }
   }
 
+  /** Create the phone folder, home point and one device's state objects. */
+  private async ensurePhoneStates(
+    deviceId: string,
+    name: string,
+  ): Promise<void> {
+    await this.setObjectNotExistsAsync("phone", {
+      type: "folder",
+      common: { name: "Phone presence" },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync(`phone.${deviceId}`, {
+      type: "folder",
+      common: { name },
+      native: {},
+    });
+    const states: Array<{
+      field: string;
+      name: string;
+      type: "string" | "boolean" | "number";
+      role: string;
+      unit?: string;
+    }> = [
+      { field: "name", name: "Name", type: "string", role: "text" },
+      { field: "enabled", name: "Enabled", type: "boolean", role: "switch" },
+      { field: "atHome", name: "At home", type: "boolean", role: "indicator.state" },
+      { field: "homeSource", name: "Home source", type: "string", role: "text" },
+      { field: "location", name: "Location", type: "string", role: "json" },
+      { field: "locationText", name: "Location text", type: "string", role: "text" },
+      { field: "mapUrl", name: "Map link", type: "string", role: "text" },
+      { field: "distance", name: "Distance from home", type: "number", role: "value", unit: "m" },
+      { field: "online", name: "Online", type: "boolean", role: "indicator.state" },
+      { field: "connection", name: "Connection", type: "string", role: "text" },
+      { field: "local", name: "Local network", type: "boolean", role: "indicator.state" },
+      { field: "permission", name: "Location permission", type: "string", role: "text" },
+      { field: "lastSeen", name: "Last seen", type: "number", role: "value.time" },
+      { field: "updatedAt", name: "Updated", type: "number", role: "value.time" },
+    ];
+    for (const state of states) {
+      await this.setObjectNotExistsAsync(`phone.${deviceId}.${state.field}`, {
+        type: "state",
+        common: {
+          name: state.name,
+          type: state.type,
+          role: state.role as never,
+          read: true,
+          write: false,
+          ...(state.unit ? { unit: state.unit } : {}),
+        },
+        native: {},
+      });
+    }
+  }
+
+  private async removePhoneDevice(deviceId: string): Promise<void> {
+    const fields = [
+      "name",
+      "enabled",
+      "atHome",
+      "homeSource",
+      "location",
+      "locationText",
+      "mapUrl",
+      "distance",
+      "online",
+      "connection",
+      "local",
+      "permission",
+      "lastSeen",
+      "updatedAt",
+    ];
+    for (const field of fields) {
+      try {
+        await this.delObjectAsync(`phone.${deviceId}.${field}`);
+      } catch {
+        // already gone
+      }
+    }
+    try {
+      await this.delObjectAsync(`phone.${deviceId}`);
+    } catch {
+      // already gone
+    }
+  }
+
+  /** Write the phone fields the SPA sent; validation rejects bad values. */
+  private async writePhoneUpdate(
+    deviceId: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const prefix = `phone.${deviceId}.`;
+    const write = (field: string, val: unknown): Promise<unknown> =>
+      this.setStateAsync(`${prefix}${field}`, {
+        val: val as ioBroker.StateValue,
+        ack: true,
+      });
+
+    const name = data.name === undefined ? undefined : validPhoneName(data.name);
+    if (data.name !== undefined) {
+      if (!name) throw new Error("invalid phone name");
+      await write("name", name);
+    }
+    if (data.enabled !== undefined) {
+      if (typeof data.enabled !== "boolean") throw new Error("invalid enabled");
+      await write("enabled", data.enabled);
+    }
+    if (data.atHome !== undefined) {
+      if (data.atHome !== null && typeof data.atHome !== "boolean") {
+        throw new Error("invalid atHome");
+      }
+      await write("atHome", data.atHome);
+    }
+    if (data.homeSource !== undefined) {
+      if (
+        typeof data.homeSource !== "string" ||
+        !["local", "geofence", "none"].includes(data.homeSource)
+      ) {
+        throw new Error("invalid homeSource");
+      }
+      await write("homeSource", data.homeSource);
+    }
+
+    const atHome = data.atHome === true;
+    if (atHome) {
+      await write("location", "");
+      await write("locationText", "At home");
+      await write("mapUrl", "");
+    } else if (data.location !== undefined) {
+      if (data.location === null) {
+        await write("location", "");
+        await write("locationText", "Unknown");
+        await write("mapUrl", "");
+      } else {
+        const location = validLocation(data.location);
+        if (!location) throw new Error("invalid location");
+        await write("location", JSON.stringify(location));
+        await write("locationText", locationText(location, false));
+        await write("mapUrl", mapUrl(location));
+      }
+    }
+    if (data.locationText !== undefined) {
+      if (typeof data.locationText !== "string" || data.locationText.length > 200) {
+        throw new Error("invalid locationText");
+      }
+      await write("locationText", data.locationText);
+    }
+    if (data.mapUrl !== undefined) {
+      if (typeof data.mapUrl !== "string" || data.mapUrl.length > 500) {
+        throw new Error("invalid mapUrl");
+      }
+      await write("mapUrl", data.mapUrl);
+    }
+    if (data.distance !== undefined) {
+      if (
+        data.distance !== null &&
+        (typeof data.distance !== "number" ||
+          !Number.isFinite(data.distance) ||
+          data.distance < 0)
+      ) {
+        throw new Error("invalid distance");
+      }
+      await write("distance", data.distance);
+    }
+    if (data.online !== undefined) {
+      if (typeof data.online !== "boolean") throw new Error("invalid online");
+      await write("online", data.online);
+    }
+    if (data.connection !== undefined) {
+      if (typeof data.connection !== "string") throw new Error("invalid connection");
+      await write("connection", normalizeConnection({ type: data.connection }));
+    }
+    if (data.local !== undefined) {
+      if (typeof data.local !== "boolean") throw new Error("invalid local");
+      await write("local", data.local);
+    }
+    if (data.permission !== undefined) {
+      if (
+        typeof data.permission !== "string" ||
+        !["granted", "denied", "prompt", "unsupported"].includes(data.permission)
+      ) {
+        throw new Error("invalid permission");
+      }
+      await write("permission", data.permission);
+    }
+    const now = Date.now();
+    await write(
+      "lastSeen",
+      typeof data.lastSeen === "number" && Number.isFinite(data.lastSeen)
+        ? data.lastSeen
+        : now,
+    );
+    await write("updatedAt", now);
+  }
+
+  private async onPhoneMessage(obj: ioBroker.Message): Promise<void> {
+    if (obj.command !== "phone") return;
+    const reply = (result: unknown): void => {
+      if (obj.callback) this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    try {
+      if (!isRecord(obj.message)) {
+        reply({ ok: false, error: "invalid payload" });
+        return;
+      }
+      const action = obj.message.action;
+      const deviceId = validDeviceId(obj.message.deviceId);
+      if (!deviceId) {
+        reply({ ok: false, error: "invalid device id" });
+        return;
+      }
+      if (action === "register") {
+        const name = validPhoneName(obj.message.name) ?? deviceId;
+        await this.ensurePhoneStates(deviceId, name);
+        await this.writePhoneUpdate(deviceId, {
+          name,
+          enabled:
+            typeof obj.message.enabled === "boolean"
+              ? obj.message.enabled
+              : true,
+        });
+        reply({ ok: true, deviceId });
+      } else if (action === "update") {
+        if (!isRecord(obj.message.data)) {
+          reply({ ok: false, error: "invalid update" });
+          return;
+        }
+        await this.ensurePhoneStates(deviceId, deviceId);
+        await this.writePhoneUpdate(deviceId, obj.message.data);
+        reply({ ok: true, deviceId });
+      } else if (action === "home") {
+        const home = validHome(obj.message.home);
+        if (!home) {
+          reply({ ok: false, error: "invalid home" });
+          return;
+        }
+        await this.setObjectNotExistsAsync("phone.home", {
+          type: "state",
+          common: {
+            name: "Phone home point",
+            type: "string",
+            role: "json" as never,
+            read: true,
+            write: false,
+          },
+          native: {},
+        });
+        await this.setStateAsync("phone.home", {
+          val: JSON.stringify(home),
+          ack: true,
+        });
+        reply({ ok: true });
+      } else if (action === "remove") {
+        await this.removePhoneDevice(deviceId);
+        reply({ ok: true });
+      } else {
+        reply({ ok: false, error: "unknown action" });
+      }
+    } catch (error) {
+      this.log.warn(`phone message: ${String(error)}`);
+      reply({ ok: false, error: String(error) });
+    }
+  }
+
   private async onReady(): Promise<void> {
     if (this.requireLog) {
       try {
@@ -711,6 +983,17 @@ class IHome extends utils.Adapter {
         name: "iHome logic readout",
         type: "string",
         role: "json",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync("phone.home", {
+      type: "state",
+      common: {
+        name: "Phone home point",
+        type: "string",
+        role: "json" as never,
         read: true,
         write: false,
       },
