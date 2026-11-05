@@ -23,3 +23,20 @@ export function connectionState(): ConnectionStatus {
 export function registerAliveState(): void {
   registerProgramStateId(aliveId());
 }
+
+/** True when the socket resolved to the local broker (not the cloud). */
+export function isLocalBroker(): boolean {
+  const url = ioBroker.brokerUrl;
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname;
+    return (
+      host === location.hostname ||
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    );
+  } catch {
+    return false;
+  }
+}
