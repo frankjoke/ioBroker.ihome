@@ -154,6 +154,17 @@ it("migrates rows with both do and goto into one function block", () => {
   expect(v2.logics[0].states.A.on[0].do).toHaveLength(1);
 });
 
+it("leaves a template without a logic body untouched", () => {
+  const template = { id: "t", name: "T", params: [] };
+  const v3 = migrateActionDocument({
+    version: 2,
+    logics: [],
+    templates: [template],
+  }) as any;
+  expect(v3.version).toBe(3);
+  expect(v3.templates[0]).toEqual(template);
+});
+
 it("migrates templates and rejects an unknown action", () => {
   const v3 = migrateActionDocument({
     version: 2,

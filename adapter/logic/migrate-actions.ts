@@ -113,8 +113,9 @@ function migrateLogic(logic: Row): Row {
   return next;
 }
 
-function migrateTemplate(template: Row): Row {
-  return { ...template, logic: migrateLogic(template.logic as Row) };
+function migrateTemplate(value: unknown): unknown {
+  if (!isRecord(value) || !("logic" in value)) return value;
+  return { ...value, logic: migrateLogic(value.logic as Row) };
 }
 
 export function migrateActionDocument(doc: unknown): LogicDocument {
