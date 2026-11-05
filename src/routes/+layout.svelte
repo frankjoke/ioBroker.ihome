@@ -47,6 +47,12 @@
   import { getSettings, initSettings } from "$lib/stores/settings.svelte";
   import AppBar from "$lib/components/AppBar.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
+  import ToastHost from "$lib/components/common/ToastHost.svelte";
+  import {
+    connectionState,
+    registerAliveState,
+  } from "$lib/stores/connection.svelte";
+  import { toast } from "$lib/stores/toasts.svelte";
 
   let { children } = $props();
 
@@ -214,6 +220,44 @@
     void initSettings(applySettings);
   });
 
+  // Connection problems are sticky toasts: they stay until the state clears.
+  // The short grace period keeps the initial connect attempt from flashing an
+  // error toast.
+  let lastConnection;
+  let connectionTimer = null;
+  $effect(() => {
+    registerAliveState();
+    const current = connectionState();
+    if (current === lastConnection) return;
+    lastConnection = current;
+    if (connectionTimer) {
+      clearTimeout(connectionTimer);
+      connectionTimer = null;
+    }
+    if (current === "error") {
+      toast.dismissKey("adapter");
+      connectionTimer = setTimeout(() => {
+        if (connectionState() === "error") {
+          toast.error("No connection to ioBroker", {
+            key: "connection",
+            sticky: true,
+          });
+        }
+      }, 2000);
+    } else if (current === "warning") {
+      toast.dismissKey("connection");
+      toast.warning("iobroker.ihome adapter not running!", {
+        key: "adapter",
+        sticky: true,
+      });
+    } else if (current === "ok") {
+      toast.dismissKey("connection");
+      toast.dismissKey("adapter");
+    } else {
+      toast.dismissKey("connection");
+    }
+  });
+
   // Load all device states once the socket is up and the object cache is ready,
   // then again for any state objects that appear later. Pages read the shared
   // reactive ioBroker.states map directly.
@@ -318,6 +362,7 @@
     </p>
   {/if}
   <AppBar />
+  <ToastHost />
 
   <main class="app-main">
     {#if configLocked}

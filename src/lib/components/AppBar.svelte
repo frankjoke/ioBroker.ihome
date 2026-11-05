@@ -30,8 +30,10 @@
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
   import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
   import { effectiveHidePencil } from "$lib/config/settings-ops";
-  import { connectionStatus } from "$lib/connection-status";
-  import { registerProgramStateId } from "$lib/stores/devices.svelte";
+  import {
+    connectionState,
+    registerAliveState,
+  } from "$lib/stores/connection.svelte";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -55,14 +57,7 @@
       ? wanted
       : (treePages[0]?.id ?? "");
   });
-  const isConnected = $derived(!!ioBroker.connected);
-  /** The instance's heartbeat: green in Admin, false once the adapter stops. */
-  const aliveId = $derived(`system.adapter.${ioBroker.namespace}.alive`);
-  const aliveState = $derived(ioBroker.states.get(aliveId));
-  const adapterAlive = $derived(
-    aliveState ? aliveState.val === true : undefined,
-  );
-  const status = $derived(connectionStatus(isConnected, adapterAlive));
+  const status = $derived(connectionState());
   const statusText = $derived(
     status === "error"
       ? {
@@ -85,7 +80,7 @@
             },
   );
   $effect(() => {
-    registerProgramStateId(aliveId);
+    registerAliveState();
   });
   /** The UI page can hide the pencil for everyone; until the settings document
    *  is read, hide it — an unauthorized pencil must not flash in. */
