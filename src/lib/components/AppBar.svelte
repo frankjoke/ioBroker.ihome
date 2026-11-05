@@ -30,6 +30,8 @@
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
   import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
   import { effectiveHidePencil } from "$lib/config/settings-ops";
+  import { connectionStatus } from "$lib/connection-status";
+  import { registerProgramStateId } from "$lib/stores/devices.svelte.js";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -54,6 +56,37 @@
       : (treePages[0]?.id ?? "");
   });
   const isConnected = $derived(!!ioBroker.connected);
+  /** The instance's heartbeat: green in Admin, false once the adapter stops. */
+  const aliveId = $derived(`system.adapter.${ioBroker.namespace}.alive`);
+  const aliveState = $derived(ioBroker.states.get(aliveId));
+  const adapterAlive = $derived(
+    aliveState ? aliveState.val === true : undefined,
+  );
+  const status = $derived(connectionStatus(isConnected, adapterAlive));
+  const statusText = $derived(
+    status === "error"
+      ? {
+          title: "Configuration — not connected",
+          label: "Configuration, not connected",
+        }
+      : status === "warning"
+        ? {
+            title: "Configuration — connected, iHome adapter is not active",
+            label: "Configuration, connected, iHome adapter is not active",
+          }
+        : status === "pending"
+          ? {
+              title: "Configuration — connected, checking iHome adapter",
+              label: "Configuration, connected, checking iHome adapter",
+            }
+          : {
+              title: "Configuration — connected",
+              label: "Configuration, connected",
+            },
+  );
+  $effect(() => {
+    registerProgramStateId(aliveId);
+  });
   /** The UI page can hide the pencil for everyone; until the settings document
    *  is read, hide it — an unauthorized pencil must not flash in. */
   const hidePencil = $derived(
@@ -239,14 +272,12 @@
 
     <a
       class="icon-btn status-btn"
-      class:connected={isConnected}
+      class:ok={status === "ok"}
+      class:warning={status === "warning"}
+      class:error={status === "error"}
       href={cogHref}
-      title={isConnected
-        ? "Configuration — connected"
-        : "Configuration — not connected"}
-      aria-label={isConnected
-        ? "Configuration, connected"
-        : "Configuration, not connected"}
+      title={statusText.title}
+      aria-label={statusText.label}
     >
       <span class="material-symbols-outlined">settings</span>
     </a>
@@ -373,7 +404,7 @@
     margin-left: auto;
   }
 
-  .status-btn.connected .material-symbols-outlined {
+  .status-btn.ok .material-symbols-outlined {
     color: var(--tertiary);
     font-variation-settings:
       "FILL" 1,
@@ -382,7 +413,11 @@
       "opsz" 24;
   }
 
-  .status-btn:not(.connected) .material-symbols-outlined {
+  .status-btn.warning .material-symbols-outlined {
     color: var(--warning-color);
+  }
+
+  .status-btn.error .material-symbols-outlined {
+    color: var(--danger-color);
   }
 </style>
