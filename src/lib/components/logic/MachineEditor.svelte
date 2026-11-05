@@ -770,6 +770,7 @@
                         label="On enter"
                         minRows={3}
                         allowGoto
+                        {stateNames}
                         {logics}
                         inputs={logic.inputs}
                         onchange={(code) =>
@@ -785,6 +786,7 @@
                         label="On exit"
                         minRows={3}
                         allowGoto
+                        {stateNames}
                         {logics}
                         inputs={logic.inputs}
                         onchange={(code) =>

@@ -50,9 +50,7 @@
     onSource,
     onControls,
     onState,
-    onStay,
     onClose,
-    allowStay = false,
     logics = [],
     logicPick = undefined,
   }: {
@@ -71,9 +69,6 @@
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
     onState?: (stateId: string) => void;
-    /** state mode: offer a `— stay —` choice above the browser. */
-    allowStay?: boolean;
-    onStay?: () => void;
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
     /** What a logic selection means: an event trigger or its output state. */
@@ -556,11 +551,6 @@
     {/if}
 
     {#if tab === "state"}
-      {#if allowStay}
-        <button type="button" class="device-source" onclick={() => onStay?.()}>
-          — stay —
-        </button>
-      {/if}
       {#if mode === "control"}
         <StateBrowser
           {objects}

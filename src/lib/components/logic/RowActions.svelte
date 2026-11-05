@@ -121,6 +121,7 @@
       label="Function"
       minRows={3}
       allowGoto
+      {stateNames}
       {logics}
       {inputs}
       placeholder={'set("light", true)\nlog("motion on")\ngoto("On")'}

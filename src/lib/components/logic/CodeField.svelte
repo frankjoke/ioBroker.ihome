@@ -15,6 +15,7 @@
     allowNoop = false,
     mode = "expression",
     allowGoto = false,
+    stateNames = [],
     logics = [],
     inputs = {},
   }: {
@@ -28,19 +29,21 @@
     mode?: "expression" | "statements";
     /** Offer the Goto insert (statement blocks). */
     allowGoto?: boolean;
+    /** The machine's states, offered by the Goto insert after `— stay —`. */
+    stateNames?: string[];
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
   } = $props();
 
+  const STAY = "__stay__";
   const STATEMENT_PLACEHOLDER = 'set("light", true)\nlog("motion on")\ngoto("On")';
 
   let editor = $state<HTMLDivElement>();
   let textarea = $state<HTMLTextAreaElement>();
   let highlight = $state<HTMLPreElement>();
   let picking = $state(false);
-  let pickingGoto = $state(false);
   let composing = $state(false);
   /** The caret to insert at: captured before the picker or a badge takes focus. */
   let start = $state(0);
@@ -101,7 +104,6 @@
 
   async function insertText(text: string) {
     picking = false;
-    pickingGoto = false;
     // A button pressed without a focused field appends instead of inserting at 0.
     const from = focusedBeforePress ? start : code.length;
     const to = focusedBeforePress ? end : code.length;
@@ -133,13 +135,24 @@
       <span>State</span>
     </button>
     {#if allowGoto}
-      <button
-        type="button"
-        class="btn btn-sm btn-outline"
+      <select
+        aria-label="Insert goto"
         title="Insert a goto at the caret"
+        value=""
         onmousedown={rememberSelection}
-        onclick={() => (pickingGoto = true)}>Goto</button
+        onchange={(e) => {
+          const target = e.currentTarget.value;
+          e.currentTarget.value = "";
+          if (target === STAY) insertText("goto()");
+          else if (target) insertText(`goto(${JSON.stringify(target)})`);
+        }}
       >
+        <option value="">— goto —</option>
+        <option value={STAY}>— stay —</option>
+        {#each stateNames as state (state)}
+          <option value={state}>{state}</option>
+        {/each}
+      </select>
     {/if}
     {#if allowNoop && mode === "expression"}
       <button
@@ -217,19 +230,6 @@
     logicPick="state"
     onState={insertReference}
     onClose={() => (picking = false)}
-  />
-{/if}
-
-{#if pickingGoto}
-  <SourcePicker
-    mode="state"
-    title="Insert goto target"
-    allowStay
-    {logics}
-    logicPick="state"
-    onState={(id) => insertText(`goto(${JSON.stringify(id)})`)}
-    onStay={() => insertText("goto()")}
-    onClose={() => (pickingGoto = false)}
   />
 {/if}
 
