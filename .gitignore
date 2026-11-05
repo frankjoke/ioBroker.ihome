@@ -39,3 +39,6 @@ docs/
 
 # Plan-execution scratch (ledger, briefs, review packages)
 .superpowers/
+
+# Isolated worktrees
+.worktrees/
