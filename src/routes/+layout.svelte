@@ -48,6 +48,7 @@
   import AppBar from "$lib/components/AppBar.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import ToastHost from "$lib/components/common/ToastHost.svelte";
+  import MessageToasts from "$lib/components/common/MessageToasts.svelte";
   import {
     connectionState,
     registerAliveState,
@@ -363,6 +364,7 @@
   {/if}
   <AppBar />
   <ToastHost />
+  <MessageToasts />
 
   <main class="app-main">
     {#if configLocked}

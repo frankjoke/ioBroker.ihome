@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "news": {
       "0.1.4": {
         "en": "Logic v1 grows up: an event combines state sources with repeating timers (an interval, a SunCalc astro time from the system location with a minute offset, or cron HH:MM[:SS] on selected weekdays), $logic.<id> triggers another logic, $var.<name> listens to a global variable, $all and $start are pseudo-states, and startup adopts the current state silently instead of replaying it. The timer type is the app's tab strip and all weekdays start checked; the tile editor adds a value/name home, rule lists, an inline device editor and a tabbed source picker with variables and logic.",

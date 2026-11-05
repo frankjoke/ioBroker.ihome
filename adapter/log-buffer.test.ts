@@ -34,6 +34,16 @@ it("clear keeps the sequence monotonic", () => {
   expect(page.entries[0].seq).toBe(3);
 });
 
+it("keeps a message timeout", () => {
+  const buffer = createLogBuffer(10);
+  buffer.push({ message: "sticky", timeout: 0 });
+  buffer.push({ message: "five", timeout: 5 });
+
+  expect(buffer.slice(0, 10).entries.map((entry) => entry.timeout)).toEqual([
+    0, 5,
+  ]);
+});
+
 it("fills missing fields with safe defaults", () => {
   const buffer = createLogBuffer(10);
   buffer.push({});

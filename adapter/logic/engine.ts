@@ -51,6 +51,12 @@ export interface EngineDeps {
   readState?(id: string): StateChange | undefined;
   write(id: string, value: unknown, ack: boolean): void;
   log(level: "info" | "warn", logicId: string, message: string): void;
+  message(
+    level: "info" | "warn" | "error",
+    logicId: string,
+    message: string,
+    timeout?: number,
+  ): void;
   now(): number;
   setTimeout(fn: () => void, ms: number): number;
   clearTimeout(handle: number): void;
@@ -251,6 +257,8 @@ export function createEngine(
         write: (name, value, ack, forward, depth) =>
           writeTarget(rt, name, value, ack, forward, depth),
         log: (level, message) => deps.log(level, logId(rt), message),
+        message: (level, message, timeout) =>
+          deps.message(level, logId(rt), message, timeout),
         now: () => deps.now(),
       });
     } catch (error) {

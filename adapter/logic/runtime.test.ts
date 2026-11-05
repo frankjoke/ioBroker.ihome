@@ -17,13 +17,15 @@ const logic = (code: string): FunctionLogic => ({
 
 function runtimeFor(source: string, info: Record<string, NameInfo> = {}) {
   const writes: unknown[][] = [];
+  const messages: unknown[][] = [];
   const runtime = createLogicRuntime(logic(source), {
     describe: (name) => info[name],
     write: (...args) => writes.push(args),
     log: () => {},
+    message: (...args) => messages.push(args),
     now: () => 1000,
   });
-  return { runtime, writes };
+  return { runtime, writes, messages };
 }
 
 const machine = (source: string): MachineLogic => ({
@@ -48,11 +50,13 @@ function blockHooks(
   writes: unknown[][],
   logs: unknown[][] = [],
   names: Record<string, NameInfo> = {},
+  messages: unknown[][] = [],
 ): RuntimeHooks {
   return {
     describe: (name) => names[name],
     write: (...args) => writes.push(args),
     log: (...args) => logs.push(args),
+    message: (...args) => messages.push(args),
     now: () => 1000,
   };
 }
@@ -264,6 +268,28 @@ it("log interpolates {{ref}} and takes a level", () => {
   const rt = createLogicRuntime(def, blockHooks([], logs, { a: info(4) }));
   rt.runStatements(def.states.A.on![0].do!, 0);
   expect(logs).toEqual([["warn", "hi 4 —"]]);
+});
+
+it("message interpolates, takes a level and a timeout", () => {
+  const messages: unknown[][] = [];
+  const def = machine('message("hi {{a}}", "Warning", 5)');
+  const rt = createLogicRuntime(
+    def,
+    blockHooks([], [], { a: info(4) }, messages),
+  );
+  rt.runStatements(def.states.A.on![0].do!, 0);
+  expect(messages).toEqual([["warn", "hi 4", 5]]);
+});
+
+it("message defaults to info and keeps 0 as sticky", () => {
+  const messages: unknown[][] = [];
+  const def = machine('message("one")\nmessage("two", "error", 0)');
+  const rt = createLogicRuntime(def, blockHooks([], [], {}, messages));
+  rt.runStatements(def.states.A.on![0].do!, 0);
+  expect(messages).toEqual([
+    ["info", "one", undefined],
+    ["error", "two", 0],
+  ]);
 });
 
 it("return ends the block", () => {

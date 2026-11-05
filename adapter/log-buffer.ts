@@ -4,6 +4,8 @@ export interface LogLine {
   from: string;
   severity: string;
   message: string;
+  /** Message toasts: seconds until dismissal; 0 keeps it until closed. */
+  timeout?: number;
 }
 
 export interface LogRaw {
@@ -11,6 +13,7 @@ export interface LogRaw {
   from?: string;
   severity?: string;
   message?: string;
+  timeout?: number;
 }
 
 export interface LogPage {
@@ -36,6 +39,7 @@ export function createLogBuffer(max = 1000) {
         from: String(raw.from ?? ""),
         severity: String(raw.severity ?? "info"),
         message: String(raw.message ?? ""),
+        timeout: raw.timeout === undefined ? undefined : Number(raw.timeout),
       });
       if (entries.length > size) entries.splice(0, entries.length - size);
     },

@@ -23,6 +23,11 @@ export interface RuntimeHooks {
     depth: number,
   ): void;
   log(level: "info" | "warn", message: string): void;
+  message(
+    level: "info" | "warn" | "error",
+    message: string,
+    timeout?: number,
+  ): void;
   now(): number;
 }
 
@@ -127,6 +132,14 @@ export function interpolate(
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** `Info`/`Warning`/`Error` and the short `warn` all work. */
+function messageLevel(value: unknown): "info" | "warn" | "error" {
+  const level = String(value ?? "info").toLowerCase();
+  if (level === "error") return "error";
+  if (level === "warn" || level === "warning") return "warn";
+  return "info";
 }
 
 /**
@@ -264,6 +277,17 @@ export function createLogicRuntime(
     hooks.log(
       level === "warn" ? "warn" : "info",
       interpolate(String(text), (name) => hooks.describe(name)),
+    );
+  });
+  define("message", (text: unknown, level?: unknown, timeout?: unknown) => {
+    const seconds =
+      typeof timeout === "number" && Number.isFinite(timeout) && timeout >= 0
+        ? timeout
+        : undefined;
+    hooks.message(
+      messageLevel(level),
+      interpolate(String(text), (name) => hooks.describe(name)),
+      seconds,
     );
   });
   define("noop", () => NOOP);

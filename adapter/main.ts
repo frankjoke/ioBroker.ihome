@@ -161,6 +161,9 @@ class IHome extends utils.Adapter {
   /** The adapter's recent log lines, published as `info.log`. */
   private readonly logs = createLogBuffer();
   private logStateTimer?: ReturnType<typeof setTimeout>;
+  /** Logic messages for live toasts, published as `info.messages`. */
+  private readonly messages = createLogBuffer(20);
+  private messageStateTimer?: ReturnType<typeof setTimeout>;
   /** The live readout per logic, published as `info.logic`. */
   private readonly logicInfo = new Map<string, LogicReading>();
   private logicStateTimer?: ReturnType<typeof setTimeout>;
@@ -209,6 +212,55 @@ class IHome extends utils.Adapter {
         ack: true,
       }).catch(() => {});
     }, 500);
+  }
+
+  /** Push a logic line to the log feed and the adapter log. */
+  private pushLogicLog(
+    level: "info" | "warn" | "error",
+    logicId: string,
+    message: string,
+  ): void {
+    const line = `[logic ${logicId}] ${message}`;
+    this.logs.push({
+      ts: Date.now(),
+      from: this.namespace,
+      severity: level,
+      message: line,
+    });
+    this.scheduleLogState();
+    if (level === "error") this.log.error(line);
+    else if (level === "warn") this.log.warn(line);
+    else this.log.info(line);
+  }
+
+  /** Publish a logic message for live toasts and log it. */
+  private pushMessage(
+    level: "info" | "warn" | "error",
+    logicId: string,
+    message: string,
+    timeout?: number,
+  ): void {
+    this.pushLogicLog(level, logicId, message);
+    this.messages.push({
+      ts: Date.now(),
+      from: logicId,
+      severity: level,
+      message,
+      timeout,
+    });
+    this.scheduleMessageState();
+  }
+
+  /** Publish the message ring as a state (debounced, like `info.log`). */
+  private scheduleMessageState(): void {
+    if (this.messageStateTimer) return;
+    this.messageStateTimer = setTimeout(() => {
+      this.messageStateTimer = undefined;
+      void this.setStateAsync("info.messages", {
+        val: JSON.stringify(this.messages.slice(0, 20)),
+        ack: true,
+      }).catch(() => {});
+    }, 200);
   }
 
   /** Publish the live logic readout as a state (debounced, like `info.log`). */
@@ -484,18 +536,10 @@ class IHome extends utils.Adapter {
           read: (id) => this.logicValues.get(id)?.val,
           readState: (id) => this.logicValues.get(id),
           write: (id, value, ack) => this.writeLogicState(id, value, ack),
-          log: (level, logicId, message) => {
-            const line = `[logic ${logicId}] ${message}`;
-            this.logs.push({
-              ts: Date.now(),
-              from: this.namespace,
-              severity: level,
-              message: line,
-            });
-            this.scheduleLogState();
-            if (level === "warn") this.log.warn(line);
-            else this.log.info(line);
-          },
+          log: (level, logicId, message) =>
+            this.pushLogicLog(level, logicId, message),
+          message: (level, logicId, message, timeout) =>
+            this.pushMessage(level, logicId, message, timeout),
           now: () => Date.now(),
           setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
           clearTimeout: (handle) =>
@@ -665,6 +709,17 @@ class IHome extends utils.Adapter {
       type: "state",
       common: {
         name: "iHome logic readout",
+        type: "string",
+        role: "json",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    await this.setObjectNotExistsAsync("info.messages", {
+      type: "state",
+      common: {
+        name: "iHome logic messages",
         type: "string",
         role: "json",
         read: true,
