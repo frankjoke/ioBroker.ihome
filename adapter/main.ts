@@ -22,6 +22,7 @@ import {
 } from "./logic/phone-ops";
 import {
   normalizePushPayload,
+  removePushSubscription,
   sendPushes,
   upsertPushSubscription,
   validPushPayload,
@@ -859,8 +860,9 @@ class IHome extends utils.Adapter {
       // already gone
     }
     const before = this.pushSubscriptions.length;
-    this.pushSubscriptions = this.pushSubscriptions.filter(
-      (entry) => entry.deviceId !== deviceId,
+    this.pushSubscriptions = removePushSubscription(
+      this.pushSubscriptions,
+      deviceId,
     );
     if (this.pushSubscriptions.length !== before) {
       await this.writePushSubscriptions();
@@ -1090,8 +1092,9 @@ class IHome extends utils.Adapter {
         await this.writePushSubscriptions();
         reply({ ok: true, deviceId });
       } else if (obj.message.action === "unsubscribe") {
-        this.pushSubscriptions = this.pushSubscriptions.filter(
-          (entry) => entry.deviceId !== deviceId,
+        this.pushSubscriptions = removePushSubscription(
+          this.pushSubscriptions,
+          deviceId,
         );
         await this.writePushSubscriptions();
         reply({ ok: true });

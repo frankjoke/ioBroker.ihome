@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   normalizePushPayload,
+  removePushSubscription,
   sendPushes,
   shouldDropSubscription,
   upsertPushSubscription,
@@ -56,6 +57,17 @@ it("replaces a subscription by device id and endpoint", () => {
     }),
   ).toHaveLength(1);
   expect(upsertPushSubscription([first], second)).toEqual([second]);
+});
+
+it("removes a subscription by device id", () => {
+  const first = {
+    deviceId: "phone-1",
+    endpoint: "https://push.example/1",
+    keys: { p256dh: "a", auth: "b" },
+    ts: 1,
+  };
+  expect(removePushSubscription([first], "phone-1")).toEqual([]);
+  expect(removePushSubscription([first], "phone-2")).toEqual([first]);
 });
 
 it("drops only gone subscriptions while sending", async () => {

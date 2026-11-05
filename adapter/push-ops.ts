@@ -129,6 +129,13 @@ export function upsertPushSubscription(
   ];
 }
 
+export function removePushSubscription(
+  subscriptions: PushSubscriptionRecord[],
+  deviceId: string,
+): PushSubscriptionRecord[] {
+  return subscriptions.filter((entry) => entry.deviceId !== deviceId);
+}
+
 export interface PushSendError {
   deviceId: string;
   statusCode: number;
