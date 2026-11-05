@@ -137,7 +137,11 @@
       }
     ]
   },
-  "native": {},
+  "native": {
+    "vapidPublicKey": "",
+    "vapidPrivateKey": ""
+  },
+  "encryptedNative": ["vapidPrivateKey"],
   "objects": [],
   "instanceObjects": []
 }

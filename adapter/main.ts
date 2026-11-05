@@ -1066,6 +1066,39 @@ class IHome extends utils.Adapter {
       },
       native: {},
     });
+    await this.setObjectNotExistsAsync("info.pushPublicKey", {
+      type: "state",
+      common: {
+        name: "Web Push public key",
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    const config = this.config as {
+      vapidPublicKey?: unknown;
+      vapidPrivateKey?: unknown;
+    };
+    const vapidPublicKey =
+      typeof config.vapidPublicKey === "string"
+        ? config.vapidPublicKey.trim()
+        : "";
+    const vapidPrivateKey =
+      typeof config.vapidPrivateKey === "string"
+        ? config.vapidPrivateKey.trim()
+        : "";
+    const pushConfigured = Boolean(vapidPublicKey && vapidPrivateKey);
+    await this.setStateAsync("info.pushPublicKey", {
+      val: pushConfigured ? vapidPublicKey : "",
+      ack: true,
+    });
+    if (!pushConfigured) {
+      this.log.warn(
+        "Web Push disabled: set vapidPublicKey and vapidPrivateKey in the adapter configuration",
+      );
+    }
     await this.setObjectNotExistsAsync("info.logClear", {
       type: "state",
       common: {
