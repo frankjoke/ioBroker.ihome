@@ -1,10 +1,14 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { checkExpression, checkStatement, highlightCode } from "$logic/expr-code";
+  import {
+    checkExpression,
+    checkStatement,
+    highlightCode,
+  } from "$logic/expr-code";
   import type { Input, LogicDef } from "$logic/types";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
-  import { insertAtCaret } from "./code-field";
+  import { gotoInsertAt, insertAtCaret, insertRange } from "./code-field";
 
   let {
     code,
@@ -37,8 +41,8 @@
     inputs?: Record<string, Input>;
   } = $props();
 
-  const STAY = "__stay__";
-  const STATEMENT_PLACEHOLDER = 'set("light", true)\nlog("motion on")\ngoto("On")';
+  const STATEMENT_PLACEHOLDER =
+    'set("light", true)\nlog("motion on")\ngoto("On")';
 
   let editor = $state<HTMLDivElement>();
   let textarea = $state<HTMLTextAreaElement>();
@@ -105,8 +109,7 @@
   async function insertText(text: string) {
     picking = false;
     // A button pressed without a focused field appends instead of inserting at 0.
-    const from = focusedBeforePress ? start : code.length;
-    const to = focusedBeforePress ? end : code.length;
+    const [from, to] = insertRange(focusedBeforePress, start, end, code.length);
     const next = insertAtCaret(code, from, to, text);
     onchange(next.text);
     await tick();
@@ -141,14 +144,13 @@
         value=""
         onmousedown={rememberSelection}
         onchange={(e) => {
-          const target = e.currentTarget.value;
-          e.currentTarget.value = "";
-          if (target === STAY) insertText("goto()");
-          else if (target) insertText(`goto(${JSON.stringify(target)})`);
+          const text = gotoInsertAt(e.currentTarget.selectedIndex, stateNames);
+          e.currentTarget.selectedIndex = 0;
+          if (text) insertText(text);
         }}
       >
         <option value="">— goto —</option>
-        <option value={STAY}>— stay —</option>
+        <option value="">— stay —</option>
         {#each stateNames as state (state)}
           <option value={state}>{state}</option>
         {/each}
@@ -197,9 +199,7 @@
       aria-invalid={problem ? "true" : undefined}
       aria-describedby={problem ? errorId : undefined}
       placeholder={placeholder ??
-        (mode === "statements"
-          ? STATEMENT_PLACEHOLDER
-          : undefined)}
+        (mode === "statements" ? STATEMENT_PLACEHOLDER : undefined)}
       rows={minRows}
       spellcheck="false"
       autocapitalize="off"
@@ -210,6 +210,13 @@
       oncompositionend={() => {
         composing = false;
         grow();
+      }}
+      onblur={() => {
+        // Keyboard users tab to an insert control without a mousedown.
+        if (!textarea) return;
+        start = textarea.selectionStart;
+        end = textarea.selectionEnd;
+        focusedBeforePress = true;
       }}
       onselect={rememberSelection}
       onkeyup={rememberSelection}
