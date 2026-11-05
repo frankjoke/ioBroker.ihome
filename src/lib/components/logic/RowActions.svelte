@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Input, LogicDef, OnRow } from "$logic/types";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import CodeField from "./CodeField.svelte";
 
   let {
@@ -21,6 +22,18 @@
   const mode = $derived(row.mode ?? "goto");
   const hasGotoDraft = $derived(mode !== "goto" && !!row.goto);
   const hasCodeDraft = $derived(mode !== "function" && !!row.do?.code.trim());
+  const rowTabs = $derived([
+    {
+      id: "goto" as const,
+      label: hasGotoDraft ? "goto •" : "goto",
+      hint: "Pick a target state, or stay in this state",
+    },
+    {
+      id: "function" as const,
+      label: hasCodeDraft ? "function •" : "function",
+      hint: "Run statements that can set, log and goto",
+    },
+  ]);
 </script>
 
 <div class="row-actions">
@@ -56,27 +69,7 @@
     {/if}
   </div>
 
-  <div class="tabs">
-    <button
-      type="button"
-      class="btn btn-sm"
-      class:active={mode === "goto"}
-      aria-pressed={mode === "goto"}
-      onclick={() => onchange({ ...row, mode: "goto" })}
-    >
-      goto{#if hasGotoDraft}<span class="dot" title="Has a saved goto"
-        ></span>{/if}
-    </button>
-    <button
-      type="button"
-      class="btn btn-sm"
-      class:active={mode === "function"}
-      aria-pressed={mode === "function"}
-      onclick={() => onchange({ ...row, mode: "function" })}
-    >
-      function{#if hasCodeDraft}<span class="dot" title="Has saved code"
-        ></span>{/if}
-    </button>
+  <div class="row-flag">
     <label class="continue">
       <input
         type="checkbox"
@@ -94,66 +87,79 @@
     </label>
   </div>
 
-  {#if mode === "goto"}
-    <select
-      aria-label="Target state"
-      value={row.goto ?? ""}
-      onchange={(e) => {
-        const goto = e.currentTarget.value || undefined;
-        onchange({
-          ...row,
-          goto,
-          mode: "goto",
-          continue: goto ? undefined : row.continue,
-        });
-      }}
-    >
-      <option value="">— stay —</option>
-      {#each stateNames as target (target)}
-        <option value={target}>{target}</option>
-      {/each}
-    </select>
-  {:else}
-    <CodeField
-      code={row.do?.code ?? ""}
-      mode="statements"
-      label="Function"
-      minRows={3}
-      allowGoto
-      {stateNames}
-      {logics}
-      {inputs}
-      placeholder={[
-        'set("light", true)',
-        'log("motion on")',
-        'goto("On")',
-      ].join("\n")}
-      onchange={(code) =>
-        onchange({
-          ...row,
-          do: code.trim() ? { code } : undefined,
-          mode: "function",
-        })}
-    />
-  {/if}
+  <OptionTabs
+    value={mode}
+    label="Row action"
+    tabs={rowTabs}
+    collapsible={false}
+    onchange={(next) => {
+      if (!next || next === mode) return;
+      onchange({ ...row, mode: next });
+    }}
+  >
+    {#snippet children(id)}
+      <div class="option-body">
+        {#if id === "goto"}
+          <select
+            aria-label="Target state"
+            value={row.goto ?? ""}
+            onchange={(e) => {
+              const goto = e.currentTarget.value || undefined;
+              onchange({
+                ...row,
+                goto,
+                mode: "goto",
+                continue: goto ? undefined : row.continue,
+              });
+            }}
+          >
+            <option value="">— stay —</option>
+            {#each stateNames as target (target)}
+              <option value={target}>{target}</option>
+            {/each}
+          </select>
+        {:else}
+          <CodeField
+            code={row.do?.code ?? ""}
+            mode="statements"
+            label="Function"
+            minRows={3}
+            allowGoto
+            {stateNames}
+            {logics}
+            {inputs}
+            placeholder={[
+              'set("light", true)',
+              'log("motion on")',
+              'goto("On")',
+            ].join("\n")}
+            onchange={(code) =>
+              onchange({
+                ...row,
+                do: code.trim() ? { code } : undefined,
+                mode: "function",
+              })}
+          />
+        {/if}
+      </div>
+    {/snippet}
+  </OptionTabs>
 </div>
 
 <style>
-  .row-actions,
-  .log-line,
-  .tabs {
+  .row-actions {
+    --option-tab-bg: var(--surface-color);
     display: flex;
+    flex-direction: column;
     gap: 0.4rem;
   }
 
-  .row-actions {
-    flex-direction: column;
-  }
-
   .log-line,
-  .tabs {
+  .row-flag {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
+    gap: 0.4rem;
   }
 
   .log-line input {
@@ -161,25 +167,18 @@
     min-width: 12rem;
   }
 
-  .tabs .active {
-    background: var(--primary-color);
-    color: var(--on-primary, #fff);
-  }
-
   .continue {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    margin-left: auto;
     font-size: var(--body-sm);
   }
 
-  .dot {
-    display: inline-block;
-    width: 0.4rem;
-    height: 0.4rem;
-    margin-left: 0.3rem;
-    border-radius: 50%;
-    background: var(--secondary-color);
+  .option-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.3rem 0 0.3rem 0.6rem;
+    border-left: 2px solid var(--border-color);
   }
 </style>

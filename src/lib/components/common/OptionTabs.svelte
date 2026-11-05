@@ -10,6 +10,7 @@
     label,
     collapsible = true,
     children,
+    onchange,
   }: {
     tabs: readonly { id: T; label: string; hint: string }[];
     /** The open tab; null = all closed. Bind it to keep the state. */
@@ -20,6 +21,8 @@
     collapsible?: boolean;
     /** The open group's body, called with the open id. */
     children?: Snippet<[T | null]>;
+    /** Called after a click with the new open id (null when closed). */
+    onchange?: (value: T | null) => void;
   } = $props();
 
   /** The open tab's hint, also readable on touch where a tooltip cannot open. */
@@ -35,8 +38,10 @@
         class:active={value === t.id}
         aria-expanded={value === t.id}
         title={t.hint}
-        onclick={() =>
-          (value = value === t.id ? (collapsible ? null : value) : t.id)}
+        onclick={() => {
+          value = value === t.id ? (collapsible ? null : value) : t.id;
+          onchange?.(value);
+        }}
       >
         {t.label}
       </button>
