@@ -1,8 +1,13 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { isLocalBroker } from "$lib/stores/connection.svelte";
 import {
+  distanceMeters,
   homeFromSystemConfig,
+  locationText,
+  mapUrl,
   normalizeConnection,
+  phoneDecision,
+  validLocation,
   type PhoneConnection,
   type PhoneHome,
   type PhoneLocation,
@@ -57,6 +62,9 @@ export const phone = $state<PhoneSettings & { status: PhoneStatus }>({
 let initialized = false;
 let heartbeat: ReturnType<typeof setInterval> | null = null;
 let listeners = false;
+let watchId: number | null = null;
+let lastSentAt = 0;
+let lastSentLocation: PhoneLocation | null = null;
 
 function newDeviceId(): string {
   try {
@@ -138,6 +146,14 @@ export function reportPhone(): void {
   phone.status.online = navigator.onLine;
   phone.status.connection = normalizeConnection((navigator as any).connection);
   phone.status.local = isLocalBroker();
+  if (phone.status.local) {
+    phone.status.atHome = true;
+    phone.status.homeSource = "local";
+    phone.status.location = null;
+    phone.status.locationText = "At home";
+    phone.status.mapUrl = "";
+    phone.status.distance = homePoint() ? 0 : null;
+  }
   phone.status.lastSeen = Date.now();
   send("update", {
     action: "update",
@@ -170,6 +186,7 @@ function stopPhone(): void {
     clearInterval(heartbeat);
     heartbeat = null;
   }
+  stopWatch();
 }
 
 function attachListeners(): void {
@@ -178,7 +195,12 @@ function attachListeners(): void {
   window.addEventListener("online", reportPhone);
   window.addEventListener("offline", reportPhone);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") reportPhone();
+    if (document.visibilityState === "visible") {
+      reportPhone();
+      if (phone.enabled && !phone.paused) void requestPhoneLocation();
+    } else {
+      stopWatch();
+    }
   });
 }
 
@@ -238,11 +260,117 @@ export function homePoint(): PhoneHome | null {
   return phone.home ?? homeFromSystemConfig(ioBroker.systemConfig);
 }
 
-/** Task 4 implements the geolocation flow; the card calls this. */
-export async function requestPhoneLocation(): Promise<void> {
-  if (!navigator.geolocation) {
-    phone.status.permission = "unsupported";
+function stopWatch(): void {
+  if (watchId === null) return;
+  if (typeof navigator.geolocation.clearWatch === "function") {
+    navigator.geolocation.clearWatch(watchId);
+  }
+  watchId = null;
+}
+
+/** Apply a fix to the status; true means the phone is inside the geofence. */
+function applyLocation(
+  location: PhoneLocation,
+  home: PhoneHome | null,
+): boolean {
+  const decision = phoneDecision(location, home);
+  phone.status.atHome = decision.atHome;
+  phone.status.homeSource = decision.homeSource;
+  phone.status.location = decision.location;
+  phone.status.locationText = locationText(decision.location, decision.atHome);
+  phone.status.mapUrl = mapUrl(decision.location);
+  phone.status.distance = home ? distanceMeters(location, home) : null;
+  phone.status.permission = "granted";
+  phone.status.lastSeen = Date.now();
+  return decision.atHome === true;
+}
+
+function startWatch(home: PhoneHome | null): void {
+  if (watchId !== null || typeof navigator.geolocation.watchPosition !== "function") {
     return;
   }
-  phone.status.permission = "prompt";
+  watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const location = validLocation({
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        ts: Date.now(),
+      });
+      if (!location) return;
+      const atHome = applyLocation(location, home);
+      const moved = lastSentLocation
+        ? distanceMeters(lastSentLocation, location)
+        : Infinity;
+      if (
+        atHome ||
+        Date.now() - lastSentAt >= 5 * 60_000 ||
+        moved >= 100
+      ) {
+        lastSentAt = Date.now();
+        lastSentLocation = location;
+        if (phone.enabled && !phone.paused) reportPhone();
+      }
+      if (atHome) stopWatch();
+    },
+    () => {
+      // The one-shot request reports the permission error; keep the watch quiet.
+    },
+    { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
+  );
+}
+
+/** Request a coarse fix; the card uses the result for “set home”. */
+export async function requestPhoneLocation(): Promise<PhoneLocation | null> {
+  if (!navigator.geolocation) {
+    phone.status.permission = "unsupported";
+    return null;
+  }
+  const home = homePoint();
+  if (isLocalBroker()) {
+    phone.status.atHome = true;
+    phone.status.homeSource = "local";
+    phone.status.location = null;
+    phone.status.locationText = "At home";
+    phone.status.mapUrl = "";
+    phone.status.distance = home ? 0 : null;
+    phone.status.permission = "prompt";
+    reportPhone();
+    return null;
+  }
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = validLocation({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          ts: Date.now(),
+        });
+        if (!location) {
+          phone.status.permission = "unsupported";
+          resolve(null);
+          return;
+        }
+        const atHome = applyLocation(location, home);
+        lastSentAt = Date.now();
+        lastSentLocation = location;
+        if (phone.enabled && !phone.paused) reportPhone();
+        if (!atHome) startWatch(home);
+        resolve(location);
+      },
+      (error) => {
+        phone.status.permission = error.code === 1 ? "denied" : "prompt";
+        phone.status.atHome = null;
+        phone.status.homeSource = "none";
+        phone.status.location = null;
+        phone.status.locationText = "Unknown";
+        phone.status.mapUrl = "";
+        phone.status.distance = null;
+        if (phone.enabled && !phone.paused) reportPhone();
+        resolve(null);
+      },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
+    );
+  });
 }

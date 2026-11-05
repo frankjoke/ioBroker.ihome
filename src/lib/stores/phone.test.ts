@@ -41,7 +41,11 @@ beforeEach(() => {
   vi.stubGlobal("navigator", {
     onLine: true,
     connection: { type: "wifi" },
-    geolocation: { getCurrentPosition: vi.fn() },
+    geolocation: {
+      getCurrentPosition: vi.fn(),
+      watchPosition: vi.fn(() => 1),
+      clearWatch: vi.fn(),
+    },
   });
   vi.stubGlobal("location", {
     hostname: "192.168.178.9",
@@ -117,4 +121,108 @@ it("detects a local broker and a cloud broker", async () => {
 
   h.ioBroker.brokerUrl = "https://iobroker.pro";
   expect(isLocalBroker()).toBe(false);
+});
+
+it("clears location when the fix is inside the geofence", async () => {
+  const { initPhone, phone, requestPhoneLocation, setPhoneEnabled, setPhoneHome } =
+    await load();
+  h.ioBroker.brokerUrl = "https://iobroker.pro";
+  initPhone();
+  setPhoneHome({ lat: 48, lon: 16, radius: 150 });
+  setPhoneEnabled(true);
+  h.sent.length = 0;
+  (navigator as any).geolocation.getCurrentPosition = vi.fn((ok: any) =>
+    ok({
+      coords: { latitude: 48.0005, longitude: 16, accuracy: 10 },
+    }),
+  );
+
+  const location = await requestPhoneLocation();
+  expect(location).not.toBeNull();
+  await Promise.resolve();
+
+  const update = h.sent.find((entry) => entry.payload.action === "update");
+  expect(update?.payload.deviceId).toBe(phone.deviceId);
+  expect(update?.payload.data).toMatchObject({
+    atHome: true,
+    homeSource: "geofence",
+    location: null,
+    locationText: "At home",
+    permission: "granted",
+  });
+  setPhoneEnabled(false);
+});
+
+it("reports the fix when outside the geofence", async () => {
+  const { initPhone, requestPhoneLocation, setPhoneEnabled, setPhoneHome } =
+    await load();
+  h.ioBroker.brokerUrl = "https://iobroker.pro";
+  initPhone();
+  setPhoneHome({ lat: 48, lon: 16, radius: 150 });
+  setPhoneEnabled(true);
+  h.sent.length = 0;
+  (navigator as any).geolocation.getCurrentPosition = vi.fn((ok: any) =>
+    ok({
+      coords: { latitude: 48.01, longitude: 16, accuracy: 20 },
+    }),
+  );
+
+  await requestPhoneLocation();
+  await Promise.resolve();
+
+  const update = h.sent.find((entry) => entry.payload.action === "update");
+  expect(update?.payload.data).toMatchObject({
+    atHome: false,
+    homeSource: "geofence",
+    permission: "granted",
+  });
+  expect(update?.payload.data.location).toMatchObject({
+    lat: 48.01,
+    lon: 16,
+  });
+  expect(update?.payload.data.mapUrl).toContain("openstreetmap.org");
+  setPhoneEnabled(false);
+});
+
+it("reports a denied permission without a location", async () => {
+  const { initPhone, requestPhoneLocation, setPhoneEnabled } = await load();
+  h.ioBroker.brokerUrl = "https://iobroker.pro";
+  initPhone();
+  setPhoneEnabled(true);
+  h.sent.length = 0;
+  (navigator as any).geolocation.getCurrentPosition = vi.fn(
+    (_ok: any, fail: any) => fail({ code: 1 }),
+  );
+
+  await requestPhoneLocation();
+  await Promise.resolve();
+
+  const update = h.sent.find((entry) => entry.payload.action === "update");
+  expect(update?.payload.data).toMatchObject({
+    atHome: null,
+    homeSource: "none",
+    location: null,
+    permission: "denied",
+  });
+  setPhoneEnabled(false);
+});
+
+it("uses the local broker as home without asking for a location", async () => {
+  const { initPhone, requestPhoneLocation, setPhoneEnabled } = await load();
+  initPhone();
+  setPhoneEnabled(true);
+  h.sent.length = 0;
+  (navigator as any).geolocation.getCurrentPosition = vi.fn();
+
+  await requestPhoneLocation();
+  await Promise.resolve();
+
+  const update = h.sent.find((entry) => entry.payload.action === "update");
+  expect(update?.payload.data).toMatchObject({
+    atHome: true,
+    homeSource: "local",
+    location: null,
+  });
+  expect((navigator as any).geolocation.getCurrentPosition).not.toHaveBeenCalled();
+  setPhoneEnabled(false);
 });
