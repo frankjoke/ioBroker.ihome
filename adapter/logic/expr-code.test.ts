@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   checkExpression,
+  checkStatement,
+  extractGotos,
+  extractRefCalls,
   extractRefs,
   highlightCode,
   renameCodeRefs,
+  renameGotoRefs,
   wrapExpression,
 } from "./expr-code";
 
@@ -120,5 +124,81 @@ describe("highlightCode", () => {
   it("keeps everything visible when the tokenizer throws", () => {
     const spans = highlightCode('get("x');
     expect(spans.map((span) => span.text).join("")).toBe('get("x');
+  });
+});
+
+describe("checkStatement", () => {
+  it("accepts statements, return, this and empty code", () => {
+    expect(
+      checkStatement('set("light", true)\nif (get("x")) goto("On")'),
+    ).toBeNull();
+    expect(checkStatement("return 1")).toBeNull();
+    expect(checkStatement("this.sum = (this.sum ?? 0) + 1")).toBeNull();
+    expect(checkStatement("")).toBeNull();
+    expect(checkStatement("// note")).toBeNull();
+  });
+
+  it("reports a syntax error", () => {
+    expect(checkStatement('set("x"')).toContain(
+      "action code failed to compile",
+    );
+  });
+});
+
+describe("extractRefs on statements", () => {
+  it("finds refs in every statement", () => {
+    expect(
+      extractRefs('set("a", 1)\nif (get("b")) set("c", state("d").value)'),
+    ).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("keeps ignoring dynamic names", () => {
+    expect(extractRefs("get(name)")).toEqual([]);
+  });
+});
+
+describe("extractRefCalls", () => {
+  it("keeps the function name for validation", () => {
+    expect(extractRefCalls('set("a", 1)\nget("b")')).toEqual([
+      { fn: "set", name: "a" },
+      { fn: "get", name: "b" },
+    ]);
+  });
+});
+
+describe("extractGotos", () => {
+  it("returns literal targets only", () => {
+    expect(extractGotos('if (get("x")) goto("A")\ngoto("B")')).toEqual([
+      "A",
+      "B",
+    ]);
+    expect(extractGotos("goto()\ngoto(NOACTION)\ngoto(name)")).toEqual([]);
+  });
+});
+
+describe("renameCodeRefs on statements", () => {
+  it("rewrites refs across statements", () => {
+    expect(renameCodeRefs('set("old", 1)\nget("old")', "old", "new")).toBe(
+      'set("new", 1)\nget("new")',
+    );
+  });
+});
+
+describe("renameGotoRefs", () => {
+  it("rewrites literal goto targets only", () => {
+    expect(renameGotoRefs('goto("old")\ngoto("other")', "old", "new")).toBe(
+      'goto("new")\ngoto("other")',
+    );
+    expect(renameGotoRefs("goto()\ngoto(NOACTION)", "old", "new")).toBe(
+      "goto()\ngoto(NOACTION)",
+    );
+  });
+});
+
+describe("highlightCode on statements", () => {
+  it("paints goto and log as functions", () => {
+    const spans = highlightCode('goto("On")\nlog("hi")');
+    expect(spans.find((span) => span.text === "goto")?.kind).toBe("function");
+    expect(spans.find((span) => span.text === "log")?.kind).toBe("function");
   });
 });
