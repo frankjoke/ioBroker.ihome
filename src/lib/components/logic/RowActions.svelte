@@ -64,8 +64,8 @@
       aria-pressed={mode === "goto"}
       onclick={() => onchange({ ...row, mode: "goto" })}
     >
-      goto{#if hasGotoDraft}<span class="dot" title="Has a saved goto"></span
-        >{/if}
+      goto{#if hasGotoDraft}<span class="dot" title="Has a saved goto"
+        ></span>{/if}
     </button>
     <button
       type="button"
@@ -75,8 +75,7 @@
       onclick={() => onchange({ ...row, mode: "function" })}
     >
       function{#if hasCodeDraft}<span class="dot" title="Has saved code"
-        ></span
-      >{/if}
+        ></span>{/if}
     </button>
     <label class="continue">
       <input
@@ -124,7 +123,11 @@
       {stateNames}
       {logics}
       {inputs}
-      placeholder={'set("light", true)\nlog("motion on")\ngoto("On")'}
+      placeholder={[
+        'set("light", true)',
+        'log("motion on")',
+        'goto("On")',
+      ].join("\n")}
       onchange={(code) =>
         onchange({
           ...row,

@@ -168,7 +168,10 @@ export function extractRefCalls(
   for (const call of programCalls(code, REF_FUNCTIONS) ?? []) {
     const key = `${call.fn}:${call.name}`;
     if (!seen.has(key)) {
-      seen.set(key, { fn: call.fn as "get" | "state" | "set", name: call.name });
+      seen.set(key, {
+        fn: call.fn as "get" | "state" | "set",
+        name: call.name,
+      });
     }
   }
   return [...seen.values()];
