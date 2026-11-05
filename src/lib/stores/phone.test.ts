@@ -8,12 +8,10 @@ const h = vi.hoisted(() => {
     connected: 1,
     brokerUrl: "http://192.168.178.9:8082",
     systemConfig: { common: { latitude: 48, longitude: 16 } },
-    sendTo: vi.fn(
-      async (_instance: string, command: string, payload: any) => {
-        sent.push({ command, payload });
-        return { ok: true };
-      },
-    ),
+    sendTo: vi.fn(async (_instance: string, command: string, payload: any) => {
+      sent.push({ command, payload });
+      return { ok: true };
+    }),
     states: new Map(),
     objects: new Map(),
   };
@@ -100,18 +98,18 @@ it("does not report while disabled or paused", async () => {
 
   reportPhone();
   await Promise.resolve();
-  expect(h.sent.filter((entry) => entry.payload.action === "update")).toHaveLength(
-    0,
-  );
+  expect(
+    h.sent.filter((entry) => entry.payload.action === "update"),
+  ).toHaveLength(0);
 
   setPhoneEnabled(true);
   pausePhone(true);
   h.sent.length = 0;
   reportPhone();
   await Promise.resolve();
-  expect(h.sent.filter((entry) => entry.payload.action === "update")).toHaveLength(
-    0,
-  );
+  expect(
+    h.sent.filter((entry) => entry.payload.action === "update"),
+  ).toHaveLength(0);
   setPhoneEnabled(false);
 });
 
@@ -124,8 +122,13 @@ it("detects a local broker and a cloud broker", async () => {
 });
 
 it("clears location when the fix is inside the geofence", async () => {
-  const { initPhone, phone, requestPhoneLocation, setPhoneEnabled, setPhoneHome } =
-    await load();
+  const {
+    initPhone,
+    phone,
+    requestPhoneLocation,
+    setPhoneEnabled,
+    setPhoneHome,
+  } = await load();
   h.ioBroker.brokerUrl = "https://iobroker.pro";
   initPhone();
   setPhoneHome({ lat: 48, lon: 16, radius: 150 });
@@ -223,6 +226,8 @@ it("uses the local broker as home without asking for a location", async () => {
     homeSource: "local",
     location: null,
   });
-  expect((navigator as any).geolocation.getCurrentPosition).not.toHaveBeenCalled();
+  expect(
+    (navigator as any).geolocation.getCurrentPosition,
+  ).not.toHaveBeenCalled();
   setPhoneEnabled(false);
 });

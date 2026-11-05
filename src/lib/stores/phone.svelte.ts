@@ -286,7 +286,10 @@ function applyLocation(
 }
 
 function startWatch(home: PhoneHome | null): void {
-  if (watchId !== null || typeof navigator.geolocation.watchPosition !== "function") {
+  if (
+    watchId !== null ||
+    typeof navigator.geolocation.watchPosition !== "function"
+  ) {
     return;
   }
   watchId = navigator.geolocation.watchPosition(
@@ -302,11 +305,7 @@ function startWatch(home: PhoneHome | null): void {
       const moved = lastSentLocation
         ? distanceMeters(lastSentLocation, location)
         : Infinity;
-      if (
-        atHome ||
-        Date.now() - lastSentAt >= 5 * 60_000 ||
-        moved >= 100
-      ) {
+      if (atHome || Date.now() - lastSentAt >= 5 * 60_000 || moved >= 100) {
         lastSentAt = Date.now();
         lastSentLocation = location;
         if (phone.enabled && !phone.paused) reportPhone();

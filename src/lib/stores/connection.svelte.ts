@@ -28,15 +28,13 @@ export function registerAliveState(): void {
 export function isLocalBroker(): boolean {
   const url = ioBroker.brokerUrl;
   if (!url) return false;
-  try {
-    const host = new URL(url).hostname;
-    return (
-      host === location.hostname ||
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)
-    );
-  } catch {
-    return false;
-  }
+  const match = /^(?:https?|wss?):\/\/([^/:?#]+)/i.exec(url);
+  if (!match) return false;
+  const host = match[1];
+  return (
+    host === location.hostname ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
 }
