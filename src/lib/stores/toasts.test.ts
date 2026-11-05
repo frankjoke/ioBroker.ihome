@@ -49,5 +49,5 @@ it("keeps at most three non-sticky toasts", () => {
   toast.info("three");
   toast.info("four");
 
-  expect(toasts.items.map((t) => t.message)).toEqual(["two", "three", "four"]);
+  expect(toasts.items.map((t) => t.message)).toEqual(["four", "three", "two"]);
 });

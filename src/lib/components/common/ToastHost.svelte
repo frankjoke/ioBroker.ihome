@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { flip } from "svelte/animate";
   import { fly } from "svelte/transition";
   import { toast, toasts, type ToastLevel } from "$lib/stores/toasts.svelte";
 
@@ -21,6 +22,7 @@
         : "status"}
       in:fly={{ y: -8, duration: 180 }}
       out:fly={{ y: -8, duration: 140 }}
+      animate:flip={{ duration: 180 }}
     >
       <span class="toast-icon" aria-hidden="true">{ICONS[item.level]}</span>
       <span class="toast-message">{item.message}</span>

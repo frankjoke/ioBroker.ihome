@@ -71,7 +71,10 @@ export function show(
   }
 
   if (toasts.items.length >= MAX_VISIBLE) {
-    const removable = toasts.items.find((toast) => !toast.sticky);
+    // Newest first: drop the oldest non-sticky toast, not the newest.
+    const removable = [...toasts.items]
+      .reverse()
+      .find((toast) => !toast.sticky);
     if (removable) remove(removable.id);
   }
 
@@ -83,7 +86,7 @@ export function show(
     sticky: options.sticky ?? false,
     timeout: options.timeout ?? DEFAULT_TIMEOUT,
   };
-  toasts.items = [...toasts.items, item];
+  toasts.items = [item, ...toasts.items];
   schedule(item);
   return item;
 }
