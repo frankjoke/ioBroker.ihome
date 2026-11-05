@@ -720,18 +720,64 @@ class IHome extends utils.Adapter {
     }> = [
       { field: "name", name: "Name", type: "string", role: "text" },
       { field: "enabled", name: "Enabled", type: "boolean", role: "switch" },
-      { field: "atHome", name: "At home", type: "boolean", role: "indicator.state" },
-      { field: "homeSource", name: "Home source", type: "string", role: "text" },
+      {
+        field: "atHome",
+        name: "At home",
+        type: "boolean",
+        role: "indicator.state",
+      },
+      {
+        field: "homeSource",
+        name: "Home source",
+        type: "string",
+        role: "text",
+      },
       { field: "location", name: "Location", type: "string", role: "json" },
-      { field: "locationText", name: "Location text", type: "string", role: "text" },
+      {
+        field: "locationText",
+        name: "Location text",
+        type: "string",
+        role: "text",
+      },
       { field: "mapUrl", name: "Map link", type: "string", role: "text" },
-      { field: "distance", name: "Distance from home", type: "number", role: "value", unit: "m" },
-      { field: "online", name: "Online", type: "boolean", role: "indicator.state" },
+      {
+        field: "distance",
+        name: "Distance from home",
+        type: "number",
+        role: "value",
+        unit: "m",
+      },
+      {
+        field: "online",
+        name: "Online",
+        type: "boolean",
+        role: "indicator.state",
+      },
       { field: "connection", name: "Connection", type: "string", role: "text" },
-      { field: "local", name: "Local network", type: "boolean", role: "indicator.state" },
-      { field: "permission", name: "Location permission", type: "string", role: "text" },
-      { field: "lastSeen", name: "Last seen", type: "number", role: "value.time" },
-      { field: "updatedAt", name: "Updated", type: "number", role: "value.time" },
+      {
+        field: "local",
+        name: "Local network",
+        type: "boolean",
+        role: "indicator.state",
+      },
+      {
+        field: "permission",
+        name: "Location permission",
+        type: "string",
+        role: "text",
+      },
+      {
+        field: "lastSeen",
+        name: "Last seen",
+        type: "number",
+        role: "value.time",
+      },
+      {
+        field: "updatedAt",
+        name: "Updated",
+        type: "number",
+        role: "value.time",
+      },
     ];
     for (const state of states) {
       await this.setObjectNotExistsAsync(`phone.${deviceId}.${state.field}`, {
@@ -792,7 +838,8 @@ class IHome extends utils.Adapter {
         ack: true,
       });
 
-    const name = data.name === undefined ? undefined : validPhoneName(data.name);
+    const name =
+      data.name === undefined ? undefined : validPhoneName(data.name);
     if (data.name !== undefined) {
       if (!name) throw new Error("invalid phone name");
       await write("name", name);
@@ -836,7 +883,10 @@ class IHome extends utils.Adapter {
       }
     }
     if (data.locationText !== undefined) {
-      if (typeof data.locationText !== "string" || data.locationText.length > 200) {
+      if (
+        typeof data.locationText !== "string" ||
+        data.locationText.length > 200
+      ) {
         throw new Error("invalid locationText");
       }
       await write("locationText", data.locationText);
@@ -863,7 +913,8 @@ class IHome extends utils.Adapter {
       await write("online", data.online);
     }
     if (data.connection !== undefined) {
-      if (typeof data.connection !== "string") throw new Error("invalid connection");
+      if (typeof data.connection !== "string")
+        throw new Error("invalid connection");
       await write("connection", normalizeConnection({ type: data.connection }));
     }
     if (data.local !== undefined) {
@@ -873,7 +924,9 @@ class IHome extends utils.Adapter {
     if (data.permission !== undefined) {
       if (
         typeof data.permission !== "string" ||
-        !["granted", "denied", "prompt", "unsupported"].includes(data.permission)
+        !["granted", "denied", "prompt", "unsupported"].includes(
+          data.permission,
+        )
       ) {
         throw new Error("invalid permission");
       }
@@ -892,7 +945,8 @@ class IHome extends utils.Adapter {
   private async onPhoneMessage(obj: ioBroker.Message): Promise<void> {
     if (obj.command !== "phone") return;
     const reply = (result: unknown): void => {
-      if (obj.callback) this.sendTo(obj.from, obj.command, result, obj.callback);
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
     };
     try {
       if (!isRecord(obj.message)) {
