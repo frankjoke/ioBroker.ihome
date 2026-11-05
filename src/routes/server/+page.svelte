@@ -12,6 +12,7 @@
     updateSettings,
   } from "$lib/stores/settings.svelte";
   import ioPackage from "../../../io-package.json";
+  import PhoneCard from "$lib/components/config/PhoneCard.svelte";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
@@ -243,6 +244,10 @@
       </div>
     </section>
   </fieldset>
+
+  <!-- Per-device, not a broker setting: reachable without the config PIN
+       because the route gate already asks before the page mounts. -->
+  <PhoneCard />
 
   <!-- The modals above open only from a control inside the fieldset; the
        route-level PIN gate in +layout.svelte is what asks before this page

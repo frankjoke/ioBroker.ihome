@@ -32,6 +32,7 @@
   } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { initLogics } from "$lib/stores/logics.svelte";
+  import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
   import { enumLabelFromObject } from "$lib/config/rooms";
@@ -323,6 +324,9 @@
     initVariables();
     initTemplates();
     initLogics();
+    // The phone reporter runs on every route: a PWA cold start on the
+    // dashboard must register and heartbeat without opening Server & Security.
+    initPhone();
     void initSettings(applySettings);
     loadViewState();
     // Registered here rather than by SvelteKit: its own call uses

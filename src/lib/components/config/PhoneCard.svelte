@@ -1,0 +1,322 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import {
+    getCanonicalRegistry,
+    setCanonicalRegistry,
+  } from "$lib/stores/devices.svelte";
+  import { saveRegistry } from "$lib/registry.svelte.js";
+  import { newId } from "$lib/utils/ids";
+  import { homeFromSystemConfig } from "$logic/phone-ops";
+  import {
+    getPhoneFix,
+    homePoint,
+    initPhone,
+    pausePhone,
+    phone,
+    requestPhoneLocation,
+    setPhoneEnabled,
+    setPhoneHome,
+    setPhoneName,
+  } from "$lib/stores/phone.svelte";
+
+  let message = $state("");
+  const systemHome = $derived(homeFromSystemConfig(ioBroker.systemConfig));
+  const secure = $derived(
+    location.protocol === "https:" ||
+      ["localhost", "127.0.0.1", "::1"].includes(location.hostname),
+  );
+  const devicePrefix = $derived(
+    `${ioBroker.namespace}.phone.${phone.deviceId}.`,
+  );
+  const deviceExists = $derived(
+    getCanonicalRegistry().devices.some((device) =>
+      device.controls.some((control) =>
+        control.stateId?.startsWith(devicePrefix),
+      ),
+    ),
+  );
+
+  onMount(() => initPhone());
+
+  function statusText(): string {
+    if (phone.status.atHome === true) return "At home";
+    if (phone.status.atHome === false) return "Away";
+    return "Unknown";
+  }
+
+  function lastSeenText(): string {
+    if (!phone.status.lastSeen) return "never";
+    return new Date(phone.status.lastSeen).toLocaleTimeString();
+  }
+
+  async function setHomeHere() {
+    const location = await getPhoneFix();
+    if (!location) {
+      message = "No fix — use the system location or allow location access.";
+      return;
+    }
+    setPhoneHome({
+      lat: location.lat,
+      lon: location.lon,
+      radius: homePoint()?.radius ?? 150,
+    });
+    message = "Home point saved from this phone.";
+  }
+
+  function useSystemHome() {
+    if (!systemHome) return;
+    setPhoneHome(systemHome);
+    message = "Home point taken from the ioBroker system location.";
+  }
+
+  function setRadius(value: string) {
+    const home = homePoint();
+    const radius = Number(value);
+    if (!home || !Number.isFinite(radius) || radius <= 0) return;
+    setPhoneHome({ ...home, radius });
+  }
+
+  function createPhoneDevice() {
+    const reg = getCanonicalRegistry();
+    if (
+      reg.devices.some((device) =>
+        device.controls.some((control) =>
+          control.stateId?.startsWith(devicePrefix),
+        ),
+      )
+    ) {
+      return;
+    }
+    const fields = [
+      ["atHome", "At home", "indicator.state", "boolean"],
+      ["online", "Online", "indicator.state", "boolean"],
+      ["connection", "Connection", "text", "string"],
+      ["distance", "Distance", "value", "number"],
+      ["lastSeen", "Last seen", "value.time", "number"],
+      ["locationText", "Location", "text", "string"],
+      ["mapUrl", "Map", "text", "string"],
+    ] as const;
+    const controls = fields.map(([feature, label, role, type]) => ({
+      id: newId(),
+      feature,
+      label,
+      writable: false,
+      stateId: `${devicePrefix}${feature}`,
+      common: { role, type, read: true, write: false },
+    }));
+    setCanonicalRegistry({
+      version: (reg.version ?? 0) + 1,
+      updatedAt: Date.now(),
+      devices: [
+        ...reg.devices,
+        {
+          id: newId(),
+          name: `Phone ${phone.name}`,
+          type: "Custom",
+          icon: "smartphone",
+          controls,
+        },
+      ],
+    });
+    saveRegistry();
+    message = "Phone device created — add it to a page in the tile editor.";
+  }
+</script>
+
+<section class="card settings-card phone-card">
+  <div class="card-header">
+    <span class="material-symbols-outlined">smartphone</span>
+    <h2 class="card-title">This phone</h2>
+  </div>
+  <div class="card-body phone-body">
+    <div class="field">
+      <label class="label-mono" for="phone-name">Device name</label>
+      <input
+        id="phone-name"
+        type="text"
+        value={phone.name}
+        maxlength="64"
+        onchange={(event) => setPhoneName(event.currentTarget.value)}
+      />
+    </div>
+
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={phone.enabled}
+        onchange={(event) => {
+          const enabled = event.currentTarget.checked;
+          setPhoneEnabled(enabled);
+          if (enabled) void requestPhoneLocation();
+        }}
+      />
+      <span>Report this phone's presence to ioBroker</span>
+    </label>
+
+    {#if phone.enabled}
+      <div class="phone-actions">
+        <button
+          class="btn"
+          type="button"
+          onclick={() => pausePhone(!phone.paused)}
+        >
+          {phone.paused ? "Resume" : "Pause"}
+        </button>
+        <button
+          class="btn"
+          type="button"
+          onclick={() => void requestPhoneLocation()}
+        >
+          Request location
+        </button>
+      </div>
+    {/if}
+
+    {#if !secure}
+      <p class="hint warning">
+        Location needs HTTPS — use iobroker.pro or a local HTTPS proxy. The LAN
+        HTTP URL can still report online/connection only.
+      </p>
+    {/if}
+
+    <div class="phone-status">
+      <div>
+        <span class="label-mono">Status</span><span>{statusText()}</span>
+      </div>
+      <div>
+        <span class="label-mono">Source</span><span
+          >{phone.status.homeSource}</span
+        >
+      </div>
+      <div>
+        <span class="label-mono">Network</span><span
+          >{phone.status.local ? "local" : "cloud"} · {phone.status
+            .connection}</span
+        >
+      </div>
+      <div>
+        <span class="label-mono">Permission</span><span
+          >{phone.status.permission}</span
+        >
+      </div>
+      <div>
+        <span class="label-mono">Distance</span><span
+          >{phone.status.distance == null
+            ? "—"
+            : `${Math.round(phone.status.distance)} m`}</span
+        >
+      </div>
+      <div>
+        <span class="label-mono">Last sent</span><span>{lastSeenText()}</span>
+      </div>
+    </div>
+
+    <div class="home-row">
+      <div>
+        <span class="label-mono">Home point</span>
+        <span class="home-value">
+          {#if homePoint()}
+            {homePoint()!.lat.toFixed(4)}, {homePoint()!.lon.toFixed(4)}
+          {:else}
+            not set
+          {/if}
+        </span>
+      </div>
+      <label class="radius">
+        <span class="label-mono">radius</span>
+        <input
+          type="number"
+          min="10"
+          max="10000"
+          value={homePoint()?.radius ?? 150}
+          onchange={(event) => setRadius(event.currentTarget.value)}
+        />
+        <span class="text-muted">m</span>
+      </label>
+    </div>
+    <div class="phone-actions">
+      <button class="btn" type="button" onclick={() => void setHomeHere()}>
+        Set home from this phone
+      </button>
+      {#if systemHome}
+        <button class="btn" type="button" onclick={useSystemHome}>
+          Use system location
+        </button>
+      {/if}
+    </div>
+
+    <div class="phone-actions">
+      <button
+        class="btn btn-primary"
+        type="button"
+        disabled={deviceExists}
+        onclick={createPhoneDevice}
+      >
+        {deviceExists ? "Phone device created" : "Create phone device"}
+      </button>
+    </div>
+
+    {#if message}
+      <p class="hint text-muted">{message}</p>
+    {/if}
+  </div>
+</section>
+
+<style>
+  .phone-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .phone-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .phone-status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1rem;
+    font-size: var(--body-sm);
+  }
+
+  .phone-status > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .home-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .home-value {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+  }
+
+  .radius {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .radius input {
+    width: 5.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+  }
+
+  .warning {
+    color: var(--warning-color);
+  }
+</style>
