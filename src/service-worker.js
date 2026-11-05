@@ -6,6 +6,11 @@
 
 import { base, build, files, prerendered, version } from "$service-worker";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
+import {
+  notificationOptions,
+  notificationTitle,
+  parsePushMessage,
+} from "$lib/push-ops";
 
 // Everything hashed may be precached; the shell (index.html) may not: a
 // precached shell kept serving the previous build after an adapter update,
@@ -44,6 +49,57 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(async () => (await caches.match(shell)) || Response.error()),
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let message = null;
+  try {
+    message = parsePushMessage(event.data?.json());
+  } catch {
+    message = null;
+  }
+  if (!message) return;
+  event.waitUntil(
+    self.registration.showNotification(
+      notificationTitle(message),
+      notificationOptions(message),
+    ),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(
+    event.notification.data?.url ?? "/",
+    self.registration.scope,
+  ).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of windows) {
+        if (client.url === target) {
+          await client.focus();
+          return;
+        }
+      }
+      const client = windows[0];
+      if (client) {
+        await client.focus();
+        if (typeof client.navigate === "function") {
+          try {
+            await client.navigate(target);
+            return;
+          } catch {
+            // fall through to a new window
+          }
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
   );
 });
 
