@@ -52,12 +52,20 @@ export interface MessageLine extends LogLine {
   timeout?: number;
 }
 
+export interface NotificationLine {
+  level: string;
+  logicId: string;
+  title: string;
+  body: string;
+}
+
 export interface Harness {
   deps: EngineDeps;
   clock: FakeClock;
   writes: Write[];
   logs: LogLine[];
   messages: MessageLine[];
+  notifications: NotificationLine[];
   attach(engine: Engine): void;
   change(
     id: string,
@@ -76,6 +84,7 @@ export function createHarness(values: Record<string, unknown>): Harness {
   const writes: Write[] = [];
   const logs: LogLine[] = [];
   const messages: MessageLine[] = [];
+  const notifications: NotificationLine[] = [];
   let engine: Engine | undefined;
 
   const deps: EngineDeps = {
@@ -87,6 +96,8 @@ export function createHarness(values: Record<string, unknown>): Harness {
     log: (level, logicId, message) => logs.push({ level, logicId, message }),
     message: (level, logicId, message, timeout) =>
       messages.push({ level, logicId, message, timeout }),
+    notify: (level, logicId, title, body) =>
+      notifications.push({ level, logicId, title, body }),
     now: () => clock.now,
     setTimeout: (fn, ms) => clock.setTimeout(fn, ms),
     clearTimeout: (handle) => clock.clearTimeout(handle),
@@ -98,6 +109,7 @@ export function createHarness(values: Record<string, unknown>): Harness {
     writes,
     logs,
     messages,
+    notifications,
     attach(next) {
       engine = next;
     },

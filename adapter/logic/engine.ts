@@ -57,6 +57,12 @@ export interface EngineDeps {
     message: string,
     timeout?: number,
   ): void;
+  notify(
+    level: "info" | "warn" | "error",
+    logicId: string,
+    title: string,
+    body: string,
+  ): void;
   now(): number;
   setTimeout(fn: () => void, ms: number): number;
   clearTimeout(handle: number): void;
@@ -259,6 +265,8 @@ export function createEngine(
         log: (level, message) => deps.log(level, logId(rt), message),
         message: (level, message, timeout) =>
           deps.message(level, logId(rt), message, timeout),
+        notify: (level, title, body) =>
+          deps.notify(level, logId(rt), title, body),
         now: () => deps.now(),
       });
     } catch (error) {

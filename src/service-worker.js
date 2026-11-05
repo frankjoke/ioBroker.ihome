@@ -6,6 +6,12 @@
 
 import { base, build, files, prerendered, version } from "$service-worker";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
+import {
+  notificationOptions,
+  notificationTarget,
+  notificationTitle,
+  parsePushMessage,
+} from "$lib/push-ops";
 
 // Everything hashed may be precached; the shell (index.html) may not: a
 // precached shell kept serving the previous build after an adapter update,
@@ -44,6 +50,62 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(async () => (await caches.match(shell)) || Response.error()),
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let message = null;
+  try {
+    message = parsePushMessage(event.data?.json());
+  } catch {
+    message = null;
+  }
+  event.waitUntil(
+    message
+      ? self.registration.showNotification(
+          notificationTitle(message),
+          notificationOptions(message),
+        )
+      : // iOS may revoke a subscription after silent pushes; never drop one.
+        self.registration.showNotification("iHome", {
+          body: "New notification",
+          data: { url: "" },
+        }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = notificationTarget(
+    event.notification.data?.url,
+    self.registration.scope,
+  );
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of windows) {
+        if (client.url === target) {
+          await client.focus();
+          return;
+        }
+      }
+      const client = windows[0];
+      if (client) {
+        await client.focus();
+        if (typeof client.navigate === "function") {
+          try {
+            await client.navigate(target);
+            return;
+          } catch {
+            // fall through to a new window
+          }
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
   );
 });
 
