@@ -1,5 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
 import * as SunCalc from "suncalc";
+import webpush from "web-push";
 import {
   createEngine,
   type Engine,
@@ -19,6 +20,13 @@ import {
   validLocation,
   validPhoneName,
 } from "./logic/phone-ops";
+import {
+  shouldDropSubscription,
+  validPushPayload,
+  validPushSubscription,
+  type PushPayload,
+  type PushSubscriptionRecord,
+} from "./push-ops";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -173,6 +181,10 @@ class IHome extends utils.Adapter {
   /** Logic messages for live toasts, published as `info.messages`. */
   private readonly messages = createLogBuffer(20);
   private messageStateTimer?: ReturnType<typeof setTimeout>;
+  /** Web Push subscriptions, mirrored in `info.pushSubscriptions`. */
+  private pushSubscriptions: PushSubscriptionRecord[] = [];
+  private pushPublicKey = "";
+  private pushPrivateKey = "";
   /** The live readout per logic, published as `info.logic`. */
   private readonly logicInfo = new Map<string, LogicReading>();
   private logicStateTimer?: ReturnType<typeof setTimeout>;
@@ -182,7 +194,11 @@ class IHome extends utils.Adapter {
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
     this.on("log", (entry: ioBroker.LogMessage) => this.onLog(entry));
-    this.on("message", (obj) => void this.onPhoneMessage(obj));
+    this.on("message", (obj) => {
+      if (obj.command === "phone") void this.onPhoneMessage(obj);
+      else if (obj.command === "push") void this.onPushMessage(obj);
+      else if (obj.command === "notify") void this.onNotifyMessage(obj);
+    });
   }
 
   /**
@@ -1014,6 +1030,162 @@ class IHome extends utils.Adapter {
     }
   }
 
+  private async onPushMessage(obj: ioBroker.Message): Promise<void> {
+    const reply = (result: unknown): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    try {
+      if (!isRecord(obj.message)) {
+        reply({ ok: false, error: "invalid payload" });
+        return;
+      }
+      const deviceId = validDeviceId(obj.message.deviceId);
+      if (!deviceId) {
+        reply({ ok: false, error: "invalid device id" });
+        return;
+      }
+      if (obj.message.action === "subscribe") {
+        const subscription = validPushSubscription({
+          ...(isRecord(obj.message.subscription)
+            ? obj.message.subscription
+            : {}),
+          deviceId,
+          name: obj.message.name,
+          ts: Date.now(),
+        });
+        if (!subscription) {
+          reply({ ok: false, error: "invalid subscription" });
+          return;
+        }
+        this.pushSubscriptions = [
+          ...this.pushSubscriptions.filter(
+            (entry) => entry.deviceId !== deviceId,
+          ),
+          subscription,
+        ];
+        await this.writePushSubscriptions();
+        reply({ ok: true, deviceId });
+      } else if (obj.message.action === "unsubscribe") {
+        this.pushSubscriptions = this.pushSubscriptions.filter(
+          (entry) => entry.deviceId !== deviceId,
+        );
+        await this.writePushSubscriptions();
+        reply({ ok: true });
+      } else {
+        reply({ ok: false, error: "unknown action" });
+      }
+    } catch (error) {
+      this.log.warn(`push message: ${String(error)}`);
+      reply({ ok: false, error: String(error) });
+    }
+  }
+
+  private async onNotifyMessage(obj: ioBroker.Message): Promise<void> {
+    const reply = (result: unknown): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    try {
+      if (!isRecord(obj.message)) {
+        reply({ ok: false, error: "invalid payload" });
+        return;
+      }
+      const payload = validPushPayload(obj.message);
+      if (!payload) {
+        reply({ ok: false, error: "invalid payload" });
+        return;
+      }
+      let deviceId: string | undefined;
+      if (obj.message.deviceId !== undefined) {
+        const valid = validDeviceId(obj.message.deviceId);
+        if (!valid) {
+          reply({ ok: false, error: "invalid device id" });
+          return;
+        }
+        deviceId = valid;
+      }
+      const result = await this.sendPush(payload, deviceId);
+      if (
+        typeof obj.message.logicId === "string" &&
+        obj.message.logicId.trim()
+      ) {
+        this.pushLogicLog(
+          payload.level,
+          obj.message.logicId.trim(),
+          payload.body || payload.title,
+        );
+      }
+      reply({ ok: true, ...result });
+    } catch (error) {
+      this.log.warn(`notify message: ${String(error)}`);
+      reply({ ok: false, error: String(error) });
+    }
+  }
+
+  private async loadPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
+    const state = await this.getStateAsync("info.pushSubscriptions");
+    if (!state || typeof state.val !== "string") return [];
+    try {
+      const parsed = JSON.parse(state.val);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map(validPushSubscription)
+        .filter((entry): entry is PushSubscriptionRecord => entry !== null);
+    } catch {
+      return [];
+    }
+  }
+
+  private async writePushSubscriptions(): Promise<void> {
+    await this.setStateAsync("info.pushSubscriptions", {
+      val: JSON.stringify(this.pushSubscriptions),
+      ack: true,
+    });
+  }
+
+  private async sendPush(
+    payload: PushPayload,
+    deviceId?: string,
+  ): Promise<{ sent: number; removed: number }> {
+    const targets = deviceId
+      ? this.pushSubscriptions.filter((entry) => entry.deviceId === deviceId)
+      : this.pushSubscriptions;
+    if (!this.pushPublicKey || !this.pushPrivateKey || targets.length === 0) {
+      return { sent: 0, removed: 0 };
+    }
+    let sent = 0;
+    let removed = 0;
+    const dropped = new Set<string>();
+    for (const entry of targets) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: entry.endpoint, keys: entry.keys },
+          JSON.stringify(payload),
+        );
+        sent += 1;
+      } catch (error) {
+        const statusCode =
+          isRecord(error) && typeof error.statusCode === "number"
+            ? error.statusCode
+            : 0;
+        if (shouldDropSubscription(statusCode)) {
+          dropped.add(entry.deviceId);
+          removed += 1;
+        } else {
+          this.log.warn(`push to ${entry.deviceId} failed: ${String(error)}`);
+        }
+      }
+    }
+    if (dropped.size) {
+      this.pushSubscriptions = this.pushSubscriptions.filter(
+        (entry) => !dropped.has(entry.deviceId),
+      );
+      await this.writePushSubscriptions();
+    }
+    return { sent, removed };
+  }
+
   private async onReady(): Promise<void> {
     if (this.requireLog) {
       try {
@@ -1081,17 +1253,31 @@ class IHome extends utils.Adapter {
       vapidPublicKey?: unknown;
       vapidPrivateKey?: unknown;
     };
-    const vapidPublicKey =
+    this.pushPublicKey =
       typeof config.vapidPublicKey === "string"
         ? config.vapidPublicKey.trim()
         : "";
-    const vapidPrivateKey =
+    this.pushPrivateKey =
       typeof config.vapidPrivateKey === "string"
         ? config.vapidPrivateKey.trim()
         : "";
-    const pushConfigured = Boolean(vapidPublicKey && vapidPrivateKey);
+    let pushConfigured = Boolean(this.pushPublicKey && this.pushPrivateKey);
+    if (pushConfigured) {
+      try {
+        webpush.setVapidDetails(
+          "mailto:ihome@localhost",
+          this.pushPublicKey,
+          this.pushPrivateKey,
+        );
+      } catch (error) {
+        this.log.warn(`Web Push disabled: ${String(error)}`);
+        this.pushPublicKey = "";
+        this.pushPrivateKey = "";
+        pushConfigured = false;
+      }
+    }
     await this.setStateAsync("info.pushPublicKey", {
-      val: pushConfigured ? vapidPublicKey : "",
+      val: pushConfigured ? this.pushPublicKey : "",
       ack: true,
     });
     if (!pushConfigured) {
@@ -1099,6 +1285,18 @@ class IHome extends utils.Adapter {
         "Web Push disabled: set vapidPublicKey and vapidPrivateKey in the adapter configuration",
       );
     }
+    await this.setObjectNotExistsAsync("info.pushSubscriptions", {
+      type: "state",
+      common: {
+        name: "Web Push subscriptions",
+        type: "string",
+        role: "json",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
+    this.pushSubscriptions = await this.loadPushSubscriptions();
     await this.setObjectNotExistsAsync("info.logClear", {
       type: "state",
       common: {
