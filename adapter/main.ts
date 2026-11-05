@@ -277,6 +277,19 @@ class IHome extends utils.Adapter {
     this.scheduleMessageState();
   }
 
+  /** Log a logic notification and send it to every subscribed phone. */
+  private notifyLogic(
+    level: "info" | "warn" | "error",
+    logicId: string,
+    title: string,
+    body: string,
+  ): void {
+    this.pushLogicLog(level, logicId, body || title);
+    void this.sendPush({ title, body, level }).catch((error) => {
+      this.log.warn(`push notify failed: ${String(error)}`);
+    });
+  }
+
   /** Publish the message ring as a state (debounced, like `info.log`). */
   private scheduleMessageState(): void {
     if (this.messageStateTimer) return;
@@ -566,6 +579,8 @@ class IHome extends utils.Adapter {
             this.pushLogicLog(level, logicId, message),
           message: (level, logicId, message, timeout) =>
             this.pushMessage(level, logicId, message, timeout),
+          notify: (level, logicId, title, body) =>
+            this.notifyLogic(level, logicId, title, body),
           now: () => Date.now(),
           setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
           clearTimeout: (handle) =>

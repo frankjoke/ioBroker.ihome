@@ -23,6 +23,7 @@ function runtimeFor(source: string, info: Record<string, NameInfo> = {}) {
     write: (...args) => writes.push(args),
     log: () => {},
     message: (...args) => messages.push(args),
+    notify: () => {},
     now: () => 1000,
   });
   return { runtime, writes, messages };
@@ -51,12 +52,14 @@ function blockHooks(
   logs: unknown[][] = [],
   names: Record<string, NameInfo> = {},
   messages: unknown[][] = [],
+  notifications: unknown[][] = [],
 ): RuntimeHooks {
   return {
     describe: (name) => names[name],
     write: (...args) => writes.push(args),
     log: (...args) => logs.push(args),
     message: (...args) => messages.push(args),
+    notify: (...args) => notifications.push(args),
     now: () => 1000,
   };
 }
@@ -290,6 +293,25 @@ it("message defaults to info and keeps 0 as sticky", () => {
     ["info", "one", undefined],
     ["error", "two", 0],
   ]);
+});
+
+it("notify sends title, body and level", () => {
+  const notifications: unknown[][] = [];
+  const def = machine('notify("Alarm {{a}}", "Pump low", "Warning")');
+  const rt = createLogicRuntime(
+    def,
+    blockHooks([], [], { a: info(4) }, [], notifications),
+  );
+  rt.runStatements(def.states.A.on![0].do!, 0);
+  expect(notifications).toEqual([["warn", "Alarm 4", "Pump low"]]);
+});
+
+it("notify defaults to info and an empty body", () => {
+  const notifications: unknown[][] = [];
+  const def = machine('notify("Hello")');
+  const rt = createLogicRuntime(def, blockHooks([], [], {}, [], notifications));
+  rt.runStatements(def.states.A.on![0].do!, 0);
+  expect(notifications).toEqual([["info", "Hello", ""]]);
 });
 
 it("return ends the block", () => {

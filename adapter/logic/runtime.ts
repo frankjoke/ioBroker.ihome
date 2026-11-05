@@ -28,6 +28,7 @@ export interface RuntimeHooks {
     message: string,
     timeout?: number,
   ): void;
+  notify(level: "info" | "warn" | "error", title: string, body: string): void;
   now(): number;
 }
 
@@ -288,6 +289,13 @@ export function createLogicRuntime(
       messageLevel(level),
       interpolate(String(text), (name) => hooks.describe(name)),
       seconds,
+    );
+  });
+  define("notify", (title: unknown, body?: unknown, level?: unknown) => {
+    hooks.notify(
+      messageLevel(level),
+      interpolate(String(title ?? ""), (name) => hooks.describe(name)),
+      interpolate(String(body ?? ""), (name) => hooks.describe(name)),
     );
   });
   define("noop", () => NOOP);
