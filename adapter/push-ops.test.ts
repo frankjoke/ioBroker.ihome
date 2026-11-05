@@ -1,5 +1,6 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
+  ensureVapidKeys,
   normalizePushPayload,
   removePushSubscription,
   sendPushes,
@@ -8,6 +9,12 @@ import {
   validPushPayload,
   validPushSubscription,
 } from "./push-ops";
+
+const VAPID = {
+  publicKey:
+    "BKHrFtP7Q0yhvGhUDFUJirKiagKv3dEpmZjKZpUBNDwiapm0y-KEbU3OGgUAXFrxEDZtra4ZVb0OfJwnN6DrPVk",
+  privateKey: "Wu4EOM26dyHvMA3_jW7GaLRIjeuuAlLTQJZdemuI1WY",
+};
 
 it("accepts a valid subscription and rejects junk", () => {
   const sub = {
@@ -25,6 +32,26 @@ it("drops only gone subscriptions", () => {
   expect(shouldDropSubscription(404)).toBe(true);
   expect(shouldDropSubscription(410)).toBe(true);
   expect(shouldDropSubscription(500)).toBe(false);
+});
+
+it("keeps valid VAPID keys and generates missing ones", () => {
+  const generate = vi.fn(() => VAPID);
+  expect(ensureVapidKeys(VAPID.publicKey, VAPID.privateKey, generate)).toEqual({
+    ...VAPID,
+    generated: false,
+  });
+  expect(generate).not.toHaveBeenCalled();
+  expect(ensureVapidKeys("", "", generate)).toEqual({
+    ...VAPID,
+    generated: true,
+  });
+  expect(ensureVapidKeys(VAPID.publicKey, "garbage", generate)).toEqual({
+    ...VAPID,
+    generated: true,
+  });
+  expect(
+    ensureVapidKeys("", "", () => ({ publicKey: "bad", privateKey: "bad" })),
+  ).toBeNull();
 });
 
 it("normalizes long logic notifications instead of dropping them", () => {

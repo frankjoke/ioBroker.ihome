@@ -42,12 +42,10 @@ non-standard setups, open the dashboard as `…/ihome/index.html?socket=wss://ho
 Push reaches an installed PWA even when it is closed. It needs HTTPS (the iobroker.pro page or a
 local HTTPS proxy); on iOS 16.4+ the PWA must be added to the home screen.
 
-1. Generate a VAPID pair: `npm run vapid`.
-2. Open the instance configuration (gear icon on `ihome.0`) → **Push notifications**, paste both
-   keys, and save. ioBroker encrypts the private key. Do not paste the keys into the object editor:
-   the private key must be encrypted by the config dialog.
-3. Open iHome over HTTPS → **Server & Security** → **This phone** → **Enable notifications**.
-4. Send a test from the card, from a script, or from a logic:
+1. Open iHome over HTTPS → **Server & Security** → **This phone** → **Enable notifications**.
+   The adapter generates the VAPID pair on first start and stores the private key encrypted; no
+   manual key setup is needed.
+2. Send a test from the card, from a script, or from a logic:
 
 ```js
 sendTo("ihome.0", "notify", { title: "Alarm", body: "Pump pressure low", level: "error" });
@@ -55,7 +53,8 @@ notify("Alarm", "Pump pressure low", "error"); // inside a logic
 ```
 
 The lock-screen text is generic by default; add `showBody: true` to the `sendTo` payload to show the
-full title and body.
+full title and body. To rotate the VAPID keys later, use the instance config dialog
+(**Push notifications**) or generate a pair with `npm run vapid`.
 
 ## Development
 

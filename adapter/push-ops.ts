@@ -20,6 +20,45 @@ export interface PushPayload {
 const TITLE_MAX = 80;
 const BODY_MAX = 300;
 
+export interface VapidKeyPair {
+  publicKey: string;
+  privateKey: string;
+  generated: boolean;
+}
+
+function validVapidKey(value: unknown, bytes: number): string | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim();
+  if (!/^[A-Za-z0-9\-_]+$/.test(key)) return null;
+  try {
+    return Buffer.from(key, "base64url").length === bytes ? key : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep a valid pair; generate a fresh one when either key is missing or bad. */
+export function ensureVapidKeys(
+  publicKey: unknown,
+  privateKey: unknown,
+  generate: () => { publicKey: string; privateKey: string },
+): VapidKeyPair | null {
+  const pub = validVapidKey(publicKey, 65);
+  const priv = validVapidKey(privateKey, 32);
+  if (pub && priv)
+    return { publicKey: pub, privateKey: priv, generated: false };
+  try {
+    const next = generate();
+    const nextPub = validVapidKey(next.publicKey, 65);
+    const nextPriv = validVapidKey(next.privateKey, 32);
+    return nextPub && nextPriv
+      ? { publicKey: nextPub, privateKey: nextPriv, generated: true }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }

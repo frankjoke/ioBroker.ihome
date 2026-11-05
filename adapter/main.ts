@@ -21,6 +21,7 @@ import {
   validPhoneName,
 } from "./logic/phone-ops";
 import {
+  ensureVapidKeys,
   normalizePushPayload,
   removePushSubscription,
   sendPushes,
@@ -1278,27 +1279,41 @@ class IHome extends utils.Adapter {
       vapidPublicKey?: unknown;
       vapidPrivateKey?: unknown;
     };
-    this.pushPublicKey =
-      typeof config.vapidPublicKey === "string"
-        ? config.vapidPublicKey.trim()
-        : "";
-    this.pushPrivateKey =
-      typeof config.vapidPrivateKey === "string"
-        ? config.vapidPrivateKey.trim()
-        : "";
-    let pushConfigured = Boolean(this.pushPublicKey && this.pushPrivateKey);
-    if (pushConfigured) {
+    const keys = ensureVapidKeys(
+      config.vapidPublicKey,
+      config.vapidPrivateKey,
+      () => webpush.generateVAPIDKeys(),
+    );
+    let pushConfigured = false;
+    if (keys) {
+      this.pushPublicKey = keys.publicKey;
+      this.pushPrivateKey = keys.privateKey;
+      if (keys.generated) {
+        try {
+          await this.updateConfig({
+            vapidPublicKey: keys.publicKey,
+            vapidPrivateKey: keys.privateKey,
+          });
+          this.log.info(
+            "Web Push keys generated and stored — no manual setup needed",
+          );
+        } catch (error) {
+          this.log.warn(
+            `cannot store generated Web Push keys: ${String(error)}`,
+          );
+        }
+      }
       try {
         webpush.setVapidDetails(
           "mailto:ihome@localhost",
-          this.pushPublicKey,
-          this.pushPrivateKey,
+          keys.publicKey,
+          keys.privateKey,
         );
+        pushConfigured = true;
       } catch (error) {
         this.log.warn(`Web Push disabled: ${String(error)}`);
         this.pushPublicKey = "";
         this.pushPrivateKey = "";
-        pushConfigured = false;
       }
     }
     await this.setStateAsync("info.pushPublicKey", {
@@ -1306,9 +1321,7 @@ class IHome extends utils.Adapter {
       ack: true,
     });
     if (!pushConfigured) {
-      this.log.warn(
-        "Web Push disabled: set vapidPublicKey and vapidPrivateKey in the adapter configuration",
-      );
+      this.log.warn("Web Push disabled: could not create or read the keys");
     }
     await this.setObjectNotExistsAsync("info.pushSubscriptions", {
       type: "state",
