@@ -203,18 +203,20 @@
           {/if}
         </span>
       </div>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Edit formula"
-        aria-label="Edit formula"
-        onclick={() => {
-          open = true;
-          showFormula = true;
-        }}
-      >
-        <span class="material-symbols-outlined">edit</span>
-      </button>{@render resetButton()}
+      {#if open}
+        <button
+          type="button"
+          class="icon-btn"
+          title="Edit formula"
+          aria-label="Edit formula"
+          onclick={() => {
+            open = true;
+            showFormula = true;
+          }}
+        >
+          <span class="material-symbols-outlined">edit</span>
+        </button>
+      {/if}{@render resetButton()}
     {:else}
       <div class="state">
         <span class="state-id mono" title={control.stateId ?? ""}
@@ -228,15 +230,17 @@
         >
       </div>
 
-      <button
-        type="button"
-        class="icon-btn"
-        title="Change state"
-        aria-label="Change state"
-        onclick={onChangeState}
-      >
-        <span class="material-symbols-outlined">edit</span>
-      </button>{@render resetButton()}
+      {#if open}
+        <button
+          type="button"
+          class="icon-btn"
+          title="Change state"
+          aria-label="Change state"
+          onclick={onChangeState}
+        >
+          <span class="material-symbols-outlined">edit</span>
+        </button>
+      {/if}{@render resetButton()}
 
       <label class="check"
         ><input
