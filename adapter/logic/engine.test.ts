@@ -2803,3 +2803,36 @@ it("a block error aborts the rest of the block and the event continues", () => {
   expect(ids).toContain("0_userdata.0.NEXT");
   expect(h.logs.some((l) => l.message.startsWith("action failed:"))).toBe(true);
 });
+
+it("a goto in an enter block finalizes only the target state", () => {
+  const d: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: { state: "A" },
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: {
+          A: { on: [{ on: "e", mode: "goto", goto: "B" }] },
+          B: {
+            after: { time: "1m", goto: "A" },
+            enter: { code: 'goto("C")' },
+          },
+          C: {},
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0 });
+  const engine = createEngine(d, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.E", 1);
+  expect(engine.memoryValue("m")).toBe("C");
+  expect(h.clock.pending).toBe(0);
+});

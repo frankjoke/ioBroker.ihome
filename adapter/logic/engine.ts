@@ -751,13 +751,14 @@ export function createEngine(
             ? `Logic “${def.name}” moves from “${oldName}” to “${name}”${because}`
             : `Logic “${def.name}” starts in “${name}”${because}`,
         );
-        runCode(rt, previous.exit, depth);
+        // A goto in the block already finalized its own transition.
+        if (runCode(rt, previous.exit, depth)) return;
       } else {
         stateLog(rt, `Logic “${def.name}” starts in “${name}”${because}`);
       }
       clearTimer(rt);
       rt.state = name;
-      runCode(rt, next.enter, depth);
+      if (runCode(rt, next.enter, depth)) return;
     }
     deps.report?.(def.id, { state: rt.state ?? name, ts: deps.now() });
     armAfter(rt, name, next);
