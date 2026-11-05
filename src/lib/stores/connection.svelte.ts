@@ -30,11 +30,13 @@ export function isLocalBroker(): boolean {
   if (!url) return false;
   const match = /^(?:https?|wss?):\/\/([^/:?#]+)/i.exec(url);
   if (!match) return false;
-  const host = match[1];
+  const host = match[1].toLowerCase();
   return (
-    host === location.hostname ||
     host === "localhost" ||
     host === "127.0.0.1" ||
+    host === "[::1]" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
     /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)
   );
 }

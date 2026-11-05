@@ -954,6 +954,30 @@ class IHome extends utils.Adapter {
         return;
       }
       const action = obj.message.action;
+      if (action === "home") {
+        const home = validHome(obj.message.home);
+        if (!home) {
+          reply({ ok: false, error: "invalid home" });
+          return;
+        }
+        await this.setObjectNotExistsAsync("phone.home", {
+          type: "state",
+          common: {
+            name: "Phone home point",
+            type: "string",
+            role: "json" as never,
+            read: true,
+            write: false,
+          },
+          native: {},
+        });
+        await this.setStateAsync("phone.home", {
+          val: JSON.stringify(home),
+          ack: true,
+        });
+        reply({ ok: true });
+        return;
+      }
       const deviceId = validDeviceId(obj.message.deviceId);
       if (!deviceId) {
         reply({ ok: false, error: "invalid device id" });
@@ -978,28 +1002,6 @@ class IHome extends utils.Adapter {
         await this.ensurePhoneStates(deviceId, deviceId);
         await this.writePhoneUpdate(deviceId, obj.message.data);
         reply({ ok: true, deviceId });
-      } else if (action === "home") {
-        const home = validHome(obj.message.home);
-        if (!home) {
-          reply({ ok: false, error: "invalid home" });
-          return;
-        }
-        await this.setObjectNotExistsAsync("phone.home", {
-          type: "state",
-          common: {
-            name: "Phone home point",
-            type: "string",
-            role: "json" as never,
-            read: true,
-            write: false,
-          },
-          native: {},
-        });
-        await this.setStateAsync("phone.home", {
-          val: JSON.stringify(home),
-          ack: true,
-        });
-        reply({ ok: true });
       } else if (action === "remove") {
         await this.removePhoneDevice(deviceId);
         reply({ ok: true });

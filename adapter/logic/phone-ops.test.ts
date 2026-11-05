@@ -17,6 +17,7 @@ it("accepts only safe device ids", () => {
   expect(validDeviceId("abc-123_X")).toBe("abc-123_X");
   expect(validDeviceId("a.b")).toBeNull();
   expect(validDeviceId("")).toBeNull();
+  expect(validDeviceId("home")).toBeNull();
   expect(validDeviceId("x".repeat(65))).toBeNull();
 });
 
@@ -102,4 +103,7 @@ it("reads the home point from system config", () => {
     radius: 150,
   });
   expect(homeFromSystemConfig({})).toBeNull();
+  expect(
+    homeFromSystemConfig({ common: { latitude: 0, longitude: 0 } }),
+  ).toBeNull();
 });

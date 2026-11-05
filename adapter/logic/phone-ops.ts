@@ -33,7 +33,9 @@ function finite(value: unknown): number | null {
 }
 
 export function validDeviceId(value: unknown): string | null {
-  return typeof value === "string" && DEVICE_ID.test(value) ? value : null;
+  return typeof value === "string" && DEVICE_ID.test(value) && value !== "home"
+    ? value
+    : null;
 }
 
 export function validPhoneName(value: unknown): string | null {
@@ -133,5 +135,6 @@ export function homeFromSystemConfig(config: unknown): PhoneHome | null {
   const lat = finite(config.common.latitude);
   const lon = finite(config.common.longitude);
   if (lat === null || lon === null) return null;
+  if (lat === 0 && lon === 0) return null;
   return validHome({ lat, lon, radius: DEFAULT_RADIUS_M });
 }

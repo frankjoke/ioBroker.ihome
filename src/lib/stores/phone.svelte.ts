@@ -7,6 +7,8 @@ import {
   mapUrl,
   normalizeConnection,
   phoneDecision,
+  validDeviceId,
+  validHome,
   validLocation,
   type PhoneConnection,
   type PhoneHome,
@@ -79,19 +81,15 @@ function readSettings(): void {
     const raw = localStorage.getItem(STORAGE_KEY);
     const value = raw ? JSON.parse(raw) : null;
     if (value && typeof value === "object") {
-      phone.deviceId =
-        typeof value.deviceId === "string" && value.deviceId
-          ? value.deviceId
-          : newDeviceId();
+      phone.deviceId = validDeviceId(value.deviceId) ?? newDeviceId();
       phone.name =
         typeof value.name === "string" && value.name.trim()
           ? value.name.trim()
           : DEFAULT_NAME;
       phone.enabled = value.enabled === true;
       phone.paused = value.paused === true;
-      if (value.home && typeof value.home === "object") {
-        phone.home = value.home;
-      }
+      const home = validHome(value.home);
+      if (home) phone.home = home;
     }
   } catch {
     // corrupt storage: start fresh
@@ -123,8 +121,8 @@ function send(command: string, data: Record<string, unknown>): void {
     .catch((error: unknown) => console.warn("phone:", error));
 }
 
-function baseData(): Record<string, unknown> {
-  return {
+function baseData(includeLocation = true): Record<string, unknown> {
+  const data: Record<string, unknown> = {
     enabled: true,
     online: navigator.onLine,
     connection: normalizeConnection((navigator as any).connection),
@@ -132,33 +130,45 @@ function baseData(): Record<string, unknown> {
     permission: phone.status.permission,
     atHome: phone.status.atHome,
     homeSource: phone.status.homeSource,
-    location: phone.status.location,
-    locationText: phone.status.locationText,
-    mapUrl: phone.status.mapUrl,
-    distance: phone.status.distance,
     lastSeen: Date.now(),
   };
+  if (includeLocation) {
+    data.location = phone.status.location;
+    data.locationText = phone.status.locationText;
+    data.mapUrl = phone.status.mapUrl;
+    data.distance = phone.status.distance;
+  }
+  return data;
 }
 
-/** Report the cheap fields; geolocation is handled by requestPhoneLocation. */
-export function reportPhone(): void {
+/** Report the cheap fields; the heartbeat omits the location payload. */
+export function reportPhone(includeLocation = true): void {
   if (!phone.enabled || phone.paused) return;
   phone.status.online = navigator.onLine;
   phone.status.connection = normalizeConnection((navigator as any).connection);
-  phone.status.local = isLocalBroker();
-  if (phone.status.local) {
+  const local = isLocalBroker();
+  phone.status.local = local;
+  if (local) {
     phone.status.atHome = true;
     phone.status.homeSource = "local";
     phone.status.location = null;
     phone.status.locationText = "At home";
     phone.status.mapUrl = "";
     phone.status.distance = homePoint() ? 0 : null;
+  } else if (phone.status.homeSource === "local") {
+    phone.status.atHome = null;
+    phone.status.homeSource = "none";
+    phone.status.location = null;
+    phone.status.locationText = "Unknown";
+    phone.status.mapUrl = "";
+    phone.status.distance = null;
+    void requestPhoneLocation();
   }
   phone.status.lastSeen = Date.now();
   send("update", {
     action: "update",
     deviceId: phone.deviceId,
-    data: baseData(),
+    data: baseData(includeLocation),
   });
 }
 
@@ -176,9 +186,27 @@ function registerPhone(): void {
 
 function startPhone(): void {
   registerPhone();
-  reportPhone();
+  reportPhone(false);
   if (heartbeat) clearInterval(heartbeat);
-  heartbeat = setInterval(reportPhone, HEARTBEAT_MS);
+  heartbeat = setInterval(() => reportPhone(false), HEARTBEAT_MS);
+}
+
+async function geolocationPermission(): Promise<string | null> {
+  try {
+    const permission = await navigator.permissions?.query({
+      name: "geolocation",
+    });
+    return permission?.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function resumeLocation(): Promise<void> {
+  if (!phone.enabled || phone.paused) return;
+  if ((await geolocationPermission()) === "granted") {
+    void requestPhoneLocation();
+  }
 }
 
 function stopPhone(): void {
@@ -192,14 +220,18 @@ function stopPhone(): void {
 function attachListeners(): void {
   if (listeners || typeof window === "undefined") return;
   listeners = true;
-  window.addEventListener("online", reportPhone);
-  window.addEventListener("offline", reportPhone);
+  window.addEventListener("online", () => reportPhone(false));
+  window.addEventListener("offline", () => reportPhone(false));
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      reportPhone();
-      if (phone.enabled && !phone.paused) void requestPhoneLocation();
+      if (phone.enabled && !phone.paused) {
+        startPhone();
+        void resumeLocation();
+      } else {
+        reportPhone(false);
+      }
     } else {
-      stopWatch();
+      stopPhone();
     }
   });
 }
@@ -213,20 +245,37 @@ export function initPhone(): void {
   phone.status.connection = normalizeConnection((navigator as any).connection);
   phone.status.local = isLocalBroker();
   phone.status.permission = navigator.geolocation ? "prompt" : "unsupported";
+  if (navigator.geolocation) {
+    void geolocationPermission().then((state) => {
+      if (state) phone.status.permission = state as PhoneStatus["permission"];
+    });
+  }
   attachListeners();
-  if (phone.enabled && !phone.paused) startPhone();
+  if (phone.enabled && !phone.paused) {
+    startPhone();
+    void resumeLocation();
+  }
 }
 
 export function setPhoneEnabled(enabled: boolean): void {
   phone.enabled = enabled;
   saveSettings();
-  if (enabled && !phone.paused) startPhone();
-  else {
+  if (enabled && !phone.paused) {
+    startPhone();
+    void requestPhoneLocation();
+  } else {
     stopPhone();
     send("update", {
       action: "update",
       deviceId: phone.deviceId,
-      data: { enabled },
+      data: {
+        enabled,
+        online: false,
+        atHome: null,
+        homeSource: "none",
+        location: null,
+        distance: null,
+      },
     });
   }
 }
@@ -253,7 +302,16 @@ export function pausePhone(paused: boolean): void {
   phone.paused = paused;
   saveSettings();
   if (paused) stopPhone();
-  else if (phone.enabled) startPhone();
+  else if (phone.enabled) {
+    phone.status.atHome = null;
+    phone.status.homeSource = "none";
+    phone.status.location = null;
+    phone.status.locationText = "Unknown";
+    phone.status.mapUrl = "";
+    phone.status.distance = null;
+    startPhone();
+    void resumeLocation();
+  }
 }
 
 export function homePoint(): PhoneHome | null {
@@ -285,9 +343,11 @@ function applyLocation(
   return decision.atHome === true;
 }
 
-function startWatch(home: PhoneHome | null): void {
+function startWatch(): void {
   if (
     watchId !== null ||
+    !phone.enabled ||
+    phone.paused ||
     typeof navigator.geolocation.watchPosition !== "function"
   ) {
     return;
@@ -301,7 +361,7 @@ function startWatch(home: PhoneHome | null): void {
         ts: Date.now(),
       });
       if (!location) return;
-      const atHome = applyLocation(location, home);
+      const atHome = applyLocation(location, homePoint());
       const moved = lastSentLocation
         ? distanceMeters(lastSentLocation, location)
         : Infinity;
@@ -314,6 +374,7 @@ function startWatch(home: PhoneHome | null): void {
     },
     () => {
       // The one-shot request reports the permission error; keep the watch quiet.
+      watchId = null;
     },
     { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
   );
@@ -333,7 +394,6 @@ export async function requestPhoneLocation(): Promise<PhoneLocation | null> {
     phone.status.locationText = "At home";
     phone.status.mapUrl = "";
     phone.status.distance = home ? 0 : null;
-    phone.status.permission = "prompt";
     reportPhone();
     return null;
   }
@@ -355,7 +415,7 @@ export async function requestPhoneLocation(): Promise<PhoneLocation | null> {
         lastSentAt = Date.now();
         lastSentLocation = location;
         if (phone.enabled && !phone.paused) reportPhone();
-        if (!atHome) startWatch(home);
+        if (!atHome && phone.enabled && !phone.paused) startWatch();
         resolve(location);
       },
       (error) => {
@@ -367,6 +427,33 @@ export async function requestPhoneLocation(): Promise<PhoneLocation | null> {
         phone.status.mapUrl = "";
         phone.status.distance = null;
         if (phone.enabled && !phone.paused) reportPhone();
+        resolve(null);
+      },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
+    );
+  });
+}
+
+/** One coarse fix regardless of the local shortcut — for “set home”. */
+export function getPhoneFix(): Promise<PhoneLocation | null> {
+  if (!navigator.geolocation) {
+    phone.status.permission = "unsupported";
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = validLocation({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          ts: Date.now(),
+        });
+        phone.status.permission = location ? "granted" : "prompt";
+        resolve(location);
+      },
+      (error) => {
+        phone.status.permission = error.code === 1 ? "denied" : "prompt";
         resolve(null);
       },
       { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },

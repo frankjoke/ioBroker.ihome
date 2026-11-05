@@ -9,6 +9,7 @@
   import { newId } from "$lib/utils/ids";
   import { homeFromSystemConfig } from "$logic/phone-ops";
   import {
+    getPhoneFix,
     homePoint,
     initPhone,
     pausePhone,
@@ -50,7 +51,7 @@
   }
 
   async function setHomeHere() {
-    const location = await requestPhoneLocation();
+    const location = await getPhoneFix();
     if (!location) {
       message = "No fix — use the system location or allow location access.";
       return;
