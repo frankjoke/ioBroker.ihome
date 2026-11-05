@@ -329,7 +329,7 @@
         <p class="hint warning">Push is not supported in this browser.</p>
       {/if}
       {#if push.error}
-        <p class="hint warning">{push.error}</p>
+        <p class="hint danger">{push.error}</p>
       {/if}
       {#if pushMessage}
         <p class="hint text-muted">{pushMessage}</p>
@@ -405,5 +405,9 @@
 
   .warning {
     color: var(--warning-color);
+  }
+
+  .danger {
+    color: var(--danger-color);
   }
 </style>

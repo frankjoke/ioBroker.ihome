@@ -43,10 +43,9 @@ Push reaches an installed PWA even when it is closed. It needs HTTPS (the iobrok
 local HTTPS proxy); on iOS 16.4+ the PWA must be added to the home screen.
 
 1. Generate a VAPID pair: `npm run vapid`.
-2. Paste the keys into the adapter instance's native configuration (`vapidPublicKey`,
-   `vapidPrivateKey`). ioBroker encrypts the private key. There is no config dialog: edit
-   `system.adapter.ihome.0` in Admin → **Objects** (expert mode) and set both `native` fields, then
-   restart the instance.
+2. Open the instance configuration (gear icon on `ihome.0`) → **Push notifications**, paste both
+   keys, and save. ioBroker encrypts the private key. Do not paste the keys into the object editor:
+   the private key must be encrypted by the config dialog.
 3. Open iHome over HTTPS → **Server & Security** → **This phone** → **Enable notifications**.
 4. Send a test from the card, from a script, or from a logic:
 

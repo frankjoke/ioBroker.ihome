@@ -1,0 +1,28 @@
+{
+  "type": "tabs",
+  "i18n": false,
+  "items": {
+    "push": {
+      "type": "panel",
+      "label": "Push notifications",
+      "items": {
+        "vapidPublicKey": {
+          "type": "text",
+          "label": "VAPID public key",
+          "help": "Run `npm run vapid` in the adapter directory and paste the publicKey here.",
+          "sm": 12,
+          "md": 6,
+          "lg": 6
+        },
+        "vapidPrivateKey": {
+          "type": "password",
+          "label": "VAPID private key",
+          "help": "Paste the privateKey from `npm run vapid`. ioBroker stores it encrypted. If the field shows garbage, clear it and paste the key again.",
+          "sm": 12,
+          "md": 6,
+          "lg": 6
+        }
+      }
+    }
+  }
+}
