@@ -68,7 +68,7 @@ export function notificationOptions(
   };
 }
 
-export function base64ToUint8Array(value: string): Uint8Array {
+export function base64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
   const binary = atob(padded);

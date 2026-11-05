@@ -19,8 +19,15 @@
     setPhoneHome,
     setPhoneName,
   } from "$lib/stores/phone.svelte";
+  import {
+    disablePush,
+    enablePush,
+    initPush,
+    push,
+  } from "$lib/stores/push.svelte";
 
   let message = $state("");
+  let pushMessage = $state("");
   const systemHome = $derived(homeFromSystemConfig(ioBroker.systemConfig));
   const secure = $derived(
     location.protocol === "https:" ||
@@ -37,7 +44,10 @@
     ),
   );
 
-  onMount(() => initPhone());
+  onMount(() => {
+    initPhone();
+    initPush();
+  });
 
   function statusText(): string {
     if (phone.status.atHome === true) return "At home";
@@ -75,6 +85,22 @@
     const radius = Number(value);
     if (!home || !Number.isFinite(radius) || radius <= 0) return;
     setPhoneHome({ ...home, radius });
+  }
+
+  async function sendTestPush() {
+    pushMessage = "";
+    try {
+      const result = (await ioBroker.sendTo(ioBroker.namespace, "notify", {
+        title: "iHome test",
+        body: "Push works",
+        level: "info",
+      })) as { ok?: boolean; sent?: number; error?: string } | undefined;
+      pushMessage = result?.ok
+        ? `Sent to ${result.sent ?? 0} device(s).`
+        : (result?.error ?? "The adapter did not accept the test.");
+    } catch (error) {
+      pushMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 
   function createPhoneDevice() {
@@ -257,6 +283,59 @@
       </button>
     </div>
 
+    <div class="push-block">
+      <span class="label-mono">Notifications</span>
+      <p class="hint text-muted">
+        Notifications need HTTPS and, on iPhone, the PWA installed on the home
+        screen.
+      </p>
+      {#if push.supported}
+        <div class="phone-actions">
+          <button
+            class="btn"
+            type="button"
+            disabled={push.busy}
+            onclick={() =>
+              void (push.subscribed ? disablePush() : enablePush())}
+          >
+            {push.busy
+              ? "Working…"
+              : push.subscribed
+                ? "Disable notifications"
+                : "Enable notifications"}
+          </button>
+          <button
+            class="btn"
+            type="button"
+            disabled={!push.subscribed || push.busy}
+            onclick={() => void sendTestPush()}
+          >
+            Send test notification
+          </button>
+        </div>
+        <div class="phone-status">
+          <div>
+            <span class="label-mono">Permission</span><span
+              >{push.permission}</span
+            >
+          </div>
+          <div>
+            <span class="label-mono">Subscription</span><span
+              >{push.subscribed ? "active" : "none"}</span
+            >
+          </div>
+        </div>
+      {:else}
+        <p class="hint warning">Push is not supported in this browser.</p>
+      {/if}
+      {#if push.error}
+        <p class="hint warning">{push.error}</p>
+      {/if}
+      {#if pushMessage}
+        <p class="hint text-muted">{pushMessage}</p>
+      {/if}
+    </div>
+
     {#if message}
       <p class="hint text-muted">{message}</p>
     {/if}
@@ -275,6 +354,14 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  .push-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
   }
 
   .phone-status {
