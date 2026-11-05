@@ -568,7 +568,8 @@ textarea {
   border: 1px solid var(--border-color);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
-  background: transparent;
+  /* Closed tabs sit in the shade; the open one joins the panel below. */
+  background: var(--surface-container-high);
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
@@ -576,12 +577,14 @@ textarea {
 
 .option-tab:hover {
   color: var(--text-color);
+  background: var(--surface-container-highest);
 }
 
 .option-tab.active {
   color: var(--primary-color);
   background: var(--option-tab-bg, var(--surface-color));
   border-bottom: 1px solid var(--option-tab-bg, var(--surface-color));
+  font-weight: 600;
 }
 
 /* ------------------------------------------------------------------ *
