@@ -427,24 +427,24 @@ export function createEngine(
     return rt.vm.runExpr(expr, depth);
   }
 
-  /** Runs an action block; true when it threw a `goto("State")` and the
-   *  transition happened. Any other error aborts the block and is logged. */
+  /** A goto ends the block even when its unknown target cannot transition. */
   function runCode(
     rt: Runtime,
     expr: Expr | undefined,
     depth: number,
-  ): boolean {
-    if (!expr) return false;
+  ): "none" | "jumped" | "transitioned" {
+    if (!expr) return "none";
     try {
       rt.vm!.runStatements(expr, depth);
-      return false;
+      return "none";
     } catch (error) {
       if (isGotoSignal(error)) {
-        transition(rt, error.state, depth, "action goto");
-        return true;
+        return transition(rt, error.state, depth, "action goto")
+          ? "transitioned"
+          : "jumped";
       }
       warn(logId(rt), `action failed: ${errorText(error)}`);
-      return false;
+      return "none";
     }
   }
 
@@ -608,7 +608,8 @@ export function createEngine(
         deps.log(row.log.level, logId(rt), fillLog(rt, row.log.text));
       }
       if ((row.mode ?? "goto") === "function") {
-        if (runCode(rt, row.do, job.depth)) return { matched, stopped: true };
+        if (runCode(rt, row.do, job.depth) !== "none")
+          return { matched, stopped: true };
       } else if (row.goto) {
         transition(rt, row.goto, job.depth, eventCause(job));
         return { matched, stopped: true };
@@ -729,12 +730,12 @@ export function createEngine(
     name: string,
     depth: number,
     reason = "",
-  ): void {
+  ): boolean {
     const def = rt.def as MachineLogic;
     const next = def.states[name];
     if (!next) {
       warn(logId(rt), `unknown state ${name}`);
-      return;
+      return false;
     }
     const same = rt.state === name;
     const previous = rt.state ? def.states[rt.state] : undefined;
@@ -752,17 +753,18 @@ export function createEngine(
             : `Logic “${def.name}” starts in “${name}”${because}`,
         );
         // A goto in the block already finalized its own transition.
-        if (runCode(rt, previous.exit, depth)) return;
+        if (runCode(rt, previous.exit, depth) === "transitioned") return true;
       } else {
         stateLog(rt, `Logic “${def.name}” starts in “${name}”${because}`);
       }
       clearTimer(rt);
       rt.state = name;
-      if (runCode(rt, next.enter, depth)) return;
+      if (runCode(rt, next.enter, depth) === "transitioned") return true;
     }
     deps.report?.(def.id, { state: rt.state ?? name, ts: deps.now() });
     armAfter(rt, name, next);
     writeOutput(rt, name, depth, reason);
+    return true;
   }
 
   /** `{{ref}}` in a log text is that ref's value, as the row sees it (D24). */

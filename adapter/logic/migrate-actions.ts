@@ -36,9 +36,10 @@ function printAction(action: unknown): string {
 }
 
 export function printActions(actions: unknown): string | undefined {
-  if (!Array.isArray(actions) || actions.length === 0) {
-    return undefined;
-  }
+  if (actions == null) return undefined;
+  if (!Array.isArray(actions))
+    throw new Error("migrate: actions must be an array");
+  if (actions.length === 0) return undefined;
   return actions.map(printAction).join("\n");
 }
 

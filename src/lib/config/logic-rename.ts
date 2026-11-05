@@ -1,4 +1,4 @@
-import type { LogicDef } from "$logic/types";
+import type { Expr, LogicDef, OnRow } from "$logic/types";
 import { renameCodeRefs, renameGotoRefs } from "$logic/expr-code";
 
 /**
@@ -18,7 +18,9 @@ export function renameMemoryRefs(
     if (value && typeof value === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, item] of Object.entries(value)) {
-        if (key === "code" && typeof item === "string") {
+        if (key === "map") {
+          out[key] = item;
+        } else if (key === "code" && typeof item === "string") {
           out[key] = renameCodeRefs(item, from, to);
         } else {
           out[key] = key === "ref" && item === from ? to : walk(item);
@@ -66,25 +68,39 @@ export function renameStateRefs(
   from: string,
   to: string,
 ): LogicDef {
-  const walk = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(walk);
-    if (value && typeof value === "object") {
-      const out: Record<string, unknown> = {};
-      for (const [key, item] of Object.entries(value)) {
-        if (key === "code" && typeof item === "string") {
-          out[key] = renameGotoRefs(item, from, to);
-        } else if (
-          (key === "goto" || key === "start" || key === "state") &&
-          item === from
-        ) {
-          out[key] = to;
-        } else {
-          out[key] = walk(item);
-        }
-      }
-      return out;
-    }
-    return value;
+  if (logic.kind !== "machine") return logic;
+  const rename = (name: string) => (name === from ? to : name);
+  const block = (expr: Expr): Expr => ({
+    ...expr,
+    code: renameGotoRefs(expr.code, from, to),
+  });
+  const row = (value: OnRow): OnRow => ({
+    ...value,
+    ...(value.goto !== undefined ? { goto: rename(value.goto) } : {}),
+    ...(value.do ? { do: block(value.do) } : {}),
+  });
+  return {
+    ...logic,
+    ...(logic.start !== undefined ? { start: rename(logic.start) } : {}),
+    ...(typeof logic.init?.state === "string"
+      ? { init: { ...logic.init, state: rename(logic.init.state) } }
+      : {}),
+    states: Object.fromEntries(
+      Object.entries(logic.states).map(([name, state]) => [
+        name,
+        {
+          ...state,
+          ...(state.after
+            ? { after: { ...state.after, goto: rename(state.after.goto) } }
+            : {}),
+          ...(state.enter ? { enter: block(state.enter) } : {}),
+          ...(state.exit ? { exit: block(state.exit) } : {}),
+          ...(state.on ? { on: state.on.map(row) } : {}),
+        },
+      ]),
+    ),
+    ...(logic.all?.on
+      ? { all: { ...logic.all, on: logic.all.on.map(row) } }
+      : {}),
   };
-  return walk(logic) as LogicDef;
 }

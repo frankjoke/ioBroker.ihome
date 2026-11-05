@@ -1,5 +1,54 @@
 import { expect, it } from "vitest";
 import { migrateActionDocument, printActions } from "./migrate-actions";
+import { parseLogicDocument } from "./validate";
+
+it("rejects present non-array actions without losing the stored document", () => {
+  expect(() => printActions({} as never)).toThrow();
+  expect(printActions(undefined)).toBeUndefined();
+  expect(printActions(null)).toBeUndefined();
+  for (const state of [
+    { on: [{ on: "e", do: { log: { text: "x" } } }] },
+    { enter: { log: { text: "x" } } },
+    { exit: { log: { text: "x" } } },
+  ]) {
+    const v2 = {
+      version: 2,
+      logics: [{ id: "m", name: "M", kind: "machine", states: { A: state } }],
+    };
+    const original = JSON.stringify(v2);
+    expect(() => migrateActionDocument(v2)).toThrow();
+    expect(parseLogicDocument(v2)).toBeNull();
+    expect(JSON.stringify(v2)).toBe(original);
+  }
+});
+
+it("migrates state exit and all-state rows", () => {
+  const v3 = migrateActionDocument({
+    version: 2,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        states: { A: { exit: [{ log: { text: "bye" } }] } },
+        all: {
+          on: [
+            {
+              on: "e",
+              do: [{ set: { target: { ref: "x" }, value: { code: "1" } } }],
+            },
+          ],
+        },
+      },
+    ],
+  }) as any;
+  expect(v3.logics[0].states.A.exit).toEqual({ code: 'log("bye")' });
+  expect(v3.logics[0].all.on[0]).toEqual({
+    on: "e",
+    mode: "function",
+    do: { code: 'set("x", (1\n))' },
+  });
+});
 
 it("prints set, goto and log statements", () => {
   expect(

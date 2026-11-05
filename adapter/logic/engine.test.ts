@@ -42,6 +42,22 @@ function engineWith(document: LogicDocument) {
   return { h, engine };
 }
 
+it("subscribes and reads refs in a bare object expression", () => {
+  const { h, engine } = engineWith(
+    doc({
+      expr: code('{"value": get("0_userdata.0.SENSOR")}.value'),
+    }),
+  );
+  expect(engine.subscriptions()).toContain("0_userdata.0.SENSOR");
+  h.change("0_userdata.0.SENSOR", 42);
+  engine.start();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 42,
+    ack: false,
+  });
+});
+
 it("runs on change only by default and writes only on change", () => {
   const { h, engine } = engineWith(doc());
   engine.start();
@@ -2836,3 +2852,54 @@ it("a goto in an enter block finalizes only the target state", () => {
   expect(engine.memoryValue("m")).toBe("C");
   expect(h.clock.pending).toBe(0);
 });
+
+it.each(["enter", "exit"] as const)(
+  "an unknown %s goto still finalizes the destination",
+  (block) => {
+    const reports: unknown[] = [];
+    const d: LogicDocument = {
+      version: 3,
+      logics: [
+        {
+          id: "m",
+          name: "M",
+          kind: "machine",
+          init: { state: "A" },
+          inputs: {
+            e: {
+              from: { type: "state", ref: "0_userdata.0.E" },
+              kind: "event",
+            },
+          },
+          output: { scope: "memory" },
+          states: {
+            A: {
+              on: [{ on: "e", goto: "B" }],
+              ...(block === "exit"
+                ? { exit: code('goto("Missing" + "")') }
+                : {}),
+            },
+            B: {
+              after: { time: "1m", goto: "A" },
+              ...(block === "enter"
+                ? { enter: code('goto("Missing" + "")') }
+                : {}),
+            },
+          },
+        },
+      ],
+    };
+    const h = createHarness({ "0_userdata.0.E": 0 });
+    h.deps.report = (_id, value) => reports.push(value);
+    const engine = createEngine(d, h.deps);
+    h.attach(engine);
+    engine.start();
+    h.change("0_userdata.0.E", 1);
+    expect(engine.memoryValue("m")).toBe("B");
+    expect(h.clock.pending).toBe(1);
+    expect(reports.at(-1)).toMatchObject({ state: "B" });
+    expect(
+      h.logs.some((line) => line.message === "unknown state Missing"),
+    ).toBe(true);
+  },
+);

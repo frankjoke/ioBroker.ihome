@@ -154,9 +154,7 @@ function programCalls(
 
 /** State names referenced by literal get/state/set calls, in source order. */
 export function extractRefs(code: string): string[] {
-  const names = (programCalls(code, REF_FUNCTIONS) ?? []).map(
-    (call) => call.name,
-  );
+  const names = (refCallsInCode(code) ?? []).map((call) => call.name);
   return [...new Set(names)];
 }
 
@@ -204,9 +202,11 @@ function quoted(quote: string, value: string): string {
   return quote === "'" ? `'${body.replace(/'/g, "\\'")}'` : `"${body}"`;
 }
 
-/** Rewrite literal get/state/set state names from `from` to `to`. */
 /** Ref calls with offsets into `code`; expression code is tried first, then statements. */
-function refCallsInCode(code: string): RefCall[] | null {
+function refCallsInCode(
+  code: string,
+  names: ReadonlySet<string> = REF_FUNCTIONS,
+): RefCall[] | null {
   const wrapped = parseOrNull(wrapExpression(code));
   if (
     wrapped &&
@@ -215,7 +215,7 @@ function refCallsInCode(code: string): RefCall[] | null {
   ) {
     const calls: RefCall[] = [];
     walk(wrapped, (node) => {
-      const call = refCall(node);
+      const call = refCall(node, names);
       // wrapExpression prepends "(", so shift AST offsets back into `code`
       if (call) {
         calls.push({ ...call, start: call.start - 1, end: call.end - 1 });
@@ -223,7 +223,7 @@ function refCallsInCode(code: string): RefCall[] | null {
     });
     return calls;
   }
-  return programCalls(code, REF_FUNCTIONS);
+  return programCalls(code, names);
 }
 
 /** Replace the literal of each call named `from` with `to`, keeping its quote style. */
@@ -262,7 +262,7 @@ export function renameCodeRefs(code: string, from: string, to: string): string {
 
 /** Rewrite literal goto targets from `from` to `to`; dynamic targets stay. */
 export function renameGotoRefs(code: string, from: string, to: string): string {
-  const calls = programCalls(code, GOTO_FUNCTIONS);
+  const calls = refCallsInCode(code, GOTO_FUNCTIONS);
   if (calls) return renameLiterals(code, calls, from, to);
 
   // shortcut: the fallback can match inside comments or strings, like renameCodeRefs

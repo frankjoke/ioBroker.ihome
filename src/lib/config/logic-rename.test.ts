@@ -75,6 +75,8 @@ it("rewrites state references in code and structured fields", () => {
     init: { state: "old" },
     states: {
       old: {
+        enter: { code: 'goto("old")' },
+        exit: { code: 'goto("old")' },
         after: { time: "1m", goto: "old" },
         on: [
           {
@@ -86,6 +88,7 @@ it("rewrites state references in code and structured fields", () => {
         ],
       },
     },
+    all: { on: [{ on: "e", goto: "old", do: { code: 'goto("old")' } }] },
   } as const;
   const next = renameStateRefs(logic as never, "old", "new") as any;
   expect(next.start).toBe("new");
@@ -95,6 +98,49 @@ it("rewrites state references in code and structured fields", () => {
     'goto("new")\nif (get("x")) goto("new")',
   );
   expect(next.states.old.on[1].goto).toBe("new");
+  expect(next.states.old.enter.code).toBe('goto("new")');
+  expect(next.states.old.exit.code).toBe('goto("new")');
+  expect(next.all.on[0].goto).toBe("new");
+  expect(next.all.on[0].do.code).toBe('goto("new")');
+});
+
+it("leaves output maps and non-action state payloads untouched", () => {
+  const logic = {
+    id: "m",
+    name: "M",
+    kind: "machine",
+    init: { state: { code: 'goto("old")' } },
+    output: {
+      scope: "state",
+      ref: "x",
+      type: "string",
+      map: { code: 'goto("old")', state: "old" },
+    },
+    states: {
+      A: {
+        on: [
+          {
+            on: "e",
+            if: { code: 'goto("old")' },
+            log: { text: "old" },
+            is: { op: "eq", value: { state: "old", code: 'goto("old")' } },
+          },
+        ],
+      },
+    },
+  } as const;
+  const next = renameStateRefs(logic as never, "old", "new");
+  expect(next).toEqual(logic);
+  const memoryLogic = {
+    ...logic,
+    output: {
+      ...logic.output,
+      map: { code: 'get("old")', state: "old", ref: "old" },
+    },
+  };
+  expect(renameMemoryRefs(memoryLogic as never, "old", "new").output).toEqual(
+    memoryLogic.output,
+  );
 });
 
 it("rewrites memory refs inside statement code", () => {

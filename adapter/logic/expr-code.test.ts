@@ -39,6 +39,11 @@ describe("checkExpression", () => {
 });
 
 describe("extractRefs", () => {
+  it("finds refs in bare object expressions", () => {
+    expect(extractRefs('{"value": get("0_userdata.0.SENSOR")}.value')).toEqual([
+      "0_userdata.0.SENSOR",
+    ]);
+  });
   it("collects literal get/state/set names", () => {
     expect(extractRefs('get("a") + state("b").value + set("c", 1)')).toEqual([
       "a",
@@ -185,6 +190,17 @@ describe("renameCodeRefs on statements", () => {
 });
 
 describe("renameGotoRefs", () => {
+  it("leaves goto text inside valid expression strings untouched", () => {
+    for (const source of [
+      'get("message") === "goto(\'old\')"',
+      '{"text": "goto(\'old\')"}.text === get("message")',
+    ]) {
+      expect(renameGotoRefs(source, "old", "new")).toBe(source);
+    }
+    expect(renameGotoRefs('{"value": goto("old")}.value', "old", "new")).toBe(
+      '{"value": goto("new")}.value',
+    );
+  });
   it("rewrites literal goto targets only", () => {
     expect(renameGotoRefs('goto("old")\ngoto("other")', "old", "new")).toBe(
       'goto("new")\ngoto("other")',
