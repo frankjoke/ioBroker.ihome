@@ -453,7 +453,7 @@ class IHome extends utils.Adapter {
   private async loadLogics(): Promise<void> {
     const loadId = ++this.logicLoad;
     const target = `${CONFIG_FOLDER}.logicList`;
-    let doc: LogicDocument | null = { version: 2, logics: [] };
+    let doc: LogicDocument | null = { version: 3, logics: [] };
     try {
       const stored = await this.getStateAsync(target);
       const raw = stored?.val;

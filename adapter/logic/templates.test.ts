@@ -28,7 +28,7 @@ it("substitutes parameters into a valid logic", () => {
     type: "boolean",
     on: "On*",
   });
-  expect(validateLogicDocument({ version: 2, logics: [logic] })).toEqual([]);
+  expect(validateLogicDocument({ version: 3, logics: [logic] })).toEqual([]);
 });
 
 it("keeps typed parameters typed", () => {
@@ -47,7 +47,7 @@ it("keeps typed parameters typed", () => {
   expect((logic as { expr?: unknown }).expr).toEqual({
     code: 'get("value") * 2.5',
   });
-  expect(validateLogicDocument({ version: 2, logics: [logic] })).toEqual([]);
+  expect(validateLogicDocument({ version: 3, logics: [logic] })).toEqual([]);
 });
 
 it("refuses a missing parameter", () => {

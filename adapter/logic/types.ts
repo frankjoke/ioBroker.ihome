@@ -1,7 +1,9 @@
 // The logic document as stored in ihome.0.config.logicList. Every field the
 // engine, the validator and the editor share lives here; the expression spec
 // (docs/superpowers/specs/2026-11-04-logic-code-expressions-design.md) is the
-// authority for Expr, the logic spec
+// authority for Expr, the action spec
+// (docs/superpowers/specs/2026-11-05-logic-action-code-design.md) for the
+// statement blocks, the logic spec
 // (docs/superpowers/specs/2026-10-31-ihome-logic-design.md, section 4) for the
 // rest.
 
@@ -116,20 +118,6 @@ export interface Ref {
 /** A bare JavaScript expression; "no update" is the runtime value of noop(). */
 export type Expr = { code: string };
 
-export type Action =
-  | {
-      set: {
-        target: Ref;
-        value: Expr;
-        /** Default false: a command, not a confirmation. */
-        ack?: boolean;
-        /** Default "changed". */
-        forward?: Forward;
-      };
-    }
-  | { goto: string }
-  | { log: { text: string; level?: "info" | "warn" } };
-
 export interface OnRow {
   /** An input name whose kind is "event", or a built-in trigger: `$init` (this
    *  logic's start), `$self` (a write to its output), `$start` (after every
@@ -146,18 +134,23 @@ export interface OnRow {
   is?: { op: Operator; value?: Json };
   /** Further condition over any ref, evaluated on the event. */
   if?: Expr;
-  do?: Action[];
+  /** Written to the log before the action runs. */
+  log?: { text: string; level?: "info" | "warn" };
+  /** Which side acts: a plain `goto` or the `do` code. Default "goto"; the
+   *  other side may stay stored but does not run. */
+  mode?: "goto" | "function";
   /** Absent = stay in the state (no output write). */
   goto?: string;
-  /** After this row's `do`, keep checking the following rows of the same state
-   *  for the same event. A row that transitions (`goto`, or a `goto` action)
-   *  still ends the event. */
+  /** Statement block; `goto("State")` inside it transitions. */
+  do?: Expr;
+  /** After this row's action, keep checking the following rows of the same
+   *  state for the same event. A row that transitions still ends the event. */
   continue?: boolean;
 }
 
 export interface StateDef {
-  enter?: Action[];
-  exit?: Action[];
+  enter?: Expr;
+  exit?: Expr;
   on?: OnRow[];
   after?: { time: Duration; goto: string };
 }
@@ -230,7 +223,7 @@ export interface LogicTemplate {
 }
 
 export interface LogicDocument {
-  version: 2;
+  version: 3;
   /** Shared values not tied to a logic output. */
   memory?: MemoryDecl[];
   logics: LogicDef[];

@@ -3,6 +3,8 @@ import { parseDuration } from "./duration";
 import {
   createLogicRuntime,
   forEachExpression,
+  interpolate,
+  isGotoSignal,
   isNoop,
   type LogicRuntime,
   type NameInfo,
@@ -10,7 +12,6 @@ import {
 import { nextCron } from "./timer-ops";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
-  Action,
   AstroEvent,
   Duration,
   Expr,
@@ -247,8 +248,9 @@ export function createEngine(
     try {
       rt.vm = createLogicRuntime(def, {
         describe: (name) => describeName(rt, name),
-        write: (name, value, ack, depth) =>
-          writeTarget(rt, name, value, ack, undefined, depth),
+        write: (name, value, ack, forward, depth) =>
+          writeTarget(rt, name, value, ack, forward, depth),
+        log: (level, message) => deps.log(level, logId(rt), message),
         now: () => deps.now(),
       });
     } catch (error) {
@@ -420,13 +422,30 @@ export function createEngine(
     return externalInfo(variable.stateId);
   }
 
-  function resolveIn(rt: Runtime, ref: string): unknown {
-    return describeName(rt, ref).value;
-  }
-
   function runExpr(rt: Runtime, expr: Expr, depth: number): unknown {
     if (!rt.vm) throw new Error("expression not compiled");
-    return rt.vm.run(expr.code, depth);
+    return rt.vm.runExpr(expr, depth);
+  }
+
+  /** Runs an action block; true when it threw a `goto("State")` and the
+   *  transition happened. Any other error aborts the block and is logged. */
+  function runCode(
+    rt: Runtime,
+    expr: Expr | undefined,
+    depth: number,
+  ): boolean {
+    if (!expr) return false;
+    try {
+      rt.vm!.runStatements(expr, depth);
+      return false;
+    } catch (error) {
+      if (isGotoSignal(error)) {
+        transition(rt, error.state, depth, "action goto");
+        return true;
+      }
+      warn(logId(rt), `action failed: ${errorText(error)}`);
+      return false;
+    }
   }
 
   function externalId(ref: string, rt: Runtime): string | undefined {
@@ -454,7 +473,7 @@ export function createEngine(
     for (const rt of runtimes) {
       const refs: string[] = [];
       collectRefs(rt.def, refs);
-      forEachExpression(rt.def, (code) => refs.push(...extractRefs(code)));
+      forEachExpression(rt.def, (expr) => refs.push(...extractRefs(expr.code)));
       for (const ref of refs) {
         const id = externalId(ref, rt);
         if (id) ids.add(id);
@@ -585,14 +604,18 @@ export function createEngine(
       }
       // A hook, not a handler: it must not swallow the `$self` output sync.
       if (!always) matched = true;
-      const jumped = runActions(rt, row.do ?? [], job.depth);
-      if (row.goto) {
+      if (row.log?.level) {
+        deps.log(row.log.level, logId(rt), fillLog(rt, row.log.text));
+      }
+      if ((row.mode ?? "goto") === "function") {
+        if (runCode(rt, row.do, job.depth)) return { matched, stopped: true };
+      } else if (row.goto) {
         transition(rt, row.goto, job.depth, eventCause(job));
         return { matched, stopped: true };
       }
       // A `continue` row leaves the state untouched and lets the rows below
-      // react to the same event; a goto (row or action) always ends it.
-      if (jumped || row.continue !== true) return { matched, stopped: true };
+      // react to the same event; a goto always ends it.
+      if (row.continue !== true) return { matched, stopped: true };
     }
     return { matched, stopped: false };
   }
@@ -728,65 +751,22 @@ export function createEngine(
             ? `Logic “${def.name}” moves from “${oldName}” to “${name}”${because}`
             : `Logic “${def.name}” starts in “${name}”${because}`,
         );
-        runActions(rt, previous.exit ?? [], depth);
+        runCode(rt, previous.exit, depth);
       } else {
         stateLog(rt, `Logic “${def.name}” starts in “${name}”${because}`);
       }
       clearTimer(rt);
       rt.state = name;
-      runActions(rt, next.enter ?? [], depth);
+      runCode(rt, next.enter, depth);
     }
     deps.report?.(def.id, { state: rt.state ?? name, ts: deps.now() });
     armAfter(rt, name, next);
     writeOutput(rt, name, depth, reason);
   }
 
-  /** Runs an action list; true when it contained a `goto` (the state changed
-   *  or was re-entered), which ends the current event. */
-  function runActions(rt: Runtime, actions: Action[], depth: number): boolean {
-    let jumped = false;
-    for (const action of actions) {
-      if ("set" in action) {
-        let value: unknown;
-        try {
-          value = runExpr(rt, action.set.value, depth);
-        } catch (error) {
-          warn(logId(rt), `set failed: ${errorText(error)}`);
-          continue;
-        }
-        writeTarget(
-          rt,
-          action.set.target.ref,
-          value,
-          action.set.ack ?? false,
-          action.set.forward,
-          depth,
-        );
-      } else if ("goto" in action) {
-        transition(rt, action.goto, depth, "action goto");
-        jumped = true;
-      } else if ("log" in action) {
-        deps.log(
-          action.log.level ?? "info",
-          logId(rt),
-          fillLog(rt, action.log.text),
-        );
-      }
-    }
-    return jumped;
-  }
-
   /** `{{ref}}` in a log text is that ref's value, as the row sees it (D24). */
   function fillLog(rt: Runtime, text: string): string {
-    return text.replace(/\{\{([^{}]+)\}\}/g, (_, name: string) => {
-      const ref = name.trim();
-      try {
-        const value = resolveIn(rt, ref);
-        return value === undefined ? "—" : String(value);
-      } catch {
-        return `{{${ref}}}`;
-      }
-    });
+    return interpolate(text, (name) => describeName(rt, name));
   }
 
   /** Stores a memory value and emits its event; true when it actually wrote

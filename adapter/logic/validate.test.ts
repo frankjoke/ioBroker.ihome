@@ -4,10 +4,10 @@ import {
   parseLogicDocument,
   validateLogicDocument,
 } from "./validate";
-import type { LogicDocument } from "./types";
+import type { LogicDocument, MachineLogic, OnRow } from "./types";
 
 const doc: LogicDocument = {
-  version: 2,
+  version: 3,
   logics: [
     {
       id: "hallway",
@@ -33,7 +33,7 @@ const doc: LogicDocument = {
 it("parses a JSON string or object and rejects everything else", () => {
   expect(parseLogicDocument(JSON.stringify(doc))?.logics).toHaveLength(1);
   expect(parseLogicDocument(doc)?.logics).toHaveLength(1);
-  for (const bad of [null, "", "{bad", "[1,2]", { version: 3, logics: [] }]) {
+  for (const bad of [null, "", "{bad", "[1,2]", { version: 4, logics: [] }]) {
     expect(parseLogicDocument(bad)).toBeNull();
   }
 });
@@ -51,7 +51,7 @@ it("migrates a v1 document in memory", () => {
     ],
   };
   const parsed = parseLogicDocument(v1);
-  expect(parsed?.version).toBe(2);
+  expect(parsed?.version).toBe(3);
   expect(parsed?.logics[0]).toMatchObject({ expr: { code: 'get("a") + 1' } });
 });
 
@@ -61,7 +61,7 @@ it("accepts the valid document", () => {
 
 it("reports jump targets, row inputs and maps", () => {
   const broken: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         ...doc.logics[0],
@@ -85,7 +85,7 @@ it("reports jump targets, row inputs and maps", () => {
 it("rejects an expression without code, empty code or broken code", () => {
   const make = (expr: unknown): LogicDocument =>
     ({
-      version: 2,
+      version: 3,
       logics: [{ id: "x", name: "X", kind: "function", expr }],
     }) as never;
   const errors = (expr: unknown) =>
@@ -99,7 +99,7 @@ it("rejects an expression without code, empty code or broken code", () => {
 
 it("requires a ref and a known type on every state output", () => {
   const bad: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "f",
@@ -117,11 +117,11 @@ it("requires a ref and a known type on every state output", () => {
 
 it("does not throw on malformed optional arrays", () => {
   expect(() =>
-    validateLogicDocument({ version: 2, logics: [], memory: {} } as never),
+    validateLogicDocument({ version: 3, logics: [], memory: {} } as never),
   ).not.toThrow();
   expect(() =>
     validateLogicDocument({
-      version: 2,
+      version: 3,
       logics: [
         { id: "x", name: "X", kind: "machine", states: { A: { on: "nope" } } },
       ],
@@ -131,7 +131,7 @@ it("does not throw on malformed optional arrays", () => {
 
 it("rejects zero-length timers", () => {
   const bad: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "z",
@@ -149,7 +149,7 @@ it("rejects zero-length timers", () => {
 
 it("checks the init policy", () => {
   const bad: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "m",
@@ -168,7 +168,7 @@ it("checks the init policy", () => {
 
 it("accepts the string operators and rejects an unknown one", () => {
   const doc = (op: string): LogicDocument => ({
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "m",
@@ -196,7 +196,7 @@ it("accepts the string operators and rejects an unknown one", () => {
 
 it("accepts a $init row and an expression init state", () => {
   const doc: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "m",
@@ -219,7 +219,7 @@ it("accepts a $init row and an expression init state", () => {
 
 it("accepts an $always row", () => {
   const doc: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "m",
@@ -235,7 +235,7 @@ it("accepts an $always row", () => {
 
 it("rejects an unknown event source", () => {
   const bad: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "s",
@@ -259,7 +259,7 @@ it("rejects an unknown event source", () => {
 
 it("warns that continue cannot outlive a goto", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "c",
@@ -272,7 +272,12 @@ it("warns that continue cannot outlive a goto", () => {
           A: {
             on: [
               { on: "e", continue: true, goto: "B" },
-              { on: "e", continue: true, do: [{ goto: "B" }] },
+              {
+                on: "e",
+                continue: true,
+                mode: "function",
+                do: { code: 'goto("B")' },
+              },
               { on: "e", continue: true },
             ],
           },
@@ -291,7 +296,7 @@ it("warns that continue cannot outlive a goto", () => {
 
 it("accepts $start as a built-in trigger", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "s",
@@ -309,7 +314,7 @@ it("accepts $start as a built-in trigger", () => {
 
 it("accepts a $logic trigger and rejects an unknown logic", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "a",
@@ -340,7 +345,7 @@ it("accepts a $logic trigger and rejects an unknown logic", () => {
 
 it("accepts a global $var trigger", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "v",
@@ -356,7 +361,7 @@ it("accepts a global $var trigger", () => {
 
 it("validates $all rows and refuses $all as a goto target", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "a",
@@ -384,7 +389,7 @@ it("validates $all rows and refuses $all as a goto target", () => {
 
 it("rejects an unknown logic in a local event's sources", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "v",
@@ -414,7 +419,7 @@ it("rejects an unknown logic in a local event's sources", () => {
 
 it("accepts a timer-only event and rejects timers on a variable", () => {
   const ok: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "t",
@@ -447,7 +452,7 @@ it("accepts a timer-only event and rejects timers on a variable", () => {
 
 it("accepts a string output unit and rejects another type", () => {
   const d: LogicDocument = {
-    version: 2,
+    version: 3,
     logics: [
       {
         id: "u",
@@ -471,4 +476,202 @@ it("accepts a string output unit and rejects another type", () => {
   expect(validateLogicDocument(bad).some((i) => i.path === "output.unit")).toBe(
     true,
   );
+});
+
+const withRow = (row: Partial<OnRow>, extra: Partial<MachineLogic> = {}) => {
+  const d: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "r",
+        name: "R",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: { A: { on: [{ on: "e", ...row }] }, B: {} },
+        ...extra,
+      } as MachineLogic,
+    ],
+  };
+  return validateLogicDocument(d);
+};
+
+it("rejects a syntax error in do", () => {
+  const issues = withRow({ mode: "function", do: { code: "if (" } });
+  expect(issues).toMatchObject([
+    {
+      path: "states.A.on.0.do",
+      severity: "error",
+      message: expect.stringContaining("action code failed to compile"),
+    },
+  ]);
+});
+
+it("accepts an empty or comment-only do", () => {
+  expect(withRow({ mode: "function", do: { code: "" } })).toEqual([]);
+  expect(withRow({ mode: "function", do: { code: "// nothing" } })).toEqual([]);
+});
+
+it("checks an enter and exit block", () => {
+  const d = structuredClone(doc);
+  const states = (d.logics[0] as MachineLogic).states;
+  states.On.enter = { code: "if (" };
+  states.On.exit = { code: 'goto("Nope")' };
+  const paths = validateLogicDocument(d).map((i) => i.path);
+  expect(paths).toEqual(["states.On.enter", "states.On.exit"]);
+});
+
+it("rejects a do without code", () => {
+  expect(
+    withRow({ mode: "function", do: {} as never }).map((i) => i.message),
+  ).toEqual(["action has no code"]);
+});
+
+it("rejects an unknown mode", () => {
+  expect(withRow({ mode: "nope" as never }).map((i) => i.path)).toEqual([
+    "states.A.on.0.mode",
+  ]);
+});
+
+it("checks the row log", () => {
+  expect(withRow({ log: { level: "info" } as never })).toMatchObject([
+    { path: "states.A.on.0.log.text", severity: "error" },
+  ]);
+  expect(
+    withRow({ log: { text: "x", level: "debug" as never } }),
+  ).toMatchObject([{ path: "states.A.on.0.log.level", severity: "error" }]);
+  expect(withRow({ log: { text: "x", level: "warn" } })).toEqual([]);
+});
+
+it("checks literal goto targets in code", () => {
+  expect(
+    withRow({ mode: "function", do: { code: 'goto("Nope")' } }),
+  ).toMatchObject([
+    {
+      path: "states.A.on.0.do",
+      severity: "error",
+      message: "unknown state Nope",
+    },
+  ]);
+  expect(withRow({ mode: "function", do: { code: 'goto("B")' } })).toEqual([]);
+});
+
+it("checks a stored goto even when mode is function", () => {
+  expect(
+    withRow({ mode: "function", goto: "Nope", do: { code: "" } }).map(
+      (i) => i.path,
+    ),
+  ).toEqual(["states.A.on.0.goto"]);
+});
+
+it("warns about a literal set of an unknown plain name", () => {
+  const issues = withRow({
+    mode: "function",
+    do: { code: 'set("nope", 1)\nset("0_userdata.0.X", 1)\nset("e", 1)' },
+  });
+  expect(issues).toMatchObject([
+    {
+      path: "states.A.on.0.do",
+      severity: "warn",
+      message: expect.stringContaining("unknown ref nope"),
+    },
+  ]);
+});
+
+it("warns that continue cannot outlive a goto in a goto-mode row", () => {
+  expect(withRow({ continue: true, goto: "B" })).toMatchObject([
+    { path: "states.A.on.0.continue", severity: "warn" },
+  ]);
+  expect(
+    withRow({ continue: true, mode: "function", goto: "B", do: { code: "" } }),
+  ).toEqual([]);
+});
+
+it("migrates a v2 document with actions to v3", () => {
+  const v2 = {
+    version: 2,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: {
+          A: {
+            enter: [{ log: { text: "hi" } }],
+            on: [
+              {
+                on: "e",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.X" },
+                      value: { code: "1" },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const parsed = parseLogicDocument(v2)!;
+  expect(parsed.version).toBe(3);
+  const state = (parsed.logics[0] as MachineLogic).states.A;
+  expect(state.enter).toEqual({ code: 'log("hi")' });
+  expect(state.on![0]).toMatchObject({
+    mode: "function",
+    do: { code: expect.stringContaining('set("0_userdata.0.X"') },
+  });
+  expect(validateLogicDocument(parsed)).toEqual([]);
+});
+
+it("migrates a v1 document with actions to v3", () => {
+  const v1 = {
+    version: 1,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        states: {
+          A: {
+            on: [
+              {
+                on: "e",
+                do: [
+                  {
+                    set: {
+                      target: { ref: "0_userdata.0.X" },
+                      value: {
+                        op: "add",
+                        left: { ref: "e" },
+                        right: { const: 1 },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const parsed = parseLogicDocument(v1)!;
+  expect(parsed.version).toBe(3);
+  const row = (parsed.logics[0] as MachineLogic).states.A.on![0];
+  expect(row.mode).toBe("function");
+  expect(row.do?.code).toContain('set("0_userdata.0.X"');
 });

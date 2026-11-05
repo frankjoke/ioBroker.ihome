@@ -1,10 +1,15 @@
 import { parseDuration } from "./duration";
-import { checkExpression } from "./expr-code";
+import {
+  checkExpression,
+  checkStatement as checkStatementCode,
+  extractGotos,
+  extractRefCalls,
+} from "./expr-code";
+import { migrateActionDocument } from "./migrate-actions";
 import { migrateDocument } from "./migrate-expr";
 import { isAstroEvent, parseCronAt } from "./timer-ops";
 import { OPERATORS } from "./types";
 import type {
-  Action,
   FunctionLogic,
   Input,
   LogicDocument,
@@ -24,7 +29,7 @@ export interface Issue {
 
 /**
  * The document as the adapter and the SPA may use it, or null when it is not
- * one: not JSON, not an object, not `version: 1`/`2`, or no `logics` array. A
+ * one: not JSON, not an object, not `version: 1`/`2`/`3`, or no `logics` array. A
  * v1 document is migrated in memory. A null is never a reason to write: the
  * caller leaves the stored document alone.
  */
@@ -41,12 +46,21 @@ export function parseLogicDocument(raw: unknown): LogicDocument | null {
     return null;
   }
   const doc = value as { version?: unknown; logics?: unknown };
-  if (doc.version === 2 && Array.isArray(doc.logics)) {
+  if (doc.version === 3 && Array.isArray(doc.logics)) {
     return doc as LogicDocument;
+  }
+  if (doc.version === 2 && Array.isArray(doc.logics)) {
+    try {
+      return migrateActionDocument(value) as unknown as LogicDocument;
+    } catch {
+      return null;
+    }
   }
   if (doc.version === 1 && Array.isArray(doc.logics)) {
     try {
-      return migrateDocument(value);
+      return migrateActionDocument(
+        migrateDocument(value),
+      ) as unknown as LogicDocument;
     } catch {
       return null;
     }
@@ -312,28 +326,19 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
             add(id, `${path}.after.goto`, `unknown state ${state.after.goto}`);
           }
         }
-        (state.enter ?? []).forEach((action, index) =>
-          checkAction(
-            id,
-            action,
-            `${path}.enter.${index}`,
-            inputNames,
-            memoryNames,
-            stateNames,
-            add,
-          ),
-        );
-        (state.exit ?? []).forEach((action, index) =>
-          checkAction(
-            id,
-            action,
-            `${path}.exit.${index}`,
-            inputNames,
-            memoryNames,
-            stateNames,
-            add,
-          ),
-        );
+        for (const key of ["enter", "exit"] as const) {
+          if (state[key] !== undefined) {
+            checkActionCode(
+              id,
+              state[key],
+              `${path}.${key}`,
+              inputNames,
+              memoryNames,
+              stateNames,
+              add,
+            );
+          }
+        }
         if (state.on !== undefined && !Array.isArray(state.on)) {
           add(id, `${path}.on`, "on must be an array of rows");
         } else {
@@ -565,24 +570,44 @@ function checkRow(
       add(id, `${path}.if${p ? `.${p}` : ""}`, message),
     );
   }
-  (row?.do ?? []).forEach((action, index) =>
-    checkAction(
+  if (
+    row?.log !== undefined &&
+    (!isRecord(row.log) || typeof row.log.text !== "string")
+  ) {
+    add(id, `${path}.log.text`, "log without text");
+  } else if (
+    row?.log?.level !== undefined &&
+    row.log.level !== "info" &&
+    row.log.level !== "warn"
+  ) {
+    add(id, `${path}.log.level`, "unknown log level");
+  }
+  if (
+    row?.mode !== undefined &&
+    row.mode !== "goto" &&
+    row.mode !== "function"
+  ) {
+    add(id, `${path}.mode`, "unknown row mode");
+  }
+  if (row?.goto !== undefined && !stateNames.includes(row.goto)) {
+    add(id, `${path}.goto`, `unknown state ${row.goto}`);
+  }
+  if (row?.do !== undefined) {
+    checkActionCode(
       id,
-      action,
-      `${path}.do.${index}`,
+      row.do,
+      `${path}.do`,
       inputNames,
       memoryNames,
       stateNames,
       add,
-    ),
-  );
-  if (row?.goto !== undefined && !stateNames.includes(row.goto)) {
-    add(id, `${path}.goto`, `unknown state ${row.goto}`);
+    );
   }
-  if (
-    row?.continue === true &&
-    (row.goto !== undefined || (row.do ?? []).some((a) => "goto" in a))
-  ) {
+  const jumps =
+    row?.mode === "function"
+      ? typeof row.do?.code === "string" && extractGotos(row.do.code).length > 0
+      : row?.goto !== undefined;
+  if (row?.continue === true && jumps) {
     add(
       id,
       `${path}.continue`,
@@ -592,54 +617,41 @@ function checkRow(
   }
 }
 
-function checkAction(
+function checkActionCode(
   id: string,
-  action: Action,
+  expr: unknown,
   path: string,
   inputNames: Set<string>,
   memoryNames: Set<string>,
   stateNames: string[],
   add: Add,
 ): void {
-  if (!isRecord(action)) {
-    add(id, path, "action is not an object");
+  if (!isRecord(expr) || typeof expr.code !== "string") {
+    add(id, path, "action has no code");
     return;
   }
-  if ("set" in action) {
-    const set = action.set;
-    if (!isRecord(set) || !isRecord(set.target)) {
-      add(id, `${path}.set`, "set without a target");
-      return;
-    }
-    if (typeof set.target.ref !== "string" || !set.target.ref) {
-      add(id, `${path}.set.target.ref`, "set target without a ref");
-    } else if (
-      !set.target.ref.includes(".") &&
-      !inputNames.has(set.target.ref) &&
-      !memoryNames.has(set.target.ref)
+  const message = checkStatementCode(expr.code);
+  if (message) {
+    add(id, path, message);
+    return;
+  }
+  for (const call of extractRefCalls(expr.code)) {
+    if (
+      call.fn === "set" &&
+      !call.name.includes(".") &&
+      !inputNames.has(call.name) &&
+      !memoryNames.has(call.name)
     ) {
       add(
         id,
-        `${path}.set.target.ref`,
-        `unknown ref ${set.target.ref} (not a state id, input or memory name)`,
+        path,
+        `unknown ref ${call.name} (not a state id, input or memory name)`,
         "warn",
       );
     }
-    if (!set.value) add(id, `${path}.set.value`, "set without a value");
-    else
-      checkExpr(set.value, (p, message) =>
-        add(id, `${path}.set.value${p ? `.${p}` : ""}`, message),
-      );
-  } else if ("goto" in action) {
-    if (!stateNames.includes(action.goto)) {
-      add(id, `${path}.goto`, `unknown state ${action.goto}`);
-    }
-  } else if ("log" in action) {
-    if (typeof action.log?.text !== "string") {
-      add(id, `${path}.log.text`, "log without text");
-    }
-  } else {
-    add(id, path, "unknown action");
+  }
+  for (const target of extractGotos(expr.code)) {
+    if (!stateNames.includes(target)) add(id, path, `unknown state ${target}`);
   }
 }
 
