@@ -1,3 +1,5 @@
+import type { LogicDocument } from "./types";
+
 type Row = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -114,7 +116,7 @@ function migrateTemplate(template: Row): Row {
   return { ...template, logic: migrateLogic(template.logic as Row) };
 }
 
-export function migrateActionDocument(doc: unknown): Record<string, unknown> {
+export function migrateActionDocument(doc: unknown): LogicDocument {
   if (!isRecord(doc)) {
     throw new Error("migrate: document must be an object");
   }
@@ -127,5 +129,5 @@ export function migrateActionDocument(doc: unknown): Record<string, unknown> {
       migrateTemplate(template as Row),
     );
   }
-  return next;
+  return next as unknown as LogicDocument;
 }

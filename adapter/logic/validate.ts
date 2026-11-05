@@ -51,16 +51,14 @@ export function parseLogicDocument(raw: unknown): LogicDocument | null {
   }
   if (doc.version === 2 && Array.isArray(doc.logics)) {
     try {
-      return migrateActionDocument(value) as unknown as LogicDocument;
+      return migrateActionDocument(value);
     } catch {
       return null;
     }
   }
   if (doc.version === 1 && Array.isArray(doc.logics)) {
     try {
-      return migrateActionDocument(
-        migrateDocument(value),
-      ) as unknown as LogicDocument;
+      return migrateActionDocument(migrateDocument(value));
     } catch {
       return null;
     }
