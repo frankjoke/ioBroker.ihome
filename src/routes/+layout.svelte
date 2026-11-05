@@ -20,7 +20,7 @@
     getCanonicalRegistry,
     devicesEnrichedStore,
     getUsedStateIds,
-  } from "$lib/stores/devices.svelte.js";
+  } from "$lib/stores/devices.svelte";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
   import { initVariables } from "$lib/variables.svelte.js";

@@ -12,7 +12,7 @@ import {
   type Settings,
 } from "$lib/config/settings-ops";
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { registerProgramStateId } from "$lib/stores/devices.svelte.js";
+import { registerProgramStateId } from "$lib/stores/devices.svelte";
 
 export const SETTINGS_ID = "ihome.0.config.settings";
 

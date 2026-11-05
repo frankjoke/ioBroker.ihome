@@ -2,7 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
-  import { registerProgramStateId } from "$lib/stores/devices.svelte.js";
+  import { registerProgramStateId } from "$lib/stores/devices.svelte";
   import {
     placeholderKeys,
     renderHtmlDocument,

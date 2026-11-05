@@ -636,4 +636,4 @@ export function getIoBroker() {
   return getContext(IOBROKER);
 }
 
-import { getUsedStateIds } from "./stores/devices.svelte.js";
+import { getUsedStateIds } from "./stores/devices.svelte";

@@ -31,7 +31,7 @@
   import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
   import { effectiveHidePencil } from "$lib/config/settings-ops";
   import { connectionStatus } from "$lib/connection-status";
-  import { registerProgramStateId } from "$lib/stores/devices.svelte.js";
+  import { registerProgramStateId } from "$lib/stores/devices.svelte";
 
   /**
    * One bar for the whole app, in two states. The left half follows the state:
@@ -279,7 +279,9 @@
       title={statusText.title}
       aria-label={statusText.label}
     >
-      <span class="material-symbols-outlined">settings</span>
+      <span class="material-symbols-outlined">
+        {status === "error" ? "construction" : "settings"}
+      </span>
     </a>
   </div>
 </header>
