@@ -72,6 +72,21 @@ fetchJson("https://api.example/price", (data, error) => {
 10 s; a logic waits on at most 10 requests. An optional third argument accepts
 `{ method, headers, body }`.
 
+## Device templates
+
+**Logic → Device templates** defines a JS object once and generates the states
+plus one machine for a JSON/HTTP device. The object has `params`, an
+`itemList`, and pure `readRequest(params)` / `writeRequest(value, item, params)`
+functions that return `{ url, options }`. Each item defines its state (`name`,
+`type`, `role`, `unit`, `states`, `readOnly`, …) and its mapping (`source`,
+`foreignWriteName`, `conversion`, `setConversion`, `updateAlways`, `ack`).
+
+The generated states and logic are unlinked copies: editing the template later
+does not touch them, and the template stays available for another device.
+Applying again updates only states whose properties actually changed. Use a
+`state` parameter for tokens so the secret is read at runtime instead of being
+embedded in the logic document.
+
 ## Development
 
 ```bash

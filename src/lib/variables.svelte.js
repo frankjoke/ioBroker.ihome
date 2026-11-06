@@ -10,9 +10,10 @@ import {
 } from "$lib/stores/variables.svelte.ts";
 import {
   VARIABLES_FOLDER_ID,
-  initialValue,
   migrateVariables,
+  variableStateSpec,
 } from "$lib/config/variables";
+import { ensureStateObject } from "$lib/state-create";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 
 let initPromise = null;
@@ -73,32 +74,9 @@ async function createVariableState(v) {
     await ioBroker.emitAsync("setObject", VARIABLES_FOLDER_ID, folder);
     ioBroker.objects.update(VARIABLES_FOLDER_ID, folder);
   }
-  const type = ["string", "number", "boolean"].includes(v.type)
-    ? v.type
-    : "string";
-  const numeric = type === "number";
-  const obj = {
-    _id: v.stateId,
-    type: "state",
-    common: {
-      name: v.name || v.stateId,
-      type,
-      role: String(v.role ?? "").trim() || "value",
-      read: true,
-      write: true,
-      ...(v.unit ? { unit: v.unit } : {}),
-      ...(numeric && typeof v.min === "number" ? { min: v.min } : {}),
-      ...(numeric && typeof v.max === "number" ? { max: v.max } : {}),
-      ...(numeric && typeof v.step === "number" ? { step: v.step } : {}),
-    },
-    native: {},
-  };
-  await ioBroker.emitAsync("setObject", v.stateId, obj);
-  // An id outside `ihome.0` is not object-subscribed, so the broker will never
-  // push this object back: cache what we just created, or the row would read
-  // "missing" until a reload.
-  ioBroker.objects.update(v.stateId, obj);
-  await ioBroker.setState(v.stateId, initialValue(type));
+  const spec = variableStateSpec(v);
+  if (!spec) return;
+  await ensureStateObject(spec);
   await addToEnums(v.stateId, v.enums);
   // The created state is not in the local cache yet; reading it is the only way
   // to show a value — but the broker can need a moment before it serves the
@@ -149,6 +127,8 @@ export async function applyVariable(v) {
       ? ioBroker.objects.get(v.stateId)
       : await ioBroker.getObject(v.stateId, true);
     if (known) {
+      const spec = variableStateSpec(v, false);
+      if (spec) await ensureStateObject(spec);
       void ioBroker.getState(v.stateId);
       return null;
     }

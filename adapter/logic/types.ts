@@ -7,6 +7,8 @@
 // (docs/superpowers/specs/2026-10-31-ihome-logic-design.md, section 4) for the
 // rest.
 
+import type { FetchOptions } from "./tasks";
+
 export type Json = string | number | boolean | null;
 
 /** Whole seconds, minutes or hours as written in the document: "90s", "2m". */
@@ -223,6 +225,54 @@ export interface LogicTemplate {
   logic: LogicDef;
 }
 
+export interface DeviceParam {
+  name: string;
+  label: string;
+  type: "string" | "number" | "boolean" | "duration" | "state";
+  default?: string | number | boolean;
+}
+
+export interface DeviceItem {
+  name: string;
+  label?: string;
+  type: "boolean" | "number" | "string" | "object";
+  role?: string;
+  unit?: string;
+  states?: Record<string, string> | string;
+  min?: number;
+  max?: number;
+  step?: number;
+  readOnly?: boolean;
+  initial?: unknown;
+  source?: string;
+  updateAlways?: boolean;
+  ack?: boolean;
+  foreignWriteName?: string;
+  conversion?: (result: unknown, raw: unknown) => unknown;
+  setConversion?: (value: unknown) => unknown;
+}
+
+export interface DeviceTemplateShape {
+  params?: DeviceParam[];
+  itemList: DeviceItem[];
+  readRequest(params: Record<string, unknown>): {
+    url: string;
+    options?: FetchOptions;
+  };
+  writeRequest(
+    value: unknown,
+    item: DeviceItem,
+    params: Record<string, unknown>,
+  ): { url: string; options?: FetchOptions };
+}
+
+export interface DeviceTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  source: string;
+}
+
 export interface LogicDocument {
   version: 3;
   /** Shared values not tied to a logic output. */
@@ -230,4 +280,6 @@ export interface LogicDocument {
   logics: LogicDef[];
   /** User templates; built-ins live in code. */
   templates?: LogicTemplate[];
+  /** JS device templates; the adapter ignores them. */
+  deviceTemplates?: DeviceTemplate[];
 }

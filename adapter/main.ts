@@ -9,7 +9,13 @@ import {
 } from "./logic/engine";
 import { isRecord, parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
-import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
+import {
+  stateCommonDiff,
+  stateObjectWithDiff,
+  type StateSpec,
+} from "./logic/state-common";
+import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
+import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
 import {
   locationText,
@@ -50,14 +56,6 @@ const DOCS = [
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
 const LEGACY_PREFIX = "0_userdata.0.Test.AiHome.";
-
-/** A machine's states as `{ "0": "Off", "1": "On" }`, for a number output. */
-function numberStatesOf(def: LogicDef): Record<string, string> | undefined {
-  if (def.kind !== "machine") return undefined;
-  const names = Object.keys(def.states ?? {});
-  if (names.length === 0) return undefined;
-  return Object.fromEntries(names.map((name, index) => [String(index), name]));
-}
 
 /** How often the adapter logs that it is still alive. */
 const HEARTBEAT_MS = 10 * 60 * 1000;
@@ -368,11 +366,40 @@ class IHome extends utils.Adapter {
   }
 
   /**
+   * Create a missing owned state or update only the common keys that differ.
+   * An equal object is left completely untouched (no ioBroker churn).
+   */
+  private async ensureOwnState(spec: StateSpec): Promise<void> {
+    const existing = await this.getObjectAsync(spec.id);
+    if (!existing) {
+      await this.setObjectNotExistsAsync(spec.id, {
+        type: "state",
+        common: spec.common as unknown as ioBroker.StateCommon,
+        native: {},
+      });
+      return;
+    }
+    const diff = stateCommonDiff(
+      existing.common as Record<string, unknown>,
+      spec.common,
+    );
+    if (diff) {
+      await this.setObjectAsync(
+        spec.id,
+        stateObjectWithDiff(
+          existing as unknown as Record<string, unknown>,
+          diff,
+        ) as unknown as ioBroker.Object,
+      );
+    }
+  }
+
+  /**
    * The logic states the adapter owns: `<namespace>.Logic.<logic id>`. Created
-   * on demand and kept in step with the document; never deleted (a deleted logic
-   * leaves its state, like a variable does). A logic output is a command, so the
-   * role is level.switch (binary) or level.state — never `value`, which the
-   * ecosystem reserves for read-only sensor readings.
+   * on demand and kept in step with the document; a state whose logic no longer
+   * has a logic output is pruned. A logic output is a command, so the role is
+   * level.switch (binary) or level.state — never `value`, which the ecosystem
+   * reserves for read-only sensor readings.
    */
   private async ensureLogicStates(doc: LogicDocument): Promise<void> {
     const own = doc.logics.filter((def) => def.output?.scope === "logic");
@@ -388,50 +415,12 @@ class IHome extends utils.Adapter {
       }
 
       for (const def of own) {
-        const output = def.output as Extract<
-          NonNullable<LogicDef["output"]>,
-          { scope: "logic" }
-        >;
-        const id = `Logic.${def.id}`;
-        const states =
-          output.type === "number" ? numberStatesOf(def) : undefined;
-        // An object output is JSON text: ioBroker stores it as a string with
-        // role `json` (a pure object state caused trouble in practice).
-        const stateType = output.type === "object" ? "string" : output.type;
-        const common = {
-          name: def.name,
-          type: stateType,
-          role:
-            output.type === "boolean"
-              ? "level.switch"
-              : output.type === "object"
-                ? "json"
-                : "level.state",
-          read: true,
-          write: true,
-          def:
-            output.type === "boolean"
-              ? false
-              : output.type === "number"
-                ? 0
-                : output.type === "object"
-                  ? "{}"
-                  : "",
-          unit: output.type === "number" ? (output.unit ?? "") : "",
-          ...(states ? { states } : {}),
-        };
+        const spec = logicOutputSpec(def, this.namespace);
+        if (!spec) continue;
         try {
-          await this.setObjectNotExistsAsync(id, {
-            type: "state",
-            common,
-            native: {},
-          });
-          // The document is the truth: keep the name, type and state labels in step.
-          await this.extendObjectAsync(id, { common });
+          await this.ensureOwnState(spec);
         } catch (error) {
-          this.log.warn(
-            `logic: cannot ensure ${this.namespace}.${id}: ${error}`,
-          );
+          this.log.warn(`logic: cannot ensure ${spec.id}: ${error}`);
         }
       }
     }

@@ -10,6 +10,7 @@ import { migrateDocument } from "./migrate-expr";
 import { isAstroEvent, parseCronAt } from "./timer-ops";
 import { OPERATORS } from "./types";
 import type {
+  DeviceTemplate,
   FunctionLogic,
   Input,
   LogicDocument,
@@ -122,6 +123,61 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       });
     }
     memoryTypes.set(entry.name, entry.type);
+  }
+
+  if (doc.deviceTemplates !== undefined) {
+    if (!Array.isArray(doc.deviceTemplates)) {
+      issues.push({
+        path: "deviceTemplates",
+        message: "deviceTemplates must be an array",
+        severity: "error",
+      });
+    } else {
+      const templateIds = new Set<string>();
+      for (const entry of doc.deviceTemplates as DeviceTemplate[]) {
+        const id = typeof entry?.id === "string" ? entry.id : "";
+        const path = `deviceTemplates.${id || "?"}`;
+        if (!id) {
+          issues.push({
+            path,
+            message: "device template without an id",
+            severity: "error",
+          });
+        } else if (templateIds.has(id)) {
+          issues.push({
+            path,
+            message: `duplicate device template id: ${id}`,
+            severity: "error",
+          });
+        } else {
+          templateIds.add(id);
+        }
+        if (typeof entry?.name !== "string" || !entry.name) {
+          issues.push({
+            path,
+            message: "device template name must be a string",
+            severity: "error",
+          });
+        }
+        if (typeof entry?.source !== "string" || !entry.source) {
+          issues.push({
+            path,
+            message: "device template source must be a string",
+            severity: "error",
+          });
+        }
+        if (
+          entry?.description !== undefined &&
+          typeof entry.description !== "string"
+        ) {
+          issues.push({
+            path,
+            message: "device template description must be a string",
+            severity: "error",
+          });
+        }
+      }
+    }
   }
 
   for (const logic of doc.logics ?? []) {
