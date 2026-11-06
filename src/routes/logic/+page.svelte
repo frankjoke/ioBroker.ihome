@@ -13,6 +13,7 @@
   import LogicEditor from "$lib/components/logic/LogicEditor.svelte";
   import LogSheet from "$lib/components/logic/LogSheet.svelte";
   import TemplateInsert from "$lib/components/logic/TemplateInsert.svelte";
+  import DeviceTemplates from "$lib/components/logic/DeviceTemplates.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
@@ -39,6 +40,7 @@
   let selectedId = $state<string | null>(null);
   let pendingDelete = $state<LogicDef | null>(null);
   let inserting = $state(false);
+  let templatesOpen = $state(false);
   /** The adapter log drawer, opened from the title line. */
   let showLog = $state(false);
 
@@ -485,6 +487,14 @@
         </button>
         <button
           type="button"
+          class="btn btn-sm"
+          onclick={() => (templatesOpen = true)}
+        >
+          <span class="material-symbols-outlined">api</span>
+          Device templates
+        </button>
+        <button
+          type="button"
           class="btn btn-primary btn-sm"
           onclick={() => (pendingCreate = "machine")}
         >
@@ -683,6 +693,18 @@
       if (commit([...doc.logics, logic])) select(logic);
     }}
     onClose={() => (inserting = false)}
+  />
+{/if}
+
+{#if templatesOpen}
+  <DeviceTemplates
+    open={templatesOpen}
+    onClose={() => (templatesOpen = false)}
+    onGenerated={(id) => {
+      templatesOpen = false;
+      const logic = getLogicDocument().logics.find((item) => item.id === id);
+      if (logic) select(logic);
+    }}
   />
 {/if}
 
