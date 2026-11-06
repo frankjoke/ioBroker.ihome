@@ -18,3 +18,20 @@ describe("built-in device templates", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+it("ships a state-sourced Meter template", () => {
+  const entry = BUILTIN_DEVICE_TEMPLATES.find(
+    (template) => template.id === "shrdzm-mqtt-meter",
+  );
+  expect(entry).toBeDefined();
+  const value = evaluateDeviceTemplate(entry!.source) as {
+    readFrom?: string;
+    deviceType?: string;
+    itemList: Array<{ source?: string | Array<string | number> }>;
+  };
+  expect(value.readFrom).toBe("state");
+  expect(value.deviceType).toBe("Meter");
+  expect(value.itemList.some((item) => item.source?.[0] === "1.8.0")).toBe(
+    true,
+  );
+});

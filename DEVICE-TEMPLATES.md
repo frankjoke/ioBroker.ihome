@@ -198,6 +198,21 @@ source: ["1.8.0"]   // 21557698
 source: "1.8.0"     // undefined
 ```
 
+### Built-in SHRDZM meter
+
+The built-in **SHRDZM / MQTT electricity meter** template is a ready-made
+state-source example:
+
+- source state: `mqtt.0.SHRDZM.3C6105FB24B9.3C6105FB24B9.sensor`
+- `deviceType: "Meter"`
+- states: total/export energy, import/export power, three voltages and three
+  currents; timestamp and uptime are hidden controls
+- energy values are divided by 1000 (Wh → kWh); adjust the conversion if your
+  meter already reports kWh
+
+Apply it with the source state and a device name to create the Meter device and
+its controls.
+
 ## 3. Applying a template
 
 1. Open **Logic → Device templates**.

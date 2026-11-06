@@ -90,6 +90,10 @@ choose the device type and visual preset. Empty means states and logic only.
 Apply saves the current user-template definition first, so unsaved edits are
 not silently lost.
 
+The built-in **SHRDZM / MQTT electricity meter** is a state-source example: it
+reads the SHRDZM JSON from an MQTT state, creates a `Meter` device with energy,
+power, voltage and current, and needs no HTTP.
+
 The generated states and logic are unlinked copies: editing the template later
 does not touch them, and the template stays available for another device.
 Applying again updates only states whose properties actually changed. Use a
