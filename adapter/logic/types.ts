@@ -246,6 +246,10 @@ export interface DeviceItem {
   initial?: unknown;
   /** Dot path for a string, or exact keys for an array (dots allowed). */
   source?: string | Array<string | number>;
+  /** Device feature name; derived from role/type when omitted. */
+  feature?: string;
+  /** Hide the generated device control; the state still exists. */
+  hidden?: boolean;
   updateAlways?: boolean;
   ack?: boolean;
   foreignWriteName?: string;
@@ -256,6 +260,8 @@ export interface DeviceItem {
 export interface DeviceTemplateShape {
   /** Default "http"; "state" listens to one state instead of polling. */
   readFrom?: "http" | "state";
+  /** Device type for the optional device entry; unknown types fall back to Custom. */
+  deviceType?: string;
   params?: DeviceParam[];
   itemList: DeviceItem[];
   readRequest?(params: Record<string, unknown>): {

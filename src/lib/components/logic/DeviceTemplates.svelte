@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
+  import { upsertDevice } from "$lib/registry.svelte.js";
   import {
     BUILTIN_DEVICE_TEMPLATES,
     evaluateDeviceTemplate,
@@ -53,6 +54,7 @@
   let applySource = $state("");
   let applyParams = $state<Record<string, string | number | boolean>>({});
   let baseState = $state("");
+  let deviceName = $state("");
   let applyError = $state("");
   let applying = $state(false);
 
@@ -82,6 +84,7 @@
     applyError = "";
     applyParams = {};
     applying = false;
+    deviceName = "";
     baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
@@ -162,6 +165,7 @@
         baseState,
         id,
         selected.name,
+        deviceName,
       );
       await createTemplateStates(plan.specs, baseState);
       const nextDoc = {
@@ -175,6 +179,7 @@
         applyError = `${issues[0].path}: ${issues[0].message}`;
         return;
       }
+      if (plan.device) upsertDevice(plan.device);
       if (!commitLogics(nextDoc)) {
         applyError = "The logic document could not be saved.";
         return;
@@ -375,6 +380,15 @@
                   type="text"
                   bind:value={baseState}
                   aria-label="Base state"
+                />
+              </label>
+              <label class="field">
+                <span class="label-mono">Device name (optional)</span>
+                <input
+                  type="text"
+                  bind:value={deviceName}
+                  placeholder="Leave empty for no device"
+                  aria-label="Device name"
                 />
               </label>
               {#each evaluated.params ?? [] as param (param.name)}

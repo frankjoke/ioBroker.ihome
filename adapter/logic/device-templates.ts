@@ -56,6 +56,9 @@ export function validateDeviceTemplate(value: unknown): {
     errors.push("readFrom must be http or state");
   }
   const stateMode = readFrom === "state";
+  if (value.deviceType !== undefined && typeof value.deviceType !== "string") {
+    errors.push("deviceType must be a string");
+  }
 
   const items = value.itemList;
   if (!Array.isArray(items) || items.length === 0) {
@@ -85,7 +88,7 @@ export function validateDeviceTemplate(value: unknown): {
       if (typeof raw.type !== "string" || !TYPES.has(raw.type)) {
         errors.push(`${name}: unknown type`);
       }
-      for (const key of ["label", "role", "unit"]) {
+      for (const key of ["label", "role", "unit", "feature"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "string") {
           errors.push(`${name}: ${key} must be a string`);
         }
@@ -114,7 +117,7 @@ export function validateDeviceTemplate(value: unknown): {
       ) {
         errors.push(`${name}: states is not valid JSON`);
       }
-      for (const key of ["readOnly", "updateAlways", "ack"]) {
+      for (const key of ["readOnly", "updateAlways", "ack", "hidden"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "boolean") {
           errors.push(`${name}: ${key} must be a boolean`);
         }
