@@ -301,3 +301,31 @@ it("accepts a param description and rejects a non-string", () => {
     "baseUrl: description must be a string",
   );
 });
+
+it("accepts decimals on number items and rejects invalid values", () => {
+  const level = template.itemList[1];
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      itemList: [{ ...level, decimals: 2 }],
+    }).errors,
+  ).toEqual([]);
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      itemList: [{ ...level, decimals: -1 }],
+    }).errors,
+  ).toContain("level: decimals must be an integer 0-100");
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      itemList: [{ ...level, decimals: 1.5 }],
+    }).errors,
+  ).toContain("level: decimals must be an integer 0-100");
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      itemList: [{ ...template.itemList[0], decimals: 2 }],
+    }).errors,
+  ).toContain("power: decimals is only for number items");
+});

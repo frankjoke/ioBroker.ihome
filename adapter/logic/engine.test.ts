@@ -3418,3 +3418,42 @@ it("maps a real MQTT JSON state with dotted keys into generated states", () => {
     ack: true,
   });
 });
+
+it("rounds number items by their decimals when no conversion is given", () => {
+  const source = `({
+    readFrom: "state",
+    params: [{ name: "source", label: "Source state", type: "state" }],
+    itemList: [
+      { name: "two", type: "number", source: ["v2"], readOnly: true,
+        decimals: 2 },
+      { name: "zero", type: "number", source: ["v0"], readOnly: true,
+        decimals: 0 },
+    ],
+  })`;
+  const template = new Function("return (" + source + ")")();
+  const logic = buildDeviceLogic(
+    template,
+    source,
+    { source: "test.source" },
+    "ihome.0.Variables.Dec",
+    "dec",
+    "Dec",
+  );
+  const h = createHarness({});
+  const engine = createEngine({ version: 3, logics: [logic] }, h.deps);
+  h.attach(engine);
+  engine.start();
+
+  h.change("test.source", JSON.stringify({ v2: "12.3456", v0: "12.9" }));
+
+  expect(h.writes).toContainEqual({
+    id: "ihome.0.Variables.Dec.two",
+    value: "12.35",
+    ack: true,
+  });
+  expect(h.writes).toContainEqual({
+    id: "ihome.0.Variables.Dec.zero",
+    value: 12,
+    ack: true,
+  });
+});

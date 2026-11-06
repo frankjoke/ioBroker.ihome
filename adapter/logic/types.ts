@@ -248,6 +248,8 @@ export interface DeviceItem {
   initial?: unknown;
   /** Dot path for a string, or exact keys for an array (dots allowed). */
   source?: string | Array<string | number>;
+  /** Number only: default read rounding when no conversion is given. */
+  decimals?: number;
   /** Device feature name; derived from role/type when omitted. */
   feature?: string;
   /** Hide the generated device control; the state still exists. */
