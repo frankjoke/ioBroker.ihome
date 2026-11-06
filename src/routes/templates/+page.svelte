@@ -3,6 +3,7 @@
   import FormulaTemplates from "$lib/components/templates/FormulaTemplates.svelte";
   import FunctionTemplates from "$lib/components/templates/FunctionTemplates.svelte";
   import VisualTemplates from "$lib/components/templates/VisualTemplates.svelte";
+  import LogicTemplates from "$lib/components/templates/LogicTemplates.svelte";
 
   type Kind = "formula" | "function" | "device" | "logic" | "logic-device";
 
@@ -50,6 +51,8 @@
     <FunctionTemplates />
   {:else if kind === "device"}
     <VisualTemplates />
+  {:else if kind === "logic"}
+    <LogicTemplates />
   {:else}
     <p class="text-muted">This template type is being added.</p>
   {/if}
