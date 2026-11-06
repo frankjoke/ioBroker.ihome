@@ -255,11 +255,18 @@
       if (source.output.scope === "memory") {
         return source.kind === "machine" ? "string" : "any";
       }
-      return source.output.type ?? "any";
+      const type = source.output.type;
+      return type === "boolean" || type === "number" || type === "string"
+        ? type
+        : "any";
     }
     if (row.on === "$self") {
       const output = logic.output;
-      return output && output.scope !== "memory" ? output.type : "any";
+      if (!output || output.scope === "memory") return "any";
+      const type = output.type;
+      return type === "boolean" || type === "number" || type === "string"
+        ? type
+        : "any";
     }
     const input = logic.inputs?.[row.on];
     if (!input || input.from.type !== "state") return "any";

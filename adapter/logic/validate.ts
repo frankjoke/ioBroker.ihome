@@ -417,7 +417,8 @@ function checkOutput(
     if (
       output.type !== "boolean" &&
       output.type !== "number" &&
-      output.type !== "string"
+      output.type !== "string" &&
+      output.type !== "object"
     ) {
       add(id, "output.type", "unknown output type");
     }
@@ -439,7 +440,8 @@ function checkOutput(
   if (
     output.type !== "boolean" &&
     output.type !== "number" &&
-    output.type !== "string"
+    output.type !== "string" &&
+    output.type !== "object"
   ) {
     add(id, "output.type", "unknown output type");
   }

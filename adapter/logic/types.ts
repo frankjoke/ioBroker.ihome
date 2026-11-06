@@ -88,9 +88,10 @@ export type Output =
   | { scope: "memory"; name?: string; forward?: Forward }
   | {
       /** A state the adapter creates at `<namespace>.Logic.<logic id>`: a logic
-       *  state is a command (writable), hence level.switch / level.state. */
+       *  state is a command (writable), hence level.switch / level.state.
+       *  `object` is stored as a JSON string with role `json`. */
       scope: "logic";
-      type: "boolean" | "number" | "string";
+      type: "boolean" | "number" | "string" | "object";
       /** Number only: the created state's `common.unit`. */
       unit?: string;
       /** Boolean only: state names matching this glob write `true`. */
@@ -102,7 +103,7 @@ export type Output =
   | {
       scope: "state";
       ref: string;
-      type: "boolean" | "number" | "string";
+      type: "boolean" | "number" | "string" | "object";
       /** Boolean only: state names matching this glob write `true`
        *  (default "On*"). */
       on?: string;

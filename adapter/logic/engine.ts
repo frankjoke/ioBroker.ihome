@@ -964,10 +964,16 @@ export function createEngine(
 
   function coerce(
     value: unknown,
-    type: "boolean" | "number" | "string",
+    type: "boolean" | "number" | "string" | "object",
   ): unknown {
     if (type === "boolean") return Boolean(value);
     if (type === "number") return Number(value);
+    // An object output is stored as JSON text; a string is taken as already
+    // serialized, so a fetched JSON string is not quoted a second time.
+    if (type === "object") {
+      if (typeof value === "string") return value;
+      return JSON.stringify(value ?? null);
+    }
     return String(value);
   }
 
@@ -1017,6 +1023,15 @@ export function createEngine(
   ): void {
     const because = cause ? ` because of ${cause}` : "";
     const output = rt.output;
+    // A machine's object output is data, not its state: only `set("$self")`
+    // writes it, a transition must not overwrite it with a state name.
+    if (
+      rt.def.kind === "machine" &&
+      output.scope !== "memory" &&
+      output.type === "object"
+    ) {
+      return;
+    }
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
       const previous = memory.get(name);
