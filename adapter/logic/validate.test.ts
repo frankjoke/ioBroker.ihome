@@ -701,3 +701,19 @@ it("accepts object outputs on function and machine logics", () => {
   );
   expect(errors).toEqual([]);
 });
+
+it("accepts and shape-checks device templates", () => {
+  const base = { version: 3, logics: [] } as LogicDocument;
+  expect(
+    validateLogicDocument({
+      ...base,
+      deviceTemplates: [{ id: "t", name: "T", source: "({})" }],
+    }),
+  ).toEqual([]);
+  expect(
+    validateLogicDocument({
+      ...base,
+      deviceTemplates: [{ id: "t" }],
+    } as never).some((issue) => issue.path === "deviceTemplates.t"),
+  ).toBe(true);
+});
