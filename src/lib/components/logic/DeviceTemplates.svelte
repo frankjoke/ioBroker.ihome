@@ -448,6 +448,11 @@
                         })}
                     />
                   {/if}
+                  {#if param.description}
+                    <span class="param-help text-muted"
+                      >{param.description}</span
+                    >
+                  {/if}
                 </label>
               {/each}
               <p class="hint text-muted">
@@ -536,6 +541,10 @@
     margin: 0;
     white-space: pre-wrap;
     font-size: var(--body-sm);
+  }
+
+  .param-help {
+    font-size: 0.8rem;
   }
 
   .apply {

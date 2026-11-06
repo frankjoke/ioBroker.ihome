@@ -176,6 +176,12 @@ export function validateDeviceTemplate(value: unknown): {
         if (typeof raw.label !== "string" || !raw.label) {
           errors.push(`${name}: label must be a string`);
         }
+        if (
+          raw.description !== undefined &&
+          typeof raw.description !== "string"
+        ) {
+          errors.push(`${name}: description must be a string`);
+        }
         const type = typeof raw.type === "string" ? raw.type : "";
         if (!PARAM_TYPES.has(type)) {
           errors.push(`${name}: unknown param type`);

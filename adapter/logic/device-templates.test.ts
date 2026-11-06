@@ -281,3 +281,23 @@ describe("state source templates", () => {
     ).toEqual([]);
   });
 });
+
+it("accepts a param description and rejects a non-string", () => {
+  const params = template.params ?? [];
+  const withDescription = {
+    ...template,
+    params: [
+      { ...params[0], description: "e.g. http://192.168.1.50:8099" },
+      ...params.slice(1),
+    ],
+  };
+  expect(validateDeviceTemplate(withDescription).errors).toEqual([]);
+
+  const bad = {
+    ...template,
+    params: [{ ...params[0], description: 1 }, ...params.slice(1)],
+  };
+  expect(validateDeviceTemplate(bad).errors).toContain(
+    "baseUrl: description must be a string",
+  );
+});
