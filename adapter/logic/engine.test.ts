@@ -13,6 +13,9 @@ import type {
 
 const code = (source: string): Expr => ({ code: source });
 
+const flush = (): Promise<void> =>
+  new Promise((resolve) => setImmediate(resolve));
+
 const doc = (extra: Partial<FunctionLogic> = {}): LogicDocument => ({
   version: 3,
   logics: [
@@ -2903,3 +2906,346 @@ it.each(["enter", "exit"] as const)(
     ).toBe(true);
   },
 );
+
+const pollDoc = (expr: string): LogicDocument => ({
+  version: 3,
+  logics: [
+    {
+      id: "poll",
+      name: "Poll",
+      kind: "function",
+      init: { run: false },
+      inputs: {
+        t: { from: { type: "timer", every: "15s" }, kind: "event" },
+      },
+      output: {
+        scope: "state",
+        ref: "0_userdata.0.OUT",
+        type: "number",
+        forward: "always",
+      },
+      expr: code(expr),
+    },
+  ],
+});
+
+it("polls on a timer and writes a state from the callback", async () => {
+  const { h, engine } = engineWith(
+    pollDoc(
+      'fetchJson("https://api.test/price", (data, error) => { if (error) { log(error, "warn"); return; } set("0_userdata.0.PRICE", data.price); })',
+    ),
+  );
+  engine.start();
+  h.clock.advance(15_000);
+
+  const request = h.nextRequest();
+  expect(request?.url).toBe("https://api.test/price");
+  expect(request?.init.headers.accept).toBe("application/json");
+  request?.respond({ body: '{"price":42}' });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.PRICE",
+    value: 42,
+    ack: false,
+  });
+  // fetchJson returns noop, so the function output is not written.
+  expect(h.writes.some((write) => write.id === "0_userdata.0.OUT")).toBe(false);
+});
+
+it("runs an event-triggered one-shot fetch", async () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    logics: [
+      {
+        id: "once",
+        name: "Once",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          go: {
+            from: { type: "state", ref: "0_userdata.0.GO" },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "number",
+        },
+        expr: code(
+          'fetchJson("https://api.test/status", (data) => set("0_userdata.0.STATUS", data.status))',
+        ),
+      },
+    ],
+  });
+  engine.start();
+  h.change("0_userdata.0.GO", 1);
+
+  h.nextRequest()?.respond({ body: '{"status":"ok"}' });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.STATUS",
+    value: "ok",
+    ack: false,
+  });
+});
+
+it('writes the function output with set("$self")', async () => {
+  const { h, engine } = engineWith(
+    pollDoc('fetchJson("https://x", (data) => set("$self", data.v))'),
+  );
+  engine.start();
+  h.clock.advance(15_000);
+
+  h.nextRequest()?.respond({ body: '{"v":9}' });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 9,
+    ack: false,
+  });
+  expect(
+    h.reports.some(
+      (report) => report.logicId === "poll" && report.reading.value === 9,
+    ),
+  ).toBe(true);
+});
+
+it('machine set("$self") writes the raw output without a transition', async () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: { state: "Off" },
+        inputs: {
+          go: {
+            from: { type: "state", ref: "0_userdata.0.GO" },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "boolean",
+        },
+        states: {
+          Off: {
+            on: [
+              {
+                on: "go",
+                mode: "function",
+                do: {
+                  code: 'fetchJson("https://x", (data) => set("$self", data.on))',
+                },
+              },
+            ],
+          },
+          On: {},
+        },
+      },
+    ],
+  });
+  engine.start();
+  h.logs.length = 0;
+  h.change("0_userdata.0.GO", 1);
+
+  h.nextRequest()?.respond({ body: '{"on":true}' });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: true,
+    ack: false,
+  });
+  expect(h.reports.filter((report) => report.reading.state)).toEqual([
+    { logicId: "m", reading: { state: "Off", ts: 0 } },
+  ]);
+});
+
+it("a memory write from a callback triggers another logic", async () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    memory: [{ name: "shared", type: "number", initial: 0 }],
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          t: { from: { type: "timer", every: "15s" }, kind: "event" },
+        },
+        expr: code('fetchJson("https://x", (data) => set("shared", data.v))'),
+      },
+      {
+        id: "b",
+        name: "B",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          m: { from: { type: "memory", ref: "shared" }, kind: "event" },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.B",
+          type: "number",
+        },
+        expr: code('get("m") * 10'),
+      },
+    ],
+  });
+  engine.start();
+  h.clock.advance(15_000);
+
+  h.nextRequest()?.respond({ body: '{"v":7}' });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.B",
+    value: 70,
+    ack: false,
+  });
+});
+
+it("stop aborts the request and no callback writes afterwards", async () => {
+  const { h, engine } = engineWith(
+    pollDoc(
+      'fetchJson("https://x", (data) => set("0_userdata.0.PRICE", data.v))',
+    ),
+  );
+  engine.start();
+  h.clock.advance(15_000);
+
+  const request = h.nextRequest();
+  engine.stop();
+  expect(request?.init.signal.aborted).toBe(true);
+  request?.respond({ body: '{"v":1}' });
+  await flush();
+
+  expect(h.writes).toEqual([]);
+});
+
+it("logs a callback failure and keeps the queue moving", async () => {
+  const { h, engine } = engineWith(
+    pollDoc('fetchJson("https://x", () => { throw new Error("bad") })'),
+  );
+  engine.start();
+  h.clock.advance(15_000);
+
+  h.nextRequest()?.respond({ body: "{}" });
+  await flush();
+  expect(h.logs.some((line) => line.message === "task failed: bad")).toBe(true);
+
+  h.clock.advance(15_000);
+  expect(h.nextRequest()?.url).toBe("https://x");
+});
+
+it("logs an HTTP failure to the callback and the adapter", async () => {
+  const { h, engine } = engineWith(
+    pollDoc(
+      'fetchJson("https://x", (data, error) => set("0_userdata.0.ERR", error))',
+    ),
+  );
+  engine.start();
+  h.clock.advance(15_000);
+
+  h.nextRequest()?.respond({
+    status: 500,
+    statusText: "Server Error",
+    body: "ignored",
+  });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.ERR",
+    value: "HTTP 500 Server Error",
+    ack: false,
+  });
+  expect(
+    h.logs.some((line) =>
+      line.message.includes("task failed: https://x — HTTP 500 Server Error"),
+    ),
+  ).toBe(true);
+});
+
+it("drops a callback beyond maxDepth and continues the queue", async () => {
+  const h = createHarness({});
+  const engine = createEngine(
+    pollDoc('fetchJson("https://x", () => set("0_userdata.0.OUT2", 1))'),
+    h.deps,
+    { maxDepth: 0 },
+  );
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(15_000);
+
+  h.nextRequest()?.respond({ body: "{}" });
+  await flush();
+  expect(
+    h.logs.some((line) => line.message.includes("cascade deeper than 0")),
+  ).toBe(true);
+  expect(h.writes).toEqual([]);
+
+  h.clock.advance(15_000);
+  expect(h.nextRequest()?.url).toBe("https://x");
+});
+
+it("a callback after a state change keeps the captured this", async () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: { state: "On" },
+        inputs: {
+          go: {
+            from: { type: "state", ref: "0_userdata.0.GO" },
+            kind: "event",
+          },
+          off: {
+            from: { type: "state", ref: "0_userdata.0.OFF" },
+            kind: "event",
+          },
+        },
+        states: {
+          On: {
+            on: [
+              {
+                on: "go",
+                mode: "function",
+                do: {
+                  code: [
+                    'this.tag = "on"',
+                    'fetchJson("https://x", () => set("0_userdata.0.SEEN", this.tag))',
+                  ].join("\n"),
+                },
+              },
+              { on: "off", goto: "Off" },
+            ],
+          },
+          Off: {},
+        },
+      },
+    ],
+  });
+  engine.start();
+  h.change("0_userdata.0.GO", 1);
+  h.change("0_userdata.0.OFF", true); // leave On before the request settles
+
+  h.nextRequest()?.respond({ body: "{}" });
+  await flush();
+
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.SEEN",
+    value: "on",
+    ack: false,
+  });
+});

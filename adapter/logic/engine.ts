@@ -10,6 +10,7 @@ import {
   type NameInfo,
 } from "./runtime";
 import { nextCron } from "./timer-ops";
+import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   AstroEvent,
@@ -66,6 +67,8 @@ export interface EngineDeps {
   now(): number;
   setTimeout(fn: () => void, ms: number): number;
   clearTimeout(handle: number): void;
+  /** Test seam; production uses the Node global. */
+  fetch?: FetchLike;
   /** Publish a logic's live readout for the logic list. */
   report?(logicId: string, reading: LogicReading): void;
   resolveVariable?(
@@ -130,6 +133,8 @@ interface Runtime {
   init: boolean;
   /** The `$start` timestamp while that event is being handled (D28). */
   starting?: number;
+  /** Serialized fetch tasks of this logic. */
+  tasks?: TaskQueue;
   /** Assigned once the hooks that close over this runtime exist. */
   vm?: LogicRuntime;
 }
@@ -143,6 +148,12 @@ interface EventMeta {
   ts?: number;
 }
 
+interface TaskJob {
+  run(data: unknown, error: string | null): void;
+  data: unknown;
+  error: string | null;
+}
+
 interface Job {
   rt: Runtime;
   input: string;
@@ -154,10 +165,15 @@ interface Job {
   /** A repeating timer of an event input: no external writer. */
   fromTimer?: boolean;
   meta: EventMeta;
+  /** A settled fetch waiting to run its callback. */
+  task?: TaskJob;
 }
 
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  // A vm-realm error is not an instance of the host Error.
+  if (isRecord(error) && typeof error.message === "string") return error.message;
+  return String(error);
 }
 
 /**
@@ -257,6 +273,24 @@ export function createEngine(
       timers: new Map<string, number>(),
       init: false,
     };
+    rt.tasks = createTaskQueue(
+      (task, data, error) => {
+        if (error) {
+          deps.log("warn", logId(rt), `task failed: ${task.url} — ${error}`);
+        }
+        enqueue({
+          rt,
+          input: "$task",
+          value: undefined,
+          hasPrevious: false,
+          depth: task.depth,
+          meta: { from: "task", self: true, ts: deps.now() },
+          task: { run: task.run, data, error },
+        });
+      },
+      (message) => deps.log("warn", logId(rt), message),
+      deps.fetch ?? (globalThis.fetch as FetchLike | undefined),
+    );
     try {
       rt.vm = createLogicRuntime(def, {
         describe: (name) => describeName(rt, name),
@@ -267,6 +301,8 @@ export function createEngine(
           deps.message(level, logId(rt), message, timeout),
         notify: (level, title, body) =>
           deps.notify(level, logId(rt), title, body),
+        fetchJson: (url, options, run, depth) =>
+          rt.tasks?.enqueue({ url, options, depth, run }),
         now: () => deps.now(),
       });
     } catch (error) {
@@ -530,6 +566,20 @@ export function createEngine(
       if (!chainWarned.has(key)) {
         chainWarned.add(key);
         warn(logId(job.rt), `cascade deeper than ${maxDepth}, event dropped`);
+      }
+      if (job.task) job.rt.tasks?.done();
+      return;
+    }
+    if (job.task) {
+      const previousMeta = currentMeta;
+      currentMeta = job.meta;
+      try {
+        job.task.run(job.task.data, job.task.error);
+      } catch (error) {
+        warn(logId(job.rt), `task failed: ${errorText(error)}`);
+      } finally {
+        currentMeta = previousMeta;
+        job.rt.tasks?.done();
       }
       return;
     }
@@ -824,6 +874,10 @@ export function createEngine(
     forward: Forward | undefined,
     depth: number,
   ): void {
+    if (ref === "$self") {
+      writeSelf(rt, value, depth);
+      return;
+    }
     const input = rt.inputs.get(ref);
     if (input) {
       if (input.input.from.type === "memory") {
@@ -999,6 +1053,38 @@ export function createEngine(
     noteWrite(target, mapped, rt.def.id);
     stateLog(rt, `writes “${String(mapped)}” to “${target}”${because}`);
     // A command, not a confirmation: devices act on ack=false only.
+    deps.write(target, mapped, false);
+    emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);
+  }
+
+  /** `set("$self", value)` from a callback or block: the logic's own output. */
+  function writeSelf(rt: Runtime, value: unknown, depth: number): void {
+    if (rt.def.kind === "function") {
+      writeOutput(rt, value, depth, "set($self)");
+      return;
+    }
+    const output = rt.output;
+    if (output.scope === "memory") {
+      const name = output.name ?? rt.def.id;
+      const previous = memory.get(name);
+      const hasPrevious = memory.has(name);
+      rt.lastOutput = value;
+      rt.hasOutput = true;
+      const wrote = writeMemory(name, value, output.forward, depth, rt.def.id);
+      if (wrote) {
+        emitLogicOutput(rt, value, depth + 1, previous, hasPrevious);
+      }
+      return;
+    }
+    const target = outputTargetId(rt);
+    if (!target) return;
+    const mapped = coerce(value, output.type);
+    if (!forwardAllows(rt, mapped, output.forward)) return;
+    const previous = rt.lastOutput;
+    const hasPrevious = rt.hasOutput;
+    rt.lastOutput = mapped;
+    rt.hasOutput = true;
+    noteWrite(target, mapped, rt.def.id);
     deps.write(target, mapped, false);
     emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);
   }
@@ -1365,6 +1451,7 @@ export function createEngine(
         clearTimer(rt);
         for (const handle of rt.timers.values()) deps.clearTimeout(handle);
         rt.timers.clear();
+        rt.tasks?.stop();
       }
       started = false;
       queue.length = 0;
