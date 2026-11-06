@@ -87,6 +87,8 @@ state-source mode, dotted-key paths and examples.
 The apply form also has an optional **Device name**. When filled, a device is
 created with controls from `itemList`; `deviceType` and per-item `feature`
 choose the device type and visual preset. Empty means states and logic only.
+Apply saves the current user-template definition first, so unsaved edits are
+not silently lost.
 
 The generated states and logic are unlinked copies: editing the template later
 does not touch them, and the template stays available for another device.

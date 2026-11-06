@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import {
@@ -57,6 +58,12 @@
   let deviceName = $state("");
   let applyError = $state("");
   let applying = $state(false);
+  const dirty = $derived(
+    !!selected &&
+      (name !== selected.name ||
+        description !== (selected.description ?? "") ||
+        source !== selected.source),
+  );
 
   const preview = $derived(
     evaluated ? templateStateSpecs(evaluated, baseState) : [],
@@ -88,11 +95,15 @@
     baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
-  function startApply(): void {
+  async function startApply(): Promise<void> {
     applyError = "";
     applyOpen = false;
     evaluated = null;
     applySource = "";
+    if (!isBuiltin && dirty) {
+      if (!saveTemplate()) return;
+      await tick();
+    }
     let value: unknown;
     try {
       value = evaluateDeviceTemplate(source);
@@ -221,19 +232,19 @@
     selectedId = copy.id;
   }
 
-  function save(): void {
-    if (!selected || isBuiltin) return;
+  function saveTemplate(): boolean {
+    if (!selected || isBuiltin) return false;
     let value: unknown;
     try {
       value = evaluateDeviceTemplate(source);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      return;
+      return false;
     }
     const check = validateDeviceTemplate(value);
     if (check.errors.length > 0) {
       error = check.errors.join("\n");
-      return;
+      return false;
     }
     const entry: DeviceTemplate = {
       id: selected.id,
@@ -247,9 +258,14 @@
     ];
     if (!commitLogics({ ...doc, deviceTemplates: next })) {
       error = "The logic document could not be saved.";
-      return;
+      return false;
     }
     error = "";
+    return true;
+  }
+
+  function save(): void {
+    saveTemplate();
   }
 
   function remove(): void {
@@ -301,7 +317,7 @@
           <p class="hint text-muted">
             {isBuiltin
               ? "Built-in template — duplicate it to edit."
-              : "Generated states and logic are unlinked copies; the template stays for reuse."}
+              : "Apply saves the current definition first. Generated states and logic are unlinked copies; the template stays for reuse."}
           </p>
 
           <label class="field">

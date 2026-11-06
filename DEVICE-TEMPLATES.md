@@ -197,7 +197,8 @@ source: "1.8.0"     // undefined
 
 1. Open **Logic → Device templates**.
 2. Select a built-in template or a saved user template.
-3. **Apply**.
+3. **Apply**. For a user template, Apply saves the current name, description and
+   source first; an invalid definition is not applied.
 4. Choose:
    - **Base state**: the prefix for generated states, e.g.
      `ihome.0.Variables.ElectricityMeter`. It must start with the adapter
