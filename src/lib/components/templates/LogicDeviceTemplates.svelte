@@ -19,7 +19,7 @@
   import { stateIdFor, validStateId } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import StateRefField from "./StateRefField.svelte";
+  import StateRefField from "../logic/StateRefField.svelte";
   import type { DeviceTemplate, DeviceTemplateShape } from "$logic/types";
 
   let {
