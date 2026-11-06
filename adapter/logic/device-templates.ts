@@ -130,6 +130,18 @@ export function validateDeviceTemplate(value: unknown): {
           errors.push(`${name}: ${key} must be a number`);
         }
       }
+      if (raw.decimals !== undefined) {
+        if (
+          typeof raw.decimals !== "number" ||
+          !Number.isInteger(raw.decimals) ||
+          raw.decimals < 0 ||
+          raw.decimals > 100
+        ) {
+          errors.push(`${name}: decimals must be an integer 0-100`);
+        } else if (raw.type !== "number") {
+          errors.push(`${name}: decimals is only for number items`);
+        }
+      }
       for (const key of ["conversion", "setConversion"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "function") {
           errors.push(`${name}: ${key} must be a function`);
@@ -332,7 +344,13 @@ function mapItemsCode(): string {
 for (const item of T.itemList) {
   try {
     const raw = item.source ? pick(result, item.source) : result;
-    const converted = item.conversion ? item.conversion(result, raw) : raw;
+    const converted = item.conversion
+      ? item.conversion(result, raw)
+      : item.type === "number" && item.decimals !== undefined
+        ? item.decimals === 0
+          ? parseInt(raw, 10)
+          : parseFloat(raw).toFixed(item.decimals)
+        : raw;
     const next = item.type === "object" && typeof converted !== "string"
       ? JSON.stringify(converted ?? null)
       : converted;
