@@ -10,6 +10,7 @@ export type DeviceType =
   | "AC"
   | "Thermometer"
   | "Motion"
+  | "Meter"
   | "Value"
   | "Custom";
 

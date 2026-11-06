@@ -84,6 +84,10 @@ functions that return `{ url, options }`. Each item defines its state (`name`,
 See [DEVICE-TEMPLATES.md](DEVICE-TEMPLATES.md) for the full field reference,
 state-source mode, dotted-key paths and examples.
 
+The apply form also has an optional **Device name**. When filled, a device is
+created with controls from `itemList`; `deviceType` and per-item `feature`
+choose the device type and visual preset. Empty means states and logic only.
+
 The generated states and logic are unlinked copies: editing the template later
 does not touch them, and the template stays available for another device.
 Applying again updates only states whose properties actually changed. Use a

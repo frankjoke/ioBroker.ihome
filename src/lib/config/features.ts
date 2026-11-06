@@ -10,6 +10,7 @@ export const DEVICE_TYPES: DeviceType[] = [
   "AC",
   "Thermometer",
   "Motion",
+  "Meter",
   "Value",
   "Custom",
 ];
@@ -154,6 +155,38 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       label: "Motion",
       widget: "switch",
       roleHints: ["motion"],
+    },
+  ],
+  Meter: [
+    {
+      feature: "power",
+      label: "Power",
+      widget: "value",
+      roleHints: ["power"],
+    },
+    {
+      feature: "energy",
+      label: "Energy",
+      widget: "value",
+      roleHints: ["energy"],
+    },
+    {
+      feature: "voltage",
+      label: "Voltage",
+      widget: "value",
+      roleHints: ["voltage"],
+    },
+    {
+      feature: "current",
+      label: "Current",
+      widget: "value",
+      roleHints: ["current"],
+    },
+    {
+      feature: "value",
+      label: "Value",
+      widget: "value",
+      roleHints: ["value", "state"],
     },
   ],
   Value: [

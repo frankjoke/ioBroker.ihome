@@ -240,6 +240,20 @@ export const PRESETS: Record<DeviceType, Template> = {
       offline,
     ],
   },
+  Meter: {
+    id: "Meter",
+    name: "Meter",
+    builtin: true,
+    type: "Meter",
+    size: { w: 2, h: 1 },
+    features: DEVICE_FEATURES.Meter,
+    slots: [
+      { kind: "value", source: "power", icon: { glyph: "bolt" } },
+      { kind: "badge", options: { pick: "energy" } },
+      ago,
+      offline,
+    ],
+  },
   Value: {
     id: "Value",
     name: "Value",

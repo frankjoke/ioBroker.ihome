@@ -4,16 +4,17 @@ A **device template** describes a JSON device once and generates:
 
 - the state objects it exposes,
 - one normal logic that reads the device and (for HTTP templates) writes
-  changed values back.
+  changed values back,
+- optionally, a device entry with controls filled from `itemList`.
 
 The generated states and logic are **unlinked copies**. Editing the template
 later does not touch existing devices; the template stays available for another
 device. Applying a template again creates another uniquely named logic (and
 updates only state objects whose properties actually changed).
 
-> Current UI: **Logic → Device templates**. A future step will expose the same
-> library under **Devices → Add device from template** and create a device entry
-> with controls; that is not implemented yet.
+> Current UI: **Logic → Device templates**. The apply form has an optional
+> **Device name**; when filled, a device is created with controls. The library
+> itself is not yet under Devices.
 
 ## 1. Template object
 
@@ -24,6 +25,8 @@ functions. It is stored as text and evaluated when applied.
 ({
   // optional: "http" (default) or "state"
   readFrom: "http",
+  // optional: known device type, default "Custom"
+  deviceType: "Switch",
 
   params: [
     { name: "baseUrl", label: "Base URL", type: "string" },
@@ -99,6 +102,8 @@ Each item describes one generated state and its read/write mapping.
 | `readOnly` | no | `false` default. When true the state is `write: false` and gets no write row. |
 | `initial` | no | Initial value; defaults `false`, `0`, `""`, `"{}"`. |
 | `source` | no | Where the value sits in the read result. A string is split on dots (`"data.power"`). An array uses exact keys (`["1.8.0"]`), so JSON keys containing dots work. Omitted = the whole result. |
+| `feature` | no | Device feature name (`power`, `energy`, `voltage`, …). Derived from `role`/`type` when omitted. |
+| `hidden` | no | Hide the generated device control; the state still exists. |
 | `updateAlways` | no | Read: write even when equal (`forward: "always"`). Write: trigger even when the value is unchanged (`edge: "any"`). |
 | `ack` | no | Ack for the read write; default `true`. `false` on a writable item is rejected because it would loop. |
 | `foreignWriteName` | writable items | API parameter name used by `writeRequest`. |
@@ -198,6 +203,9 @@ source: "1.8.0"     // undefined
      `ihome.0.Variables.ElectricityMeter`. It must start with the adapter
      namespace and must not use `Logic`, `config`, `info`, `phone`, `system`
      or `enum`.
+   - **Device name** (optional): when filled, a device entry is created with
+     controls from `itemList`; when empty, only states and the logic are
+     created.
    - Each template parameter. A `state` parameter opens the state picker.
 5. Review the state preview and **Generate**.
 
@@ -207,7 +215,8 @@ The apply flow:
 2. builds the state specs and the machine,
 3. creates/updates the states,
 4. validates the merged logic document,
-5. inserts the machine.
+5. creates the device when a device name is given,
+6. inserts the machine.
 
 A state-creation or validation failure aborts before the logic is inserted.
 
@@ -238,7 +247,30 @@ One machine with one state `Run`, output **Memory**:
 
 The machine stays in `Run`; it does not transition.
 
-## 5. State creation is idempotent
+## 5. Device entry (optional)
+
+If **Device name** is filled, the apply flow also creates a normal device in the
+device registry:
+
+- `id`: fresh unique id; `name`: the entered name.
+- `type`: `template.deviceType` when it is a known device type, otherwise
+  `Custom`.
+- `controls`: one per `itemList` entry:
+  - `stateId`: `<baseState>.<item.name>`
+  - `feature`: `item.feature` when set, otherwise derived from the role/type
+  - `writable: !readOnly`
+  - `label`, `unit`, `role`, `type`, `states`, `min/max/step`, `hidden`
+- no room or tile placement; the device appears in **Devices** and can be
+  placed on a page.
+
+The `Meter` device type has `power`, `energy`, `voltage` and `current`
+features. Its preset shows power as the headline value and energy as a badge;
+voltage and current are available in the detail page.
+
+If the name is empty or only whitespace, no device is created and the apply
+behaves exactly as before.
+
+## 6. State creation is idempotent
 
 The apply flow compares the desired `common` with the existing object and:
 
@@ -258,7 +290,7 @@ ids rather than silently taking it over.
 The same creator is used for logic output states and global variable states;
 the goal is no object churn when nothing changed.
 
-## 6. Validation
+## 7. Validation
 
 Template validation checks:
 
@@ -277,7 +309,7 @@ Template validation checks:
 The generated logic is validated with the normal document validator before it
 is inserted. The merged document is validated before saving.
 
-## 7. Security and limits
+## 8. Security and limits
 
 - Template code is trusted user code. It runs in the SPA at apply time and in
   the logic vm at runtime; the vm is not a security boundary.
@@ -289,11 +321,11 @@ is inserted. The merged document is validated before saving.
 - The poll can overwrite a just-sent command before the device applies it. A
   generic pending guard is not implemented; use `updateAlways`/`ack`
   deliberately.
-- No live link, regeneration, dashboard tile generation or retry.
-- The current UI creates states and a logic; a device entry and controls are a
-  planned follow-up.
+- No live link, regeneration, dashboard tile placement or retry.
+- When a device name is given, a device entry with controls is created; tile
+  placement remains manual.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 - **No read:** check the adapter log, that the URL is reachable from the
   adapter host (not just your browser), and that the running adapter build has
