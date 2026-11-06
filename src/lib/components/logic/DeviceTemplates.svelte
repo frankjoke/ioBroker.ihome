@@ -4,8 +4,19 @@
     BUILTIN_DEVICE_TEMPLATES,
     evaluateDeviceTemplate,
   } from "$lib/config/device-templates";
-  import { validateDeviceTemplate } from "$logic/device-templates";
-  import type { DeviceTemplate } from "$logic/types";
+  import {
+    templateStateSpecs,
+    validateDeviceTemplate,
+  } from "$logic/device-templates";
+  import {
+    planDeviceTemplate,
+    createTemplateStates,
+  } from "$lib/device-template-apply";
+  import { parseDuration } from "$logic/duration";
+  import { stateIdFor, validStateId } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import StateRefField from "./StateRefField.svelte";
+  import type { DeviceTemplate, DeviceTemplateShape } from "$logic/types";
 
   let {
     open,
@@ -35,6 +46,24 @@
   let source = $state("");
   let error = $state("");
   let deleting = $state(false);
+  let applyOpen = $state(false);
+  let evaluated = $state<DeviceTemplateShape | null>(null);
+  let applyParams = $state<Record<string, string | number | boolean>>({});
+  let baseState = $state("");
+  let applyError = $state("");
+
+  const preview = $derived(
+    evaluated ? templateStateSpecs(evaluated, baseState) : [],
+  );
+
+  function slug(text: string): string {
+    return (
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "device"
+    );
+  }
 
   $effect(() => {
     if (!selected) return;
@@ -43,7 +72,97 @@
     source = selected.source;
     error = "";
     deleting = false;
+    applyOpen = false;
+    evaluated = null;
+    applyError = "";
+    applyParams = {};
+    baseState = `ihome.0.Variables.${slug(selected.name)}`;
   });
+
+  function startApply(): void {
+    applyError = "";
+    let value: unknown;
+    try {
+      value = evaluateDeviceTemplate(source);
+    } catch (e) {
+      applyError = e instanceof Error ? e.message : String(e);
+      return;
+    }
+    const check = validateDeviceTemplate(value);
+    if (check.errors.length > 0) {
+      applyError = check.errors.join("\n");
+      return;
+    }
+    const shape = check.template!;
+    const defaults: Record<string, string | number | boolean> = {};
+    for (const param of shape.params ?? []) {
+      defaults[param.name] =
+        param.default !== undefined
+          ? param.default
+          : param.type === "boolean"
+            ? false
+            : param.type === "number"
+              ? 0
+              : param.type === "duration"
+                ? "30s"
+                : "";
+    }
+    evaluated = shape;
+    applyParams = defaults;
+    baseState = `ihome.0.Variables.${slug(selected?.name ?? "device")}`;
+    applyOpen = true;
+  }
+
+  async function generate(): Promise<void> {
+    if (!evaluated || !selected) return;
+    applyError = "";
+    if (!validStateId(baseState)) {
+      applyError = "Base state needs adapter.instance.path.";
+      return;
+    }
+    const values = { ...applyParams };
+    for (const param of evaluated.params ?? []) {
+      if (param.type === "duration") {
+        if (parseDuration(String(values[param.name] ?? "")) === null) {
+          applyError = `${param.label}: use e.g. 30s, 5m or 1h.`;
+          return;
+        }
+        continue;
+      }
+      if (param.type !== "state") continue;
+      const ref = String(values[param.name] ?? "");
+      if (!ref) {
+        applyError = `${param.label}: choose a state.`;
+        return;
+      }
+      values[param.name] = stateIdFor(ref, getVariables());
+    }
+    const suffix = baseState.split(".").pop() ?? "device";
+    const base = `${selected.id}-${suffix}`;
+    const taken = new Set(doc.logics.map((logic) => logic.id));
+    let id = base;
+    let index = 2;
+    while (taken.has(id)) id = `${base}-${index++}`;
+    try {
+      const plan = planDeviceTemplate(
+        evaluated,
+        source,
+        values,
+        baseState,
+        id,
+        selected.name,
+      );
+      await createTemplateStates(plan.specs, baseState);
+      if (!commitLogics({ ...doc, logics: [...doc.logics, plan.logic] })) {
+        applyError = "The logic document could not be saved.";
+        return;
+      }
+      onGenerated(plan.logic.id);
+      onClose();
+    } catch (e) {
+      applyError = e instanceof Error ? e.message : String(e);
+    }
+  }
 
   function uniqueId(base: string): string {
     const taken = new Set(allTemplates.map((entry) => entry.id));
@@ -188,6 +307,9 @@
           {/if}
 
           <div class="actions">
+            <button type="button" class="btn btn-primary" onclick={startApply}>
+              Apply
+            </button>
             <button type="button" class="btn" onclick={duplicate}>
               Duplicate
             </button>
@@ -205,6 +327,91 @@
             {/if}
             <button type="button" class="btn" onclick={onClose}>Close</button>
           </div>
+
+          {#if applyError && !applyOpen}
+            <p class="error text-danger">{applyError}</p>
+          {/if}
+
+          {#if applyOpen && evaluated}
+            <div class="apply">
+              <h4>Apply template</h4>
+              <label class="field">
+                <span class="label-mono">Base state</span>
+                <input
+                  type="text"
+                  bind:value={baseState}
+                  aria-label="Base state"
+                />
+              </label>
+              {#each evaluated.params ?? [] as param (param.name)}
+                <label class="field">
+                  <span class="label-mono">{param.label}</span>
+                  {#if param.type === "state"}
+                    <StateRefField
+                      value={String(applyParams[param.name] ?? "")}
+                      label={param.label}
+                      onchange={(ref) =>
+                        (applyParams = { ...applyParams, [param.name]: ref })}
+                    />
+                  {:else if param.type === "boolean"}
+                    <input
+                      type="checkbox"
+                      checked={applyParams[param.name] === true}
+                      onchange={(e) =>
+                        (applyParams = {
+                          ...applyParams,
+                          [param.name]: e.currentTarget.checked,
+                        })}
+                    />
+                  {:else if param.type === "number"}
+                    <input
+                      type="number"
+                      value={String(applyParams[param.name] ?? 0)}
+                      oninput={(e) =>
+                        (applyParams = {
+                          ...applyParams,
+                          [param.name]: Number(e.currentTarget.value),
+                        })}
+                    />
+                  {:else}
+                    <input
+                      type="text"
+                      value={String(applyParams[param.name] ?? "")}
+                      oninput={(e) =>
+                        (applyParams = {
+                          ...applyParams,
+                          [param.name]: e.currentTarget.value,
+                        })}
+                    />
+                  {/if}
+                </label>
+              {/each}
+              <p class="hint text-muted">
+                States: {preview
+                  .map((spec) => `${spec.id} (${spec.common.type})`)
+                  .join(", ")}
+              </p>
+              {#if applyError}
+                <p class="error text-danger">{applyError}</p>
+              {/if}
+              <div class="actions">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  onclick={generate}
+                >
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  onclick={() => (applyOpen = false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -264,6 +471,19 @@
     margin: 0;
     white-space: pre-wrap;
     font-size: var(--body-sm);
+  }
+
+  .apply {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.6rem;
+    margin-top: 0.4rem;
+  }
+
+  .apply h4 {
+    margin: 0;
   }
 
   .actions {
