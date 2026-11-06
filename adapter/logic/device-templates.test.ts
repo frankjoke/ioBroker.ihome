@@ -160,3 +160,23 @@ describe("buildDeviceLogic", () => {
     ).toBe("any");
   });
 });
+
+it("rejects async request or conversion functions", () => {
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      readRequest: async () => ({ url: "https://x" }),
+    }).errors,
+  ).toContain("readRequest must be synchronous");
+  expect(
+    validateDeviceTemplate({
+      ...template,
+      itemList: [
+        {
+          ...template.itemList[0],
+          conversion: async (_result, raw) => raw,
+        },
+      ],
+    }).errors,
+  ).toContain("power: conversion must be synchronous");
+});

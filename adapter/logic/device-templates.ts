@@ -23,6 +23,10 @@ const PARAM_TYPES = new Set([
   "state",
 ]);
 
+function isAsyncFunction(value: unknown): boolean {
+  return Object.prototype.toString.call(value) === "[object AsyncFunction]";
+}
+
 /** Check the evaluated template object; never calls the request functions. */
 export function validateDeviceTemplate(value: unknown): {
   errors: string[];
@@ -91,6 +95,8 @@ export function validateDeviceTemplate(value: unknown): {
       for (const key of ["conversion", "setConversion"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "function") {
           errors.push(`${name}: ${key} must be a function`);
+        } else if (typeof raw[key] === "function" && isAsyncFunction(raw[key])) {
+          errors.push(`${name}: ${key} must be synchronous`);
         }
       }
       const writable = raw.readOnly !== true;
@@ -155,9 +161,13 @@ export function validateDeviceTemplate(value: unknown): {
 
   if (typeof value.readRequest !== "function") {
     errors.push("readRequest must be a function");
+  } else if (isAsyncFunction(value.readRequest)) {
+    errors.push("readRequest must be synchronous");
   }
   if (typeof value.writeRequest !== "function") {
     errors.push("writeRequest must be a function");
+  } else if (isAsyncFunction(value.writeRequest)) {
+    errors.push("writeRequest must be synchronous");
   }
 
   return errors.length > 0
