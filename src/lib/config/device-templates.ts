@@ -5,6 +5,55 @@ export function evaluateDeviceTemplate(source: string): unknown {
   return new Function(`return (${source});`)();
 }
 
+const SHRDZM_METER = `({
+  readFrom: "state",
+  deviceType: "Meter",
+  params: [
+    {
+      name: "source",
+      label: "MQTT sensor state",
+      type: "state",
+      description: "e.g. mqtt.0.SHRDZM.3C6105FB24B9.3C6105FB24B9.sensor",
+    },
+  ],
+  itemList: [
+    { name: "energy_total", label: "Energy total", type: "number",
+      role: "value.energy", unit: "kWh", source: ["1.8.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) / 1000 },
+    { name: "energy_export", label: "Energy export", type: "number",
+      role: "value.energy", unit: "kWh", source: ["2.8.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) / 1000 },
+    { name: "power", label: "Power import", type: "number",
+      role: "value.power", unit: "W", source: ["1.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "power_export", label: "Power export", type: "number",
+      role: "value.power", unit: "W", source: ["2.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "voltage_l1", label: "Voltage L1", type: "number",
+      role: "value.voltage", unit: "V", source: ["32.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "voltage_l2", label: "Voltage L2", type: "number",
+      role: "value.voltage", unit: "V", source: ["52.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "voltage_l3", label: "Voltage L3", type: "number",
+      role: "value.voltage", unit: "V", source: ["72.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "current_l1", label: "Current L1", type: "number",
+      role: "value.current", unit: "A", source: ["31.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "current_l2", label: "Current L2", type: "number",
+      role: "value.current", unit: "A", source: ["51.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "current_l3", label: "Current L3", type: "number",
+      role: "value.current", unit: "A", source: ["71.7.0"], readOnly: true,
+      conversion: (result, raw) => Number(raw) },
+    { name: "timestamp", label: "Timestamp", type: "string", role: "text",
+      source: ["timestamp"], readOnly: true, hidden: true },
+    { name: "uptime", label: "Uptime", type: "string", role: "text",
+      source: ["uptime"], readOnly: true, hidden: true },
+  ],
+})`;
+
 const GENERIC_REST = `({
   params: [
     {
@@ -83,5 +132,12 @@ export const BUILTIN_DEVICE_TEMPLATES: DeviceTemplate[] = [
     description:
       "Polls a JSON status endpoint and writes changed values back to /set.",
     source: GENERIC_REST,
+  },
+  {
+    id: "shrdzm-mqtt-meter",
+    name: "SHRDZM / MQTT electricity meter",
+    description:
+      "Reads the SHRDZM JSON from an MQTT state and creates a Meter device with energy, power, voltage and current.",
+    source: SHRDZM_METER,
   },
 ];
