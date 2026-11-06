@@ -407,6 +407,25 @@ describe("fetchJson", () => {
     );
   });
 
+  it("rejects an async callback synchronously", () => {
+    const source = 'fetchJson("https://x", async () => {})';
+    const { runtime, fetches } = runtimeFor(source);
+    expect(() => runtime.runExpr({ code: source }, 0)).toThrow(
+      /fetchJson needs a synchronous callback/,
+    );
+    expect(fetches).toHaveLength(0);
+  });
+
+  it("rejects a callback that returns a promise", () => {
+    const source =
+      'fetchJson("https://x", () => Promise.reject(new Error("late")))';
+    const { runtime, fetches } = runtimeFor(source);
+    runtime.runExpr({ code: source }, 0);
+    expect(() => fetches[0].run(null, null)).toThrow(
+      /fetchJson needs a synchronous callback/,
+    );
+  });
+
   it("runs the callback later with data and the callback depth", () => {
     const source =
       'fetchJson("https://x", (data, error) => set("0_userdata.0.OUT", error ?? data.v))';

@@ -75,6 +75,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+function isAsyncFunction(value: unknown): boolean {
+  return Object.prototype.toString.call(value) === "[object AsyncFunction]";
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -393,7 +405,12 @@ export function createLogicRuntime(
     sandbox.__task_error = error;
     inTask = true;
     try {
-      run(taskRunner, depth, thisObject);
+      const result = run(taskRunner, depth, thisObject);
+      if (isThenable(result)) {
+        // The callback would continue outside the vm timeout and this depth.
+        void Promise.resolve(result).catch(() => {});
+        throw new Error("fetchJson needs a synchronous callback");
+      }
     } finally {
       inTask = false;
       sandbox.__task_cb = undefined;
@@ -411,6 +428,9 @@ export function createLogicRuntime(
       }
       if (typeof callback !== "function") {
         throw new Error("fetchJson needs a callback");
+      }
+      if (isAsyncFunction(callback)) {
+        throw new Error("fetchJson needs a synchronous callback");
       }
       const object = currentObject();
       const depth = currentDepth() + 1;

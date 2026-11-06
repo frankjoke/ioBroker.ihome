@@ -64,6 +64,7 @@
   const spans = $derived(highlightCode(code));
   const inputEntries = $derived(Object.entries(inputs));
   const errorId = $props.id();
+  const hintId = `${errorId}-hint`;
 
   /** Grow between the rows minimum and the CSS max-height. */
   function grow() {
@@ -200,7 +201,9 @@
       value={code}
       aria-label={label}
       aria-invalid={problem ? "true" : undefined}
-      aria-describedby={problem ? errorId : undefined}
+      aria-describedby={[problem ? errorId : "", hint ? hintId : ""]
+        .filter(Boolean)
+        .join(" ") || undefined}
       placeholder={placeholder ??
         (mode === "statements" ? STATEMENT_PLACEHOLDER : undefined)}
       rows={minRows}
@@ -231,7 +234,7 @@
     <p id={errorId} class="text-danger">{problem}</p>
   {/if}
   {#if hint}
-    <p class="hint text-muted">{hint}</p>
+    <p id={hintId} class="hint text-muted">{hint}</p>
   {/if}
 </div>
 
