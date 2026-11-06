@@ -30,11 +30,11 @@ functions. It is stored as text and evaluated when applied.
 
   params: [
     { name: "baseUrl", label: "Base URL", type: "string",
-      description: "e.g. http://192.168.1.50:8099" },
+      description: "e.g. http://192.168.1.50:8099/service/api" },
     { name: "token", label: "Token", type: "state",
-      description: "State whose value is sent as the Bearer token." },
+      description: "State ID whose string value is sent as the Bearer token." },
     { name: "poll", label: "Poll interval", type: "duration", default: "30s",
-      description: "How often to read; e.g. 30s, 5m, 1h." },
+      description: "How fast you want to update; e.g. every  30s, 5m, 1h." },
   ],
 
   itemList: [
