@@ -94,6 +94,15 @@ The built-in **SHRDZM / MQTT electricity meter** is a state-source example: it
 reads the SHRDZM JSON from an MQTT state, creates a `Meter` device with energy,
 power, voltage and current, and needs no HTTP.
 
+## Templates page
+
+The cogs menu’s **Templates** page groups the reusable definitions by type:
+Formula, Function, Device, Logic and Logic + device. Formula and Function
+templates are selected from their entry forms; Device, Logic and Logic + device
+templates are applied. Phase 1 provides the page, the Formula/Function editors
+and the Device/Logic definitions; Apply flows for Device/Logic and the composed
+Samsung bundle follow.
+
 The generated states and logic are unlinked copies: editing the template later
 does not touch them, and the template stays available for another device.
 Applying again updates only states whose properties actually changed. Use a

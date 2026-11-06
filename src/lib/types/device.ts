@@ -70,6 +70,20 @@ export interface FormulaLibrary {
   formulas: FormulaTemplate[];
 }
 
+export interface FunctionTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  mode: "expression" | "statements";
+  code: string;
+}
+
+export interface FunctionLibrary {
+  version: number;
+  updatedAt: number;
+  functions: FunctionTemplate[];
+}
+
 export type HistoryDurationUnit = "hours" | "days";
 export type HistoryAggregate =
   "average" | "min" | "max" | "total" | "count" | "none" | "onchange";

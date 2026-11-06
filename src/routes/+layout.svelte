@@ -23,6 +23,7 @@
   } from "$lib/stores/devices.svelte";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
+  import { initFunctions } from "$lib/functions.svelte.js";
   import { initVariables } from "$lib/variables.svelte.js";
   import {
     initPages,
@@ -321,6 +322,7 @@
   onMount(() => {
     initRegistry();
     initFormulas();
+    initFunctions();
     initVariables();
     initTemplates();
     initLogics();

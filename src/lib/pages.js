@@ -25,10 +25,10 @@ export const pages = [
     title: "Variables & Constants",
   },
   {
-    id: "/formulas",
-    label: "Formula Templates",
-    icon: "functions",
-    title: "Formula Templates",
+    id: "/templates",
+    label: "Templates",
+    icon: "dashboard_customize",
+    title: "Templates",
   },
   { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
   {

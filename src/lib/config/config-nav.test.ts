@@ -14,6 +14,11 @@ it("cogTarget returns the remembered config page", () => {
   expect(cogTarget("/ui", IDS)).toBe("/ui");
 });
 
+it("cogTarget maps the old formula page to Templates", () => {
+  expect(cogTarget("/formulas", [...IDS, "/templates"])).toBe("/templates");
+  expect(cogTarget("/formulas", IDS)).toBe("/ui");
+});
+
 it("the session key is the documented one", () => {
   expect(CONFIG_LAST_KEY).toBe("iHome.configPage");
 });
