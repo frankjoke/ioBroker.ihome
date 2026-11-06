@@ -130,6 +130,13 @@ describe("highlightCode", () => {
     const spans = highlightCode('get("x');
     expect(spans.map((span) => span.text).join("")).toBe('get("x');
   });
+
+  it("paints fetchJson as a function", () => {
+    const spans = highlightCode('fetchJson("https://x", () => {})');
+    expect(spans.find((span) => span.text === "fetchJson")?.kind).toBe(
+      "function",
+    );
+  });
 });
 
 describe("checkStatement", () => {
@@ -159,6 +166,14 @@ describe("extractRefs on statements", () => {
 
   it("keeps ignoring dynamic names", () => {
     expect(extractRefs("get(name)")).toEqual([]);
+  });
+
+  it("finds refs inside a fetch callback", () => {
+    expect(
+      extractRefs(
+        'fetchJson("https://x", (data) => set("0_userdata.0.CB", data))',
+      ),
+    ).toContain("0_userdata.0.CB");
   });
 });
 

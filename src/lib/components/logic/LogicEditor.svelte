@@ -173,6 +173,7 @@
         code={draft.expr.code}
         label="Result expression"
         placeholder={RESULT_PLACEHOLDER}
+        hint="fetchJson(url, (data, error) => …)"
         allowNoop
         {logics}
         inputs={draft.inputs}

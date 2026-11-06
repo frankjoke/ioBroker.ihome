@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   createLogicRuntime,
   isGotoSignal,
@@ -6,6 +6,7 @@ import {
   type NameInfo,
   type RuntimeHooks,
 } from "./runtime";
+import type { FetchOptions } from "./tasks";
 import type { Expr, FunctionLogic, MachineLogic } from "./types";
 
 const logic = (code: string): FunctionLogic => ({
@@ -18,15 +19,23 @@ const logic = (code: string): FunctionLogic => ({
 function runtimeFor(source: string, info: Record<string, NameInfo> = {}) {
   const writes: unknown[][] = [];
   const messages: unknown[][] = [];
+  const fetches: Array<{
+    url: string;
+    options: FetchOptions | undefined;
+    run: (data: unknown, error: string | null) => void;
+    depth: number;
+  }> = [];
   const runtime = createLogicRuntime(logic(source), {
     describe: (name) => info[name],
     write: (...args) => writes.push(args),
     log: () => {},
     message: (...args) => messages.push(args),
     notify: () => {},
+    fetchJson: (url, options, run, depth) =>
+      fetches.push({ url, options, run, depth }),
     now: () => 1000,
   });
-  return { runtime, writes, messages };
+  return { runtime, writes, messages, fetches };
 }
 
 const machine = (source: string): MachineLogic => ({
@@ -53,6 +62,7 @@ function blockHooks(
   names: Record<string, NameInfo> = {},
   messages: unknown[][] = [],
   notifications: unknown[][] = [],
+  fetches: unknown[][] = [],
 ): RuntimeHooks {
   return {
     describe: (name) => names[name],
@@ -60,6 +70,7 @@ function blockHooks(
     log: (...args) => logs.push(args),
     message: (...args) => messages.push(args),
     notify: (...args) => notifications.push(args),
+    fetchJson: (...args) => fetches.push(args),
     now: () => 1000,
   };
 }
@@ -349,4 +360,242 @@ it("a caught goto signal does not throw out of the block", () => {
   expect(() =>
     rt.runStatements({ code: 'try { goto("B") } catch (e) {}' } as Expr, 0),
   ).not.toThrow();
+});
+
+describe("fetchJson", () => {
+  it("returns noop and schedules at depth + 1", () => {
+    const { runtime, fetches } = runtimeFor(
+      'fetchJson("https://api.test/x", () => {})',
+    );
+    expect(
+      isNoop(
+        runtime.runExpr(
+          { code: 'fetchJson("https://api.test/x", () => {})' },
+          4,
+        ),
+      ),
+    ).toBe(true);
+    expect(fetches).toHaveLength(1);
+    expect(fetches[0].url).toBe("https://api.test/x");
+    expect(fetches[0].depth).toBe(5);
+    expect(fetches[0].options).toBeUndefined();
+  });
+
+  it("passes options through", () => {
+    const code =
+      'fetchJson("https://x", () => {}, { method: "post", headers: { "X-Key": "k", bad: 1 }, body: "{}" })';
+    const { runtime, fetches } = runtimeFor(code);
+    runtime.runExpr({ code }, 0);
+    expect(fetches[0].options).toEqual({
+      method: "post",
+      headers: { "X-Key": "k" },
+      body: "{}",
+    });
+  });
+
+  it("rejects a non-http url and a missing callback synchronously", () => {
+    const badUrl = 'fetchJson("ftp://x", () => {})';
+    const badUrlRuntime = runtimeFor(badUrl).runtime;
+    expect(() => badUrlRuntime.runExpr({ code: badUrl }, 0)).toThrow(
+      /fetchJson needs an http\(s\) url/,
+    );
+
+    const noCallback = 'fetchJson("https://x")';
+    const noCallbackRuntime = runtimeFor(noCallback).runtime;
+    expect(() => noCallbackRuntime.runExpr({ code: noCallback }, 0)).toThrow(
+      /fetchJson needs a callback/,
+    );
+  });
+
+  it("rejects an async callback synchronously", () => {
+    const source = 'fetchJson("https://x", async () => {})';
+    const { runtime, fetches } = runtimeFor(source);
+    expect(() => runtime.runExpr({ code: source }, 0)).toThrow(
+      /fetchJson needs a synchronous callback/,
+    );
+    expect(fetches).toHaveLength(0);
+  });
+
+  it("rejects a callback that returns a promise", () => {
+    const source =
+      'fetchJson("https://x", () => Promise.reject(new Error("late")))';
+    const { runtime, fetches } = runtimeFor(source);
+    runtime.runExpr({ code: source }, 0);
+    expect(() => fetches[0].run(null, null)).toThrow(
+      /fetchJson needs a synchronous callback/,
+    );
+  });
+
+  it("runs the callback later with data and the callback depth", () => {
+    const source =
+      'fetchJson("https://x", (data, error) => set("0_userdata.0.OUT", error ?? data.v))';
+    const { runtime, fetches, writes } = runtimeFor(source);
+    runtime.runExpr({ code: source }, 4);
+    fetches[0].run({ v: 7 }, null);
+    expect(writes).toEqual([["0_userdata.0.OUT", 7, false, undefined, 5]]);
+  });
+
+  it("runs the callback on failure with the error string", () => {
+    const source =
+      'fetchJson("https://x", (data, error) => set("out", String(error)))';
+    const { runtime, fetches, writes } = runtimeFor(source);
+    runtime.runExpr({ code: source }, 0);
+    fetches[0].run(undefined, "boom");
+    expect(writes).toEqual([["out", "boom", false, undefined, 1]]);
+  });
+
+  it("keeps the action block's this in the callback", () => {
+    const writes: unknown[][] = [];
+    const fetches: unknown[][] = [];
+    const def = machine(
+      'this.tag = "on"\nfetchJson("https://x", function (data) { set("out", this.tag + data) })',
+    );
+    const rt = createLogicRuntime(
+      def,
+      blockHooks(writes, [], {}, [], [], fetches),
+    );
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    run("!", null);
+    expect(writes).toEqual([["out", "on!", false, undefined, 1]]);
+  });
+
+  it("keeps the scheduling state's object after another state ran", () => {
+    const writes: unknown[][] = [];
+    const fetches: unknown[][] = [];
+    const def: MachineLogic = {
+      ...machine(
+        'this.tag = "A"\nfetchJson("https://x", () => set("out", this.tag))',
+      ),
+      states: {
+        A: {
+          on: [
+            {
+              on: "e",
+              mode: "function",
+              do: {
+                code: 'this.tag = "A"\nfetchJson("https://x", () => set("out", this.tag))',
+              },
+            },
+          ],
+        },
+        B: {
+          on: [
+            {
+              on: "e",
+              mode: "function",
+              do: { code: 'this.tag = "B"' },
+            },
+          ],
+        },
+      },
+    };
+    const rt = createLogicRuntime(
+      def,
+      blockHooks(writes, [], {}, [], [], fetches),
+    );
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    rt.runStatements(def.states.B.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    run(null, null);
+    expect(writes).toEqual([["out", "A", false, undefined, 1]]);
+  });
+
+  it("blocks goto inside a callback", () => {
+    const fetches: unknown[][] = [];
+    const def = machine('fetchJson("https://x", () => goto("B"))');
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    expect(() => run(null, null)).toThrow(
+      "goto is not available in a fetch callback",
+    );
+  });
+
+  it("still allows goto() and goto(NOACTION) inside a callback", () => {
+    for (const call of ["goto()", "goto(NOACTION)"]) {
+      const fetches: unknown[][] = [];
+      const writes: unknown[][] = [];
+      const def = machine(
+        `fetchJson("https://x", () => { ${call}; set("out", 1) })`,
+      );
+      const rt = createLogicRuntime(
+        def,
+        blockHooks(writes, [], {}, [], [], fetches),
+      );
+      rt.runStatements(def.states.A.on![0].do!, 0);
+      const run = fetches[0][2] as (
+        data: unknown,
+        error: string | null,
+      ) => void;
+      run(null, null);
+      expect(writes).toEqual([["out", 1, false, undefined, 1]]);
+    }
+  });
+
+  it("can schedule another fetch from a callback", () => {
+    const fetches: unknown[][] = [];
+    const def = machine(
+      'fetchJson("https://a", () => fetchJson("https://b", () => {}))',
+    );
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    run(null, null);
+    expect(fetches.map((entry) => entry[0])).toEqual([
+      "https://a",
+      "https://b",
+    ]);
+    expect(fetches[1][3]).toBe(2); // callback depth + 1
+  });
+
+  it("hits the 50 ms timeout inside a callback", () => {
+    const fetches: unknown[][] = [];
+    const def = machine('fetchJson("https://x", () => { for (;;) {} })');
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    expect(() => run(null, null)).toThrow(/timed out/i);
+  });
+
+  it("get and state work inside a callback with the callback depth", () => {
+    const names = {
+      a: {
+        value: 4,
+        ack: true,
+        from: "x",
+        ts: 1,
+        changed: true,
+        writable: true,
+      },
+    };
+    const fetches: unknown[][] = [];
+    const writes: unknown[][] = [];
+    const def = machine(
+      'fetchJson("https://x", () => set("out", get("a") + (state("a").changed ? 1 : 0)))',
+    );
+    const rt = createLogicRuntime(
+      def,
+      blockHooks(writes, [], names, [], [], fetches),
+    );
+    rt.runStatements(def.states.A.on![0].do!, 0);
+    const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+    run(null, null);
+    expect(writes).toEqual([["out", 5, false, undefined, 1]]);
+  });
+
+  it('set("$self") bypasses the read-only pseudo input', () => {
+    const names = {
+      $self: {
+        value: false,
+        ack: true,
+        ts: 1,
+        changed: false,
+        writable: false,
+      },
+    };
+    const { runtime, writes } = runtimeFor('set("$self", 1)', names);
+    runtime.runExpr({ code: 'set("$self", 1)' }, 0);
+    expect(writes).toEqual([["$self", 1, false, undefined, 0]]);
+  });
 });

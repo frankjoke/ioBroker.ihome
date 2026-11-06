@@ -1,4 +1,5 @@
-import type { Engine, EngineDeps, StateChange } from "./engine";
+import type { Engine, EngineDeps, LogicReading, StateChange } from "./engine";
+import type { FetchInit, FetchLike } from "./tasks";
 
 /** A manual clock: timers fire only when the test advances it. */
 export class FakeClock {
@@ -59,6 +60,17 @@ export interface NotificationLine {
   body: string;
 }
 
+export interface FetchRequest {
+  url: string;
+  init: FetchInit;
+  respond(response?: {
+    status?: number;
+    statusText?: string;
+    body?: string;
+  }): void;
+  fail(error: unknown): void;
+}
+
 export interface Harness {
   deps: EngineDeps;
   clock: FakeClock;
@@ -66,6 +78,10 @@ export interface Harness {
   logs: LogLine[];
   messages: MessageLine[];
   notifications: NotificationLine[];
+  reports: Array<{ logicId: string; reading: LogicReading }>;
+  requests: FetchRequest[];
+  /** The first request that has neither responded nor failed. */
+  nextRequest(): FetchRequest | undefined;
   attach(engine: Engine): void;
   change(
     id: string,
@@ -85,7 +101,44 @@ export function createHarness(values: Record<string, unknown>): Harness {
   const logs: LogLine[] = [];
   const messages: MessageLine[] = [];
   const notifications: NotificationLine[] = [];
+  const reports: Array<{ logicId: string; reading: LogicReading }> = [];
+  const requests: Array<FetchRequest & { pending: boolean }> = [];
   let engine: Engine | undefined;
+
+  const fetch: FetchLike = (url, init) =>
+    new Promise((resolve, reject) => {
+      const request: FetchRequest & { pending: boolean } = {
+        url,
+        init,
+        pending: true,
+        respond(
+          response: {
+            status?: number;
+            statusText?: string;
+            body?: string;
+          } = {},
+        ) {
+          if (!request.pending) return;
+          request.pending = false;
+          const status = response.status ?? 200;
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            statusText: response.statusText ?? "",
+            text: async () => response.body ?? "",
+          });
+        },
+        fail(error: unknown) {
+          if (!request.pending) return;
+          request.pending = false;
+          reject(error);
+        },
+      };
+      init.signal.addEventListener("abort", () =>
+        request.fail(new Error("aborted")),
+      );
+      requests.push(request);
+    });
 
   const deps: EngineDeps = {
     read: (id) => values[id],
@@ -101,6 +154,8 @@ export function createHarness(values: Record<string, unknown>): Harness {
     now: () => clock.now,
     setTimeout: (fn, ms) => clock.setTimeout(fn, ms),
     clearTimeout: (handle) => clock.clearTimeout(handle),
+    fetch,
+    report: (logicId, reading) => reports.push({ logicId, reading }),
   };
 
   return {
@@ -110,6 +165,9 @@ export function createHarness(values: Record<string, unknown>): Harness {
     logs,
     messages,
     notifications,
+    reports,
+    requests,
+    nextRequest: () => requests.find((request) => request.pending),
     attach(next) {
       engine = next;
     },

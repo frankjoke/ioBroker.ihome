@@ -9,6 +9,7 @@ const GOTO_FUNCTIONS = new Set(["goto"]);
 const HIGHLIGHT_NAMES = new Set([
   ...REF_FUNCTIONS,
   ...GOTO_FUNCTIONS,
+  "fetchJson",
   "log",
   "noop",
   "Math",

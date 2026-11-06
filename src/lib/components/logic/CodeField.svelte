@@ -15,6 +15,7 @@
     onchange,
     label,
     placeholder,
+    hint,
     minRows = 2,
     allowNoop = false,
     mode = "expression",
@@ -27,6 +28,8 @@
     onchange: (code: string) => void;
     label: string;
     placeholder?: string;
+    /** One muted line under the field; the fetchJson signature. */
+    hint?: string;
     minRows?: number;
     allowNoop?: boolean;
     /** A single expression, or a block of statements. */
@@ -61,6 +64,7 @@
   const spans = $derived(highlightCode(code));
   const inputEntries = $derived(Object.entries(inputs));
   const errorId = $props.id();
+  const hintId = `${errorId}-hint`;
 
   /** Grow between the rows minimum and the CSS max-height. */
   function grow() {
@@ -197,7 +201,9 @@
       value={code}
       aria-label={label}
       aria-invalid={problem ? "true" : undefined}
-      aria-describedby={problem ? errorId : undefined}
+      aria-describedby={[problem ? errorId : "", hint ? hintId : ""]
+        .filter(Boolean)
+        .join(" ") || undefined}
       placeholder={placeholder ??
         (mode === "statements" ? STATEMENT_PLACEHOLDER : undefined)}
       rows={minRows}
@@ -226,6 +232,9 @@
 
   {#if problem}
     <p id={errorId} class="text-danger">{problem}</p>
+  {/if}
+  {#if hint}
+    <p id={hintId} class="hint text-muted">{hint}</p>
   {/if}
 </div>
 
@@ -360,6 +369,11 @@
 
   .comment {
     color: var(--text-muted);
+  }
+
+  .hint {
+    margin: 0;
+    font-size: 0.8rem;
   }
 
   .plain {

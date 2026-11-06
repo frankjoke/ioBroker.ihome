@@ -1,5 +1,6 @@
 import { createContext, runInContext, Script } from "node:vm";
 import { wrapExpression } from "./expr-code";
+import type { FetchOptions } from "./tasks";
 import type { Expr, Forward, LogicDef } from "./types";
 
 /** How one name looks to `get`/`state`/`set` during an evaluation. */
@@ -29,6 +30,12 @@ export interface RuntimeHooks {
     timeout?: number,
   ): void;
   notify(level: "info" | "warn" | "error", title: string, body: string): void;
+  fetchJson(
+    url: string,
+    options: FetchOptions | undefined,
+    run: (data: unknown, error: string | null) => void,
+    depth: number,
+  ): void;
   now(): number;
 }
 
@@ -66,6 +73,42 @@ export type ExprMode = "expression" | "statements";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isAsyncFunction(value: unknown): boolean {
+  return Object.prototype.toString.call(value) === "[object AsyncFunction]";
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function fetchOptions(raw: unknown): FetchOptions | undefined {
+  if (!isRecord(raw)) return undefined;
+  const headers: Record<string, string> = {};
+  if (isRecord(raw.headers)) {
+    for (const [name, value] of Object.entries(raw.headers)) {
+      if (typeof value === "string") headers[name] = value;
+    }
+  }
+  return {
+    method: typeof raw.method === "string" ? raw.method : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
+    body: typeof raw.body === "string" ? raw.body : undefined,
+  };
 }
 
 function isExpr(value: unknown): value is Expr {
@@ -153,6 +196,10 @@ export function createLogicRuntime(
 ): LogicRuntime {
   const depths: number[] = [];
   const currentDepth = (): number => depths[depths.length - 1] ?? 0;
+  /** The state object of the active action block, if any. */
+  const objects: unknown[] = [];
+  const currentObject = (): unknown => objects[objects.length - 1];
+  let inTask = false;
 
   const sandbox = Object.create(null);
   const context = createContext(sandbox, {
@@ -171,9 +218,29 @@ export function createLogicRuntime(
   };
   const defineHidden = (name: string, value: unknown): void =>
     define(name, value, false);
+  const defineSlot = (name: string): void => {
+    Object.defineProperty(sandbox, name, {
+      value: undefined,
+      writable: true,
+      configurable: false,
+      enumerable: false,
+    });
+  };
+  for (const slot of [
+    "__task_cb",
+    "__task_this",
+    "__task_data",
+    "__task_error",
+  ]) {
+    defineSlot(slot);
+  }
+  const taskRunner = new Script(
+    "__task_cb.call(__task_this, __task_data, __task_error)",
+    { filename: `${def.id}:task` },
+  );
 
   const scripts = new Map<string, Script>();
-  const runners = new WeakMap<Expr, Script>();
+  const blocks = new WeakMap<Expr, { runner: Script; object: unknown }>();
   const stateNames = new Map<string, string>();
   let hiddenCount = 0;
 
@@ -204,18 +271,26 @@ export function createLogicRuntime(
     return name;
   };
 
-  const compileBlock = (expr: Expr, path: string, stateKey: string): Script => {
+  const compileBlock = (
+    expr: Expr,
+    path: string,
+    stateKey: string,
+  ): { runner: Script; object: unknown } => {
     try {
       const block = new Script(`(function () {\n${expr.code}\n})`, {
         filename: `${def.id}:${path}`,
       }).runInContext(context);
       const blockName = `__block_${hiddenCount++}`;
       defineHidden(blockName, block);
-      const runner = new Script(`${blockName}.call(${stateObject(stateKey)})`, {
-        filename: `${def.id}:${path}`,
-      });
-      runners.set(expr, runner);
-      return runner;
+      const objectName = stateObject(stateKey);
+      const entry = {
+        runner: new Script(`${blockName}.call(${objectName})`, {
+          filename: `${def.id}:${path}`,
+        }),
+        object: sandbox[objectName],
+      };
+      blocks.set(expr, entry);
+      return entry;
     } catch (error) {
       throw new Error(
         `${path}: action code failed to compile: ${errorText(error)}`,
@@ -261,12 +336,17 @@ export function createLogicRuntime(
     });
   });
   define("set", (name: string, value: unknown, opts?: unknown) => {
-    const info = hooks.describe(name);
-    if (info && !info.writable) throw new Error(`${name} is not writable`);
+    if (name !== "$self") {
+      const info = hooks.describe(name);
+      if (info && !info.writable) throw new Error(`${name} is not writable`);
+    }
     const { ack, forward } = options(opts);
     hooks.write(name, value, ack, forward, currentDepth());
   });
   define("goto", function (state?: unknown): void {
+    if (inTask && arguments.length > 0 && state !== NOACTION) {
+      throw new Error("goto is not available in a fetch callback");
+    }
     // `arguments` tells goto() (stay) from goto(undefined) (a mistake).
     if (arguments.length === 0 || state === NOACTION) return;
     if (typeof state === "string" && state !== "") {
@@ -301,14 +381,68 @@ export function createLogicRuntime(
   define("noop", () => NOOP);
   define("NOACTION", NOACTION);
 
-  const run = (script: Script, depth: number): unknown => {
+  const run = (script: Script, depth: number, object?: unknown): unknown => {
     depths.push(depth);
+    if (object !== undefined) objects.push(object);
     try {
       return script.runInContext(context, { timeout: 50 });
     } finally {
+      if (object !== undefined) objects.pop();
       depths.pop();
     }
   };
+
+  const runTask = (
+    callback: unknown,
+    thisObject: unknown,
+    data: unknown,
+    error: string | null,
+    depth: number,
+  ): void => {
+    sandbox.__task_cb = callback;
+    sandbox.__task_this = thisObject;
+    sandbox.__task_data = data;
+    sandbox.__task_error = error;
+    inTask = true;
+    try {
+      const result = run(taskRunner, depth, thisObject);
+      if (isThenable(result)) {
+        // The callback would continue outside the vm timeout and this depth.
+        void Promise.resolve(result).catch(() => {});
+        throw new Error("fetchJson needs a synchronous callback");
+      }
+    } finally {
+      inTask = false;
+      sandbox.__task_cb = undefined;
+      sandbox.__task_this = undefined;
+      sandbox.__task_data = undefined;
+      sandbox.__task_error = undefined;
+    }
+  };
+
+  define(
+    "fetchJson",
+    (url: unknown, callback: unknown, rawOptions?: unknown) => {
+      if (typeof url !== "string" || !isHttpUrl(url)) {
+        throw new Error("fetchJson needs an http(s) url");
+      }
+      if (typeof callback !== "function") {
+        throw new Error("fetchJson needs a callback");
+      }
+      if (isAsyncFunction(callback)) {
+        throw new Error("fetchJson needs a synchronous callback");
+      }
+      const object = currentObject();
+      const depth = currentDepth() + 1;
+      hooks.fetchJson(
+        url,
+        fetchOptions(rawOptions),
+        (data, error) => runTask(callback, object, data, error, depth),
+        depth,
+      );
+      return NOOP;
+    },
+  );
 
   return {
     runExpr(expr, depth) {
@@ -318,9 +452,8 @@ export function createLogicRuntime(
     },
     runStatements(expr, depth) {
       // A block outside the definition (a test, a draft) gets its own state.
-      const runner =
-        runners.get(expr) ?? compileBlock(expr, "action", "$adhoc");
-      return run(runner, depth);
+      const block = blocks.get(expr) ?? compileBlock(expr, "action", "$adhoc");
+      return run(block.runner, depth, block.object);
     },
   };
 }
