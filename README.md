@@ -81,6 +81,9 @@ functions that return `{ url, options }`. Each item defines its state (`name`,
 `type`, `role`, `unit`, `states`, `readOnly`, …) and its mapping (`source`,
 `foreignWriteName`, `conversion`, `setConversion`, `updateAlways`, `ack`).
 
+See [DEVICE-TEMPLATES.md](DEVICE-TEMPLATES.md) for the full field reference,
+state-source mode, dotted-key paths and examples.
+
 The generated states and logic are unlinked copies: editing the template later
 does not touch them, and the template stays available for another device.
 Applying again updates only states whose properties actually changed. Use a
