@@ -1,5 +1,5 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { ensureStateObject } from "$lib/state-create";
+import { ensureStateObject, readStateObject } from "$lib/state-create";
 import {
   buildDeviceLogic,
   templateStateSpecs,
@@ -38,15 +38,23 @@ export function planDeviceTemplate(
 
 /** Create each missing folder below the namespace, never above it. */
 async function ensureFolderPath(baseState: string): Promise<void> {
-  const parts = baseState.split(".").filter(Boolean);
-  if (parts.length < 3) {
-    throw new Error("base state needs adapter.instance.name");
+  const namespace = ioBroker.namespace;
+  if (!namespace) throw new Error("Not connected to ioBroker");
+  const prefix = `${namespace}.`;
+  if (!baseState.startsWith(prefix)) {
+    throw new Error(`base state must start with ${prefix}`);
   }
-  let id = parts.slice(0, 2).join(".");
-  for (const part of parts.slice(2)) {
+  const parts = baseState.slice(prefix.length).split(".").filter(Boolean);
+  if (parts.length === 0) throw new Error("base state needs a folder name");
+  if (
+    ["Logic", "config", "info", "phone", "system", "enum"].includes(parts[0])
+  ) {
+    throw new Error(`base state may not use the ${parts[0]} folder`);
+  }
+  let id = namespace;
+  for (const part of parts) {
     id += `.${part}`;
-    const known =
-      ioBroker.objects?.get(id) ?? (await ioBroker.getObject(id, true));
+    const known = await readStateObject(id);
     if (known) {
       if (known.type !== "folder") throw new Error(`${id} is not a folder`);
       continue;
@@ -68,7 +76,14 @@ export async function createTemplateStates(
   baseState: string,
 ): Promise<void> {
   await ensureFolderPath(baseState);
+  const skipped: string[] = [];
   for (const spec of specs) {
-    await ensureStateObject(spec);
+    const result = await ensureStateObject(spec);
+    if (result === "foreign-skipped") skipped.push(spec.id);
+  }
+  if (skipped.length > 0) {
+    throw new Error(
+      `existing foreign states were not overwritten: ${skipped.join(", ")}`,
+    );
   }
 }

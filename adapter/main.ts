@@ -9,7 +9,11 @@ import {
 } from "./logic/engine";
 import { isRecord, parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
-import { stateCommonDiff, type StateSpec } from "./logic/state-common";
+import {
+  stateCommonDiff,
+  stateObjectWithDiff,
+  type StateSpec,
+} from "./logic/state-common";
 import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
 import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
@@ -362,13 +366,6 @@ class IHome extends utils.Adapter {
   }
 
   /**
-   * The logic states the adapter owns: `<namespace>.Logic.<logic id>`. Created
-   * on demand and kept in step with the document; never deleted (a deleted logic
-   * leaves its state, like a variable does). A logic output is a command, so the
-   * role is level.switch (binary) or level.state — never `value`, which the
-   * ecosystem reserves for read-only sensor readings.
-   */
-  /**
    * Create a missing owned state or update only the common keys that differ.
    * An equal object is left completely untouched (no ioBroker churn).
    */
@@ -386,9 +383,24 @@ class IHome extends utils.Adapter {
       existing.common as Record<string, unknown>,
       spec.common,
     );
-    if (diff) await this.extendObjectAsync(spec.id, { common: diff });
+    if (diff) {
+      await this.setObjectAsync(
+        spec.id,
+        stateObjectWithDiff(
+          existing as unknown as Record<string, unknown>,
+          diff,
+        ) as unknown as ioBroker.Object,
+      );
+    }
   }
 
+  /**
+   * The logic states the adapter owns: `<namespace>.Logic.<logic id>`. Created
+   * on demand and kept in step with the document; a state whose logic no longer
+   * has a logic output is pruned. A logic output is a command, so the role is
+   * level.switch (binary) or level.state — never `value`, which the ecosystem
+   * reserves for read-only sensor readings.
+   */
   private async ensureLogicStates(doc: LogicDocument): Promise<void> {
     const own = doc.logics.filter((def) => def.output?.scope === "logic");
     if (own.length > 0) {

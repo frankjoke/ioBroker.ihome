@@ -8,7 +8,7 @@ export interface GlobalVariable {
   name: string;
   kind: "constant" | "state";
   /** string | number | boolean for constants and new states; a picked state
-   *  keeps its object's own type (which may be "mixed" or anything else). */
+   *  keeps its object's own type, name, role and read/write flags. */
   type: string;
   /** Constant value, kept as text so the form round-trips exactly. */
   value?: string;
@@ -271,21 +271,27 @@ export function initialValue(type: string): unknown {
 }
 
 /** The state object a global state variable wants; constants have none. */
-export function variableStateSpec(v: GlobalVariable): StateSpec | undefined {
+export function variableStateSpec(
+  v: GlobalVariable,
+  creating = true,
+): StateSpec | undefined {
   if (v.kind !== "state" || !v.stateId) return undefined;
   const type = ["string", "number", "boolean"].includes(v.type)
     ? v.type
     : "string";
   const initial = initialValue(type);
-  const common: Record<string, unknown> = {
-    name: v.name || v.stateId,
-    type,
-    role: String(v.role ?? "").trim() || "value",
-    read: true,
-    write: true,
-    unit: String(v.unit ?? ""),
-    def: initial,
-  };
+  const common: Record<string, unknown> = { type };
+  if (creating) {
+    common.name = v.name || v.stateId;
+    common.role = String(v.role ?? "").trim() || "value";
+    common.read = true;
+    common.write = true;
+    common.unit = String(v.unit ?? "");
+    common.def = initial;
+  } else {
+    if (String(v.role ?? "").trim()) common.role = String(v.role).trim();
+    common.unit = String(v.unit ?? "");
+  }
   if (type === "number") {
     if (typeof v.min === "number" && Number.isFinite(v.min)) common.min = v.min;
     if (typeof v.max === "number" && Number.isFinite(v.max)) common.max = v.max;
@@ -293,7 +299,9 @@ export function variableStateSpec(v: GlobalVariable): StateSpec | undefined {
       common.step = v.step;
     }
   }
-  return { id: v.stateId, common, initial };
+  return creating
+    ? { id: v.stateId, common, initial }
+    : { id: v.stateId, common };
 }
 
 /** The constants as iHome-internal values: they exist only while the config is

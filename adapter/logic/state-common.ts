@@ -66,3 +66,14 @@ export function stateCommonDiff(
   }
   return Object.keys(diff).length > 0 ? diff : null;
 }
+
+/** A full object whose common replaces the changed keys (no deep merge). */
+export function stateObjectWithDiff(
+  existing: Record<string, unknown>,
+  diff: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...existing,
+    common: { ...(existing.common as Record<string, unknown>), ...diff },
+  };
+}

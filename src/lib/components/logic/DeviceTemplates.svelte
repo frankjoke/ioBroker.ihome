@@ -8,6 +8,7 @@
     templateStateSpecs,
     validateDeviceTemplate,
   } from "$logic/device-templates";
+  import { validateLogicDocument } from "$logic/validate";
   import {
     planDeviceTemplate,
     createTemplateStates,
@@ -49,9 +50,11 @@
   let deleting = $state(false);
   let applyOpen = $state(false);
   let evaluated = $state<DeviceTemplateShape | null>(null);
+  let applySource = $state("");
   let applyParams = $state<Record<string, string | number | boolean>>({});
   let baseState = $state("");
   let applyError = $state("");
+  let applying = $state(false);
 
   const preview = $derived(
     evaluated ? templateStateSpecs(evaluated, baseState) : [],
@@ -75,13 +78,18 @@
     deleting = false;
     applyOpen = false;
     evaluated = null;
+    applySource = "";
     applyError = "";
     applyParams = {};
+    applying = false;
     baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
   function startApply(): void {
     applyError = "";
+    applyOpen = false;
+    evaluated = null;
+    applySource = "";
     let value: unknown;
     try {
       value = evaluateDeviceTemplate(source);
@@ -109,52 +117,65 @@
                 : "";
     }
     evaluated = shape;
+    applySource = source;
     applyParams = defaults;
     baseState = `${ioBroker.namespace}.Variables.${slug(selected?.name ?? "device")}`;
     applyOpen = true;
   }
 
   async function generate(): Promise<void> {
-    if (!evaluated || !selected) return;
+    if (!evaluated || !selected || applying) return;
+    applying = true;
     applyError = "";
-    if (!validStateId(baseState)) {
-      applyError = "Base state needs adapter.instance.path.";
-      return;
-    }
-    const values = { ...applyParams };
-    for (const param of evaluated.params ?? []) {
-      if (param.type === "duration") {
-        if (parseDuration(String(values[param.name] ?? "")) === null) {
-          applyError = `${param.label}: use e.g. 30s, 5m or 1h.`;
-          return;
-        }
-        continue;
-      }
-      if (param.type !== "state") continue;
-      const ref = String(values[param.name] ?? "");
-      if (!ref) {
-        applyError = `${param.label}: choose a state.`;
+    try {
+      if (!validStateId(baseState)) {
+        applyError = "Base state needs adapter.instance.path.";
         return;
       }
-      values[param.name] = stateIdFor(ref, getVariables());
-    }
-    const suffix = baseState.split(".").pop() ?? "device";
-    const base = `${selected.id}-${suffix}`;
-    const taken = new Set(doc.logics.map((logic) => logic.id));
-    let id = base;
-    let index = 2;
-    while (taken.has(id)) id = `${base}-${index++}`;
-    try {
+      const values = { ...applyParams };
+      for (const param of evaluated.params ?? []) {
+        if (param.type === "duration") {
+          if (parseDuration(String(values[param.name] ?? "")) === null) {
+            applyError = `${param.label}: use e.g. 30s, 5m or 1h.`;
+            return;
+          }
+          continue;
+        }
+        if (param.type !== "state") continue;
+        const ref = String(values[param.name] ?? "");
+        if (!ref) {
+          applyError = `${param.label}: choose a state.`;
+          return;
+        }
+        values[param.name] = stateIdFor(ref, getVariables());
+      }
+      const suffix = baseState.split(".").pop() ?? "device";
+      const base = `${selected.id}-${suffix}`;
+      const taken = new Set(doc.logics.map((logic) => logic.id));
+      let id = base;
+      let index = 2;
+      while (taken.has(id)) id = `${base}-${index++}`;
       const plan = planDeviceTemplate(
         evaluated,
-        source,
+        applySource,
         values,
         baseState,
         id,
         selected.name,
       );
       await createTemplateStates(plan.specs, baseState);
-      if (!commitLogics({ ...doc, logics: [...doc.logics, plan.logic] })) {
+      const nextDoc = {
+        ...doc,
+        logics: [...doc.logics, plan.logic],
+      };
+      const issues = validateLogicDocument(nextDoc).filter(
+        (issue) => issue.severity === "error",
+      );
+      if (issues.length > 0) {
+        applyError = `${issues[0].path}: ${issues[0].message}`;
+        return;
+      }
+      if (!commitLogics(nextDoc)) {
         applyError = "The logic document could not be saved.";
         return;
       }
@@ -162,6 +183,8 @@
       onClose();
     } catch (e) {
       applyError = e instanceof Error ? e.message : String(e);
+    } finally {
+      applying = false;
     }
   }
 
@@ -301,7 +324,7 @@
             <textarea
               class="source"
               bind:value={source}
-              readonly={isBuiltin}
+              readonly={isBuiltin || applyOpen}
               rows="18"
               spellcheck="false"
               aria-label="Template source"
@@ -313,7 +336,12 @@
           {/if}
 
           <div class="actions">
-            <button type="button" class="btn btn-primary" onclick={startApply}>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick={startApply}
+              disabled={applying}
+            >
               Apply
             </button>
             <button type="button" class="btn" onclick={duplicate}>
@@ -405,6 +433,7 @@
                   type="button"
                   class="btn btn-primary"
                   onclick={generate}
+                  disabled={applying}
                 >
                   Generate
                 </button>

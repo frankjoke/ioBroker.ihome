@@ -127,7 +127,7 @@ export async function applyVariable(v) {
       ? ioBroker.objects.get(v.stateId)
       : await ioBroker.getObject(v.stateId, true);
     if (known) {
-      const spec = variableStateSpec(v);
+      const spec = variableStateSpec(v, false);
       if (spec) await ensureStateObject(spec);
       void ioBroker.getState(v.stateId);
       return null;

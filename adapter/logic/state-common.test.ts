@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isOwnedState, normalizeStates, stateCommonDiff } from "./state-common";
+import {
+  isOwnedState,
+  normalizeStates,
+  stateCommonDiff,
+  stateObjectWithDiff,
+} from "./state-common";
 
 describe("normalizeStates", () => {
   it("accepts an object or a JSON string", () => {
@@ -109,5 +114,22 @@ describe("stateCommonDiff", () => {
     expect(
       stateCommonDiff({ name: "x", unit: "V", custom: "keep" }, { name: "x" }),
     ).toBeNull();
+  });
+});
+
+describe("stateObjectWithDiff", () => {
+  it("returns a full object whose common replaces changed keys", () => {
+    const existing = {
+      _id: "ihome.0.Variables.x",
+      type: "state",
+      common: { states: { "0": "Off" }, custom: "keep" },
+      native: { a: 1 },
+    };
+    expect(stateObjectWithDiff(existing, { states: {} })).toEqual({
+      _id: "ihome.0.Variables.x",
+      type: "state",
+      common: { states: {}, custom: "keep" },
+      native: { a: 1 },
+    });
   });
 });

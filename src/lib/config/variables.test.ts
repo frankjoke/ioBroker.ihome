@@ -474,3 +474,41 @@ describe("variableStateSpec", () => {
     ).toBeUndefined();
   });
 });
+
+describe("variableStateSpec for an existing state", () => {
+  it("keeps the state's name, role and access flags", () => {
+    expect(
+      variableStateSpec(
+        {
+          id: "6",
+          name: "Local label",
+          kind: "state",
+          type: "number",
+          stateId: "ihome.0.Variables.temp",
+          unit: "°C",
+          min: 0,
+        },
+        false,
+      ),
+    ).toEqual({
+      id: "ihome.0.Variables.temp",
+      common: { type: "number", unit: "°C", min: 0 },
+    });
+  });
+
+  it("updates an explicitly set role", () => {
+    expect(
+      variableStateSpec(
+        {
+          id: "7",
+          name: "Sensor",
+          kind: "state",
+          type: "number",
+          stateId: "ihome.0.Variables.temp",
+          role: "value.temperature",
+        },
+        false,
+      ),
+    ).toMatchObject({ common: { role: "value.temperature" } });
+  });
+});
