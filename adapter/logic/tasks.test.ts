@@ -276,7 +276,10 @@ describe("createTaskQueue", () => {
 
   it("fails cleanly when fetch is missing", async () => {
     const settled: unknown[][] = [];
-    const queue = createTaskQueue((...args) => settled.push(args), () => {});
+    const queue = createTaskQueue(
+      (...args) => settled.push(args),
+      () => {},
+    );
 
     queue.enqueue(task("a"));
     await flush();

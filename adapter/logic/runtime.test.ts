@@ -485,10 +485,7 @@ describe("fetchJson", () => {
   it("blocks goto inside a callback", () => {
     const fetches: unknown[][] = [];
     const def = machine('fetchJson("https://x", () => goto("B"))');
-    const rt = createLogicRuntime(
-      def,
-      blockHooks([], [], {}, [], [], fetches),
-    );
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
     rt.runStatements(def.states.A.on![0].do!, 0);
     const run = fetches[0][2] as (data: unknown, error: string | null) => void;
     expect(() => run(null, null)).toThrow(
@@ -508,7 +505,10 @@ describe("fetchJson", () => {
         blockHooks(writes, [], {}, [], [], fetches),
       );
       rt.runStatements(def.states.A.on![0].do!, 0);
-      const run = fetches[0][2] as (data: unknown, error: string | null) => void;
+      const run = fetches[0][2] as (
+        data: unknown,
+        error: string | null,
+      ) => void;
       run(null, null);
       expect(writes).toEqual([["out", 1, false, undefined, 1]]);
     }
@@ -519,10 +519,7 @@ describe("fetchJson", () => {
     const def = machine(
       'fetchJson("https://a", () => fetchJson("https://b", () => {}))',
     );
-    const rt = createLogicRuntime(
-      def,
-      blockHooks([], [], {}, [], [], fetches),
-    );
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
     rt.runStatements(def.states.A.on![0].do!, 0);
     const run = fetches[0][2] as (data: unknown, error: string | null) => void;
     run(null, null);
@@ -536,10 +533,7 @@ describe("fetchJson", () => {
   it("hits the 50 ms timeout inside a callback", () => {
     const fetches: unknown[][] = [];
     const def = machine('fetchJson("https://x", () => { for (;;) {} })');
-    const rt = createLogicRuntime(
-      def,
-      blockHooks([], [], {}, [], [], fetches),
-    );
+    const rt = createLogicRuntime(def, blockHooks([], [], {}, [], [], fetches));
     rt.runStatements(def.states.A.on![0].do!, 0);
     const run = fetches[0][2] as (data: unknown, error: string | null) => void;
     expect(() => run(null, null)).toThrow(/timed out/i);

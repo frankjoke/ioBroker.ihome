@@ -403,23 +403,26 @@ export function createLogicRuntime(
     }
   };
 
-  define("fetchJson", (url: unknown, callback: unknown, rawOptions?: unknown) => {
-    if (typeof url !== "string" || !isHttpUrl(url)) {
-      throw new Error("fetchJson needs an http(s) url");
-    }
-    if (typeof callback !== "function") {
-      throw new Error("fetchJson needs a callback");
-    }
-    const object = currentObject();
-    const depth = currentDepth() + 1;
-    hooks.fetchJson(
-      url,
-      fetchOptions(rawOptions),
-      (data, error) => runTask(callback, object, data, error, depth),
-      depth,
-    );
-    return NOOP;
-  });
+  define(
+    "fetchJson",
+    (url: unknown, callback: unknown, rawOptions?: unknown) => {
+      if (typeof url !== "string" || !isHttpUrl(url)) {
+        throw new Error("fetchJson needs an http(s) url");
+      }
+      if (typeof callback !== "function") {
+        throw new Error("fetchJson needs a callback");
+      }
+      const object = currentObject();
+      const depth = currentDepth() + 1;
+      hooks.fetchJson(
+        url,
+        fetchOptions(rawOptions),
+        (data, error) => runTask(callback, object, data, error, depth),
+        depth,
+      );
+      return NOOP;
+    },
+  );
 
   return {
     runExpr(expr, depth) {

@@ -111,11 +111,13 @@ export function createHarness(values: Record<string, unknown>): Harness {
         url,
         init,
         pending: true,
-        respond(response: {
-          status?: number;
-          statusText?: string;
-          body?: string;
-        } = {}) {
+        respond(
+          response: {
+            status?: number;
+            statusText?: string;
+            body?: string;
+          } = {},
+        ) {
           if (!request.pending) return;
           request.pending = false;
           const status = response.status ?? 200;

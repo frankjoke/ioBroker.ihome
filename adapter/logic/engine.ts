@@ -172,7 +172,8 @@ interface Job {
 function errorText(error: unknown): string {
   if (error instanceof Error) return error.message;
   // A vm-realm error is not an instance of the host Error.
-  if (isRecord(error) && typeof error.message === "string") return error.message;
+  if (isRecord(error) && typeof error.message === "string")
+    return error.message;
   return String(error);
 }
 
