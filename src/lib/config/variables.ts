@@ -1,4 +1,5 @@
 import { newLocalTaken } from "$lib/config/virtual-ops";
+import type { StateSpec } from "$logic/state-common";
 
 /** A global variable: either a constant kept inside iHome, or a named
  *  reference to an ioBroker state (inside ihome.0 or anywhere else). */
@@ -267,6 +268,32 @@ export function initialValue(type: string): unknown {
   if (type === "number") return 0;
   if (type === "boolean") return false;
   return "";
+}
+
+/** The state object a global state variable wants; constants have none. */
+export function variableStateSpec(v: GlobalVariable): StateSpec | undefined {
+  if (v.kind !== "state" || !v.stateId) return undefined;
+  const type = ["string", "number", "boolean"].includes(v.type)
+    ? v.type
+    : "string";
+  const initial = initialValue(type);
+  const common: Record<string, unknown> = {
+    name: v.name || v.stateId,
+    type,
+    role: String(v.role ?? "").trim() || "value",
+    read: true,
+    write: true,
+    unit: String(v.unit ?? ""),
+    def: initial,
+  };
+  if (type === "number") {
+    if (typeof v.min === "number" && Number.isFinite(v.min)) common.min = v.min;
+    if (typeof v.max === "number" && Number.isFinite(v.max)) common.max = v.max;
+    if (typeof v.step === "number" && Number.isFinite(v.step)) {
+      common.step = v.step;
+    }
+  }
+  return { id: v.stateId, common, initial };
 }
 
 /** The constants as iHome-internal values: they exist only while the config is
