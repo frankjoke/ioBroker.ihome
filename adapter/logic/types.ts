@@ -244,7 +244,8 @@ export interface DeviceItem {
   step?: number;
   readOnly?: boolean;
   initial?: unknown;
-  source?: string;
+  /** Dot path for a string, or exact keys for an array (dots allowed). */
+  source?: string | Array<string | number>;
   updateAlways?: boolean;
   ack?: boolean;
   foreignWriteName?: string;
@@ -253,13 +254,15 @@ export interface DeviceItem {
 }
 
 export interface DeviceTemplateShape {
+  /** Default "http"; "state" listens to one state instead of polling. */
+  readFrom?: "http" | "state";
   params?: DeviceParam[];
   itemList: DeviceItem[];
-  readRequest(params: Record<string, unknown>): {
+  readRequest?(params: Record<string, unknown>): {
     url: string;
     options?: FetchOptions;
   };
-  writeRequest(
+  writeRequest?(
     value: unknown,
     item: DeviceItem,
     params: Record<string, unknown>,

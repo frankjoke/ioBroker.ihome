@@ -87,6 +87,24 @@ Applying again updates only states whose properties actually changed. Use a
 `state` parameter for tokens so the secret is read at runtime instead of being
 embedded in the logic document.
 
+A template can also read one JSON state instead of polling HTTP:
+
+```js
+{
+  readFrom: "state",
+  params: [{ name: "source", label: "Source state", type: "state" }],
+  itemList: [
+    { name: "energy", type: "number", source: ["1.8.0"], readOnly: true },
+    { name: "power", type: "number", source: ["1.7.0"], readOnly: true },
+  ],
+}
+```
+
+`source` is a dot path (`"data.power"`) or an array of exact keys
+(`["1.8.0"]`) for JSON keys that contain dots. State templates are read-only:
+the generated machine listens to the source state, parses a JSON string, and
+updates the generated states with `ack: true`. No timer, HTTP or write rows.
+
 ## Development
 
 ```bash

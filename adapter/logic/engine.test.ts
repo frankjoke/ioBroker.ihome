@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { buildDeviceLogic } from "./device-templates";
 import { createEngine, type Engine } from "./engine";
 import { createHarness } from "./testing";
 import { parseLogicDocument } from "./validate";
@@ -3370,4 +3371,50 @@ it("a machine transition does not write an object output", () => {
   expect(h.writes.filter((write) => write.id === "0_userdata.0.OUT")).toEqual(
     [],
   );
+});
+
+it("maps a real MQTT JSON state with dotted keys into generated states", () => {
+  const source = `({
+    readFrom: "state",
+    params: [{ name: "source", label: "Source state", type: "state" }],
+    itemList: [
+      { name: "energy", type: "number", source: ["1.8.0"], readOnly: true,
+        conversion: (result, raw) => Number(raw) },
+      { name: "power", type: "number", source: ["1.7.0"], readOnly: true,
+        conversion: (result, raw) => Number(raw) },
+    ],
+  })`;
+  const template = new Function("return (" + source + ")")();
+  const logic = buildDeviceLogic(
+    template,
+    source,
+    { source: "mqtt.0.SHRDZM.3C6105FB24B9.3C6105FB24B9.sensor" },
+    "ihome.0.Variables.Meter",
+    "meter",
+    "Meter",
+  );
+  const h = createHarness({});
+  const engine = createEngine({ version: 3, logics: [logic] }, h.deps);
+  h.attach(engine);
+  engine.start();
+
+  h.change(
+    "mqtt.0.SHRDZM.3C6105FB24B9.3C6105FB24B9.sensor",
+    JSON.stringify({
+      timestamp: "2026-11-06T20:44:30",
+      "1.8.0": "21557698",
+      "1.7.0": "388",
+    }),
+  );
+
+  expect(h.writes).toContainEqual({
+    id: "ihome.0.Variables.Meter.energy",
+    value: 21557698,
+    ack: true,
+  });
+  expect(h.writes).toContainEqual({
+    id: "ihome.0.Variables.Meter.power",
+    value: 388,
+    ack: true,
+  });
 });
