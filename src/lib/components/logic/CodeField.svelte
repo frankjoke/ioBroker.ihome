@@ -15,6 +15,7 @@
     onchange,
     label,
     placeholder,
+    hint,
     minRows = 2,
     allowNoop = false,
     mode = "expression",
@@ -27,6 +28,8 @@
     onchange: (code: string) => void;
     label: string;
     placeholder?: string;
+    /** One muted line under the field; the fetchJson signature. */
+    hint?: string;
     minRows?: number;
     allowNoop?: boolean;
     /** A single expression, or a block of statements. */
@@ -227,6 +230,9 @@
   {#if problem}
     <p id={errorId} class="text-danger">{problem}</p>
   {/if}
+  {#if hint}
+    <p class="hint text-muted">{hint}</p>
+  {/if}
 </div>
 
 {#if picking}
@@ -360,6 +366,11 @@
 
   .comment {
     color: var(--text-muted);
+  }
+
+  .hint {
+    margin: 0;
+    font-size: 0.8rem;
   }
 
   .plain {

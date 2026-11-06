@@ -123,6 +123,7 @@
             code={row.do?.code ?? ""}
             mode="statements"
             label="Function"
+            hint="fetchJson(url, (data, error) => …)"
             minRows={3}
             allowGoto
             {stateNames}

@@ -56,6 +56,22 @@ The lock-screen text is generic by default; add `showBody: true` to the `sendTo`
 full title and body. To rotate the VAPID keys later, use the instance config dialog
 (**Push notifications**) or generate a pair with `npm run vapid`.
 
+## Logic fetchJson
+
+Inside a logic, `fetchJson` fetches JSON without blocking the event. The
+callback runs later in the same logic, one request at a time:
+
+```js
+fetchJson("https://api.example/price", (data, error) => {
+  if (error) return;
+  set("0_userdata.0.Price", data.value);
+});
+```
+
+`set("$self", value)` writes the logic's own output. Requests time out after
+10 s; a logic waits on at most 10 requests. An optional third argument accepts
+`{ method, headers, body }`.
+
 ## Development
 
 ```bash
