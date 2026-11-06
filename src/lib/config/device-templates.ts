@@ -7,9 +7,25 @@ export function evaluateDeviceTemplate(source: string): unknown {
 
 const GENERIC_REST = `({
   params: [
-    { name: "baseUrl", label: "Base URL", type: "string" },
-    { name: "token", label: "Token", type: "state" },
-    { name: "poll", label: "Poll interval", type: "duration", default: "30s" },
+    {
+      name: "baseUrl",
+      label: "Base URL",
+      type: "string",
+      description: "e.g. http://192.168.1.50:8099",
+    },
+    {
+      name: "token",
+      label: "Token",
+      type: "state",
+      description: "State whose value is sent as the Bearer token; may be empty.",
+    },
+    {
+      name: "poll",
+      label: "Poll interval",
+      type: "duration",
+      default: "30s",
+      description: "How often to read; e.g. 30s, 5m, 1h.",
+    },
   ],
   itemList: [
     {

@@ -29,9 +29,12 @@ functions. It is stored as text and evaluated when applied.
   deviceType: "Switch",
 
   params: [
-    { name: "baseUrl", label: "Base URL", type: "string" },
-    { name: "token", label: "Token", type: "state" },
-    { name: "poll", label: "Poll interval", type: "duration", default: "30s" },
+    { name: "baseUrl", label: "Base URL", type: "string",
+      description: "e.g. http://192.168.1.50:8099" },
+    { name: "token", label: "Token", type: "state",
+      description: "State whose value is sent as the Bearer token." },
+    { name: "poll", label: "Poll interval", type: "duration", default: "30s",
+      description: "How often to read; e.g. 30s, 5m, 1h." },
   ],
 
   itemList: [
@@ -71,7 +74,7 @@ functions. It is stored as text and evaluated when applied.
 
 ### `params`
 
-Each entry is `{ name, label, type, default? }`.
+Each entry is `{ name, label, type, default?, description? }`.
 
 | `type` | Meaning |
 | --- | --- |
@@ -81,6 +84,7 @@ Each entry is `{ name, label, type, default? }`.
 | `duration` | Duration text such as `30s`, `5m`, `1h`; used as the poll interval. |
 | `state` | A state id chosen in the apply form. The generated logic reads its **value at runtime**, so tokens are not embedded in the logic document. |
 
+- `description` is optional help text shown under the field in the apply form.
 - `baseState` is reserved and must not be a parameter name.
 - A `poll` parameter is the timer interval for HTTP templates; default `30s`.
 - Parameter names are currently not identifier-checked; avoid dots, `__proto__`
@@ -133,7 +137,8 @@ value. This is the mode for MQTT, another adapter, or another logic’s output.
 ({
   readFrom: "state",
   params: [
-    { name: "source", label: "Source state", type: "state" },
+    { name: "source", label: "Source state", type: "state",
+      description: "e.g. mqtt.0.SHRDZM...sensor" },
   ],
   itemList: [
     {

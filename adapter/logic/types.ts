@@ -230,6 +230,8 @@ export interface DeviceParam {
   label: string;
   type: "string" | "number" | "boolean" | "duration" | "state";
   default?: string | number | boolean;
+  /** Help text under the field in the apply form. */
+  description?: string;
 }
 
 export interface DeviceItem {
