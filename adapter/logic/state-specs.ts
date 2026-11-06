@@ -32,8 +32,7 @@ export function logicOutputSpec(
       read: true,
       write: true,
       unit: output.type === "number" ? (output.unit ?? "") : "",
-      states:
-        output.type === "number" ? (numberStatesOf(def) ?? {}) : {},
+      states: output.type === "number" ? (numberStatesOf(def) ?? {}) : {},
       def:
         output.type === "boolean"
           ? false

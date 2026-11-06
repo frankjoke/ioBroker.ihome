@@ -15,6 +15,7 @@
   import { parseDuration } from "$logic/duration";
   import { stateIdFor, validStateId } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import StateRefField from "./StateRefField.svelte";
   import type { DeviceTemplate, DeviceTemplateShape } from "$logic/types";
 
@@ -76,7 +77,7 @@
     evaluated = null;
     applyError = "";
     applyParams = {};
-    baseState = `ihome.0.Variables.${slug(selected.name)}`;
+    baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
   function startApply(): void {
@@ -109,7 +110,7 @@
     }
     evaluated = shape;
     applyParams = defaults;
-    baseState = `ihome.0.Variables.${slug(selected?.name ?? "device")}`;
+    baseState = `${ioBroker.namespace}.Variables.${slug(selected?.name ?? "device")}`;
     applyOpen = true;
   }
 
@@ -180,7 +181,12 @@
       description: selected.description,
       source: selected.source,
     };
-    if (!commitLogics({ ...doc, deviceTemplates: [...(doc.deviceTemplates ?? []), copy] })) {
+    if (
+      !commitLogics({
+        ...doc,
+        deviceTemplates: [...(doc.deviceTemplates ?? []), copy],
+      })
+    ) {
       error = "The logic document could not be saved.";
       return;
     }
@@ -255,7 +261,7 @@
             </optgroup>
             {#if (doc.deviceTemplates ?? []).length > 0}
               <optgroup label="My templates">
-                {#each (doc.deviceTemplates ?? []) as entry (entry.id)}
+                {#each doc.deviceTemplates ?? [] as entry (entry.id)}
                   <option value={entry.id}>{entry.name}</option>
                 {/each}
               </optgroup>

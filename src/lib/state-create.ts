@@ -6,10 +6,7 @@ import {
 } from "$logic/state-common";
 
 export type EnsureStateResult =
-  | "created"
-  | "updated"
-  | "unchanged"
-  | "foreign-skipped";
+  "created" | "updated" | "unchanged" | "foreign-skipped";
 
 /**
  * Create a missing owned state or update only the common keys that differ.

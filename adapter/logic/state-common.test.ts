@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isOwnedState,
-  normalizeStates,
-  stateCommonDiff,
-} from "./state-common";
+import { isOwnedState, normalizeStates, stateCommonDiff } from "./state-common";
 
 describe("normalizeStates", () => {
   it("accepts an object or a JSON string", () => {
@@ -82,9 +78,11 @@ describe("stateCommonDiff", () => {
   });
 
   it("clears stale labels with an empty states object", () => {
-    expect(stateCommonDiff({ states: { "0": "Off" } }, { states: {} })).toEqual({
-      states: {},
-    });
+    expect(stateCommonDiff({ states: { "0": "Off" } }, { states: {} })).toEqual(
+      {
+        states: {},
+      },
+    );
   });
 
   it("compares def objects canonically", () => {

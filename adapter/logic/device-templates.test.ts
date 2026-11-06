@@ -26,7 +26,9 @@ const SOURCE = `({
   writeRequest(v, item, p) { return { url: p.baseUrl + "/set?" + item.foreignWriteName + "=" + item.setConversion(v) }; },
 })`;
 
-const template = new Function("return (" + SOURCE + ")")() as DeviceTemplateShape;
+const template = new Function(
+  "return (" + SOURCE + ")",
+)() as DeviceTemplateShape;
 
 describe("validateDeviceTemplate", () => {
   it("accepts a valid template", () => {
@@ -155,9 +157,9 @@ describe("buildDeviceLogic", () => {
       "garden",
       "Garden",
     );
-    expect(
-      logic.states.Run.on!.find((row) => row.on === "power")!.edge,
-    ).toBe("any");
+    expect(logic.states.Run.on!.find((row) => row.on === "power")!.edge).toBe(
+      "any",
+    );
   });
 });
 

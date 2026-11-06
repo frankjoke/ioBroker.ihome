@@ -95,16 +95,16 @@ export function validateDeviceTemplate(value: unknown): {
       for (const key of ["conversion", "setConversion"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "function") {
           errors.push(`${name}: ${key} must be a function`);
-        } else if (typeof raw[key] === "function" && isAsyncFunction(raw[key])) {
+        } else if (
+          typeof raw[key] === "function" &&
+          isAsyncFunction(raw[key])
+        ) {
           errors.push(`${name}: ${key} must be synchronous`);
         }
       }
       const writable = raw.readOnly !== true;
       if (writable) {
-        if (
-          typeof raw.foreignWriteName !== "string" ||
-          !raw.foreignWriteName
-        ) {
+        if (typeof raw.foreignWriteName !== "string" || !raw.foreignWriteName) {
           errors.push(`${name} needs foreignWriteName`);
         }
         if (raw.ack === false) {

@@ -11,7 +11,7 @@ import { isRecord, parseLogicDocument } from "./logic/validate";
 import { subscriptionDiff } from "./logic/subscriptions";
 import { stateCommonDiff, type StateSpec } from "./logic/state-common";
 import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
-import type { AstroEvent, LogicDef, LogicDocument } from "./logic/types";
+import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
 import {
   locationText,
