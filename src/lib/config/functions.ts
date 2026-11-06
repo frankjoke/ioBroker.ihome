@@ -1,8 +1,5 @@
 import { checkExpression, checkStatement } from "$logic/expr-code";
-import type {
-  FunctionLibrary,
-  FunctionTemplate,
-} from "$lib/types/device";
+import type { FunctionLibrary, FunctionTemplate } from "$lib/types/device";
 
 /** Normalise arbitrary persisted data into a FunctionLibrary; never throws. */
 export function migrateFunctionLibrary(raw: unknown): FunctionLibrary {

@@ -5,5 +5,7 @@
 export const CONFIG_LAST_KEY = "iHome.configPage";
 
 export function cogTarget(stored: string | null, ids: string[]): string {
-  return stored && ids.includes(stored) ? stored : "/ui";
+  // The cogs entry moved from the standalone formula page to Templates.
+  const remembered = stored === "/formulas" ? "/templates" : stored;
+  return remembered && ids.includes(remembered) ? remembered : "/ui";
 }

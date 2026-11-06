@@ -11,6 +11,8 @@
   import { saveFormulas } from "$lib/formulas.svelte.js";
   import type { FormulaTemplate } from "$lib/types/device";
 
+  let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
+
   let editing = $state<FormulaTemplate | null>(null);
   let pendingDelete = $state<FormulaTemplate | null>(null);
   let search = $state("");
@@ -40,11 +42,14 @@
   const storedTemplate = $derived(
     editing ? (formulas.find((t) => t.id === editing.id) ?? null) : null,
   );
-  const dirty = $derived(
+  const isDirty = $derived(
     !!editing &&
       (!storedTemplate ||
         JSON.stringify(editing) !== JSON.stringify(storedTemplate)),
   );
+  $effect(() => {
+    dirty = isDirty;
+  });
   /** A row picked while the open draft was dirty. */
   let pendingTemplate = $state<FormulaTemplate | null>(null);
   let askClose = $state(false);
@@ -54,7 +59,7 @@
       requestClose();
       return;
     }
-    if (dirty) {
+    if (isDirty) {
       pendingTemplate = t;
       askClose = true;
       return;
@@ -63,7 +68,7 @@
   }
 
   function requestClose() {
-    if (dirty) {
+    if (isDirty) {
       pendingTemplate = null;
       askClose = true;
       return;
@@ -188,7 +193,7 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={!dirty}
+                    disabled={!isDirty}
                     onclick={save}>Save</button
                   >
                 {/if}

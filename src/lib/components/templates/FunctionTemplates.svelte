@@ -5,12 +5,16 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import {
     deleteFunction,
+    functionSaveFailed,
     getFunctions,
+    isFunctionsWritable,
     upsertFunction,
   } from "$lib/stores/functions.svelte";
   import { saveFunctions } from "$lib/functions.svelte.js";
   import { functionTemplateProblem } from "$lib/config/functions";
   import type { FunctionTemplate } from "$lib/types/device";
+
+  let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
   let editing = $state<FunctionTemplate | null>(null);
   let pendingDelete = $state<FunctionTemplate | null>(null);
@@ -18,9 +22,9 @@
   let sortDir = $state<"asc" | "desc">("asc");
 
   const functions = $derived(getFunctions());
-  const problem = $derived(
-    editing ? functionTemplateProblem(editing) : null,
-  );
+  const writable = $derived(isFunctionsWritable());
+  const saveFailed = $derived(functionSaveFailed());
+  const problem = $derived(editing ? functionTemplateProblem(editing) : null);
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();
@@ -49,10 +53,13 @@
       ? (functions.find((template) => template.id === editing!.id) ?? null)
       : null,
   );
-  const dirty = $derived(
+  const isDirty = $derived(
     !!editing &&
       (!stored || JSON.stringify(editing) !== JSON.stringify(stored)),
   );
+  $effect(() => {
+    dirty = isDirty;
+  });
 
   let pendingTemplate = $state<FunctionTemplate | null>(null);
   let askClose = $state(false);
@@ -62,7 +69,7 @@
       requestClose();
       return;
     }
-    if (dirty) {
+    if (isDirty) {
       pendingTemplate = template;
       askClose = true;
       return;
@@ -71,7 +78,7 @@
   }
 
   function requestClose() {
-    if (dirty) {
+    if (isDirty) {
       pendingTemplate = null;
       askClose = true;
       return;
@@ -88,14 +95,14 @@
   }
 
   function save() {
-    if (!editing || problem) return;
+    if (!editing || problem || !writable) return;
     upsertFunction({ ...editing, name: editing.name.trim() || "Untitled" });
     saveFunctions();
     editing = null;
   }
 
   function confirmDelete() {
-    if (pendingDelete) {
+    if (pendingDelete && writable) {
       deleteFunction(pendingDelete.id);
       saveFunctions();
     }
@@ -122,6 +129,15 @@
       </button>
     </div>
   </div>
+
+  {#if !writable}
+    <p class="text-danger hint">
+      Function templates could not be loaded — saving is disabled so the stored
+      list is not overwritten.
+    </p>
+  {:else if saveFailed}
+    <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+  {/if}
 
   {#if functions.length === 0 && !editing}
     <div class="card empty-state">
@@ -185,7 +201,7 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={!dirty || !!problem}
+                    disabled={!isDirty || !!problem || !writable}
                     onclick={save}>Save</button
                   >
                 {/if}
@@ -212,15 +228,15 @@
                   >
                   <label class="field"
                     ><span class="label-mono">Description</span>
-                    <input type="text" bind:value={editing.description} /></label
+                    <input
+                      type="text"
+                      bind:value={editing.description}
+                    /></label
                   >
                 </div>
                 <label class="field"
                   ><span class="label-mono">Code</span>
-                  <textarea
-                    rows="6"
-                    class="mono"
-                    bind:value={editing.code}
+                  <textarea rows="6" class="mono" bind:value={editing.code}
                   ></textarea></label
                 >
                 {#if problem}

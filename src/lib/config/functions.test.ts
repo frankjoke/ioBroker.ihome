@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  functionTemplateProblem,
-  migrateFunctionLibrary,
-} from "./functions";
+import { functionTemplateProblem, migrateFunctionLibrary } from "./functions";
 
 const template = (
   over: Partial<Parameters<typeof functionTemplateProblem>[0]> = {},

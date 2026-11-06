@@ -1,7 +1,4 @@
-import type {
-  FunctionLibrary,
-  FunctionTemplate,
-} from "$lib/types/device";
+import type { FunctionLibrary, FunctionTemplate } from "$lib/types/device";
 
 export const FUNCTION_LIST_ID = "ihome.0.config.functionList";
 
@@ -12,6 +9,34 @@ const defaultLibrary: FunctionLibrary = {
 };
 
 let canonicalLibrary = $state<FunctionLibrary>(defaultLibrary);
+/** How the stored document last loaded. `absent` is a valid empty state (the
+ *  first save creates it); only `pending` and `unreadable` block writes. */
+let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
+  "pending",
+);
+let saveFailed = $state(false);
+
+export function functionsLoadKind(): typeof loadKind {
+  return loadKind;
+}
+
+/** True while the last document write failed, so the pane can say "not saved". */
+export function functionSaveFailed(): boolean {
+  return saveFailed;
+}
+
+/** False until the document was read, and false for an unreadable one. */
+export function isFunctionsWritable(): boolean {
+  return loadKind === "loaded" || loadKind === "absent";
+}
+
+export function setFunctionsLoadKind(kind: typeof loadKind): void {
+  loadKind = kind;
+}
+
+export function setFunctionSaveFailed(failed: boolean): void {
+  saveFailed = failed;
+}
 
 export function getFunctionLibrary() {
   return canonicalLibrary;

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import FormulaTemplates from "$lib/components/templates/FormulaTemplates.svelte";
   import FunctionTemplates from "$lib/components/templates/FunctionTemplates.svelte";
   import VisualTemplates from "$lib/components/templates/VisualTemplates.svelte";
@@ -15,13 +16,44 @@
     { id: "logic", label: "Logic" },
     { id: "logic-device", label: "Logic + device" },
   ];
-  const fromQuery = page.url.searchParams.get("type");
+
+  /** The app is hash-routed, so `?type=` lives inside `page.url.hash`. */
+  function requestedKind(): string | null {
+    const hash = page.url.hash;
+    const hashQuery = hash.includes("?")
+      ? hash.slice(hash.indexOf("?") + 1)
+      : "";
+    return (
+      page.url.searchParams.get("type") ??
+      new URLSearchParams(hashQuery).get("type")
+    );
+  }
+
+  const fromQuery = requestedKind();
   let kind = $state<Kind>(
     kinds.some((entry) => entry.id === fromQuery)
       ? (fromQuery as Kind)
       : "formula",
   );
+  let dirty = $state(false);
+  let pendingKind = $state<Kind | null>(null);
+  let askSwitch = $state(false);
   let logicDeviceOpen = $state(false);
+
+  function go(next: Kind) {
+    dirty = false;
+    kind = next;
+  }
+
+  function requestKind(next: Kind) {
+    if (next === kind) return;
+    if (dirty) {
+      pendingKind = next;
+      askSwitch = true;
+      return;
+    }
+    go(next);
+  }
 </script>
 
 <svelte:head>
@@ -40,7 +72,7 @@
         class="btn btn-sm"
         class:btn-primary={kind === entry.id}
         aria-current={kind === entry.id ? "page" : undefined}
-        onclick={() => (kind = entry.id)}
+        onclick={() => requestKind(entry.id)}
       >
         {entry.label}
       </button>
@@ -48,13 +80,13 @@
   </nav>
 
   {#if kind === "formula"}
-    <FormulaTemplates />
+    <FormulaTemplates bind:dirty />
   {:else if kind === "function"}
-    <FunctionTemplates />
+    <FunctionTemplates bind:dirty />
   {:else if kind === "device"}
-    <VisualTemplates />
+    <VisualTemplates bind:dirty />
   {:else if kind === "logic"}
-    <LogicTemplates />
+    <LogicTemplates bind:dirty />
   {:else if kind === "logic-device"}
     <div class="card logic-device-card">
       <p class="text-muted">
@@ -77,6 +109,24 @@
     {/if}
   {:else}
     <p class="text-muted">This template type is being added.</p>
+  {/if}
+
+  {#if askSwitch}
+    <ConfirmModal
+      title="Discard unsaved changes?"
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      onConfirm={() => {
+        askSwitch = false;
+        const next = pendingKind;
+        pendingKind = null;
+        if (next) go(next);
+      }}
+      onCancel={() => {
+        askSwitch = false;
+        pendingKind = null;
+      }}
+    />
   {/if}
 </div>
 
