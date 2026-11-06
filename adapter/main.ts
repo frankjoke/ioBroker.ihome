@@ -395,10 +395,18 @@ class IHome extends utils.Adapter {
         const id = `Logic.${def.id}`;
         const states =
           output.type === "number" ? numberStatesOf(def) : undefined;
+        // An object output is JSON text: ioBroker stores it as a string with
+        // role `json` (a pure object state caused trouble in practice).
+        const stateType = output.type === "object" ? "string" : output.type;
         const common = {
           name: def.name,
-          type: output.type,
-          role: output.type === "boolean" ? "level.switch" : "level.state",
+          type: stateType,
+          role:
+            output.type === "boolean"
+              ? "level.switch"
+              : output.type === "object"
+                ? "json"
+                : "level.state",
           read: true,
           write: true,
           def:
@@ -406,7 +414,9 @@ class IHome extends utils.Adapter {
               ? false
               : output.type === "number"
                 ? 0
-                : "",
+                : output.type === "object"
+                  ? "{}"
+                  : "",
           unit: output.type === "number" ? (output.unit ?? "") : "",
           ...(states ? { states } : {}),
         };

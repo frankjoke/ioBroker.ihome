@@ -3249,3 +3249,125 @@ it("a callback after a state change keeps the captured this", async () => {
     ack: false,
   });
 });
+
+it("writes an object output as JSON text", () => {
+  const { h, engine } = engineWith(
+    doc({
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "object" },
+      expr: code("({ a: 1, b: [2] })"),
+    }),
+  );
+  engine.start();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: '{"a":1,"b":[2]}',
+    ack: false,
+  });
+});
+
+it("stores an already serialized object output unchanged", () => {
+  const { h, engine } = engineWith(
+    doc({
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "object" },
+      expr: code('"{\\"a\\":1}"'),
+    }),
+  );
+  engine.start();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: '{"a":1}',
+    ack: false,
+  });
+});
+
+it("writes undefined as null JSON text", () => {
+  const { h, engine } = engineWith(
+    doc({
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "object" },
+      expr: code("undefined"),
+    }),
+  );
+  engine.start();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: "null",
+    ack: false,
+  });
+});
+
+it('machine set("$self") writes an object output as JSON text', () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: { state: "Off" },
+        inputs: {
+          go: {
+            from: { type: "state", ref: "0_userdata.0.GO" },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "object",
+        },
+        states: {
+          Off: {
+            on: [
+              {
+                on: "go",
+                mode: "function",
+                do: { code: 'set("$self", { on: true })' },
+              },
+            ],
+          },
+        },
+      },
+    ],
+  });
+  engine.start();
+  h.change("0_userdata.0.GO", 1);
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: '{"on":true}',
+    ack: false,
+  });
+});
+
+it("a machine transition does not write an object output", () => {
+  const { h, engine } = engineWith({
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        init: { state: "On" },
+        inputs: {
+          go: {
+            from: { type: "state", ref: "0_userdata.0.GO" },
+            kind: "event",
+          },
+        },
+        output: {
+          scope: "state",
+          ref: "0_userdata.0.OUT",
+          type: "object",
+        },
+        states: {
+          On: { on: [{ on: "go", goto: "Off" }] },
+          Off: {},
+        },
+      },
+    ],
+  });
+  engine.start();
+  h.change("0_userdata.0.GO", 1);
+  expect(h.writes.filter((write) => write.id === "0_userdata.0.OUT")).toEqual(
+    [],
+  );
+});

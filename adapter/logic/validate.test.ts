@@ -675,3 +675,29 @@ it("migrates a v1 document with actions to v3", () => {
   expect(row.mode).toBe("function");
   expect(row.do?.code).toContain('set("0_userdata.0.X"');
 });
+
+it("accepts object outputs on function and machine logics", () => {
+  const document: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "f",
+        name: "F",
+        kind: "function",
+        expr: { code: "({ a: 1 })" },
+        output: { scope: "logic", type: "object" },
+      },
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        states: { A: {} },
+        output: { scope: "state", ref: "0_userdata.0.O", type: "object" },
+      },
+    ],
+  };
+  const errors = validateLogicDocument(document).filter(
+    (issue) => issue.severity === "error",
+  );
+  expect(errors).toEqual([]);
+});

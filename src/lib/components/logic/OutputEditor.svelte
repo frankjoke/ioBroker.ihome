@@ -23,7 +23,7 @@
     onchange: (output: Output) => void;
   } = $props();
 
-  const TYPE = ["boolean", "number", "string"] as const;
+  const TYPE = ["boolean", "number", "string", "object"] as const;
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   const logicStateId = $derived(`${ioBroker.namespace}.Logic.${logicId}`);
@@ -87,7 +87,9 @@
 
   /** The selected state's declared type, so the field shows the truth. */
   function stateType(ref: string): (typeof TYPE)[number] | undefined {
-    const type = ioBroker.objects.get(realId(ref))?.common?.type;
+    const common = ioBroker.objects.get(realId(ref))?.common;
+    const type = common?.type;
+    if (type === "string" && common?.role === "json") return "object";
     if (type === "boolean" || type === "number" || type === "string") {
       return type;
     }
@@ -95,7 +97,10 @@
   }
 
   const shownType = $derived(
-    output.scope === "state" ? (stateType(stateRef) ?? output.type) : "boolean",
+    output.scope === "state"
+      ? (stateType(stateRef) ??
+          (output.type === "object" ? "string" : output.type))
+      : "boolean",
   );
 
   /** The selected state's unit; a foreign state is never written to. */
@@ -113,12 +118,18 @@
       });
       return;
     }
+    const currentType = output.scope === "memory" ? "boolean" : output.type;
     onchange({
       scope: "state",
       ref,
       // The state's own type wins; it is what the engine will write.
       type:
-        stateType(ref) ?? (output.scope === "state" ? output.type : "boolean"),
+        stateType(ref) ??
+        (currentType === "object"
+          ? "string"
+          : output.scope === "state"
+            ? currentType
+            : "boolean"),
       map: output.scope === "state" ? output.map : undefined,
       forward: output.forward,
     });
