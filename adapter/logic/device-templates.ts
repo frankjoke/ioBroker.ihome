@@ -27,6 +27,21 @@ function isAsyncFunction(value: unknown): boolean {
   return Object.prototype.toString.call(value) === "[object AsyncFunction]";
 }
 
+/** A string is split on dots; an array is used as exact keys. */
+export function pickPath(
+  value: unknown,
+  path: string | Array<string | number>,
+): unknown {
+  const parts = Array.isArray(path) ? path : String(path).split(".");
+  return parts.reduce<unknown>(
+    (current, key) =>
+      current == null
+        ? undefined
+        : (current as Record<string | number, unknown>)[key],
+    value,
+  );
+}
+
 /** Check the evaluated template object; never calls the request functions. */
 export function validateDeviceTemplate(value: unknown): {
   errors: string[];
@@ -36,6 +51,11 @@ export function validateDeviceTemplate(value: unknown): {
   if (!isRecord(value)) {
     return { errors: ["template must be an object"] };
   }
+  const readFrom = value.readFrom === undefined ? "http" : value.readFrom;
+  if (readFrom !== "http" && readFrom !== "state") {
+    errors.push("readFrom must be http or state");
+  }
+  const stateMode = readFrom === "state";
 
   const items = value.itemList;
   if (!Array.isArray(items) || items.length === 0) {
@@ -65,9 +85,21 @@ export function validateDeviceTemplate(value: unknown): {
       if (typeof raw.type !== "string" || !TYPES.has(raw.type)) {
         errors.push(`${name}: unknown type`);
       }
-      for (const key of ["label", "role", "unit", "source"]) {
+      for (const key of ["label", "role", "unit"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "string") {
           errors.push(`${name}: ${key} must be a string`);
+        }
+      }
+      if (raw.source !== undefined) {
+        const source = raw.source;
+        const valid =
+          typeof source === "string" ||
+          (Array.isArray(source) &&
+            source.every(
+              (part) => typeof part === "string" || typeof part === "number",
+            ));
+        if (!valid) {
+          errors.push(`${name}: source must be a string or an array of names`);
         }
       }
       if (
@@ -87,6 +119,9 @@ export function validateDeviceTemplate(value: unknown): {
           errors.push(`${name}: ${key} must be a boolean`);
         }
       }
+      if (stateMode && raw.readOnly !== true) {
+        errors.push(`${name}: state templates are read-only`);
+      }
       for (const key of ["min", "max", "step"]) {
         if (raw[key] !== undefined && typeof raw[key] !== "number") {
           errors.push(`${name}: ${key} must be a number`);
@@ -103,7 +138,7 @@ export function validateDeviceTemplate(value: unknown): {
         }
       }
       const writable = raw.readOnly !== true;
-      if (writable) {
+      if (!stateMode && writable) {
         if (typeof raw.foreignWriteName !== "string" || !raw.foreignWriteName) {
           errors.push(`${name} needs foreignWriteName`);
         }
@@ -159,15 +194,41 @@ export function validateDeviceTemplate(value: unknown): {
     }
   }
 
-  if (typeof value.readRequest !== "function") {
-    errors.push("readRequest must be a function");
-  } else if (isAsyncFunction(value.readRequest)) {
-    errors.push("readRequest must be synchronous");
+  if (stateMode) {
+    const params = Array.isArray(value.params) ? value.params : [];
+    const source = params.some(
+      (param) =>
+        isRecord(param) && param.name === "source" && param.type === "state",
+    );
+    if (!source) errors.push("state template needs a source param");
   }
-  if (typeof value.writeRequest !== "function") {
-    errors.push("writeRequest must be a function");
-  } else if (isAsyncFunction(value.writeRequest)) {
-    errors.push("writeRequest must be synchronous");
+
+  if (stateMode) {
+    if (value.readRequest !== undefined) {
+      if (typeof value.readRequest !== "function") {
+        errors.push("readRequest must be a function");
+      } else if (isAsyncFunction(value.readRequest)) {
+        errors.push("readRequest must be synchronous");
+      }
+    }
+    if (value.writeRequest !== undefined) {
+      if (typeof value.writeRequest !== "function") {
+        errors.push("writeRequest must be a function");
+      } else if (isAsyncFunction(value.writeRequest)) {
+        errors.push("writeRequest must be synchronous");
+      }
+    }
+  } else {
+    if (typeof value.readRequest !== "function") {
+      errors.push("readRequest must be a function");
+    } else if (isAsyncFunction(value.readRequest)) {
+      errors.push("readRequest must be synchronous");
+    }
+    if (typeof value.writeRequest !== "function") {
+      errors.push("writeRequest must be a function");
+    } else if (isAsyncFunction(value.writeRequest)) {
+      errors.push("writeRequest must be synchronous");
+    }
   }
 
   return errors.length > 0
@@ -254,6 +315,28 @@ function paramHeader(
   return lines.join("\n");
 }
 
+function mapItemsCode(): string {
+  return `const pick = (value, path) => {
+  const parts = Array.isArray(path) ? path : String(path).split(".");
+  return parts.reduce((v, key) => (v == null ? undefined : v[key]), value);
+};
+for (const item of T.itemList) {
+  try {
+    const raw = item.source ? pick(result, item.source) : result;
+    const converted = item.conversion ? item.conversion(result, raw) : raw;
+    const next = item.type === "object" && typeof converted !== "string"
+      ? JSON.stringify(converted ?? null)
+      : converted;
+    set(P.baseState + "." + item.name, next, {
+      ack: item.ack ?? true,
+      forward: item.updateAlways ? "always" : "changed",
+    });
+  } catch (e) {
+    log("template item " + item.name + ": " + e, "warn");
+  }
+}`;
+}
+
 function readCode(
   template: DeviceTemplateShape,
   source: string,
@@ -262,26 +345,28 @@ function readCode(
 ): string {
   return `const T = (${source});
 ${paramHeader(template, params, baseState)}
-const pick = (value, path) => path.split(".").reduce((v, key) => (v == null ? undefined : v[key]), value);
 const req = T.readRequest(P);
 fetchJson(req.url, (result, error) => {
   if (error) { log(error, "warn"); return; }
-  for (const item of T.itemList) {
-    try {
-      const raw = item.source ? pick(result, item.source) : result;
-      const converted = item.conversion ? item.conversion(result, raw) : raw;
-      const next = item.type === "object" && typeof converted !== "string"
-        ? JSON.stringify(converted ?? null)
-        : converted;
-      set(P.baseState + "." + item.name, next, {
-        ack: item.ack ?? true,
-        forward: item.updateAlways ? "always" : "changed",
-      });
-    } catch (e) {
-      log("template item " + item.name + ": " + e, "warn");
-    }
-  }
+${mapItemsCode()}
 }, req.options);`;
+}
+
+function readStateCode(
+  template: DeviceTemplateShape,
+  source: string,
+  params: Record<string, unknown>,
+  baseState: string,
+): string {
+  const sourceId = typeof params.source === "string" ? params.source : "";
+  return `const T = (${source});
+const P = { baseState: ${JSON.stringify(baseState)} };
+const value = get(${JSON.stringify(sourceId)});
+let result = value;
+if (typeof value === "string") {
+  try { result = JSON.parse(value); } catch (e) { log("template source: " + e, "warn"); return; }
+}
+${mapItemsCode()}`;
 }
 
 function writeCode(
@@ -309,6 +394,35 @@ export function buildDeviceLogic(
   id: string,
   name: string,
 ): MachineLogic {
+  if (template.readFrom === "state") {
+    const sourceId = typeof params.source === "string" ? params.source : "";
+    if (!sourceId) throw new Error("state template needs a source state");
+    return {
+      id,
+      name,
+      kind: "machine",
+      inputs: {
+        source: {
+          from: { type: "state", ref: sourceId },
+          kind: "event",
+        },
+      },
+      output: { scope: "memory", name: id },
+      init: { run: false },
+      start: "Run",
+      states: {
+        Run: {
+          on: [
+            {
+              on: "source",
+              mode: "function",
+              do: { code: readStateCode(template, source, params, baseState) },
+            },
+          ],
+        },
+      },
+    };
+  }
   const poll =
     typeof params.poll === "string" && parseDuration(params.poll) !== null
       ? params.poll
