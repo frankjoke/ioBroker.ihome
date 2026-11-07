@@ -2,7 +2,11 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { splitReading } from "$lib/config/format";
-  import { normalizeStates, unitFor } from "$lib/config/state-meta";
+  import {
+    effectiveWidget,
+    normalizeStates,
+    unitFor,
+  } from "$lib/config/state-meta";
   import { levelRange } from "$lib/config/features";
   import { valueShown } from "$lib/config/tile-parts";
   import type { EnrichedControl } from "$lib/types/device";
@@ -62,6 +66,10 @@
   }
   /** The body's own homes; absent = both. `hideValue` turns it off entirely. */
   const showValue = $derived(valueShown(options, home));
+  /** A read-only level is a reading, not a disabled slider. */
+  const widget = $derived(
+    effectiveWidget(control.widget, control.writable === true),
+  );
 
   // Keep a drag on a slider from reaching the tile underneath it.
   function stop(e: Event) {
@@ -71,7 +79,7 @@
 
 {#if !control.available && control.kind !== "virtual"}
   <span class="text-muted">unavailable</span>
-{:else if showValue && control.widget === "switch"}
+{:else if showValue && widget === "switch"}
   <button
     type="button"
     class="btn"
@@ -83,7 +91,7 @@
   >
     {truthy(control.liveValue) ? "On" : "Off"}
   </button>
-{:else if control.widget === "level"}
+{:else if widget === "level"}
   <div class="level">
     <input
       type="range"
@@ -101,7 +109,7 @@
       <span class="mono">{readout()}</span>
     {/if}
   </div>
-{:else if showValue && control.widget === "color"}
+{:else if showValue && widget === "color"}
   <input
     class="color"
     type="color"
@@ -112,7 +120,7 @@
     onclick={stop}
     onchange={(e) => write(e.currentTarget.value)}
   />
-{:else if showValue && control.widget === "enum"}
+{:else if showValue && widget === "enum"}
   <select
     aria-label={control.label || control.feature}
     value={String(control.liveValue ?? "")}
@@ -125,7 +133,7 @@
       <option value={opt.value}>{opt.label}</option>
     {/each}
   </select>
-{:else if showValue && control.widget === "button"}
+{:else if showValue && widget === "button"}
   <button
     type="button"
     class="btn"

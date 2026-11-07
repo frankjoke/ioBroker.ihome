@@ -37,6 +37,37 @@ it("carries a control's effective metadata into the synthetic bag", () => {
   expect(res.device.controls[0].states).toEqual({ "0": "Frei" });
 });
 
+it("a value slot stays a value even when the control suggests a level", () => {
+  const control = {
+    id: "c",
+    feature: "temperature",
+    stateId: "s",
+    liveValue: 18,
+    writable: false,
+    available: true,
+    exists: true,
+    widget: "level" as const,
+    meta: { type: "number", role: "value.temperature", min: -20, max: 100 },
+  };
+  const res = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "control", device: "d", control: "c" },
+        },
+      ],
+    } as any,
+    "T",
+    {
+      devices: [{ id: "d", controls: [control] }] as any,
+      states: new Map(),
+      objects: new Map(),
+    },
+  );
+  expect(res.device.controls[0].widget).toBe("value");
+});
+
 it("builds a raw state's meta from its object, range included", () => {
   const res = resolveTile(
     {

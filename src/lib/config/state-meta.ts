@@ -155,3 +155,11 @@ export function widgetForMeta(meta: ControlMeta, fallback?: Widget): Widget {
   if (type === "boolean" && meta.write === true) return "switch";
   return "value";
 }
+
+/** A read-only level is a reading, not a dead slider. */
+export function effectiveWidget(
+  widget: Widget | undefined,
+  writable: boolean,
+): Widget | undefined {
+  return widget === "level" && !writable ? "value" : widget;
+}

@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   normalizeStates,
   effectiveCommon,
+  effectiveWidget,
   widgetForMeta,
   effectiveRoom,
   effectiveFunctions,
@@ -11,6 +12,13 @@ import type { Control } from "$lib/types/device";
 
 const control = (patch: Partial<Control> = {}): Control =>
   ({ id: "c", feature: "power", writable: true, ...patch }) as Control;
+
+it("turns a read-only level into a value", () => {
+  expect(effectiveWidget("level", false)).toBe("value");
+  expect(effectiveWidget("level", true)).toBe("level");
+  expect(effectiveWidget("switch", false)).toBe("switch");
+  expect(effectiveWidget(undefined, false)).toBeUndefined();
+});
 
 it("normalizes object and array states, rejects junk", () => {
   expect(normalizeStates({ "0": "Standby", "1": "Heizung" })).toEqual({

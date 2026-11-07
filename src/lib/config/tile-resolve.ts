@@ -42,7 +42,9 @@ function pseudoControl(
   resolved: ResolvedSource | undefined,
 ): EnrichedControl {
   const widget =
-    widgetForKind(slot.kind) ?? resolved?.widget ?? ("value" as Widget);
+    slot.kind === "value"
+      ? "value"
+      : (widgetForKind(slot.kind) ?? resolved?.widget ?? ("value" as Widget));
   return {
     id,
     feature:
