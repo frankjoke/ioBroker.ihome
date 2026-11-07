@@ -24,6 +24,7 @@
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
   import { initFormulas } from "$lib/formulas.svelte.js";
   import { initFunctions } from "$lib/functions.svelte.js";
+  import { initTemplateBundles } from "$lib/template-bundles.svelte.js";
   import { initVariables } from "$lib/variables.svelte.js";
   import {
     initPages,
@@ -323,6 +324,7 @@
     initRegistry();
     initFormulas();
     initFunctions();
+    initTemplateBundles();
     initVariables();
     initTemplates();
     initLogics();
