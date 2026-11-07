@@ -33,6 +33,7 @@ it("puts the bridge before a document's own scripts", () => {
   expect(withHead.indexOf("window.ihome")).toBeLessThan(
     withHead.indexOf("<script>run()"),
   );
+  expect(withHead).toContain("call:");
 
   const fragment = injectHtmlBridge("<h1>Hi</h1>");
   expect(fragment.startsWith("<script>")).toBe(true);

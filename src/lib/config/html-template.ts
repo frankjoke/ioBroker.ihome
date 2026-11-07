@@ -36,7 +36,8 @@ const BRIDGE = `<script>
     getState: function (id) { return parent.__IHOME__.getState(id); },
     toggle: function (id) { return parent.__IHOME__.toggle(id); },
     setVariable: function (name, value) { return parent.__IHOME__.setVariable(name, value); },
-    getVariable: function (name) { return parent.__IHOME__.getVariable(name); }
+    getVariable: function (name) { return parent.__IHOME__.getVariable(name); },
+    call: function (id, payload) { return parent.__IHOME__.call(id, payload); }
   };
   window.ihome = api;
   window.setState = api.setState;

@@ -1,4 +1,5 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { callPlugin } from "$lib/config/plugin-call";
 import { getVariables, upsertVariable } from "$lib/stores/variables.svelte";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { saveVariables } from "$lib/variables.svelte.js";
@@ -54,6 +55,16 @@ export const htmlBridge = {
     upsertVariable({ ...variable, value: String(value) });
     saveVariables();
     return true;
+  },
+
+  /** Call an adapter-side plugin by id. */
+  async call(id: string, payload?: unknown) {
+    return callPlugin(
+      (instance, command, data) => ioBroker.sendTo(instance, command, data),
+      ioBroker.namespace,
+      id,
+      payload,
+    );
   },
 };
 
