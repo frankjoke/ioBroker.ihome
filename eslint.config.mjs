@@ -16,6 +16,8 @@ export default [
       ".svelte-kit/",
       "coverage/",
       "*.tgz",
+      // Local-only design record and handoffs (gitignored).
+      "docs/",
       // Scratch: the plan-execution workspaces (ledgers, briefs, review
       // packages, and whatever test tree a plan serves from here).
       ".superpowers/",
