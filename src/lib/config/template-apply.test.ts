@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPartLabel,
+  bundleApplyParts,
+  bundleDeviceTemplate,
+  bundleLogicParams,
   devicesForTemplate,
   logicApplyDefaults,
   planDeviceApply,
   planLogicApply,
   resolveTemplateParams,
+  runApplyParts,
+  type ApplyParam,
 } from "./template-apply";
 import type { Device } from "$lib/types/device";
+import type { TemplateBundle } from "$lib/types/templates";
 import type { LogicTemplate, TemplateParam } from "$logic/types";
 
 const template = {
@@ -83,6 +90,19 @@ describe("resolveTemplateParams", () => {
     expect(result).toEqual({
       values: { source: "id:alias.0.X", wait: "5m", box: "counter" },
     });
+  });
+
+  it("accepts an empty string param but still requires memory", () => {
+    const mixed: ApplyParam[] = [
+      { name: "host", label: "Host", type: "string" },
+      { name: "box", label: "Box", type: "memory" },
+    ];
+    expect(
+      resolveTemplateParams(mixed, { host: "", box: "x" }, (r) => r),
+    ).toEqual({ values: { host: "", box: "x" } });
+    expect(
+      resolveTemplateParams(mixed, { host: "", box: "" }, (r) => r),
+    ).toMatchObject({ problem: expect.stringMatching(/Box.*required/i) });
   });
 
   it("refuses an empty state, a bad duration and a missing memory", () => {
@@ -163,4 +183,81 @@ describe("planLogicApply", () => {
       logic: expect.objectContaining({ id: "ghost-user" }),
     });
   });
+});
+
+const bundle = {
+  id: "tv",
+  name: "TV",
+  params: [
+    { name: "host", label: "Host", type: "string" as const },
+    { name: "source", label: "Source", type: "state" as const },
+    { name: "counter", label: "Counter", type: "memory" as const },
+  ],
+  device: { type: "Custom" as const, features: [], slots: [] },
+  logic: {
+    logic: {
+      id: "",
+      name: "",
+      kind: "function" as const,
+      inputs: {},
+      output: { scope: "memory" as const },
+      expr: { code: "noop()" },
+    },
+  },
+  api: { source: "({})" },
+} as TemplateBundle;
+
+it("orders the present parts API, Device, Logic", () => {
+  expect(bundleApplyParts(bundle)).toEqual(["api", "device", "logic"]);
+  expect(bundleApplyParts({ id: "x", name: "X", logic: bundle.logic })).toEqual(
+    ["logic"],
+  );
+  expect(applyPartLabel("api")).toBe("API");
+});
+
+it("builds a user visual template from a device part", () => {
+  const template = bundleDeviceTemplate(
+    {
+      type: "Custom",
+      features: [
+        {
+          feature: "power",
+          label: "Power",
+          widget: "switch",
+          roleHints: [],
+        },
+      ],
+      slots: [{ kind: "value", source: "power" }],
+      size: { w: 2, h: 2 },
+    },
+    "new-id",
+    "TV",
+  );
+  expect(template).toMatchObject({
+    id: "new-id",
+    name: "TV",
+    type: "Custom",
+    builtin: false,
+    size: { w: 2, h: 2 },
+  });
+  expect(template.features).toHaveLength(1);
+  expect(template.slots).toHaveLength(1);
+});
+
+it("keeps logic params and drops string/description", () => {
+  expect(bundleLogicParams(bundle)).toEqual([
+    { name: "source", label: "Source", type: "state" },
+    { name: "counter", label: "Counter", type: "memory" },
+  ]);
+});
+
+it("stops at the first failing part and names it", async () => {
+  const calls: string[] = [];
+  expect(
+    await runApplyParts(["api", "device", "logic"], async (part) => {
+      calls.push(part);
+      if (part === "device") throw new Error("bad target");
+    }),
+  ).toEqual({ part: "device", error: "bad target" });
+  expect(calls).toEqual(["api", "device"]);
 });

@@ -1,12 +1,12 @@
 <script lang="ts">
   import StateRefField from "$lib/components/logic/StateRefField.svelte";
-  import type { TemplateParam } from "$logic/types";
+  import type { ApplyParam } from "$lib/config/template-apply";
 
   let {
     params,
     values = $bindable({}),
   }: {
-    params: TemplateParam[];
+    params: ApplyParam[];
     values?: Record<string, string | number | boolean>;
   } = $props();
 </script>
