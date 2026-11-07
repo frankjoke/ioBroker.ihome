@@ -35,6 +35,7 @@
   import LogicTemplates from "./LogicTemplates.svelte";
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
   import BundleEditor from "./BundleEditor.svelte";
+  import { exportTemplate } from "$lib/template-export";
   import type { TemplateBundle } from "$lib/types/templates";
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
@@ -141,6 +142,34 @@
       );
     }
     return entry.kind === "device" ? "Device" : "Logic";
+  }
+
+  function definitionFor(entry: TemplateEntry) {
+    if (entry.kind === "device") {
+      return (
+        Object.values(PRESETS).find((template) => template.id === entry.id) ??
+        (registry.templates ?? []).find((template) => template.id === entry.id)
+      );
+    }
+    if (entry.kind === "logic") {
+      return (
+        BUILTIN_TEMPLATES.find((template) => template.id === entry.id) ??
+        (doc.templates ?? []).find((template) => template.id === entry.id)
+      );
+    }
+    if (entry.kind === "api") {
+      return (
+        BUILTIN_DEVICE_TEMPLATES.find((template) => template.id === entry.id) ??
+        (doc.deviceTemplates ?? []).find((template) => template.id === entry.id)
+      );
+    }
+    return bundles.find((bundle) => bundle.id === entry.id);
+  }
+
+  function exportEntry(entry: TemplateEntry) {
+    const definition = definitionFor(entry);
+    if (!definition) return;
+    exportTemplate(entry.kind, $state.snapshot(definition));
   }
 
   function guard(action: () => void) {
@@ -488,6 +517,12 @@
             </button>
             <span class="badge">{badge(entry)}</span>
             <span class="item-actions">
+              <IconButton
+                icon="download"
+                label={`Export ${entry.name}`}
+                disabled={!definitionFor(entry)}
+                onclick={() => exportEntry(entry)}
+              />
               {#if isOpen(entry)}
                 {#if entry.kind === "api"}
                   <button

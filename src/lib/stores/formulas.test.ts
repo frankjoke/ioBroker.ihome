@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isFormulasWritable,
-  setFormulasLoadKind,
-} from "./formulas.svelte";
+import { isFormulasWritable, setFormulasLoadKind } from "./formulas.svelte";
 
 describe("formula store guards", () => {
   it("only allows writes after a successful or absent load", () => {

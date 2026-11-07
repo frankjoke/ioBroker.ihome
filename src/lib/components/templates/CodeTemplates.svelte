@@ -27,6 +27,7 @@
   import { saveFunctions } from "$lib/functions.svelte.js";
   import FormulaEditor from "./FormulaEditor.svelte";
   import FunctionEditor from "./FunctionEditor.svelte";
+  import { exportTemplate } from "$lib/template-export";
   import type { FormulaTemplate, FunctionTemplate } from "$lib/types/device";
 
   let {
@@ -77,6 +78,22 @@
 
   function isOpen(entry: CodeEntry) {
     return selected?.kind === entry.kind && selected?.id === entry.id;
+  }
+
+  function definitionFor(entry: CodeEntry) {
+    return entry.kind === "formula"
+      ? formulas.find((template) => template.id === entry.id)
+      : (functions.find((template) => template.id === entry.id) ??
+          BUILTIN_FUNCTIONS.find((template) => template.id === entry.id));
+  }
+
+  function exportEntry(entry: CodeEntry) {
+    const definition = definitionFor(entry);
+    if (!definition) return;
+    exportTemplate(
+      entry.kind === "formula" ? "formula" : "snippet",
+      $state.snapshot(definition),
+    );
   }
 
   function onLineClick(event: MouseEvent, entry: CodeEntry) {
@@ -316,6 +333,12 @@
               >
               <code class="preview">{entry.preview}</code>
               <span class="item-actions">
+                <IconButton
+                  icon="download"
+                  label={`Export ${entry.name}`}
+                  disabled={!definitionFor(entry)}
+                  onclick={() => exportEntry(entry)}
+                />
                 {#if isOpen(entry)}
                   <button
                     type="button"
