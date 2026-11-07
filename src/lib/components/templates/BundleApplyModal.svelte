@@ -11,6 +11,7 @@
     runApplyParts,
   } from "$lib/config/template-apply";
   import {
+    bundleApiSource,
     evaluateBundleApi,
     templateBundleProblem,
   } from "$lib/config/template-bundles";
@@ -176,7 +177,7 @@
         );
         const plan = planDeviceTemplate(
           apiShape,
-          bundle.api.source,
+          bundleApiSource(bundle, apiShape),
           resolved.values,
           baseState,
           id,

@@ -130,6 +130,31 @@ export function evaluateBundleApi(bundle: TemplateBundle): DeviceTemplateShape {
   };
 }
 
+function itemSource(item: DeviceItem): string {
+  const { conversion, setConversion, ...rest } = item;
+  const json = JSON.stringify(rest);
+  const extras = [
+    conversion ? `"conversion":${conversion.toString()}` : "",
+    setConversion ? `"setConversion":${setConversion.toString()}` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
+  return extras ? json.replace(/\}$/, `,${extras}}`) : json;
+}
+
+/** A source string the generated machine can embed. Unlike the author's
+ *  source, it already contains the shared itemList/params (conversions stay
+ *  functions), so `T.itemList` is iterable at runtime. The base source keeps
+ *  the request functions. */
+export function bundleApiSource(
+  bundle: TemplateBundle,
+  shape: DeviceTemplateShape = evaluateBundleApi(bundle),
+): string {
+  const base = bundle.api?.source ? `(${bundle.api.source})` : "({})";
+  const items = (shape.itemList ?? []).map(itemSource).join(",");
+  return `({ ...${base}, itemList: [${items}], params: ${JSON.stringify(shape.params ?? [])} })`;
+}
+
 /** The first problem with a bundle, or null. */
 export function templateBundleProblem(
   value: unknown,

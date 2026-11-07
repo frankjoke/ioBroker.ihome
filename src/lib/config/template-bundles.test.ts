@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { TemplateBundle } from "$lib/types/templates";
+import { evaluateDeviceTemplate } from "./device-templates";
+import { NETWORK_DEVICE_BUNDLE } from "./builtin-bundles";
 import {
+  bundleApiSource,
   compileTemplateItems,
   devicePartFromTemplate,
   evaluateBundleApi,
@@ -230,5 +233,45 @@ describe("part helpers", () => {
     expect(
       logicPartFromTemplate({ id: "l", name: "L", params: [], logic: body }),
     ).toEqual({ logic: body });
+  });
+});
+
+describe("bundleApiSource", () => {
+  it("embeds the shared items and params in the generated source", () => {
+    const source = bundleApiSource(NETWORK_DEVICE_BUNDLE);
+    const shape = evaluateDeviceTemplate(source) as {
+      itemList: Array<{ name: string }>;
+      params: Array<{ name: string }>;
+    };
+    expect(shape.itemList.map((item) => item.name)).toEqual([
+      "online",
+      "lastConnected",
+      "lastDisconnected",
+      "lastSeen",
+    ]);
+    expect(shape.params.map((param) => param.name)).toContain("source");
+  });
+
+  it("keeps compiled conversion functions callable in the source", () => {
+    const bundle = {
+      id: "x",
+      name: "X",
+      items: [
+        {
+          name: "n",
+          type: "number",
+          source: "n",
+          conversion: "(result, raw) => Number(raw) + 1",
+        },
+      ],
+      api: { source: '({ readFrom: "state", deviceType: "Custom" })' },
+    } as TemplateBundle;
+    const shape = evaluateDeviceTemplate(bundleApiSource(bundle)) as {
+      itemList: Array<{
+        conversion?: (result: unknown, raw: unknown) => unknown;
+      }>;
+    };
+    expect(typeof shape.itemList[0].conversion).toBe("function");
+    expect(shape.itemList[0].conversion?.(1, "2")).toBe(3);
   });
 });
