@@ -52,9 +52,8 @@ it("ships a state-sourced Meter template", () => {
   );
   const net = value.itemList.find((item) => item.name === "power_net");
   expect(net).toBeDefined();
-  expect(net!.conversion!({ "1.7.0": 1000, "2.7.0": 250 }, undefined)).toBe(
-    750,
-  );
+  expect(net!.source).toEqual(["16.7.0"]);
+  expect(net!.conversion).toBeUndefined();
 });
 
 it("checks an API template by evaluating its source", () => {

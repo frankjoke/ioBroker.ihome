@@ -63,9 +63,8 @@ const SHRDZM_METER = `({
       role: "value.power", unit: "W", source: ["2.7.0"], readOnly: true,
       decimals: 0 },
     { name: "power_net", label: "Power net", type: "number",
-      role: "value.power", unit: "W", readOnly: true, decimals: 0,
-      conversion: (result) =>
-        Number(result?.["1.7.0"] ?? 0) - Number(result?.["2.7.0"] ?? 0) },
+      role: "value.power", unit: "W", source: ["16.7.0"], readOnly: true,
+      decimals: 0 },
     { name: "voltage_l1", label: "Voltage L1", type: "number",
       role: "value.voltage", unit: "V", source: ["32.7.0"], readOnly: true,
       decimals: 1 },
