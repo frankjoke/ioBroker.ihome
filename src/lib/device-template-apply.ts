@@ -19,6 +19,18 @@ export interface DeviceTemplatePlan {
   device?: Device;
 }
 
+/** Is a device with this display name already in the registry? */
+export function deviceNameTaken(
+  name: string,
+  devices: Array<{ name?: string }>,
+): boolean {
+  const key = name.trim().toLowerCase();
+  return (
+    key !== "" &&
+    devices.some((device) => (device.name ?? "").trim().toLowerCase() === key)
+  );
+}
+
 /** Build the state list and machine without touching the broker. */
 export function planDeviceTemplate(
   template: DeviceTemplateShape,

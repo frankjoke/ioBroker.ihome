@@ -24,6 +24,7 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({ ioBroker: mock.ioBroker }));
 import { validateLogicDocument } from "$logic/validate";
 import {
   createTemplateStates,
+  deviceNameTaken,
   planDeviceTemplate,
 } from "./device-template-apply";
 
@@ -32,6 +33,14 @@ const SOURCE = `({
   readRequest() { return { url: "https://x/status" }; },
   writeRequest(v, item) { return { url: "https://x/set?" + item.foreignWriteName + "=" + v }; },
 })`;
+
+it("detects an existing device name case-insensitively", () => {
+  const devices = [{ name: "PowerMeter" }, { name: "Heizung" }];
+  expect(deviceNameTaken("PowerMeter", devices)).toBe(true);
+  expect(deviceNameTaken(" powermeter ", devices)).toBe(true);
+  expect(deviceNameTaken("PowerMeter 2", devices)).toBe(false);
+  expect(deviceNameTaken("", devices)).toBe(false);
+});
 
 it("plans states and a valid machine", () => {
   const template = new Function("return (" + SOURCE + ")")();

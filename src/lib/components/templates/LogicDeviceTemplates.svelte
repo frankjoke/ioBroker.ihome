@@ -14,7 +14,9 @@
   import {
     planDeviceTemplate,
     createTemplateStates,
+    deviceNameTaken,
   } from "$lib/device-template-apply";
+  import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { parseDuration } from "$logic/duration";
   import { stateIdFor, validStateId } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -190,6 +192,14 @@
     try {
       if (!validStateId(baseState)) {
         applyError = "Base state needs adapter.instance.path.";
+        return;
+      }
+      const trimmedName = deviceName.trim();
+      if (
+        trimmedName &&
+        deviceNameTaken(trimmedName, getCanonicalRegistry().devices ?? [])
+      ) {
+        applyError = `A device named “${trimmedName}” already exists. Rename it or delete the old device first.`;
         return;
       }
       const values = { ...applyParams };
