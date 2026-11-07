@@ -265,19 +265,21 @@
       </a>
     {/if}
 
-    <a
-      class="icon-btn status-btn"
-      class:ok={status === "ok"}
-      class:warning={status === "warning"}
-      class:error={status === "error"}
-      href={cogHref}
-      title={statusText.title}
-      aria-label={statusText.label}
-    >
-      <span class="material-symbols-outlined">
-        {status === "error" ? "construction" : "settings"}
-      </span>
-    </a>
+    {#if isDisplay}
+      <a
+        class="icon-btn status-btn"
+        class:ok={status === "ok"}
+        class:warning={status === "warning"}
+        class:error={status === "error"}
+        href={cogHref}
+        title={statusText.title}
+        aria-label={statusText.label}
+      >
+        <span class="material-symbols-outlined">
+          {status === "error" ? "construction" : "settings"}
+        </span>
+      </a>
+    {/if}
   </div>
 </header>
 
