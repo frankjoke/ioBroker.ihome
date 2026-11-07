@@ -43,7 +43,10 @@
   let sortDir = $state<"asc" | "desc">("asc");
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);
-  let editorRef = $state<{ save: () => void } | null>(null);
+  let editorRef = $state<{
+    save: () => void;
+    startApply?: () => void;
+  } | null>(null);
   let pendingAction: (() => void) | null = null;
   let askSwitch = $state(false);
   let error = $state("");
@@ -484,11 +487,19 @@
               {entry.name}
             </button>
             <span class="badge">{badge(entry)}</span>
-            {#if entry.builtin}
-              <span class="badge">built-in</span>
-            {/if}
-            {#if isOpen(entry)}
-              <span class="item-actions">
+            <span class="item-actions">
+              {#if isOpen(entry)}
+                {#if entry.kind === "api"}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={editorDirty || !writable || blocked}
+                    onclick={() => editorRef?.startApply?.()}
+                  >
+                    <span class="material-symbols-outlined">play_arrow</span>
+                    Apply
+                  </button>
+                {/if}
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
@@ -503,22 +514,19 @@
                   disabled={!writable || blocked}
                   onclick={duplicateSelected}
                 />
-                {#if !entry.builtin}
-                  <IconButton
-                    icon="delete"
-                    danger
-                    label={`Delete ${entry.name}`}
-                    disabled={!writable || blocked}
-                    onclick={() => (pendingDelete = entry)}
-                  />
-                {/if}
+              {/if}
+              {#if entry.builtin}
+                <span class="badge">built-in</span>
+              {:else}
                 <IconButton
-                  icon="close"
-                  label="Close"
-                  onclick={() => guard(closeNow)}
+                  icon="delete"
+                  danger
+                  label={`Delete ${entry.name}`}
+                  disabled={!writable || blocked}
+                  onclick={() => (pendingDelete = entry)}
                 />
-              </span>
-            {/if}
+              {/if}
+            </span>
           </div>
           {#if isOpen(entry)}
             <div class="item-editor">

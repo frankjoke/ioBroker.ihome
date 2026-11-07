@@ -298,39 +298,31 @@
               <span class="badge"
                 >{entry.kind === "formula" ? "Formula" : "Function"}</span
               >
-              {#if entry.builtin}
-                <span class="badge">built-in</span>
-              {/if}
               <code class="preview">{entry.preview}</code>
-              {#if isOpen(entry) || !entry.builtin}
-                <span class="item-actions">
-                  {#if isOpen(entry)}
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-sm"
-                      disabled={!editorDirty ||
-                        !!editorProblem ||
-                        (draftKind === "function" && !isFunctionsWritable())}
-                      onclick={() => editorRef?.save()}
-                    >
-                      <span class="material-symbols-outlined">check</span> Save
-                    </button>
-                    <IconButton
-                      icon="close"
-                      label="Close"
-                      onclick={() => guard(closeNow)}
-                    />
-                  {/if}
-                  {#if !entry.builtin}
-                    <IconButton
-                      icon="delete"
-                      danger
-                      label={`Delete ${entry.name}`}
-                      onclick={() => (pendingDelete = entry)}
-                    />
-                  {/if}
-                </span>
-              {/if}
+              <span class="item-actions">
+                {#if isOpen(entry)}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={!editorDirty ||
+                      !!editorProblem ||
+                      (draftKind === "function" && !isFunctionsWritable())}
+                    onclick={() => editorRef?.save()}
+                  >
+                    <span class="material-symbols-outlined">check</span> Save
+                  </button>
+                {/if}
+                {#if entry.builtin}
+                  <span class="badge">built-in</span>
+                {:else}
+                  <IconButton
+                    icon="delete"
+                    danger
+                    label={`Delete ${entry.name}`}
+                    onclick={() => (pendingDelete = entry)}
+                  />
+                {/if}
+              </span>
             </div>
             {#if isOpen(entry)}
               <div class="item-editor">

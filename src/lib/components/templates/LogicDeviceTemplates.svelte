@@ -137,14 +137,14 @@
     baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
-  async function startApply(): Promise<void> {
+  export async function startApply(): Promise<void> {
     applyError = "";
     applyOpen = false;
     evaluated = null;
     applySource = "";
     if (!isBuiltin && isDirty) {
-      if (!saveTemplate()) return;
-      await tick();
+      applyError = "Save the template before applying.";
+      return;
     }
     let value: unknown;
     try {
@@ -181,6 +181,10 @@
 
   async function generate(): Promise<void> {
     if (!evaluated || !selected || applying) return;
+    if (!isBuiltin && isDirty) {
+      applyError = "Save the template before applying.";
+      return;
+    }
     applying = true;
     applyError = "";
     try {
@@ -329,18 +333,6 @@
 
 {#snippet editorBody()}
   {#if selected}
-    {#if embedded}
-      <div class="actions">
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onclick={startApply}
-          disabled={applying}
-        >
-          <span class="material-symbols-outlined">play_arrow</span> Apply
-        </button>
-      </div>
-    {/if}
     <p class="hint text-muted">
       {isBuiltin
         ? "Built-in template — duplicate it to edit."
