@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   placementAt,
   placementUnder,
+  sectionTitleUnder,
   type HitElement,
 } from "$lib/config/tile-hit";
 
@@ -67,6 +68,23 @@ it("ignores an element whose placement id is empty", () => {
     }),
   ];
   expect(placementAt(stack)?.placementId).toBe("t1");
+});
+
+it("finds the section title whose box holds the point", () => {
+  const title = el(
+    {
+      "data-section-title": "",
+      "data-page-id": "rooms",
+      "data-section-id": "bad",
+    },
+    { left: 10, top: 20, right: 80, bottom: 40 },
+  );
+  expect(sectionTitleUnder([title], 30, 30)).toEqual({
+    pageId: "rooms",
+    sectionId: "bad",
+  });
+  expect(sectionTitleUnder([title], 5, 30)).toBeNull();
+  expect(sectionTitleUnder([], 30, 30)).toBeNull();
 });
 
 it("finds the tile whose box holds the point — the later one on overlap", () => {

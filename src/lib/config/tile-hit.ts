@@ -14,6 +14,32 @@ export interface HitElement {
   };
 }
 
+/** The page and section of a section title under a point. */
+export interface SectionHit {
+  pageId: string;
+  sectionId: string;
+}
+
+/** The section-title box under a point, if any. */
+export function sectionTitleUnder(
+  titles: HitElement[],
+  x: number,
+  y: number,
+): SectionHit | null {
+  for (const el of titles ?? []) {
+    const sectionId = el.getAttribute("data-section-id")?.trim();
+    if (!sectionId) continue;
+    const r = el.getBoundingClientRect();
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+      return {
+        pageId: el.getAttribute("data-page-id") ?? "",
+        sectionId,
+      };
+    }
+  }
+  return null;
+}
+
 /**
  * The placement an element carries, with the page and section it belongs to
  * (A48). An element without a placement id (a gap, a section heading, the

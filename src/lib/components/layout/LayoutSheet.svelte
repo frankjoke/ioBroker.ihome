@@ -51,8 +51,8 @@
     pageId?: string;
     onPage: (id: string) => void;
     onClose: () => void;
-    /** The tile a click in the display landed on (A48). */
-    picked?: PlacementAnchor | null;
+    /** The tile or section a click in the display landed on (A48). */
+    picked?: LayoutSelection | null;
   } = $props();
 
   let selection = $state<LayoutSelection | null>(sheet.selection);
@@ -127,7 +127,7 @@
     if (!hit) return;
     pageOpen = false;
     sectionOpen = false;
-    selection = { kind: "tile", ...hit };
+    selection = hit;
   });
 
   function selectSection(id: string): void {

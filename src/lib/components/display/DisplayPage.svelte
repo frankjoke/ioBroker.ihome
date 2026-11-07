@@ -6,8 +6,8 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { sheet } from "$lib/stores/sheet.svelte.js";
   import { goto } from "$app/navigation";
-  import { placementUnder } from "$lib/config/tile-hit";
-  import type { PlacementAnchor } from "$lib/config/layout-ops";
+  import { placementUnder, sectionTitleUnder } from "$lib/config/tile-hit";
+  import type { LayoutSelection } from "$lib/config/layout-ops";
   import type { Page } from "$lib/types/display";
 
   /** The display as one page shows it — at "/" (the page the wall left behind)
@@ -22,8 +22,8 @@
     pagePlaceholder(ioBroker.connected, getPagesLoadKind()),
   );
 
-  /** The tile the last click in the display landed on (A48). */
-  let picked = $state<PlacementAnchor | null>(null);
+  /** The tile or section the last click in the display landed on (A48). */
+  let picked = $state<LayoutSelection | null>(null);
 
   function pick(event: MouseEvent): void {
     // The tiles are inside the inert stage, so they cannot be hit-tested: the
@@ -33,12 +33,22 @@
       event.clientX,
       event.clientY,
     );
-    if (!hit) return;
-    // The cursor's page is the display's page (A45), so the page moves here —
-    // one state write, in the click, not an effect reading the display's page
-    // it would then re-apply on every later page change.
-    setLastPage(hit.pageId);
-    picked = hit;
+    if (hit) {
+      // The cursor's page is the display's page (A45), so the page moves here —
+      // one state write, in the click, not an effect reading the display's page
+      // it would then re-apply on every later page change.
+      setLastPage(hit.pageId);
+      picked = { kind: "tile", ...hit };
+      return;
+    }
+    const section = sectionTitleUnder(
+      [...document.querySelectorAll(".stage [data-section-title]")],
+      event.clientX,
+      event.clientY,
+    );
+    if (!section) return;
+    setLastPage(section.pageId);
+    picked = { kind: "section", ...section };
   }
 
   // A pick is spent when the sheet closes: reopening must not jump back to the

@@ -70,7 +70,13 @@
          layout editor stays reachable via the AppBar pencil, so no key handler. -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <h2 class="group-title" onclick={onTitleClick}>
+    <h2
+      class="group-title"
+      data-section-title=""
+      data-page-id={pageId}
+      data-section-id={group.id}
+      onclick={onTitleClick}
+    >
       {#if group.icon}<span class="group-icon"
           ><Icon value={group.icon} size={18} /></span
         >{/if}
