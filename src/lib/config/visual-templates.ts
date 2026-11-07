@@ -55,11 +55,11 @@ export function visualTemplateProblem(
       typeof size.w !== "number" ||
       typeof size.h !== "number" ||
       size.w < 1 ||
-      size.w > 10 ||
+      size.w > 20 ||
       size.h < 1 ||
       size.h > 10
     ) {
-      return "size needs w and h between 1 and 10.";
+      return "size needs w between 1 and 20 and h between 1 and 10.";
     }
   }
   return null;

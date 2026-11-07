@@ -13,6 +13,7 @@
     headlineSlot,
     rowIcon,
     rowSpark,
+    singleSurface,
     stateLook,
     tileParts,
     tileSeries,
@@ -303,6 +304,8 @@
 
   const chart = $derived(tileSeries(parts.rows));
   const bodySlots = $derived(parts.body);
+  /** A lone frame/html slot is the whole face: no name, no padding. */
+  const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
 
   /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small.
    *  A tile that draws a chart blends its big glyph out whatever the state says
@@ -596,6 +599,7 @@
   class:active
   class:glow={glowing}
   class:disabled={tileStyle.disabled === true}
+  class:single-surface={surfaceOnly}
   data-page-id={anchor?.pageId}
   data-section-id={anchor?.sectionId}
   data-placement-id={anchor?.placementId}
@@ -623,7 +627,7 @@
       <TileChart series={chart} />
     </div>
   {/if}
-  {#if tileName}<span class="tile-name">{tileName}</span>{/if}
+  {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
   <div class="tile-body">
     {#each bodySlots as r, i (i)}
       <SlotRenderer
@@ -634,6 +638,7 @@
         icon={bodyIcon(r)}
         anchor={r.slot === headline}
         stack={r.slot === headline && columns < 2}
+        single={surfaceOnly}
         onPrimary={actionFor(r.control)}
         emphasis={r === mainValueRow ? "primary" : "secondary"}
       />
@@ -769,5 +774,17 @@
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
+  }
+
+  /* A lone frame/html slot owns the whole face: the tile title would steal a
+     line from the page and the padding would frame it twice. */
+  .tile.single-surface {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .tile.single-surface .tile-body {
+    gap: 0;
   }
 </style>

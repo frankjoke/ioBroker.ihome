@@ -12,9 +12,11 @@ export const DEFAULT_SPAN: Size = { w: 1, h: 1 };
 
 /**
  * The largest hint a document may carry (A2). A breakpoint may still clamp to
- * less than this — the editor writes up to here, the type names it.
+ * less than this — the editor writes up to here, the type names it. The width
+ * is larger because a web-page tile often needs twice the old 10-module width.
  */
-export const SIZE_MAX = 10;
+export const SIZE_MAX_W = 20;
+export const SIZE_MAX_H = 10;
 
 export interface BreakpointDef {
   name: Breakpoint;
@@ -55,24 +57,24 @@ export const BREAKPOINTS: BreakpointDef[] = [
     minWidth: 0,
     tileW: 61,
     tileH: 122,
-    maxW: SIZE_MAX,
-    maxH: SIZE_MAX,
+    maxW: SIZE_MAX_W,
+    maxH: SIZE_MAX_H,
   },
   {
     name: "tablet",
     minWidth: 600,
     tileW: 51,
     tileH: 102,
-    maxW: SIZE_MAX,
-    maxH: SIZE_MAX,
+    maxW: SIZE_MAX_W,
+    maxH: SIZE_MAX_H,
   },
   {
     name: "desktop",
     minWidth: 1025,
     tileW: 57,
     tileH: 114,
-    maxW: SIZE_MAX,
-    maxH: SIZE_MAX,
+    maxW: SIZE_MAX_W,
+    maxH: SIZE_MAX_H,
   },
 ];
 

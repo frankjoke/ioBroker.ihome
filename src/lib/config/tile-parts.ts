@@ -270,6 +270,12 @@ export function labelShown(
   return where === "both" || where === home;
 }
 
+/** A lone frame/html slot is the tile's whole face: no name, no padding. */
+export function singleSurface(slots: Slot[]): boolean {
+  if (slots.length !== 1) return false;
+  return slots[0].kind === "frame" || slots[0].kind === "html";
+}
+
 // ------------------------------------------------------------------ charts
 
 /** The series colours, in assignment order (A61): theme tokens, so the chart

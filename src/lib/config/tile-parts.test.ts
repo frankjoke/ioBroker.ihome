@@ -8,6 +8,7 @@ import {
   labelShown,
   rowIcon,
   rowSpark,
+  singleSurface,
   stateLook,
   tileParts,
   tileSeries,
@@ -702,4 +703,12 @@ it("the tile icon is separate from the headline slot icon", () => {
     glyph: "device",
   });
   expect(headerIcon(undefined, {})).toBeUndefined();
+});
+
+it("treats a lone frame or html slot as a full surface", () => {
+  expect(singleSurface([{ kind: "frame" }])).toBe(true);
+  expect(singleSurface([{ kind: "html" }])).toBe(true);
+  expect(singleSurface([{ kind: "value" }])).toBe(false);
+  expect(singleSurface([{ kind: "frame" }, { kind: "value" }])).toBe(false);
+  expect(singleSurface([])).toBe(false);
 });

@@ -12,7 +12,8 @@
   import { resolveSection } from "$lib/config/pages-ops";
   import {
     BREAKPOINTS,
-    SIZE_MAX,
+    SIZE_MAX_H,
+    SIZE_MAX_W,
     breakpointFor,
     type TileSpan,
   } from "$lib/config/size-ops";
@@ -484,10 +485,14 @@
   function setSize(axis: "w" | "h", raw: string): void {
     const value = Math.trunc(Number(raw));
     if (!Number.isFinite(value) || value < 1) return;
-    // The document keeps the hint as typed, bounded by SIZE_MAX (A2); each
+    // The document keeps the hint as typed, bounded by the axis cap (A2); each
     // breakpoint clamps it to what it can show while rendering.
     const size = { ...effectiveTileSpan() } as Size;
-    size[axis] = Math.min(value, SIZE_MAX) as Size["w"];
+    if (axis === "w") {
+      size.w = Math.min(value, SIZE_MAX_W) as Size["w"];
+    } else {
+      size.h = Math.min(value, SIZE_MAX_H) as Size["h"];
+    }
     edit((t) => ({ ...t, size }));
   }
 
@@ -1053,7 +1058,7 @@
                     type="number"
                     class="num-input"
                     min="1"
-                    max={SIZE_MAX}
+                    max={axis === "w" ? SIZE_MAX_W : SIZE_MAX_H}
                     step="1"
                     aria-label={`Size ${axis}`}
                     value={String(

@@ -23,6 +23,7 @@
     icon,
     stack = false,
     anchor = false,
+    single = false,
     home = "tile",
   }: {
     slot: Slot;
@@ -38,6 +39,8 @@
     stack?: boolean;
     /** The headline row: the tile measures its glyph for the chart band. */
     anchor?: boolean;
+    /** The tile has only this surface slot; its name would be redundant. */
+    single?: boolean;
     /** The surface this renderer draws on: the tile or the detail page. */
     home?: "tile" | "modal";
   } = $props();
@@ -55,7 +58,9 @@
   /** The tile's caption: the slot's name on the face, when its home allows it.
    *  The detail row's name is its own label, drawn by the panel. */
   const name = $derived(slot.label ?? control?.label);
-  const showName = $derived(home === "tile" && labelShown(slot, "tile"));
+  const showName = $derived(
+    home === "tile" && !single && labelShown(slot, "tile"),
+  );
 </script>
 
 {#snippet content()}

@@ -1,10 +1,32 @@
 import type { DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
 
-/** Tile size hint, 1–10 modules per axis. Clamped per breakpoint — never a coordinate. */
+/** Tile size hint, 1–20 half-modules wide and 1–10 modules high. Clamped per breakpoint — never a coordinate. */
+export type SizeW =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20;
+export type SizeH = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type Size = {
-  w: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-  h: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  w: SizeW;
+  h: SizeH;
 };
 
 /**

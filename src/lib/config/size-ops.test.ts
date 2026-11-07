@@ -2,7 +2,8 @@ import { it, expect } from "vitest";
 import {
   BREAKPOINTS,
   DEFAULT_SPAN,
-  SIZE_MAX,
+  SIZE_MAX_H,
+  SIZE_MAX_W,
   breakpointFor,
   clampSpan,
   tileColumns,
@@ -24,11 +25,12 @@ it("clamps hints per breakpoint", () => {
   expect(clampSpan({ w: 10, h: 10 }, "tablet")).toEqual({ w: 10, h: 10 });
   expect(clampSpan({ w: 10, h: 10 }, "desktop")).toEqual({ w: 10, h: 10 });
   expect(clampSpan({ w: 10, h: 10 }, "phone")).toEqual({ w: 10, h: 10 });
-  // Nothing in a document can ask for more than SIZE_MAX; every cap is ≤ it.
-  // (A document is untrusted JSON, so 11 can reach the clamp at runtime.)
-  expect(clampSpan({ w: 11, h: 11 } as never, "desktop")).toEqual({
-    w: SIZE_MAX,
-    h: SIZE_MAX,
+  expect(clampSpan({ w: 20, h: 10 }, "desktop")).toEqual({ w: 20, h: 10 });
+  // Nothing in a document can ask for more than the axis cap.
+  // (A document is untrusted JSON, so 21/11 can reach the clamp at runtime.)
+  expect(clampSpan({ w: 21, h: 11 } as never, "desktop")).toEqual({
+    w: SIZE_MAX_W,
+    h: SIZE_MAX_H,
   });
   expect(clampSpan(undefined, "desktop")).toEqual({ w: 1, h: 1 });
   expect(clampSpan({ w: 1, h: 1 }, "phone")).toEqual({ w: 1, h: 1 });
@@ -52,9 +54,9 @@ it("keeps the values the stylesheet needs", () => {
   expect(
     BREAKPOINTS.map((b) => [b.name, b.tileW, b.tileH, b.maxW, b.maxH]),
   ).toEqual([
-    ["phone", 61, 122, SIZE_MAX, SIZE_MAX],
-    ["tablet", 51, 102, SIZE_MAX, SIZE_MAX],
-    ["desktop", 57, 114, SIZE_MAX, SIZE_MAX],
+    ["phone", 61, 122, SIZE_MAX_W, SIZE_MAX_H],
+    ["tablet", 51, 102, SIZE_MAX_W, SIZE_MAX_H],
+    ["desktop", 57, 114, SIZE_MAX_W, SIZE_MAX_H],
   ]);
   // the column module is half the row module, which is what makes `w: 1` a
   // half-width card
