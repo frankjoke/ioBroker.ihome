@@ -1,3 +1,4 @@
+import { expressionSyntaxProblem } from "$lib/config/code-syntax";
 import { evaluateDeviceTemplate } from "$lib/config/device-templates";
 import { logicTemplateProblem } from "$lib/config/logic-templates";
 import { visualTemplateProblem } from "$lib/config/visual-templates";
@@ -135,7 +136,7 @@ export function templateBundleProblem(
   takenIds: Iterable<string> = [],
   logicIds: Iterable<string> = [],
   currentId?: string,
-  options: { validateApi?: boolean } = {},
+  options: { validateApi?: boolean; evaluateConversions?: boolean } = {},
 ): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return "A template bundle must be an object.";
@@ -189,12 +190,18 @@ export function templateBundleProblem(
         if (typeof code !== "string") {
           return `Item ${item.name}: ${field} must be a code string.`;
         }
-        try {
-          compileFunction(code);
-        } catch (e) {
-          return `Item ${item.name}: ${field} does not compile: ${
-            e instanceof Error ? e.message : String(e)
-          }`;
+        let problem: string | null = null;
+        if (options.evaluateConversions === false) {
+          problem = expressionSyntaxProblem(code);
+        } else {
+          try {
+            compileFunction(code);
+          } catch (e) {
+            problem = e instanceof Error ? e.message : String(e);
+          }
+        }
+        if (problem) {
+          return `Item ${item.name}: ${field} does not compile: ${problem}`;
         }
       }
     }
@@ -227,14 +234,22 @@ export function templateBundleProblem(
     );
     if (problem) return problem;
   }
-  if (bundle.api && options.validateApi !== false) {
-    try {
-      const checked = validateDeviceTemplate(
-        evaluateBundleApi(bundle as TemplateBundle),
-      );
-      if (checked.errors.length > 0) return checked.errors[0];
-    } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+  if (bundle.api) {
+    if (typeof bundle.api.source !== "string" || !bundle.api.source.trim()) {
+      return "The API source is empty.";
+    }
+    if (options.validateApi === false) {
+      const problem = expressionSyntaxProblem(bundle.api.source);
+      if (problem) return `API source does not compile: ${problem}`;
+    } else {
+      try {
+        const checked = validateDeviceTemplate(
+          evaluateBundleApi(bundle as TemplateBundle),
+        );
+        if (checked.errors.length > 0) return checked.errors[0];
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
     }
   }
   return null;

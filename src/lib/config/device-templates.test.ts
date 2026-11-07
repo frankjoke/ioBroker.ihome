@@ -51,3 +51,19 @@ it("checks an API template by evaluating its source", () => {
     deviceTemplateProblem({ ...BUILTIN_DEVICE_TEMPLATES[0], source: "({})" }),
   ).toMatch(/itemList/i);
 });
+
+it("syntax-checks the API source without evaluating it when asked", () => {
+  const entry = BUILTIN_DEVICE_TEMPLATES[0];
+  expect(
+    deviceTemplateProblem({ ...entry, source: "({})" }, { evaluate: false }),
+  ).toBeNull();
+  expect(
+    deviceTemplateProblem(
+      { ...entry, source: "(() => { throw new Error('ran'); })()" },
+      { evaluate: false },
+    ),
+  ).toBeNull();
+  expect(
+    deviceTemplateProblem({ ...entry, source: "1 +" }, { evaluate: false }),
+  ).toBeTruthy();
+});

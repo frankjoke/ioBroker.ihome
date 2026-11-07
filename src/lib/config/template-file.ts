@@ -55,9 +55,13 @@ function definitionProblem(kind: TemplateKind, value: unknown): string | null {
     case "logic":
       return logicTemplateProblem(value, [], [], id);
     case "api":
-      return deviceTemplateProblem(value);
+      // Import never executes the source or the conversion strings.
+      return deviceTemplateProblem(value, { evaluate: false });
     case "bundle":
-      return templateBundleProblem(value, [], [], id);
+      return templateBundleProblem(value, [], [], id, {
+        validateApi: false,
+        evaluateConversions: false,
+      });
   }
 }
 

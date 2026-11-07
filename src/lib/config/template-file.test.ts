@@ -31,6 +31,7 @@ const device = {
   slots: [],
   basedOn: "Light",
   size: { w: 2, h: 2 },
+  background: { kind: "solid", value: "#123456" },
   builtin: true,
 };
 const logic = {
@@ -144,6 +145,60 @@ describe("templateFile round trip", () => {
     expect(
       parseTemplateFile(templateFile("bundle", { id: "b", name: "B" })),
     ).toMatchObject({ problem: expect.stringMatching(/part/i) });
+  });
+
+  it("refuses cross-kind and malformed snippets without throwing", () => {
+    expect(parseTemplateFile(templateFile("api", device))).toMatchObject({
+      problem: expect.stringMatching(/source/i),
+    });
+    expect(parseTemplateFile(templateFile("device", api))).toMatchObject({
+      problem: expect.stringMatching(/type/i),
+    });
+    expect(parseTemplateFile(templateFile("snippet", formula))).toMatchObject({
+      problem: expect.any(String),
+    });
+    expect(
+      parseTemplateFile(
+        templateFile("snippet", { id: "s", name: "S", mode: "expression" }),
+      ),
+    ).toMatchObject({ problem: expect.stringMatching(/code/i) });
+    expect(
+      parseTemplateFile(
+        templateFile("snippet", {
+          id: "s",
+          name: "S",
+          mode: "nope",
+          code: "1",
+        }),
+      ),
+    ).toMatchObject({ problem: expect.stringMatching(/mode/i) });
+  });
+
+  it("does not execute API or conversion code while parsing", () => {
+    const sideEffectApi = {
+      id: "api",
+      name: "API",
+      source: "(() => { throw new Error('executed'); })()",
+    };
+    expect(
+      "file" in parseTemplateFile(templateFile("api", sideEffectApi)),
+    ).toBe(true);
+
+    const sideEffectBundle = {
+      id: "b",
+      name: "B",
+      items: [
+        {
+          name: "x",
+          type: "number" as const,
+          conversion: "(() => { throw new Error('executed'); })()",
+        },
+      ],
+      device: { type: "Custom", features: [], slots: [] },
+    };
+    expect(
+      "file" in parseTemplateFile(templateFile("bundle", sideEffectBundle)),
+    ).toBe(true);
   });
 });
 

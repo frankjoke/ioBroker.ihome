@@ -112,6 +112,11 @@ export function installTemplateFile(
             "Logic templates could not be loaded — the import was not saved.",
         };
       }
+      if (logicBlocked()) {
+        return {
+          problem: "The logic document has errors — fix them before importing.",
+        };
+      }
       const doc = getLogicDocument();
       const next = prepareTemplateImport(file.kind, file.definition, [
         ...BUILTIN_TEMPLATES.map((template) => template.id),
@@ -141,6 +146,11 @@ export function installTemplateFile(
         return {
           problem:
             "API templates could not be loaded — the import was not saved.",
+        };
+      }
+      if (logicBlocked()) {
+        return {
+          problem: "The logic document has errors — fix them before importing.",
         };
       }
       const doc = getLogicDocument();
