@@ -4,7 +4,18 @@ import { instantiateTemplate } from "$logic/templates";
 import { validateLogicDocument } from "$logic/validate";
 import type { Device } from "$lib/types/device";
 import type { Template } from "$lib/types/display";
+import type { TemplateBundle, TemplateDevicePart } from "$lib/types/templates";
 import type { LogicDef, LogicTemplate, TemplateParam } from "$logic/types";
+
+export type ApplyParam = {
+  name: string;
+  label: string;
+  type: "string" | "state" | "memory" | "number" | "boolean" | "duration";
+  default?: string | number | boolean;
+  description?: string;
+};
+
+export type ApplyPart = "api" | "device" | "logic";
 
 /** Devices a visual template may be applied to, sorted by name. */
 export function devicesForTemplate(
@@ -35,7 +46,7 @@ export function planDeviceApply(
 
 /** Initial apply-form values for a logic template's params. */
 export function logicApplyDefaults(
-  params: TemplateParam[],
+  params: ApplyParam[],
 ): Record<string, string | number | boolean> {
   const values: Record<string, string | number | boolean> = {};
   for (const param of params) {
@@ -50,7 +61,7 @@ export function logicApplyDefaults(
 
 /** Resolve state refs and check durations/required values before applying. */
 export function resolveTemplateParams(
-  params: TemplateParam[],
+  params: ApplyParam[],
   values: Record<string, string | number | boolean>,
   resolveStateRef: (ref: string) => string,
 ): { values: Record<string, string | number | boolean> } | { problem: string } {
@@ -69,6 +80,7 @@ export function resolveTemplateParams(
       }
       continue;
     }
+    if (param.type === "string") continue;
     if (raw === undefined || raw === "") {
       if (param.default === undefined) {
         return { problem: `${param.label} is required.` };
@@ -103,4 +115,73 @@ export function planLogicApply(
   } catch (e) {
     return { problem: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Parts present in a bundle, in apply order. */
+export function bundleApplyParts(bundle: TemplateBundle): ApplyPart[] {
+  const parts: ApplyPart[] = [];
+  if (bundle.api) parts.push("api");
+  if (bundle.device) parts.push("device");
+  if (bundle.logic) parts.push("logic");
+  return parts;
+}
+
+/** The user visual template a bundle's Device part applies. */
+export function bundleDeviceTemplate(
+  part: TemplateDevicePart,
+  id: string,
+  name: string,
+): Template {
+  return {
+    id,
+    name,
+    builtin: false,
+    type: part.type,
+    ...(part.size ? { size: part.size } : {}),
+    ...(part.background ? { background: part.background } : {}),
+    features: structuredClone(part.features),
+    slots: structuredClone(part.slots),
+  };
+}
+
+const LOGIC_PARAM_TYPES = new Set<ApplyParam["type"]>([
+  "state",
+  "memory",
+  "number",
+  "boolean",
+  "duration",
+]);
+
+/** Shared params the Logic part understands, without the API-only types. */
+export function bundleLogicParams(bundle: TemplateBundle): TemplateParam[] {
+  return (bundle.params ?? [])
+    .filter((param) => LOGIC_PARAM_TYPES.has(param.type))
+    .map((param) => ({
+      name: param.name,
+      label: param.label,
+      type: param.type as TemplateParam["type"],
+      ...(param.default !== undefined ? { default: param.default } : {}),
+    }));
+}
+
+export function applyPartLabel(part: ApplyPart): string {
+  return part === "api" ? "API" : part === "device" ? "Device" : "Logic";
+}
+
+/** Run the parts in order; the first throw stops and names its part. */
+export async function runApplyParts(
+  parts: ApplyPart[],
+  run: (part: ApplyPart) => Promise<void>,
+): Promise<{ part: ApplyPart; error: string } | null> {
+  for (const part of parts) {
+    try {
+      await run(part);
+    } catch (e) {
+      return {
+        part,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  }
+  return null;
 }
