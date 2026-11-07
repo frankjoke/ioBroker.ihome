@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BUILTIN_TEMPLATES } from "$logic/templates";
 import { logicTemplateProblem } from "./logic-templates";
 
 const valid = {
@@ -87,5 +88,15 @@ describe("logicTemplateProblem", () => {
         ["other"],
       ),
     ).toBeNull();
+  });
+});
+
+describe("built-in logic template help", () => {
+  it("describes every parameter", () => {
+    for (const template of BUILTIN_TEMPLATES) {
+      for (const param of template.params) {
+        expect(param.description?.trim()).toBeTruthy();
+      }
+    }
   });
 });

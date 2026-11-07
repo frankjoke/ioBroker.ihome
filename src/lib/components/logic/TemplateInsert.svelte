@@ -81,44 +81,49 @@
       <p class="hint text-muted">{template.description}</p>
 
       {#each template.params as param (param.name)}
-        <div class="row">
-          <span class="label-mono param-label">{param.label}</span>
-          {#if param.type === "state"}
-            <StateRefField
-              value={String(values[param.name] ?? "")}
-              label={param.label}
-              onchange={(ref) => (values = { ...values, [param.name]: ref })}
-            />
-          {:else if param.type === "number"}
-            <input
-              type="number"
-              aria-label={param.label}
-              value={String(values[param.name] ?? "")}
-              onchange={(e) =>
-                (values = {
-                  ...values,
-                  [param.name]: Number(e.currentTarget.value),
-                })}
-            />
-          {:else if param.type === "boolean"}
-            <input
-              type="checkbox"
-              aria-label={param.label}
-              checked={values[param.name] === true}
-              onchange={(e) =>
-                (values = {
-                  ...values,
-                  [param.name]: e.currentTarget.checked,
-                })}
-            />
-          {:else}
-            <input
-              aria-label={param.label}
-              placeholder={param.type === "duration" ? "2m" : ""}
-              value={String(values[param.name] ?? "")}
-              onchange={(e) =>
-                (values = { ...values, [param.name]: e.currentTarget.value })}
-            />
+        <div class="param">
+          <div class="row">
+            <span class="label-mono param-label">{param.label}</span>
+            {#if param.type === "state"}
+              <StateRefField
+                value={String(values[param.name] ?? "")}
+                label={param.label}
+                onchange={(ref) => (values = { ...values, [param.name]: ref })}
+              />
+            {:else if param.type === "number"}
+              <input
+                type="number"
+                aria-label={param.label}
+                value={String(values[param.name] ?? "")}
+                onchange={(e) =>
+                  (values = {
+                    ...values,
+                    [param.name]: Number(e.currentTarget.value),
+                  })}
+              />
+            {:else if param.type === "boolean"}
+              <input
+                type="checkbox"
+                aria-label={param.label}
+                checked={values[param.name] === true}
+                onchange={(e) =>
+                  (values = {
+                    ...values,
+                    [param.name]: e.currentTarget.checked,
+                  })}
+              />
+            {:else}
+              <input
+                aria-label={param.label}
+                placeholder={param.type === "duration" ? "2m" : ""}
+                value={String(values[param.name] ?? "")}
+                onchange={(e) =>
+                  (values = { ...values, [param.name]: e.currentTarget.value })}
+              />
+            {/if}
+          </div>
+          {#if param.description}
+            <span class="param-help text-muted">{param.description}</span>
           {/if}
         </div>
       {/each}
@@ -161,6 +166,12 @@
     margin: 0.8rem 0;
   }
 
+  .param {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .row {
     display: flex;
     align-items: center;
@@ -170,6 +181,10 @@
 
   .param-label {
     min-width: 8rem;
+  }
+
+  .param-help {
+    font-size: var(--body-sm);
   }
 
   .actions {

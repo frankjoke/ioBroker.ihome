@@ -24,7 +24,11 @@ describe("built-in bundles", () => {
       ["lastDisconnected", "lastDisconnected"],
       ["lastSeen", "lastSeen"],
     ]);
-    expect(bundle.params?.[0]).toMatchObject({ name: "source", type: "state" });
+    expect(bundle.params?.[0]).toMatchObject({
+      name: "source",
+      type: "state",
+    });
+    expect(bundle.params?.[0]?.description?.trim()).toBeTruthy();
     const shape = evaluateBundleApi(bundle);
     expect(validateDeviceTemplate(shape).errors).toEqual([]);
   });

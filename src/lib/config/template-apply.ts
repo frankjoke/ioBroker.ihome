@@ -161,6 +161,7 @@ export function bundleLogicParams(bundle: TemplateBundle): TemplateParam[] {
       label: param.label,
       type: param.type as TemplateParam["type"],
       ...(param.default !== undefined ? { default: param.default } : {}),
+      ...(param.description ? { description: param.description } : {}),
     }));
 }
 

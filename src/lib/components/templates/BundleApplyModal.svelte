@@ -294,6 +294,9 @@
         <label class="field">
           <span class="label-mono">Base state</span>
           <input type="text" bind:value={baseState} aria-label="Base state" />
+          <span class="hint text-muted"
+            >Folder for the API-created states; must start with {ioBroker.namespace}.</span
+          >
         </label>
         <label class="field">
           <span class="label-mono">Device name (optional)</span>
@@ -303,6 +306,10 @@
             aria-label="Device name"
             placeholder="Creates a device from the API states"
           />
+          <span class="hint text-muted"
+            >Creates the device with the API-created controls. Leave empty to
+            create only the states and machine.</span
+          >
         </label>
       {/if}
       {#if bundle.device}

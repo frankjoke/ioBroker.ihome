@@ -429,6 +429,9 @@
         <label class="field">
           <span class="label-mono">Base state</span>
           <input type="text" bind:value={baseState} aria-label="Base state" />
+          <span class="param-help text-muted"
+            >Folder for the generated states; must start with {ioBroker.namespace}.</span
+          >
         </label>
         <label class="field">
           <span class="label-mono">Device name (optional)</span>
@@ -438,6 +441,10 @@
             placeholder="Leave empty for no device"
             aria-label="Device name"
           />
+          <span class="param-help text-muted"
+            >Optional; creates a device with the generated controls. Leave empty
+            to create only the states and machine.</span
+          >
         </label>
         {#each evaluated.params ?? [] as param (param.name)}
           <label class="field">

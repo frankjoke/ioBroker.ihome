@@ -12,9 +12,26 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     description:
       "Switches a light on when the switch turns on and off again after the delay without a new on signal.",
     params: [
-      { name: "switch", label: "Switch state", type: "state" },
-      { name: "light", label: "Light state", type: "state" },
-      { name: "delay", label: "Off after", type: "duration", default: "5m" },
+      {
+        name: "switch",
+        label: "Switch state",
+        type: "state",
+        description: "The switch state that turns the light on.",
+      },
+      {
+        name: "light",
+        label: "Light state",
+        type: "state",
+        description: "The light state to switch.",
+      },
+      {
+        name: "delay",
+        label: "Off after",
+        type: "duration",
+        default: "5m",
+        description:
+          "Turn the light off after this time without a new on signal (e.g. 5m).",
+      },
     ],
     logic: {
       id: "logik",
@@ -51,9 +68,26 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     description:
       "Switches a light on on motion and off again after the delay without new motion.",
     params: [
-      { name: "motion", label: "Motion state", type: "state" },
-      { name: "light", label: "Light state", type: "state" },
-      { name: "delay", label: "Off after", type: "duration", default: "2m" },
+      {
+        name: "motion",
+        label: "Motion state",
+        type: "state",
+        description: "The motion sensor state that triggers the light.",
+      },
+      {
+        name: "light",
+        label: "Light state",
+        type: "state",
+        description: "The light state to switch.",
+      },
+      {
+        name: "delay",
+        label: "Off after",
+        type: "duration",
+        default: "2m",
+        description:
+          "Turn the light off after this time without new motion (e.g. 2m).",
+      },
     ],
     logic: {
       id: "logik",
@@ -90,9 +124,25 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     description:
       "Writes the source value multiplied by a factor into a state whenever it changes.",
     params: [
-      { name: "source", label: "Source state", type: "state" },
-      { name: "target", label: "Target state", type: "state" },
-      { name: "factor", label: "Factor", type: "number", default: 1 },
+      {
+        name: "source",
+        label: "Source state",
+        type: "state",
+        description: "The state whose value is read.",
+      },
+      {
+        name: "target",
+        label: "Target state",
+        type: "state",
+        description: "The state that receives the multiplied value.",
+      },
+      {
+        name: "factor",
+        label: "Factor",
+        type: "number",
+        default: 1,
+        description: "Multiplier applied to the source value.",
+      },
     ],
     logic: {
       id: "logik",

@@ -214,6 +214,8 @@ export interface TemplateParam {
   label: string;
   type: "state" | "memory" | "number" | "boolean" | "duration";
   default?: string | number | boolean;
+  /** Help text under the field in the apply form. */
+  description?: string;
 }
 
 export interface LogicTemplate {

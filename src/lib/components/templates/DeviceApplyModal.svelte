@@ -45,8 +45,7 @@
     <div class="body">
       <p class="hint text-muted">
         Apply <strong>{template.name}</strong> to a
-        <strong>{template.type}</strong> device. The device keeps its controls; only
-        its visual template changes.
+        <strong>{template.type}</strong> device.
       </p>
       {#if targets.length > 0}
         <label class="field">
@@ -56,6 +55,10 @@
               <option value={device.id}>{device.name}</option>
             {/each}
           </select>
+          <span class="hint text-muted"
+            >The device keeps its controls and states; only the visual template
+            changes.</span
+          >
         </label>
       {:else}
         <p class="hint text-muted">

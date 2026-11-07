@@ -190,7 +190,12 @@ const bundle = {
   name: "TV",
   params: [
     { name: "host", label: "Host", type: "string" as const },
-    { name: "source", label: "Source", type: "state" as const },
+    {
+      name: "source",
+      label: "Source",
+      type: "state" as const,
+      description: "The state to read.",
+    },
     { name: "counter", label: "Counter", type: "memory" as const },
   ],
   device: { type: "Custom" as const, features: [], slots: [] },
@@ -246,7 +251,12 @@ it("builds a user visual template from a device part", () => {
 
 it("keeps logic params and drops string/description", () => {
   expect(bundleLogicParams(bundle)).toEqual([
-    { name: "source", label: "Source", type: "state" },
+    {
+      name: "source",
+      label: "Source",
+      type: "state",
+      description: "The state to read.",
+    },
     { name: "counter", label: "Counter", type: "memory" },
   ]);
 });

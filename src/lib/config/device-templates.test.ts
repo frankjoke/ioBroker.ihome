@@ -18,6 +18,17 @@ describe("built-in device templates", () => {
     const ids = BUILTIN_DEVICE_TEMPLATES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("describes every parameter", () => {
+    for (const entry of BUILTIN_DEVICE_TEMPLATES) {
+      const shape = evaluateDeviceTemplate(entry.source) as {
+        params?: Array<{ description?: string }>;
+      };
+      for (const param of shape.params ?? []) {
+        expect(param.description?.trim()).toBeTruthy();
+      }
+    }
+  });
 });
 
 it("ships a state-sourced Meter template", () => {
