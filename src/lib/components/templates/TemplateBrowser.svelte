@@ -119,8 +119,10 @@
     selected?.kind === "bundle"
       ? bundleDraft?.id === selected.id
         ? bundleDraft
-        : (bundles.find((bundle) => bundle.id === selected.id) ??
-          BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
+        : selected.builtin
+          ? BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id)
+          : (bundles.find((bundle) => bundle.id === selected.id) ??
+            BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
       : undefined,
   );
   const writable = $derived(
@@ -195,10 +197,10 @@
         (doc.deviceTemplates ?? []).find((template) => template.id === entry.id)
       );
     }
-    return (
-      bundles.find((bundle) => bundle.id === entry.id) ??
-      BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id)
-    );
+    return entry.builtin
+      ? BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id)
+      : (bundles.find((bundle) => bundle.id === entry.id) ??
+          BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id));
   }
 
   function exportEntry(entry: TemplateEntry) {
@@ -219,9 +221,10 @@
 
   function openBundleApply(entry: TemplateEntry) {
     if (bundleDraft?.id === entry.id) return;
-    const bundle =
-      bundles.find((item) => item.id === entry.id) ??
-      BUILTIN_BUNDLES.find((item) => item.id === entry.id);
+    const bundle = entry.builtin
+      ? BUILTIN_BUNDLES.find((item) => item.id === entry.id)
+      : (bundles.find((item) => item.id === entry.id) ??
+        BUILTIN_BUNDLES.find((item) => item.id === entry.id));
     if (bundle) bundleApplyTemplate = bundle;
   }
 
@@ -382,10 +385,11 @@
     if (source) duplicateApi(source.id);
   }
 
-  function duplicateBundle(id: string) {
-    const source =
-      bundles.find((bundle) => bundle.id === id) ??
-      BUILTIN_BUNDLES.find((bundle) => bundle.id === id);
+  function duplicateBundle(entry: TemplateEntry) {
+    const source = entry.builtin
+      ? BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id)
+      : (bundles.find((bundle) => bundle.id === entry.id) ??
+        BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id));
     if (!source) return;
     const copy = {
       ...structuredClone($state.snapshot(source)),
@@ -412,7 +416,7 @@
     if (selected.kind === "device") duplicateDevice(selected.id);
     else if (selected.kind === "logic") duplicateLogic(selected.id);
     else if (selected.kind === "api") duplicateApi(selected.id);
-    else if (selected.kind === "bundle") duplicateBundle(selected.id);
+    else if (selected.kind === "bundle") duplicateBundle(selected);
   }
 
   export function startNew(kind: "device" | "logic" | "api" | "both") {
@@ -455,6 +459,11 @@
   }
 
   function saveBundle(next: TemplateBundle) {
+    if (selected?.builtin) return;
+    if (BUILTIN_BUNDLES.some((bundle) => bundle.id === next.id)) {
+      error = "That id belongs to a built-in template. Duplicate it to edit.";
+      return;
+    }
     if (!upsertTemplateBundle(next)) {
       error = "Combined templates could not be saved.";
       return;
@@ -541,7 +550,7 @@
     </div>
   {:else}
     <div class="template-list">
-      {#each rows as entry (`${entry.kind}:${entry.id}`)}
+      {#each rows as entry (`${entry.kind}:${entry.id}:${entry.builtin ? "builtin" : "user"}`)}
         <div class="item" class:open={isOpen(entry)}>
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -602,14 +611,16 @@
                     Apply
                   </button>
                 {/if}
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  disabled={!editorDirty || !writable || blocked}
-                  onclick={() => editorRef?.save()}
-                >
-                  <span class="material-symbols-outlined">check</span> Save
-                </button>
+                {#if !entry.builtin}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={!editorDirty || !writable || blocked}
+                    onclick={() => editorRef?.save()}
+                  >
+                    <span class="material-symbols-outlined">check</span> Save
+                  </button>
+                {/if}
                 <IconButton
                   icon="content_copy"
                   label={`Duplicate ${entry.name}`}

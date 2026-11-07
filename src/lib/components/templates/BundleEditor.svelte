@@ -72,11 +72,13 @@
     }),
   );
   const isDirty = $derived(
-    isNew ||
-      JSON.stringify(draft) !== JSON.stringify(bundle) ||
-      deviceJson !==
-        (draft.device ? JSON.stringify(draft.device, null, 2) : "") ||
-      logicJson !== (draft.logic ? JSON.stringify(draft.logic, null, 2) : ""),
+    !builtin &&
+      (isNew ||
+        JSON.stringify(draft) !== JSON.stringify(bundle) ||
+        deviceJson !==
+          (draft.device ? JSON.stringify(draft.device, null, 2) : "") ||
+        logicJson !==
+          (draft.logic ? JSON.stringify(draft.logic, null, 2) : "")),
   );
 
   $effect(() => {
