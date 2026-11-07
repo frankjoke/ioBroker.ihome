@@ -95,7 +95,7 @@
         }
       }
     },
-    "plugins": {
+    "pluginSettings": {
       "type": "panel",
       "label": "Plugins",
       "items": {
