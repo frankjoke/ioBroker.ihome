@@ -33,7 +33,15 @@
   let {
     formulaOnly = false,
     dirty = $bindable(false),
-  }: { formulaOnly?: boolean; dirty?: boolean } = $props();
+    focus = null,
+    onFocusApplied,
+  }: {
+    formulaOnly?: boolean;
+    dirty?: boolean;
+    focus?: { kind: "formula" | "function"; id: string } | null;
+    onFocusApplied?: () => void;
+  } = $props();
+  let lastFocus = "";
 
   let search = $state("");
   let sortDir = $state<"asc" | "desc">("asc");
@@ -157,6 +165,22 @@
     }
     guard(() => start(entry));
   }
+
+  $effect(() => {
+    if (!focus) {
+      lastFocus = "";
+      return;
+    }
+    const key = `${focus.kind}:${focus.id}`;
+    if (key === lastFocus) return;
+    lastFocus = key;
+    const entry = entries.find(
+      (item) => item.kind === focus.kind && item.id === focus.id,
+    );
+    if (!entry) return;
+    start(entry);
+    onFocusApplied?.();
+  });
 
   function startNew(kind: "formula" | "function") {
     if (kind === "formula") {

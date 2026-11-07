@@ -38,7 +38,19 @@
   import { exportTemplate } from "$lib/template-export";
   import type { TemplateBundle } from "$lib/types/templates";
 
-  let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
+  let {
+    dirty = $bindable(false),
+    focus = null,
+    onFocusApplied,
+  }: {
+    dirty?: boolean;
+    focus?: {
+      kind: "device" | "logic" | "api" | "bundle";
+      id: string;
+    } | null;
+    onFocusApplied?: () => void;
+  } = $props();
+  let lastFocus = "";
 
   let search = $state("");
   let sortDir = $state<"asc" | "desc">("asc");
@@ -201,6 +213,22 @@
     }
     guard(() => start(entry));
   }
+
+  $effect(() => {
+    if (!focus) {
+      lastFocus = "";
+      return;
+    }
+    const key = `${focus.kind}:${focus.id}`;
+    if (key === lastFocus) return;
+    lastFocus = key;
+    const entry = entries.find(
+      (item) => item.kind === focus.kind && item.id === focus.id,
+    );
+    if (!entry) return;
+    start(entry);
+    onFocusApplied?.();
+  });
 
   function duplicateDevice(id: string) {
     const source = [
