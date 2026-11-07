@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { goto } from "$app/navigation";
   import { page as route } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
@@ -167,10 +168,14 @@
       openSheetGated();
       return;
     }
-    // In the editor the tabs move the sheet, not the route (A43): the display
-    // and the sheet share one page, so nothing navigates and nothing is left
-    // pointing at a page the editor is not showing.
-    if (sheet.open) event.preventDefault();
+    // In the editor the tabs move the sheet to that page. `goto` keeps the
+    // sheet open (module state), unlike a hash edit, which reloads the router.
+    if (sheet.open) {
+      event.preventDefault();
+      setLastPage(id);
+      void goto(`#/p/${id}`);
+      return;
+    }
     setLastPage(id);
   }
 

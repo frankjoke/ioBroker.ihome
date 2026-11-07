@@ -1089,14 +1089,27 @@
         {#if id === "view"}
           <div class="field">
             <div class="row">
+              <span
+                class="source-name"
+                title={activeCond?.source
+                  ? sourceLabel(activeCond.source)
+                  : "No active source"}
+                >{activeCond?.source
+                  ? sourceLabel(activeCond.source)
+                  : "not set"}</span
+              >
               <button
                 type="button"
-                class="btn btn-sm"
+                class="icon-btn"
+                title={activeCond
+                  ? "Change the active source"
+                  : "Set the active source"}
+                aria-label={activeCond
+                  ? "Change the active source"
+                  : "Set the active source"}
                 onclick={() => (activePicker = true)}
               >
-                {activeCond?.source
-                  ? sourceLabel(activeCond.source)
-                  : "not set"}
+                <span class="material-symbols-outlined">edit</span>
               </button>
               {#if activeCond}
                 <select
@@ -2583,6 +2596,8 @@
   }
 
   .source-name {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
