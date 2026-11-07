@@ -1,6 +1,7 @@
 <script lang="ts">
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
@@ -13,15 +14,18 @@
   import {
     commitTemplates,
     getTemplateRegistry,
+    isTemplatesWritable,
   } from "$lib/stores/templates.svelte.js";
   import {
     commitLogics,
     getLogicDocument,
+    isLogicsWritable,
     logicBlocked,
   } from "$lib/stores/logics.svelte";
   import {
     deleteTemplateBundle,
     getTemplateBundles,
+    isTemplateBundlesWritable,
     templateBundleSaveFailed,
     upsertTemplateBundle,
   } from "$lib/stores/template-bundles.svelte";
@@ -39,11 +43,12 @@
   let sortDir = $state<"asc" | "desc">("asc");
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);
+  let editorRef = $state<{ save: () => void } | null>(null);
   let pendingAction: (() => void) | null = null;
   let askSwitch = $state(false);
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
-  let pendingBundleDelete = $state<TemplateBundle | null>(null);
+  let pendingDelete = $state<TemplateEntry | null>(null);
 
   const registry = $derived(getTemplateRegistry());
   const doc = $derived(getLogicDocument());
@@ -87,6 +92,18 @@
       : [selected, ...shown];
   });
   const bundleSaveFailed = $derived(templateBundleSaveFailed());
+  const writable = $derived(
+    selected?.kind === "device"
+      ? isTemplatesWritable()
+      : selected?.kind === "bundle"
+        ? isTemplateBundlesWritable()
+        : isLogicsWritable(),
+  );
+  const blocked = $derived(
+    selected?.kind === "logic" || selected?.kind === "api"
+      ? logicBlocked()
+      : false,
+  );
 
   function isOpen(entry: TemplateEntry) {
     return selected?.kind === entry.kind && selected?.id === entry.id;
@@ -153,15 +170,18 @@
     guard(() => start(entry));
   }
 
-  function newDevice() {
-    const source = Object.values(PRESETS)[0];
+  function duplicateDevice(id: string) {
+    const source = [
+      ...Object.values(PRESETS),
+      ...(registry.templates ?? []),
+    ].find((template) => template.id === id);
     if (!source) return;
     const copy = {
       ...structuredClone($state.snapshot(source)),
       id: newId(),
       name: `${source.name} copy`,
       builtin: false,
-      basedOn: source.type,
+      basedOn: source.basedOn ?? source.type,
     };
     if (
       !commitTemplates({
@@ -182,8 +202,15 @@
     });
   }
 
-  function newLogic() {
-    const source = BUILTIN_TEMPLATES[0];
+  function newDevice() {
+    const source = Object.values(PRESETS)[0];
+    if (source) duplicateDevice(source.id);
+  }
+
+  function duplicateLogic(id: string) {
+    const source = [...BUILTIN_TEMPLATES, ...(doc.templates ?? [])].find(
+      (template) => template.id === id,
+    );
     if (!source) return;
     const copy = {
       ...structuredClone($state.snapshot(source)),
@@ -210,8 +237,16 @@
     });
   }
 
-  function newApi() {
-    const source = BUILTIN_DEVICE_TEMPLATES[0];
+  function newLogic() {
+    const source = BUILTIN_TEMPLATES[0];
+    if (source) duplicateLogic(source.id);
+  }
+
+  function duplicateApi(id: string) {
+    const source = [
+      ...BUILTIN_DEVICE_TEMPLATES,
+      ...(doc.deviceTemplates ?? []),
+    ].find((template) => template.id === id);
     if (!source) return;
     const copy = {
       ...structuredClone($state.snapshot(source)),
@@ -239,6 +274,42 @@
       builtin: false,
       search: "",
     });
+  }
+
+  function newApi() {
+    const source = BUILTIN_DEVICE_TEMPLATES[0];
+    if (source) duplicateApi(source.id);
+  }
+
+  function duplicateBundle(id: string) {
+    const source = bundles.find((bundle) => bundle.id === id);
+    if (!source) return;
+    const copy = {
+      ...structuredClone($state.snapshot(source)),
+      id: newId(),
+      name: `${source.name} copy`,
+    };
+    if (!upsertTemplateBundle(copy)) {
+      error = "Combined templates could not be saved.";
+      return;
+    }
+    saveTemplateBundles();
+    start({
+      id: copy.id,
+      name: copy.name,
+      kind: "bundle",
+      parts: bundleParts(copy),
+      builtin: false,
+      search: "",
+    });
+  }
+
+  function duplicateSelected() {
+    if (!selected) return;
+    if (selected.kind === "device") duplicateDevice(selected.id);
+    else if (selected.kind === "logic") duplicateLogic(selected.id);
+    else if (selected.kind === "api") duplicateApi(selected.id);
+    else if (selected.kind === "bundle") duplicateBundle(selected.id);
   }
 
   function startBoth() {
@@ -281,20 +352,66 @@
     closeNow();
   }
 
-  function deleteBundle() {
-    if (!pendingBundleDelete) return;
-    const id = pendingBundleDelete.id;
-    if (!deleteTemplateBundle(id)) {
-      error = "Combined templates could not be saved.";
-      pendingBundleDelete = null;
-      return;
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    const entry = pendingDelete;
+    pendingDelete = null;
+    if (entry.builtin) return;
+    if (entry.kind === "device") {
+      if (
+        !commitTemplates({
+          ...registry,
+          templates: (registry.templates ?? []).filter(
+            (template) => template.id !== entry.id,
+          ),
+        })
+      ) {
+        error = "The device template document could not be saved.";
+        return;
+      }
+    } else if (entry.kind === "logic") {
+      if (
+        !commitLogics({
+          ...doc,
+          templates: (doc.templates ?? []).filter(
+            (template) => template.id !== entry.id,
+          ),
+        })
+      ) {
+        error = "The logic document could not be saved.";
+        return;
+      }
+      if (logicBlocked()) {
+        error = "Not saved — fix the logic errors in the document.";
+        return;
+      }
+    } else if (entry.kind === "api") {
+      if (
+        !commitLogics({
+          ...doc,
+          deviceTemplates: (doc.deviceTemplates ?? []).filter(
+            (template) => template.id !== entry.id,
+          ),
+        })
+      ) {
+        error = "The logic document could not be saved.";
+        return;
+      }
+      if (logicBlocked()) {
+        error = "Not saved — fix the logic errors in the document.";
+        return;
+      }
+    } else if (entry.kind === "bundle") {
+      if (!deleteTemplateBundle(entry.id)) {
+        error = "Combined templates could not be saved.";
+        return;
+      }
+      saveTemplateBundles();
     }
-    saveTemplateBundles();
-    if (selected?.id === id) {
+    if (selected?.kind === entry.kind && selected?.id === entry.id) {
       bundleDraft = null;
       closeNow();
     }
-    pendingBundleDelete = null;
   }
 </script>
 
@@ -374,11 +491,32 @@
               <span class="item-actions">
                 <button
                   type="button"
-                  class="btn btn-sm"
-                  onclick={() => guard(closeNow)}
+                  class="btn btn-primary btn-sm"
+                  disabled={!editorDirty || !writable || blocked}
+                  onclick={() => editorRef?.save()}
                 >
-                  Close
+                  <span class="material-symbols-outlined">check</span> Save
                 </button>
+                <IconButton
+                  icon="content_copy"
+                  label={`Duplicate ${entry.name}`}
+                  disabled={!writable || blocked}
+                  onclick={duplicateSelected}
+                />
+                {#if !entry.builtin}
+                  <IconButton
+                    icon="delete"
+                    danger
+                    label={`Delete ${entry.name}`}
+                    disabled={!writable || blocked}
+                    onclick={() => (pendingDelete = entry)}
+                  />
+                {/if}
+                <IconButton
+                  icon="close"
+                  label="Close"
+                  onclick={() => guard(closeNow)}
+                />
               </span>
             {/if}
           </div>
@@ -386,18 +524,21 @@
             <div class="item-editor">
               {#if entry.kind === "device"}
                 <VisualTemplates
+                  bind:this={editorRef}
                   embedded
                   focusId={entry.id}
                   bind:dirty={editorDirty}
                 />
               {:else if entry.kind === "logic"}
                 <LogicTemplates
+                  bind:this={editorRef}
                   embedded
                   focusId={entry.id}
                   bind:dirty={editorDirty}
                 />
               {:else if entry.kind === "api"}
                 <LogicDeviceTemplates
+                  bind:this={editorRef}
                   open={true}
                   embedded
                   focusId={entry.id}
@@ -407,11 +548,11 @@
                 />
               {:else if entry.kind === "bundle" && selectedBundle}
                 <BundleEditor
+                  bind:this={editorRef}
                   bundle={selectedBundle}
                   isNew={bundleDraft?.id === selectedBundle.id}
                   bind:dirty={editorDirty}
                   onSave={saveBundle}
-                  onDelete={() => (pendingBundleDelete = selectedBundle)}
                 />
               {:else if entry.kind === "bundle"}
                 <p class="text-muted hint">Select a bundle to edit it.</p>
@@ -442,12 +583,12 @@
     />
   {/if}
 
-  {#if pendingBundleDelete}
+  {#if pendingDelete}
     <ConfirmModal
-      title={deleteTitle("template", pendingBundleDelete.name)}
+      title={deleteTitle("template", pendingDelete.name)}
       confirmLabel="Delete"
-      onConfirm={deleteBundle}
-      onCancel={() => (pendingBundleDelete = null)}
+      onConfirm={confirmDelete}
+      onCancel={() => (pendingDelete = null)}
     >
       <p>Applied copies keep their logic and device.</p>
     </ConfirmModal>

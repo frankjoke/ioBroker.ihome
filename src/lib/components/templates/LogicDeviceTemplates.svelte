@@ -306,7 +306,7 @@
     return true;
   }
 
-  function save(): void {
+  export function save(): void {
     saveTemplate();
   }
 
@@ -329,6 +329,18 @@
 
 {#snippet editorBody()}
   {#if selected}
+    {#if embedded}
+      <div class="actions">
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={startApply}
+          disabled={applying}
+        >
+          <span class="material-symbols-outlined">play_arrow</span> Apply
+        </button>
+      </div>
+    {/if}
     <p class="hint text-muted">
       {isBuiltin
         ? "Built-in template — duplicate it to edit."
@@ -383,32 +395,37 @@
       <p class="error text-danger">{error}</p>
     {/if}
 
-    <div class="actions">
-      <button
-        type="button"
-        class="btn btn-primary"
-        onclick={startApply}
-        disabled={applying}
-      >
-        Apply
-      </button>
-      <button type="button" class="btn" onclick={duplicate}> Duplicate </button>
-      {#if !isBuiltin}
-        <button type="button" class="btn btn-primary" onclick={save}>
-          Save
-        </button>
+    {#if !embedded}
+      <div class="actions">
         <button
           type="button"
-          class="btn {deleting ? 'btn-danger' : ''}"
-          onclick={remove}
+          class="btn btn-primary"
+          onclick={startApply}
+          disabled={applying}
         >
-          {deleting ? "Confirm delete" : "Delete"}
+          <span class="material-symbols-outlined">play_arrow</span> Apply
         </button>
-      {/if}
-      {#if !embedded}<button type="button" class="btn" onclick={onClose}
-          >Close</button
-        >{/if}
-    </div>
+        <button type="button" class="btn" onclick={duplicate}>
+          <span class="material-symbols-outlined">content_copy</span> Duplicate
+        </button>
+        {#if !isBuiltin}
+          <button type="button" class="btn btn-primary" onclick={save}>
+            <span class="material-symbols-outlined">check</span> Save
+          </button>
+          <button
+            type="button"
+            class="btn {deleting ? 'btn-danger' : ''}"
+            onclick={remove}
+          >
+            <span class="material-symbols-outlined">delete</span>
+            {deleting ? "Confirm delete" : "Delete"}
+          </button>
+        {/if}
+        <button type="button" class="btn" onclick={onClose}>
+          <span class="material-symbols-outlined">close</span> Close
+        </button>
+      </div>
+    {/if}
 
     {#if applyError && !applyOpen}
       <p class="error text-danger">{applyError}</p>
@@ -491,10 +508,10 @@
             onclick={generate}
             disabled={applying}
           >
-            Generate
+            <span class="material-symbols-outlined">play_arrow</span> Generate
           </button>
           <button type="button" class="btn" onclick={() => (applyOpen = false)}>
-            Cancel
+            <span class="material-symbols-outlined">close</span> Cancel
           </button>
         </div>
       </div>

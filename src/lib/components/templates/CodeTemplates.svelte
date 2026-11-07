@@ -38,6 +38,8 @@
   let draftKind = $state<"formula" | "function">("formula");
   let draft = $state<FormulaTemplate | FunctionTemplate | null>(null);
   let editorDirty = $state(false);
+  let editorProblem = $state<string | null>(null);
+  let editorRef = $state<{ save: () => void } | null>(null);
   let pendingAction: (() => void) | null = null;
   let askClose = $state(false);
   let pendingDelete = $state<CodeEntry | null>(null);
@@ -102,6 +104,7 @@
     selected = null;
     draft = null;
     editorDirty = false;
+    editorProblem = null;
   }
 
   function start(entry: CodeEntry) {
@@ -122,6 +125,7 @@
     }
     selected = entry;
     editorDirty = false;
+    editorProblem = null;
   }
 
   function open(entry: CodeEntry) {
@@ -164,6 +168,7 @@
       };
     }
     editorDirty = false;
+    editorProblem = null;
   }
 
   function save(template: FormulaTemplate | FunctionTemplate) {
@@ -302,11 +307,19 @@
                   {#if isOpen(entry)}
                     <button
                       type="button"
-                      class="btn btn-sm"
-                      onclick={() => guard(closeNow)}
+                      class="btn btn-primary btn-sm"
+                      disabled={!editorDirty ||
+                        !!editorProblem ||
+                        (draftKind === "function" && !isFunctionsWritable())}
+                      onclick={() => editorRef?.save()}
                     >
-                      Close
+                      <span class="material-symbols-outlined">check</span> Save
                     </button>
+                    <IconButton
+                      icon="close"
+                      label="Close"
+                      onclick={() => guard(closeNow)}
+                    />
                   {/if}
                   {#if !entry.builtin}
                     <IconButton
@@ -325,14 +338,18 @@
                   <FormulaEditor
                     template={draft as FormulaTemplate}
                     {isNew}
+                    bind:this={editorRef}
                     bind:dirty={editorDirty}
+                    bind:problem={editorProblem}
                     onSave={save}
                   />
                 {:else}
                   <FunctionEditor
                     template={draft as FunctionTemplate}
                     {isNew}
+                    bind:this={editorRef}
                     bind:dirty={editorDirty}
+                    bind:problem={editorProblem}
                     onSave={save}
                   />
                 {/if}

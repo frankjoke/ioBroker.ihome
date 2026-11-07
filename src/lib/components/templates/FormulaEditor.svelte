@@ -7,11 +7,13 @@
     template,
     isNew = false,
     dirty = $bindable(false),
+    problem = $bindable<string | null>(null),
     onSave,
   }: {
     template: FormulaTemplate;
     isNew?: boolean;
     dirty?: boolean;
+    problem?: string | null;
     onSave: (template: FormulaTemplate) => void;
   } = $props();
 
@@ -22,12 +24,15 @@
     if (draft.id !== template.id) draft = { ...template };
   });
 
-  const problem = $derived(problemFor(draft));
+  const validation = $derived(problemFor(draft));
   const isDirty = $derived(
     isNew || JSON.stringify(draft) !== JSON.stringify(template),
   );
   $effect(() => {
     dirty = isDirty;
+  });
+  $effect(() => {
+    problem = validation;
   });
 
   function problemFor(value: FormulaTemplate): string | null {
@@ -36,8 +41,8 @@
     return checkExpression(value.expr);
   }
 
-  function save() {
-    if (problem || !isDirty) return;
+  export function save() {
+    if (validation || !isDirty) return;
     onSave({ ...draft, name: draft.name.trim() || "Untitled" });
   }
 </script>
@@ -80,17 +85,9 @@
     ><span class="label-mono">Notes</span>
     <input type="text" bind:value={draft.notes} /></label
   >
-  {#if problem}
-    <p class="text-danger hint">{problem}</p>
+  {#if validation}
+    <p class="text-danger hint">{validation}</p>
   {/if}
-  <div class="actions">
-    <button
-      type="button"
-      class="btn btn-primary btn-sm"
-      disabled={!!problem || !isDirty}
-      onclick={save}>Save</button
-    >
-  </div>
 </div>
 
 <style>
@@ -116,10 +113,5 @@
   .hint {
     margin: 0;
     font-size: var(--body-sm);
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
   }
 </style>

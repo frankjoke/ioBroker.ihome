@@ -7,6 +7,7 @@
     templateBundleProblem,
   } from "$lib/config/template-bundles";
   import { insertAtCaret } from "$lib/components/logic/code-field";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import SnippetInput from "$lib/components/templates/SnippetInput.svelte";
   import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
   import {
@@ -31,14 +32,12 @@
     isNew = false,
     dirty = $bindable(false),
     onSave,
-    onDelete,
   }: {
     bundle: TemplateBundle;
     builtin?: boolean;
     isNew?: boolean;
     dirty?: boolean;
     onSave: (bundle: TemplateBundle) => void;
-    onDelete?: () => void;
   } = $props();
 
   // svelte-ignore state_referenced_locally
@@ -184,7 +183,7 @@
     draft.api = { source: "({})" };
   }
 
-  function save() {
+  export function save() {
     saveError = "";
     if (!writable) return;
     const next = structuredClone($state.snapshot(draft));
@@ -236,7 +235,7 @@
       <h4>Params</h4>
       {#if !builtin}
         <button type="button" class="btn btn-sm" onclick={addParam}>
-          Add param
+          <span class="material-symbols-outlined">add</span> Add param
         </button>
       {/if}
     </div>
@@ -288,13 +287,11 @@
           /></label
         >
         {#if !builtin}
-          <button
-            type="button"
-            class="btn btn-sm"
+          <IconButton
+            icon="delete"
+            label="Remove parameter"
             onclick={() => removeParam(index)}
-          >
-            Remove
-          </button>
+          />
         {/if}
       </div>
     {/each}
@@ -305,7 +302,7 @@
       <h4>Items</h4>
       {#if !builtin}
         <button type="button" class="btn btn-sm" onclick={addItem}>
-          Add item
+          <span class="material-symbols-outlined">add</span> Add item
         </button>
       {/if}
     </div>
@@ -425,13 +422,11 @@
         </div>
         {#if !builtin}
           <div class="row-actions">
-            <button
-              type="button"
-              class="btn btn-sm"
+            <IconButton
+              icon="delete"
+              label="Remove item"
               onclick={() => removeItem(index)}
-            >
-              Remove
-            </button>
+            />
           </div>
         {/if}
       </div>
@@ -448,7 +443,7 @@
           onclick={() =>
             (draft.device = { type: "Custom", features: [], slots: [] })}
         >
-          Add device part
+          <span class="material-symbols-outlined">add</span> Add device part
         </button>
       {/if}
     </div>
@@ -463,13 +458,11 @@
         </select></label
       >
       {#if draft.device && !builtin}
-        <button
-          type="button"
-          class="btn btn-sm"
+        <IconButton
+          icon="close"
+          label="Clear device part"
           onclick={() => (draft.device = undefined)}
-        >
-          Clear
-        </button>
+        />
       {/if}
     </div>
     <textarea
@@ -501,7 +494,7 @@
               },
             })}
         >
-          Add logic part
+          <span class="material-symbols-outlined">add</span> Add logic part
         </button>
       {/if}
     </div>
@@ -516,13 +509,11 @@
         </select></label
       >
       {#if draft.logic && !builtin}
-        <button
-          type="button"
-          class="btn btn-sm"
+        <IconButton
+          icon="close"
+          label="Clear logic part"
           onclick={() => (draft.logic = undefined)}
-        >
-          Clear
-        </button>
+        />
       {/if}
     </div>
     <textarea
@@ -540,7 +531,7 @@
       <h4>API part</h4>
       {#if !builtin}
         <button type="button" class="btn btn-sm" onclick={addApi}>
-          Add API part
+          <span class="material-symbols-outlined">add</span> Add API part
         </button>
       {/if}
     </div>
@@ -552,13 +543,11 @@
             onBeforeOpen={rememberApi}
             onInsert={insertApi}
           />
-          <button
-            type="button"
-            class="btn btn-sm"
+          <IconButton
+            icon="close"
+            label="Clear API part"
             onclick={() => (draft.api = undefined)}
-          >
-            Clear
-          </button>
+          />
         </div>
       {/if}
       <textarea
@@ -579,29 +568,6 @@
 
   {#if saveError || problem}
     <p class="text-danger hint">{saveError || problem}</p>
-  {/if}
-
-  {#if !builtin}
-    <div class="actions">
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        disabled={!writable || !isDirty}
-        onclick={save}
-      >
-        Save
-      </button>
-      {#if onDelete}
-        <button
-          type="button"
-          class="btn btn-sm"
-          disabled={!writable}
-          onclick={onDelete}
-        >
-          Delete
-        </button>
-      {/if}
-    </div>
   {/if}
 </div>
 
@@ -684,11 +650,5 @@
     tab-size: 2;
     white-space: pre;
     overflow: auto;
-  }
-
-  .actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
   }
 </style>

@@ -124,7 +124,7 @@
     selectedId = copy.id;
   }
 
-  function save(): void {
+  export function save(): void {
     if (!selected || isBuiltin || !writable) return;
     let parsed: unknown;
     try {
@@ -265,47 +265,49 @@
 
   {#if selected}
     <div class="editor">
-      <div class="editor-head">
-        <span class="label-mono">{selected.name}</span>
-        {#if isBuiltin}
-          <span class="item-actions">
-            <span class="hint text-muted">Built-in — duplicate to edit.</span>
-            <button
-              type="button"
-              class="btn btn-sm"
-              disabled={!writable || blocked}
-              onclick={() => guard(duplicate)}
-            >
-              Duplicate
-            </button>
-          </span>
-        {:else}
-          <span class="item-actions">
-            <button
-              type="button"
-              class="btn btn-sm"
-              disabled={!writable || blocked}
-              onclick={() => guard(duplicate)}
-            >
-              Duplicate
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              disabled={!writable || blocked || !isDirty}
-              onclick={save}
-            >
-              Save
-            </button>
-            <IconButton
-              icon="delete"
-              danger
-              label={`Delete ${selected.name}`}
-              onclick={() => guard(() => (pendingDelete = selected))}
-            />
-          </span>
-        {/if}
-      </div>
+      {#if !embedded}
+        <div class="editor-head">
+          <span class="label-mono">{selected.name}</span>
+          {#if isBuiltin}
+            <span class="item-actions">
+              <span class="hint text-muted">Built-in — duplicate to edit.</span>
+              <button
+                type="button"
+                class="btn btn-sm"
+                disabled={!writable || blocked}
+                onclick={() => guard(duplicate)}
+              >
+                Duplicate
+              </button>
+            </span>
+          {:else}
+            <span class="item-actions">
+              <button
+                type="button"
+                class="btn btn-sm"
+                disabled={!writable || blocked}
+                onclick={() => guard(duplicate)}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                disabled={!writable || blocked || !isDirty}
+                onclick={save}
+              >
+                Save
+              </button>
+              <IconButton
+                icon="delete"
+                danger
+                label={`Delete ${selected.name}`}
+                onclick={() => guard(() => (pendingDelete = selected))}
+              />
+            </span>
+          {/if}
+        </div>
+      {/if}
       <textarea
         class="json"
         rows="20"
