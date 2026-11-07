@@ -117,14 +117,9 @@
       hint: "What makes the tile active: a state, an operator and a value.",
     },
     {
-      id: "icon",
-      label: "Icon",
-      hint: "The tile's own icon, on its face and in the detail header.",
-    },
-    {
       id: "look",
       label: "Look",
-      hint: "Per-state glyph, glow, icon colour and background — wins over the rules.",
+      hint: "The base tile icon plus per-state glyph, glow, icon colour and background — a state look wins over the base icon.",
     },
     {
       id: "pin",
@@ -147,7 +142,7 @@
   /** Slot UI: which row is expanded, which rule is open, pickers. */
   let expandedSlot = $state<number | null>(null);
   /** The tile editor's option tab: one group open at a time, none by default. */
-  let tileTab = $state<"size" | "view" | "icon" | "look" | "pin" | null>(null);
+  let tileTab = $state<"size" | "view" | "look" | "pin" | null>(null);
   /** The open rule, by slot and rule index. */
   let openRule = $state<{ slot: number; rule: number } | null>(null);
   let sourcePickerFor = $state<number | null>(null);
@@ -242,7 +237,9 @@
   );
 
   /** What the headline icon shows while the look sets no glyph (A67). */
-  const defaultGlyph = $derived(headlineSlot(shownSlots)?.icon?.glyph);
+  const defaultGlyph = $derived(
+    tile?.tile?.icon ?? headlineSlot(shownSlots)?.icon?.glyph,
+  );
 
   /** How many of them still live on the tile — the guard for A34. */
   const tileVisibleCount = $derived(
@@ -1134,9 +1131,10 @@
           </div>
         {/if}
 
-        {#if id === "icon"}
+        {#if id === "look"}
           <div class="field">
             <div class="row">
+              <span class="label-mono">Tile icon</span>
               <button
                 type="button"
                 class="btn btn-sm glyph-pick"
@@ -1163,11 +1161,9 @@
                 </button>
               {/if}
             </div>
-          </div>
-        {/if}
-
-        {#if id === "look"}
-          <div class="field">
+            <p class="note text-muted">
+              The base icon; a glyph in the state look below wins over it.
+            </p>
             <div class="look">
               {#each lookStates as state (state)}
                 {@const lk = tile?.tile?.look?.[state] ?? {}}
