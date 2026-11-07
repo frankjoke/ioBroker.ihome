@@ -39,12 +39,21 @@ it("ships a state-sourced Meter template", () => {
   const value = evaluateDeviceTemplate(entry!.source) as {
     readFrom?: string;
     deviceType?: string;
-    itemList: Array<{ source?: string | Array<string | number> }>;
+    itemList: Array<{
+      name: string;
+      source?: string | Array<string | number>;
+      conversion?: (result: unknown, raw: unknown) => unknown;
+    }>;
   };
   expect(value.readFrom).toBe("state");
   expect(value.deviceType).toBe("Meter");
   expect(value.itemList.some((item) => item.source?.[0] === "1.8.0")).toBe(
     true,
+  );
+  const net = value.itemList.find((item) => item.name === "power_net");
+  expect(net).toBeDefined();
+  expect(net!.conversion!({ "1.7.0": 1000, "2.7.0": 250 }, undefined)).toBe(
+    750,
   );
 });
 
