@@ -86,8 +86,13 @@
   });
 
   $effect(() => {
-    if (!targetCandidates.some((device) => device.id === targetId)) {
-      targetId = targetCandidates[0]?.id ?? "";
+    // Keep a chosen device valid when the list changes, but leave the empty
+    // “use the API-created device / none” option selectable.
+    if (
+      targetId &&
+      !targetCandidates.some((device) => device.id === targetId)
+    ) {
+      targetId = "";
     }
   });
 

@@ -200,6 +200,11 @@
           >{primary.toFixed(2)} rem
           <span class="text-muted">({px(primary)})</span></span
         >
+        <button
+          class="btn btn-sm"
+          disabled={primary === UI_DEFAULTS.primary}
+          onclick={() => reset("ui.primaryText")}>Reset</button
+        >
       </div>
       <div class="ui-row">
         <span class="label-mono row-label">Secondary text</span>
@@ -216,6 +221,11 @@
         <span class="ui-value mono"
           >{secondary.toFixed(2)} rem
           <span class="text-muted">({px(secondary)})</span></span
+        >
+        <button
+          class="btn btn-sm"
+          disabled={secondary === UI_DEFAULTS.secondary}
+          onclick={() => reset("ui.secondaryText")}>Reset</button
         >
       </div>
       <div class="sample" aria-label="Text sample">
@@ -252,6 +262,11 @@
           onchange={() => set("ui.tileScale", scale)}
         />
         <span class="ui-value mono">{Math.round(scale * 100)} %</span>
+        <button
+          class="btn btn-sm"
+          disabled={scale === UI_DEFAULTS.tileScale}
+          onclick={() => reset("ui.tileScale")}>Reset</button
+        >
       </div>
       <ul class="sizes">
         {#each BREAKPOINTS as def (def.name)}
