@@ -35,6 +35,7 @@
   import LogicTemplates from "./LogicTemplates.svelte";
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
   import BundleEditor from "./BundleEditor.svelte";
+  import BundleApplyModal from "./BundleApplyModal.svelte";
   import DeviceApplyModal from "./DeviceApplyModal.svelte";
   import LogicApplyModal from "./LogicApplyModal.svelte";
   import { exportTemplate } from "$lib/template-export";
@@ -72,6 +73,7 @@
   let bundleDraft = $state<TemplateBundle | null>(null);
   let deviceApplyTemplate = $state<Template | null>(null);
   let logicApplyTemplate = $state<LogicTemplate | null>(null);
+  let bundleApplyTemplate = $state<TemplateBundle | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
 
   const registry = $derived(getTemplateRegistry());
@@ -124,9 +126,16 @@
         : isLogicsWritable(),
   );
   const blocked = $derived(
-    selected?.kind === "logic" || selected?.kind === "api"
+    selected?.kind === "logic" ||
+      selected?.kind === "api" ||
+      selected?.kind === "bundle"
       ? logicBlocked()
       : false,
+  );
+  const applyWritable = $derived(
+    selected?.kind === "bundle"
+      ? isLogicsWritable() && isTemplatesWritable()
+      : writable,
   );
 
   function isOpen(entry: TemplateEntry) {
@@ -200,6 +209,12 @@
   function openLogicApply(entry: TemplateEntry) {
     const definition = definitionFor(entry);
     if (definition) logicApplyTemplate = definition as LogicTemplate;
+  }
+
+  function openBundleApply(entry: TemplateEntry) {
+    if (bundleDraft?.id === entry.id) return;
+    const bundle = bundles.find((item) => item.id === entry.id);
+    if (bundle) bundleApplyTemplate = bundle;
   }
 
   function guard(action: () => void) {
@@ -537,7 +552,7 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={editorDirty || !writable || blocked}
+                    disabled={editorDirty || !applyWritable || blocked}
                     onclick={() => editorRef?.startApply?.()}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>
@@ -547,7 +562,7 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={editorDirty || !writable || blocked}
+                    disabled={editorDirty || !applyWritable || blocked}
                     onclick={() => openDeviceApply(entry)}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>
@@ -557,8 +572,21 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={editorDirty || !writable || blocked}
+                    disabled={editorDirty || !applyWritable || blocked}
                     onclick={() => openLogicApply(entry)}
+                  >
+                    <span class="material-symbols-outlined">play_arrow</span>
+                    Apply
+                  </button>
+                {:else if entry.kind === "bundle"}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={editorDirty ||
+                      !applyWritable ||
+                      blocked ||
+                      bundleDraft?.id === entry.id}
+                    onclick={() => openBundleApply(entry)}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>
                     Apply
@@ -666,6 +694,13 @@
     <LogicApplyModal
       template={logicApplyTemplate}
       onClose={() => (logicApplyTemplate = null)}
+    />
+  {/if}
+
+  {#if bundleApplyTemplate}
+    <BundleApplyModal
+      bundle={bundleApplyTemplate}
+      onClose={() => (bundleApplyTemplate = null)}
     />
   {/if}
 
