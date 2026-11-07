@@ -18,6 +18,7 @@
     upsertFormula,
   } from "$lib/stores/formulas.svelte";
   import { saveFormulas } from "$lib/formulas.svelte.js";
+  import { isFormulasWritable } from "$lib/stores/formulas.svelte";
   import { applyTemplate, detachTemplate } from "$lib/config/formulas";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue } from "$lib/config/format";
@@ -60,7 +61,7 @@
         ? "Update template"
         : "Save as template",
   );
-  const actionEnabled = $derived(hasName || changed);
+  const actionEnabled = $derived((hasName || changed) && isFormulasWritable());
 
   function liveOf(c: Control): unknown {
     if (c.kind === "virtual" || !c.stateId) return undefined;

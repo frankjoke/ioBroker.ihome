@@ -11,7 +11,9 @@
   } from "$lib/config/code-entries";
   import {
     deleteFormula,
+    formulaSaveFailed,
     getFormulas,
+    isFormulasWritable,
     upsertFormula,
   } from "$lib/stores/formulas.svelte";
   import { saveFormulas } from "$lib/formulas.svelte.js";
@@ -47,7 +49,10 @@
 
   const formulas = $derived(getFormulas());
   const functions = $derived(getFunctions());
-  const saveFailed = $derived(functionSaveFailed());
+  const saveFailed = $derived(functionSaveFailed() || formulaSaveFailed());
+  const writable = $derived(
+    draftKind === "formula" ? isFormulasWritable() : isFunctionsWritable(),
+  );
   const entries = $derived(
     codeEntries(
       formulas,
@@ -174,6 +179,11 @@
   function save(template: FormulaTemplate | FunctionTemplate) {
     error = "";
     if (draftKind === "formula") {
+      if (!isFormulasWritable()) {
+        error =
+          "Formula templates could not be loaded — the change was not saved.";
+        return;
+      }
       upsertFormula(template as FormulaTemplate);
       saveFormulas();
     } else {
@@ -192,6 +202,12 @@
     if (!pendingDelete) return;
     error = "";
     if (pendingDelete.kind === "formula") {
+      if (!isFormulasWritable()) {
+        error =
+          "Formula templates could not be loaded — the delete was not saved.";
+        pendingDelete = null;
+        return;
+      }
       deleteFormula(pendingDelete.id);
       saveFormulas();
     } else {
@@ -304,9 +320,7 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={!editorDirty ||
-                      !!editorProblem ||
-                      (draftKind === "function" && !isFunctionsWritable())}
+                    disabled={!editorDirty || !!editorProblem || !writable}
                     onclick={() => editorRef?.save()}
                   >
                     <span class="material-symbols-outlined">check</span> Save

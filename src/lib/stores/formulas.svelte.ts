@@ -9,6 +9,35 @@ const defaultLibrary: FormulaLibrary = {
 };
 
 let canonicalLibrary = $state<FormulaLibrary>(defaultLibrary);
+/** How the stored document last loaded. `absent` is a valid empty state (the
+ *  first save creates it); only `pending` and `unreadable` block writes. */
+let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
+  "pending",
+);
+let saveFailed = $state(false);
+
+export function formulasLoadKind(): typeof loadKind {
+  return loadKind;
+}
+
+/** True while the last document write failed, so the pane can say "not saved". */
+export function formulaSaveFailed(): boolean {
+  return saveFailed;
+}
+
+/** False until the document was read, and false for an unreadable one. */
+export function isFormulasWritable(): boolean {
+  return loadKind === "loaded" || loadKind === "absent";
+}
+
+export function setFormulasLoadKind(kind: typeof loadKind): void {
+  loadKind = kind;
+}
+
+export function setFormulaSaveFailed(failed: boolean): void {
+  saveFailed = failed;
+}
+
 export function getFormulaLibrary() {
   return canonicalLibrary;
 }
