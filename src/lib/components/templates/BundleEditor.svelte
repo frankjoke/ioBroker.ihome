@@ -389,15 +389,19 @@
           <label class="check"
             ><input
               type="checkbox"
-              bind:checked={item.readOnly}
+              checked={item.readOnly === true}
               disabled={builtin}
+              onchange={(e) =>
+                (item.readOnly = e.currentTarget.checked || undefined)}
             /> read only</label
           >
           <label class="check"
             ><input
               type="checkbox"
-              bind:checked={item.hidden}
+              checked={item.hidden === true}
               disabled={builtin}
+              onchange={(e) =>
+                (item.hidden = e.currentTarget.checked || undefined)}
             /> hidden</label
           >
         </div>

@@ -4,6 +4,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { PRESETS } from "$lib/config/presets";
+  import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
   import {
     bundleParts,
@@ -87,7 +88,7 @@
       logicUser: doc.templates ?? [],
       apiBuiltins: BUILTIN_DEVICE_TEMPLATES,
       apiUser: doc.deviceTemplates ?? [],
-      bundleBuiltins: [],
+      bundleBuiltins: BUILTIN_BUNDLES,
       bundleUser: bundles,
     }),
     ...(bundleDraft
@@ -151,7 +152,8 @@
     selected?.kind === "bundle"
       ? bundleDraft?.id === selected.id
         ? bundleDraft
-        : bundles.find((bundle) => bundle.id === selected.id)
+        : (bundles.find((bundle) => bundle.id === selected.id) ??
+          BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
       : undefined,
   );
 
@@ -192,7 +194,10 @@
         (doc.deviceTemplates ?? []).find((template) => template.id === entry.id)
       );
     }
-    return bundles.find((bundle) => bundle.id === entry.id);
+    return (
+      bundles.find((bundle) => bundle.id === entry.id) ??
+      BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id)
+    );
   }
 
   function exportEntry(entry: TemplateEntry) {
@@ -213,7 +218,9 @@
 
   function openBundleApply(entry: TemplateEntry) {
     if (bundleDraft?.id === entry.id) return;
-    const bundle = bundles.find((item) => item.id === entry.id);
+    const bundle =
+      bundles.find((item) => item.id === entry.id) ??
+      BUILTIN_BUNDLES.find((item) => item.id === entry.id);
     if (bundle) bundleApplyTemplate = bundle;
   }
 
@@ -375,7 +382,9 @@
   }
 
   function duplicateBundle(id: string) {
-    const source = bundles.find((bundle) => bundle.id === id);
+    const source =
+      bundles.find((bundle) => bundle.id === id) ??
+      BUILTIN_BUNDLES.find((bundle) => bundle.id === id);
     if (!source) return;
     const copy = {
       ...structuredClone($state.snapshot(source)),
@@ -650,6 +659,7 @@
                 <BundleEditor
                   bind:this={editorRef}
                   bundle={selectedBundle}
+                  builtin={selected?.builtin ?? false}
                   isNew={bundleDraft?.id === selectedBundle.id}
                   bind:dirty={editorDirty}
                   onSave={saveBundle}
