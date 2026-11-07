@@ -1,8 +1,41 @@
+import { expressionSyntaxProblem } from "$lib/config/code-syntax";
+import { validateDeviceTemplate } from "$logic/device-templates";
 import type { DeviceTemplate } from "$logic/types";
 
 /** Evaluate the user-authored JS object literal in the browser. */
 export function evaluateDeviceTemplate(source: string): unknown {
   return new Function(`return (${source});`)();
+}
+
+/** The first problem with an API template, or null.
+ *  `evaluate: false` only compiles the source, so importing never runs it. */
+export function deviceTemplateProblem(
+  value: unknown,
+  options: { evaluate?: boolean } = {},
+): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "An API template must be an object.";
+  }
+  const template = value as Partial<DeviceTemplate>;
+  if (typeof template.id !== "string" || !template.id.trim()) {
+    return "An API template needs a non-empty id.";
+  }
+  if (typeof template.name !== "string" || !template.name.trim()) {
+    return "An API template needs a name.";
+  }
+  if (typeof template.source !== "string" || !template.source.trim()) {
+    return "The API source is empty.";
+  }
+  if (options.evaluate === false) {
+    return expressionSyntaxProblem(template.source);
+  }
+  let shape: unknown;
+  try {
+    shape = evaluateDeviceTemplate(template.source);
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return validateDeviceTemplate(shape).errors[0] ?? null;
 }
 
 const SHRDZM_METER = `({

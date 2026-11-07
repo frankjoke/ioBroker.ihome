@@ -36,10 +36,24 @@ export function migrateFunctionLibrary(raw: unknown): FunctionLibrary {
 
 /** The first problem with a function template, or null. */
 export function functionTemplateProblem(
-  template: FunctionTemplate,
+  value: FunctionTemplate,
 ): string | null {
-  if (!template.name.trim()) return "A name is required.";
-  if (!template.code.trim()) return "The code is empty.";
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "A function template must be an object.";
+  }
+  const template = value as Partial<FunctionTemplate>;
+  if (typeof template.id !== "string" || !template.id.trim()) {
+    return "A snippet needs a non-empty id.";
+  }
+  if (typeof template.name !== "string" || !template.name.trim()) {
+    return "A name is required.";
+  }
+  if (template.mode !== "expression" && template.mode !== "statements") {
+    return "mode must be expression or statements.";
+  }
+  if (typeof template.code !== "string" || !template.code.trim()) {
+    return "The code is empty.";
+  }
   return template.mode === "statements"
     ? checkStatement(template.code)
     : checkExpression(template.code);

@@ -11,7 +11,9 @@
   } from "$lib/config/code-entries";
   import {
     deleteFormula,
+    formulaSaveFailed,
     getFormulas,
+    isFormulasWritable,
     upsertFormula,
   } from "$lib/stores/formulas.svelte";
   import { saveFormulas } from "$lib/formulas.svelte.js";
@@ -25,12 +27,21 @@
   import { saveFunctions } from "$lib/functions.svelte.js";
   import FormulaEditor from "./FormulaEditor.svelte";
   import FunctionEditor from "./FunctionEditor.svelte";
+  import { exportTemplate } from "$lib/template-export";
   import type { FormulaTemplate, FunctionTemplate } from "$lib/types/device";
 
   let {
     formulaOnly = false,
     dirty = $bindable(false),
-  }: { formulaOnly?: boolean; dirty?: boolean } = $props();
+    focus = null,
+    onFocusApplied,
+  }: {
+    formulaOnly?: boolean;
+    dirty?: boolean;
+    focus?: { kind: "formula" | "function"; id: string } | null;
+    onFocusApplied?: () => void;
+  } = $props();
+  let lastFocus = "";
 
   let search = $state("");
   let sortDir = $state<"asc" | "desc">("asc");
@@ -47,7 +58,10 @@
 
   const formulas = $derived(getFormulas());
   const functions = $derived(getFunctions());
-  const saveFailed = $derived(functionSaveFailed());
+  const saveFailed = $derived(functionSaveFailed() || formulaSaveFailed());
+  const writable = $derived(
+    draftKind === "formula" ? isFormulasWritable() : isFunctionsWritable(),
+  );
   const entries = $derived(
     codeEntries(
       formulas,
@@ -72,6 +86,22 @@
 
   function isOpen(entry: CodeEntry) {
     return selected?.kind === entry.kind && selected?.id === entry.id;
+  }
+
+  function definitionFor(entry: CodeEntry) {
+    return entry.kind === "formula"
+      ? formulas.find((template) => template.id === entry.id)
+      : (functions.find((template) => template.id === entry.id) ??
+          BUILTIN_FUNCTIONS.find((template) => template.id === entry.id));
+  }
+
+  function exportEntry(entry: CodeEntry) {
+    const definition = definitionFor(entry);
+    if (!definition) return;
+    exportTemplate(
+      entry.kind === "formula" ? "formula" : "snippet",
+      $state.snapshot(definition),
+    );
   }
 
   function onLineClick(event: MouseEvent, entry: CodeEntry) {
@@ -136,6 +166,22 @@
     guard(() => start(entry));
   }
 
+  $effect(() => {
+    if (!focus) {
+      lastFocus = "";
+      return;
+    }
+    const key = `${focus.kind}:${focus.id}`;
+    if (key === lastFocus) return;
+    lastFocus = key;
+    const entry = entries.find(
+      (item) => item.kind === focus.kind && item.id === focus.id,
+    );
+    if (!entry) return;
+    start(entry);
+    onFocusApplied?.();
+  });
+
   function startNew(kind: "formula" | "function") {
     if (kind === "formula") {
       draftKind = "formula";
@@ -174,6 +220,11 @@
   function save(template: FormulaTemplate | FunctionTemplate) {
     error = "";
     if (draftKind === "formula") {
+      if (!isFormulasWritable()) {
+        error =
+          "Formula templates could not be loaded — the change was not saved.";
+        return;
+      }
       upsertFormula(template as FormulaTemplate);
       saveFormulas();
     } else {
@@ -192,6 +243,12 @@
     if (!pendingDelete) return;
     error = "";
     if (pendingDelete.kind === "formula") {
+      if (!isFormulasWritable()) {
+        error =
+          "Formula templates could not be loaded — the delete was not saved.";
+        pendingDelete = null;
+        return;
+      }
       deleteFormula(pendingDelete.id);
       saveFormulas();
     } else {
@@ -300,13 +357,17 @@
               >
               <code class="preview">{entry.preview}</code>
               <span class="item-actions">
+                <IconButton
+                  icon="download"
+                  label={`Export ${entry.name}`}
+                  disabled={!definitionFor(entry)}
+                  onclick={() => exportEntry(entry)}
+                />
                 {#if isOpen(entry)}
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={!editorDirty ||
-                      !!editorProblem ||
-                      (draftKind === "function" && !isFunctionsWritable())}
+                    disabled={!editorDirty || !!editorProblem || !writable}
                     onclick={() => editorRef?.save()}
                   >
                     <span class="material-symbols-outlined">check</span> Save

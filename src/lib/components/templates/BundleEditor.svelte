@@ -68,6 +68,7 @@
   const problem = $derived(
     templateBundleProblem(draft, bundleIds, logicIds, bundle.id, {
       validateApi: false,
+      evaluateConversions: false,
     }),
   );
   const isDirty = $derived(

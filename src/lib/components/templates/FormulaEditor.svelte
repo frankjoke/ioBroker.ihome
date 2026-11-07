@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { checkExpression } from "$logic/expr-code";
   import CodeField from "$lib/components/logic/CodeField.svelte";
+  import { formulaTemplateProblem } from "$lib/config/formulas";
+  import {
+    formulaSaveFailed,
+    isFormulasWritable,
+  } from "$lib/stores/formulas.svelte";
   import type { FormulaTemplate } from "$lib/types/device";
 
   let {
@@ -24,7 +28,9 @@
     if (draft.id !== template.id) draft = { ...template };
   });
 
-  const validation = $derived(problemFor(draft));
+  const writable = $derived(isFormulasWritable());
+  const saveFailed = $derived(formulaSaveFailed());
+  const validation = $derived(formulaTemplateProblem(draft));
   const isDirty = $derived(
     isNew || JSON.stringify(draft) !== JSON.stringify(template),
   );
@@ -35,14 +41,8 @@
     problem = validation;
   });
 
-  function problemFor(value: FormulaTemplate): string | null {
-    if (!value.name.trim()) return "A name is required.";
-    if (!value.expr.trim()) return "The expression is empty.";
-    return checkExpression(value.expr);
-  }
-
   export function save() {
-    if (validation || !isDirty) return;
+    if (validation || !isDirty || !writable) return;
     onSave({ ...draft, name: draft.name.trim() || "Untitled" });
   }
 </script>
@@ -85,6 +85,13 @@
     ><span class="label-mono">Notes</span>
     <input type="text" bind:value={draft.notes} /></label
   >
+  {#if !writable}
+    <p class="text-danger hint">
+      Formula templates could not be loaded — saving is disabled.
+    </p>
+  {:else if saveFailed}
+    <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+  {/if}
   {#if validation}
     <p class="text-danger hint">{validation}</p>
   {/if}
