@@ -94,7 +94,7 @@ describe("NetworkPresenceService", () => {
 });
 
 describe("probeTcp", () => {
-  it("reports an open port and a closed one", async () => {
+  it("reports an open port and treats a refusal as reachable", async () => {
     const server = net.createServer();
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", resolve),
@@ -102,6 +102,8 @@ describe("probeTcp", () => {
     const port = (server.address() as net.AddressInfo).port;
     expect(await probeTcp("127.0.0.1", port, 500)).toBe(true);
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    expect(await probeTcp("127.0.0.1", port, 200)).toBe(false);
+    // A closed port on a reachable host answers with ECONNREFUSED: the phone
+    // is up, even though nothing listens there.
+    expect(await probeTcp("127.0.0.1", port, 200)).toBe(true);
   });
 });

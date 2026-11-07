@@ -45,7 +45,9 @@ export function probePing(host: string, timeoutMs: number): Promise<boolean> {
   });
 }
 
-/** A TCP connect; true when the port accepts. */
+/** A TCP presence probe.
+ *  Open port = reachable; a refused connection also proves the host is up
+ *  (Android answers a closed port with RST), so both count as online. */
 export function probeTcp(
   host: string,
   port: number,
@@ -63,7 +65,9 @@ export function probeTcp(
     socket.setTimeout(timeoutMs);
     socket.once("connect", () => finish(true));
     socket.once("timeout", () => finish(false));
-    socket.once("error", () => finish(false));
+    socket.once("error", (error) =>
+      finish((error as { code?: string }).code === "ECONNREFUSED"),
+    );
   });
 }
 
