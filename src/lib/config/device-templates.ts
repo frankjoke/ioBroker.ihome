@@ -44,9 +44,10 @@ const SHRDZM_METER = `({
   params: [
     {
       name: "source",
-      label: "MQTT sensor state",
+      label: "Power meter state",
       type: "state",
-      description: "e.g. mqtt.0.SHRDZM.3C6105FB24B9.3C6105FB24B9.sensor",
+      description:
+        "The state whose JSON value is the meter reading; standard power meters expose the same OBIS fields.",
     },
   ],
   itemList: [
@@ -171,9 +172,9 @@ export const BUILTIN_DEVICE_TEMPLATES: DeviceTemplate[] = [
   },
   {
     id: "shrdzm-mqtt-meter",
-    name: "SHRDZM / MQTT electricity meter",
+    name: "PowerMeter from state",
     description:
-      "Reads the SHRDZM JSON from an MQTT state and creates a Meter device with energy, power, voltage and current.",
+      "Reads a power meter's JSON state and creates a Meter device with energy, power, voltage and current.",
     source: SHRDZM_METER,
   },
 ];
