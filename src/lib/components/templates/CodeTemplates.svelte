@@ -32,19 +32,23 @@
 
   let {
     formulaOnly = false,
+    embedded = false,
     dirty = $bindable(false),
+    search = $bindable(""),
+    sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
   }: {
     formulaOnly?: boolean;
+    embedded?: boolean;
     dirty?: boolean;
+    search?: string;
+    sortDir?: "asc" | "desc";
     focus?: { kind: "formula" | "function"; id: string } | null;
     onFocusApplied?: () => void;
   } = $props();
   let lastFocus = "";
 
-  let search = $state("");
-  let sortDir = $state<"asc" | "desc">("asc");
   let selected = $state<CodeEntry | null>(null);
   let draftKind = $state<"formula" | "function">("formula");
   let draft = $state<FormulaTemplate | FunctionTemplate | null>(null);
@@ -182,7 +186,11 @@
     onFocusApplied?.();
   });
 
-  function startNew(kind: "formula" | "function") {
+  export function startNew(kind: "formula" | "function") {
+    guard(() => beginNew(kind));
+  }
+
+  function beginNew(kind: "formula" | "function") {
     if (kind === "formula") {
       draftKind = "formula";
       const template = { id: newId(), name: "", expr: "" };
@@ -272,35 +280,37 @@
 </script>
 
 <div class="code-templates">
-  <div class="page-header">
-    <div class="page-heading">
-      <h1>{formulaOnly ? "Formula Templates" : "Code templates"}</h1>
-      {#if !formulaOnly}
-        <p class="text-muted hint">
-          Formula and Function snippets used from formula, action and function
-          fields.
-        </p>
-      {/if}
-    </div>
-    <div class="page-actions">
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        onclick={() => guard(() => startNew("formula"))}
-      >
-        <span class="material-symbols-outlined">add</span> Formula
-      </button>
-      {#if !formulaOnly}
+  {#if !embedded}
+    <div class="page-header">
+      <div class="page-heading">
+        <h1>{formulaOnly ? "Formula Templates" : "Code templates"}</h1>
+        {#if !formulaOnly}
+          <p class="text-muted hint">
+            Formula and Function snippets used from formula, action and function
+            fields.
+          </p>
+        {/if}
+      </div>
+      <div class="page-actions">
         <button
           type="button"
-          class="btn btn-sm"
-          onclick={() => guard(() => startNew("function"))}
+          class="btn btn-primary btn-sm"
+          onclick={() => startNew("formula")}
         >
-          <span class="material-symbols-outlined">add</span> Function
+          <span class="material-symbols-outlined">add</span> Formula
         </button>
-      {/if}
+        {#if !formulaOnly}
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => startNew("function")}
+          >
+            <span class="material-symbols-outlined">add</span> Function
+          </button>
+        {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 
   {#if error}
     <p class="text-danger hint">{error}</p>
@@ -314,7 +324,7 @@
       <p class="text-muted">No templates yet — add one to get started.</p>
     </div>
   {:else}
-    {#if entries.length > 0}
+    {#if !embedded && entries.length > 0}
       <div class="filter-bar">
         <input
           type="search"
@@ -357,13 +367,13 @@
               >
               <code class="preview">{entry.preview}</code>
               <span class="item-actions">
-                <IconButton
-                  icon="download"
-                  label={`Export ${entry.name}`}
-                  disabled={!definitionFor(entry)}
-                  onclick={() => exportEntry(entry)}
-                />
                 {#if isOpen(entry)}
+                  <IconButton
+                    icon="download"
+                    label={`Export ${entry.name}`}
+                    disabled={!definitionFor(entry)}
+                    onclick={() => exportEntry(entry)}
+                  />
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"

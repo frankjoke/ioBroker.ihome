@@ -50,6 +50,14 @@
   let importError = $state("");
   let pendingImport = $state<TemplateFile | null>(null);
   let focus = $state<{ kind: TemplateKind; id: string } | null>(null);
+  let search = $state("");
+  let sortDir = $state<"asc" | "desc">("asc");
+  let codeRef = $state<{
+    startNew: (kind: "formula" | "function") => void;
+  } | null>(null);
+  let templateRef = $state<{
+    startNew: (kind: "device" | "logic" | "api" | "both") => void;
+  } | null>(null);
 
   const codeFocus = $derived(
     focus && (focus.kind === "formula" || focus.kind === "snippet")
@@ -70,6 +78,8 @@
 
   function go(next: Group) {
     dirty = false;
+    search = "";
+    sortDir = "asc";
     group = next;
     tabValue = next;
   }
@@ -90,10 +100,7 @@
   }
 
   function applyFocus(kind: TemplateKind, id: string) {
-    const next = templateGroup(kind);
-    dirty = false;
-    group = next;
-    tabValue = next;
+    go(templateGroup(kind));
     focus = { kind, id };
     importError = "";
   }
@@ -143,39 +150,115 @@
 <div class="templates-page">
   <div class="page-heading">
     <h1>Templates</h1>
-    <button
-      type="button"
-      class="btn btn-sm"
-      onclick={() => {
-        importError = "";
-        importOpen = true;
-      }}
-    >
-      <span class="material-symbols-outlined">upload</span> Import
-    </button>
+    <div class="page-actions">
+      {#if group === "code"}
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={() => codeRef?.startNew("formula")}
+        >
+          <span class="material-symbols-outlined">add</span> Formula
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => codeRef?.startNew("function")}
+        >
+          <span class="material-symbols-outlined">add</span> Function
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={() => templateRef?.startNew("device")}
+        >
+          <span class="material-symbols-outlined">add</span> Device
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => templateRef?.startNew("logic")}
+        >
+          <span class="material-symbols-outlined">add</span> Logic
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => templateRef?.startNew("api")}
+        >
+          <span class="material-symbols-outlined">add</span> API
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => templateRef?.startNew("both")}
+        >
+          <span class="material-symbols-outlined">add</span> Both
+        </button>
+      {/if}
+      <button
+        type="button"
+        class="btn btn-sm"
+        onclick={() => {
+          importError = "";
+          importOpen = true;
+        }}
+      >
+        <span class="material-symbols-outlined">upload</span> Import
+      </button>
+    </div>
   </div>
 
   {#if importError}
     <p class="text-danger hint">{importError}</p>
   {/if}
 
-  <OptionTabs
-    bind:value={tabValue}
-    label="Template group"
-    {tabs}
-    collapsible={false}
-    onchange={onTabChange}
-  />
+  <div class="list-toolbar">
+    <OptionTabs
+      bind:value={tabValue}
+      label="Template group"
+      {tabs}
+      collapsible={false}
+      onchange={onTabChange}
+    />
+    <div class="list-filter">
+      <input
+        type="search"
+        placeholder={group === "code"
+          ? "Search name or code…"
+          : "Search name or part…"}
+        bind:value={search}
+      />
+      <button
+        type="button"
+        class="sort-dir"
+        title="Toggle sort direction"
+        aria-label="Toggle sort direction"
+        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
+      >
+        <span class="material-symbols-outlined"
+          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+        >
+      </button>
+    </div>
+  </div>
 
   {#if group === "code"}
     <CodeTemplates
+      embedded
+      bind:this={codeRef}
       bind:dirty
+      bind:search
+      bind:sortDir
       focus={codeFocus}
       onFocusApplied={() => (focus = null)}
     />
   {:else}
     <TemplateBrowser
+      bind:this={templateRef}
       bind:dirty
+      bind:search
+      bind:sortDir
       focus={templateFocus}
       onFocusApplied={() => (focus = null)}
     />
@@ -214,6 +297,53 @@
 
   .page-heading h1 {
     margin: 0;
+  }
+
+  .page-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .list-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .list-filter {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) auto;
+    gap: 0.5rem;
+    flex: 1 1 18rem;
+    margin-left: auto;
+  }
+
+  .list-filter input {
+    min-width: 0;
+    padding: 0.35rem;
+  }
+
+  .sort-dir {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+  }
+
+  .sort-dir:hover {
+    background: var(--surface-container);
+  }
+
+  .sort-dir .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .hint {

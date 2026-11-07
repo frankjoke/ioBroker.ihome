@@ -40,10 +40,14 @@
 
   let {
     dirty = $bindable(false),
+    search = $bindable(""),
+    sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
   }: {
     dirty?: boolean;
+    search?: string;
+    sortDir?: "asc" | "desc";
     focus?: {
       kind: "device" | "logic" | "api" | "bundle";
       id: string;
@@ -52,8 +56,6 @@
   } = $props();
   let lastFocus = "";
 
-  let search = $state("");
-  let sortDir = $state<"asc" | "desc">("asc");
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);
   let editorRef = $state<{
@@ -372,6 +374,15 @@
     else if (selected.kind === "bundle") duplicateBundle(selected.id);
   }
 
+  export function startNew(kind: "device" | "logic" | "api" | "both") {
+    guard(() => {
+      if (kind === "device") newDevice();
+      else if (kind === "logic") newLogic();
+      else if (kind === "api") newApi();
+      else startBoth();
+    });
+  }
+
   function startBoth() {
     const draft: TemplateBundle = {
       id: newId(),
@@ -476,58 +487,12 @@
 </script>
 
 <div class="template-browser">
-  <div class="page-header">
-    <div class="page-heading">
-      <h2>Templates</h2>
-      <p class="text-muted hint">
-        Applyable templates: a device, a logic, both, or an API logic + device.
-      </p>
-    </div>
-    <div class="page-actions">
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        onclick={() => guard(newDevice)}
-      >
-        <span class="material-symbols-outlined">add</span> Device
-      </button>
-      <button type="button" class="btn btn-sm" onclick={() => guard(newLogic)}>
-        <span class="material-symbols-outlined">add</span> Logic
-      </button>
-      <button type="button" class="btn btn-sm" onclick={() => guard(newApi)}>
-        <span class="material-symbols-outlined">add</span> API
-      </button>
-      <button type="button" class="btn btn-sm" onclick={() => guard(startBoth)}>
-        <span class="material-symbols-outlined">add</span> Both
-      </button>
-    </div>
-  </div>
-
   {#if error}
     <p class="text-danger hint">{error}</p>
   {/if}
   {#if bundleSaveFailed}
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
-
-  <div class="filter-bar">
-    <input
-      type="search"
-      placeholder="Search name or part…"
-      bind:value={search}
-    />
-    <button
-      type="button"
-      class="sort-dir"
-      title="Toggle sort direction"
-      aria-label="Toggle sort direction"
-      onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-    >
-      <span class="material-symbols-outlined"
-        >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
-      >
-    </button>
-  </div>
 
   {#if rows.length === 0}
     <div class="card empty-state">
@@ -545,13 +510,13 @@
             </button>
             <span class="badge">{badge(entry)}</span>
             <span class="item-actions">
-              <IconButton
-                icon="download"
-                label={`Export ${entry.name}`}
-                disabled={!definitionFor(entry)}
-                onclick={() => exportEntry(entry)}
-              />
               {#if isOpen(entry)}
+                <IconButton
+                  icon="download"
+                  label={`Export ${entry.name}`}
+                  disabled={!definitionFor(entry)}
+                  onclick={() => exportEntry(entry)}
+                />
                 {#if entry.kind === "api"}
                   <button
                     type="button"
@@ -676,67 +641,9 @@
     width: 100%;
   }
 
-  .page-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .page-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    flex: 1 1 14rem;
-    min-width: 0;
-  }
-
-  .page-heading h2 {
-    margin: 0;
-  }
-
-  .page-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
   .hint {
     margin: 0;
     font-size: var(--body-sm);
-  }
-
-  .filter-bar {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.5rem;
-  }
-
-  .filter-bar input {
-    min-width: 0;
-    padding: 0.35rem;
-  }
-
-  .sort-dir {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .sort-dir:hover {
-    background: var(--surface-container);
-  }
-
-  .sort-dir .material-symbols-outlined {
-    font-size: 18px;
   }
 
   .template-list {
