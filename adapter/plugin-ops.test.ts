@@ -4,6 +4,7 @@ import {
   DEFAULT_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_CODE,
   parsePluginMessage,
+  pluginConfigWithBuiltins,
   pluginError,
   pluginReply,
   seedBuiltinPlugins,
@@ -49,6 +50,28 @@ describe("validAdapterPlugins", () => {
         code: undefined,
       },
     ]);
+  });
+
+  it("logs dropped and duplicate entries without changing the raw config", () => {
+    const logs: string[] = [];
+    const raw = [
+      { id: "Bad", name: "Bad", enabled: true, code: "x" },
+      { id: "good", name: "Good", enabled: true, code: "x" },
+      { id: "good", name: "Duplicate", enabled: true, code: "y" },
+    ];
+    const valid = validAdapterPlugins(raw, BUILTIN_PLUGINS, (message) =>
+      logs.push(message),
+    );
+    expect(valid.map((plugin) => plugin.id)).toEqual(["good"]);
+    expect(logs).toHaveLength(2);
+    expect(logs[0]).toContain("Bad");
+    expect(logs[1]).toContain("good");
+
+    const next = pluginConfigWithBuiltins(raw, valid);
+    expect(next.slice(0, raw.length)).toEqual(raw);
+    expect(next.slice(raw.length).map((entry) => entry.id)).toEqual(
+      BUILTIN_PLUGINS.map((builtin) => builtin.id),
+    );
   });
 
   it("rejects user code on reserved ids, unknown builtins, empty code, bad ids and overlong code", () => {

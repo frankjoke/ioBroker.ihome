@@ -98,13 +98,30 @@ function validEntry(
 export function validAdapterPlugins(
   value: unknown,
   builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
+  log?: (message: string) => void,
 ): AdapterPlugin[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    if (value !== undefined && value !== null) {
+      log?.("plugin list: expected an array");
+    }
+    return [];
+  }
   const seen = new Set<string>();
   const plugins: AdapterPlugin[] = [];
-  for (const entry of value) {
+  for (const [index, entry] of value.entries()) {
     const plugin = validEntry(entry, builtins);
-    if (!plugin || seen.has(plugin.id)) continue;
+    if (!plugin) {
+      const id =
+        record(entry) && typeof entry.id === "string"
+          ? entry.id
+          : `#${index + 1}`;
+      log?.(`plugin list: ignoring invalid entry ${id}`);
+      continue;
+    }
+    if (seen.has(plugin.id)) {
+      log?.(`plugin list: ignoring duplicate plugin ${plugin.id}`);
+      continue;
+    }
     seen.add(plugin.id);
     plugins.push(plugin);
   }
@@ -115,8 +132,9 @@ export function validAdapterPlugins(
 export function seedBuiltinPlugins(
   value: unknown,
   builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
+  log?: (message: string) => void,
 ): AdapterPlugin[] {
-  const plugins = validAdapterPlugins(value, builtins);
+  const plugins = validAdapterPlugins(value, builtins, log);
   const ids = new Set(plugins.map((plugin) => plugin.id));
   for (const builtin of builtins) {
     if (ids.has(builtin.id)) continue;
@@ -130,6 +148,33 @@ export function seedBuiltinPlugins(
     });
   }
   return plugins;
+}
+
+/**
+ * The config to persist when seeding builtins: the raw entries stay untouched
+ * (invalid ones are only ignored at runtime and logged), plus every missing
+ * builtin. Never persist the filtered list, which would delete admin data.
+ */
+export function pluginConfigWithBuiltins(
+  raw: unknown,
+  plugins: AdapterPlugin[],
+  builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
+): unknown[] {
+  const current = Array.isArray(raw) ? raw : [];
+  const validBuiltinIds = new Set(
+    plugins.filter((plugin) => plugin.builtin).map((plugin) => plugin.id),
+  );
+  const missing = builtins
+    .filter((builtin) => !validBuiltinIds.has(builtin.id))
+    .map((builtin) => ({
+      id: builtin.id,
+      name: builtin.name,
+      enabled: true,
+      builtin: true,
+      timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+      code: undefined,
+    }));
+  return [...current, ...missing];
 }
 
 /** The `plugin` message payload, or the reason it cannot be used. */

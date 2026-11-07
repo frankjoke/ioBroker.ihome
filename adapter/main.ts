@@ -23,6 +23,7 @@ import { createPluginApi } from "./plugin-api";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
   parsePluginMessage,
+  pluginConfigWithBuiltins,
   pluginError,
   seedBuiltinPlugins,
   type PluginReply,
@@ -1515,15 +1516,14 @@ class IHome extends utils.Adapter {
       (this.config as { networkDevices?: unknown }).networkDevices,
     );
 
-    const plugins = seedBuiltinPlugins(
-      (this.config as { plugins?: unknown }).plugins,
+    const rawPlugins = (this.config as { plugins?: unknown }).plugins;
+    const plugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
+      this.log.warn(message),
     );
-    if (
-      JSON.stringify(plugins) !==
-      JSON.stringify((this.config as { plugins?: unknown }).plugins)
-    ) {
+    const persistedPlugins = pluginConfigWithBuiltins(rawPlugins, plugins);
+    if (JSON.stringify(persistedPlugins) !== JSON.stringify(rawPlugins)) {
       try {
-        await this.updateConfig({ plugins });
+        await this.updateConfig({ plugins: persistedPlugins });
       } catch (error) {
         this.log.warn(`cannot store the plugin list: ${String(error)}`);
       }
