@@ -1511,7 +1511,8 @@
                       <span class="label-mono">URL</span>
                       <input
                         type="text"
-                        placeholder="http://…/echarts/index.html?preset=…"
+                        placeholder="samsung.html or /echarts/index.html?preset=…"
+                        title={"Use a path relative to /ihome/ so it also works through ioBroker Pro. {{origin}}, {{base}} and //path are substituted; a full http://LAN URL works only at home."}
                         value={String(slot.options?.url ?? "")}
                         oninput={(e) =>
                           patchOptions(i, {
@@ -1546,6 +1547,13 @@
                             patchOptions(i, { html: e.currentTarget.value })}
                         ></textarea>
                       </label>
+                      <p class="url-help text-muted">
+                        Use <span class="mono">{"{{base}}"}</span> or
+                        <span class="mono">{"{{origin}}"}</span> for local links:
+                        base is relative in production (works locally and through
+                        ioBroker Pro), the broker URL in dev; origin is the page/broker
+                        origin.
+                      </p>
                       <div class="row">
                         <div class="small grow">
                           <span class="label-mono">From state</span>
@@ -2587,6 +2595,11 @@
   .slot-editor .small input,
   .slot-editor .small select {
     min-width: 0;
+  }
+
+  .url-help {
+    margin: 0;
+    font-size: var(--body-sm);
   }
 
   .source-pick {

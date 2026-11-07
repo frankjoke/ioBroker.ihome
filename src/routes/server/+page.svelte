@@ -11,11 +11,20 @@
     settingsSaveFailed,
     updateSettings,
   } from "$lib/stores/settings.svelte";
+  import { appBaseUrl } from "$lib/config/frame-url";
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
+
+  /** What local frame/HTML links should start with in this view: relative in
+   *  production (follows the page origin, so it works locally and through
+   *  iobroker.pro), the broker's absolute base in dev. */
+  const pageBase = appBaseUrl({
+    dev: import.meta.env.DEV,
+    origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+  });
 
   /**
    * The broker the live socket is actually on. The fields above may hold an
@@ -92,6 +101,11 @@
             >Leave empty to use the configured broker fallback, or the host
             serving this page when no fallback is set (socket.io on port 8081).
             Editing this while connected is fine — saving reconnects.</span
+          >
+          <span class="hint text-muted"
+            >Page base for local links: <span class="mono">{pageBase}</span>.
+            Relative in production, so frames/HTML work locally and through
+            iobroker.pro; in dev it points at the broker.</span
           >
         </div>
         <div class="field">

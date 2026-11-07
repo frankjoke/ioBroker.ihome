@@ -1,5 +1,8 @@
+/* global location */
+
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { callPlugin } from "$lib/config/plugin-call";
+import { appBaseUrl, appOrigin } from "$lib/config/frame-url";
 import { getVariables, upsertVariable } from "$lib/stores/variables.svelte";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { saveVariables } from "$lib/variables.svelte.js";
@@ -16,6 +19,20 @@ function findVariable(name: string): GlobalVariable | undefined {
  * variables; the broker's ACL still applies to the state writes.
  */
 export const htmlBridge = {
+  /** The web adapter base for this view (relative in production, absolute in
+   *  dev). Local links built from it work locally and through ioBroker Pro. */
+  baseUrl: appBaseUrl({
+    dev: import.meta.env.DEV,
+    origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+  }),
+  /** The origin for local links: the page's own origin in production, the
+   *  broker's origin in dev. */
+  origin: appOrigin({
+    dev: import.meta.env.DEV,
+    origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+    pageOrigin: location.origin,
+  }),
+
   /** Write a state (ack=false), subscribing it for any later reads. */
   async setState(id: string, value: unknown) {
     registerProgramStateId(id);

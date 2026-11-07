@@ -32,6 +32,8 @@ export function renderHtmlTemplate(
 const BRIDGE = `<script>
 (function () {
   var api = {
+    baseUrl: parent.__IHOME__.baseUrl,
+    origin: parent.__IHOME__.origin,
     setState: function (id, value) { return parent.__IHOME__.setState(id, value); },
     getState: function (id) { return parent.__IHOME__.getState(id); },
     toggle: function (id) { return parent.__IHOME__.toggle(id); },

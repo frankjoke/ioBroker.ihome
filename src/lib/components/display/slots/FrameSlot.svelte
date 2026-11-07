@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { frameUrl } from "$lib/config/frame-url";
   import type { Slot } from "$lib/types/display";
 
   /**
@@ -6,11 +7,21 @@
    * (eCharts, Energiefluss) or any URL. It fills whatever space it is given, so
    * the tile's span decides how much shows on the tile and the modal's row how
    * much in the modal.
+   *
+   * The stored URL is the deployed one (relative to `/ihome/`); the dev server
+   * resolves it against the broker origin instead (`VITE_IOBROKER_ORIGIN`).
    */
   let { slot }: { slot: Slot } = $props();
 
   const url = $derived(
-    typeof slot.options?.url === "string" ? slot.options.url : "",
+    typeof slot.options?.url === "string"
+      ? frameUrl(slot.options.url, {
+          dev: import.meta.env.DEV,
+          origin:
+            import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+          pageOrigin: location.origin,
+        })
+      : "",
   );
 </script>
 

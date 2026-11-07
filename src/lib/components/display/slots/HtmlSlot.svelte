@@ -7,6 +7,7 @@
     placeholderKeys,
     renderHtmlDocument,
   } from "$lib/config/html-template";
+  import { appBaseUrl, appOrigin } from "$lib/config/frame-url";
   import { installHtmlBridge } from "$lib/html-bridge";
   import type { Slot } from "$lib/types/display";
 
@@ -62,6 +63,21 @@
   });
 
   function placeholderValue(key: string): unknown {
+    // Reserved: the web adapter base/origin for this view. Relative in
+    // production (works locally and through ioBroker Pro), absolute in dev.
+    if (key === "base" || key === "$base") {
+      return appBaseUrl({
+        dev: import.meta.env.DEV,
+        origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+      });
+    }
+    if (key === "origin" || key === "$origin") {
+      return appOrigin({
+        dev: import.meta.env.DEV,
+        origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+        pageOrigin: location.origin,
+      });
+    }
     const variable = getVariables().find((v) => v.name === key);
     if (variable) {
       if (variable.kind === "state" && variable.stateId) {
