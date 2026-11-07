@@ -317,7 +317,7 @@
     display: grid;
     grid-template-columns: minmax(10rem, 1fr) auto;
     gap: 0.5rem;
-    flex: 1 1 18rem;
+    flex: 0 1 20rem;
     margin-left: auto;
   }
 
