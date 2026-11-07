@@ -27,22 +27,67 @@ export type NetworkProbe = (device: NetworkDevice) => Promise<boolean>;
 
 const PING_TIMEOUT_PAD_MS = 500;
 
-/** A single ping; true only on exit code 0. */
-export function probePing(host: string, timeoutMs: number): Promise<boolean> {
-  const args =
-    process.platform === "win32"
-      ? ["-n", "1", "-w", String(timeoutMs), host]
-      : process.platform === "darwin"
-        ? ["-c", "1", "-W", String(timeoutMs), host]
-        : ["-c", "1", "-W", String(Math.ceil(timeoutMs / 1000)), host];
-  return new Promise((resolve) => {
+export interface PingCommand {
+  file: string;
+  args: string[];
+}
+
+export type PingRunner = (
+  file: string,
+  args: string[],
+  timeoutMs: number,
+) => Promise<boolean>;
+
+/** The platform and address-family specific ping invocation. */
+export function pingCommand(
+  host: string,
+  timeoutMs: number,
+  platform: typeof process.platform = process.platform,
+): PingCommand {
+  const v6 = net.isIP(host) === 6;
+  if (platform === "win32") {
+    return {
+      file: "ping",
+      args: [...(v6 ? ["-6"] : []), "-n", "1", "-w", String(timeoutMs), host],
+    };
+  }
+  if (platform === "darwin") {
+    return {
+      file: v6 ? "ping6" : "ping",
+      args: ["-c", "1", "-W", String(timeoutMs), host],
+    };
+  }
+  return {
+    file: "ping",
+    args: [
+      ...(v6 ? ["-6"] : []),
+      "-c",
+      "1",
+      "-W",
+      String(Math.ceil(timeoutMs / 1000)),
+      host,
+    ],
+  };
+}
+
+const defaultPingRunner: PingRunner = (file, args, timeoutMs) =>
+  new Promise((resolve) => {
     execFile(
-      "ping",
+      file,
       args,
       { timeout: timeoutMs + PING_TIMEOUT_PAD_MS, windowsHide: true },
       (error) => resolve(!error),
     );
   });
+
+/** A single ping; true only on exit code 0. */
+export function probePing(
+  host: string,
+  timeoutMs: number,
+  run: PingRunner = defaultPingRunner,
+): Promise<boolean> {
+  const { file, args } = pingCommand(host, timeoutMs);
+  return run(file, args, timeoutMs);
 }
 
 /** A TCP presence probe.

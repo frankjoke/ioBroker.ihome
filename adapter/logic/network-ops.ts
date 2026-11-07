@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 /** One configured network device (adapter native config). */
 export interface NetworkDevice {
   id: string;
@@ -51,7 +53,8 @@ export function validNetworkDevice(value: unknown): NetworkDevice | null {
   const name = typeof value.name === "string" ? value.name.trim() : "";
   if (!name || name.length > 64) return null;
   const host = typeof value.host === "string" ? value.host.trim() : "";
-  if (!host || host.length > 253 || !HOST.test(host)) return null;
+  if (!host || host.length > 253) return null;
+  if (isIP(host) === 0 && !HOST.test(host)) return null;
   let mac: string | undefined;
   if (value.mac !== undefined && value.mac !== "") {
     if (typeof value.mac !== "string" || !MAC.test(value.mac)) return null;

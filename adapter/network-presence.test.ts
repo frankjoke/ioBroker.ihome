@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import net from "node:net";
 import {
   NetworkPresenceService,
+  pingCommand,
   probeTcp,
   type NetworkAdapter,
 } from "./network-presence";
@@ -105,5 +106,26 @@ describe("probeTcp", () => {
     // A closed port on a reachable host answers with ECONNREFUSED: the phone
     // is up, even though nothing listens there.
     expect(await probeTcp("127.0.0.1", port, 200)).toBe(true);
+  });
+});
+
+describe("pingCommand", () => {
+  it("builds platform and family specific ping commands", () => {
+    expect(pingCommand("192.168.1.2", 2000, "win32")).toEqual({
+      file: "ping",
+      args: ["-n", "1", "-w", "2000", "192.168.1.2"],
+    });
+    expect(pingCommand("fe80::1", 2000, "win32")).toEqual({
+      file: "ping",
+      args: ["-6", "-n", "1", "-w", "2000", "fe80::1"],
+    });
+    expect(pingCommand("fe80::1", 2000, "linux")).toEqual({
+      file: "ping",
+      args: ["-6", "-c", "1", "-W", "2", "fe80::1"],
+    });
+    expect(pingCommand("fe80::1", 2000, "darwin")).toEqual({
+      file: "ping6",
+      args: ["-c", "1", "-W", "2000", "fe80::1"],
+    });
   });
 });

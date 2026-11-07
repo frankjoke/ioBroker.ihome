@@ -9,6 +9,23 @@ import {
 } from "./network-ops";
 
 describe("validNetworkDevice", () => {
+  it("accepts IPv6 literals and still rejects unsafe hosts", () => {
+    expect(
+      validNetworkDevice({ id: "v6", name: "V6", host: "fe80::1" }),
+    ).toMatchObject({
+      host: "fe80::1",
+    });
+    expect(
+      validNetworkDevice({ id: "v6", name: "V6", host: "2001:db8::10" }),
+    ).toMatchObject({ host: "2001:db8::10" });
+    expect(
+      validNetworkDevice({ id: "bad", name: "Bad", host: "a:b" }),
+    ).toBeNull();
+    expect(
+      validNetworkDevice({ id: "bad", name: "Bad", host: "-oops" }),
+    ).toBeNull();
+  });
+
   it("accepts a full entry, normalizes the MAC and clamps the numbers", () => {
     expect(
       validNetworkDevice({
