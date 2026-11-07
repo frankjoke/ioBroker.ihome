@@ -54,6 +54,29 @@
     ),
   );
   const shown = $derived(filterCodeEntries(entries, search, sortDir));
+  const rows = $derived.by(() => {
+    if (!selected) return shown;
+    const exists = shown.some(
+      (entry) => entry.kind === selected.kind && entry.id === selected.id,
+    );
+    return exists
+      ? shown.map((entry) =>
+          entry.kind === selected.kind && entry.id === selected.id
+            ? selected
+            : entry,
+        )
+      : [selected, ...shown];
+  });
+
+  function isOpen(entry: CodeEntry) {
+    return selected?.kind === entry.kind && selected?.id === entry.id;
+  }
+
+  function onLineClick(event: MouseEvent, entry: CodeEntry) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, select, textarea, a, label")) return;
+    open(entry);
+  }
 
   $effect(() => {
     dirty = editorDirty;
@@ -224,43 +247,46 @@
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 
-  {#if entries.length === 0}
+  {#if entries.length === 0 && !selected}
     <div class="card empty-state">
       <p class="text-muted">No templates yet — add one to get started.</p>
     </div>
   {:else}
-    <div class="filter-bar">
-      <input
-        type="search"
-        placeholder="Search name or code…"
-        bind:value={search}
-      />
-      <button
-        type="button"
-        class="sort-dir"
-        title="Toggle sort direction"
-        aria-label="Toggle sort direction"
-        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-      >
-        <span class="material-symbols-outlined"
-          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+    {#if entries.length > 0}
+      <div class="filter-bar">
+        <input
+          type="search"
+          placeholder="Search name or code…"
+          bind:value={search}
+        />
+        <button
+          type="button"
+          class="sort-dir"
+          title="Toggle sort direction"
+          aria-label="Toggle sort direction"
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
         >
-      </button>
-    </div>
+          <span class="material-symbols-outlined"
+            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+          >
+        </button>
+      </div>
+    {/if}
 
-    {#if shown.length === 0}
+    {#if rows.length === 0}
       <div class="card empty-state">
         <p class="text-muted">No templates match the search.</p>
       </div>
     {:else}
       <div class="code-list">
-        {#each shown as entry (`${entry.kind}:${entry.id}`)}
-          <div
-            class="item"
-            class:open={selected?.kind === entry.kind &&
-              selected?.id === entry.id}
-          >
-            <div class="item-line">
+        {#each rows as entry (`${entry.kind}:${entry.id}`)}
+          <div class="item" class:open={isOpen(entry)}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="item-line"
+              onclick={(event) => onLineClick(event, entry)}
+            >
               <button type="button" class="name" onclick={() => open(entry)}>
                 {entry.name}
               </button>
@@ -271,53 +297,51 @@
                 <span class="badge">built-in</span>
               {/if}
               <code class="preview">{entry.preview}</code>
-              {#if !entry.builtin}
+              {#if isOpen(entry) || !entry.builtin}
                 <span class="item-actions">
-                  <IconButton
-                    icon="delete"
-                    danger
-                    label={`Delete ${entry.name}`}
-                    onclick={() => (pendingDelete = entry)}
-                  />
+                  {#if isOpen(entry)}
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      onclick={() => guard(closeNow)}
+                    >
+                      Close
+                    </button>
+                  {/if}
+                  {#if !entry.builtin}
+                    <IconButton
+                      icon="delete"
+                      danger
+                      label={`Delete ${entry.name}`}
+                      onclick={() => (pendingDelete = entry)}
+                    />
+                  {/if}
                 </span>
               {/if}
             </div>
+            {#if isOpen(entry)}
+              <div class="item-editor">
+                {#if draftKind === "formula"}
+                  <FormulaEditor
+                    template={draft as FormulaTemplate}
+                    {isNew}
+                    bind:dirty={editorDirty}
+                    onSave={save}
+                  />
+                {:else}
+                  <FunctionEditor
+                    template={draft as FunctionTemplate}
+                    {isNew}
+                    bind:dirty={editorDirty}
+                    onSave={save}
+                  />
+                {/if}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
     {/if}
-  {/if}
-
-  {#if draft}
-    <div class="card editor-panel">
-      <div class="editor-head">
-        <span class="label-mono"
-          >{draftKind === "formula" ? "Formula" : "Function"}</span
-        >
-        <button
-          type="button"
-          class="btn btn-sm"
-          onclick={() => guard(closeNow)}
-        >
-          Close
-        </button>
-      </div>
-      {#if draftKind === "formula"}
-        <FormulaEditor
-          template={draft as FormulaTemplate}
-          {isNew}
-          bind:dirty={editorDirty}
-          onSave={save}
-        />
-      {:else}
-        <FunctionEditor
-          template={draft as FunctionTemplate}
-          {isNew}
-          bind:dirty={editorDirty}
-          onSave={save}
-        />
-      {/if}
-    </div>
   {/if}
 
   {#if askClose}
@@ -474,19 +498,5 @@
   .empty-state {
     padding: 2rem;
     text-align: center;
-  }
-
-  .editor-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
-  }
-
-  .editor-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
   }
 </style>

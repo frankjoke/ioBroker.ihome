@@ -73,7 +73,30 @@
       : []),
   ]);
   const shown = $derived(filterTemplateEntries(entries, search, sortDir));
+  const rows = $derived.by(() => {
+    if (!selected) return shown;
+    const exists = shown.some(
+      (entry) => entry.kind === selected.kind && entry.id === selected.id,
+    );
+    return exists
+      ? shown.map((entry) =>
+          entry.kind === selected.kind && entry.id === selected.id
+            ? selected
+            : entry,
+        )
+      : [selected, ...shown];
+  });
   const bundleSaveFailed = $derived(templateBundleSaveFailed());
+
+  function isOpen(entry: TemplateEntry) {
+    return selected?.kind === entry.kind && selected?.id === entry.id;
+  }
+
+  function onLineClick(event: MouseEvent, entry: TemplateEntry) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, select, textarea, a, label")) return;
+    open(entry);
+  }
   const selectedBundle = $derived(
     selected?.kind === "bundle"
       ? bundleDraft?.id === selected.id
@@ -329,53 +352,75 @@
     </button>
   </div>
 
-  {#if shown.length === 0}
+  {#if rows.length === 0}
     <div class="card empty-state">
       <p class="text-muted">No templates match the search.</p>
     </div>
   {:else}
     <div class="template-list">
-      {#each shown as entry (`${entry.kind}:${entry.id}`)}
-        <button
-          type="button"
-          class="item-line row"
-          class:active={selected?.kind === entry.kind &&
-            selected?.id === entry.id}
-          onclick={() => open(entry)}
-        >
-          <span class="name">{entry.name}</span>
-          <span class="badge">{badge(entry)}</span>
-          {#if entry.builtin}
-            <span class="badge">built-in</span>
+      {#each rows as entry (`${entry.kind}:${entry.id}`)}
+        <div class="item" class:open={isOpen(entry)}>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
+            <button type="button" class="name" onclick={() => open(entry)}>
+              {entry.name}
+            </button>
+            <span class="badge">{badge(entry)}</span>
+            {#if entry.builtin}
+              <span class="badge">built-in</span>
+            {/if}
+            {#if isOpen(entry)}
+              <span class="item-actions">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() => guard(closeNow)}
+                >
+                  Close
+                </button>
+              </span>
+            {/if}
+          </div>
+          {#if isOpen(entry)}
+            <div class="item-editor">
+              {#if entry.kind === "device"}
+                <VisualTemplates
+                  embedded
+                  focusId={entry.id}
+                  bind:dirty={editorDirty}
+                />
+              {:else if entry.kind === "logic"}
+                <LogicTemplates
+                  embedded
+                  focusId={entry.id}
+                  bind:dirty={editorDirty}
+                />
+              {:else if entry.kind === "api"}
+                <LogicDeviceTemplates
+                  open={true}
+                  embedded
+                  focusId={entry.id}
+                  bind:dirty={editorDirty}
+                  onClose={() => {}}
+                  onGenerated={() => {}}
+                />
+              {:else if entry.kind === "bundle" && selectedBundle}
+                <BundleEditor
+                  bundle={selectedBundle}
+                  isNew={bundleDraft?.id === selectedBundle.id}
+                  bind:dirty={editorDirty}
+                  onSave={saveBundle}
+                  onDelete={() => (pendingBundleDelete = selectedBundle)}
+                />
+              {:else if entry.kind === "bundle"}
+                <p class="text-muted hint">Select a bundle to edit it.</p>
+              {/if}
+            </div>
           {/if}
-        </button>
+        </div>
       {/each}
     </div>
-  {/if}
-
-  {#if selected?.kind === "device"}
-    <VisualTemplates embedded focusId={selected.id} bind:dirty={editorDirty} />
-  {:else if selected?.kind === "logic"}
-    <LogicTemplates embedded focusId={selected.id} bind:dirty={editorDirty} />
-  {:else if selected?.kind === "api"}
-    <LogicDeviceTemplates
-      open={true}
-      embedded
-      focusId={selected.id}
-      bind:dirty={editorDirty}
-      onClose={() => {}}
-      onGenerated={() => {}}
-    />
-  {:else if selected?.kind === "bundle" && selectedBundle}
-    <BundleEditor
-      bundle={selectedBundle}
-      isNew={bundleDraft?.id === selectedBundle.id}
-      bind:dirty={editorDirty}
-      onSave={saveBundle}
-      onDelete={() => (pendingBundleDelete = selectedBundle)}
-    />
-  {:else if selected?.kind === "bundle"}
-    <p class="text-muted hint">Select a bundle to edit it.</p>
   {/if}
 
   {#if askSwitch}
@@ -486,21 +531,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-  }
-
-  .row {
-    width: 100%;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-color, #fff);
-    color: var(--text-color);
-    cursor: pointer;
-    text-align: left;
-    padding: 0.4rem 0.55rem;
-  }
-
-  .row.active {
-    border-color: var(--primary-color);
   }
 
   .name {
