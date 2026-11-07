@@ -63,14 +63,23 @@ const defaultWakeSender: WakeSender = (packet, port, targets) =>
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      socket.close();
+      try {
+        socket.close();
+      } catch {
+        // already closed by a previous error
+      }
       if (error) reject(error);
       else resolve();
     };
 
     socket.once("error", finish);
     socket.bind(() => {
-      socket.setBroadcast(true);
+      try {
+        socket.setBroadcast(true);
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
       let pending = targets.length;
       for (const target of targets) {
         socket.send(packet, port, target, (error) => {

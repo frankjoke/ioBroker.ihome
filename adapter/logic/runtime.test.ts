@@ -71,6 +71,7 @@ function blockHooks(
     message: (...args) => messages.push(args),
     notify: (...args) => notifications.push(args),
     fetchJson: (...args) => fetches.push(args),
+    callPlugin: (...args) => fetches.push(args),
     now: () => 1000,
   };
 }
