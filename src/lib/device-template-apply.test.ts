@@ -24,9 +24,10 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({ ioBroker: mock.ioBroker }));
 import { validateLogicDocument } from "$logic/validate";
 import {
   createTemplateStates,
-  deviceNameTaken,
+  isGeneratedForBase,
   planDeviceTemplate,
 } from "./device-template-apply";
+import type { LogicDef } from "$logic/types";
 
 const SOURCE = `({
   itemList: [{ name: "power", type: "boolean", source: "data.power", foreignWriteName: "power" }],
@@ -34,12 +35,32 @@ const SOURCE = `({
   writeRequest(v, item) { return { url: "https://x/set?" + item.foreignWriteName + "=" + v }; },
 })`;
 
-it("detects an existing device name case-insensitively", () => {
-  const devices = [{ name: "PowerMeter" }, { name: "Heizung" }];
-  expect(deviceNameTaken("PowerMeter", devices)).toBe(true);
-  expect(deviceNameTaken(" powermeter ", devices)).toBe(true);
-  expect(deviceNameTaken("PowerMeter 2", devices)).toBe(false);
-  expect(deviceNameTaken("", devices)).toBe(false);
+it("recognises a template-generated machine for a base state", () => {
+  const logic = {
+    id: "meter",
+    name: "Meter",
+    kind: "machine",
+    states: {
+      Run: {
+        on: [
+          {
+            on: "source",
+            do: {
+              code: 'const T = ({});\nconst P = { baseState: "ihome.0.Devices.PowerMeter" };',
+            },
+          },
+        ],
+      },
+    },
+  } as LogicDef;
+  expect(isGeneratedForBase(logic, "ihome.0.Devices.PowerMeter")).toBe(true);
+  expect(isGeneratedForBase(logic, "ihome.0.Other")).toBe(false);
+  expect(
+    isGeneratedForBase(
+      { ...logic, kind: "function" } as never,
+      "ihome.0.Devices.PowerMeter",
+    ),
+  ).toBe(false);
 });
 
 it("plans states and a valid machine", () => {
@@ -132,6 +153,17 @@ it("plans a device with controls when a device name is given", () => {
     name: "My Meter",
     type: "Meter",
   });
+  const kept = planDeviceTemplate(
+    template,
+    DEVICE_SOURCE,
+    {},
+    "ihome.0.Variables.Meter",
+    "meter",
+    "Meter",
+    "My Meter",
+    "existing-id",
+  );
+  expect(kept.device?.id).toBe("existing-id");
   expect(plan.device?.controls).toHaveLength(3);
   expect(plan.device?.controls[0]).toMatchObject({
     id: "power",

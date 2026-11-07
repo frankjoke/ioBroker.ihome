@@ -10,7 +10,7 @@ import {
 } from "$logic/device-templates";
 import { validateLogicDocument } from "$logic/validate";
 import { normalizeStates, type StateSpec } from "$logic/state-common";
-import type { DeviceTemplateShape, MachineLogic } from "$logic/types";
+import type { DeviceTemplateShape, LogicDef, MachineLogic } from "$logic/types";
 import type { Control, Device, DeviceType } from "$lib/types/device";
 
 export interface DeviceTemplatePlan {
@@ -19,15 +19,16 @@ export interface DeviceTemplatePlan {
   device?: Device;
 }
 
-/** Is a device with this display name already in the registry? */
-export function deviceNameTaken(
-  name: string,
-  devices: Array<{ name?: string }>,
+/** Is this logic a template-generated machine for `baseState`? */
+export function isGeneratedForBase(
+  logic: LogicDef,
+  baseState: string,
 ): boolean {
-  const key = name.trim().toLowerCase();
+  if (logic.kind !== "machine") return false;
+  const code = logic.states?.Run?.on?.[0]?.do?.code ?? "";
   return (
-    key !== "" &&
-    devices.some((device) => (device.name ?? "").trim().toLowerCase() === key)
+    code.includes("const T = (") &&
+    code.includes(`baseState: ${JSON.stringify(baseState)}`)
   );
 }
 
@@ -40,6 +41,7 @@ export function planDeviceTemplate(
   id: string,
   name: string,
   deviceName?: string,
+  deviceId?: string,
 ): DeviceTemplatePlan {
   const check = validateDeviceTemplate(template);
   if (check.errors.length > 0) throw new Error(check.errors[0]);
@@ -88,7 +90,7 @@ export function planDeviceTemplate(
       return control;
     });
     device = projectDevice({
-      id: newId(),
+      id: deviceId ?? newId(),
       name: trimmed,
       type,
       controls,

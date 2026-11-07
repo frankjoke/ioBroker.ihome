@@ -14,7 +14,7 @@
   import {
     planDeviceTemplate,
     createTemplateStates,
-    deviceNameTaken,
+    isGeneratedForBase,
   } from "$lib/device-template-apply";
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { parseDuration } from "$logic/duration";
@@ -195,13 +195,13 @@
         return;
       }
       const trimmedName = deviceName.trim();
-      if (
-        trimmedName &&
-        deviceNameTaken(trimmedName, getCanonicalRegistry().devices ?? [])
-      ) {
-        applyError = `A device named “${trimmedName}” already exists. Rename it or delete the old device first.`;
-        return;
-      }
+      const devices = getCanonicalRegistry().devices ?? [];
+      const existing = trimmedName
+        ? devices.find(
+            (device) =>
+              device.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+          )
+        : undefined;
       const values = { ...applyParams };
       for (const param of evaluated.params ?? []) {
         if (param.type === "duration") {
@@ -221,7 +221,10 @@
       }
       const suffix = baseState.split(".").pop() ?? "device";
       const base = `${selected.id}-${suffix}`;
-      const taken = new Set(doc.logics.map((logic) => logic.id));
+      const baseLogics = existing
+        ? doc.logics.filter((logic) => !isGeneratedForBase(logic, baseState))
+        : doc.logics;
+      const taken = new Set(baseLogics.map((logic) => logic.id));
       let id = base;
       let index = 2;
       while (taken.has(id)) id = `${base}-${index++}`;
@@ -233,11 +236,12 @@
         id,
         selected.name,
         deviceName,
+        existing?.id,
       );
       await createTemplateStates(plan.specs, baseState);
       const nextDoc = {
         ...doc,
-        logics: [...doc.logics, plan.logic],
+        logics: [...baseLogics, plan.logic],
       };
       const issues = validateLogicDocument(nextDoc).filter(
         (issue) => issue.severity === "error",
@@ -246,7 +250,17 @@
         applyError = `${issues[0].path}: ${issues[0].message}`;
         return;
       }
-      if (plan.device) upsertDevice(plan.device);
+      if (plan.device) {
+        const device = existing
+          ? {
+              ...existing,
+              name: plan.device.name,
+              type: plan.device.type,
+              controls: plan.device.controls,
+            }
+          : plan.device;
+        upsertDevice(device);
+      }
       if (!commitLogics(nextDoc)) {
         applyError = "The logic document could not be saved.";
         return;
