@@ -1,4 +1,5 @@
 import type { TemplateBundle } from "$lib/types/templates";
+import { SAMSUNG_REMOTE_HTML } from "$lib/config/samsung-remote";
 
 /** Built-in bundles. The user can duplicate one to edit it. */
 export const NETWORK_DEVICE_BUNDLE: TemplateBundle = {
@@ -82,3 +83,35 @@ export const NETWORK_DEVICE_BUNDLE: TemplateBundle = {
 };
 
 export const BUILTIN_BUNDLES: TemplateBundle[] = [NETWORK_DEVICE_BUNDLE];
+
+export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
+  id: "samsung-tv-remote",
+  name: "Samsung TV remote",
+  description:
+    "A Samsung TV remote. Configure the TV in the adapter's Network devices (host and MAC) and set its id here; the remote reads the host and wakes the TV through the adapter plugin.",
+  params: [
+    {
+      name: "wakeDevice",
+      label: "Network device",
+      type: "string",
+      default: "tv",
+      description:
+        "The id from the adapter's Network devices list. It must have a MAC for Wake-on-LAN.",
+    },
+  ],
+  device: {
+    type: "Custom",
+    size: { w: 2, h: 2 },
+    features: [],
+    slots: [
+      {
+        kind: "html",
+        where: "modal",
+        label: "TV remote",
+        options: { html: SAMSUNG_REMOTE_HTML },
+      },
+    ],
+  },
+};
+
+BUILTIN_BUNDLES.push(SAMSUNG_TV_BUNDLE);
