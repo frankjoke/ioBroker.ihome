@@ -147,6 +147,18 @@ it("a new tile takes its name, size and glyph from the first control", () => {
   });
 });
 
+it("a Custom device takes the face from its first control", () => {
+  const battery = device({
+    id: "battery",
+    name: "Battery",
+    type: "Custom",
+    controls: [ctl("soc", "soc", { role: "value.battery", type: "number" })],
+  });
+  const slots = [slotFromControl(battery, battery.controls[0])];
+  expect(slots[0].icon?.glyph).toBe("battery_full");
+  expect(tileSeed(slots, [battery], []).icon).toBe("battery_full");
+});
+
 it("never suggests a hidden control", () => {
   const light = device({
     type: "Light",

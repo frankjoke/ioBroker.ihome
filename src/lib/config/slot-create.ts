@@ -171,9 +171,13 @@ export function tileSeed(
   }
   const device = devices.find((d) => d.id === source.device);
   if (!device) return first.label ? { title: first.label } : {};
+  const typeGlyph = presetGlyph(device.type);
   return {
     title: tileTitle(device) || undefined,
     size: resolveTemplate(device, templates).size,
-    icon: presetGlyph(device.type),
+    // A Custom device has no face of its own: the first control's glyph is the
+    // meaningful one, not the type preset's generic "widgets" placeholder.
+    icon:
+      device.type === "Custom" ? (first.icon?.glyph ?? typeGlyph) : typeGlyph,
   };
 }
