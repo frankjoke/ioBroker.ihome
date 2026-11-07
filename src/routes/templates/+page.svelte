@@ -1,58 +1,64 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import FormulaTemplates from "$lib/components/templates/FormulaTemplates.svelte";
-  import FunctionTemplates from "$lib/components/templates/FunctionTemplates.svelte";
-  import VisualTemplates from "$lib/components/templates/VisualTemplates.svelte";
-  import LogicTemplates from "$lib/components/templates/LogicTemplates.svelte";
-  import LogicDeviceTemplates from "$lib/components/templates/LogicDeviceTemplates.svelte";
+  import CodeTemplates from "$lib/components/templates/CodeTemplates.svelte";
+  import TemplateBrowser from "$lib/components/templates/TemplateBrowser.svelte";
+  import { templateKind } from "$lib/config/config-nav";
 
-  type Kind = "formula" | "function" | "device" | "logic" | "logic-device";
+  type Group = "code" | "templates";
 
-  const kinds: Array<{ id: Kind; label: string }> = [
-    { id: "formula", label: "Formula" },
-    { id: "function", label: "Function" },
-    { id: "device", label: "Device" },
-    { id: "logic", label: "Logic" },
-    { id: "logic-device", label: "Logic + device" },
+  const tabs: Array<{ id: Group; label: string; hint: string }> = [
+    {
+      id: "code",
+      label: "Code",
+      hint: "Formula and Function snippets used from entry fields.",
+    },
+    {
+      id: "templates",
+      label: "Templates",
+      hint: "Device, logic, both or API templates.",
+    },
   ];
 
   /** The app is hash-routed, so `?type=` lives inside `page.url.hash`. */
-  function requestedKind(): string | null {
+  function requestedGroup(): Group {
     const hash = page.url.hash;
     const hashQuery = hash.includes("?")
       ? hash.slice(hash.indexOf("?") + 1)
       : "";
-    return (
+    const value =
       page.url.searchParams.get("type") ??
-      new URLSearchParams(hashQuery).get("type")
-    );
+      new URLSearchParams(hashQuery).get("type");
+    return templateKind(value);
   }
 
-  const fromQuery = requestedKind();
-  let kind = $state<Kind>(
-    kinds.some((entry) => entry.id === fromQuery)
-      ? (fromQuery as Kind)
-      : "formula",
-  );
+  const initialGroup = requestedGroup();
+  let group = $state<Group>(initialGroup);
+  let tabValue = $state<Group | null>(initialGroup);
   let dirty = $state(false);
-  let pendingKind = $state<Kind | null>(null);
+  let pendingGroup = $state<Group | null>(null);
   let askSwitch = $state(false);
-  let logicDeviceOpen = $state(false);
 
-  function go(next: Kind) {
+  function go(next: Group) {
     dirty = false;
-    kind = next;
+    group = next;
+    tabValue = next;
   }
 
-  function requestKind(next: Kind) {
-    if (next === kind) return;
-    if (dirty) {
-      pendingKind = next;
-      askSwitch = true;
+  function onTabChange(next: Group | null) {
+    const target = next ?? group;
+    if (target === group) {
+      tabValue = group;
       return;
     }
-    go(next);
+    if (dirty) {
+      pendingGroup = target;
+      askSwitch = true;
+      tabValue = group;
+      return;
+    }
+    go(target);
   }
 </script>
 
@@ -65,50 +71,18 @@
     <h1>Templates</h1>
   </div>
 
-  <nav class="type-tabs" aria-label="Template type">
-    {#each kinds as entry (entry.id)}
-      <button
-        type="button"
-        class="btn btn-sm"
-        class:btn-primary={kind === entry.id}
-        aria-current={kind === entry.id ? "page" : undefined}
-        onclick={() => requestKind(entry.id)}
-      >
-        {entry.label}
-      </button>
-    {/each}
-  </nav>
+  <OptionTabs
+    bind:value={tabValue}
+    label="Template group"
+    {tabs}
+    collapsible={false}
+    onchange={onTabChange}
+  />
 
-  {#if kind === "formula"}
-    <FormulaTemplates bind:dirty />
-  {:else if kind === "function"}
-    <FunctionTemplates bind:dirty />
-  {:else if kind === "device"}
-    <VisualTemplates bind:dirty />
-  {:else if kind === "logic"}
-    <LogicTemplates bind:dirty />
-  {:else if kind === "logic-device"}
-    <div class="card logic-device-card">
-      <p class="text-muted">
-        API templates that generate states, a machine and an optional device.
-      </p>
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        onclick={() => (logicDeviceOpen = true)}
-      >
-        Open logic + device templates
-      </button>
-    </div>
-    {#if logicDeviceOpen}
-      <LogicDeviceTemplates
-        open={logicDeviceOpen}
-        onClose={() => (logicDeviceOpen = false)}
-        onGenerated={() => (logicDeviceOpen = false)}
-      />
-    {/if}
+  {#if group === "code"}
+    <CodeTemplates bind:dirty />
   {:else}
-    <p class="text-muted">This template type is being added.</p>
+    <TemplateBrowser bind:dirty />
   {/if}
 
   {#if askSwitch}
@@ -118,13 +92,13 @@
       cancelLabel="Keep editing"
       onConfirm={() => {
         askSwitch = false;
-        const next = pendingKind;
-        pendingKind = null;
+        const next = pendingGroup;
+        pendingGroup = null;
         if (next) go(next);
       }}
       onCancel={() => {
         askSwitch = false;
-        pendingKind = null;
+        pendingGroup = null;
       }}
     />
   {/if}
@@ -135,21 +109,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    --option-tab-bg: var(--background-color);
   }
 
-  .type-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-
-  .logic-device-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    max-width: 640px;
-    margin: 0 auto;
-    width: 100%;
+  .page-heading h1 {
+    margin: 0;
   }
 </style>
