@@ -174,6 +174,35 @@ describe("templateBundleProblem", () => {
       templateBundleProblem(bundle({ api: { source: "1 +" } }), [], []),
     ).toBeTruthy();
   });
+
+  it("rejects a broken conversion string without an API part", () => {
+    expect(
+      templateBundleProblem(
+        bundle({
+          api: undefined,
+          items: [{ name: "t", type: "number", conversion: "1 +" }],
+        }),
+        [],
+        [],
+      ),
+    ).toMatch(/conversion/i);
+  });
+
+  it("does not evaluate the API source when validation is skipped", () => {
+    expect(
+      templateBundleProblem(
+        bundle({
+          api: {
+            source: '(() => { throw new Error("boom") })()',
+          },
+        }),
+        [],
+        [],
+        undefined,
+        { validateApi: false },
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("part helpers", () => {

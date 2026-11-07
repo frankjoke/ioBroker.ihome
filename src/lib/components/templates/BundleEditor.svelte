@@ -7,6 +7,7 @@
     templateBundleProblem,
   } from "$lib/config/template-bundles";
   import { insertAtCaret } from "$lib/components/logic/code-field";
+  import SnippetInput from "$lib/components/templates/SnippetInput.svelte";
   import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
   import {
     getTemplateBundles,
@@ -52,11 +53,6 @@
   let apiStart = 0;
   let apiEnd = 0;
   let apiFocused = false;
-  let activeInput: HTMLInputElement | null = null;
-  let activeStart = 0;
-  let activeEnd = 0;
-  let activeItem: TemplateItem | null = null;
-  let activeField: "conversion" | "setConversion" | null = null;
 
   const writable = $derived(isTemplateBundlesWritable());
   const saveFailed = $derived(templateBundleSaveFailed());
@@ -71,7 +67,9 @@
   const bundleIds = $derived(getTemplateBundles().map((entry) => entry.id));
   const logicIds = $derived(getLogicDocument().logics.map((logic) => logic.id));
   const problem = $derived(
-    templateBundleProblem(draft, bundleIds, logicIds, bundle.id),
+    templateBundleProblem(draft, bundleIds, logicIds, bundle.id, {
+      validateApi: false,
+    }),
   );
   const isDirty = $derived(
     isNew ||
@@ -125,30 +123,6 @@
     apiStart = next.caret;
     apiEnd = next.caret;
     apiFocused = true;
-  }
-
-  function rememberItem(
-    event: Event,
-    item: TemplateItem,
-    field: "conversion" | "setConversion",
-  ) {
-    const input = event.currentTarget as HTMLInputElement;
-    activeInput = input;
-    activeStart = input.selectionStart ?? 0;
-    activeEnd = input.selectionEnd ?? 0;
-    activeItem = item;
-    activeField = field;
-  }
-
-  async function insertItem(code: string) {
-    if (!activeItem || !activeField) return;
-    const value = String(activeItem[activeField] ?? "");
-    const next = insertAtCaret(value, activeStart, activeEnd, code);
-    activeItem[activeField] = next.text;
-    const input = activeInput;
-    await tick();
-    input?.focus();
-    input?.setSelectionRange(next.caret, next.caret);
   }
 
   function setItemSource(item: TemplateItem, value: string) {
@@ -430,36 +404,27 @@
           >
         </div>
         <div class="row-grid">
-          <label class="field"
-            ><span class="label-mono">Conversion</span>
-            <input
-              type="text"
-              bind:value={item.conversion}
+          <div class="field">
+            <span class="label-mono">Conversion</span>
+            <SnippetInput
+              value={item.conversion ?? ""}
+              onchange={(value) => (item.conversion = value)}
+              label="Conversion"
               readonly={builtin}
-              onmousedown={(e) => rememberItem(e, item, "conversion")}
-              onfocus={(e) => rememberItem(e, item, "conversion")}
-              onselect={(e) => rememberItem(e, item, "conversion")}
-              onkeyup={(e) => rememberItem(e, item, "conversion")}
-              onclick={(e) => rememberItem(e, item, "conversion")}
-            /></label
-          >
-          <label class="field"
-            ><span class="label-mono">Set conversion</span>
-            <input
-              type="text"
-              bind:value={item.setConversion}
+            />
+          </div>
+          <div class="field">
+            <span class="label-mono">Set conversion</span>
+            <SnippetInput
+              value={item.setConversion ?? ""}
+              onchange={(value) => (item.setConversion = value)}
+              label="Set conversion"
               readonly={builtin}
-              onmousedown={(e) => rememberItem(e, item, "setConversion")}
-              onfocus={(e) => rememberItem(e, item, "setConversion")}
-              onselect={(e) => rememberItem(e, item, "setConversion")}
-              onkeyup={(e) => rememberItem(e, item, "setConversion")}
-              onclick={(e) => rememberItem(e, item, "setConversion")}
-            /></label
-          >
+            />
+          </div>
         </div>
         {#if !builtin}
           <div class="row-actions">
-            <SnippetSelect mode="expression" onInsert={insertItem} />
             <button
               type="button"
               class="btn btn-sm"
@@ -608,7 +573,6 @@
         onselect={rememberApi}
         onkeyup={rememberApi}
         onclick={rememberApi}
-        onblur={rememberApi}
       ></textarea>
     {/if}
   </section>
@@ -628,7 +592,12 @@
         Save
       </button>
       {#if onDelete}
-        <button type="button" class="btn btn-sm" onclick={onDelete}>
+        <button
+          type="button"
+          class="btn btn-sm"
+          disabled={!writable}
+          onclick={onDelete}
+        >
           Delete
         </button>
       {/if}

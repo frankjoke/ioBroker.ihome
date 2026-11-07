@@ -376,7 +376,6 @@
         onselect={rememberSource}
         onkeyup={rememberSource}
         onclick={rememberSource}
-        onblur={rememberSource}
       ></textarea>
     </label>
 

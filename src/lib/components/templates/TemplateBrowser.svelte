@@ -22,6 +22,7 @@
   import {
     deleteTemplateBundle,
     getTemplateBundles,
+    templateBundleSaveFailed,
     upsertTemplateBundle,
   } from "$lib/stores/template-bundles.svelte";
   import { saveTemplateBundles } from "$lib/template-bundles.svelte.js";
@@ -72,6 +73,7 @@
       : []),
   ]);
   const shown = $derived(filterTemplateEntries(entries, search, sortDir));
+  const bundleSaveFailed = $derived(templateBundleSaveFailed());
   const selectedBundle = $derived(
     selected?.kind === "bundle"
       ? bundleDraft?.id === selected.id
@@ -110,9 +112,11 @@
   function closeNow() {
     selected = null;
     editorDirty = false;
+    bundleDraft = null;
   }
 
   function start(entry: TemplateEntry) {
+    if (entry.id !== bundleDraft?.id) bundleDraft = null;
     selected = entry;
     editorDirty = false;
     error = "";
@@ -245,7 +249,10 @@
   }
 
   function saveBundle(next: TemplateBundle) {
-    upsertTemplateBundle(next);
+    if (!upsertTemplateBundle(next)) {
+      error = "Combined templates could not be saved.";
+      return;
+    }
     saveTemplateBundles();
     bundleDraft = null;
     closeNow();
@@ -253,9 +260,14 @@
 
   function deleteBundle() {
     if (!pendingBundleDelete) return;
-    deleteTemplateBundle(pendingBundleDelete.id);
+    const id = pendingBundleDelete.id;
+    if (!deleteTemplateBundle(id)) {
+      error = "Combined templates could not be saved.";
+      pendingBundleDelete = null;
+      return;
+    }
     saveTemplateBundles();
-    if (selectedBundle?.id === pendingBundleDelete.id) {
+    if (selected?.id === id) {
       bundleDraft = null;
       closeNow();
     }
@@ -293,6 +305,9 @@
 
   {#if error}
     <p class="text-danger hint">{error}</p>
+  {/if}
+  {#if bundleSaveFailed}
+    <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 
   <div class="filter-bar">

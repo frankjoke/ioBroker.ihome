@@ -65,7 +65,8 @@ function commit(bundles: TemplateBundle[]) {
   };
 }
 
-export function upsertTemplateBundle(bundle: TemplateBundle) {
+export function upsertTemplateBundle(bundle: TemplateBundle): boolean {
+  if (!isTemplateBundlesWritable()) return false;
   commit(
     getTemplateBundles().some((entry) => entry.id === bundle.id)
       ? getTemplateBundles().map((entry) =>
@@ -73,8 +74,11 @@ export function upsertTemplateBundle(bundle: TemplateBundle) {
         )
       : [...getTemplateBundles(), bundle],
   );
+  return true;
 }
 
-export function deleteTemplateBundle(id: string) {
+export function deleteTemplateBundle(id: string): boolean {
+  if (!isTemplateBundlesWritable()) return false;
   commit(getTemplateBundles().filter((entry) => entry.id !== id));
+  return true;
 }

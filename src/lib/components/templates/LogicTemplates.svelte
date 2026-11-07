@@ -274,7 +274,7 @@
               type="button"
               class="btn btn-sm"
               disabled={!writable || blocked}
-              onclick={duplicate}
+              onclick={() => guard(duplicate)}
             >
               Duplicate
             </button>
@@ -285,7 +285,7 @@
               type="button"
               class="btn btn-sm"
               disabled={!writable || blocked}
-              onclick={duplicate}
+              onclick={() => guard(duplicate)}
             >
               Duplicate
             </button>

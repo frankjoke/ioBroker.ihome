@@ -17,7 +17,9 @@
   import { saveFormulas } from "$lib/formulas.svelte.js";
   import {
     deleteFunction,
+    functionSaveFailed,
     getFunctions,
+    isFunctionsWritable,
     upsertFunction,
   } from "$lib/stores/functions.svelte";
   import { saveFunctions } from "$lib/functions.svelte.js";
@@ -39,9 +41,11 @@
   let pendingAction: (() => void) | null = null;
   let askClose = $state(false);
   let pendingDelete = $state<CodeEntry | null>(null);
+  let error = $state("");
 
   const formulas = $derived(getFormulas());
   const functions = $derived(getFunctions());
+  const saveFailed = $derived(functionSaveFailed());
   const entries = $derived(
     codeEntries(
       formulas,
@@ -140,10 +144,16 @@
   }
 
   function save(template: FormulaTemplate | FunctionTemplate) {
+    error = "";
     if (draftKind === "formula") {
       upsertFormula(template as FormulaTemplate);
       saveFormulas();
     } else {
+      if (!isFunctionsWritable()) {
+        error =
+          "Function templates could not be loaded — the change was not saved.";
+        return;
+      }
       upsertFunction(template as FunctionTemplate);
       saveFunctions();
     }
@@ -152,10 +162,17 @@
 
   function confirmDelete() {
     if (!pendingDelete) return;
+    error = "";
     if (pendingDelete.kind === "formula") {
       deleteFormula(pendingDelete.id);
       saveFormulas();
     } else {
+      if (!isFunctionsWritable()) {
+        error =
+          "Function templates could not be loaded — the delete was not saved.";
+        pendingDelete = null;
+        return;
+      }
       deleteFunction(pendingDelete.id);
       saveFunctions();
     }
@@ -199,6 +216,13 @@
       {/if}
     </div>
   </div>
+
+  {#if error}
+    <p class="text-danger hint">{error}</p>
+  {/if}
+  {#if saveFailed}
+    <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+  {/if}
 
   {#if entries.length === 0}
     <div class="card empty-state">

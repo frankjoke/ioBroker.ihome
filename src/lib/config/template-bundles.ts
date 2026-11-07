@@ -135,6 +135,7 @@ export function templateBundleProblem(
   takenIds: Iterable<string> = [],
   logicIds: Iterable<string> = [],
   currentId?: string,
+  options: { validateApi?: boolean } = {},
 ): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return "A template bundle must be an object.";
@@ -182,6 +183,20 @@ export function templateBundleProblem(
       if (!ITEM_TYPES.has(item.type)) {
         return `Item ${item.name} has an unknown type.`;
       }
+      for (const field of ["conversion", "setConversion"] as const) {
+        const code = item[field];
+        if (code === undefined) continue;
+        if (typeof code !== "string") {
+          return `Item ${item.name}: ${field} must be a code string.`;
+        }
+        try {
+          compileFunction(code);
+        } catch (e) {
+          return `Item ${item.name}: ${field} does not compile: ${
+            e instanceof Error ? e.message : String(e)
+          }`;
+        }
+      }
     }
   }
   if (bundle.device) {
@@ -212,7 +227,7 @@ export function templateBundleProblem(
     );
     if (problem) return problem;
   }
-  if (bundle.api) {
+  if (bundle.api && options.validateApi !== false) {
     try {
       const checked = validateDeviceTemplate(
         evaluateBundleApi(bundle as TemplateBundle),
