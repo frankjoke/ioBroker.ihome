@@ -20,16 +20,24 @@
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import StateRefField from "../logic/StateRefField.svelte";
+  import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
+  import { insertAtCaret, insertRange } from "$lib/components/logic/code-field";
   import type { DeviceTemplate, DeviceTemplateShape } from "$logic/types";
 
   let {
     open,
     onClose,
     onGenerated,
+    embedded = false,
+    focusId = "",
+    dirty = $bindable(false),
   }: {
     open: boolean;
     onClose: () => void;
-    onGenerated: (logicId: string) => void;
+    onGenerated?: (logicId: string) => void;
+    embedded?: boolean;
+    focusId?: string;
+    dirty?: boolean;
   } = $props();
 
   const doc = $derived(getLogicDocument());
@@ -58,12 +66,46 @@
   let deviceName = $state("");
   let applyError = $state("");
   let applying = $state(false);
-  const dirty = $derived(
+  let sourceEl = $state<HTMLTextAreaElement>();
+  let sourceStart = 0;
+  let sourceEnd = 0;
+  let sourceFocused = false;
+
+  function rememberSource() {
+    if (!sourceEl) return;
+    sourceFocused = document.activeElement === sourceEl;
+    sourceStart = sourceEl.selectionStart;
+    sourceEnd = sourceEl.selectionEnd;
+  }
+
+  async function insertSource(code: string) {
+    const [from, to] = insertRange(
+      sourceFocused,
+      sourceStart,
+      sourceEnd,
+      source.length,
+    );
+    const next = insertAtCaret(source, from, to, code);
+    source = next.text;
+    await tick();
+    sourceEl?.focus();
+    sourceEl?.setSelectionRange(next.caret, next.caret);
+    sourceStart = next.caret;
+    sourceEnd = next.caret;
+    sourceFocused = true;
+  }
+  const isDirty = $derived(
     !!selected &&
       (name !== selected.name ||
         description !== (selected.description ?? "") ||
         source !== selected.source),
   );
+  $effect(() => {
+    if (embedded && focusId) selectedId = focusId;
+  });
+  $effect(() => {
+    dirty = isDirty;
+  });
 
   const preview = $derived(
     evaluated ? templateStateSpecs(evaluated, baseState) : [],
@@ -100,7 +142,7 @@
     applyOpen = false;
     evaluated = null;
     applySource = "";
-    if (!isBuiltin && dirty) {
+    if (!isBuiltin && isDirty) {
       if (!saveTemplate()) return;
       await tick();
     }
@@ -195,7 +237,7 @@
         applyError = "The logic document could not be saved.";
         return;
       }
-      onGenerated(plan.logic.id);
+      onGenerated?.(plan.logic.id);
       onClose();
     } catch (e) {
       applyError = e instanceof Error ? e.message : String(e);
@@ -285,7 +327,187 @@
   }
 </script>
 
-{#if open}
+{#snippet editorBody()}
+  {#if selected}
+    <p class="hint text-muted">
+      {isBuiltin
+        ? "Built-in template — duplicate it to edit."
+        : "Apply saves the current definition first. Generated states and logic are unlinked copies; the template stays for reuse."}
+    </p>
+
+    <label class="field">
+      <span class="label-mono">Name</span>
+      <input
+        type="text"
+        bind:value={name}
+        readonly={isBuiltin}
+        aria-label="Template name"
+      />
+    </label>
+
+    <label class="field">
+      <span class="label-mono">Description</span>
+      <input
+        type="text"
+        bind:value={description}
+        readonly={isBuiltin}
+        aria-label="Template description"
+      />
+    </label>
+
+    {#if !isBuiltin}
+      <SnippetSelect
+        mode="both"
+        onBeforeOpen={rememberSource}
+        onInsert={insertSource}
+      />
+    {/if}
+    <label class="field">
+      <span class="label-mono">Definition (JS object)</span>
+      <textarea
+        class="source"
+        bind:this={sourceEl}
+        bind:value={source}
+        readonly={isBuiltin || applyOpen}
+        rows="18"
+        spellcheck="false"
+        aria-label="Template source"
+        onmousedown={rememberSource}
+        onselect={rememberSource}
+        onkeyup={rememberSource}
+        onclick={rememberSource}
+        onblur={rememberSource}
+      ></textarea>
+    </label>
+
+    {#if error}
+      <p class="error text-danger">{error}</p>
+    {/if}
+
+    <div class="actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        onclick={startApply}
+        disabled={applying}
+      >
+        Apply
+      </button>
+      <button type="button" class="btn" onclick={duplicate}> Duplicate </button>
+      {#if !isBuiltin}
+        <button type="button" class="btn btn-primary" onclick={save}>
+          Save
+        </button>
+        <button
+          type="button"
+          class="btn {deleting ? 'btn-danger' : ''}"
+          onclick={remove}
+        >
+          {deleting ? "Confirm delete" : "Delete"}
+        </button>
+      {/if}
+      {#if !embedded}<button type="button" class="btn" onclick={onClose}
+          >Close</button
+        >{/if}
+    </div>
+
+    {#if applyError && !applyOpen}
+      <p class="error text-danger">{applyError}</p>
+    {/if}
+
+    {#if applyOpen && evaluated}
+      <div class="apply">
+        <h4>Apply template</h4>
+        <label class="field">
+          <span class="label-mono">Base state</span>
+          <input type="text" bind:value={baseState} aria-label="Base state" />
+        </label>
+        <label class="field">
+          <span class="label-mono">Device name (optional)</span>
+          <input
+            type="text"
+            bind:value={deviceName}
+            placeholder="Leave empty for no device"
+            aria-label="Device name"
+          />
+        </label>
+        {#each evaluated.params ?? [] as param (param.name)}
+          <label class="field">
+            <span class="label-mono">{param.label}</span>
+            {#if param.type === "state"}
+              <StateRefField
+                value={String(applyParams[param.name] ?? "")}
+                label={param.label}
+                onchange={(ref) =>
+                  (applyParams = { ...applyParams, [param.name]: ref })}
+              />
+            {:else if param.type === "boolean"}
+              <input
+                type="checkbox"
+                checked={applyParams[param.name] === true}
+                onchange={(e) =>
+                  (applyParams = {
+                    ...applyParams,
+                    [param.name]: e.currentTarget.checked,
+                  })}
+              />
+            {:else if param.type === "number"}
+              <input
+                type="number"
+                value={String(applyParams[param.name] ?? 0)}
+                oninput={(e) =>
+                  (applyParams = {
+                    ...applyParams,
+                    [param.name]: Number(e.currentTarget.value),
+                  })}
+              />
+            {:else}
+              <input
+                type="text"
+                value={String(applyParams[param.name] ?? "")}
+                oninput={(e) =>
+                  (applyParams = {
+                    ...applyParams,
+                    [param.name]: e.currentTarget.value,
+                  })}
+              />
+            {/if}
+            {#if param.description}
+              <span class="param-help text-muted">{param.description}</span>
+            {/if}
+          </label>
+        {/each}
+        <p class="hint text-muted">
+          States: {preview
+            .map((spec) => `${spec.id} (${spec.common.type})`)
+            .join(", ")}
+        </p>
+        {#if applyError}
+          <p class="error text-danger">{applyError}</p>
+        {/if}
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick={generate}
+            disabled={applying}
+          >
+            Generate
+          </button>
+          <button type="button" class="btn" onclick={() => (applyOpen = false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
+
+{#if embedded}
+  <div class="body embedded-body">
+    {@render editorBody()}
+  </div>
+{:else if open}
   <div
     class="modal"
     role="dialog"
@@ -312,177 +534,7 @@
             {/if}
           </select>
         </label>
-
-        {#if selected}
-          <p class="hint text-muted">
-            {isBuiltin
-              ? "Built-in template — duplicate it to edit."
-              : "Apply saves the current definition first. Generated states and logic are unlinked copies; the template stays for reuse."}
-          </p>
-
-          <label class="field">
-            <span class="label-mono">Name</span>
-            <input
-              type="text"
-              bind:value={name}
-              readonly={isBuiltin}
-              aria-label="Template name"
-            />
-          </label>
-
-          <label class="field">
-            <span class="label-mono">Description</span>
-            <input
-              type="text"
-              bind:value={description}
-              readonly={isBuiltin}
-              aria-label="Template description"
-            />
-          </label>
-
-          <label class="field">
-            <span class="label-mono">Definition (JS object)</span>
-            <textarea
-              class="source"
-              bind:value={source}
-              readonly={isBuiltin || applyOpen}
-              rows="18"
-              spellcheck="false"
-              aria-label="Template source"
-            ></textarea>
-          </label>
-
-          {#if error}
-            <p class="error text-danger">{error}</p>
-          {/if}
-
-          <div class="actions">
-            <button
-              type="button"
-              class="btn btn-primary"
-              onclick={startApply}
-              disabled={applying}
-            >
-              Apply
-            </button>
-            <button type="button" class="btn" onclick={duplicate}>
-              Duplicate
-            </button>
-            {#if !isBuiltin}
-              <button type="button" class="btn btn-primary" onclick={save}>
-                Save
-              </button>
-              <button
-                type="button"
-                class="btn {deleting ? 'btn-danger' : ''}"
-                onclick={remove}
-              >
-                {deleting ? "Confirm delete" : "Delete"}
-              </button>
-            {/if}
-            <button type="button" class="btn" onclick={onClose}>Close</button>
-          </div>
-
-          {#if applyError && !applyOpen}
-            <p class="error text-danger">{applyError}</p>
-          {/if}
-
-          {#if applyOpen && evaluated}
-            <div class="apply">
-              <h4>Apply template</h4>
-              <label class="field">
-                <span class="label-mono">Base state</span>
-                <input
-                  type="text"
-                  bind:value={baseState}
-                  aria-label="Base state"
-                />
-              </label>
-              <label class="field">
-                <span class="label-mono">Device name (optional)</span>
-                <input
-                  type="text"
-                  bind:value={deviceName}
-                  placeholder="Leave empty for no device"
-                  aria-label="Device name"
-                />
-              </label>
-              {#each evaluated.params ?? [] as param (param.name)}
-                <label class="field">
-                  <span class="label-mono">{param.label}</span>
-                  {#if param.type === "state"}
-                    <StateRefField
-                      value={String(applyParams[param.name] ?? "")}
-                      label={param.label}
-                      onchange={(ref) =>
-                        (applyParams = { ...applyParams, [param.name]: ref })}
-                    />
-                  {:else if param.type === "boolean"}
-                    <input
-                      type="checkbox"
-                      checked={applyParams[param.name] === true}
-                      onchange={(e) =>
-                        (applyParams = {
-                          ...applyParams,
-                          [param.name]: e.currentTarget.checked,
-                        })}
-                    />
-                  {:else if param.type === "number"}
-                    <input
-                      type="number"
-                      value={String(applyParams[param.name] ?? 0)}
-                      oninput={(e) =>
-                        (applyParams = {
-                          ...applyParams,
-                          [param.name]: Number(e.currentTarget.value),
-                        })}
-                    />
-                  {:else}
-                    <input
-                      type="text"
-                      value={String(applyParams[param.name] ?? "")}
-                      oninput={(e) =>
-                        (applyParams = {
-                          ...applyParams,
-                          [param.name]: e.currentTarget.value,
-                        })}
-                    />
-                  {/if}
-                  {#if param.description}
-                    <span class="param-help text-muted"
-                      >{param.description}</span
-                    >
-                  {/if}
-                </label>
-              {/each}
-              <p class="hint text-muted">
-                States: {preview
-                  .map((spec) => `${spec.id} (${spec.common.type})`)
-                  .join(", ")}
-              </p>
-              {#if applyError}
-                <p class="error text-danger">{applyError}</p>
-              {/if}
-              <div class="actions">
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  onclick={generate}
-                  disabled={applying}
-                >
-                  Generate
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  onclick={() => (applyOpen = false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          {/if}
-        {/if}
+        {@render editorBody()}
       </div>
     </div>
   </div>
