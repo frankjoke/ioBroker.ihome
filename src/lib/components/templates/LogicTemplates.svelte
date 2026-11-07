@@ -14,7 +14,11 @@
   } from "$lib/stores/logics.svelte";
   import type { LogicTemplate } from "$logic/types";
 
-  let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
+  let {
+    dirty = $bindable(false),
+    embedded = false,
+    focusId = "",
+  }: { dirty?: boolean; embedded?: boolean; focusId?: string } = $props();
 
   const doc = $derived(getLogicDocument());
   const writable = $derived(isLogicsWritable());
@@ -65,6 +69,9 @@
         loadedJson = next;
       }
     }
+  });
+  $effect(() => {
+    if (embedded && focusId) selectedId = focusId;
   });
   $effect(() => {
     dirty = isDirty;
@@ -177,25 +184,27 @@
 </script>
 
 <div class="logic-templates">
-  <div class="page-header">
-    <div class="page-heading">
-      <h2>Logic templates</h2>
-      <p class="text-muted hint">
-        Logic definitions with parameter placeholders. Duplicate a built-in to
-        edit it.
-      </p>
+  {#if !embedded}
+    <div class="page-header">
+      <div class="page-heading">
+        <h2>Logic templates</h2>
+        <p class="text-muted hint">
+          Logic definitions with parameter placeholders. Duplicate a built-in to
+          edit it.
+        </p>
+      </div>
+      <div class="page-actions">
+        <button
+          type="button"
+          class="btn btn-sm"
+          disabled={!writable || blocked}
+          onclick={() => guard(duplicate)}
+        >
+          Duplicate
+        </button>
+      </div>
     </div>
-    <div class="page-actions">
-      <button
-        type="button"
-        class="btn btn-sm"
-        disabled={!writable || blocked}
-        onclick={() => guard(duplicate)}
-      >
-        Duplicate
-      </button>
-    </div>
-  </div>
+  {/if}
 
   {#if !writable}
     <p class="text-danger hint">
@@ -211,45 +220,47 @@
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 
-  <div class="filter-bar">
-    <input
-      type="search"
-      placeholder="Search name or description…"
-      bind:value={search}
-    />
-    <button
-      type="button"
-      class="sort-dir"
-      title="Toggle sort direction"
-      aria-label="Toggle sort direction"
-      onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-    >
-      <span class="material-symbols-outlined"
-        >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+  {#if !embedded}
+    <div class="filter-bar">
+      <input
+        type="search"
+        placeholder="Search name or description…"
+        bind:value={search}
+      />
+      <button
+        type="button"
+        class="sort-dir"
+        title="Toggle sort direction"
+        aria-label="Toggle sort direction"
+        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
       >
-    </button>
-  </div>
-
-  {#if shown.length === 0}
-    <div class="card empty-state">
-      <p class="text-muted">No templates match the search.</p>
-    </div>
-  {:else}
-    <div class="template-list">
-      {#each shown as template (template.id)}
-        <button
-          type="button"
-          class="template-row"
-          class:active={selectedId === template.id}
-          onclick={() => guard(() => (selectedId = template.id))}
+        <span class="material-symbols-outlined"
+          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
         >
-          <span class="name">{template.name}</span>
-          <span class="badge"
-            >{builtinIds.has(template.id) ? "built-in" : "user"}</span
-          >
-        </button>
-      {/each}
+      </button>
     </div>
+
+    {#if shown.length === 0}
+      <div class="card empty-state">
+        <p class="text-muted">No templates match the search.</p>
+      </div>
+    {:else}
+      <div class="template-list">
+        {#each shown as template (template.id)}
+          <button
+            type="button"
+            class="template-row"
+            class:active={selectedId === template.id}
+            onclick={() => guard(() => (selectedId = template.id))}
+          >
+            <span class="name">{template.name}</span>
+            <span class="badge"
+              >{builtinIds.has(template.id) ? "built-in" : "user"}</span
+            >
+          </button>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
   {#if selected}
@@ -257,9 +268,27 @@
       <div class="editor-head">
         <span class="label-mono">{selected.name}</span>
         {#if isBuiltin}
-          <span class="hint text-muted">Built-in — duplicate to edit.</span>
+          <span class="item-actions">
+            <span class="hint text-muted">Built-in — duplicate to edit.</span>
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={!writable || blocked}
+              onclick={() => guard(duplicate)}
+            >
+              Duplicate
+            </button>
+          </span>
         {:else}
           <span class="item-actions">
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={!writable || blocked}
+              onclick={() => guard(duplicate)}
+            >
+              Duplicate
+            </button>
             <button
               type="button"
               class="btn btn-primary btn-sm"

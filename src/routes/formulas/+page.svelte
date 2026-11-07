@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FormulaTemplates from "$lib/components/templates/FormulaTemplates.svelte";
+  import CodeTemplates from "$lib/components/templates/CodeTemplates.svelte";
 </script>
 
-<FormulaTemplates />
+<CodeTemplates formulaOnly />
