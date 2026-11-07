@@ -216,7 +216,7 @@
     );
   });
   const canSave = $derived(
-    dirty && !issues.some((issue) => issue.severity === "error"),
+    dirty && !nameError && !issues.some((issue) => issue.severity === "error"),
   );
 
   /** The row's name opens it; clicking another row asks first when the draft is
@@ -575,11 +575,7 @@
                 class="name-input"
                 value={draft.name}
                 aria-label="Logic name"
-                onchange={(e) => {
-                  if (!renameLogic(e.currentTarget.value)) {
-                    e.currentTarget.value = draft?.name ?? "";
-                  }
-                }}
+                oninput={(e) => renameLogic(e.currentTarget.value)}
               />
             {:else}
               <button type="button" class="name" onclick={() => select(logic)}>
