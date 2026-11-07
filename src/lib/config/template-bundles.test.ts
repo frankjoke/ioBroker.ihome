@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { TemplateBundle } from "$lib/types/templates";
 import {
   compileTemplateItems,
+  devicePartFromTemplate,
   evaluateBundleApi,
+  logicPartFromTemplate,
   migrateTemplateBundleLibrary,
   templateBundleProblem,
 } from "./template-bundles";
@@ -171,5 +173,33 @@ describe("templateBundleProblem", () => {
     expect(
       templateBundleProblem(bundle({ api: { source: "1 +" } }), [], []),
     ).toBeTruthy();
+  });
+});
+
+describe("part helpers", () => {
+  it("copies a visual template into a device part", () => {
+    const part = devicePartFromTemplate({
+      id: "x",
+      name: "X",
+      type: "Light",
+      features: [],
+      slots: [],
+      builtin: true,
+    });
+    expect(part).toEqual({ type: "Light", features: [], slots: [] });
+  });
+
+  it("copies a logic template into a logic part", () => {
+    const body = {
+      id: "l",
+      name: "L",
+      kind: "function" as const,
+      inputs: {},
+      output: { scope: "memory" as const },
+      expr: { code: "noop()" },
+    };
+    expect(
+      logicPartFromTemplate({ id: "l", name: "L", params: [], logic: body }),
+    ).toEqual({ logic: body });
   });
 });

@@ -6,12 +6,16 @@ import type {
   DeviceItem,
   DeviceParam,
   DeviceTemplateShape,
+  LogicTemplate,
   TemplateParam,
 } from "$logic/types";
+import type { Template } from "$lib/types/display";
 import type {
   TemplateBundle,
   TemplateBundleLibrary,
+  TemplateDevicePart,
   TemplateItem,
+  TemplateLogicPart,
 } from "$lib/types/templates";
 
 const PARAM_TYPES = new Set([
@@ -219,4 +223,23 @@ export function templateBundleProblem(
     }
   }
   return null;
+}
+
+/** Copy a visual template into a bundle's device part (drop its identity). */
+export function devicePartFromTemplate(template: Template): TemplateDevicePart {
+  const part: TemplateDevicePart = {
+    type: template.type,
+    features: structuredClone(template.features),
+    slots: structuredClone(template.slots),
+  };
+  if (template.size) part.size = template.size;
+  if (template.background) part.background = template.background;
+  return part;
+}
+
+/** Copy a logic template into a bundle's logic part (drop its identity). */
+export function logicPartFromTemplate(
+  template: LogicTemplate,
+): TemplateLogicPart {
+  return { logic: structuredClone(template.logic) };
 }

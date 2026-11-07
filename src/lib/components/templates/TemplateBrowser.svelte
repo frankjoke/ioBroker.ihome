@@ -1,9 +1,11 @@
 <script lang="ts">
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
   import {
+    bundleParts,
     filterTemplateEntries,
     templateEntries,
     type TemplateEntry,
@@ -17,11 +19,18 @@
     getLogicDocument,
     logicBlocked,
   } from "$lib/stores/logics.svelte";
-  import { getTemplateBundles } from "$lib/stores/template-bundles.svelte";
+  import {
+    deleteTemplateBundle,
+    getTemplateBundles,
+    upsertTemplateBundle,
+  } from "$lib/stores/template-bundles.svelte";
+  import { saveTemplateBundles } from "$lib/template-bundles.svelte.js";
   import { BUILTIN_TEMPLATES } from "$logic/templates";
   import VisualTemplates from "./VisualTemplates.svelte";
   import LogicTemplates from "./LogicTemplates.svelte";
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
+  import BundleEditor from "./BundleEditor.svelte";
+  import type { TemplateBundle } from "$lib/types/templates";
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
@@ -32,12 +41,14 @@
   let pendingAction: (() => void) | null = null;
   let askSwitch = $state(false);
   let error = $state("");
+  let bundleDraft = $state<TemplateBundle | null>(null);
+  let pendingBundleDelete = $state<TemplateBundle | null>(null);
 
   const registry = $derived(getTemplateRegistry());
   const doc = $derived(getLogicDocument());
   const bundles = $derived(getTemplateBundles());
-  const entries = $derived(
-    templateEntries({
+  const entries = $derived([
+    ...templateEntries({
       presets: Object.values(PRESETS),
       visual: registry.templates ?? [],
       logicBuiltins: BUILTIN_TEMPLATES,
@@ -47,8 +58,27 @@
       bundleBuiltins: [],
       bundleUser: bundles,
     }),
-  );
+    ...(bundleDraft
+      ? [
+          {
+            id: bundleDraft.id,
+            name: bundleDraft.name || "New template",
+            kind: "bundle" as const,
+            parts: bundleParts(bundleDraft),
+            builtin: false,
+            search: (bundleDraft.name || "New template").toLowerCase(),
+          },
+        ]
+      : []),
+  ]);
   const shown = $derived(filterTemplateEntries(entries, search, sortDir));
+  const selectedBundle = $derived(
+    selected?.kind === "bundle"
+      ? bundleDraft?.id === selected.id
+        ? bundleDraft
+        : bundles.find((bundle) => bundle.id === selected.id)
+      : undefined,
+  );
 
   $effect(() => {
     dirty = editorDirty;
@@ -183,6 +213,54 @@
       search: "",
     });
   }
+
+  function startBoth() {
+    const draft: TemplateBundle = {
+      id: newId(),
+      name: "",
+      description: "",
+      params: [],
+      items: [],
+      device: { type: "Custom", features: [], slots: [] },
+      logic: {
+        logic: {
+          id: "",
+          name: "",
+          kind: "function",
+          inputs: {},
+          output: { scope: "memory" },
+          expr: { code: "noop()" },
+        },
+      },
+    };
+    bundleDraft = draft;
+    start({
+      id: draft.id,
+      name: "New template",
+      kind: "bundle",
+      parts: ["device", "logic"],
+      builtin: false,
+      search: "new template",
+    });
+  }
+
+  function saveBundle(next: TemplateBundle) {
+    upsertTemplateBundle(next);
+    saveTemplateBundles();
+    bundleDraft = null;
+    closeNow();
+  }
+
+  function deleteBundle() {
+    if (!pendingBundleDelete) return;
+    deleteTemplateBundle(pendingBundleDelete.id);
+    saveTemplateBundles();
+    if (selectedBundle?.id === pendingBundleDelete.id) {
+      bundleDraft = null;
+      closeNow();
+    }
+    pendingBundleDelete = null;
+  }
 </script>
 
 <div class="template-browser">
@@ -206,6 +284,9 @@
       </button>
       <button type="button" class="btn btn-sm" onclick={() => guard(newApi)}>
         <span class="material-symbols-outlined">add</span> API
+      </button>
+      <button type="button" class="btn btn-sm" onclick={() => guard(startBoth)}>
+        <span class="material-symbols-outlined">add</span> Both
       </button>
     </div>
   </div>
@@ -270,8 +351,16 @@
       onClose={() => {}}
       onGenerated={() => {}}
     />
+  {:else if selected?.kind === "bundle" && selectedBundle}
+    <BundleEditor
+      bundle={selectedBundle}
+      isNew={bundleDraft?.id === selectedBundle.id}
+      bind:dirty={editorDirty}
+      onSave={saveBundle}
+      onDelete={() => (pendingBundleDelete = selectedBundle)}
+    />
   {:else if selected?.kind === "bundle"}
-    <p class="text-muted hint">Bundle editor is added by the bundle task.</p>
+    <p class="text-muted hint">Select a bundle to edit it.</p>
   {/if}
 
   {#if askSwitch}
@@ -291,6 +380,17 @@
         pendingAction = null;
       }}
     />
+  {/if}
+
+  {#if pendingBundleDelete}
+    <ConfirmModal
+      title={deleteTitle("template", pendingBundleDelete.name)}
+      confirmLabel="Delete"
+      onConfirm={deleteBundle}
+      onCancel={() => (pendingBundleDelete = null)}
+    >
+      <p>Applied copies keep their logic and device.</p>
+    </ConfirmModal>
   {/if}
 </div>
 

@@ -31,7 +31,7 @@ function entry(
   };
 }
 
-function bundleParts(bundle: TemplateBundle): TemplatePart[] {
+export function bundleParts(bundle: TemplateBundle): TemplatePart[] {
   const parts: TemplatePart[] = [];
   if (bundle.device) parts.push("device");
   if (bundle.logic) parts.push("logic");
