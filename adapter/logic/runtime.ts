@@ -36,6 +36,12 @@ export interface RuntimeHooks {
     run: (data: unknown, error: string | null) => void,
     depth: number,
   ): void;
+  callPlugin(
+    id: string,
+    payload: unknown,
+    run: (data: unknown, error: string | null) => void,
+    depth: number,
+  ): void;
   now(): number;
 }
 
@@ -443,6 +449,27 @@ export function createLogicRuntime(
       return NOOP;
     },
   );
+
+  define("call", (id: unknown, payload: unknown, callback: unknown) => {
+    if (typeof id !== "string" || !id.trim()) {
+      throw new Error("call needs a plugin id");
+    }
+    if (typeof callback !== "function") {
+      throw new Error("call needs a callback");
+    }
+    if (isAsyncFunction(callback)) {
+      throw new Error("call needs a synchronous callback");
+    }
+    const object = currentObject();
+    const depth = currentDepth() + 1;
+    hooks.callPlugin(
+      id.trim(),
+      payload,
+      (data, error) => runTask(callback, object, data, error, depth),
+      depth,
+    );
+    return NOOP;
+  });
 
   return {
     runExpr(expr, depth) {

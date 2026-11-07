@@ -35,7 +35,11 @@ export interface PluginApi {
     list(): NetworkDeviceInfo[];
     get(id: string): NetworkDeviceInfo | undefined;
   };
-  sendTo(instance: string, command: string, payload?: unknown): Promise<unknown>;
+  sendTo(
+    instance: string,
+    command: string,
+    payload?: unknown,
+  ): Promise<unknown>;
 }
 
 export interface PluginApiDeps {

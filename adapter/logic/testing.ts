@@ -80,6 +80,9 @@ export interface Harness {
   notifications: NotificationLine[];
   reports: Array<{ logicId: string; reading: LogicReading }>;
   requests: FetchRequest[];
+  pluginCalls: Array<{ id: string; payload: unknown }>;
+  /** Replace the fake plugin caller used by the engine. */
+  setCallPlugin(fn: NonNullable<EngineDeps["callPlugin"]>): void;
   /** The first request that has neither responded nor failed. */
   nextRequest(): FetchRequest | undefined;
   attach(engine: Engine): void;
@@ -103,6 +106,11 @@ export function createHarness(values: Record<string, unknown>): Harness {
   const notifications: NotificationLine[] = [];
   const reports: Array<{ logicId: string; reading: LogicReading }> = [];
   const requests: Array<FetchRequest & { pending: boolean }> = [];
+  const pluginCalls: Array<{ id: string; payload: unknown }> = [];
+  let callPlugin: NonNullable<EngineDeps["callPlugin"]> = async () => ({
+    ok: true,
+    result: null,
+  });
   let engine: Engine | undefined;
 
   const fetch: FetchLike = (url, init) =>
@@ -155,6 +163,10 @@ export function createHarness(values: Record<string, unknown>): Harness {
     setTimeout: (fn, ms) => clock.setTimeout(fn, ms),
     clearTimeout: (handle) => clock.clearTimeout(handle),
     fetch,
+    callPlugin: (id, payload) => {
+      pluginCalls.push({ id, payload });
+      return callPlugin(id, payload);
+    },
     report: (logicId, reading) => reports.push({ logicId, reading }),
   };
 
@@ -167,6 +179,10 @@ export function createHarness(values: Record<string, unknown>): Harness {
     notifications,
     reports,
     requests,
+    pluginCalls,
+    setCallPlugin(fn) {
+      callPlugin = fn;
+    },
     nextRequest: () => requests.find((request) => request.pending),
     attach(next) {
       engine = next;

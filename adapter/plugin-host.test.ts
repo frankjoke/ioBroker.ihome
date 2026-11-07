@@ -171,9 +171,14 @@ describe("createPluginHost", () => {
     const host = createPluginHost(
       [
         plugin("demo", "", 5000, { builtin: true }),
-        plugin("off", "module.exports = () => ({ async call() { return 1; } });", 5000, {
-          enabled: false,
-        }),
+        plugin(
+          "off",
+          "module.exports = () => ({ async call() { return 1; } });",
+          5000,
+          {
+            enabled: false,
+          },
+        ),
       ],
       fakeApi,
       builtins,

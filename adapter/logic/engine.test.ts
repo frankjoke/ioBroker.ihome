@@ -3251,6 +3251,46 @@ it("a callback after a state change keeps the captured this", async () => {
   });
 });
 
+it("runs a plugin callback with its result", async () => {
+  const { h, engine } = engineWith(
+    doc({
+      expr: code(
+        'call("demo", { id: "tv" }, (result, error) => set("0_userdata.0.OUT", error ?? result.sent))',
+      ),
+    }),
+  );
+  h.setCallPlugin(async () => ({ ok: true, result: { sent: true } }));
+  engine.start();
+  await flush();
+  expect(h.writes).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: true,
+    ack: false,
+  });
+  expect(h.pluginCalls).toEqual([{ id: "demo", payload: { id: "tv" } }]);
+});
+
+it("runs a plugin callback with its error and forbids goto", async () => {
+  const { h, engine } = engineWith(
+    doc({
+      expr: code(
+        'call("demo", null, (result, error) => { message(error, "warn"); goto("On"); })',
+      ),
+    }),
+  );
+  h.setCallPlugin(async () => ({ ok: false, error: "nope" }));
+  engine.start();
+  await flush();
+  expect(h.messages).toContainEqual(
+    expect.objectContaining({ message: "nope", level: "warn" }),
+  );
+  expect(
+    h.logs.some((line) =>
+      line.message.includes("goto is not available in a fetch callback"),
+    ),
+  ).toBe(true);
+});
+
 it("writes an object output as JSON text", () => {
   const { h, engine } = engineWith(
     doc({

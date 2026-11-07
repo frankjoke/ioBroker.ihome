@@ -63,7 +63,7 @@ function compile(plugin: AdapterPlugin): PluginFactory {
   ) as (
     module: { exports: unknown },
     exports: unknown,
-    require: NodeRequire,
+    require: (id: string) => unknown,
   ) => void;
   factory(module, module.exports, require);
   if (typeof module.exports !== "function") {

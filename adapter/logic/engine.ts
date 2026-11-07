@@ -11,6 +11,8 @@ import {
 } from "./runtime";
 import { nextCron } from "./timer-ops";
 import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
+import { createPluginQueue, type PluginQueue } from "./plugin-queue";
+import type { PluginReply } from "../plugin-ops";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   AstroEvent,
@@ -70,6 +72,8 @@ export interface EngineDeps {
   clearTimeout(handle: number): void;
   /** Test seam; production uses the Node global. */
   fetch?: FetchLike;
+  /** Call an adapter plugin; omitted in tests that do not use plugins. */
+  callPlugin?(id: string, payload: unknown): Promise<PluginReply>;
   /** Publish a logic's live readout for the logic list. */
   report?(logicId: string, reading: LogicReading): void;
   resolveVariable?(
@@ -136,6 +140,8 @@ interface Runtime {
   starting?: number;
   /** Serialized fetch tasks of this logic. */
   tasks?: TaskQueue;
+  /** Serialized plugin calls of this logic. */
+  pluginTasks?: PluginQueue;
   /** Assigned once the hooks that close over this runtime exist. */
   vm?: LogicRuntime;
 }
@@ -153,6 +159,8 @@ interface TaskJob {
   run(data: unknown, error: string | null): void;
   data: unknown;
   error: string | null;
+  /** Which per-logic queue releases its active slot after the callback. */
+  done?: () => void;
 }
 
 interface Job {
@@ -287,11 +295,48 @@ export function createEngine(
           hasPrevious: false,
           depth: task.depth,
           meta: { from: "task", self: true, ts: deps.now() },
-          task: { run: task.run, data, error },
+          task: {
+            run: task.run,
+            data,
+            error,
+            done: () => rt.tasks?.done(),
+          },
         });
       },
       (message) => deps.log("warn", logId(rt), message),
       deps.fetch ?? (globalThis.fetch as FetchLike | undefined),
+    );
+    rt.pluginTasks = createPluginQueue(
+      deps.callPlugin ??
+        (() =>
+          Promise.resolve({
+            ok: false,
+            error: "plugin calls are not available",
+          } as PluginReply)),
+      (task, data, error) => {
+        if (error) {
+          deps.log(
+            "warn",
+            logId(rt),
+            `plugin call failed: ${task.id} — ${error}`,
+          );
+        }
+        enqueue({
+          rt,
+          input: "$task",
+          value: undefined,
+          hasPrevious: false,
+          depth: task.depth,
+          meta: { from: "task", self: true, ts: deps.now() },
+          task: {
+            run: task.run,
+            data,
+            error,
+            done: () => rt.pluginTasks?.done(),
+          },
+        });
+      },
+      (message) => deps.log("warn", logId(rt), message),
     );
     try {
       rt.vm = createLogicRuntime(def, {
@@ -305,6 +350,8 @@ export function createEngine(
           deps.notify(level, logId(rt), title, body),
         fetchJson: (url, options, run, depth) =>
           rt.tasks?.enqueue({ url, options, depth, run }),
+        callPlugin: (id, payload, run, depth) =>
+          rt.pluginTasks?.enqueue({ id, payload, depth, run }),
         now: () => deps.now(),
       });
     } catch (error) {
@@ -569,7 +616,7 @@ export function createEngine(
         chainWarned.add(key);
         warn(logId(job.rt), `cascade deeper than ${maxDepth}, event dropped`);
       }
-      if (job.task) job.rt.tasks?.done();
+      if (job.task) job.task.done?.();
       return;
     }
     if (job.task) {
@@ -581,7 +628,7 @@ export function createEngine(
         warn(logId(job.rt), `task failed: ${errorText(error)}`);
       } finally {
         currentMeta = previousMeta;
-        job.rt.tasks?.done();
+        job.task.done?.();
       }
       return;
     }
@@ -1482,6 +1529,7 @@ export function createEngine(
         for (const handle of rt.timers.values()) deps.clearTimeout(handle);
         rt.timers.clear();
         rt.tasks?.stop();
+        rt.pluginTasks?.stop();
       }
       started = false;
       queue.length = 0;
