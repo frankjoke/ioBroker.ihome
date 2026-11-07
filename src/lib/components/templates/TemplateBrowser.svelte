@@ -35,7 +35,9 @@
   import LogicTemplates from "./LogicTemplates.svelte";
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
   import BundleEditor from "./BundleEditor.svelte";
+  import DeviceApplyModal from "./DeviceApplyModal.svelte";
   import { exportTemplate } from "$lib/template-export";
+  import type { Template } from "$lib/types/display";
   import type { TemplateBundle } from "$lib/types/templates";
 
   let {
@@ -66,6 +68,7 @@
   let askSwitch = $state(false);
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
+  let deviceApplyTemplate = $state<Template | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
 
   const registry = $derived(getTemplateRegistry());
@@ -184,6 +187,11 @@
     const definition = definitionFor(entry);
     if (!definition) return;
     exportTemplate(entry.kind, $state.snapshot(definition));
+  }
+
+  function openDeviceApply(entry: TemplateEntry) {
+    const definition = definitionFor(entry);
+    if (definition) deviceApplyTemplate = definition as Template;
   }
 
   function guard(action: () => void) {
@@ -527,6 +535,16 @@
                     <span class="material-symbols-outlined">play_arrow</span>
                     Apply
                   </button>
+                {:else if entry.kind === "device"}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={editorDirty || !writable || blocked}
+                    onclick={() => openDeviceApply(entry)}
+                  >
+                    <span class="material-symbols-outlined">play_arrow</span>
+                    Apply
+                  </button>
                 {/if}
                 <button
                   type="button"
@@ -616,6 +634,13 @@
         askSwitch = false;
         pendingAction = null;
       }}
+    />
+  {/if}
+
+  {#if deviceApplyTemplate}
+    <DeviceApplyModal
+      template={deviceApplyTemplate}
+      onClose={() => (deviceApplyTemplate = null)}
     />
   {/if}
 

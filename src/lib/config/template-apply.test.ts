@@ -42,9 +42,9 @@ describe("planDeviceApply", () => {
     expect(planDeviceApply(template, undefined)).toMatchObject({
       problem: expect.stringMatching(/choose/i),
     });
-    expect(
-      planDeviceApply(template, device({ type: "Switch" })),
-    ).toMatchObject({ problem: expect.stringMatching(/type|Light|Switch/i) });
+    expect(planDeviceApply(template, device({ type: "Switch" }))).toMatchObject(
+      { problem: expect.stringMatching(/type|Light|Switch/i) },
+    );
   });
 });
 
