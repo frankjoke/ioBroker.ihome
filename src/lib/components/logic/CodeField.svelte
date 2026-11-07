@@ -8,6 +8,7 @@
   import type { Input, LogicDef } from "$logic/types";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
+  import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
   import { gotoInsertAt, insertAtCaret, insertRange } from "./code-field";
 
   let {
@@ -169,6 +170,11 @@
         onclick={() => insertText("noop()")}>No update</button
       >
     {/if}
+    <SnippetSelect
+      {mode}
+      onBeforeOpen={rememberSelection}
+      onInsert={insertText}
+    />
     {#if inputEntries.length > 0}
       <div class="badges">
         {#each inputEntries as [name, input] (name)}
