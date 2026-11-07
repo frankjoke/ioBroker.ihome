@@ -16,6 +16,37 @@ import type { Device } from "$lib/types/device";
 import type { TemplateBundle } from "$lib/types/templates";
 import type { LogicTemplate, TemplateParam } from "$logic/types";
 
+it("substitutes shared params in a device part", () => {
+  const template = bundleDeviceTemplate(
+    {
+      type: "Custom",
+      features: [],
+      slots: [
+        {
+          kind: "html",
+          options: { html: '<p data-id="{{wakeDevice}}">{{wakeDevice}}</p>' },
+        },
+      ],
+    },
+    "tpl",
+    "TV",
+    { wakeDevice: "tv" },
+  );
+  expect(template.slots[0].options?.html).toBe('<p data-id="tv">tv</p>');
+});
+
+it("leaves a device part without placeholders unchanged", () => {
+  const part = { type: "Custom" as const, features: [], slots: [] };
+  expect(bundleDeviceTemplate(part, "tpl", "TV", { wakeDevice: "tv" })).toEqual(
+    {
+      ...part,
+      id: "tpl",
+      name: "TV",
+      builtin: false,
+    },
+  );
+});
+
 const template = {
   id: "Light",
   name: "Light",

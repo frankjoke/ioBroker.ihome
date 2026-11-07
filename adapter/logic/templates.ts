@@ -216,3 +216,11 @@ function substitute(value: unknown, params: Record<string, unknown>): unknown {
   }
   return value;
 }
+
+/** Substitute `{{name}}` placeholders in any template value. */
+export function substituteTemplateParams(
+  value: unknown,
+  params: Record<string, unknown>,
+): unknown {
+  return substitute(value, params);
+}

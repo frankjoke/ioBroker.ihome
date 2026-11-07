@@ -232,6 +232,7 @@
           $state.snapshot(devicePart),
           newId(),
           bundle.name,
+          resolved.values,
         );
         const nextRegistry = {
           ...registry,

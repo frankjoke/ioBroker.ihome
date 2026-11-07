@@ -1,6 +1,9 @@
 import { uniqueSlug } from "$lib/config/slug";
 import { parseDuration } from "$logic/duration";
-import { instantiateTemplate } from "$logic/templates";
+import {
+  instantiateTemplate,
+  substituteTemplateParams,
+} from "$logic/templates";
 import { validateLogicDocument } from "$logic/validate";
 import type { Device } from "$lib/types/device";
 import type { Template } from "$lib/types/display";
@@ -131,16 +134,21 @@ export function bundleDeviceTemplate(
   part: TemplateDevicePart,
   id: string,
   name: string,
+  params: Record<string, unknown> = {},
 ): Template {
+  const substituted = substituteTemplateParams(
+    structuredClone(part),
+    params,
+  ) as TemplateDevicePart;
   return {
     id,
     name,
     builtin: false,
-    type: part.type,
-    ...(part.size ? { size: part.size } : {}),
-    ...(part.background ? { background: part.background } : {}),
-    features: structuredClone(part.features),
-    slots: structuredClone(part.slots),
+    type: substituted.type,
+    ...(substituted.size ? { size: substituted.size } : {}),
+    ...(substituted.background ? { background: substituted.background } : {}),
+    features: structuredClone(substituted.features),
+    slots: structuredClone(substituted.slots),
   };
 }
 
