@@ -14,6 +14,7 @@
     modules = 0,
     bp,
     pageId,
+    bare = false,
   }: {
     group: Group;
     tiles: ResolvedTile[];
@@ -21,6 +22,8 @@
     modules?: number;
     bp: Breakpoint;
     pageId: string;
+    /** The page has one populated section: render its tiles without chrome. */
+    bare?: boolean;
   } = $props();
 
   /**
@@ -33,12 +36,12 @@
   // page's column count (PageView) has to use the same number.
   const decoration = $derived(bp === "phone" ? 10 : 14);
   const width = $derived(
-    modules > 0
+    !bare && modules > 0
       ? `width: calc(${modules} * var(--tile-w, 57px) + ${modules - 1} * 6px + ${decoration}px);`
       : "",
   );
   const background = $derived(
-    group.appearance?.background
+    !bare && group.appearance?.background
       ? backgroundCss(group.appearance.background)
       : "",
   );
@@ -59,9 +62,10 @@
   class:bordered={group.appearance?.border === true}
   class:new-line={group.newLine === true}
   class:phone={bp === "phone"}
+  class:bare
   style="{background} {width}"
 >
-  {#if group.title}
+  {#if group.title && !bare}
     <!-- Ctrl/Cmd+click is a power-user shortcut on a heading, not a control; the
          layout editor stays reachable via the AppBar pencil, so no key handler. -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -76,7 +80,7 @@
 
   <div
     class="grid"
-    style={modules > 0
+    style={!bare && modules > 0
       ? `grid-template-columns: repeat(${modules}, var(--tile-w, 57px));`
       : ""}
   >
@@ -117,6 +121,20 @@
   /* `appearance.border: true` draws the section's box; absent is today's look. */
   .group.bordered {
     border-color: var(--border-color);
+  }
+
+  /* A page with one populated section skips the section box entirely. */
+  .group.bare {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .group.bare .grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-w, 57px), 1fr));
   }
 
   /* A phone gives the tiles the margin (see PageView's pagePad). */

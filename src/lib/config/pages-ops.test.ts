@@ -514,17 +514,18 @@ it("keeps the same placement in two sections", () => {
   expect(resolvePage(page)).toHaveLength(2);
 });
 
-it("keeps an empty placement list invisible unless showEmpty", () => {
+it("keeps an empty placement list visible when the section has a title", () => {
   const page: Page = {
     id: "p",
     title: "P",
     groups: [
-      { id: "g1", tiles: [] },
+      { id: "g1", title: "Named", tiles: [] },
       { id: "g2", tiles: [], showEmpty: true },
+      { id: "g3", tiles: [] },
     ],
   };
   const res = resolvePage(page);
-  expect(res.map((r) => r.group.id)).toEqual(["g2"]);
+  expect(res.map((r) => r.group.id)).toEqual(["g1", "g2"]);
 });
 
 it("the display's placeholder distinguishes connecting, unreadable and empty", () => {

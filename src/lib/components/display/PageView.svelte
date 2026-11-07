@@ -51,6 +51,12 @@
   const sections = $derived(
     groups.map((g) => layoutSection(g.group, g.tiles, spanOf, maxModules)),
   );
+  /** A page with one populated section renders its tiles directly on the page. */
+  const singleSection = $derived(
+    sections.length === 1 && sections[0].tiles.length > 0,
+  );
+  /** The bare section has no border/padding decoration to subtract. */
+  const bareModules = $derived(modulesFor(width, moduleSize.w, 6, pagePad * 2));
 
   const pageStyle = $derived(
     `--tile-w: ${moduleSize.w}px; --tile-h: ${moduleSize.h}px; --page-pad: ${pagePad}px; ${backgroundCss(page.background)}`,
@@ -71,9 +77,10 @@
     <GroupSection
       group={s.group}
       tiles={s.tiles}
-      modules={s.modules}
+      modules={singleSection ? bareModules : s.modules}
       {bp}
       pageId={page.id}
+      bare={singleSection}
     />
   {/each}
 </div>

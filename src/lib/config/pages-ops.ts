@@ -125,13 +125,18 @@ export function resolveSection(group: Group): ResolvedTile[] {
 /**
  * Resolve a page for the display: every section's placements, in order.
  * Membership is explicit now (A8), so the same device may appear in more than
- * one section — nothing is claimed — and a section with nothing to show
- * disappears unless it asks for empties.
+ * one section — nothing is claimed — and an empty section stays visible when
+ * it has a title or asks for empties.
  */
 export function resolvePage(page: Page): ResolvedGroup[] {
   return (page.groups ?? [])
     .map((group) => ({ group, tiles: resolveSection(group) }))
-    .filter((r) => r.tiles.length > 0 || r.group.showEmpty === true);
+    .filter(
+      (r) =>
+        r.tiles.length > 0 ||
+        r.group.showEmpty === true ||
+        Boolean(r.group.title?.trim()),
+    );
 }
 
 /** The page-registry schema version this build writes (A15). */
