@@ -79,13 +79,9 @@
     const exists = shown.some(
       (entry) => entry.kind === selected.kind && entry.id === selected.id,
     );
-    return exists
-      ? shown.map((entry) =>
-          entry.kind === selected.kind && entry.id === selected.id
-            ? selected
-            : entry,
-        )
-      : [selected, ...shown];
+    // Use the current entry (a save may have renamed it); the snapshot is only
+    // needed to keep a draft or filtered-out row visible.
+    return exists ? shown : [selected, ...shown];
   });
 
   function isOpen(entry: CodeEntry) {

@@ -110,15 +110,19 @@
     const exists = shown.some(
       (entry) => entry.kind === selected.kind && entry.id === selected.id,
     );
-    return exists
-      ? shown.map((entry) =>
-          entry.kind === selected.kind && entry.id === selected.id
-            ? selected
-            : entry,
-        )
-      : [selected, ...shown];
+    // Use the current entry (a save may have renamed it); the snapshot is only
+    // needed to keep a draft or filtered-out row visible.
+    return exists ? shown : [selected, ...shown];
   });
   const bundleSaveFailed = $derived(templateBundleSaveFailed());
+  const selectedBundle = $derived(
+    selected?.kind === "bundle"
+      ? bundleDraft?.id === selected.id
+        ? bundleDraft
+        : (bundles.find((bundle) => bundle.id === selected.id) ??
+          BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
+      : undefined,
+  );
   const writable = $derived(
     selected?.kind === "device"
       ? isTemplatesWritable()
@@ -127,17 +131,22 @@
         : isLogicsWritable(),
   );
   const blocked = $derived(
-    selected?.kind === "logic" ||
-      selected?.kind === "api" ||
-      selected?.kind === "bundle"
+    selected?.kind === "logic" || selected?.kind === "api"
       ? logicBlocked()
-      : false,
+      : selected?.kind === "bundle" &&
+          (selectedBundle?.logic || selectedBundle?.api)
+        ? logicBlocked()
+        : false,
   );
-  const applyWritable = $derived(
-    selected?.kind === "bundle"
-      ? isLogicsWritable() && isTemplatesWritable()
-      : writable,
-  );
+  const applyWritable = $derived.by(() => {
+    if (selected?.kind !== "bundle") return writable;
+    const needsLogic = !!(selectedBundle?.logic || selectedBundle?.api);
+    const needsTemplates = !!selectedBundle?.device;
+    return (
+      (!needsLogic || isLogicsWritable()) &&
+      (!needsTemplates || isTemplatesWritable())
+    );
+  });
 
   function isOpen(entry: TemplateEntry) {
     return selected?.kind === entry.kind && selected?.id === entry.id;
@@ -148,14 +157,6 @@
     if (target.closest("button, input, select, textarea, a, label")) return;
     open(entry);
   }
-  const selectedBundle = $derived(
-    selected?.kind === "bundle"
-      ? bundleDraft?.id === selected.id
-        ? bundleDraft
-        : (bundles.find((bundle) => bundle.id === selected.id) ??
-          BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
-      : undefined,
-  );
 
   $effect(() => {
     dirty = editorDirty;

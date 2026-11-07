@@ -54,8 +54,13 @@
   const parts = $derived(bundleApplyParts(bundle));
   const doc = $derived(getLogicDocument());
   const registry = $derived(getTemplateRegistry());
-  const writable = $derived(isLogicsWritable() && isTemplatesWritable());
-  const blocked = $derived(logicBlocked());
+  const needsLogic = $derived(!!(bundle.api || bundle.logic));
+  const needsTemplates = $derived(!!bundle.device);
+  const writable = $derived(
+    (!needsLogic || isLogicsWritable()) &&
+      (!needsTemplates || isTemplatesWritable()),
+  );
+  const blocked = $derived(needsLogic ? logicBlocked() : false);
   // svelte-ignore state_referenced_locally
   let values = $state(logicApplyDefaults(bundle.params ?? []));
   // svelte-ignore state_referenced_locally

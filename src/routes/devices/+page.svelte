@@ -236,6 +236,8 @@
     commit(
       idx >= 0 ? devices.map((x) => (x.id === d.id ? d : x)) : [...devices, d],
     );
+    formDirty = false;
+    pendingOpen = null;
     showForm = false;
     editing = null;
   }
