@@ -82,6 +82,28 @@ export function takeRequestedDeviceConfig() {
   }
 }
 
+const LOGIC_EDIT_KEY = "iHome.editLogic";
+
+/** Ask the logic page to open one logic's editor, then navigate. */
+export function requestLogicConfig(id) {
+  try {
+    sessionStorage.setItem(LOGIC_EDIT_KEY, id);
+  } catch {
+    /* private mode: the shortcut just navigates without selecting */
+  }
+}
+
+/** The requested logic id, cleared as it is taken. */
+export function takeRequestedLogicConfig() {
+  try {
+    const id = sessionStorage.getItem(LOGIC_EDIT_KEY) || "";
+    sessionStorage.removeItem(LOGIC_EDIT_KEY);
+    return id;
+  } catch {
+    return "";
+  }
+}
+
 /** Should this click open the device config instead of the tile's own action? */
 export function wantsDeviceConfig(event) {
   return !!(event?.metaKey || event?.ctrlKey);

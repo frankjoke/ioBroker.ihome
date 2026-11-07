@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import { goto } from "$app/navigation";
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import {
@@ -17,6 +18,7 @@
     isGeneratedForBase,
   } from "$lib/device-template-apply";
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
+  import { requestDeviceConfig, requestLogicConfig } from "$lib/pages.js";
   import { parseDuration } from "$logic/duration";
   import { stateIdFor, validStateId } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -221,9 +223,11 @@
       }
       const suffix = baseState.split(".").pop() ?? "device";
       const base = `${selected.id}-${suffix}`;
-      const baseLogics = existing
-        ? doc.logics.filter((logic) => !isGeneratedForBase(logic, baseState))
-        : doc.logics;
+      // One generated machine per base state, with or without a device: a
+      // re-apply replaces it instead of stacking a second poller on the states.
+      const baseLogics = doc.logics.filter(
+        (logic) => !isGeneratedForBase(logic, baseState),
+      );
       const taken = new Set(baseLogics.map((logic) => logic.id));
       let id = base;
       let index = 2;
@@ -267,6 +271,16 @@
       }
       onGenerated?.(plan.logic.id);
       onClose();
+      // The apply dialog is the only feedback so far: close it and open the
+      // thing that was just generated, so a second click cannot make a copy.
+      applyOpen = false;
+      if (plan.device) {
+        requestDeviceConfig(plan.device.id);
+        void goto("#/devices");
+      } else {
+        requestLogicConfig(plan.logic.id);
+        void goto("#/logic");
+      }
     } catch (e) {
       applyError = e instanceof Error ? e.message : String(e);
     } finally {

@@ -34,6 +34,7 @@
     fetchPickerValues,
     getPickerValue,
   } from "$lib/picker-values.svelte.js";
+  import { takeRequestedLogicConfig } from "$lib/pages.js";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -58,6 +59,19 @@
     if (selectedId && inlineForm) {
       inlineForm.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
+  });
+
+  /** A template apply asks for its generated logic to be opened on arrival. */
+  let requestedId = $state("");
+  onMount(() => {
+    requestedId = takeRequestedLogicConfig();
+  });
+  $effect(() => {
+    if (!requestedId) return;
+    const logic = doc.logics.find((item) => item.id === requestedId);
+    if (!logic) return;
+    requestedId = "";
+    openLogic(logic);
   });
 
   function uniqueId(base: string): string {

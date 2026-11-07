@@ -26,9 +26,13 @@ export function isGeneratedForBase(
 ): boolean {
   if (logic.kind !== "machine") return false;
   const code = logic.states?.Run?.on?.[0]?.do?.code ?? "";
+  const quoted = JSON.stringify(baseState);
   return (
     code.includes("const T = (") &&
-    code.includes(`baseState: ${JSON.stringify(baseState)}`)
+    // HTTP templates write a JSON header (`"baseState":"…"`), state templates
+    // a literal one (`baseState: "…"`).
+    (code.includes(`"baseState":${quoted}`) ||
+      code.includes(`baseState: ${quoted}`))
   );
 }
 

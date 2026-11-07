@@ -36,28 +36,27 @@ const SOURCE = `({
 })`;
 
 it("recognises a template-generated machine for a base state", () => {
-  const logic = {
-    id: "meter",
-    name: "Meter",
-    kind: "machine",
-    states: {
-      Run: {
-        on: [
-          {
-            on: "source",
-            do: {
-              code: 'const T = ({});\nconst P = { baseState: "ihome.0.Devices.PowerMeter" };',
-            },
-          },
-        ],
-      },
-    },
-  } as LogicDef;
-  expect(isGeneratedForBase(logic, "ihome.0.Devices.PowerMeter")).toBe(true);
-  expect(isGeneratedForBase(logic, "ihome.0.Other")).toBe(false);
+  const machine = (code: string) =>
+    ({
+      id: "meter",
+      name: "Meter",
+      kind: "machine",
+      states: { Run: { on: [{ on: "poll", do: { code } }] } },
+    }) as LogicDef;
+  // An HTTP template's header is JSON, without a space after the colon.
+  const http = machine(
+    'const T = ({});\nconst P = {"baseState":"ihome.0.Devices.PowerMeter","baseUrl":"http://x"};',
+  );
+  expect(isGeneratedForBase(http, "ihome.0.Devices.PowerMeter")).toBe(true);
+  // A state template's header is a literal object.
+  const state = machine(
+    'const T = ({});\nconst P = { baseState: "ihome.0.Devices.PowerMeter" };',
+  );
+  expect(isGeneratedForBase(state, "ihome.0.Devices.PowerMeter")).toBe(true);
+  expect(isGeneratedForBase(http, "ihome.0.Other")).toBe(false);
   expect(
     isGeneratedForBase(
-      { ...logic, kind: "function" } as never,
+      { ...http, kind: "function" } as never,
       "ihome.0.Devices.PowerMeter",
     ),
   ).toBe(false);
