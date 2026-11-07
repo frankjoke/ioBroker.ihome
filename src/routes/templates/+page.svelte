@@ -48,7 +48,10 @@
   let askSwitch = $state(false);
   let importOpen = $state(false);
   let importError = $state("");
-  let pendingImport = $state<TemplateFile | null>(null);
+  let pendingImport = $state<{
+    file: TemplateFile;
+    name: string;
+  } | null>(null);
   let focus = $state<{ kind: TemplateKind; id: string } | null>(null);
   let search = $state("");
   let sortDir = $state<"asc" | "desc">("asc");
@@ -105,14 +108,14 @@
     importError = "";
   }
 
-  function onImport(file: TemplateFile): string | null {
+  function onImport(file: TemplateFile, name: string): string | null {
     if (dirty) {
-      pendingImport = file;
+      pendingImport = { file, name };
       importOpen = false;
       askSwitch = true;
       return null;
     }
-    const result = installTemplateFile(file);
+    const result = installTemplateFile(file, name);
     if ("problem" in result) return result.problem;
     applyFocus(file.kind, result.id);
     return null;
@@ -120,15 +123,15 @@
 
   function confirmDiscard() {
     askSwitch = false;
-    const file = pendingImport;
+    const pending = pendingImport;
     pendingImport = null;
-    if (file) {
-      const result = installTemplateFile(file);
+    if (pending) {
+      const result = installTemplateFile(pending.file, pending.name);
       if ("problem" in result) {
         importError = result.problem;
         return;
       }
-      applyFocus(file.kind, result.id);
+      applyFocus(pending.file.kind, result.id);
       return;
     }
     const next = pendingGroup;

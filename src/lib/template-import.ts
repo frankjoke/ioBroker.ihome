@@ -42,6 +42,7 @@ import type { TemplateBundle } from "$lib/types/templates";
 
 export function installTemplateFile(
   file: TemplateFile,
+  name?: string,
 ): { id: string } | { problem: string } {
   switch (file.kind) {
     case "formula": {
@@ -55,6 +56,7 @@ export function installTemplateFile(
         file.kind,
         file.definition,
         getFormulas().map((template) => template.id),
+        name,
       );
       upsertFormula(next.definition as unknown as FormulaTemplate);
       saveFormulas();
@@ -68,10 +70,15 @@ export function installTemplateFile(
             "Function templates could not be loaded — the import was not saved.",
         };
       }
-      const next = prepareTemplateImport(file.kind, file.definition, [
-        ...getFunctions().map((template) => template.id),
-        ...BUILTIN_FUNCTIONS.map((template) => template.id),
-      ]);
+      const next = prepareTemplateImport(
+        file.kind,
+        file.definition,
+        [
+          ...getFunctions().map((template) => template.id),
+          ...BUILTIN_FUNCTIONS.map((template) => template.id),
+        ],
+        name,
+      );
       upsertFunction(next.definition as unknown as FunctionTemplate);
       saveFunctions();
       return { id: next.id };
@@ -85,10 +92,15 @@ export function installTemplateFile(
         };
       }
       const registry = getTemplateRegistry();
-      const next = prepareTemplateImport(file.kind, file.definition, [
-        ...Object.values(PRESETS).map((template) => template.id),
-        ...(registry.templates ?? []).map((template) => template.id),
-      ]);
+      const next = prepareTemplateImport(
+        file.kind,
+        file.definition,
+        [
+          ...Object.values(PRESETS).map((template) => template.id),
+          ...(registry.templates ?? []).map((template) => template.id),
+        ],
+        name,
+      );
       if (
         !commitTemplates({
           ...registry,
@@ -118,10 +130,15 @@ export function installTemplateFile(
         };
       }
       const doc = getLogicDocument();
-      const next = prepareTemplateImport(file.kind, file.definition, [
-        ...BUILTIN_TEMPLATES.map((template) => template.id),
-        ...(doc.templates ?? []).map((template) => template.id),
-      ]);
+      const next = prepareTemplateImport(
+        file.kind,
+        file.definition,
+        [
+          ...BUILTIN_TEMPLATES.map((template) => template.id),
+          ...(doc.templates ?? []).map((template) => template.id),
+        ],
+        name,
+      );
       if (
         !commitLogics({
           ...doc,
@@ -154,10 +171,15 @@ export function installTemplateFile(
         };
       }
       const doc = getLogicDocument();
-      const next = prepareTemplateImport(file.kind, file.definition, [
-        ...BUILTIN_DEVICE_TEMPLATES.map((template) => template.id),
-        ...(doc.deviceTemplates ?? []).map((template) => template.id),
-      ]);
+      const next = prepareTemplateImport(
+        file.kind,
+        file.definition,
+        [
+          ...BUILTIN_DEVICE_TEMPLATES.map((template) => template.id),
+          ...(doc.deviceTemplates ?? []).map((template) => template.id),
+        ],
+        name,
+      );
       if (
         !commitLogics({
           ...doc,
@@ -188,6 +210,7 @@ export function installTemplateFile(
         file.kind,
         file.definition,
         getTemplateBundles().map((bundle) => bundle.id),
+        name,
       );
       if (!upsertTemplateBundle(next.definition as unknown as TemplateBundle)) {
         return { problem: "Combined templates could not be saved." };
