@@ -57,11 +57,21 @@ export interface SectionAppearance {
  * A tile's own config. Absent → resolved from the device → its template →
  * the preset; on the first edit it is materialised (complete, not a patch).
  */
+/** Tile chart layout: the sparkline band can sit above the rows instead of
+ *  behind the headline icon. */
+export interface TileChartConfig {
+  separate?: boolean;
+  /** Separated band height in px; absent → 56. */
+  height?: number;
+}
+
 export interface TileConfig {
   template?: string;
   size?: Size;
   /** The tile's CSS background (solid/gradient/image), behind its content. */
   background?: Background;
+  /** Sparkline layout for this tile. */
+  chart?: TileChartConfig;
   /** What "active" means for this tile (A30): evaluated live per render. */
   active?: ActiveCondition;
   /** How the tile looks in each active state (A71): read only while `active`

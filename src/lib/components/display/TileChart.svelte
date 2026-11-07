@@ -8,7 +8,8 @@
   } from "$lib/stores/history.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
-  let { series }: { series: ChartSeries[] } = $props();
+  let { series, wide = false }: { series: ChartSeries[]; wide?: boolean } =
+    $props();
 
   // Fetch and feed every series (the store dedupes per state + spec), so the
   // tile chart and a row chart read one cache.
@@ -66,6 +67,7 @@
 {#if drawn.length}
   <svg
     class="chart"
+    class:wide
     viewBox="0 0 120 28"
     preserveAspectRatio="none"
     aria-hidden="true"
@@ -84,6 +86,11 @@
     width: 100%;
     max-width: 140px;
     height: 28px;
+  }
+
+  .chart.wide {
+    max-width: none;
+    height: 100%;
   }
 
   .chart polyline {

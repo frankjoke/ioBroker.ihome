@@ -526,6 +526,11 @@
     edit((t) => setLook(t, state, patch));
   }
 
+  /** The tile's sparkline layout (separate band / height). */
+  function patchChart(patch: { separate?: boolean; height?: number }): void {
+    edit((t) => ({ ...t, chart: { ...(t.chart ?? {}), ...patch } }));
+  }
+
   // ------------------------------------------------------------------- slots
 
   /**
@@ -1133,6 +1138,38 @@
 
         {#if id === "look"}
           <div class="field">
+            <div class="row">
+              <label class="check">
+                <input
+                  type="checkbox"
+                  checked={tile?.tile?.chart?.separate === true}
+                  onchange={(e) =>
+                    patchChart({ separate: e.currentTarget.checked })}
+                />
+                <span>Separate sparkline from icon</span>
+              </label>
+              {#if tile?.tile?.chart?.separate}
+                <label class="small">
+                  <span class="label-mono">Chart height (px)</span>
+                  <input
+                    type="number"
+                    class="num-input"
+                    min="8"
+                    max="200"
+                    step="1"
+                    value={String(tile.tile.chart?.height ?? 56)}
+                    oninput={(e) => {
+                      const value = Math.trunc(Number(e.currentTarget.value));
+                      if (Number.isFinite(value)) {
+                        patchChart({
+                          height: Math.min(200, Math.max(8, value)),
+                        });
+                      }
+                    }}
+                  />
+                </label>
+              {/if}
+            </div>
             <div class="row">
               <span class="label-mono">Tile icon</span>
               <button

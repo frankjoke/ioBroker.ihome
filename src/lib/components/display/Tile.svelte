@@ -306,6 +306,12 @@
   const bodySlots = $derived(parts.body);
   /** A lone frame/html slot is the whole face: no name, no padding. */
   const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
+  /** Sparkline layout: a separate band instead of the icon overlay. */
+  const chartConfig = $derived(workingTile?.chart);
+  const separatedChart = $derived(
+    chartConfig?.separate === true && chart.length > 0,
+  );
+  const chartHeight = $derived(chartConfig?.height ?? 56);
 
   /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small.
    *  A tile that draws a chart blends its big glyph out whatever the state says
@@ -345,7 +351,7 @@
 
   $effect(() => {
     const el = tileEl;
-    if (!el || !chart.length) {
+    if (!el || !chart.length || separatedChart) {
       band = undefined;
       return;
     }
@@ -618,7 +624,7 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  {#if chart.length}
+  {#if chart.length && !separatedChart}
     <div
       class="tile-bg"
       style:--chart-top={band ? `${band.top}px` : undefined}
@@ -628,6 +634,11 @@
     </div>
   {/if}
   {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
+  {#if separatedChart}
+    <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
+      <TileChart series={chart} wide />
+    </div>
+  {/if}
   <div class="tile-body">
     {#each bodySlots as r, i (i)}
       <SlotRenderer
@@ -743,6 +754,26 @@
   /* Stretch the chart across the band: the chart ships a fixed size for the
      in-body case, and a scoped style cannot reach into the child. */
   .tile-bg :global(.chart) {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+  }
+
+  /* A separated sparkline: its own band above the tile's name and rows, so
+     multiple lines never sit behind the icon. The 5% side inset is the 0.1
+     total breathing room from the tile edge. */
+  .tile-chart {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    height: var(--chart-height, 56px);
+    flex: 0 0 auto;
+    padding-inline: 5%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .tile-chart :global(.chart) {
     width: 100%;
     max-width: none;
     height: 100%;
