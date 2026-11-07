@@ -534,6 +534,13 @@
     return slotLabel({ kind: "value", source });
   }
 
+  /** The device a source names, for preselecting it in the source picker. */
+  function sourceDevice(source: SlotSource | string | undefined): string {
+    return source && typeof source !== "string" && source.kind !== "state"
+      ? source.device
+      : "";
+  }
+
   /**
    * What a slot row shows next to its kind: `Device.Control` for a control
    * reference, the state id for a raw state, the URL for a frame (S3).
@@ -2201,6 +2208,7 @@
       title="Choose a source"
       {devices}
       slots={shownSlots}
+      activeDeviceId={sourceDevice(activeCond?.source)}
       onSource={setActiveSource}
       onClose={() => (activePicker = false)}
     />
@@ -2212,6 +2220,7 @@
       title="Choose a source"
       {devices}
       slots={shownSlots}
+      activeDeviceId={sourceDevice(shownSlots[sourcePickerFor]?.source)}
       onSource={(source) => {
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;

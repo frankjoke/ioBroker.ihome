@@ -41,6 +41,8 @@
     rooms,
     devices = [],
     showHead = true,
+    /** Open the state picker automatically for a new (empty) device. */
+    autoPick = true,
     dirty = $bindable(false),
     onSave,
     onCancel,
@@ -51,6 +53,8 @@
     rooms: { id: string; label: string; icon?: string }[];
     devices?: Device[];
     showHead?: boolean;
+    /** Open the state picker automatically for a new (empty) device. */
+    autoPick?: boolean;
     /** True while the form differs from the device it opened with. */
     dirty?: boolean;
     onSave: (d: Device) => void;
@@ -72,7 +76,7 @@
   let icon = $state(init?.icon ?? "");
   let controls = $state<Control[]>(init?.controls ?? []);
   // auto-open the picker for a brand-new (empty) device
-  let showPicker = $state(untrack(() => !device));
+  let showPicker = $state(untrack(() => autoPick && !device));
 
   // Control-list filters (spec §7): they read the effective metadata, so a
   // corrected control is found by its correction.
@@ -444,6 +448,7 @@
     mode="control"
     title={replaceIndex !== null ? "Change state" : "Add states"}
     deviceType={type}
+    activeDeviceId={device?.id ?? ""}
     {devices}
     single={replaceIndex !== null}
     onControls={(picked) =>

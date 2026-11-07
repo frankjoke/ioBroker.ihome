@@ -14,6 +14,8 @@
     rooms,
     roomsOf,
     devices = [],
+    /** Open the state picker automatically for a new (empty) device. */
+    autoPick = true,
     onSave,
     onCancel,
     onDuplicate,
@@ -24,6 +26,8 @@
     rooms: { id: string; label: string; icon?: string }[];
     roomsOf: (id: string) => string[];
     devices?: Device[];
+    /** Open the state picker automatically for a new (empty) device. */
+    autoPick?: boolean;
     onSave: (d: Device) => void;
     onCancel: () => void;
     onDuplicate?: (d: Device) => void;
@@ -80,6 +84,7 @@
         {rooms}
         {roomsOf}
         {devices}
+        {autoPick}
         {onSave}
         {onCancel}
         showHead={false}

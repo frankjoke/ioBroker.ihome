@@ -45,6 +45,8 @@
     templates = [],
     slots = [],
     deviceType = "Custom",
+    /** Preselect the device this picker was opened for, so its controls show. */
+    activeDeviceId = "",
     single = false,
     onSlots,
     onSource,
@@ -63,6 +65,8 @@
     slots?: Slot[];
     /** control mode: the feature suggestion type of the device being edited. */
     deviceType?: DeviceType;
+    /** The device the picker opened for (tile/slot/control). */
+    activeDeviceId?: string;
     /** control mode: picking replaces one state instead of adding. */
     single?: boolean;
     onSlots?: (slots: Slot[]) => void;
@@ -100,7 +104,17 @@
 
   let tab = $state<Tab>(untrack(() => (mode === "state" ? "state" : "device")));
   let search = $state("");
-  let selectedDeviceId = $state("");
+  /** The device the picker opened for, else the first device the tile uses. */
+  function initialDeviceId(): string {
+    if (activeDeviceId) return activeDeviceId;
+    for (const slot of slots) {
+      const source = slot.source;
+      if (source && typeof source !== "string" && source.kind !== "state")
+        return source.device;
+    }
+    return "";
+  }
+  let selectedDeviceId = $state(untrack(initialDeviceId));
   /** Slot mode: the controls of the shown device, ticked for "Add N slots". */
   let selectedControls = new SvelteSet<string>();
   /** Control mode: picked states across the device and the tree. */
@@ -118,6 +132,8 @@
   /** The device editors fold out only where a device is picked, not inside the
    *  device form's own control picker. */
   const canEditDevices = $derived(mode === "slot" || mode === "source");
+  /** A new device can be created from every device tab. */
+  const canAddDevice = $derived(mode !== "state");
   /** A device saved in this picker before the store's list caught up. */
   let createdDevice = $state<Device | null>(null);
 
@@ -680,18 +696,30 @@
               <option value={f.value}>{f.label}</option>
             {/each}
           </select>
-          {#if canEditDevices}
-            <button
-              type="button"
-              class="icon-btn"
-              title="Add device"
-              aria-label="Add device"
-              onclick={() => (deviceForm = { device: null })}
-            >
-              <span class="material-symbols-outlined">add</span>
-            </button>
-          {/if}
         </div>
+        {#if canAddDevice || (canEditDevices && selectedDevice)}
+          <div class="device-tools">
+            {#if canAddDevice}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => (deviceForm = { device: null })}
+              >
+                <span class="material-symbols-outlined">add</span> Add device
+              </button>
+            {/if}
+            {#if canEditDevices && selectedDevice}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => (deviceForm = { device: selectedDevice })}
+              >
+                <span class="material-symbols-outlined">edit</span>
+                Edit {selectedDevice.name || selectedDevice.id}
+              </button>
+            {/if}
+          </div>
+        {/if}
         <ul class="list device-list">
           {#each filtered as d (d.id)}
             <li class="device-row">
@@ -704,17 +732,6 @@
                 <span class="name">{d.name || d.id}</span>
                 <span class="meta text-muted">{d.type}</span>
               </button>
-              {#if canEditDevices}
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title={`Edit ${d.name || d.id}`}
-                  aria-label={`Edit ${d.name || d.id}`}
-                  onclick={() => (deviceForm = { device: d })}
-                >
-                  <span class="material-symbols-outlined">edit</span>
-                </button>
-              {/if}
             </li>
           {/each}
           {#if filtered.length === 0}
@@ -729,6 +746,7 @@
               {roomsOf}
               {rooms}
               devices={allDevices}
+              autoPick={false}
               onSave={saveDevice}
               onCancel={() => (deviceForm = null)}
             />
@@ -921,7 +939,7 @@
     gap: 0.75rem;
   }
 
-  /* One device row: the pick target, then its pencil. */
+  /* One device row: the pick target. */
   .device-row {
     display: flex;
     align-items: center;
@@ -933,8 +951,16 @@
     min-width: 0;
   }
 
-  .device-row .icon-btn {
-    flex: 0 0 auto;
+  .device-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .device-tools .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   /* The shared editor item folds out under the list, inside the picker's scroll. */
