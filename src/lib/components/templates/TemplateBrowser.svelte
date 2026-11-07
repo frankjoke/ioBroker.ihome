@@ -36,9 +36,11 @@
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
   import BundleEditor from "./BundleEditor.svelte";
   import DeviceApplyModal from "./DeviceApplyModal.svelte";
+  import LogicApplyModal from "./LogicApplyModal.svelte";
   import { exportTemplate } from "$lib/template-export";
   import type { Template } from "$lib/types/display";
   import type { TemplateBundle } from "$lib/types/templates";
+  import type { LogicTemplate } from "$logic/types";
 
   let {
     dirty = $bindable(false),
@@ -69,6 +71,7 @@
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
   let deviceApplyTemplate = $state<Template | null>(null);
+  let logicApplyTemplate = $state<LogicTemplate | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
 
   const registry = $derived(getTemplateRegistry());
@@ -192,6 +195,11 @@
   function openDeviceApply(entry: TemplateEntry) {
     const definition = definitionFor(entry);
     if (definition) deviceApplyTemplate = definition as Template;
+  }
+
+  function openLogicApply(entry: TemplateEntry) {
+    const definition = definitionFor(entry);
+    if (definition) logicApplyTemplate = definition as LogicTemplate;
   }
 
   function guard(action: () => void) {
@@ -545,6 +553,16 @@
                     <span class="material-symbols-outlined">play_arrow</span>
                     Apply
                   </button>
+                {:else if entry.kind === "logic"}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={editorDirty || !writable || blocked}
+                    onclick={() => openLogicApply(entry)}
+                  >
+                    <span class="material-symbols-outlined">play_arrow</span>
+                    Apply
+                  </button>
                 {/if}
                 <button
                   type="button"
@@ -641,6 +659,13 @@
     <DeviceApplyModal
       template={deviceApplyTemplate}
       onClose={() => (deviceApplyTemplate = null)}
+    />
+  {/if}
+
+  {#if logicApplyTemplate}
+    <LogicApplyModal
+      template={logicApplyTemplate}
+      onClose={() => (logicApplyTemplate = null)}
     />
   {/if}
 
