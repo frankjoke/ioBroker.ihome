@@ -56,16 +56,33 @@ export function formatNumber(v: unknown, decimals?: number): string {
  * consumed as the label and never repeated; a missing value shows "—" with no
  * unit, because "— °C" is noise.
  */
+/**
+ * An epoch-ms timestamp as the viewer's local date and time. 0 means "never"
+ * in ioBroker, so it reads as an empty value instead of 1970.
+ */
+export function formatTimestamp(v: unknown): string {
+  const ms =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  if (!Number.isFinite(ms)) return String(v);
+  return ms > 0 ? new Date(ms).toLocaleString() : "—";
+}
+
 export function splitReading(
   v: unknown,
   unit?: string,
   decimals?: number,
   states?: Record<string, string>,
+  role?: string,
 ): { value: string; unit: string } {
   if (v === null || v === undefined) return { value: "—", unit: "" };
   // A states label is the whole reading: "Standby °C" would be noise.
   const label = states?.[String(v)];
   if (label !== undefined) return { value: label, unit: "" };
+  if (role === "value.time") return { value: formatTimestamp(v), unit: "" };
   if (typeof v === "boolean") {
     return { value: formatBoolean(v, unit || "Off/On"), unit: "" };
   }
@@ -87,9 +104,13 @@ export function splitValueUnit(
  * unit, e.g. "Aus/Ein") rather than true/false, everything else goes through
  * `formatValue`.
  */
-export function formatSlotText(v: unknown, unit?: string): string {
+export function formatSlotText(
+  v: unknown,
+  unit?: string,
+  role?: string,
+): string {
   if (typeof v === "boolean") return formatBoolean(v, unit || "Off/On");
-  return formatValue(v, unit);
+  return formatValue(v, unit, role);
 }
 
 /** Pick readable text (#1a1a1a or #fff) for a background colour. */
@@ -123,8 +144,9 @@ export function formatBoolean(v: boolean, unit?: string): string {
 }
 
 /** Display a value, appending a unit when present. */
-export function formatValue(v: unknown, unit?: string): string {
+export function formatValue(v: unknown, unit?: string, role?: string): string {
   if (v === null || v === undefined) return "—";
+  if (role === "value.time") return formatTimestamp(v);
   if (typeof v === "boolean") return formatBoolean(v, unit);
   if (typeof v === "object") return JSON.stringify(v);
   return String(v) + (unit ? " " + unit : "");

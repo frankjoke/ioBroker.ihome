@@ -46,14 +46,29 @@ describe("logicOutputSpec", () => {
     });
   });
 
-  it("builds a number output with states and unit", () => {
+  it("builds a multistate output with state labels", () => {
     expect(logicOutputSpec(machine(), "ihome.0")).toMatchObject({
       id: "ihome.0.Logic.light",
       common: {
-        type: "number",
+        type: "multistate",
         role: "level.state",
-        unit: "lx",
+        unit: "",
         states: { "0": "Idle", "1": "On" },
+        def: 0,
+      },
+    });
+  });
+
+  it("marks a timestamp number output as value.time", () => {
+    expect(
+      logicOutputSpec(
+        fn({ scope: "logic", type: "number", role: "value.time" }),
+        "ihome.0",
+      ),
+    ).toMatchObject({
+      common: {
+        type: "number",
+        role: "value.time",
         def: 0,
       },
     });
@@ -65,9 +80,38 @@ describe("logicOutputSpec", () => {
     ).toMatchObject({
       common: {
         type: "string",
-        role: "json",
+        role: "text.json",
         def: "{}",
         states: {},
+      },
+    });
+  });
+
+  it("stores a mixed output as mixed", () => {
+    expect(
+      logicOutputSpec(fn({ scope: "logic", type: "mixed" }), "ihome.0"),
+    ).toMatchObject({
+      common: {
+        type: "mixed",
+        role: "state",
+        def: null,
+        states: {},
+      },
+    });
+  });
+
+  it("keeps a machine's object output as JSON data", () => {
+    expect(
+      logicOutputSpec(
+        { ...machine(), output: { scope: "logic", type: "object" } },
+        "ihome.0",
+      ),
+    ).toMatchObject({
+      common: {
+        type: "string",
+        role: "text.json",
+        states: {},
+        def: "{}",
       },
     });
   });

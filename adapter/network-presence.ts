@@ -169,7 +169,7 @@ export class NetworkPresenceService {
         field: "json",
         name: "Presence (JSON)",
         type: "string",
-        role: "json",
+        role: "text.json",
         def: "{}",
       },
       {

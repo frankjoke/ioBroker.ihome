@@ -164,7 +164,8 @@
       : stateIdFor(ref, getVariables());
     const reading = getPickerValue(id);
     if (!reading) return "";
-    return formatValue(reading.val, ioBroker.objects.get(id)?.common?.unit);
+    const common = ioBroker.objects.get(id)?.common;
+    return formatValue(reading.val, common?.unit, common?.role);
   }
 
   /** The source states the line readings need, as broker ids. */

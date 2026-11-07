@@ -53,7 +53,7 @@
     const id = node.obj?._id ?? node.id;
     const pv = getPickerValue(id);
     if (pv) {
-      return `${formatValue(pv.val, node.obj?.common?.unit)} · ${formatAge(pv.ts)}`;
+      return `${formatValue(pv.val, node.obj?.common?.unit, node.obj?.common?.role)} · ${formatAge(pv.ts)}`;
     }
     return isPickerFetched(id) ? "unavailable" : "…";
   }

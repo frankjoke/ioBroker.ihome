@@ -293,6 +293,7 @@ export interface BadgeControl {
   hidden?: boolean;
   liveValue?: unknown;
   unit?: string;
+  role?: string;
   states?: Record<string, string> | string[];
   meta?: ControlMeta;
   rules?: Rule[];
@@ -349,6 +350,7 @@ function controlBadge(
     unitFor(slot.unit, control.meta?.unit, control.unit),
     undefined,
     normalizeStates(control.meta?.states ?? control.states),
+    control.meta?.role ?? control.role,
   );
   return {
     source: String(slot.source),

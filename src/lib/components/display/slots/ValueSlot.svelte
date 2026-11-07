@@ -42,6 +42,7 @@
             : unitFor(slot.unit, control.meta?.unit, control.unit),
           decimals,
           normalizeStates(control.states),
+          control.meta?.role ?? control.role,
         )
       : { value: "—", unit: "" },
   );

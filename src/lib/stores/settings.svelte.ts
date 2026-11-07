@@ -43,8 +43,8 @@ async function ensureSettingsObject() {
       type: "state",
       common: {
         name: "iHome settings",
-        type: "json",
-        role: "json",
+        type: "string",
+        role: "text.json",
         read: true,
         write: true,
       },

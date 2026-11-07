@@ -50,7 +50,7 @@ export function planDeviceTemplate(
     const controls: Control[] = template.itemList.map((item, index) => {
       const spec = specs[index];
       const object = item.type === "object";
-      const role = object ? "json" : item.role;
+      const role = object ? "text.json" : item.role;
       const stateType = object ? "string" : item.type;
       const suggested =
         item.feature ??

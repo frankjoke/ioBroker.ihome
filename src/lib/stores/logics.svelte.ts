@@ -58,8 +58,8 @@ async function ensureLogicsObject() {
       type: "state",
       common: {
         name: "iHome logic documents",
-        type: "json",
-        role: "json",
+        type: "string",
+        role: "text.json",
         read: true,
         write: true,
       },

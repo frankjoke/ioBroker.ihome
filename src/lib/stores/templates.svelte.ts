@@ -63,8 +63,8 @@ async function ensureTemplatesObject() {
       type: "state",
       common: {
         name: "AiHome user templates",
-        type: "json",
-        role: "json",
+        type: "string",
+        role: "text.json",
         read: true,
         write: true,
       },

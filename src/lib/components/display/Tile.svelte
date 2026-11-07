@@ -203,6 +203,7 @@
       stateId: id,
       label: obj.common?.name ?? id,
       unit: obj.common?.unit,
+      role: obj.common?.role,
       liveValue: state?.val,
       writable: false,
     };

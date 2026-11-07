@@ -39,6 +39,7 @@
       unitFor(undefined, control.meta?.unit, control.unit),
       undefined,
       normalizeStates(control.meta?.states ?? control.states),
+      control.meta?.role ?? control.role,
     );
     return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
   }

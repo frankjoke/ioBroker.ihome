@@ -474,9 +474,14 @@ function checkOutput(
       output.type !== "boolean" &&
       output.type !== "number" &&
       output.type !== "string" &&
-      output.type !== "object"
+      output.type !== "object" &&
+      output.type !== "mixed" &&
+      output.type !== "multistate"
     ) {
       add(id, "output.type", "unknown output type");
+    }
+    if (output.role !== undefined && output.role !== "value.time") {
+      add(id, "output.role", "unknown output role");
     }
     if (output.on !== undefined && typeof output.on !== "string") {
       add(id, "output.on", "on must be a state-name pattern");
@@ -497,7 +502,9 @@ function checkOutput(
     output.type !== "boolean" &&
     output.type !== "number" &&
     output.type !== "string" &&
-    output.type !== "object"
+    output.type !== "object" &&
+    output.type !== "mixed" &&
+    output.type !== "multistate"
   ) {
     add(id, "output.type", "unknown output type");
   }

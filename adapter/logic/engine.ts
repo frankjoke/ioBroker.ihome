@@ -24,6 +24,7 @@ import type {
   MachineLogic,
   OnRow,
   Output,
+  OutputType,
   StateDef,
   TimerSpec,
 } from "./types";
@@ -962,12 +963,10 @@ export function createEngine(
     writeOutput(rt, value, depth, cause);
   }
 
-  function coerce(
-    value: unknown,
-    type: "boolean" | "number" | "string" | "object",
-  ): unknown {
+  function coerce(value: unknown, type: OutputType): unknown {
     if (type === "boolean") return Boolean(value);
-    if (type === "number") return Number(value);
+    if (type === "number" || type === "multistate") return Number(value);
+    if (type === "mixed") return value;
     // An object output is stored as JSON text; a string is taken as already
     // serialized, so a fetched JSON string is not quoted a second time.
     if (type === "object") {
@@ -1003,12 +1002,23 @@ export function createEngine(
     if (rt.def.kind !== "machine") return coerce(value, output.type);
     const name = String(value);
     if (output.map && name in output.map) return output.map[name];
+    // A machine state is its index (an ihome output is `multistate`); an
+    // explicit number/multistate output asks for the same. A legacy boolean
+    // machine output that wrote true/false is upgraded with the state object.
+    if (
+      output.type === "number" ||
+      output.type === "multistate" ||
+      (output.scope === "logic" &&
+        output.type !== "object" &&
+        output.type !== "mixed")
+    ) {
+      const index = Object.keys(rt.def.states).indexOf(name);
+      return index < 0 ? 0 : index;
+    }
     if (output.type === "boolean")
       return matchesPattern(name, output.on ?? "On*");
     if (output.type === "string") return name;
-    // A number output is the state's index in declaration order.
-    const index = Object.keys(rt.def.states).indexOf(name);
-    return index < 0 ? 0 : index;
+    return coerce(value, output.type);
   }
 
   function matchesPattern(name: string, pattern: string): boolean {
@@ -1028,7 +1038,7 @@ export function createEngine(
     if (
       rt.def.kind === "machine" &&
       output.scope !== "memory" &&
-      output.type === "object"
+      (output.type === "object" || output.type === "mixed")
     ) {
       return;
     }
@@ -1157,7 +1167,11 @@ export function createEngine(
     // map has no mapping to trust, so it falls through to init.state/start.
     const mappable =
       rt.output.scope !== "memory" &&
-      (!!rt.output.map || rt.output.type === "boolean");
+      (!!rt.output.map ||
+        rt.output.type === "boolean" ||
+        (rt.output.scope === "logic" &&
+          rt.output.type !== "object" &&
+          rt.output.type !== "mixed"));
     if (
       rt.output.scope !== "memory" &&
       (init?.match === "output" || mappable)

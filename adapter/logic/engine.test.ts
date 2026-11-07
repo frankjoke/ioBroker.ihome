@@ -85,7 +85,7 @@ it("writes a logic output to the adapter-created state", () => {
   expect(write?.ack).toBe(false);
 });
 
-it("maps a machine's state names to a boolean logic output", () => {
+it("maps a machine's state names to its multistate index", () => {
   const machine: LogicDocument = {
     version: 3,
     logics: [
@@ -112,7 +112,7 @@ it("maps a machine's state names to a boolean logic output", () => {
   expect(h.writes).toEqual([]);
   h.change("0_userdata.0.E", 1);
   const on = h.writes.find((w) => w.id === "system.adapter.ihome.0.Logic.lift");
-  expect(on?.value).toBe(true);
+  expect(on?.value).toBe(1);
 });
 
 const follower = (extra: Partial<MachineLogic> = {}): LogicDocument => ({

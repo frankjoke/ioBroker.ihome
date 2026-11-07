@@ -95,7 +95,7 @@ describe("templateStateSpecs", () => {
     expect(specs[2]).toMatchObject({
       common: {
         type: "string",
-        role: "json",
+        role: "text.json",
         write: false,
         states: {},
         def: "{}",

@@ -161,8 +161,8 @@ async function ensurePagesObject() {
       type: "state",
       common: {
         name: "AiHome display pages",
-        type: "json",
-        role: "json",
+        type: "string",
+        role: "text.json",
         read: true,
         write: true,
       },
@@ -251,8 +251,8 @@ async function writeBackupOnce(raw: string): Promise<boolean> {
         type: "state",
         common: {
           name: "iHome display pages (v1 backup)",
-          type: "json",
-          role: "json",
+          type: "string",
+          role: "text.json",
           read: true,
           write: false,
         },

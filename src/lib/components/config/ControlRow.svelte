@@ -107,7 +107,13 @@
     if (!l) return "…";
     const id = stateIdFor(control.stateId ?? "", getVariables());
     const meta = effectiveCommon(control, ioBroker.objects.get(id));
-    const parts = splitReading(l.val, meta.unit, undefined, meta.states);
+    const parts = splitReading(
+      l.val,
+      meta.unit,
+      undefined,
+      meta.states,
+      meta.role,
+    );
     const reading = parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
     return `${reading} · ${formatAge(l.ts)}`;
   });

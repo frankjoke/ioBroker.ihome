@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Output } from "$logic/types";
+  import type { Output, OutputType } from "$logic/types";
   import type { LogicDef } from "$logic/types";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -11,6 +11,7 @@
     output,
     stateNames,
     logicId,
+    kind = "function",
     logics = [],
     onchange,
   }: {
@@ -18,12 +19,32 @@
     stateNames: string[];
     /** The logic id, for the derived logic-state id. */
     logicId: string;
+    /** A state machine writes its state index as `multistate`. */
+    kind?: "machine" | "function";
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
     onchange: (output: Output) => void;
   } = $props();
 
-  const TYPE = ["boolean", "number", "string", "object"] as const;
+  const LOGIC_TYPES = [
+    "boolean",
+    "number",
+    "string",
+    "object",
+    "mixed",
+  ] as const;
+  const MACHINE_TYPES = ["multistate", "object", "mixed"] as const;
+  const STATE_TYPES = [
+    "boolean",
+    "number",
+    "string",
+    "object",
+    "mixed",
+    "multistate",
+  ] as const;
+  const typeOptions = $derived(
+    kind === "machine" ? MACHINE_TYPES : LOGIC_TYPES,
+  );
 
   const stateRef = $derived(output.scope === "state" ? output.ref : "");
   const logicStateId = $derived(`${ioBroker.namespace}.Logic.${logicId}`);
@@ -56,7 +77,17 @@
     if (scope === "logic") {
       onchange({
         scope: "logic",
-        type: output.scope === "memory" ? "boolean" : output.type,
+        type:
+          kind === "machine" &&
+          (output.scope === "memory" ||
+            (output.type !== "object" && output.type !== "mixed"))
+            ? "multistate"
+            : output.scope === "memory"
+              ? "boolean"
+              : output.type,
+        ...(output.scope === "logic" && output.role
+          ? { role: output.role }
+          : {}),
         on: output.scope === "memory" ? undefined : output.on,
         map: output.scope === "memory" ? undefined : output.map,
         forward: output.forward,
@@ -86,21 +117,44 @@
   }
 
   /** The selected state's declared type, so the field shows the truth. */
-  function stateType(ref: string): (typeof TYPE)[number] | undefined {
+  function stateType(ref: string): OutputType | undefined {
     const common = ioBroker.objects.get(realId(ref))?.common;
     const type = common?.type;
-    if (type === "string" && common?.role === "json") return "object";
-    if (type === "boolean" || type === "number" || type === "string") {
+    // `json` is the old name of a JSON string; both show as object.
+    if (type === "json") return "object";
+    if (
+      type === "string" &&
+      (common?.role === "json" || common?.role === "text.json")
+    )
+      return "object";
+    if (
+      type === "boolean" ||
+      type === "number" ||
+      type === "string" ||
+      type === "mixed" ||
+      type === "multistate"
+    ) {
       return type;
     }
     return undefined;
   }
 
+  /** A machine's ihome output is always `multistate`. */
+  const shownLogicType = $derived(
+    output.scope === "logic"
+      ? kind === "machine" &&
+        output.type !== "object" &&
+        output.type !== "mixed"
+        ? "multistate"
+        : output.type
+      : "boolean",
+  );
+
   const shownType = $derived(
     output.scope === "state"
       ? (stateType(stateRef) ??
           (output.type === "object" ? "string" : output.type))
-      : "boolean",
+      : shownLogicType,
   );
 
   /** The selected state's unit; a foreign state is never written to. */
@@ -153,18 +207,21 @@
       <select
         class="type"
         aria-label="Output type"
-        value={output.type}
-        onchange={(e) =>
+        value={shownLogicType}
+        onchange={(e) => {
+          const type = e.currentTarget.value as OutputType;
           onchange({
             ...output,
-            type: e.currentTarget.value as "boolean" | "number" | "string",
-          })}
+            type,
+            role: type === "number" ? output.role : undefined,
+          });
+        }}
       >
-        {#each TYPE as type (type)}
+        {#each typeOptions as type (type)}
           <option value={type}>{type}</option>
         {/each}
       </select>
-      {#if output.type === "number"}
+      {#if shownLogicType === "number"}
         <input
           class="unit"
           aria-label="Output unit"
@@ -176,6 +233,21 @@
               unit: e.currentTarget.value.trim() || undefined,
             })}
         />
+        <label
+          class="inline timestamp"
+          title="Show the epoch-ms value as local date and time"
+        >
+          <input
+            type="checkbox"
+            checked={output.role === "value.time"}
+            onchange={(e) =>
+              onchange({
+                ...output,
+                role: e.currentTarget.checked ? "value.time" : undefined,
+              })}
+          />
+          value.time
+        </label>
       {/if}
     {:else if output.scope === "state"}
       <span
@@ -196,7 +268,7 @@
         disabled
         title="The type comes from the selected state"
       >
-        {#each TYPE as type (type)}
+        {#each STATE_TYPES as type (type)}
           <option value={type}>{type}</option>
         {/each}
       </select>
@@ -237,7 +309,7 @@
     />
   {/if}
 
-  {#if output.scope !== "memory" && output.type === "boolean" && stateNames.length > 0}
+  {#if output.scope !== "memory" && output.type === "boolean" && !(output.scope === "logic" && kind === "machine") && stateNames.length > 0}
     <div class="row">
       <span class="label-mono">True for states</span>
       <input
@@ -253,7 +325,7 @@
       />
       <span class="hint text-muted"> * matches all; will be true </span>
     </div>
-  {:else if output.scope !== "memory" && output.type === "number" && stateNames.length > 0}
+  {:else if output.scope !== "memory" && (output.type === "number" || (output.scope === "logic" && shownLogicType === "multistate")) && stateNames.length > 0}
     <div class="row">
       <span class="label-mono">Values</span>
       <span class="hint text-muted">state index, in this order:</span>

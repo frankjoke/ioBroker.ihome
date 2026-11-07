@@ -281,7 +281,7 @@ export function templateStateSpecs(
     const common: Record<string, unknown> = {
       name: item.label ?? item.name,
       type: object ? "string" : item.type,
-      role: object ? "json" : (item.role ?? "state"),
+      role: object ? "text.json" : (item.role ?? "state"),
       read: true,
       write: item.readOnly !== true,
       unit: item.type === "number" ? (item.unit ?? "") : "",

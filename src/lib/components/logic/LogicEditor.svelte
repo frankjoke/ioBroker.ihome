@@ -128,6 +128,7 @@
       {output}
       {stateNames}
       logicId={draft.id}
+      kind={draft.kind}
       {logics}
       onchange={(next) => patch({ output: next })}
     />

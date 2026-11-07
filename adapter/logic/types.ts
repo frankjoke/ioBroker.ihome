@@ -86,14 +86,21 @@ export interface Input {
 
 export type Forward = "changed" | "always";
 
+export type OutputType =
+  "boolean" | "number" | "string" | "object" | "mixed" | "multistate";
+
 export type Output =
   | { scope: "memory"; name?: string; forward?: Forward }
   | {
       /** A state the adapter creates at `<namespace>.Logic.<logic id>`: a logic
        *  state is a command (writable), hence level.switch / level.state.
-       *  `object` is stored as a JSON string with role `json`. */
+       *  `object` is stored as a JSON string with role `text.json`; a machine
+       *  writes its state index as a `multistate` number; `mixed` holds any
+       *  scalar. */
       scope: "logic";
-      type: "boolean" | "number" | "string" | "object";
+      type: OutputType;
+      /** Number only: show the state as local date/time (role `value.time`). */
+      role?: "value.time";
       /** Number only: the created state's `common.unit`. */
       unit?: string;
       /** Boolean only: state names matching this glob write `true`. */
@@ -105,7 +112,7 @@ export type Output =
   | {
       scope: "state";
       ref: string;
-      type: "boolean" | "number" | "string" | "object";
+      type: OutputType;
       /** Boolean only: state names matching this glob write `true`
        *  (default "On*"). */
       on?: string;

@@ -771,7 +771,12 @@ class IHome extends utils.Adapter {
         type: "string",
         role: "text",
       },
-      { field: "location", name: "Location", type: "string", role: "json" },
+      {
+        field: "location",
+        name: "Location",
+        type: "string",
+        role: "text.json",
+      },
       {
         field: "locationText",
         name: "Location text",
@@ -1012,7 +1017,7 @@ class IHome extends utils.Adapter {
           common: {
             name: "Phone home point",
             type: "string",
-            role: "json" as never,
+            role: "text.json",
             read: true,
             write: false,
           },
@@ -1228,7 +1233,7 @@ class IHome extends utils.Adapter {
       common: {
         name: "iHome log feed",
         type: "string",
-        role: "json",
+        role: "text.json",
         read: true,
         write: false,
       },
@@ -1239,7 +1244,7 @@ class IHome extends utils.Adapter {
       common: {
         name: "iHome logic readout",
         type: "string",
-        role: "json",
+        role: "text.json",
         read: true,
         write: false,
       },
@@ -1250,7 +1255,7 @@ class IHome extends utils.Adapter {
       common: {
         name: "Phone home point",
         type: "string",
-        role: "json" as never,
+        role: "text.json",
         read: true,
         write: false,
       },
@@ -1261,7 +1266,7 @@ class IHome extends utils.Adapter {
       common: {
         name: "iHome logic messages",
         type: "string",
-        role: "json",
+        role: "text.json",
         read: true,
         write: false,
       },
@@ -1331,7 +1336,7 @@ class IHome extends utils.Adapter {
       common: {
         name: "Web Push subscriptions",
         type: "string",
-        role: "json",
+        role: "text.json",
         read: true,
         write: false,
       },
@@ -1359,14 +1364,26 @@ class IHome extends utils.Adapter {
         type: "state",
         common: {
           name,
-          // The broker accepts "json"; ioBroker's CommonType omits it.
-          type: "json" as never,
-          role: "json",
+          // Documents are JSON text: string type + the text.json role.
+          type: "string",
+          role: "text.json",
           read: true,
           write: true,
         },
         native: {},
       });
+
+      // States created before `text.json` existed still carry type/role "json".
+      const currentObject = await this.getObjectAsync(target);
+      if (
+        currentObject &&
+        (currentObject.common?.type !== "string" ||
+          currentObject.common?.role !== "text.json")
+      ) {
+        await this.extendObjectAsync(target, {
+          common: { type: "string", role: "text.json" },
+        });
+      }
 
       const current = await this.getStateAsync(target);
       this.log.debug(

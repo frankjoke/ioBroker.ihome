@@ -88,6 +88,18 @@ it("renders a states label without a unit", () => {
   });
 });
 
+it("shows a value.time reading as local date and time", () => {
+  const ts = Date.UTC(2026, 0, 2, 3, 4, 5);
+  const local = new Date(ts).toLocaleString();
+  expect(splitReading(ts, "", undefined, undefined, "value.time")).toEqual({
+    value: local,
+    unit: "",
+  });
+  expect(formatValue(ts, "", "value.time")).toBe(local);
+  expect(formatValue("0", "", "value.time")).toBe("—");
+  expect(formatValue(0, "", "value.time")).toBe("—");
+});
+
 it("rounds a reading to its slot's precision, trailing zeros dropped", () => {
   expect(formatNumber(54.32, 1)).toBe("54.3");
   expect(formatNumber(54.36, 1)).toBe("54.4");

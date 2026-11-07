@@ -433,13 +433,17 @@
     if (reading.value === undefined) return "";
     const output = logic.output;
     let unit = "";
+    let role: string | undefined;
     if (output?.scope === "logic" && output.type === "number") {
       unit = output.unit ?? "";
+      role = output.role;
     } else if (output?.scope === "state" && output.type === "number") {
       const id = stateIdFor(output.ref, getVariables());
-      unit = String(ioBroker.objects.get(id)?.common?.unit ?? "");
+      const common = ioBroker.objects.get(id)?.common;
+      unit = String(common?.unit ?? "");
+      role = common?.role;
     }
-    return formatValue(reading.value, unit);
+    return formatValue(reading.value, unit, role);
   }
 
   /** How long ago the output state last changed, like the device list. */
