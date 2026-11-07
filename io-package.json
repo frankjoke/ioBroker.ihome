@@ -140,7 +140,8 @@
   "native": {
     "vapidPublicKey": "",
     "vapidPrivateKey": "",
-    "networkDevices": []
+    "networkDevices": [],
+    "plugins": []
   },
   "encryptedNative": ["vapidPrivateKey"],
   "protectedNative": ["vapidPrivateKey"],

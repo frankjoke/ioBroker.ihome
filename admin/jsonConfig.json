@@ -94,6 +94,70 @@
           ]
         }
       }
+    },
+    "plugins": {
+      "type": "panel",
+      "label": "Plugins",
+      "items": {
+        "plugins": {
+          "type": "table",
+          "label": "Adapter plugins",
+          "help": "Built-ins ignore Code. User plugins are trusted Node code. Saving restarts the adapter. The SPA cannot edit this list.",
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12,
+          "uniqueColumns": ["id"],
+          "items": [
+            {
+              "type": "text",
+              "attr": "id",
+              "title": "ID",
+              "width": 130,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "name",
+              "title": "Name",
+              "width": 150,
+              "default": ""
+            },
+            {
+              "type": "checkbox",
+              "attr": "enabled",
+              "title": "Enabled",
+              "width": 80,
+              "default": true
+            },
+            {
+              "type": "checkbox",
+              "attr": "builtin",
+              "title": "Built-in",
+              "width": 80,
+              "default": false
+            },
+            {
+              "type": "number",
+              "attr": "timeoutMs",
+              "title": "Timeout (ms)",
+              "width": 110,
+              "default": 5000,
+              "min": 100,
+              "max": 30000
+            },
+            {
+              "type": "text",
+              "attr": "code",
+              "title": "Code",
+              "width": 420,
+              "minRows": 8,
+              "maxRows": 20,
+              "default": ""
+            }
+          ]
+        }
+      }
     }
   }
 }

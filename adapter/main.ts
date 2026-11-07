@@ -19,6 +19,15 @@ import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
 import { NetworkPresenceService } from "./network-presence";
 import { validNetworkDevices } from "./logic/network-ops";
+import { createPluginApi } from "./plugin-api";
+import { createPluginHost, type PluginHost } from "./plugin-host";
+import {
+  parsePluginMessage,
+  pluginError,
+  seedBuiltinPlugins,
+  type PluginReply,
+} from "./plugin-ops";
+import { createNetworkPlugins } from "./plugins/network";
 import {
   locationText,
   mapUrl,
@@ -194,6 +203,8 @@ class IHome extends utils.Adapter {
   private logicStateTimer?: ReturnType<typeof setTimeout>;
   /** The LAN presence pollers configured under native.networkDevices. */
   private networkPresence?: NetworkPresenceService;
+  /** The admin-managed adapter-side plugins. */
+  private pluginHost?: PluginHost;
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
@@ -204,6 +215,7 @@ class IHome extends utils.Adapter {
       if (obj.command === "phone") void this.onPhoneMessage(obj);
       else if (obj.command === "push") void this.onPushMessage(obj);
       else if (obj.command === "notify") void this.onNotifyMessage(obj);
+      else if (obj.command === "plugin") void this.onPluginMessage(obj);
     });
   }
 
@@ -604,6 +616,9 @@ class IHome extends utils.Adapter {
             if (variable) return { kind: "state", stateId: variable.stateId };
             return undefined;
           },
+          callPlugin: (id, payload) =>
+            this.pluginHost?.call(id, payload) ??
+            Promise.resolve(pluginError("plugins are not available")),
           nextAstro: (event, offset, from) =>
             this.nextAstro(event, offset, from),
         },
@@ -992,6 +1007,21 @@ class IHome extends utils.Adapter {
         : now,
     );
     await write("updatedAt", now);
+  }
+
+  private async onPluginMessage(obj: ioBroker.Message): Promise<void> {
+    if (obj.command !== "plugin") return;
+    const reply = (result: PluginReply): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    const parsed = parsePluginMessage(obj.message);
+    if (!parsed.ok) return reply(pluginError(parsed.error));
+    if (!this.pluginHost)
+      return reply(pluginError("plugins are not available"));
+    reply(
+      await this.pluginHost.call(parsed.message.id, parsed.message.payload),
+    );
   }
 
   private async onPhoneMessage(obj: ioBroker.Message): Promise<void> {
@@ -1481,11 +1511,68 @@ class IHome extends utils.Adapter {
         void this.loadLogics();
       }
     });
-    await this.loadLogics();
-
     const networkDevices = validNetworkDevices(
       (this.config as { networkDevices?: unknown }).networkDevices,
     );
+
+    const plugins = seedBuiltinPlugins(
+      (this.config as { plugins?: unknown }).plugins,
+    );
+    if (
+      JSON.stringify(plugins) !==
+      JSON.stringify((this.config as { plugins?: unknown }).plugins)
+    ) {
+      try {
+        await this.updateConfig({ plugins });
+      } catch (error) {
+        this.log.warn(`cannot store the plugin list: ${String(error)}`);
+      }
+    }
+    this.pluginHost = createPluginHost(
+      plugins,
+      (plugin) =>
+        createPluginApi(plugin.id, {
+          namespace: this.namespace,
+          config: this.config as Record<string, unknown>,
+          networkDevices,
+          getState: (id) => this.getStateAsync(id),
+          setState: (id, value, ack) =>
+            this.setStateAsync(id, {
+              val: value as ioBroker.StateValue,
+              ack,
+            }),
+          getForeignState: (id) => this.getForeignStateAsync(id),
+          setForeignState: (id, value, ack) =>
+            this.setForeignStateAsync(id, {
+              val: value as ioBroker.StateValue,
+              ack,
+            }),
+          getObject: async (id) =>
+            (await this.getObjectAsync(id)) as unknown as Record<
+              string,
+              unknown
+            > | null,
+          getForeignObject: async (id) =>
+            (await this.getForeignObjectAsync(id)) as unknown as Record<
+              string,
+              unknown
+            > | null,
+          sendTo: (instance, command, payload) =>
+            this.sendToAsync(instance, command, payload),
+          log: {
+            debug: (message) => this.log.debug(message),
+            info: (message) => this.log.info(message),
+            warn: (message) => this.log.warn(message),
+            error: (message) => this.log.error(message),
+          },
+        }),
+      createNetworkPlugins(),
+      (level, message) => this.log[level](message),
+    );
+    await this.pluginHost.start();
+
+    await this.loadLogics();
+
     if (networkDevices.length > 0) {
       this.networkPresence = new NetworkPresenceService(this, networkDevices);
       await this.networkPresence.start();
@@ -1499,7 +1586,20 @@ class IHome extends utils.Adapter {
   }
 
   private onUnload(callback: () => void): void {
+    void this.shutdown(callback);
+  }
+
+  private async shutdown(callback: () => void): Promise<void> {
     this.log.debug("Unload: stopping the heartbeat and the logic engine");
+    const pluginHost = this.pluginHost;
+    this.pluginHost = undefined;
+    if (pluginHost) {
+      try {
+        await pluginHost.stop();
+      } catch (error) {
+        this.log.warn(`plugins did not stop cleanly: ${String(error)}`);
+      }
+    }
     this.networkPresence?.stop();
     this.networkPresence = undefined;
     if (this.logStateTimer) {
