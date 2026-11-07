@@ -23,6 +23,77 @@
           "lg": 6
         }
       }
+    },
+    "network": {
+      "type": "panel",
+      "label": "Network devices",
+      "items": {
+        "networkDevices": {
+          "type": "table",
+          "label": "Devices",
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12,
+          "items": [
+            {
+              "type": "text",
+              "attr": "id",
+              "title": "ID",
+              "width": 110,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "name",
+              "title": "Name",
+              "width": 130,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "host",
+              "title": "IP / host",
+              "width": 150,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "mac",
+              "title": "MAC (optional)",
+              "width": 150,
+              "default": ""
+            },
+            {
+              "type": "number",
+              "attr": "interval",
+              "title": "Every (s)",
+              "width": 90,
+              "default": 60,
+              "min": 10,
+              "max": 3600
+            },
+            {
+              "type": "number",
+              "attr": "timeout",
+              "title": "Timeout (s)",
+              "width": 90,
+              "default": 2,
+              "min": 1,
+              "max": 30
+            },
+            {
+              "type": "number",
+              "attr": "port",
+              "title": "TCP port (0 = ping)",
+              "width": 130,
+              "default": 0,
+              "min": 0,
+              "max": 65535
+            }
+          ]
+        }
+      }
     }
   }
 }

@@ -17,6 +17,8 @@ import {
 import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
 import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
+import { NetworkPresenceService } from "./network-presence";
+import { validNetworkDevices } from "./logic/network-ops";
 import {
   locationText,
   mapUrl,
@@ -190,6 +192,8 @@ class IHome extends utils.Adapter {
   /** The live readout per logic, published as `info.logic`. */
   private readonly logicInfo = new Map<string, LogicReading>();
   private logicStateTimer?: ReturnType<typeof setTimeout>;
+  /** The LAN presence pollers configured under native.networkDevices. */
+  private networkPresence?: NetworkPresenceService;
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
@@ -1462,6 +1466,14 @@ class IHome extends utils.Adapter {
     });
     await this.loadLogics();
 
+    const networkDevices = validNetworkDevices(
+      (this.config as { networkDevices?: unknown }).networkDevices,
+    );
+    if (networkDevices.length > 0) {
+      this.networkPresence = new NetworkPresenceService(this, networkDevices);
+      await this.networkPresence.start();
+    }
+
     this.log.info(`iHome ${this.version ?? ""} started (${this.namespace})`);
     this.heartbeat = setInterval(() => {
       const minutes = Math.round((Date.now() - this.startedAt) / 60_000);
@@ -1471,6 +1483,8 @@ class IHome extends utils.Adapter {
 
   private onUnload(callback: () => void): void {
     this.log.debug("Unload: stopping the heartbeat and the logic engine");
+    this.networkPresence?.stop();
+    this.networkPresence = undefined;
     if (this.logStateTimer) {
       clearTimeout(this.logStateTimer);
       this.logStateTimer = undefined;

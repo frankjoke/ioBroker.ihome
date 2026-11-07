@@ -1,3 +1,4 @@
+import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
 import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
 import { BUILTIN_FUNCTIONS } from "$lib/config/function-presets";
 import { PRESETS } from "$lib/config/presets";
@@ -209,7 +210,10 @@ export function installTemplateFile(
       const next = prepareTemplateImport(
         file.kind,
         file.definition,
-        getTemplateBundles().map((bundle) => bundle.id),
+        [
+          ...getTemplateBundles().map((bundle) => bundle.id),
+          ...BUILTIN_BUNDLES.map((bundle) => bundle.id),
+        ],
         name,
       );
       if (!upsertTemplateBundle(next.definition as unknown as TemplateBundle)) {

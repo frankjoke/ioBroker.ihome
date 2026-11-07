@@ -139,7 +139,8 @@
   },
   "native": {
     "vapidPublicKey": "",
-    "vapidPrivateKey": ""
+    "vapidPrivateKey": "",
+    "networkDevices": []
   },
   "encryptedNative": ["vapidPrivateKey"],
   "protectedNative": ["vapidPrivateKey"],
