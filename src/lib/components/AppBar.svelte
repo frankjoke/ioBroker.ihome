@@ -200,6 +200,7 @@
 <header
   class="bar"
   class:editing={isDisplay && sheet.open}
+  class:view={isDisplay && !sheet.open}
   class:config={!isDisplay}
 >
   <nav class="tabs" aria-label={isDisplay ? "Pages" : "Configuration"}>
@@ -313,6 +314,12 @@
     background-color: var(--surface-container-low);
     border-bottom: 1px solid var(--border-color);
     backdrop-filter: blur(8px);
+  }
+
+  /* View mode: the page tabs sit on a stronger light gray so the menu is
+     easier to pick out from the page below. */
+  .bar.view {
+    background-color: var(--surface-container-high);
   }
 
   /* Editing the layout is a different mode than viewing it — the bar tints
