@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { checkExpression } from "$logic/expr-code";
   import CodeField from "$lib/components/logic/CodeField.svelte";
+  import { formulaTemplateProblem } from "$lib/config/formulas";
   import type { FormulaTemplate } from "$lib/types/device";
 
   let {
@@ -24,7 +24,7 @@
     if (draft.id !== template.id) draft = { ...template };
   });
 
-  const validation = $derived(problemFor(draft));
+  const validation = $derived(formulaTemplateProblem(draft));
   const isDirty = $derived(
     isNew || JSON.stringify(draft) !== JSON.stringify(template),
   );
@@ -34,12 +34,6 @@
   $effect(() => {
     problem = validation;
   });
-
-  function problemFor(value: FormulaTemplate): string | null {
-    if (!value.name.trim()) return "A name is required.";
-    if (!value.expr.trim()) return "The expression is empty.";
-    return checkExpression(value.expr);
-  }
 
   export function save() {
     if (validation || !isDirty) return;

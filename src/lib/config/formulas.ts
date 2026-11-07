@@ -1,8 +1,40 @@
+import { checkExpression } from "$logic/expr-code";
 import type {
   Control,
   FormulaLibrary,
   FormulaTemplate,
 } from "$lib/types/device";
+
+/** The first problem with a formula template, or null. */
+export function formulaTemplateProblem(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "A formula template must be an object.";
+  }
+  const template = value as Partial<FormulaTemplate>;
+  if (typeof template.id !== "string" || !template.id.trim()) {
+    return "A formula template needs a non-empty id.";
+  }
+  if (typeof template.name !== "string" || !template.name.trim()) {
+    return "A formula template needs a name.";
+  }
+  if (typeof template.expr !== "string" || !template.expr.trim()) {
+    return "The expression is empty.";
+  }
+  if (
+    template.precision !== undefined &&
+    (typeof template.precision !== "number" ||
+      !Number.isFinite(template.precision))
+  ) {
+    return "precision must be a number.";
+  }
+  if (template.unit !== undefined && typeof template.unit !== "string") {
+    return "unit must be a string.";
+  }
+  if (template.notes !== undefined && typeof template.notes !== "string") {
+    return "notes must be a string.";
+  }
+  return checkExpression(template.expr);
+}
 
 const DEW_POINT =
   "(237.7 * (Math.log(humidity / 100) + (17.27 * temperature) / (237.7 + temperature))) / (17.27 - (Math.log(humidity / 100) + (17.27 * temperature) / (237.7 + temperature)))";

@@ -6,6 +6,7 @@ import {
   syncFormulaId,
   detachTemplate,
   migrateLibrary,
+  formulaTemplateProblem,
 } from "$lib/config/formulas";
 import type { Control } from "$lib/types/device";
 
@@ -116,5 +117,19 @@ describe("migrateLibrary", () => {
   it("unwraps a { val } state and tolerates garbage", () => {
     expect(migrateLibrary({ val: "{not json" }).formulas).toEqual([]);
     expect(migrateLibrary(null).formulas).toEqual([]);
+  });
+});
+
+describe("formulaTemplateProblem", () => {
+  it("refuses bad fields and a broken expression", () => {
+    expect(formulaTemplateProblem(tpl)).toBeNull();
+    expect(formulaTemplateProblem({ ...tpl, id: "" })).toMatch(/id/i);
+    expect(formulaTemplateProblem({ ...tpl, name: " " })).toMatch(/name/i);
+    expect(formulaTemplateProblem({ ...tpl, expr: "" })).toMatch(/expression/i);
+    expect(formulaTemplateProblem({ ...tpl, expr: "1 +" })).toBeTruthy();
+    expect(formulaTemplateProblem({ ...tpl, precision: "x" })).toMatch(
+      /precision/i,
+    );
+    expect(formulaTemplateProblem({ ...tpl, unit: 1 })).toMatch(/unit/i);
   });
 });

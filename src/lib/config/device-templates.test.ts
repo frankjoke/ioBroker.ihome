@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateDeviceTemplate } from "$logic/device-templates";
 import {
   BUILTIN_DEVICE_TEMPLATES,
+  deviceTemplateProblem,
   evaluateDeviceTemplate,
 } from "./device-templates";
 
@@ -34,4 +35,19 @@ it("ships a state-sourced Meter template", () => {
   expect(value.itemList.some((item) => item.source?.[0] === "1.8.0")).toBe(
     true,
   );
+});
+
+it("checks an API template by evaluating its source", () => {
+  for (const entry of BUILTIN_DEVICE_TEMPLATES) {
+    expect(deviceTemplateProblem(entry)).toBeNull();
+  }
+  expect(
+    deviceTemplateProblem({ ...BUILTIN_DEVICE_TEMPLATES[0], id: "" }),
+  ).toMatch(/id/i);
+  expect(
+    deviceTemplateProblem({ ...BUILTIN_DEVICE_TEMPLATES[0], source: "1 +" }),
+  ).toBeTruthy();
+  expect(
+    deviceTemplateProblem({ ...BUILTIN_DEVICE_TEMPLATES[0], source: "({})" }),
+  ).toMatch(/itemList/i);
 });
