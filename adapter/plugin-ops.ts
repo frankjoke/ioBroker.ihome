@@ -14,8 +14,7 @@ export interface BuiltinPluginDef {
 }
 
 export type PluginReply =
-  | { ok: true; result: unknown }
-  | { ok: false; error: string };
+  { ok: true; result: unknown } | { ok: false; error: string };
 
 export interface PluginMessage {
   id: string;
