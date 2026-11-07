@@ -110,6 +110,7 @@ export function prepareTemplateImport(
   kind: TemplateKind,
   definition: unknown,
   takenIds: Iterable<string>,
+  name?: string,
 ): { definition: Record<string, unknown>; id: string; renamed: boolean } {
   const clone = JSON.parse(JSON.stringify(definition)) as Record<
     string,
@@ -119,8 +120,10 @@ export function prepareTemplateImport(
   const renamed = typeof clone.id === "string" && taken.has(clone.id);
   if (renamed) {
     clone.id = newId();
-    clone.name = `${String(clone.name)} (imported)`;
+    if (!name?.trim()) clone.name = `${String(clone.name)} (imported)`;
   }
+  const chosen = name?.trim();
+  if (chosen) clone.name = chosen;
   if (kind === "device") clone.builtin = false;
   return { definition: clone, id: String(clone.id), renamed };
 }

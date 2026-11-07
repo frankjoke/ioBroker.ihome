@@ -220,6 +220,17 @@ describe("prepareTemplateImport", () => {
     expect(result.definition.builtin).toBe(false);
     expect(result.definition.name).toBe("Lamp (imported)");
   });
+
+  it("uses an explicit name and keeps it on an id collision", () => {
+    const named = prepareTemplateImport("formula", formula, ["dew"], "My dew");
+    expect(named.id).not.toBe("dew");
+    expect(named.renamed).toBe(true);
+    expect(named.definition.name).toBe("My dew");
+    expect(
+      prepareTemplateImport("formula", formula, ["other"], "  Custom  ")
+        .definition.name,
+    ).toBe("Custom");
+  });
 });
 
 describe("export payload", () => {
