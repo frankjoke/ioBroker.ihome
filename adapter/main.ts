@@ -1520,7 +1520,7 @@ class IHome extends utils.Adapter {
     const plugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
       this.log.warn(message),
     );
-    const persistedPlugins = pluginConfigWithBuiltins(rawPlugins, plugins);
+    const persistedPlugins = pluginConfigWithBuiltins(rawPlugins);
     if (JSON.stringify(persistedPlugins) !== JSON.stringify(rawPlugins)) {
       try {
         await this.updateConfig({ plugins: persistedPlugins });

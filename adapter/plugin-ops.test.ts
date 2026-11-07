@@ -67,10 +67,23 @@ describe("validAdapterPlugins", () => {
     expect(logs[0]).toContain("Bad");
     expect(logs[1]).toContain("good");
 
-    const next = pluginConfigWithBuiltins(raw, valid);
+    const next = pluginConfigWithBuiltins(raw);
     expect(next.slice(0, raw.length)).toEqual(raw);
     expect(next.slice(raw.length).map((entry) => entry.id)).toEqual(
       BUILTIN_PLUGINS.map((builtin) => builtin.id),
+    );
+  });
+
+  it("seeds builtins into an empty config", () => {
+    expect(pluginConfigWithBuiltins([])).toEqual(
+      BUILTIN_PLUGINS.map((builtin) => ({
+        id: builtin.id,
+        name: builtin.name,
+        enabled: true,
+        builtin: true,
+        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        code: undefined,
+      })),
     );
   });
 

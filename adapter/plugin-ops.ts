@@ -157,12 +157,13 @@ export function seedBuiltinPlugins(
  */
 export function pluginConfigWithBuiltins(
   raw: unknown,
-  plugins: AdapterPlugin[],
   builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
 ): unknown[] {
   const current = Array.isArray(raw) ? raw : [];
   const validBuiltinIds = new Set(
-    plugins.filter((plugin) => plugin.builtin).map((plugin) => plugin.id),
+    validAdapterPlugins(raw, builtins)
+      .filter((plugin) => plugin.builtin)
+      .map((plugin) => plugin.id),
   );
   const missing = builtins
     .filter((builtin) => !validBuiltinIds.has(builtin.id))
