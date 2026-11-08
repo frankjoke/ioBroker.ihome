@@ -2,6 +2,7 @@
   import { splitReading } from "$lib/config/format";
   import { normalizeStates, unitFor } from "$lib/config/state-meta";
   import { valueShown } from "$lib/config/tile-parts";
+  import { time } from "$lib/time.svelte.js";
   import type { Slot } from "$lib/types/display";
   import type { SlotControl } from "$lib/types/device";
 
@@ -43,6 +44,7 @@
           decimals,
           normalizeStates(control.states),
           control.meta?.role ?? control.role,
+          time.now,
         )
       : { value: "—", unit: "" },
   );

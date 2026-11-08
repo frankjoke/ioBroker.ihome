@@ -2,6 +2,7 @@
   import type { Control } from "$lib/types/device";
   import { getPickerValue } from "$lib/picker-values.svelte.js";
   import { formatAge, formatValue, splitReading } from "$lib/config/format";
+  import { time } from "$lib/time.svelte.js";
   import { effectiveCommon } from "$lib/config/state-meta";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { applyRead } from "$lib/utils/transform";
@@ -113,6 +114,7 @@
       undefined,
       meta.states,
       meta.role,
+      time.now,
     );
     const reading = parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
     return `${reading} · ${formatAge(l.ts)}`;
@@ -318,6 +320,7 @@
           <input
             type="text"
             value={control.unit ?? ""}
+            title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
             oninput={(e) =>
               onChange({ ...control, unit: e.currentTarget.value })}
           /></label

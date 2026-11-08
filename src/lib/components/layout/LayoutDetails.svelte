@@ -1623,6 +1623,7 @@
                       type="text"
                       class="unit-input"
                       value={slot.unit ?? ""}
+                      title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
                       oninput={(e) =>
                         edit((t) =>
                           patchSlot(t, i, {

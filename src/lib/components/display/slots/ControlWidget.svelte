@@ -2,6 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { splitReading } from "$lib/config/format";
+  import { time } from "$lib/time.svelte.js";
   import {
     effectiveWidget,
     normalizeStates,
@@ -61,6 +62,7 @@
       undefined,
       normalizeStates(control.meta?.states ?? control.states),
       control.meta?.role ?? control.role,
+      time.now,
     );
     return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
   }

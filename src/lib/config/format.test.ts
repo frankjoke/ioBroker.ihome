@@ -4,6 +4,7 @@ import {
   formatAge,
   formatNumber,
   formatSlotText,
+  formatTimestamp,
   formatValue,
   splitReading,
   splitValueUnit,
@@ -98,6 +99,40 @@ it("shows a value.time reading as local date and time", () => {
   expect(formatValue(ts, "", "value.time")).toBe(local);
   expect(formatValue("0", "", "value.time")).toBe("—");
   expect(formatValue(0, "", "value.time")).toBe("—");
+});
+
+it("formats a timestamp with ago/time/date/datetime units", () => {
+  const ts = now - 5 * 60_000;
+  expect(formatTimestamp(ts, "ago", now)).toBe("5m ago");
+  expect(formatTimestamp(now - 1000, "ago", now)).toBe("just now");
+  expect(formatTimestamp(ts, "time")).toBe(new Date(ts).toLocaleTimeString());
+  expect(formatTimestamp(ts, "date")).toBe(new Date(ts).toLocaleDateString());
+  expect(formatTimestamp(ts, "datetime")).toBe(new Date(ts).toLocaleString());
+  expect(formatTimestamp(0, "ago", now)).toBe("—");
+});
+
+it("formats a timestamp with an explicit pattern", () => {
+  const d = new Date(2026, 10, 8, 21, 32, 55);
+  expect(formatTimestamp(d.getTime(), "HH:mm:ss")).toBe("21:32:55");
+  expect(formatTimestamp(d.getTime(), "DD.MM.YYYY")).toBe("08.11.2026");
+  expect(formatTimestamp(d.getTime(), "YYYY-MM-DD HH:mm")).toBe(
+    "2026-11-08 21:32",
+  );
+});
+
+it("parses a date string as well as an epoch number", () => {
+  const d = new Date(2026, 10, 8, 21, 32, 55);
+  expect(formatTimestamp(d.toISOString(), "HH:mm:ss")).toBe("21:32:55");
+});
+
+it("uses a date-format unit on a plain state and consumes it", () => {
+  const ts = now - 3 * 60_000;
+  expect(splitReading(ts, "ago", undefined, undefined, undefined, now)).toEqual(
+    { value: "3m ago", unit: "" },
+  );
+  expect(formatValue(ts, "ago", undefined, now)).toBe("3m ago");
+  // a real unit that is not a date token stays a unit
+  expect(splitReading(12.5, "mm")).toEqual({ value: "12.5", unit: "mm" });
 });
 
 it("rounds a reading to its slot's precision, trailing zeros dropped", () => {

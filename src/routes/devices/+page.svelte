@@ -7,6 +7,7 @@
   } from "$lib/stores/devices";
   import { newId } from "$lib/utils/ids";
   import { formatAge, splitReading } from "$lib/config/format";
+  import { time } from "$lib/time.svelte.js";
   import { unitFor } from "$lib/config/state-meta";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -73,6 +74,8 @@
           unitFor(undefined, c.meta?.unit, c.unit),
           undefined,
           c.meta?.states,
+          undefined,
+          time.now,
         );
         const reading = parts.unit
           ? `${parts.value} ${parts.unit}`

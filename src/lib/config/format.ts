@@ -56,19 +56,70 @@ export function formatNumber(v: unknown, decimals?: number): string {
  * consumed as the label and never repeated; a missing value shows "—" with no
  * unit, because "— °C" is noise.
  */
+const TIMESTAMP_TOKENS = /YYYY|MM|DD|HH|mm|ss/g;
+
+/** A unit that asks for a date/time rendering rather than a suffix. */
+function isDateFormat(unit: string | undefined): boolean {
+  const value = String(unit ?? "").trim();
+  if (!value) return false;
+  const named = value.toLowerCase();
+  return (
+    named === "ago" ||
+    named === "time" ||
+    named === "date" ||
+    named === "datetime" ||
+    /YYYY|HH|ss/.test(value)
+  );
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatPattern(date: Date, pattern: string): string {
+  const parts: Record<string, string> = {
+    YYYY: String(date.getFullYear()),
+    MM: pad2(date.getMonth() + 1),
+    DD: pad2(date.getDate()),
+    HH: pad2(date.getHours()),
+    mm: pad2(date.getMinutes()),
+    ss: pad2(date.getSeconds()),
+  };
+  return pattern.replace(TIMESTAMP_TOKENS, (token) => parts[token]);
+}
+
 /**
- * An epoch-ms timestamp as the viewer's local date and time. 0 means "never"
- * in ioBroker, so it reads as an empty value instead of 1970.
+ * An epoch-ms timestamp (or an ISO/date string) in the viewer's local time.
+ * A format unit picks the rendering: `ago` (relative), `time`/`date`/
+ * `datetime` (browser locale), or a token pattern like `HH:mm:ss`. 0 means
+ * "never" in ioBroker, so it reads as an empty value instead of 1970.
  */
-export function formatTimestamp(v: unknown): string {
+export function formatTimestamp(
+  v: unknown,
+  format?: string,
+  now: number = Date.now(),
+): string {
   const ms =
     typeof v === "number"
       ? v
       : typeof v === "string" && v.trim() !== ""
         ? Number(v)
         : NaN;
-  if (!Number.isFinite(ms)) return String(v);
-  return ms > 0 ? new Date(ms).toLocaleString() : "—";
+  const time = Number.isFinite(ms) ? ms : Date.parse(String(v));
+  if (!Number.isFinite(time)) return String(v);
+  if (time <= 0) return "—";
+  const date = new Date(time);
+  const wanted = String(format ?? "").trim();
+  const named = wanted.toLowerCase();
+  if (named === "ago") {
+    const age = formatAge(time, now);
+    return age === "now" ? "just now" : `${age} ago`;
+  }
+  if (named === "time") return date.toLocaleTimeString();
+  if (named === "date") return date.toLocaleDateString();
+  if (named === "datetime") return date.toLocaleString();
+  if (/YYYY|HH|ss/.test(wanted)) return formatPattern(date, wanted);
+  return date.toLocaleString();
 }
 
 export function splitReading(
@@ -77,12 +128,16 @@ export function splitReading(
   decimals?: number,
   states?: Record<string, string>,
   role?: string,
+  now: number = Date.now(),
 ): { value: string; unit: string } {
   if (v === null || v === undefined) return { value: "—", unit: "" };
   // A states label is the whole reading: "Standby °C" would be noise.
   const label = states?.[String(v)];
   if (label !== undefined) return { value: label, unit: "" };
-  if (role === "value.time") return { value: formatTimestamp(v), unit: "" };
+  // A date-format unit is consumed as the rendering, not shown as a suffix.
+  if (role === "value.time" || isDateFormat(unit)) {
+    return { value: formatTimestamp(v, unit, now), unit: "" };
+  }
   if (typeof v === "boolean") {
     return { value: formatBoolean(v, unit || "Off/On"), unit: "" };
   }
@@ -108,9 +163,10 @@ export function formatSlotText(
   v: unknown,
   unit?: string,
   role?: string,
+  now: number = Date.now(),
 ): string {
   if (typeof v === "boolean") return formatBoolean(v, unit || "Off/On");
-  return formatValue(v, unit, role);
+  return formatValue(v, unit, role, now);
 }
 
 /** Pick readable text (#1a1a1a or #fff) for a background colour. */
@@ -144,9 +200,16 @@ export function formatBoolean(v: boolean, unit?: string): string {
 }
 
 /** Display a value, appending a unit when present. */
-export function formatValue(v: unknown, unit?: string, role?: string): string {
+export function formatValue(
+  v: unknown,
+  unit?: string,
+  role?: string,
+  now: number = Date.now(),
+): string {
   if (v === null || v === undefined) return "—";
-  if (role === "value.time") return formatTimestamp(v);
+  if (role === "value.time" || isDateFormat(unit)) {
+    return formatTimestamp(v, unit, now);
+  }
   if (typeof v === "boolean") return formatBoolean(v, unit);
   if (typeof v === "object") return JSON.stringify(v);
   return String(v) + (unit ? " " + unit : "");
