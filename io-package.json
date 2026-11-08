@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "news": {
+      "0.3.1": {
+        "en": "Samsung TV remote: compact the Home/Zurück/Info buttons and move the connection status into the title.",
+        "de": "Samsung TV-Fernbedienung: HOME/Zurück/Info komprimieren und den Verbindungsstatus in den Titel setzen.",
+        "ru": "Пульт дистанционного управления телевизором Samsung: зажмите кнопки Home/Zurück/Info и перенесите состояние подключения в заголовок.",
+        "pt": "Remoto da TV Samsung: compacte os botões Home/Voltar/Info e mova o status da conexão para o título.",
+        "nl": "Afstandsbediening van de Samsung TV: druk op de knoppen Home/Zurück/Info en verplaats de verbindingsstatus naar de titel.",
+        "fr": "Télécommande TV Samsung : compactez les boutons Home/Zurück/Info et placez l'état de la connexion dans le titre.",
+        "it": "Telecomando TV Samsung: compatta i tasti Home/Zurück/Info e sposta lo stato della connessione nel titolo.",
+        "es": "Mando de TV Samsung: compacta los botones de inicio/Zurück/Info y mueve el estado de la conexión al título.",
+        "pl": "Pilot Samsung TV: kompaktuj przyciski Home/Zurück/Info i przenieś stan połączenia do tytułu.",
+        "uk": "Пульт дистанційного керування телевізора Samsung: ущільніть кнопки Home/Zurück/Info та перемістіть статус з'єднання в заголовок.",
+        "zh-cn": "三星电视遥控器：压缩 Home/Zurück/Info 按钮，然后将连接状态移至标题中。"
+      },
       "0.3.0": {
         "en": "Plugins: a plugin API with `network.info`/`network.wake`, network device presence monitoring and the Samsung TV remote bundle. Device templates: JavaScript API templates (`readRequest`/`writeRequest`) with generated states and polling/write logic, user templates, the built-in meter template, and applying a template creates or updates the device in place. Logic: object output, async `fetchJson` tasks and editor refinements. UI: the apply dialog opens the generated device or logic, re-applying keeps one generated logic, a section title selects its section, Custom-device tiles take the first control's icon, and frame/HTML URLs work in dev, on the LAN and through ioBroker Pro (`{{origin}}`/`{{base}}`/`//path`).",
         "de": "Plugins: eine Plugin-API mit `network.info`/`network.wake`, Anwesenheitskontrolle und Samsung TV Remote Bundle. Gerätevorlagen: JavaScript-API-Vorlagen (`ReadRequest`/`WriteRequest`) mit generierten Zuständen und Abfrage-/Schreiblogik, Benutzervorlagen, Zählervorlage. Durch Anwenden einer Vorlage wird das Gerät erstellt oder aktualisiert. Logik: Objektausgabe, asynchrone `fetchJSON`-Aufgaben und Editor. UI: Der Anwenden-Dialog öffnet das generierte Gerät oder die generierte Logik, ein Abschnittstitel wählt seinen Abschnitt aus, Gerätekacheln nehmen das erste Steuersymbol an und Frame/HTML-URLs funktionieren in dev, im LAN und über ioBroker Pro (`{{origin}} `/` {{base}}",
@@ -35,10 +48,6 @@
       "0.1.0": {
         "en": "One picker for every state or control selection: the same modal adds a slot, picks a tile's active source, edits device controls or a variable, and lists the tile's own sources first. The layout editor keeps the selected tile across view/edit, moves tiles and sections through dialogs, reorders pages, and can hide the pencil for everyone. The mobile bar drops the network icon (the cog shows the connection) and page-tab icons on narrow screens; the theme choice now lives in User Interface and stays per browser.",
         "de": "Ein Picker für jede State- oder Control-Auswahl: Dasselbe Fenster legt einen Slot an, wählt die aktive Quelle einer Kachel, bearbeitet Geräte-Controls oder eine Variable und zeigt die Quellen der Kachel zuerst. Der Layout-Editor behält die gewählte Kachel über Ansicht/Editor, verschiebt Kacheln und Bereiche per Dialog, ordnet Seiten um und kann den Stift für alle ausblenden. Die mobile Leiste verliert das Netzwerk-Icon (das Zahnrad zeigt die Verbindung) und auf schmalen Bildschirmen die Seiten-Icons; die Theme-Wahl liegt jetzt unter Benutzeroberfläche und bleibt pro Browser."
-      },
-      "0.0.33": {
-        "en": "Tiles are now built from slots: each slot reads a device control or any raw state, and a tile no longer owns a device. Loading a device adds slots only for its real controls, and existing pages migrate once with a backup (pageListV1).",
-        "de": "Kacheln bestehen jetzt aus Slots: Jeder Slot liest ein Geräte-Control oder einen beliebigen Roh-State, und eine Kachel besitzt kein Gerät mehr. Das Laden eines Geräts erzeugt Slots nur für seine tatsächlichen Controls, und vorhandene Seiten werden einmalig mit einer Sicherung (pageListV1) migriert."
       }
     },
     "titleLang": {
