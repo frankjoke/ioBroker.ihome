@@ -154,6 +154,21 @@ export function normalizePushPayload(value: unknown): PushPayload {
   };
 }
 
+/**
+ * A written text state as a push message: one line is the body under the app
+ * title; with two or more lines the first is the title and the rest the body.
+ */
+export function pushStatePayload(value: unknown): PushPayload | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text) return null;
+  const lines = text.split(/\r?\n/);
+  const hasTitle = lines.length > 1;
+  const title = hasTitle ? lines[0].trim() : "";
+  const body = hasTitle ? lines.slice(1).join("\n").trim() : text;
+  return normalizePushPayload({ title: title || "iHome", body });
+}
+
 export function upsertPushSubscription(
   subscriptions: PushSubscriptionRecord[],
   record: PushSubscriptionRecord,

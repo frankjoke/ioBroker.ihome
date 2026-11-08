@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import {
   ensureVapidKeys,
   normalizePushPayload,
+  pushStatePayload,
   removePushSubscription,
   sendPushes,
   shouldDropSubscription,
@@ -67,6 +68,29 @@ it("normalizes long logic notifications instead of dropping them", () => {
     title: "iHome",
     body: "b",
   });
+});
+
+it("turns a written text state into a push message", () => {
+  // One line: the app title, the line as the body.
+  expect(pushStatePayload("Pump is dry")).toEqual({
+    title: "iHome",
+    body: "Pump is dry",
+    level: "info",
+  });
+  // Two or more lines: the first is the title, the rest the body.
+  expect(pushStatePayload("Waschmaschine\nFertig")).toEqual({
+    title: "Waschmaschine",
+    body: "Fertig",
+    level: "info",
+  });
+  expect(pushStatePayload("Alarm\r\nDoor\r\nopen")).toEqual({
+    title: "Alarm",
+    body: "Door\nopen",
+    level: "info",
+  });
+  expect(pushStatePayload("")).toBeNull();
+  expect(pushStatePayload("   ")).toBeNull();
+  expect(pushStatePayload(42)).toBeNull();
 });
 
 it("replaces a subscription by device id and endpoint", () => {

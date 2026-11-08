@@ -41,6 +41,7 @@ import {
 import {
   ensureVapidKeys,
   normalizePushPayload,
+  pushStatePayload,
   removePushSubscription,
   sendPushes,
   upsertPushSubscription,
@@ -1386,6 +1387,18 @@ class IHome extends utils.Adapter {
       native: {},
     });
     this.subscribeStates("info.logClear");
+    await this.setObjectNotExistsAsync("phone.pushMessage", {
+      type: "state",
+      common: {
+        name: "Send a push message (first line = title)",
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+      },
+      native: {},
+    });
+    this.subscribeStates("phone.pushMessage");
     this.log.debug(
       `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
     );
@@ -1498,6 +1511,28 @@ class IHome extends utils.Adapter {
           this.scheduleLogState();
           void this.setStateAsync("info.logClear", {
             val: false,
+            ack: true,
+          }).catch(() => {});
+        }
+      } else if (id === `${this.namespace}.phone.pushMessage`) {
+        if (state.ack === false) {
+          const payload = pushStatePayload(state.val);
+          if (payload) {
+            void this.sendPush(payload)
+              .then((result) => {
+                if (result.sent === 0) {
+                  this.log.warn(
+                    "push message: no subscribed phone received it",
+                  );
+                }
+              })
+              .catch((error) =>
+                this.log.warn(`push message failed: ${String(error)}`),
+              );
+          }
+          // A command state: clear it so the same text can be sent again.
+          void this.setStateAsync("phone.pushMessage", {
+            val: "",
             ack: true,
           }).catch(() => {});
         }
