@@ -11,6 +11,7 @@
     adminPageUrl({
       hostPort: storage.hostPort,
       brokerUrl: ioBroker.brokerUrl,
+      cloudHost: storage.cloudHost,
       protocol: typeof location === "undefined" ? "http:" : location.protocol,
       host: typeof location === "undefined" ? "" : location.host,
     }),

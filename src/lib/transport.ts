@@ -99,12 +99,29 @@ export function resolveTransport(sources: Sources): {
 export function adminPageUrl(sources: {
   hostPort?: string;
   brokerUrl?: string | null;
+  cloudHost?: string;
   protocol: string;
   host: string;
 }): string {
   const brokerUrl = String(sources.brokerUrl ?? "");
   const secure =
     sources.protocol === "https:" || /^(https|wss):/i.test(brokerUrl);
+  const pageHost = hostnameOf(sources.host).toLowerCase();
+  const cloudHost = hostnameOf(
+    String(sources.cloudHost ?? "")
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, ""),
+  ).toLowerCase();
+  // Through iobroker.pro (or another configured cloud host) the admin is
+  // proxied under /admin/, not exposed on the socket's :8081.
+  if (
+    pageHost === "iobroker.pro" ||
+    pageHost.endsWith(".iobroker.pro") ||
+    (cloudHost && pageHost === cloudHost)
+  ) {
+    return `${secure ? "https" : "http"}://${pageHost}/admin/index.html#tab-overview`;
+  }
   const stored = (sources.hostPort ?? "").trim();
   const brokerHost = /^[a-z]+:\/\/([^/]+)/i.exec(brokerUrl)?.[1];
   const authority = stored || `${hostnameOf(brokerHost || sources.host)}:8081`;

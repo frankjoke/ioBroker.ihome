@@ -219,15 +219,35 @@ it("derives the admin host from the broker, on the admin port", () => {
   ).toBe("http://host:8081/#tab-overview");
 });
 
+it("uses the proxied admin path on a cloud host", () => {
+  expect(
+    adminPageUrl({
+      hostPort: "192.168.178.9:8081",
+      brokerUrl: "https://iobroker.pro",
+      cloudHost: "iobroker.pro",
+      protocol: "https:",
+      host: "iobroker.pro",
+    }),
+  ).toBe("https://iobroker.pro/admin/index.html#tab-overview");
+  expect(
+    adminPageUrl({
+      brokerUrl: "https://home.example",
+      cloudHost: "home.example",
+      protocol: "https:",
+      host: "home.example",
+    }),
+  ).toBe("https://home.example/admin/index.html#tab-overview");
+});
+
 it("falls back to the page host and keeps an https page on https", () => {
   expect(adminPageUrl({ protocol: "http:", host: "192.168.178.9:8082" })).toBe(
     "http://192.168.178.9:8081/#tab-overview",
   );
   expect(
     adminPageUrl({
-      brokerUrl: "https://iobroker.pro",
+      brokerUrl: "https://home.example",
       protocol: "https:",
-      host: "iobroker.pro",
+      host: "home.example",
     }),
-  ).toBe("https://iobroker.pro:8081/#tab-overview");
+  ).toBe("https://home.example:8081/#tab-overview");
 });
