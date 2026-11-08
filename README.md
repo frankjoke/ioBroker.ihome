@@ -149,6 +149,8 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### **WORK IN PROGRESS**
+
 ### 0.3.1 (2026-11-08)
 
 Samsung TV remote: compact the Home/Zurück/Info buttons and move the connection status into the title.
