@@ -149,8 +149,7 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
-
-### **WORK IN PROGRESS**
+### 0.3.0 (2026-11-08)
 
 Plugins: a plugin API with `network.info`/`network.wake`, network device presence monitoring and the Samsung TV remote bundle. Device templates: JavaScript API templates (`readRequest`/`writeRequest`) with generated states and polling/write logic, user templates, the built-in meter template, and applying a template creates or updates the device in place. Logic: object output, async `fetchJson` tasks and editor refinements. UI: the apply dialog opens the generated device or logic, re-applying keeps one generated logic, a section title selects its section, Custom-device tiles take the first control's icon, and frame/HTML URLs work in dev, on the LAN and through ioBroker Pro (`{{origin}}`/`{{base}}`/`//path`).
 

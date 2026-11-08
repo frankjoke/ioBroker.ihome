@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.2.3",
+    "version": "0.3.0",
     "news": {
+      "0.3.0": {
+        "en": "Plugins: a plugin API with `network.info`/`network.wake`, network device presence monitoring and the Samsung TV remote bundle. Device templates: JavaScript API templates (`readRequest`/`writeRequest`) with generated states and polling/write logic, user templates, the built-in meter template, and applying a template creates or updates the device in place. Logic: object output, async `fetchJson` tasks and editor refinements. UI: the apply dialog opens the generated device or logic, re-applying keeps one generated logic, a section title selects its section, Custom-device tiles take the first control's icon, and frame/HTML URLs work in dev, on the LAN and through ioBroker Pro (`{{origin}}`/`{{base}}`/`//path`).",
+        "de": "Plugins: eine Plugin-API mit `network.info`/`network.wake`, Anwesenheitskontrolle und Samsung TV Remote Bundle. Gerätevorlagen: JavaScript-API-Vorlagen (`ReadRequest`/`WriteRequest`) mit generierten Zuständen und Abfrage-/Schreiblogik, Benutzervorlagen, Zählervorlage. Durch Anwenden einer Vorlage wird das Gerät erstellt oder aktualisiert. Logik: Objektausgabe, asynchrone `fetchJSON`-Aufgaben und Editor. UI: Der Anwenden-Dialog öffnet das generierte Gerät oder die generierte Logik, ein Abschnittstitel wählt seinen Abschnitt aus, Gerätekacheln nehmen das erste Steuersymbol an und Frame/HTML-URLs funktionieren in dev, im LAN und über ioBroker Pro (`{{origin}} `/` {{base}}",
+        "ru": "Плагины: API плагинов с `network.info`/`network.wake`, мониторингом присутствия сетевых устройств и комплектом пульта дистанционного управления Samsung TV. Шаблоны устройств: шаблоны JavaScript API (`ReadRequest`/ `WriteRequest`) с генерируемыми состояниями и логикой опроса и записи, пользовательские шаблоны, встроенный шаблон измерителя, а применение шаблона позволяет создать или обновить устройство на месте. Логика: вывод объектов, асинхронные задачи `fetchJSON` и доработки редактора. Пользовательский интерфейс: диалоговое окно подачи заявки открывает сгенерированное устройство или логику, повторное применение сохраняет одну сгенерированную логику, заголовок раздела выбирает соответствующий раздел, плитки пользовательских устройств занимают значок первого элемента управления, а URL-адреса фрейма/HTML работают в разработчике, в локальной сети и через IOBroker Pro (`{{origin}} `/` {base}} `/`//path`).",
+        "pt": "Plugins: uma API de plug-in com `network.info`/`network.wake`, monitoramento de presença de rede e pacote remoto de TV Samsung. Modelos de API JavaScript (`readRequest`/`writeRequest`) com estados gerados e lógica de sondagem/escrita, modelos de usuário, o modelo de medidor embutido e a aplicação de um modelo cria ou atualiza o dispositivo. Lógica: saída de objeto, tarefas assíncronas e editor. UI: a caixa de diálogo abre o dispositivo ou a lógica gerada, a reaplicação mantém uma lógica gerada, o título da seção seleciona a seção, os blocos personalizados pegam o ícone do primeiro controle e os URLs frame/HTML funcionam em dev, na LAN e através do IOBroker Pro (`{{origin}} `/` {origin}} `/`//path`).",
+        "nl": "Plug-ins: een plug-in-API met `network.info`/`network.wake`, aanwezigheidsbewaking van netwerkapparaten en de externe bundel van Samsung TV. Apparaatsjablonen: JavaScript-API-sjablonen (`ReadRequest`/`WriteRequest`) met gegenereerde statussen en polling-/schrijflogica, gebruikerssjablonen, het ingebouwde metersjabloon, en als u een sjabloon toepast, wordt het apparaat op zijn plaats gemaakt of bijgewerkt. Logica: uitvoer van objecten, asynchrone 'FetchJSON'-taken en verfijningen van de editor. Gebruikersinterface: in het dialoogvenster Toepassen wordt het gegenereerde apparaat of de gegenereerde logica geopend, bij opnieuw toepassen blijft één gegenereerde logica behouden, een sectietitel selecteert de sectie, aangepaste apparaattegels nemen het pictogram van het eerste besturingselement over, en Frame/HTML-URL's werken in dev, op het LAN en via ioBroker Pro (`{{origin}} `/` {base}} `///path`).",
+        "fr": "Plugins : un plugin API avec « network.info`/`network.wake », la surveillance de la présence des appareils réseau et le pack de télécommandes Samsung TV. Modèles d'appareils : modèles d'API JavaScript (`ReadRequest`/`WriteRequest`) avec états générés et logique d'écriture, modèles utilisateur, modèle de compteur intégré, et l'application d'un modèle crée ou met à jour l'appareil en place. Logique : sortie d'objets, tâches asynchrones « FetchJSON » et éditeur amélioré. Interface utilisateur : la boîte de dialogue ouvre l'appareil ou la logique générée, la réapplication conserve une logique générée, le titre d'une section sélectionne sa section, les vignettes personnalisées prennent l'icône du premier contrôle et les URL Frame/HTML fonctionnent en développement, sur le LAN et via IObroker Pro (`{{origin}} `/` {{base}} `/`//path`).",
+        "it": "Plugin: un'API plugin con `network.info`/`network.wake`, monitoraggio della presenza dei dispositivi e TV Samsung. Modelli di dispositivo: modelli API JavaScript (ReadRequest`/`WriteRequest`) con stati generati e logica di polling/write, modelli utente, modello di contatore integrato e l'applicazione di un modello crea o aggiorna il dispositivo. Logica: output di oggetti, task fetchJSON asincroni e editor. Interfaccia utente: la finestra di dialogo Applica apre il dispositivo o la logica generata, la riapplicazione mantiene una logica generata, i riquadri personalizzati del dispositivo occupano l'icona del primo controllo e gli URL Frame/HTML funzionano in dev, sulla LAN e tramite IOBroker Pro.",
+        "es": "Plugins: una API de plugins con `network.info`/`network.wake`, monitorización de presencia de dispositivos de red y el paquete Samsung TV Remote. Plantillas de dispositivos: plantillas de API de JavaScript (`ReadRequest`/`writeRequest`) con estados generados y lógica de sondeo y escritura, plantillas de usuario, plantilla de contadores integrada y al aplicar una plantilla, se crea o actualiza el dispositivo en su lugar. Lógica: salida de objetos, tareas asíncronas de FetchJSON y ajustes de editor. Interfaz de usuario: el cuadro de diálogo de aplicación abre el dispositivo o la lógica generada, al volver a aplicar se conserva una lógica generada, el título de una sección selecciona su sección, los mosaicos del dispositivo personalizado toman el icono del primer control y las URL Frame/HTML funcionan en dev, en la LAN y a través de IOBroker Pro (`{{origin}} `/`//path`).",
+        "pl": "Wtyczki: interfejs API wtyczki z `network.info`/`network.wake`, monitorowaniem obecności urządzeń sieciowych i pakietem zdalnego sterowania Samsung TV. Szablony urządzeń: Szablony interfejsu API JavaScript (`ReadRequest`/`WriteRequest`) z wygenerowanymi stanami i logiką zapytania/zapisu, szablony użytkownika, wbudowany szablon licznika i zastosowanie szablonu tworzy lub aktualizuje urządzenie na miejscu. Logika: wyjście obiektów, zadania asynchroniczne `fetchJSON` i udoskonalenia edytora. Interfejs użytkownika: okno dialogowe aplikacji otwiera wygenerowane urządzenie lub logikę, ponowne zastosowanie zachowuje jedną wygenerowaną logikę, tytuł sekcji wybiera sekcję, kafelki urządzenia niestandardowego przejmują ikonę pierwszej kontrolki, a adresy Frame/HTML działają w dev, w sieci LAN i przez ioBroker Pro (`{{origin}} `/`//path`).",
+        "uk": "Плагіни: API плагінів з `network.info`/`network.wake`, моніторинг присутності мережевих пристроїв та комплект дистанційного керування Samsung TV. Шаблони пристроїв: шаблони API JavaScript (`ReadRequest`/`WriteRequest`) зі згенерованими станами та логікою опитування/запису, шаблони користувачів, вбудований шаблон лічильника та застосування шаблону створює або оновлює пристрій на місці. Логіка: виведення об'єкта, асинхронні завдання `FetchJson` та уточнення редактора. Інтерфейс користувача: діалогове вікно застосування відкриває згенерований пристрій або логіку, повторне застосування зберігає одну згенеровану логіку, заголовок розділу вибирає його розділ, плитки Custom-device приймають значок першого елемента керування, а URL-адреси фрейму/HTML працюють у dev, на локальній мережі та через ioBroker Pro (`{{origin}} `/` {{base}} `/`//path`).",
+        "zh-cn": "插件：带有 “network.info`/network.wake”、网络设备状态监控和三星电视遥控器套装的插件 API。设备模板：带有生成状态和轮询/写入逻辑的 JavaScript API 模板（`ReadRequest`/`WriteRequest`）、用户模板、内置仪表模板以及应用模板可在原地创建或更新设备。逻辑：对象输出、异步 `fetchJSON`任务和编辑器优化。用户界面：应用对话框打开生成的设备或逻辑，重新应用会保留一个生成的逻辑，章节标题选择其分区，自定义设备图块使用第一个控件的图标，框架/HTML 网址在开发中、局域网和通过 ioBroker Pro 运行（`{{origin}} `/`//path`）。"
+      },
       "0.1.4": {
         "en": "Logic v1 grows up: an event combines state sources with repeating timers (an interval, a SunCalc astro time from the system location with a minute offset, or cron HH:MM[:SS] on selected weekdays), $logic.<id> triggers another logic, $var.<name> listens to a global variable, $all and $start are pseudo-states, and startup adopts the current state silently instead of replaying it. The timer type is the app's tab strip and all weekdays start checked; the tile editor adds a value/name home, rule lists, an inline device editor and a tabbed source picker with variables and logic.",
         "de": "Logik v1 wächst: Ein Event kombiniert State-Quellen mit wiederkehrenden Timern (Intervall, SunCalc-Astrozeit aus dem System-Standort mit Minuten-Offset oder Cron HH:MM[:SS] an ausgewählten Wochentagen), $logic.<id> stößt eine andere Logik an, $var.<name> hört auf eine globale Variable, $all und $start sind Pseudo-States, und der Start übernimmt den aktuellen Zustand still statt ihn nachzuspielen. Der Timer-Typ ist die Tab-Leiste der App und alle Wochentage sind vorausgewählt; der Kachel-Editor ergänzt eine Wert-/Namens-Ansicht, Regellisten, einen eingebetteten Geräte-Editor und einen getabbten Quellen-Picker mit Variablen und Logik."
@@ -26,22 +39,6 @@
       "0.0.33": {
         "en": "Tiles are now built from slots: each slot reads a device control or any raw state, and a tile no longer owns a device. Loading a device adds slots only for its real controls, and existing pages migrate once with a backup (pageListV1).",
         "de": "Kacheln bestehen jetzt aus Slots: Jeder Slot liest ein Geräte-Control oder einen beliebigen Roh-State, und eine Kachel besitzt kein Gerät mehr. Das Laden eines Geräts erzeugt Slots nur für seine tatsächlichen Controls, und vorhandene Seiten werden einmalig mit einer Sicherung (pageListV1) migriert."
-      },
-      "0.0.32": {
-        "en": "Blank tiles: a tile can be added without a device (frames, raw values, badges), a device can be created from the add-tile picker, and a device attaches to a blank tile without losing its layout. The level slider follows the slot's own min/max/step and its thumb reaches both ends of the track.",
-        "de": "Leere Kacheln: Eine Kachel kann ohne Gerät angelegt werden (Webseiten, Rohwerte, Badges), ein Gerät lässt sich direkt aus dem Kachel-Picker erzeugen, und ein Gerät hängt sich an eine leere Kachel, ohne deren Layout zu verlieren. Der Level-Slider beachtet min/max/step des Slots und sein Griff erreicht beide Enden der Spur."
-      },
-      "0.0.30": {
-        "en": "Adding a slot from Any state uses the same state picker as changing a source: the full tree with adapter, room, type and role filters, live values and the _Variables group, while the Kind dropdown and the other add-slot tabs stay as they were",
-        "de": "Das Hinzufügen eines Slots unter „Any state“ nutzt denselben State-Picker wie das Ändern einer Quelle: den vollständigen Baum mit Adapter-, Raum-, Typ- und Rollenfiltern, Live-Werten und der _Variables-Gruppe, während die Kind-Auswahl und die übrigen Reiter unverändert bleiben"
-      },
-      "0.0.29": {
-        "en": "Changing a slot's source in the tile or device editor now uses the same state picker as a device control: the full state tree with adapter, room, type and role filters and the _Variables group, plus a This device strip for the device's own controls — variables and any state are pickable, and the slot reads the value live",
-        "de": "Das Ändern der Quelle eines Slots im Kachel- oder Geräte-Editor nutzt jetzt denselben State-Picker wie ein Geräte-Control: den vollständigen State-Baum mit Adapter-, Raum-, Typ- und Rollenfiltern und der _Variables-Gruppe, dazu eine Leiste „This device“ für die eigenen Controls des Geräts — Variablen und jeder State sind wählbar, und der Slot liest den Wert live"
-      },
-      "0.0.28": {
-        "en": "A slot added in the tile editor from Any state now shows its live value right away, and after a reload: the state behind a raw slot is subscribed and fetched like a device control (it used to stay “—” until the same state was also added to the device)",
-        "de": "Ein im Kachel-Editor unter „Any state“ hinzugefügter Slot zeigt seinen Live-Wert jetzt sofort und auch nach einem Neuladen: Der State hinter einem rohen Slot wird wie ein Geräte-Control abonniert und gelesen (bisher blieb er bei „—“ , bis derselbe State auch am Gerät hing)"
       }
     },
     "titleLang": {
@@ -70,7 +67,9 @@
       "uk": "Адаптер візуального інтерфейсу для автоматизаціїбудинку ioBroker з Svelte SPA",
       "zh-cn": "用于ioBroker家庭自动化的Svelte SPA可视化界面适配器"
     },
-    "authors": ["Frank Joke <frankjoke@hotmail.com>"],
+    "authors": [
+      "Frank Joke <frankjoke@hotmail.com>"
+    ],
     "keywords": [
       "ioBroker",
       "ihome",
@@ -143,8 +142,12 @@
     "networkDevices": [],
     "plugins": []
   },
-  "encryptedNative": ["vapidPrivateKey"],
-  "protectedNative": ["vapidPrivateKey"],
+  "encryptedNative": [
+    "vapidPrivateKey"
+  ],
+  "protectedNative": [
+    "vapidPrivateKey"
+  ],
   "objects": [],
   "instanceObjects": []
 }
