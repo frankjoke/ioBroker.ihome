@@ -349,7 +349,7 @@ for (const item of T.itemList) {
       : item.type === "number" && item.decimals !== undefined
         ? item.decimals === 0
           ? parseInt(raw, 10)
-          : parseFloat(raw).toFixed(item.decimals)
+          : Number(parseFloat(raw).toFixed(item.decimals))
         : raw;
     const next = item.type === "object" && typeof converted !== "string"
       ? JSON.stringify(converted ?? null)

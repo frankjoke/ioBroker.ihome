@@ -3488,7 +3488,7 @@ it("rounds number items by their decimals when no conversion is given", () => {
 
   expect(h.writes).toContainEqual({
     id: "ihome.0.Variables.Dec.two",
-    value: "12.35",
+    value: 12.35,
     ack: true,
   });
   expect(h.writes).toContainEqual({

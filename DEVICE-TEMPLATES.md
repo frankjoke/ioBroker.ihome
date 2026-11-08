@@ -103,7 +103,7 @@ Each item describes one generated state and its read/write mapping.
 | `unit` | no | `common.unit` for number states. |
 | `states` | no | `common.states` labels; object or JSON string. |
 | `min`, `max`, `step` | no | Number state limits. |
-| `decimals` | no | Number only: default read rounding when no `conversion` is given. `0` uses `parseInt`; `n > 0` uses `parseFloat(raw).toFixed(n)`. A `conversion` wins over this. |
+| `decimals` | no | Number only: default read rounding when no `conversion` is given. `0` uses `parseInt`; `n > 0` rounds with `parseFloat(raw).toFixed(n)` and converts the result back to a number. A `conversion` wins over this. |
 | `readOnly` | no | `false` default. When true the state is `write: false` and gets no write row. |
 | `initial` | no | Initial value; defaults `false`, `0`, `""`, `"{}"`. |
 | `source` | no | Where the value sits in the read result. A string is split on dots (`"data.power"`). An array uses exact keys (`["1.8.0"]`), so JSON keys containing dots work. Omitted = the whole result. |
