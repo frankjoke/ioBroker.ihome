@@ -43,6 +43,12 @@ export const pages = [
     icon: "admin_panel_settings",
     title: "Server & Security",
   },
+  {
+    id: "/admin",
+    label: "Admin",
+    icon: "settings_applications",
+    title: "Admin",
+  },
 ];
 
 /**

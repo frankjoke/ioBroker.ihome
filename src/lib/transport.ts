@@ -89,6 +89,28 @@ export function resolveTransport(sources: Sources): {
   };
 }
 
+/**
+ * Where the ioBroker admin UI lives: the stored host:port when the operator
+ * set one, else the host this app talks to (the live broker URL, then the
+ * page) on the admin port 8081 — which is also where the ws socket lives, but
+ * not the web adapter that serves this page. The scheme follows an https page
+ * or broker, so an https page never embeds a mixed-content http frame.
+ */
+export function adminPageUrl(sources: {
+  hostPort?: string;
+  brokerUrl?: string | null;
+  protocol: string;
+  host: string;
+}): string {
+  const brokerUrl = String(sources.brokerUrl ?? "");
+  const secure =
+    sources.protocol === "https:" || /^(https|wss):/i.test(brokerUrl);
+  const stored = (sources.hostPort ?? "").trim();
+  const brokerHost = /^[a-z]+:\/\/([^/]+)/i.exec(brokerUrl)?.[1];
+  const authority = stored || `${hostnameOf(brokerHost || sources.host)}:8081`;
+  return `${secure ? "https" : "http"}://${authority}/#tab-overview`;
+}
+
 /** A host as something to compare: scheme and path stripped, lower-cased. */
 function hostOnly(value: string): string {
   return String(value ?? "")

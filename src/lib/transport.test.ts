@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  adminPageUrl,
   cloudPageUrl,
   parseSocketInfo,
   resolveConnection,
@@ -183,4 +184,50 @@ it("a fetch that fails or hangs falls back to the ws default, not to a stall", a
       fetchInfo: () => Promise.reject(new Error("boom")),
     }),
   ).toEqual({ transport: "ws", url: "ws://host:8081/socket.io" });
+});
+
+// --- the Admin page's address ---------------------------------------------
+
+it("puts the admin UI on the stored host:port", () => {
+  expect(
+    adminPageUrl({
+      hostPort: "10.0.0.5:8081",
+      brokerUrl: "ws://192.168.178.9:8081/socket.io",
+      protocol: "http:",
+      host: "192.168.178.9:8082",
+    }),
+  ).toBe("http://10.0.0.5:8081/#tab-overview");
+});
+
+it("derives the admin host from the broker, on the admin port", () => {
+  // Dev: the page is on localhost, the broker elsewhere.
+  expect(
+    adminPageUrl({
+      hostPort: "",
+      brokerUrl: "ws://192.168.178.9:8081/socket.io",
+      protocol: "http:",
+      host: "localhost:5173",
+    }),
+  ).toBe("http://192.168.178.9:8081/#tab-overview");
+  // Web-served production: the socket is on the page's web port, the admin is not.
+  expect(
+    adminPageUrl({
+      brokerUrl: "http://host:8082",
+      protocol: "http:",
+      host: "host:8082",
+    }),
+  ).toBe("http://host:8081/#tab-overview");
+});
+
+it("falls back to the page host and keeps an https page on https", () => {
+  expect(adminPageUrl({ protocol: "http:", host: "192.168.178.9:8082" })).toBe(
+    "http://192.168.178.9:8081/#tab-overview",
+  );
+  expect(
+    adminPageUrl({
+      brokerUrl: "https://iobroker.pro",
+      protocol: "https:",
+      host: "iobroker.pro",
+    }),
+  ).toBe("https://iobroker.pro:8081/#tab-overview");
 });
