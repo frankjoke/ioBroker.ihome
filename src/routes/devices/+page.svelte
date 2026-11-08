@@ -8,6 +8,7 @@
   import { newId } from "$lib/utils/ids";
   import { formatAge, splitReading } from "$lib/config/format";
   import { time } from "$lib/time.svelte.js";
+  import { deviceTimestamp } from "$lib/config/device-time";
   import { unitFor } from "$lib/config/state-meta";
   import { saveRegistry } from "$lib/registry.svelte.js";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -85,17 +86,12 @@
       .join(", ");
   }
 
-  /** Newest `ts` across the device's state-backed controls, or undefined. */
+  /** When the device was last seen/connected, else its newest state update. */
   function lastUpdate(device: Device): number | undefined {
-    let latest: number | undefined;
-    for (const c of device.controls ?? []) {
-      if (!c.stateId) continue;
-      const ts = ioBroker.states.get(c.stateId)?.ts;
-      if (typeof ts === "number" && (latest === undefined || ts > latest)) {
-        latest = ts;
-      }
-    }
-    return latest;
+    const controls = (enrichedById.get(device.id)?.controls ??
+      device.controls ??
+      []) as EnrichedControl[];
+    return deviceTimestamp(controls, (id) => ioBroker.states.get(id)?.ts);
   }
 
   /** "24m ago" / "just now". */
