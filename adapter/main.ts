@@ -50,6 +50,7 @@ import {
   type PushPayload,
   type PushSubscriptionRecord,
 } from "./push-ops";
+import { uiMessage } from "./ui-message";
 
 // JSON documents the dashboard reads and writes. The adapter owns the objects;
 // the SPA (served by the web adapter at /ihome/) edits the values. Everything
@@ -1399,6 +1400,18 @@ class IHome extends utils.Adapter {
       native: {},
     });
     this.subscribeStates("phone.pushMessage");
+    await this.setObjectNotExistsAsync("phone.uiMessage", {
+      type: "state",
+      common: {
+        name: "Show a UI message (Alarm/Warning/Info prefix)",
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+      },
+      native: {},
+    });
+    this.subscribeStates("phone.uiMessage");
     this.log.debug(
       `Ready: ensuring ${DOCS.length} documents under ${this.namespace}.${CONFIG_FOLDER}`,
     );
@@ -1532,6 +1545,23 @@ class IHome extends utils.Adapter {
           }
           // A command state: clear it so the same text can be sent again.
           void this.setStateAsync("phone.pushMessage", {
+            val: "",
+            ack: true,
+          }).catch(() => {});
+        }
+      } else if (id === `${this.namespace}.phone.uiMessage`) {
+        if (state.ack === false) {
+          const message = uiMessage(state.val);
+          if (message) {
+            this.pushMessage(
+              message.level,
+              "ui",
+              message.text,
+              message.timeout,
+            );
+          }
+          // A command state: clear it so the same text can be shown again.
+          void this.setStateAsync("phone.uiMessage", {
             val: "",
             ack: true,
           }).catch(() => {});
