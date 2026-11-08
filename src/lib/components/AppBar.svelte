@@ -45,11 +45,13 @@
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
   const currentConfig = $derived(configPages.find((p) => p.id === routeId));
-  /** Small screens: the config pages live in a menu, not a tab strip. */
+  /** Small screens: many pages live in a menu, not a tab strip. */
   let configMenuOpen = $state(false);
+  let pageMenuOpen = $state(false);
   $effect(() => {
     routeId;
     configMenuOpen = false;
+    pageMenuOpen = false;
   });
 
   const treePages = $derived(getPageRegistry().pages ?? []);
@@ -65,6 +67,7 @@
       ? wanted
       : (treePages[0]?.id ?? "");
   });
+  const currentPage = $derived(treePages.find((p) => p.id === currentId));
   const status = $derived(connectionState());
   const statusText = $derived(
     status === "error"
@@ -211,7 +214,10 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === "Escape") configMenuOpen = false;
+    if (e.key === "Escape") {
+      configMenuOpen = false;
+      pageMenuOpen = false;
+    }
   }}
 />
 
@@ -224,6 +230,7 @@
   <nav
     class="tabs"
     class:config={!isDisplay}
+    class:pages-menu={isDisplay && treePages.length > 3}
     aria-label={isDisplay ? "Pages" : "Configuration"}
   >
     {#if isDisplay}
@@ -256,6 +263,48 @@
       {/each}
     {/if}
   </nav>
+
+  {#if isDisplay && treePages.length > 3}
+    <div class="config-menu">
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Pages menu"
+        aria-haspopup="true"
+        aria-expanded={pageMenuOpen}
+        aria-controls="pages-menu-panel"
+        title="Pages"
+        onclick={() => (pageMenuOpen = !pageMenuOpen)}
+      >
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <span class="menu-current">{currentPage?.title ?? "Pages"}</span>
+
+      {#if pageMenuOpen}
+        <button
+          type="button"
+          class="menu-backdrop"
+          aria-label="Close the pages menu"
+          onclick={() => (pageMenuOpen = false)}
+        ></button>
+        <nav id="pages-menu-panel" class="menu-panel" aria-label="Pages">
+          {#each treePages as p (p.id)}
+            <a
+              class="menu-item"
+              class:active={p.id === currentId}
+              href={`${base}/#/p/${p.id}`}
+              aria-current={p.id === currentId ? "page" : undefined}
+              onclickcapture={(e) => onPageClick(e, p.id)}
+              onclick={() => (pageMenuOpen = false)}
+            >
+              {#if p.icon}<Icon value={p.icon} size={18} />{/if}
+              <span>{p.title}</span>
+            </a>
+          {/each}
+        </nav>
+      {/if}
+    </div>
+  {/if}
 
   {#if !isDisplay}
     <div class="config-menu">
@@ -560,7 +609,8 @@
   }
 
   @media (max-width: 820px) {
-    .tabs.config {
+    .tabs.config,
+    .tabs.pages-menu {
       display: none;
     }
     .config-menu {
