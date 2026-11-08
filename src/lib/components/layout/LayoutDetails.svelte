@@ -146,8 +146,9 @@
   /** The open rule, by slot and rule index. */
   let openRule = $state<{ slot: number; rule: number } | null>(null);
   let sourcePickerFor = $state<number | null>(null);
-  /** The state picker for an HTML slot's document. */
+  /** The state picker for an HTML slot's document or a frame's URL. */
   let htmlSourceFor = $state<number | null>(null);
+  let frameSourceFor = $state<number | null>(null);
   let ruleIconFor = $state<{ slot: number; rule: number } | null>(null);
   /** The slot icon's own picker (A57). */
   let iconPickerFor = $state<number | null>(null);
@@ -554,6 +555,13 @@
    */
   function slotLabel(slot: Slot): string {
     if (slot.kind === "frame") {
+      if (
+        slot.source &&
+        typeof slot.source === "object" &&
+        slot.source.kind === "state"
+      ) {
+        return slot.label || slot.source.stateId;
+      }
       return String(slot.options?.url ?? "") || "no page";
     }
     if (slot.kind === "html") {
@@ -577,8 +585,8 @@
     return device ? `${device.name || device.id}.${name}` : name;
   }
 
-  /** The state an HTML slot reads its document from, or the picker's prompt. */
-  function htmlStateLabel(slot: Slot): string {
+  /** The state an HTML slot or frame reads from, or the picker's prompt. */
+  function stateSourceLabel(slot: Slot): string {
     const source = slot.source;
     return source && typeof source === "object" && source.kind === "state"
       ? source.stateId
@@ -1534,6 +1542,31 @@
                       />
                       <span>ignore pointer</span>
                     </label>
+                    <div class="small grow">
+                      <span class="label-mono">From state</span>
+                      <button
+                        type="button"
+                        class="btn btn-sm source-pick"
+                        title="Read the frame URL from a state's string value"
+                        onclick={() => (frameSourceFor = i)}
+                      >
+                        <Icon value="edit" size={15} />
+                        <span class="source-name">{stateSourceLabel(slot)}</span
+                        >
+                      </button>
+                    </div>
+                    {#if slot.source}
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="Use the fixed URL again"
+                        aria-label="Clear the frame state"
+                        onclick={() =>
+                          edit((t) => patchSlot(t, i, { source: undefined }))}
+                      >
+                        <span class="material-symbols-outlined">delete</span>
+                      </button>
+                    {/if}
                   {:else if slot.kind === "html"}
                     <div class="small grow html-block">
                       <label class="small grow">
@@ -1565,7 +1598,7 @@
                           >
                             <Icon value="edit" size={15} />
                             <span class="source-name"
-                              >{htmlStateLabel(slot)}</span
+                              >{stateSourceLabel(slot)}</span
                             >
                           </button>
                         </div>
@@ -2304,6 +2337,22 @@
         );
       }}
       onClose={() => (htmlSourceFor = null)}
+    />
+  {/if}
+
+  {#if frameSourceFor !== null}
+    <SourcePicker
+      mode="state"
+      title="Choose a frame state"
+      onState={(id) => {
+        const slotIndex = frameSourceFor;
+        frameSourceFor = null;
+        if (slotIndex === null) return;
+        edit((t) =>
+          patchSlot(t, slotIndex, { source: { kind: "state", stateId: id } }),
+        );
+      }}
+      onClose={() => (frameSourceFor = null)}
     />
   {/if}
 

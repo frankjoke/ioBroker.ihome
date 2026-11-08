@@ -112,7 +112,12 @@ export function locationText(
 export function mapUrl(location: PhoneLocation | null): string {
   if (!location) return "";
   const { lat, lon } = location;
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`;
+  // OSM's export/embed page is the one that allows framing; the regular page
+  // sends X-Frame-Options: SAMEORIGIN. The bbox is a ~1 km box around the fix.
+  const dLat = 0.0025;
+  const dLon = 0.005;
+  const bbox = `${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
 }
 
 export function normalizeConnection(value: unknown): PhoneConnection {

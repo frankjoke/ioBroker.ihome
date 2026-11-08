@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { frameUrl } from "$lib/config/frame-url";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { frameUrl, safeFrameUrl } from "$lib/config/frame-url";
+  import { stateIdFor } from "$lib/config/variables";
+  import { getVariables } from "$lib/stores/variables.svelte";
   import type { Slot } from "$lib/types/display";
 
   /**
@@ -10,12 +13,32 @@
    *
    * The stored URL is the deployed one (relative to `/ihome/`); the dev server
    * resolves it against the broker origin instead (`VITE_IOBROKER_ORIGIN`).
+   * A state source makes the URL live (e.g. a phone's map link); the fixed URL
+   * is the fallback while that state is empty. A state is not editor-authored,
+   * so only web URLs pass (no `javascript:`/`data:`).
    */
   let { slot }: { slot: Slot } = $props();
 
+  const stateId = $derived(
+    slot.source &&
+      typeof slot.source === "object" &&
+      slot.source.kind === "state"
+      ? stateIdFor(slot.source.stateId, getVariables())
+      : "",
+  );
+  const stateValue = $derived(
+    stateId ? ioBroker.states.get(stateId)?.val : undefined,
+  );
+  const staged = $derived(
+    stateId && typeof stateValue === "string" && stateValue.trim()
+      ? safeFrameUrl(stateValue)
+      : typeof slot.options?.url === "string"
+        ? slot.options.url
+        : "",
+  );
   const url = $derived(
-    typeof slot.options?.url === "string"
-      ? frameUrl(slot.options.url, {
+    staged
+      ? frameUrl(staged, {
           dev: import.meta.env.DEV,
           origin:
             import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
@@ -35,7 +58,11 @@
     title={slot.label || url}
   ></iframe>
 {:else}
-  <p class="empty text-muted">No page set — add a URL in the pane.</p>
+  <p class="empty text-muted">
+    {stateId
+      ? "No usable URL in this state."
+      : "No page set — add a URL in the pane."}
+  </p>
 {/if}
 
 <style>

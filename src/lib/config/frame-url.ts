@@ -106,3 +106,24 @@ export function frameUrl(
     return value;
   }
 }
+
+/**
+ * A frame URL read from a state: only a web address (http/https), a
+ * protocol-relative address or a relative path. A state is not authored by the
+ * editor, so `javascript:`, `data:` and the like must never reach a frame.
+ */
+export function safeFrameUrl(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  // Detect the scheme on a control-character-free copy, so `java\nscript:`
+  // cannot slip past the allowlist.
+  const probe = [...text]
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code > 32 && code !== 127;
+    })
+    .join("");
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(probe)?.[1]?.toLowerCase();
+  if (scheme && scheme !== "http" && scheme !== "https") return "";
+  return text;
+}

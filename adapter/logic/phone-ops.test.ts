@@ -83,7 +83,10 @@ it("renders a readable location and map link", () => {
     "48.12346, 16.65432",
   );
   expect(mapUrl(null)).toBe("");
-  expect(mapUrl({ lat: 48, lon: 16, ts: 1 })).toContain("openstreetmap.org");
+  const embed = mapUrl({ lat: 48, lon: 16, ts: 1 });
+  expect(embed).toContain("openstreetmap.org/export/embed.html");
+  expect(embed).toContain("marker=48,16");
+  expect(embed).toContain("bbox=");
 });
 
 it("normalizes connection types", () => {

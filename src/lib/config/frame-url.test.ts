@@ -4,6 +4,7 @@ import {
   appOrigin,
   frameUrl,
   resolveAppUrl,
+  safeFrameUrl,
 } from "$lib/config/frame-url";
 
 const dev = {
@@ -80,4 +81,16 @@ it("keeps absolute URLs and production values untouched", () => {
     }),
   ).toBe("samsung.html");
   expect(frameUrl("", dev)).toBe("");
+});
+
+it("accepts only web URLs from a state", () => {
+  expect(safeFrameUrl("https://example.com/x")).toBe("https://example.com/x");
+  expect(safeFrameUrl("http://host/x")).toBe("http://host/x");
+  expect(safeFrameUrl("//example.com/x")).toBe("//example.com/x");
+  expect(safeFrameUrl("samsung.html")).toBe("samsung.html");
+  expect(safeFrameUrl("{{origin}}/x")).toBe("{{origin}}/x");
+  expect(safeFrameUrl("javascript:alert(1)")).toBe("");
+  expect(safeFrameUrl(" data:text/html,x")).toBe("");
+  expect(safeFrameUrl("java\nscript:alert(1)")).toBe("");
+  expect(safeFrameUrl("")).toBe("");
 });
