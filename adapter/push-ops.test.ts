@@ -76,17 +76,20 @@ it("turns a written text state into a push message", () => {
     title: "iHome",
     body: "Pump is dry",
     level: "info",
+    showBody: true,
   });
   // Two or more lines: the first is the title, the rest the body.
   expect(pushStatePayload("Waschmaschine\nFertig")).toEqual({
     title: "Waschmaschine",
     body: "Fertig",
     level: "info",
+    showBody: true,
   });
   expect(pushStatePayload("Alarm\r\nDoor\r\nopen")).toEqual({
     title: "Alarm",
     body: "Door\nopen",
     level: "info",
+    showBody: true,
   });
   expect(pushStatePayload("")).toBeNull();
   expect(pushStatePayload("   ")).toBeNull();

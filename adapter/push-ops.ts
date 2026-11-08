@@ -166,7 +166,13 @@ export function pushStatePayload(value: unknown): PushPayload | null {
   const hasTitle = lines.length > 1;
   const title = hasTitle ? lines[0].trim() : "";
   const body = hasTitle ? lines.slice(1).join("\n").trim() : text;
-  return normalizePushPayload({ title: title || "iHome", body });
+  // An explicitly written message is the point of the state: show it, unlike
+  // the generic lock-screen text used for logic/notify pushes.
+  return normalizePushPayload({
+    title: title || "iHome",
+    body,
+    showBody: true,
+  });
 }
 
 export function upsertPushSubscription(
