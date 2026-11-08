@@ -44,6 +44,13 @@
    */
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
+  const currentConfig = $derived(configPages.find((p) => p.id === routeId));
+  /** Small screens: the config pages live in a menu, not a tab strip. */
+  let configMenuOpen = $state(false);
+  $effect(() => {
+    routeId;
+    configMenuOpen = false;
+  });
 
   const treePages = $derived(getPageRegistry().pages ?? []);
   /**
@@ -202,13 +209,23 @@
   }
 </script>
 
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === "Escape") configMenuOpen = false;
+  }}
+/>
+
 <header
   class="bar"
   class:editing={isDisplay && sheet.open}
   class:view={isDisplay && !sheet.open}
   class:config={!isDisplay}
 >
-  <nav class="tabs" aria-label={isDisplay ? "Pages" : "Configuration"}>
+  <nav
+    class="tabs"
+    class:config={!isDisplay}
+    aria-label={isDisplay ? "Pages" : "Configuration"}
+  >
     {#if isDisplay}
       {#each treePages as p (p.id)}
         <a
@@ -239,6 +256,54 @@
       {/each}
     {/if}
   </nav>
+
+  {#if !isDisplay}
+    <div class="config-menu">
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Configuration menu"
+        aria-haspopup="true"
+        aria-expanded={configMenuOpen}
+        aria-controls="config-menu-panel"
+        title="Configuration pages"
+        onclick={() => (configMenuOpen = !configMenuOpen)}
+      >
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <span class="menu-current">{currentConfig?.label ?? "Configuration"}</span
+      >
+
+      {#if configMenuOpen}
+        <button
+          type="button"
+          class="menu-backdrop"
+          aria-label="Close the configuration menu"
+          onclick={() => (configMenuOpen = false)}
+        ></button>
+        <nav
+          id="config-menu-panel"
+          class="menu-panel"
+          aria-label="Configuration pages"
+        >
+          {#each configPages as p (p.id)}
+            <a
+              class="menu-item"
+              class:active={routeId === p.id}
+              href={pageHref(p.id, base)}
+              aria-current={routeId === p.id ? "page" : undefined}
+              onclick={() => (configMenuOpen = false)}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{p.icon}</span
+              >
+              <span>{p.label}</span>
+            </a>
+          {/each}
+        </nav>
+      {/if}
+    </div>
+  {/if}
 
   <div class="actions">
     <!-- The editor's mode switch: it sits with the other action icons, not in
@@ -413,6 +478,94 @@
     align-items: center;
     gap: 2px;
     margin-left: auto;
+  }
+
+  /* ------------------------------------------------- config menu (small) */
+
+  /* Desktop keeps the tab strip; phones get a menu button instead. */
+  .config-menu {
+    display: none;
+    position: relative;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .menu-current {
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 45vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Below the bar, so the menu button and the eye stay usable while open. */
+  .menu-backdrop {
+    position: fixed;
+    top: 44px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+  }
+
+  .menu-panel {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 15rem;
+    max-width: min(20rem, calc(100vw - 1.5rem));
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: 0.3rem;
+    background-color: var(--surface-container-lowest);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md, 12px);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.6rem;
+    border-radius: var(--border-radius-sm, 4px);
+    color: var(--text-color);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .menu-item:hover {
+    background-color: var(--surface-container);
+    text-decoration: none;
+  }
+
+  .menu-item.active {
+    background-color: var(--primary-container);
+    color: var(--on-primary-container);
+  }
+
+  .menu-item .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  @media (max-width: 820px) {
+    .tabs.config {
+      display: none;
+    }
+    .config-menu {
+      display: flex;
+    }
   }
 
   .status-btn.ok .material-symbols-outlined {
