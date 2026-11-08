@@ -27,8 +27,22 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
   h1 {
     font-size: 16px;
     font-weight: 600;
-    margin: 0 0 12px;
+    margin: 0;
     color: #9ad
+  }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 12px
+  }
+
+  .head #status {
+    margin: 0;
+    font-size: 12px;
+    text-align: right
   }
 
   #pad {
@@ -77,10 +91,21 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
   }
 
   #status {
-    margin: 12px 0 0;
-    font-size: 13px;
+    margin: 0;
+    font-size: 12px;
     color: #888;
     min-height: 1.3em
+  }
+
+  button.small {
+    padding: 8px 4px;
+    font-size: 12px
+  }
+
+  button.round.small {
+    width: 72%;
+    justify-self: center;
+    align-self: center
   }
 
   .ok {
@@ -103,13 +128,16 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
   }
 </style>
 <main>
-  <h1>Samsung TV</h1>
+  <header class="head">
+    <h1>Samsung TV</h1>
+    <p id="status">nicht verbunden</p>
+  </header>
   <input id="host" type="text" value="" placeholder="TV host or IP" spellcheck="false">
   <div id="pad">
     <button id="power">Power</button>
-    <button data-key="KEY_HOME">Home</button>
-    <button data-key="KEY_RETURN">Zurück</button>
-    <button data-key="KEY_INFO" class="round">i</button>
+    <button data-key="KEY_HOME" class="small">Home</button>
+    <button data-key="KEY_RETURN" class="small">Zurück</button>
+    <button data-key="KEY_INFO" class="round small">i</button>
     <button data-key="KEY_UP" class="round">▲</button>
     <button data-key="KEY_VOLUMEUP" class="round">Vol +</button>
     <button data-key="KEY_LEFT" class="round">◀</button>
@@ -143,7 +171,6 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
     <button id="apps">Apps testen</button>
     <button id="conn">Verbinden</button>
   </div>
-  <p id="status">nicht verbunden</p>
 </main>
 <script>
   const NAME = btoa("opencode-remote"); // derselbe Name, den der TV kennt
