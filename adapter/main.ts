@@ -1624,6 +1624,8 @@ class IHome extends utils.Adapter {
             > | null,
           sendTo: (instance, command, payload) =>
             this.sendToAsync(instance, command, payload),
+          settings: () => ({}),
+          debug: () => false,
           log: {
             debug: (message) => this.log.debug(message),
             info: (message) => this.log.info(message),

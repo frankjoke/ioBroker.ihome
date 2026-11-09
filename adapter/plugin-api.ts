@@ -11,6 +11,8 @@ export interface PluginApi {
   namespace: string;
   /** Read-only native config snapshot; protected secrets and plugins omitted. */
   config: Readonly<Record<string, unknown>>;
+  /** Live non-secret settings for this plugin (a fresh copy per read). */
+  readonly settings: Readonly<Record<string, unknown>>;
   log: {
     debug(message: string): void;
     info(message: string): void;
@@ -55,6 +57,8 @@ export interface PluginApiDeps {
     id: string,
   ): Promise<Record<string, unknown> | null | undefined>;
   sendTo(instance: string, command: string, payload: unknown): Promise<unknown>;
+  settings(): Record<string, unknown>;
+  debug(): boolean;
   log: {
     debug(message: string): void;
     info(message: string): void;
@@ -91,8 +95,14 @@ export function createPluginApi(
   return {
     namespace: deps.namespace,
     config: sanitizedConfig(deps.config),
+    get settings() {
+      return { ...deps.settings() };
+    },
     log: {
-      debug: (message) => deps.log.debug(prefix(message)),
+      debug: (message) => {
+        if (!deps.debug()) return;
+        deps.log.debug(prefix(message));
+      },
       info: (message) => deps.log.info(prefix(message)),
       warn: (message) => deps.log.warn(prefix(message)),
       error: (message) => deps.log.error(prefix(message)),

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPluginApi, type PluginApiDeps } from "./plugin-api";
 
 function fakeDeps(): PluginApiDeps {
@@ -31,6 +31,8 @@ function fakeDeps(): PluginApiDeps {
       command,
       payload,
     }),
+    settings: () => ({}),
+    debug: () => false,
     log: { debug() {}, info() {}, warn() {}, error() {} },
   };
 }
@@ -75,6 +77,37 @@ describe("createPluginApi", () => {
     expect(api.network.list()).toHaveLength(1);
     expect(api.config).not.toHaveProperty("vapidPrivateKey");
     expect(api.config).not.toHaveProperty("plugins");
+  });
+
+  it("reads settings live and protects the source object", () => {
+    let settings: Record<string, unknown> = { prefix: "a" };
+    const deps = fakeDeps();
+    deps.settings = () => settings;
+    const api = createPluginApi("demo", deps);
+    expect(api.settings.prefix).toBe("a");
+    settings = { prefix: "b" };
+    expect(api.settings.prefix).toBe("b");
+    (api.settings as Record<string, unknown>).prefix = "hacked";
+    expect(settings.prefix).toBe("b");
+  });
+
+  it("drops debug logs when debug is off and passes them when on", () => {
+    let debug = false;
+    const log = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const deps = fakeDeps();
+    deps.log = log;
+    deps.debug = () => debug;
+    const api = createPluginApi("demo", deps);
+    api.log.debug("x");
+    expect(log.debug).not.toHaveBeenCalled();
+    debug = true;
+    api.log.debug("x");
+    expect(log.debug).toHaveBeenCalledWith("plugin demo: x");
   });
 
   it("prefixes log lines with the plugin id", () => {
