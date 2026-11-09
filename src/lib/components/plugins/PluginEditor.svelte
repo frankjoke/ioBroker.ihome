@@ -183,6 +183,10 @@
       Plugin file: {plugin.codeLength} bytes (imported). Export to change it outside
       iHome.
     </p>
+  {:else}
+    <p class="hint text-muted">
+      Export contains this built-in's settings only; no code.
+    </p>
   {/if}
 
   {#if error}
@@ -202,10 +206,10 @@
       >
         Delete
       </button>
-      <button type="button" class="btn" disabled={busy} onclick={exportFile}>
-        Export
-      </button>
     {/if}
+    <button type="button" class="btn" disabled={busy} onclick={exportFile}>
+      Export
+    </button>
     <button
       type="button"
       class="btn btn-primary"

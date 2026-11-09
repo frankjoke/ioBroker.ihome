@@ -1318,6 +1318,36 @@ class IHome extends utils.Adapter {
         plugin: command.plugin,
       });
       if ("problem" in parsed) return pluginError(parsed.problem);
+      if (parsed.plugin.builtin) {
+        const current = this.pluginConfig.find(
+          (entry) => entry.id === parsed.plugin.id,
+        );
+        if (!current?.builtin) {
+          return pluginError(`unknown built-in plugin: ${parsed.plugin.id}`);
+        }
+        const previous = this.pluginSettings.settings[parsed.plugin.id] ?? {
+          enabled: current.enabled,
+          timeoutMs: current.timeoutMs,
+          debug: current.debug,
+        };
+        const doc = {
+          ...this.pluginSettings,
+          settings: {
+            ...this.pluginSettings.settings,
+            [parsed.plugin.id]: {
+              ...previous,
+              settings: parsed.plugin.settings ?? {},
+              timeoutMs: parsed.plugin.timeoutMs ?? previous.timeoutMs,
+            },
+          },
+        };
+        await this.applyPluginSettings(doc, JSON.stringify(doc));
+        await this.savePluginSettings();
+        return pluginReply({
+          plugins: this.pluginViews(),
+          restartRequired: [],
+        });
+      }
       this.pluginSettings = importStaged(this.pluginSettings, parsed.plugin);
       await this.savePluginSettings();
       return pluginReply({
@@ -1334,8 +1364,15 @@ class IHome extends utils.Adapter {
       const plugin = this.pluginConfig.find((entry) => entry.id === command.id);
       if (!plugin) return pluginError(`unknown plugin: ${command.id}`);
       if (plugin.builtin) {
-        return pluginError(
-          `plugin ${command.id} is built-in and has no portable code`,
+        return pluginReply(
+          pluginFile({
+            id: plugin.id,
+            name: plugin.name,
+            builtin: true,
+            timeoutMs: plugin.timeoutMs,
+            ...(plugin.settings ? { settings: plugin.settings } : {}),
+            code: "",
+          }),
         );
       }
       return pluginReply(

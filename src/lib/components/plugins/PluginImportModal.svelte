@@ -48,8 +48,13 @@
   <div class="modal-card card">
     <h3>Import plugin</h3>
     <p class="hint text-muted">
-      Choose an iHome plugin file. The plugin stays switched off until you
-      restart iHome in Admin and enable it here.
+      {#if plugin?.builtin}
+        Choose a built-in plugin settings file. Its settings are applied
+        immediately; the built-in code stays untouched.
+      {:else}
+        Choose an iHome plugin file. The plugin stays switched off until you
+        restart iHome in Admin and enable it here.
+      {/if}
     </p>
 
     <label class="field">
@@ -72,19 +77,26 @@
           <span class="mono text-muted">{plugin.id}</span>
         </p>
         <p class="hint text-muted">
-          Timeout {plugin.timeoutMs ?? 5000} ms · Code {plugin.code.length}
-          bytes · {plugin.settingsSchema?.length ?? 0} settings fields ·
-          {plugin.help ? "help" : "no help"} · {plugin.usage
-            ? "usage"
-            : "no usage"}
+          {#if plugin.builtin}
+            Built-in settings · Timeout {plugin.timeoutMs ?? 5000} ms ·
+            {Object.keys(plugin.settings ?? {}).length} settings · no code
+          {:else}
+            Timeout {plugin.timeoutMs ?? 5000} ms · Code {plugin.code.length}
+            bytes · {plugin.settingsSchema?.length ?? 0} settings fields ·
+            {plugin.help ? "help" : "no help"} · {plugin.usage
+              ? "usage"
+              : "no usage"}
+          {/if}
         </p>
       </div>
     {/if}
 
-    <p class="warning-banner">
-      The imported plugin stays switched off. Restart iHome in Admin, then
-      enable it here.
-    </p>
+    {#if !plugin?.builtin}
+      <p class="warning-banner">
+        The imported plugin stays switched off. Restart iHome in Admin, then
+        enable it here.
+      </p>
+    {/if}
 
     <div class="actions">
       <button type="button" class="btn" disabled={busy} onclick={onClose}>

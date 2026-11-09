@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PLUGIN_CODE, MAX_PLUGIN_HELP } from "./plugin-ops";
+import {
+  BUILTIN_PLUGINS,
+  MAX_PLUGIN_CODE,
+  MAX_PLUGIN_HELP,
+} from "./plugin-ops";
 import {
   parsePluginFile,
   pluginFile,
@@ -72,6 +76,55 @@ describe("parsePluginFile", () => {
         plugin: { ...base.plugin, help: "x".repeat(MAX_PLUGIN_HELP + 1) },
       }),
     ).toMatchObject({ problem: expect.any(String) });
+  });
+
+  it("parses a built-in settings file without code", () => {
+    const httpIn = BUILTIN_PLUGINS.find((plugin) => plugin.id === "http.in");
+    expect(
+      parsePluginFile({
+        ...base,
+        plugin: {
+          id: "http.in",
+          name: "ignored name",
+          builtin: true,
+          timeoutMs: 4000,
+          code: "",
+          settings: { port: 3000, endpoints: "[]" },
+        },
+      }),
+    ).toEqual({
+      plugin: {
+        id: "http.in",
+        name: httpIn?.name,
+        builtin: true,
+        timeoutMs: 4000,
+        settings: { port: 3000, endpoints: "[]" },
+        code: "",
+      },
+    });
+  });
+
+  it("rejects invalid built-in settings files", () => {
+    const builtinFile = (plugin: Record<string, unknown>) =>
+      parsePluginFile({
+        ...base,
+        plugin: {
+          id: "http.in",
+          name: "x",
+          builtin: true,
+          code: "",
+          ...plugin,
+        },
+      });
+    expect(builtinFile({ id: "http.missing" })).toMatchObject({
+      problem: expect.stringContaining("Unknown built-in"),
+    });
+    expect(builtinFile({ code: "x" })).toMatchObject({
+      problem: expect.stringContaining("must not contain code"),
+    });
+    expect(builtinFile({ settings: { port: "3000" } })).toEqual({
+      problem: expect.stringContaining("settings.port"),
+    });
   });
 
   it("rejects an invalid schema or settings", () => {

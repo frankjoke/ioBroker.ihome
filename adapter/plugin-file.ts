@@ -14,10 +14,14 @@ import {
   type PluginSettingDef,
 } from "./plugin-ops";
 
-/** The portable plugin shape: no `enabled`, no `builtin`, code included. */
+/**
+ * The portable plugin shape: no `enabled`, code included. A `builtin: true`
+ * file carries only the settings of an existing built-in, so `code` is empty.
+ */
 export interface ImportedPlugin {
   id: string;
   name: string;
+  builtin?: true;
   timeoutMs?: number;
   help?: string;
   usage?: string;
@@ -73,8 +77,46 @@ export function parsePluginFile(
       "The plugin id must match a-z, 0-9, dot, dash or underscore.",
     );
   }
-  if (builtins.some((builtin) => builtin.id === plugin.id)) {
-    return problem("That id is reserved for a built-in plugin.");
+  const builtin = builtins.find((entry) => entry.id === plugin.id);
+  if (builtin) {
+    if (plugin.builtin !== true) {
+      return problem("That id is reserved for a built-in plugin.");
+    }
+    if (plugin.code !== undefined && plugin.code !== "") {
+      return problem("A built-in settings file must not contain code.");
+    }
+    if (plugin.settings !== undefined && !record(plugin.settings)) {
+      return problem("Settings must be a JSON object.");
+    }
+    const settings =
+      plugin.settings !== undefined
+        ? pluginSettings(plugin.settings)
+        : undefined;
+    if (plugin.settings !== undefined && !settings) {
+      return problem("Settings are too large or not JSON-safe.");
+    }
+    const settingsError = settingsProblem(builtin.settingsSchema, settings);
+    if (settingsError) return problem(settingsError);
+    const timeoutMs =
+      typeof plugin.timeoutMs === "number"
+        ? Math.min(
+            MAX_PLUGIN_TIMEOUT_MS,
+            Math.max(MIN_PLUGIN_TIMEOUT_MS, Math.round(plugin.timeoutMs)),
+          )
+        : DEFAULT_PLUGIN_TIMEOUT_MS;
+    return {
+      plugin: {
+        id: builtin.id,
+        name: builtin.name,
+        builtin: true,
+        timeoutMs,
+        ...(settings ? { settings } : {}),
+        code: "",
+      },
+    };
+  }
+  if (plugin.builtin === true) {
+    return problem(`Unknown built-in plugin: ${plugin.id}`);
   }
   const name = typeof plugin.name === "string" ? plugin.name.trim() : "";
   if (!name || name.length > 64) {
