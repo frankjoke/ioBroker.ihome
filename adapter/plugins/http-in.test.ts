@@ -108,6 +108,18 @@ describe("target writes", () => {
       },
     ]);
   });
+
+  it("skips targets whose field is missing", () => {
+    const endpoint = parseHttpEndpoints(config)[1];
+    expect(targetWrites(endpoint, { kind: "x" })).toEqual([
+      {
+        state: "0_userdata.0.Hook.kind",
+        value: "x",
+        type: "string",
+        role: undefined,
+      },
+    ]);
+  });
 });
 
 describe("applyHttpWrites", () => {

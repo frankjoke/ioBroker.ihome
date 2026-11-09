@@ -238,6 +238,8 @@ export function targetWrites(
   const writes: HttpTargetWrite[] = [];
   for (const target of endpoint.targets ?? []) {
     const raw = evaluate(target.value, data);
+    // A missing field skips its state; otherwise transforms turn it into NaN.
+    if (raw === undefined) continue;
     const transformed =
       target.transform === undefined
         ? raw
