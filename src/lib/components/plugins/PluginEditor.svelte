@@ -1,18 +1,19 @@
 <script lang="ts">
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
-  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
-  import { deletePlugin, savePlugin } from "$lib/stores/plugins.svelte";
+  import { savePlugin } from "$lib/stores/plugins.svelte";
   import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 
   let {
     plugin,
+    dirty = $bindable(false),
+    valid = $bindable(true),
     onSaved,
-    onDeleted,
   }: {
     plugin: PluginView;
+    dirty?: boolean;
+    valid?: boolean;
     onSaved: () => void;
-    onDeleted: () => void;
   } = $props();
 
   // Drafts: the page keys this editor by plugin id, so one initial read is
@@ -31,8 +32,6 @@
   });
   let busy = $state(false);
   let error = $state("");
-  let settingsValid = $state(true);
-  let confirmDelete = $state(false);
 
   // One snapshot for the dirty check; the form never updates it.
   const initial = (() => ({
@@ -42,13 +41,16 @@
     usage,
     settings: JSON.stringify(settings),
   }))();
-  const dirty = $derived(
+  const changed = $derived(
     name !== initial.name ||
       timeoutMs !== initial.timeoutMs ||
       help !== initial.help ||
       usage !== initial.usage ||
       JSON.stringify(settings) !== initial.settings,
   );
+  $effect(() => {
+    dirty = changed;
+  });
 
   function defaults(
     schema: PluginView["settingsSchema"],
@@ -61,9 +63,10 @@
     return { ...next, ...(values ?? {}) };
   }
 
-  async function save(): Promise<void> {
+  /** Save lives on the item's line while open, so the list calls this. */
+  export async function save(): Promise<void> {
     error = "";
-    if (busy || !settingsValid) return;
+    if (busy || !valid || !changed) return;
     busy = true;
     const patch: PluginPatch = {
       id: plugin.id,
@@ -84,24 +87,9 @@
       busy = false;
     }
   }
-
-  async function remove(): Promise<void> {
-    confirmDelete = false;
-    error = "";
-    if (busy) return;
-    busy = true;
-    try {
-      await deletePlugin(plugin.id);
-      onDeleted();
-    } catch (failure) {
-      error = failure instanceof Error ? failure.message : String(failure);
-    } finally {
-      busy = false;
-    }
-  }
 </script>
 
-<section class="plugin-editor card">
+<section class="plugin-editor">
   {#if plugin.usage}
     <div class="plugin-usage">
       <span class="label-mono">Usage</span>
@@ -137,7 +125,7 @@
     <PluginSettingsForm
       schema={plugin.settingsSchema}
       bind:values={settings}
-      bind:valid={settingsValid}
+      bind:valid
     />
   {/if}
 
@@ -177,45 +165,13 @@
   {#if error}
     <p class="text-danger hint">{error}</p>
   {/if}
-
-  <div class="actions">
-    {#if !plugin.builtin}
-      <button
-        type="button"
-        class="btn btn-danger"
-        disabled={busy}
-        onclick={() => (confirmDelete = true)}
-      >
-        Delete
-      </button>
-    {/if}
-    <button
-      type="button"
-      class="btn btn-primary"
-      disabled={busy || !settingsValid || !dirty}
-      onclick={save}
-    >
-      Save
-    </button>
-  </div>
 </section>
-
-{#if confirmDelete}
-  <ConfirmModal
-    title={`Delete ${plugin.name}?`}
-    confirmLabel="Delete"
-    cancelLabel="Keep"
-    onConfirm={remove}
-    onCancel={() => (confirmDelete = false)}
-  />
-{/if}
 
 <style>
   .plugin-editor {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0.75rem;
   }
 
   .plugin-usage {
@@ -259,16 +215,5 @@
 
   .restart a {
     color: inherit;
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .btn-danger {
-    margin-right: auto;
   }
 </style>

@@ -1,9 +1,12 @@
 <script lang="ts">
   import PluginEditor from "./PluginEditor.svelte";
-  import { exportPlugin } from "$lib/stores/plugins.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import { deletePlugin, exportPlugin } from "$lib/stores/plugins.svelte";
   import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
   import { downloadJson } from "$lib/utils/download";
   import { slugify } from "$lib/config/slug";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import type { PluginView } from "$adapter/plugin-admin";
 
   let {
@@ -21,16 +24,51 @@
   } = $props();
 
   let selectedId = $state("");
+  let editorEl = $state<{ save: () => void } | undefined>();
+  let editorDirty = $state(false);
+  let editorValid = $state(true);
   let exportingId = $state("");
-  let exportError = $state("");
+  let rowError = $state("");
+  let pendingDelete = $state<PluginView | null>(null);
+  let pendingEdit = $state<PluginView | null>(null);
+  let askDiscard = $state(false);
+
+  function resetDraft(): void {
+    rowError = "";
+    editorDirty = false;
+    editorValid = true;
+  }
 
   function edit(plugin: PluginView): void {
-    exportError = "";
+    if (editorDirty) {
+      pendingEdit = plugin;
+      askDiscard = true;
+      return;
+    }
+    resetDraft();
     selectedId = selectedId === plugin.id ? "" : plugin.id;
   }
 
+  function discard(): void {
+    askDiscard = false;
+    const next = pendingEdit;
+    pendingEdit = null;
+    resetDraft();
+    selectedId = next && next.id !== selectedId ? next.id : "";
+  }
+
+  function onLineClick(event: MouseEvent, plugin: PluginView): void {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    edit(plugin);
+  }
+
   async function exportFile(plugin: PluginView): Promise<void> {
-    exportError = "";
+    rowError = "";
     if (exportingId) return;
     exportingId = plugin.id;
     try {
@@ -40,10 +78,23 @@
         serializePluginFile(pluginFile(exported)),
       );
     } catch (failure) {
-      exportError =
-        failure instanceof Error ? failure.message : String(failure);
+      rowError = failure instanceof Error ? failure.message : String(failure);
     } finally {
       exportingId = "";
+    }
+  }
+
+  async function remove(): Promise<void> {
+    if (!pendingDelete) return;
+    const plugin = pendingDelete;
+    pendingDelete = null;
+    rowError = "";
+    try {
+      await deletePlugin(plugin.id);
+      selectedId = "";
+      resetDraft();
+    } catch (failure) {
+      rowError = failure instanceof Error ? failure.message : String(failure);
     }
   }
 
@@ -55,23 +106,27 @@
 
 <div class="plugin-list">
   {#each plugins as plugin (plugin.id)}
-    <div class="item" class:open={selectedId === plugin.id}>
-      <div class="plugin-row">
-        <div class="plugin-main">
-          <button
-            type="button"
-            class="plugin-name"
-            onclick={() => edit(plugin)}
-          >
-            {plugin.name}
-          </button>
-          <span class="plugin-id mono">{plugin.id}</span>
-          <span class="badge">{plugin.builtin ? "built-in" : "user"}</span>
-          <span class="badge status-{plugin.status}"
-            >{statusLabel(plugin.status)}</span
-          >
-        </div>
-        <div class="plugin-actions">
+    {@const open = selectedId === plugin.id}
+    <div class="item" class:open>
+      <!-- The free line area is a mouse convenience: keyboard users use the
+           name button. Controls keep their own hit areas. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(event) => onLineClick(event, plugin)}>
+        <button
+          type="button"
+          class="name"
+          aria-expanded={open}
+          onclick={() => edit(plugin)}
+        >
+          {plugin.name}
+        </button>
+        <span class="mono hint text-muted">{plugin.id}</span>
+        <span class="badge">{plugin.builtin ? "built-in" : "user"}</span>
+        <span class="badge status-{plugin.status}"
+          >{statusLabel(plugin.status)}</span
+        >
+        <span class="item-actions">
           <label class="switch">
             <input
               type="checkbox"
@@ -98,41 +153,57 @@
             />
             <span>Debug logs</span>
           </label>
-          {#if selectedId === plugin.id}
-            <button
-              type="button"
-              class="btn btn-sm"
+          {#if open}
+            <IconButton
+              icon="download"
+              label={`Export ${plugin.name}`}
+              title="Export"
               disabled={busy || exportingId === plugin.id}
               onclick={() => exportFile(plugin)}
+            />
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={busy || !editorDirty || !editorValid}
+              onclick={() => editorEl?.save()}
             >
-              Export
+              <span class="material-symbols-outlined">check</span> Save
             </button>
           {/if}
-          <button type="button" class="btn btn-sm" onclick={() => edit(plugin)}>
-            Edit
-          </button>
-        </div>
-        {#if exportError && selectedId === plugin.id}
-          <p class="text-danger hint">{exportError}</p>
+          {#if !plugin.builtin}
+            <IconButton
+              icon="delete"
+              danger
+              label={`Delete ${plugin.name}`}
+              onclick={() => (pendingDelete = plugin)}
+            />
+          {/if}
+        </span>
+        {#if rowError && open}
+          <p class="row-error text-danger hint">{rowError}</p>
         {/if}
         {#if plugin.removalPending}
           <p class="restart hint">
             Removal pending — restart iHome in Admin.
-            <a href="#/admin">Open Admin</a>
+            <a href="#/admin">Open Admin</a>.
           </p>
         {:else if plugin.restartRequired}
           <p class="restart hint">
-            Restart iHome in Admin to apply. <a href="#/admin">Open Admin</a>
+            Restart iHome in Admin to apply. <a href="#/admin">Open Admin</a>.
           </p>
         {/if}
       </div>
-
-      {#if selectedId === plugin.id}
+      {#if open}
         <div class="item-editor">
           <PluginEditor
+            bind:this={editorEl}
             {plugin}
-            onSaved={() => (selectedId = "")}
-            onDeleted={() => (selectedId = "")}
+            bind:dirty={editorDirty}
+            bind:valid={editorValid}
+            onSaved={() => {
+              selectedId = "";
+              resetDraft();
+            }}
           />
         </div>
       {/if}
@@ -140,71 +211,42 @@
   {/each}
 </div>
 
+{#if pendingDelete}
+  <ConfirmModal
+    title={deleteTitle("plugin", pendingDelete.name)}
+    confirmLabel="Delete"
+    onConfirm={remove}
+    onCancel={() => (pendingDelete = null)}
+  >
+    <p class="text-muted">
+      The plugin and its settings are removed after a restart in Admin.
+    </p>
+  </ConfirmModal>
+{/if}
+
+{#if askDiscard}
+  <ConfirmModal
+    title="Discard unsaved changes?"
+    confirmLabel="Discard"
+    cancelLabel="Keep editing"
+    onConfirm={discard}
+    onCancel={() => {
+      askDiscard = false;
+      pendingEdit = null;
+    }}
+  >
+    <p class="text-muted">
+      The changes in {plugins.find((entry) => entry.id === selectedId)?.name ??
+        "this plugin"} are not saved.
+    </p>
+  </ConfirmModal>
+{/if}
+
 <style>
   .plugin-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .item {
-    gap: 0;
-    padding: 0;
-  }
-
-  .plugin-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    padding: 0.5rem 0.75rem;
-  }
-
-  /* The card inside is the only white surface: no second box/border between
-     the grey row and the editor. */
-  .item-editor {
-    display: contents;
-  }
-
-  .item > :global(.plugin-editor) {
-    border: 0;
-    border-radius: 0 0 var(--border-radius-sm, 6px) var(--border-radius-sm, 6px);
-    box-shadow: none;
-  }
-
-  .plugin-main {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .plugin-name {
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--text-color);
-    font: inherit;
-    font-weight: 600;
-    text-align: left;
-  }
-
-  .plugin-name:hover {
-    color: var(--primary-color);
-  }
-
-  .plugin-id {
-    color: var(--text-muted);
-    font-size: var(--body-sm);
-  }
-
-  .plugin-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.25rem;
   }
 
   .switch {
@@ -240,9 +282,13 @@
     color: var(--on-warning);
   }
 
+  .row-error,
   .restart {
     flex: 1 1 100%;
     margin: 0;
+  }
+
+  .restart {
     color: var(--warning-color);
   }
 
