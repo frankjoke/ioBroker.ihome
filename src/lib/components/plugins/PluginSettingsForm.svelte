@@ -4,9 +4,11 @@
   let {
     schema,
     values = $bindable(),
+    valid = $bindable(true),
   }: {
     schema?: PluginSettingDef[];
     values: Record<string, unknown>;
+    valid?: boolean;
   } = $props();
 
   // The field list is stable for one plugin; the editor keys the form by id.
@@ -23,12 +25,15 @@
       const parsed = JSON.parse(text);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         jsonError = "Settings must be a JSON object.";
+        valid = false;
         return;
       }
       jsonError = "";
+      valid = true;
       values = parsed as Record<string, unknown>;
     } catch (error) {
       jsonError = error instanceof Error ? error.message : "Invalid JSON.";
+      valid = false;
     }
   }
 </script>

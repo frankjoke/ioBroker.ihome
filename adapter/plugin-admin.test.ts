@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BUILTIN_PLUGINS,
+  MAX_PLUGIN_HELP,
   type AdapterPlugin,
   type PluginSettingDef,
 } from "./plugin-ops";
@@ -8,8 +9,6 @@ import {
   applyPluginPatches,
   parsePluginsCommand,
   pluginView,
-  removeUserPlugin,
-  stagePluginImport,
 } from "./plugin-admin";
 
 function schema(): PluginSettingDef[] {
@@ -115,6 +114,24 @@ describe("applyPluginPatches", () => {
     expect(ok.plugins[0].settings).toEqual({ port: 81 });
   });
 
+  it("clears help with an empty string and rejects overlong text", () => {
+    const current = [userPlugin("u", true, "code", { help: "old" })];
+    const cleared = applyPluginPatches(
+      current,
+      [{ id: "u", help: "" }],
+      BUILTIN_PLUGINS,
+    );
+    expect(cleared.problems).toEqual([]);
+    expect(cleared.plugins[0].help).toBeUndefined();
+    expect(
+      applyPluginPatches(
+        current,
+        [{ id: "u", help: "x".repeat(MAX_PLUGIN_HELP + 1) }],
+        BUILTIN_PLUGINS,
+      ).problems,
+    ).not.toEqual([]);
+  });
+
   it("clamps timeout and keeps built-in metadata", () => {
     const current = [builtin("network.wake")];
     const { plugins, problems } = applyPluginPatches(
@@ -126,62 +143,6 @@ describe("applyPluginPatches", () => {
     expect(plugins[0].timeoutMs).toBe(30_000);
     expect(plugins[0].enabled).toBe(false);
     expect(plugins[0].name).toBe(BUILTIN_PLUGINS[1].name);
-  });
-});
-
-describe("stagePluginImport", () => {
-  it("stages an import disabled and replaces code", () => {
-    const current = [userPlugin("u", true, "old")];
-    const { plugins } = stagePluginImport(current, {
-      id: "u",
-      name: "U",
-      code: "new",
-    });
-    expect(plugins[0].code).toBe("new");
-    expect(plugins[0].enabled).toBe(false);
-  });
-
-  it("keeps existing settings when the import omits them", () => {
-    const current = [userPlugin("u", true, "old", { settings: { port: 80 } })];
-    const { plugins } = stagePluginImport(current, {
-      id: "u",
-      name: "U",
-      code: "new",
-    });
-    expect(plugins[0].settings).toEqual({ port: 80 });
-  });
-
-  it("adds a new plugin disabled and rejects built-in ids", () => {
-    const added = stagePluginImport([], {
-      id: "demo.echo",
-      name: "Echo",
-      code: "x",
-    });
-    expect(added.plugins[0]).toMatchObject({
-      id: "demo.echo",
-      enabled: false,
-      builtin: false,
-      debug: false,
-      timeoutMs: 5000,
-    });
-    expect(
-      stagePluginImport([], {
-        id: "network.wake",
-        name: "Nope",
-        code: "x",
-      }).problem,
-    ).toContain("built-in");
-  });
-});
-
-describe("removeUserPlugin", () => {
-  it("refuses built-ins and removes user plugins", () => {
-    expect(
-      removeUserPlugin([builtin("network.wake")], "network.wake").problem,
-    ).toContain("built-in");
-    expect(removeUserPlugin([userPlugin("u", true, "x")], "u").plugins).toEqual(
-      [],
-    );
   });
 });
 
@@ -200,6 +161,8 @@ describe("pluginView", () => {
       hasCode: true,
       codeLength: 4,
       restartRequired: false,
+      staged: false,
+      removalPending: false,
     });
     expect(view).not.toHaveProperty("code");
   });

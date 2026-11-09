@@ -63,6 +63,8 @@ module.exports = (api) => {
 
 Settings changes apply live when the plugin implements \`reload\`; otherwise the page marks a restart required. Code changes always need the Admin edit and restart.
 
+Use **Export** in the plugin editor to download a user plugin as the same JSON file. Built-ins cannot be exported because their code lives in the adapter.
+
 ## Debug logs
 
 Turn on **Debug logs** for one plugin; its \`api.log.debug\` lines appear in the ioBroker log with the prefix \`plugin <id>:\`. The adapter's log level must allow debug.

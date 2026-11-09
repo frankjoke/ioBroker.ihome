@@ -101,15 +101,32 @@ function jsonish(value: unknown): unknown {
   }
 }
 
+function jsonValue(value: unknown): boolean {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(jsonValue);
+  return false;
+}
+
 export function pluginSettings(
   value: unknown,
 ): Record<string, unknown> | undefined {
   const parsed = jsonish(value);
   if (!record(parsed)) return undefined;
   try {
-    return JSON.stringify(parsed).length <= MAX_PLUGIN_SETTINGS
-      ? parsed
-      : undefined;
+    if (
+      JSON.stringify(parsed).length > MAX_PLUGIN_SETTINGS ||
+      !Object.values(parsed).every(jsonValue)
+    ) {
+      return undefined;
+    }
+    return parsed;
   } catch {
     return undefined;
   }

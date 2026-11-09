@@ -7,8 +7,11 @@ import {
   normalizeSettingsDoc,
   pluginSettingsChanged,
   pluginSettingsDoc,
+  removeNativePlugin,
   removeStaged,
+  stagedSettingsEntry,
   stageRemoval,
+  upsertNativePlugin,
   type PluginSettingsDocument,
 } from "./plugin-config";
 
@@ -138,10 +141,46 @@ describe("plugin settings document", () => {
 
   it("detects settings changes without treating an empty patch as one", () => {
     expect(pluginSettingsChanged(undefined, undefined)).toBe(false);
+    expect(pluginSettingsChanged(undefined, {})).toBe(false);
     expect(pluginSettingsChanged({}, {})).toBe(false);
     expect(pluginSettingsChanged({ port: 80 }, { port: 80 })).toBe(false);
     expect(pluginSettingsChanged({ port: 80 }, { port: 81 })).toBe(true);
     expect(pluginSettingsChanged(undefined, { port: 80 })).toBe(true);
+  });
+
+  it("preserves previous settings when an import omits them", () => {
+    expect(
+      stagedSettingsEntry(
+        { id: "u", name: "U", code: "new" },
+        {
+          enabled: true,
+          timeoutMs: 1000,
+          debug: true,
+          settings: { port: 80 },
+        },
+      ),
+    ).toMatchObject({
+      enabled: false,
+      timeoutMs: 5000,
+      debug: true,
+      settings: { port: 80 },
+    });
+    expect(
+      stagedSettingsEntry(
+        { id: "u", name: "U", code: "new", settings: { port: 81 } },
+        { enabled: true, timeoutMs: 1000, debug: true, settings: { port: 80 } },
+      ).settings,
+    ).toEqual({ port: 81 });
+  });
+
+  it("upserts and removes native entries while preserving unknown ones", () => {
+    const invalid = { id: "bad", nope: true };
+    const raw = [invalid, { id: "u", name: "old" }];
+    const next = upsertNativePlugin(raw, plugin("u", { name: "new" }));
+    expect(next).toHaveLength(2);
+    expect(next[0]).toBe(invalid);
+    expect(next[1]).toMatchObject({ id: "u", name: "new", code: "code-u" });
+    expect(removeNativePlugin(next, "u")).toEqual([invalid]);
   });
 
   it("deduplicates staged removals", () => {

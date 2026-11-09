@@ -52,11 +52,16 @@
           />
           <span>Enabled</span>
         </label>
-        <label class="switch">
+        <label
+          class="switch"
+          title={plugin.staged
+            ? "Available after an adapter restart"
+            : undefined}
+        >
           <input
             type="checkbox"
             checked={plugin.debug}
-            disabled={busy}
+            disabled={busy || plugin.staged}
             onchange={(event) =>
               onToggle(plugin, "debug", event.currentTarget.checked)}
           />
@@ -66,7 +71,12 @@
           Edit
         </button>
       </div>
-      {#if plugin.restartRequired}
+      {#if plugin.removalPending}
+        <p class="restart hint">
+          Removal pending after an adapter restart.
+          <a href="#/admin">Open Admin</a>
+        </p>
+      {:else if plugin.restartRequired}
         <p class="restart hint">
           Needs an adapter restart. <a href="#/admin">Open Admin</a>
         </p>

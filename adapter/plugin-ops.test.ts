@@ -77,6 +77,19 @@ describe("validAdapterPlugins", () => {
     expect(plugin.settingsSchema?.[0].type).toBe("number");
   });
 
+  it("drops nested settings values instead of the plugin", () => {
+    const [plugin] = validAdapterPlugins([
+      {
+        id: "my.plugin",
+        name: "My",
+        code: "x",
+        settings: { nested: { a: 1 } },
+      },
+    ]);
+    expect(plugin.id).toBe("my.plugin");
+    expect(plugin.settings).toBeUndefined();
+  });
+
   it("drops invalid optional metadata instead of the plugin", () => {
     const [plugin] = validAdapterPlugins([
       {

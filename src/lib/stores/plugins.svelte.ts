@@ -34,7 +34,9 @@ async function command<T>(
       action,
       ...payload,
     });
-    return unwrapPluginReply(reply) as T;
+    const result = unwrapPluginReply(reply) as T;
+    error = "";
+    return result;
   } catch (failure) {
     error = failure instanceof Error ? failure.message : String(failure);
     throw failure;

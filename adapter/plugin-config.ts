@@ -155,7 +155,46 @@ export function pluginSettingsChanged(
   before: Record<string, unknown> | undefined,
   after: Record<string, unknown> | undefined,
 ): boolean {
-  return JSON.stringify(before) !== JSON.stringify(after);
+  return JSON.stringify(before ?? {}) !== JSON.stringify(after ?? {});
+}
+
+/** The settings entry a staged import starts with at the next adapter start. */
+export function stagedSettingsEntry(
+  imported: ImportedPlugin,
+  previous?: PluginSettingsEntry,
+): PluginSettingsEntry {
+  const settings =
+    imported.settings !== undefined ? imported.settings : previous?.settings;
+  return {
+    enabled: false,
+    timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
+    debug: previous?.debug === true,
+    ...(imported.help ? { help: imported.help } : {}),
+    ...(imported.usage ? { usage: imported.usage } : {}),
+    ...(imported.settingsSchema
+      ? { settingsSchema: imported.settingsSchema }
+      : {}),
+    ...(settings ? { settings } : {}),
+  };
+}
+
+export function upsertNativePlugin(
+  raw: unknown[],
+  plugin: AdapterPlugin,
+): unknown[] {
+  const entry = { ...plugin, builtin: false };
+  const index = raw.findIndex(
+    (value) => record(value) && value.id === plugin.id,
+  );
+  if (index < 0) return [...raw, entry];
+  if (!record(raw[index])) return [...raw, entry];
+  const next = [...raw];
+  next[index] = entry;
+  return next;
+}
+
+export function removeNativePlugin(raw: unknown[], id: string): unknown[] {
+  return raw.filter((value) => !(record(value) && value.id === id));
 }
 
 export function importStaged(

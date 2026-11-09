@@ -42,6 +42,7 @@
   });
   let busy = $state(false);
   let error = $state("");
+  let settingsValid = $state(true);
   let confirmDelete = $state(false);
 
   function defaults(
@@ -57,7 +58,7 @@
 
   async function save(): Promise<void> {
     error = "";
-    if (busy) return;
+    if (busy || !settingsValid) return;
     busy = true;
     const patch: PluginPatch = {
       id: plugin.id,
@@ -67,8 +68,8 @@
     };
     if (!plugin.builtin) {
       patch.name = name.trim();
-      patch.help = help.trim() || undefined;
-      patch.usage = usage.trim() || undefined;
+      patch.help = help.trim();
+      patch.usage = usage.trim();
     }
     try {
       await savePlugin(patch);
@@ -138,12 +139,21 @@
       <input type="number" min="100" max="30000" bind:value={timeoutMs} />
     </label>
     <label class="switch">
-      <input type="checkbox" bind:checked={debug} />
+      <input
+        type="checkbox"
+        bind:checked={debug}
+        disabled={plugin.staged}
+        title={plugin.staged ? "Available after an adapter restart" : undefined}
+      />
       <span>Debug logs</span>
     </label>
   </div>
 
-  <PluginSettingsForm schema={plugin.settingsSchema} bind:values={settings} />
+  <PluginSettingsForm
+    schema={plugin.settingsSchema}
+    bind:values={settings}
+    bind:valid={settingsValid}
+  />
 
   <div class="help-blocks">
     <HelpSection help={plugin.help} />
@@ -190,7 +200,7 @@
     <button
       type="button"
       class="btn btn-primary"
-      disabled={busy}
+      disabled={busy || !settingsValid}
       onclick={save}
     >
       Save

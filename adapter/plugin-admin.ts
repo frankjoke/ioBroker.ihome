@@ -1,7 +1,6 @@
 import type { ImportedPlugin } from "./plugin-file";
 import {
   BUILTIN_PLUGINS,
-  DEFAULT_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_HELP,
   MAX_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_USAGE,
@@ -43,6 +42,10 @@ export interface PluginView {
   hasCode: boolean;
   codeLength: number;
   restartRequired: boolean;
+  /** A staged import that is not active yet. */
+  staged: boolean;
+  /** A user plugin waiting to be removed at the next start. */
+  removalPending: boolean;
 }
 
 export type PluginsCommand =
@@ -125,7 +128,11 @@ export function applyPluginPatches(
         fail(`plugin ${patch.id} ${key} must be text`);
         continue;
       }
-      const trimmed = text(value, max);
+      if (value.length > max) {
+        fail(`plugin ${patch.id} ${key} must be at most ${max} characters`);
+        continue;
+      }
+      const trimmed = value.trim();
       if (trimmed) next[key] = trimmed;
       else delete next[key];
     }
@@ -167,92 +174,14 @@ export function applyPluginPatches(
 }
 
 /** Add or replace a user plugin as a disabled, restart-required stage. */
-export function stagePluginImport(
-  current: AdapterPlugin[],
-  imported: ImportedPlugin,
-): { plugins: AdapterPlugin[]; problem?: string } {
-  if (BUILTIN_PLUGINS.some((builtin) => builtin.id === imported.id)) {
-    return {
-      plugins: current,
-      problem: `plugin ${imported.id} is reserved for a built-in`,
-    };
-  }
-  const index = current.findIndex((plugin) => plugin.id === imported.id);
-  const timeoutMs = imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS;
-  if (index < 0) {
-    return {
-      plugins: [
-        ...current,
-        {
-          id: imported.id,
-          name: imported.name,
-          enabled: false,
-          builtin: false,
-          timeoutMs,
-          debug: false,
-          ...(imported.help ? { help: imported.help } : {}),
-          ...(imported.usage ? { usage: imported.usage } : {}),
-          ...(imported.settings ? { settings: imported.settings } : {}),
-          ...(imported.settingsSchema
-            ? { settingsSchema: imported.settingsSchema }
-            : {}),
-          code: imported.code,
-        },
-      ],
-    };
-  }
-  const existing = current[index];
-  if (existing.builtin) {
-    return {
-      plugins: current,
-      problem: `plugin ${imported.id} is reserved for a built-in`,
-    };
-  }
-  const next: AdapterPlugin = {
-    id: imported.id,
-    name: imported.name,
-    enabled: false,
-    builtin: false,
-    timeoutMs,
-    debug: false,
-    ...(imported.help ? { help: imported.help } : {}),
-    ...(imported.usage ? { usage: imported.usage } : {}),
-    ...(imported.settings !== undefined
-      ? { settings: imported.settings }
-      : existing.settings !== undefined
-        ? { settings: existing.settings }
-        : {}),
-    ...(imported.settingsSchema
-      ? { settingsSchema: imported.settingsSchema }
-      : {}),
-    code: imported.code,
-  };
-  const plugins = [...current];
-  plugins[index] = next;
-  return { plugins };
-}
-
-export function removeUserPlugin(
-  current: AdapterPlugin[],
-  id: string,
-): { plugins: AdapterPlugin[]; problem?: string } {
-  const plugin = current.find((entry) => entry.id === id);
-  if (!plugin) return { plugins: current, problem: `unknown plugin: ${id}` };
-  if (plugin.builtin) {
-    return {
-      plugins: current,
-      problem: `plugin ${id} is built-in and cannot be deleted`,
-    };
-  }
-  return { plugins: current.filter((entry) => entry.id !== id) };
-}
-
 export function pluginView(
   plugin: AdapterPlugin,
   opts: {
     status: PluginViewStatus;
     hotSettings: boolean;
     restartRequired: boolean;
+    staged?: boolean;
+    removalPending?: boolean;
   },
 ): PluginView {
   return {
@@ -271,6 +200,8 @@ export function pluginView(
     hasCode: typeof plugin.code === "string",
     codeLength: plugin.code?.length ?? 0,
     restartRequired: opts.restartRequired,
+    staged: opts.staged === true,
+    removalPending: opts.removalPending === true,
   };
 }
 

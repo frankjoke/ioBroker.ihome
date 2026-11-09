@@ -33,8 +33,11 @@ import {
   normalizeSettingsDoc,
   pluginSettingsChanged,
   pluginSettingsDoc,
+  removeNativePlugin,
   removeStaged,
+  stagedSettingsEntry,
   stageRemoval,
+  upsertNativePlugin,
   type PluginSettingsDocument,
 } from "./plugin-config";
 import {
@@ -1131,6 +1134,10 @@ class IHome extends utils.Adapter {
       status,
       hotSettings: host?.hasReload(plugin.id) ?? false,
       restartRequired,
+      staged: this.pluginSettings.staged.some(
+        (entry) => entry.id === plugin.id,
+      ),
+      removalPending: this.pluginSettings.removals.includes(plugin.id),
     });
   }
 
@@ -1160,6 +1167,7 @@ class IHome extends utils.Adapter {
             status: "restart-required",
             hotSettings: false,
             restartRequired: true,
+            staged: true,
           },
         ),
       );
@@ -1955,64 +1963,72 @@ class IHome extends utils.Adapter {
     // Page-managed settings live outside native config, so availability,
     // settings and debug changes do not restart the adapter. Imports and
     // removals are applied here, at the next start.
-    let native = nativePlugins.map((plugin) => ({ ...plugin }));
+    const originalNative = nativePlugins.map((plugin) => ({ ...plugin }));
+    let native = originalNative.map((plugin) => ({ ...plugin }));
     let doc = (await this.readPluginSettings()) ?? pluginSettingsDoc(native);
+    const sourceDoc = structuredClone(doc);
+    let persisted = persistedPlugins;
     let nativeDirty = false;
+    let updateFailed = false;
     for (const imported of doc.staged) {
       if (BUILTIN_PLUGINS.some((builtin) => builtin.id === imported.id)) {
         this.log.warn(`staged plugin ${imported.id}: built-in id is reserved`);
         continue;
       }
+      const previous = doc.settings[imported.id];
+      const settingsEntry = stagedSettingsEntry(imported, previous);
+      doc.settings[imported.id] = settingsEntry;
       const entry: AdapterPlugin = {
         id: imported.id,
         name: imported.name,
-        enabled: false,
-        builtin: false,
-        timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
-        debug: false,
+        ...settingsEntry,
+        code: imported.code,
         ...(imported.help ? { help: imported.help } : {}),
         ...(imported.usage ? { usage: imported.usage } : {}),
-        ...(imported.settings ? { settings: imported.settings } : {}),
         ...(imported.settingsSchema
           ? { settingsSchema: imported.settingsSchema }
           : {}),
-        code: imported.code,
       };
       const existing = native.find((plugin) => plugin.id === entry.id);
+      const changed =
+        !existing ||
+        existing.code !== entry.code ||
+        existing.name !== entry.name ||
+        existing.timeoutMs !== entry.timeoutMs ||
+        existing.debug !== entry.debug;
       if (existing) Object.assign(existing, entry);
       else native.push(entry);
-      doc.settings[entry.id] = {
-        enabled: false,
-        timeoutMs: entry.timeoutMs,
-        debug: false,
-        ...(entry.help ? { help: entry.help } : {}),
-        ...(entry.usage ? { usage: entry.usage } : {}),
-        ...(entry.settings ? { settings: entry.settings } : {}),
-        ...(entry.settingsSchema
-          ? { settingsSchema: entry.settingsSchema }
-          : {}),
-      };
-      nativeDirty = true;
+      if (changed) {
+        persisted = upsertNativePlugin(persisted, entry);
+        nativeDirty = true;
+      }
       this.log.info(`staged plugin ${entry.id}: installed disabled`);
     }
     for (const id of doc.removals) {
       const plugin = native.find((entry) => entry.id === id);
       if (!plugin || plugin.builtin) continue;
       native = native.filter((entry) => entry.id !== id);
+      persisted = removeNativePlugin(persisted, id);
       delete doc.settings[id];
       nativeDirty = true;
       this.log.info(`staged removal ${id}: plugin removed`);
     }
-    doc = { ...doc, staged: [], removals: [] };
     if (nativeDirty) {
       try {
-        await this.updateConfig({ plugins: native });
+        await this.updateConfig({ plugins: persisted });
       } catch (error) {
+        updateFailed = true;
         this.log.warn(`cannot store the plugin list: ${String(error)}`);
       }
     }
-    this.pluginConfig = mergePluginSettings(native, doc);
-    this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+    if (updateFailed) {
+      this.pluginConfig = mergePluginSettings(originalNative, sourceDoc);
+      this.pluginSettings = sourceDoc;
+    } else {
+      doc = { ...doc, staged: [], removals: [] };
+      this.pluginConfig = mergePluginSettings(native, doc);
+      this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+    }
     await this.savePluginSettings();
 
     this.pluginHost = createPluginHost(
