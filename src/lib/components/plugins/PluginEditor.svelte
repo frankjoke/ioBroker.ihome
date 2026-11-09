@@ -168,10 +168,6 @@
     <pre><code>{`await ihome.call("${plugin.id}", options);`}</code></pre>
   </div>
 
-  <div class="help-blocks">
-    <HelpSection help={plugin.help} />
-  </div>
-
   {#if !plugin.builtin}
     <div class="fields">
       <label class="field">
@@ -269,12 +265,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .help-blocks {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
   }
 
   .call-examples {
