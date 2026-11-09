@@ -31,8 +31,6 @@
   // svelte-ignore state_referenced_locally
   let timeoutMs = $state(plugin.timeoutMs);
   // svelte-ignore state_referenced_locally
-  let debug = $state(plugin.debug);
-  // svelte-ignore state_referenced_locally
   let help = $state(plugin.help ?? "");
   // svelte-ignore state_referenced_locally
   let usage = $state(plugin.usage ?? "");
@@ -62,7 +60,6 @@
     busy = true;
     const patch: PluginPatch = {
       id: plugin.id,
-      debug,
       timeoutMs,
       settings,
     };
@@ -135,36 +132,33 @@
       </label>
     {/if}
     <label class="field">
-      <span class="label-mono">Timeout (ms)</span>
+      <span class="label-mono">Default timeout (ms)</span>
       <input type="number" min="100" max="30000" bind:value={timeoutMs} />
-    </label>
-    <label class="switch">
-      <input
-        type="checkbox"
-        bind:checked={debug}
-        disabled={plugin.staged}
-        title={plugin.staged ? "Available after a restart in Admin" : undefined}
-      />
-      <span>Debug logs</span>
+      <span class="hint text-muted"
+        >Maximum time a plugin call may take. Some plugins accept their own
+        timeout option.</span
+      >
     </label>
   </div>
 
-  <PluginSettingsForm
-    schema={plugin.settingsSchema}
-    bind:values={settings}
-    bind:valid={settingsValid}
-  />
+  {#if plugin.settingsSchema?.length || Object.keys(settings).length > 0}
+    <PluginSettingsForm
+      schema={plugin.settingsSchema}
+      bind:values={settings}
+      bind:valid={settingsValid}
+    />
+  {/if}
 
   <div class="call-examples">
     <span class="label-mono">Call it from a logic</span>
     <pre><code
-        >{`call("${plugin.id}", payload, (data, error) => {
+        >{`call("${plugin.id}", options, (data, error) => {
   if (error) return;
   // use data
 });`}</code
       ></pre>
     <span class="label-mono">Call it from an HTML tile</span>
-    <pre><code>{`await ihome.call("${plugin.id}", payload);`}</code></pre>
+    <pre><code>{`await ihome.call("${plugin.id}", options);`}</code></pre>
   </div>
 
   <div class="help-blocks">
@@ -262,14 +256,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: var(--body-sm);
-    color: var(--text-muted);
   }
 
   .help-blocks {

@@ -73,7 +73,10 @@ export function createNetworkPlugins(
         const broadcast = textOf(payload, "broadcast");
         const timeout = timeoutOf(payload);
         return wake({
-          host: textOf(payload, "host") ?? "255.255.255.255",
+          host:
+            textOf(payload, "ip") ??
+            textOf(payload, "host") ??
+            "255.255.255.255",
           mac,
           port: portOf(payload),
           ...(broadcast ? { broadcast } : {}),

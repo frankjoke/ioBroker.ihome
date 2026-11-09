@@ -116,6 +116,11 @@ describe("createNetworkPlugins", () => {
       mac: "aa:bb:cc:dd:ee:ff",
       broadcast: "192.168.1.255",
     });
+    await plugins["network.wake"](api).call!({
+      mac: "aa:bb:cc:dd:ee:ff",
+      ip: "192.168.1.4",
+    });
+    expect(sent[2]).toMatchObject({ host: "192.168.1.4" });
     await expect(plugins["network.wake"](api).call!({})).rejects.toThrow("MAC");
   });
 
