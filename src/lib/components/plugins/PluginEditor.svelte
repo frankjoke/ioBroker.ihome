@@ -2,24 +2,15 @@
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
-  import {
-    deletePlugin,
-    exportPlugin,
-    savePlugin,
-  } from "$lib/stores/plugins.svelte";
-  import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
-  import { downloadJson } from "$lib/utils/download";
-  import { slugify } from "$lib/config/slug";
+  import { deletePlugin, savePlugin } from "$lib/stores/plugins.svelte";
   import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 
   let {
     plugin,
-    onClose,
     onSaved,
     onDeleted,
   }: {
     plugin: PluginView;
-    onClose: () => void;
     onSaved: () => void;
     onDeleted: () => void;
   } = $props();
@@ -42,6 +33,22 @@
   let error = $state("");
   let settingsValid = $state(true);
   let confirmDelete = $state(false);
+
+  // One snapshot for the dirty check; the form never updates it.
+  const initial = (() => ({
+    name,
+    timeoutMs,
+    help,
+    usage,
+    settings: JSON.stringify(settings),
+  }))();
+  const dirty = $derived(
+    name !== initial.name ||
+      timeoutMs !== initial.timeoutMs ||
+      help !== initial.help ||
+      usage !== initial.usage ||
+      JSON.stringify(settings) !== initial.settings,
+  );
 
   function defaults(
     schema: PluginView["settingsSchema"],
@@ -78,23 +85,6 @@
     }
   }
 
-  async function exportFile(): Promise<void> {
-    error = "";
-    if (busy) return;
-    busy = true;
-    try {
-      const exported = await exportPlugin(plugin.id);
-      downloadJson(
-        `ihome-plugin-${slugify(exported.name) || "plugin"}.json`,
-        serializePluginFile(pluginFile(exported)),
-      );
-    } catch (failure) {
-      error = failure instanceof Error ? failure.message : String(failure);
-    } finally {
-      busy = false;
-    }
-  }
-
   async function remove(): Promise<void> {
     confirmDelete = false;
     error = "";
@@ -112,11 +102,6 @@
 </script>
 
 <section class="plugin-editor card">
-  <div class="editor-head">
-    <h2>{plugin.builtin ? "Built-in plugin" : "User plugin"}</h2>
-    <span class="mono text-muted">{plugin.id}</span>
-  </div>
-
   {#if plugin.usage}
     <div class="plugin-usage">
       <span class="label-mono">Usage</span>
@@ -194,9 +179,6 @@
   {/if}
 
   <div class="actions">
-    <button type="button" class="btn" disabled={busy} onclick={onClose}>
-      Cancel
-    </button>
     {#if !plugin.builtin}
       <button
         type="button"
@@ -207,13 +189,10 @@
         Delete
       </button>
     {/if}
-    <button type="button" class="btn" disabled={busy} onclick={exportFile}>
-      Export
-    </button>
     <button
       type="button"
       class="btn btn-primary"
-      disabled={busy || !settingsValid}
+      disabled={busy || !settingsValid || !dirty}
       onclick={save}
     >
       Save
@@ -237,19 +216,6 @@
     flex-direction: column;
     gap: 0.75rem;
     padding: 0.75rem;
-  }
-
-  .editor-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .editor-head h2 {
-    margin: 0;
-    font-size: var(--body-lg);
   }
 
   .plugin-usage {

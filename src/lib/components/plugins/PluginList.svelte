@@ -1,5 +1,9 @@
 <script lang="ts">
   import PluginEditor from "./PluginEditor.svelte";
+  import { exportPlugin } from "$lib/stores/plugins.svelte";
+  import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
+  import { downloadJson } from "$lib/utils/download";
+  import { slugify } from "$lib/config/slug";
   import type { PluginView } from "$adapter/plugin-admin";
 
   let {
@@ -17,9 +21,30 @@
   } = $props();
 
   let selectedId = $state("");
+  let exportingId = $state("");
+  let exportError = $state("");
 
   function edit(plugin: PluginView): void {
+    exportError = "";
     selectedId = selectedId === plugin.id ? "" : plugin.id;
+  }
+
+  async function exportFile(plugin: PluginView): Promise<void> {
+    exportError = "";
+    if (exportingId) return;
+    exportingId = plugin.id;
+    try {
+      const exported = await exportPlugin(plugin.id);
+      downloadJson(
+        `ihome-plugin-${slugify(exported.name) || "plugin"}.json`,
+        serializePluginFile(pluginFile(exported)),
+      );
+    } catch (failure) {
+      exportError =
+        failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      exportingId = "";
+    }
   }
 
   function statusLabel(status: PluginView["status"]): string {
@@ -73,10 +98,23 @@
             />
             <span>Debug logs</span>
           </label>
+          {#if selectedId === plugin.id}
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={busy || exportingId === plugin.id}
+              onclick={() => exportFile(plugin)}
+            >
+              Export
+            </button>
+          {/if}
           <button type="button" class="btn btn-sm" onclick={() => edit(plugin)}>
             Edit
           </button>
         </div>
+        {#if exportError && selectedId === plugin.id}
+          <p class="text-danger hint">{exportError}</p>
+        {/if}
         {#if plugin.removalPending}
           <p class="restart hint">
             Removal pending — restart iHome in Admin.
@@ -93,7 +131,6 @@
         <div class="item-editor">
           <PluginEditor
             {plugin}
-            onClose={() => (selectedId = "")}
             onSaved={() => (selectedId = "")}
             onDeleted={() => (selectedId = "")}
           />
