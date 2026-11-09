@@ -20,12 +20,25 @@ import { createLogBuffer } from "./log-buffer";
 import { NetworkPresenceService } from "./network-presence";
 import { validNetworkDevices } from "./logic/network-ops";
 import { createPluginApi } from "./plugin-api";
+import {
+  applyPluginPatches,
+  parsePluginsCommand,
+  pluginView as makePluginView,
+  removeUserPlugin,
+  stagePluginImport,
+  type PluginView,
+  type PluginsCommand,
+} from "./plugin-admin";
+import { parsePluginFile, pluginFile } from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
+  BUILTIN_PLUGINS,
   parsePluginMessage,
   pluginConfigWithBuiltins,
   pluginError,
+  pluginReply,
   seedBuiltinPlugins,
+  type AdapterPlugin,
   type PluginReply,
 } from "./plugin-ops";
 import { createNetworkPlugins } from "./plugins/network";
@@ -208,6 +221,10 @@ class IHome extends utils.Adapter {
   private networkPresence?: NetworkPresenceService;
   /** The admin-managed adapter-side plugins. */
   private pluginHost?: PluginHost;
+  /** The plugin list as the adapter currently knows it. */
+  private pluginConfig: AdapterPlugin[] = [];
+  /** Serializes plugin management commands. */
+  private pluginsTail: Promise<unknown> = Promise.resolve();
 
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ihome" });
@@ -219,6 +236,7 @@ class IHome extends utils.Adapter {
       else if (obj.command === "push") void this.onPushMessage(obj);
       else if (obj.command === "notify") void this.onNotifyMessage(obj);
       else if (obj.command === "plugin") void this.onPluginMessage(obj);
+      else if (obj.command === "plugins") void this.onPluginsMessage(obj);
     });
   }
 
@@ -1027,6 +1045,141 @@ class IHome extends utils.Adapter {
     );
   }
 
+  private pluginViewOf(plugin: AdapterPlugin): PluginView {
+    const host = this.pluginHost;
+    const restartRequired =
+      !host ||
+      !host.canHotEnable(plugin.id, plugin.code) ||
+      host.needsSettingsRestart(plugin.id);
+    const status = restartRequired
+      ? "restart-required"
+      : (host?.status(plugin.id) ?? "disabled");
+    return makePluginView(plugin, {
+      status,
+      hotSettings: host?.hasReload(plugin.id) ?? false,
+      restartRequired,
+    });
+  }
+
+  private pluginViews(): PluginView[] {
+    return this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
+  }
+
+  private async onPluginsMessage(obj: ioBroker.Message): Promise<void> {
+    if (obj.command !== "plugins") return;
+    const reply = (result: PluginReply): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    const parsed = parsePluginsCommand(obj.message);
+    if ("problem" in parsed) return reply(pluginError(parsed.problem));
+    const run = this.pluginsTail.then(
+      () => this.handlePlugins(parsed.command),
+      () => this.handlePlugins(parsed.command),
+    );
+    this.pluginsTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      reply(await run);
+    } catch (error) {
+      reply(pluginError(error));
+    }
+  }
+
+  private async handlePlugins(command: PluginsCommand): Promise<PluginReply> {
+    const host = this.pluginHost;
+    if (!host) return pluginError("plugins are not available");
+
+    if (command.action === "list") {
+      return pluginReply({ plugins: this.pluginViews() });
+    }
+
+    if (command.action === "save") {
+      const { plugins, problems } = applyPluginPatches(
+        this.pluginConfig,
+        command.patches,
+        BUILTIN_PLUGINS,
+      );
+      if (problems.length > 0) return pluginError(problems.join("; "));
+      await this.updateConfig({ plugins });
+      this.pluginConfig = plugins;
+      for (const patch of command.patches) {
+        const entry = plugins.find((plugin) => plugin.id === patch.id);
+        if (!entry) continue;
+        if (patch.enabled !== undefined) await host.setEnabled(entry);
+        if (patch.settings !== undefined) {
+          await host.updateSettings(entry.id, entry.settings ?? {});
+        }
+        if (patch.timeoutMs !== undefined || patch.debug !== undefined) {
+          host.updateMeta(entry.id, {
+            timeoutMs: entry.timeoutMs,
+            debug: entry.debug,
+          });
+        }
+      }
+      const views = this.pluginViews();
+      return pluginReply({
+        plugins: views,
+        restartRequired: views
+          .filter((view) => view.restartRequired)
+          .map((view) => view.id),
+      });
+    }
+
+    if (command.action === "import") {
+      const parsed = parsePluginFile({
+        format: "ihome-plugin",
+        version: 1,
+        plugin: command.plugin,
+      });
+      if ("problem" in parsed) return pluginError(parsed.problem);
+      const staged = stagePluginImport(this.pluginConfig, parsed.plugin);
+      if (staged.problem) return pluginError(staged.problem);
+      await this.updateConfig({ plugins: staged.plugins });
+      this.pluginConfig = staged.plugins;
+      return pluginReply({
+        plugins: this.pluginViews(),
+        restartRequired: [parsed.plugin.id],
+      });
+    }
+
+    if (command.action === "export") {
+      const plugin = this.pluginConfig.find((entry) => entry.id === command.id);
+      if (!plugin) return pluginError(`unknown plugin: ${command.id}`);
+      if (plugin.builtin) {
+        return pluginError(
+          `plugin ${command.id} is built-in and has no portable code`,
+        );
+      }
+      return pluginReply(
+        pluginFile({
+          id: plugin.id,
+          name: plugin.name,
+          timeoutMs: plugin.timeoutMs,
+          ...(plugin.help ? { help: plugin.help } : {}),
+          ...(plugin.usage ? { usage: plugin.usage } : {}),
+          ...(plugin.settings ? { settings: plugin.settings } : {}),
+          ...(plugin.settingsSchema
+            ? { settingsSchema: plugin.settingsSchema }
+            : {}),
+          code: plugin.code ?? "",
+        }),
+      );
+    }
+
+    const removed = removeUserPlugin(this.pluginConfig, command.id);
+    if (removed.problem) return pluginError(removed.problem);
+    const old = this.pluginConfig.find((entry) => entry.id === command.id);
+    if (old && host.status(command.id) === "running") {
+      await host.setEnabled({ ...old, enabled: false });
+    }
+    await this.updateConfig({ plugins: removed.plugins });
+    this.pluginConfig = removed.plugins;
+    return pluginReply({ plugins: this.pluginViews() });
+  }
+
   private async onPhoneMessage(obj: ioBroker.Message): Promise<void> {
     if (obj.command !== "phone") return;
     const reply = (result: unknown): void => {
@@ -1585,6 +1738,7 @@ class IHome extends utils.Adapter {
     const plugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
       this.log.warn(message),
     );
+    this.pluginConfig = plugins;
     const persistedPlugins = pluginConfigWithBuiltins(rawPlugins);
     if (JSON.stringify(persistedPlugins) !== JSON.stringify(rawPlugins)) {
       try {
