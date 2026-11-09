@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import PluginList from "$lib/components/plugins/PluginList.svelte";
+  import PluginEditor from "$lib/components/plugins/PluginEditor.svelte";
   import {
     getPlugins,
     loadPlugins,
@@ -15,6 +16,9 @@
   const plugins = $derived(getPlugins());
   const loading = $derived(pluginsLoading());
   const error = $derived(pluginsError());
+  const selected = $derived(
+    plugins.find((plugin) => plugin.id === selectedId) ?? null,
+  );
 
   $effect(() => {
     if (ioBroker.connected && plugins.length === 0) {
@@ -93,10 +97,15 @@
     <PluginList {plugins} {busy} onToggle={toggle} onEdit={edit} />
   {/if}
 
-  {#if selectedId}
-    <p class="hint text-muted">
-      Editor for {selectedId} follows in the next task.
-    </p>
+  {#if selected}
+    {#key selected.id}
+      <PluginEditor
+        plugin={selected}
+        onClose={() => (selectedId = "")}
+        onSaved={() => (selectedId = "")}
+        onDeleted={() => (selectedId = "")}
+      />
+    {/key}
   {/if}
 </div>
 
