@@ -9,23 +9,39 @@ import {
 export interface PluginModule {
   start?: () => unknown | Promise<unknown>;
   call?: (payload: unknown) => unknown | Promise<unknown>;
+  reload?: (api: PluginApi) => unknown | Promise<unknown>;
   stop?: () => unknown | Promise<unknown>;
 }
 
 export type PluginFactory = (api: PluginApi) => PluginModule;
+
+export interface PluginRuntime {
+  settings: Record<string, unknown>;
+  debug: boolean;
+}
+
+export type PluginStatus = "running" | "disabled" | "failed";
 
 export interface PluginHost {
   start(): Promise<void>;
   call(id: string, payload: unknown): Promise<PluginReply>;
   stop(): Promise<void>;
   has(id: string): boolean;
+  status(id: string): PluginStatus;
+  canHotEnable(id: string, code?: string): boolean;
+  setEnabled(entry: AdapterPlugin): Promise<PluginReply>;
+  hasReload(id: string): boolean;
 }
 
 type PluginLog = (level: "info" | "warn" | "error", message: string) => void;
 
 interface Loaded {
   call(payload: unknown): unknown;
+  start?: () => unknown;
   stop?: () => unknown;
+  reload?: (api: PluginApi) => unknown;
+  api: PluginApi;
+  runtime: PluginRuntime;
   timeoutMs: number;
   tail: Promise<void>;
 }
@@ -72,19 +88,117 @@ function compile(plugin: AdapterPlugin): PluginFactory {
   return module.exports as PluginFactory;
 }
 
+function runtimeOf(plugin: AdapterPlugin): PluginRuntime {
+  return {
+    settings: { ...(plugin.settings ?? {}) },
+    debug: plugin.debug === true,
+  };
+}
+
 export function createPluginHost(
   plugins: AdapterPlugin[],
-  createApi: (plugin: AdapterPlugin) => PluginApi,
+  createApi: (plugin: AdapterPlugin, runtime: PluginRuntime) => PluginApi,
   builtins: Record<string, PluginFactory>,
   log: PluginLog,
 ): PluginHost {
   const records = new Map<string, Loaded>();
   const failed = new Set<string>();
   const disabled = new Set<string>();
+  const snapshot = new Map<string, string | undefined>(
+    plugins.map((plugin) => [plugin.id, plugin.code]),
+  );
+
+  function load(plugin: AdapterPlugin): Loaded {
+    const factory = plugin.builtin ? builtins[plugin.id] : compile(plugin);
+    if (!factory) throw new Error("no builtin factory");
+    const runtime = runtimeOf(plugin);
+    const api = createApi(plugin, runtime);
+    const instance = factory(api);
+    if (!instance || typeof instance !== "object") {
+      throw new Error("factory must return a plugin object");
+    }
+    if (typeof instance.call !== "function") {
+      throw new Error("plugin needs a call method");
+    }
+    return {
+      call: instance.call.bind(instance) as (payload: unknown) => unknown,
+      start: instance.start?.bind(instance) as (() => unknown) | undefined,
+      stop: instance.stop?.bind(instance) as (() => unknown) | undefined,
+      reload: instance.reload?.bind(instance) as
+        ((api: PluginApi) => unknown) | undefined,
+      api,
+      runtime,
+      timeoutMs: plugin.timeoutMs,
+      tail: Promise.resolve(),
+    };
+  }
+
+  async function startPlugin(plugin: AdapterPlugin): Promise<Loaded> {
+    const loaded = load(plugin);
+    if (loaded.start) {
+      await withTimeout(
+        Promise.resolve(loaded.start()),
+        plugin.timeoutMs,
+        "start ",
+      );
+    }
+    return loaded;
+  }
 
   return {
     has(id) {
       return records.has(id);
+    },
+
+    status(id) {
+      if (records.has(id)) return "running";
+      if (failed.has(id)) return "failed";
+      return "disabled";
+    },
+
+    canHotEnable(id, code) {
+      return snapshot.has(id) && snapshot.get(id) === code;
+    },
+
+    hasReload(id) {
+      return typeof records.get(id)?.reload === "function";
+    },
+
+    async setEnabled(entry) {
+      const id = entry.id;
+      if (!entry.enabled) {
+        const record = records.get(id);
+        if (record) {
+          try {
+            await withTimeout(Promise.resolve(record.stop?.()), 1000, "stop ");
+          } catch (error) {
+            log("warn", `plugin ${id}: ${errorText(error)}`);
+          }
+          records.delete(id);
+        }
+        failed.delete(id);
+        disabled.add(id);
+        return pluginReply(undefined);
+      }
+      if (records.has(id)) return pluginReply(undefined);
+      if (!snapshot.has(id) || snapshot.get(id) !== entry.code) {
+        return pluginError(`plugin ${id} needs an adapter restart`);
+      }
+      try {
+        const loaded = await startPlugin({
+          ...entry,
+          code: snapshot.get(id),
+        });
+        records.set(id, loaded);
+        failed.delete(id);
+        disabled.delete(id);
+        return pluginReply(undefined);
+      } catch (error) {
+        failed.add(id);
+        disabled.delete(id);
+        log("warn", `plugin ${id}: ${errorText(error)}`);
+        return pluginError(error);
+      }
     },
 
     async start() {
@@ -97,33 +211,7 @@ export function createPluginHost(
           continue;
         }
         try {
-          const factory = plugin.builtin
-            ? builtins[plugin.id]
-            : compile(plugin);
-          if (!factory) {
-            throw new Error("no builtin factory");
-          }
-          const instance = factory(createApi(plugin));
-          if (!instance || typeof instance !== "object") {
-            throw new Error("factory must return a plugin object");
-          }
-          if (typeof instance.call !== "function") {
-            throw new Error("plugin needs a call method");
-          }
-          const loaded: Loaded = {
-            call: instance.call.bind(instance) as (payload: unknown) => unknown,
-            stop: instance.stop?.bind(instance) as (() => unknown) | undefined,
-            timeoutMs: plugin.timeoutMs,
-            tail: Promise.resolve(),
-          };
-          if (typeof instance.start === "function") {
-            await withTimeout(
-              Promise.resolve(instance.start.call(instance)),
-              plugin.timeoutMs,
-              "start ",
-            );
-          }
-          records.set(plugin.id, loaded);
+          records.set(plugin.id, await startPlugin(plugin));
         } catch (error) {
           failed.add(plugin.id);
           log("warn", `plugin ${plugin.id}: ${errorText(error)}`);

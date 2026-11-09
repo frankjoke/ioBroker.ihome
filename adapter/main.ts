@@ -1595,7 +1595,7 @@ class IHome extends utils.Adapter {
     }
     this.pluginHost = createPluginHost(
       plugins,
-      (plugin) =>
+      (plugin, runtime) =>
         createPluginApi(plugin.id, {
           namespace: this.namespace,
           config: this.config as Record<string, unknown>,
@@ -1624,8 +1624,8 @@ class IHome extends utils.Adapter {
             > | null,
           sendTo: (instance, command, payload) =>
             this.sendToAsync(instance, command, payload),
-          settings: () => ({}),
-          debug: () => false,
+          settings: () => runtime.settings,
+          debug: () => runtime.debug,
           log: {
             debug: (message) => this.log.debug(message),
             info: (message) => this.log.info(message),
