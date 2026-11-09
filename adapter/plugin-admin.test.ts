@@ -166,6 +166,21 @@ describe("pluginView", () => {
     });
     expect(view).not.toHaveProperty("code");
   });
+
+  it("exposes a bundled device template", () => {
+    const bundle = {
+      version: 1 as const,
+      device: {
+        controls: [{ state: "charge", feature: "value" }],
+      },
+    };
+    const view = pluginView(userPlugin("u", true, "abcd", { bundle }), {
+      status: "running",
+      hotSettings: false,
+      restartRequired: false,
+    });
+    expect(view.bundle).toEqual(bundle);
+  });
 });
 
 describe("parsePluginsCommand", () => {

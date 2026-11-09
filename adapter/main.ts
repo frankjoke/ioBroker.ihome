@@ -1162,6 +1162,7 @@ class IHome extends utils.Adapter {
             ...(imported.settingsSchema
               ? { settingsSchema: imported.settingsSchema }
               : {}),
+            ...(imported.bundle ? { bundle: imported.bundle } : {}),
             code: imported.code,
           },
           {
@@ -1386,6 +1387,7 @@ class IHome extends utils.Adapter {
           ...(plugin.settingsSchema
             ? { settingsSchema: plugin.settingsSchema }
             : {}),
+          ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
           code: plugin.code ?? "",
         }),
       );
@@ -2026,6 +2028,7 @@ class IHome extends utils.Adapter {
         ...(imported.settingsSchema
           ? { settingsSchema: imported.settingsSchema }
           : {}),
+        ...(imported.bundle ? { bundle: imported.bundle } : {}),
       };
       const existing = native.find((plugin) => plugin.id === entry.id);
       const changed =
@@ -2033,7 +2036,8 @@ class IHome extends utils.Adapter {
         existing.code !== entry.code ||
         existing.name !== entry.name ||
         existing.timeoutMs !== entry.timeoutMs ||
-        existing.debug !== entry.debug;
+        existing.debug !== entry.debug ||
+        JSON.stringify(existing.bundle) !== JSON.stringify(entry.bundle);
       if (existing) Object.assign(existing, entry);
       else native.push(entry);
       if (changed) {

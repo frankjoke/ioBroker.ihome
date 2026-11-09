@@ -15,7 +15,34 @@ export interface AdapterPlugin {
   settings?: Record<string, unknown>;
   /** Optional form schema for the Plugins page. */
   settingsSchema?: PluginSettingDef[];
+  /** Declarative device the UI creates when the plugin is enabled. */
+  bundle?: PluginBundle;
   code?: string;
+}
+
+export interface PluginBundleControl {
+  /** State path relative to the plugin base, or an absolute state id. */
+  state: string;
+  feature: string;
+  label?: string;
+  unit?: string;
+  role?: string;
+  type?: string;
+  writable?: boolean;
+  transform?: unknown;
+}
+
+export interface PluginBundleDevice {
+  name?: string;
+  type?: string;
+  icon?: string;
+  size?: { w: number; h: number };
+  controls: PluginBundleControl[];
+}
+
+export interface PluginBundle {
+  version: 1;
+  device: PluginBundleDevice;
 }
 
 export interface PluginSettingDef {
@@ -378,6 +405,96 @@ export function settingsProblem(
   return null;
 }
 
+export const MAX_PLUGIN_BUNDLE = 50_000;
+const MAX_BUNDLE_CONTROLS = 100;
+
+/** Strict shape for a plugin's declarative device; `undefined` means invalid. */
+export function pluginBundleOf(value: unknown): PluginBundle | undefined {
+  if (!record(value) || value.version !== 1) return undefined;
+  if (JSON.stringify(value).length > MAX_PLUGIN_BUNDLE) return undefined;
+  if (!record(value.device)) return undefined;
+  const device = value.device;
+  if (!Array.isArray(device.controls)) return undefined;
+  if (
+    device.controls.length < 1 ||
+    device.controls.length > MAX_BUNDLE_CONTROLS
+  ) {
+    return undefined;
+  }
+  const controls: PluginBundleControl[] = [];
+  for (const raw of device.controls) {
+    if (!record(raw)) return undefined;
+    const state = textOf(raw.state, 200);
+    const feature = textOf(raw.feature, 80);
+    if (!state || !feature) return undefined;
+    const control: PluginBundleControl = { state, feature };
+    if (raw.label !== undefined) {
+      const label = textOf(raw.label, 80);
+      if (!label) return undefined;
+      control.label = label;
+    }
+    if (raw.unit !== undefined) {
+      const unit = textOf(raw.unit, 40);
+      if (!unit) return undefined;
+      control.unit = unit;
+    }
+    if (raw.role !== undefined) {
+      const role = textOf(raw.role, 80);
+      if (!role) return undefined;
+      control.role = role;
+    }
+    if (raw.type !== undefined) {
+      const type = textOf(raw.type, 40);
+      if (!type) return undefined;
+      control.type = type;
+    }
+    if (raw.writable !== undefined) {
+      if (typeof raw.writable !== "boolean") return undefined;
+      control.writable = raw.writable;
+    }
+    if (raw.transform !== undefined) {
+      if (!record(raw.transform)) return undefined;
+      control.transform = raw.transform;
+    }
+    controls.push(control);
+  }
+  const result: PluginBundleDevice = { controls };
+  if (device.name !== undefined) {
+    const name = textOf(device.name, 64);
+    if (!name) return undefined;
+    result.name = name;
+  }
+  if (device.type !== undefined) {
+    const type = textOf(device.type, 40);
+    if (!type) return undefined;
+    result.type = type;
+  }
+  if (device.icon !== undefined) {
+    const icon = textOf(device.icon, 200);
+    if (!icon) return undefined;
+    result.icon = icon;
+  }
+  if (device.size !== undefined) {
+    if (!record(device.size)) return undefined;
+    const w = device.size.w;
+    const h = device.size.h;
+    if (
+      typeof w !== "number" ||
+      typeof h !== "number" ||
+      !Number.isInteger(w) ||
+      !Number.isInteger(h) ||
+      w < 1 ||
+      w > 20 ||
+      h < 1 ||
+      h > 10
+    ) {
+      return undefined;
+    }
+    result.size = { w, h };
+  }
+  return { version: 1, device: result };
+}
+
 export function validPluginId(value: unknown): value is string {
   return typeof value === "string" && ID.test(value);
 }
@@ -430,6 +547,9 @@ function validEntry(
   const help = textOf(value.help, MAX_PLUGIN_HELP);
   const usage = textOf(value.usage, MAX_PLUGIN_USAGE);
   const settingsSchema = pluginSettingsSchema(value.settingsSchema);
+  const bundle =
+    value.bundle === undefined ? undefined : pluginBundleOf(value.bundle);
+  if (value.bundle !== undefined && !bundle) return null;
   return {
     id,
     name,
@@ -441,6 +561,7 @@ function validEntry(
     ...(usage ? { usage } : {}),
     ...(settings ? { settings } : {}),
     ...(settingsSchema ? { settingsSchema } : {}),
+    ...(bundle ? { bundle } : {}),
     code: value.code,
   };
 }

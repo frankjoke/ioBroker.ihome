@@ -65,6 +65,15 @@ the iHome namespace — for example \`ihome.0.plugins.nut.ups.*\`. Use
 want the data elsewhere. \`http.in\` is the exception: it writes exactly the
 \`target\` or \`targets\` you configure.
 
+## Device template
+
+A plugin file may carry a \`bundle.device\` preset. When the plugin is enabled,
+the UI creates that device from the preset; if a generated device already
+exists and the template changed, it asks before updating. Control \`state\`
+paths are relative to \`plugins.<plugin-id>\` or the plugin's \`base\` setting.
+The device is tagged with \`plugin:<id>\` and the bundle hash; disabling or
+removing the plugin leaves it in place.
+
 ## Install and run
 
 The Import dialog has a **NUT example** button — a read-only Network UPS Tools

@@ -9,6 +9,7 @@ import {
   settingsProblem,
   validPluginId,
   type AdapterPlugin,
+  type PluginBundle,
   type PluginSettingDef,
 } from "./plugin-ops";
 
@@ -37,6 +38,8 @@ export interface PluginView {
   usage?: string;
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
+  /** Declarative device the UI creates when the plugin is enabled. */
+  bundle?: PluginBundle;
   status: PluginViewStatus;
   hotSettings: boolean;
   hasCode: boolean;
@@ -195,6 +198,7 @@ export function pluginView(
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
+    ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
     status: opts.status,
     hotSettings: opts.hotSettings,
     hasCode: typeof plugin.code === "string",

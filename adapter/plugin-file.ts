@@ -6,11 +6,13 @@ import {
   MAX_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_USAGE,
   MIN_PLUGIN_TIMEOUT_MS,
+  pluginBundleOf,
   pluginSettings,
   pluginSettingsSchema,
   settingsProblem,
   validPluginId,
   type BuiltinPluginDef,
+  type PluginBundle,
   type PluginSettingDef,
 } from "./plugin-ops";
 
@@ -27,6 +29,7 @@ export interface ImportedPlugin {
   usage?: string;
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
+  bundle?: PluginBundle;
   code: string;
 }
 
@@ -171,6 +174,11 @@ export function parsePluginFile(
   }
   const settingsError = settingsProblem(settingsSchema, settings);
   if (settingsError) return problem(settingsError);
+  const bundle =
+    plugin.bundle !== undefined ? pluginBundleOf(plugin.bundle) : undefined;
+  if (plugin.bundle !== undefined && !bundle) {
+    return problem("The device template is invalid.");
+  }
 
   const timeoutMs =
     typeof plugin.timeoutMs === "number"
@@ -198,6 +206,7 @@ export function parsePluginFile(
       ...(usage ? { usage } : {}),
       ...(settings ? { settings } : {}),
       ...(settingsSchema ? { settingsSchema } : {}),
+      ...(bundle ? { bundle } : {}),
     },
   };
 }

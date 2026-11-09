@@ -92,7 +92,9 @@
             bytes · {plugin.settingsSchema?.length ?? 0} settings fields ·
             {plugin.help ? "help" : "no help"} · {plugin.usage
               ? "usage"
-              : "no usage"}
+              : "no usage"}{#if plugin.bundle}
+              · device template ({plugin.bundle.device.controls.length}
+              controls){/if}
           {/if}
         </p>
       </div>

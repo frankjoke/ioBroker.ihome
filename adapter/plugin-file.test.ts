@@ -78,6 +78,61 @@ describe("parsePluginFile", () => {
     ).toMatchObject({ problem: expect.any(String) });
   });
 
+  it("keeps a device template bundle", () => {
+    const bundle = {
+      version: 1 as const,
+      device: {
+        name: "NUT UPS",
+        type: "Custom",
+        controls: [
+          {
+            state: "battery.charge",
+            feature: "value",
+            label: "Battery",
+            unit: "%",
+          },
+        ],
+      },
+    };
+    expect(
+      parsePluginFile({
+        ...base,
+        plugin: { ...base.plugin, bundle },
+      }),
+    ).toEqual({
+      plugin: { ...base.plugin, timeoutMs: 5000, bundle },
+    });
+  });
+
+  it("rejects invalid device templates", () => {
+    const withBundle = (bundle: unknown) =>
+      parsePluginFile({
+        ...base,
+        plugin: { ...base.plugin, bundle },
+      });
+    expect(withBundle({ version: 2, device: { controls: [] } })).toMatchObject({
+      problem: expect.any(String),
+    });
+    expect(withBundle({ version: 1, device: { controls: [] } })).toMatchObject({
+      problem: expect.any(String),
+    });
+    expect(
+      withBundle({
+        version: 1,
+        device: { controls: [{ state: "x" }] },
+      }),
+    ).toMatchObject({ problem: expect.any(String) });
+    expect(
+      withBundle({
+        version: 1,
+        device: {
+          controls: [{ state: "x", feature: "value" }],
+          size: { w: 0, h: 1 },
+        },
+      }),
+    ).toMatchObject({ problem: expect.any(String) });
+  });
+
   it("parses a built-in settings file without code", () => {
     const httpIn = BUILTIN_PLUGINS.find((plugin) => plugin.id === "http.in");
     expect(
