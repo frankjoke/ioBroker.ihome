@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "news": {
+      "0.3.2": {
+        "en": "Plugins page: list built-in and user plugins, enable/disable them, manage per-plugin settings and debug logs, read help/usage, export user plugins and stage JSON imports. Imported plugins start disabled and need an adapter restart from Admin; code changes stay in Admin.",
+        "de": "Plugin-Seite: integrierte und Benutzer-Plugins auflisten, aktivieren/deaktivieren, Einstellungen und Debug-Logs pro Plugin verwalten, Hilfe/Nutzung lesen, Benutzer-Plugins exportieren und JSON-Importe vorbereiten. Importierte Plugins starten deaktiviert und brauchen einen Adapter-Neustart aus Admin; Code-Änderungen bleiben in Admin."
+      },
       "0.3.1": {
         "en": "Samsung TV remote: compact the Home/Zurück/Info buttons and move the connection status into the title.",
         "de": "Samsung TV-Fernbedienung: HOME/Zurück/Info komprimieren und den Verbindungsstatus in den Titel setzen.",

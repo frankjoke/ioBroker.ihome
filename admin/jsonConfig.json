@@ -102,7 +102,7 @@
         "plugins": {
           "type": "table",
           "label": "Adapter plugins",
-          "help": "Built-ins ignore Code. User plugins are trusted Node code. Saving restarts the adapter. The SPA cannot edit this list.",
+          "help": "Built-in code lives in the adapter. User plugins are trusted Node code. The SPA manages availability, settings, help and imports; adding or changing code here saves and restarts the adapter.",
           "xs": 12,
           "sm": 12,
           "md": 12,
@@ -145,6 +145,49 @@
               "default": 5000,
               "min": 100,
               "max": 30000
+            },
+            {
+              "type": "checkbox",
+              "attr": "debug",
+              "title": "Debug",
+              "width": 80,
+              "default": false
+            },
+            {
+              "type": "text",
+              "attr": "help",
+              "title": "Help (Markdown)",
+              "width": 260,
+              "minRows": 2,
+              "maxRows": 6,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "usage",
+              "title": "Usage (Markdown)",
+              "width": 260,
+              "minRows": 2,
+              "maxRows": 6,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "settings",
+              "title": "Settings (JSON)",
+              "width": 260,
+              "minRows": 3,
+              "maxRows": 8,
+              "default": ""
+            },
+            {
+              "type": "text",
+              "attr": "settingsSchema",
+              "title": "Settings schema (JSON)",
+              "width": 260,
+              "minRows": 3,
+              "maxRows": 8,
+              "default": ""
             },
             {
               "type": "text",
