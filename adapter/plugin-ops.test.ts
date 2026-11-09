@@ -3,11 +3,13 @@ import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_CODE,
+  MAX_PLUGIN_USAGE,
   parsePluginMessage,
   pluginConfigWithBuiltins,
   pluginError,
   pluginReply,
   seedBuiltinPlugins,
+  settingsProblem,
   validAdapterPlugins,
 } from "./plugin-ops";
 
@@ -24,9 +26,74 @@ describe("validAdapterPlugins", () => {
         enabled: true,
         builtin: false,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
         code: "x",
       },
     ]);
+  });
+
+  it("keeps help, usage, debug and settings on a user plugin", () => {
+    expect(
+      validAdapterPlugins([
+        {
+          id: "my.plugin",
+          name: "My plugin",
+          code: "x",
+          help: "Help",
+          usage: "Usage",
+          debug: true,
+          settings: { host: "1.2.3.4" },
+          settingsSchema: [{ name: "host", label: "Host", type: "string" }],
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "my.plugin",
+        name: "My plugin",
+        enabled: true,
+        builtin: false,
+        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: true,
+        code: "x",
+        help: "Help",
+        usage: "Usage",
+        settings: { host: "1.2.3.4" },
+        settingsSchema: [{ name: "host", label: "Host", type: "string" }],
+      },
+    ]);
+  });
+
+  it("reads settings and schema from JSON strings", () => {
+    const [plugin] = validAdapterPlugins([
+      {
+        id: "my.plugin",
+        name: "My",
+        code: "x",
+        settings: '{"port":80}',
+        settingsSchema: '[{"name":"port","label":"Port","type":"number"}]',
+      },
+    ]);
+    expect(plugin.settings).toEqual({ port: 80 });
+    expect(plugin.settingsSchema?.[0].type).toBe("number");
+  });
+
+  it("drops invalid optional metadata instead of the plugin", () => {
+    const [plugin] = validAdapterPlugins([
+      {
+        id: "my.plugin",
+        name: "My",
+        code: "x",
+        help: 42,
+        usage: "x".repeat(MAX_PLUGIN_USAGE + 1),
+        settings: "not json",
+        settingsSchema: [{ nope: true }],
+      },
+    ]);
+    expect(plugin.id).toBe("my.plugin");
+    expect(plugin.help).toBeUndefined();
+    expect(plugin.usage).toBeUndefined();
+    expect(plugin.settings).toBeUndefined();
+    expect(plugin.settingsSchema).toBeUndefined();
   });
 
   it("accepts a builtin entry and ignores its code", () => {
@@ -47,9 +114,19 @@ describe("validAdapterPlugins", () => {
         enabled: false,
         builtin: true,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
+        help: BUILTIN_PLUGINS[0].help,
+        usage: BUILTIN_PLUGINS[0].usage,
         code: undefined,
       },
     ]);
+  });
+
+  it("gives every builtin help and usage", () => {
+    for (const builtin of BUILTIN_PLUGINS) {
+      expect(builtin.help?.trim()).toBeTruthy();
+      expect(builtin.usage?.trim()).toBeTruthy();
+    }
   });
 
   it("logs dropped and duplicate entries without changing the raw config", () => {
@@ -82,6 +159,7 @@ describe("validAdapterPlugins", () => {
         enabled: true,
         builtin: true,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
         code: undefined,
       })),
     );
@@ -117,9 +195,43 @@ describe("validAdapterPlugins", () => {
         enabled: true,
         builtin: false,
         timeoutMs: 100,
+        debug: false,
         code: "x",
       },
     ]);
+  });
+});
+
+describe("settingsProblem", () => {
+  const schema = [
+    { name: "port", label: "Port", type: "number" as const },
+    { name: "host", label: "Host", type: "string" as const },
+    { name: "enabled", label: "Enabled", type: "boolean" as const },
+    {
+      name: "mode",
+      label: "Mode",
+      type: "select" as const,
+      options: ["a", "b"],
+    },
+  ];
+
+  it("rejects wrong types and unknown select options", () => {
+    expect(settingsProblem(schema, { port: "80" })).toContain("port");
+    expect(settingsProblem(schema, { enabled: 1 })).toContain("enabled");
+    expect(settingsProblem(schema, { mode: "c" })).toContain("mode");
+    expect(
+      settingsProblem(schema, {
+        port: 80,
+        host: "x",
+        enabled: true,
+        mode: "a",
+      }),
+    ).toBeNull();
+  });
+
+  it("allows unknown keys and missing schema", () => {
+    expect(settingsProblem(schema, { extra: "ok" })).toBeNull();
+    expect(settingsProblem(undefined, { anything: [1, 2] })).toBeNull();
   });
 });
 
@@ -142,6 +254,9 @@ describe("seedBuiltinPlugins", () => {
         enabled: false,
         builtin: true,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
+        help: BUILTIN_PLUGINS[0].help,
+        usage: BUILTIN_PLUGINS[0].usage,
         code: undefined,
       },
       {
@@ -150,6 +265,7 @@ describe("seedBuiltinPlugins", () => {
         enabled: true,
         builtin: false,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
         code: "x",
       },
       {
@@ -158,6 +274,9 @@ describe("seedBuiltinPlugins", () => {
         enabled: true,
         builtin: true,
         timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
+        help: BUILTIN_PLUGINS[1].help,
+        usage: BUILTIN_PLUGINS[1].usage,
         code: undefined,
       },
     ]);
