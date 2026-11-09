@@ -14,9 +14,30 @@
   // The field list is stable for one plugin; the editor keys the form by id.
   let json = $state(JSON.stringify(values, null, 2));
   let jsonError = $state("");
+  let jsonFieldErrors = $state<Record<string, string>>({});
 
   function set(name: string, value: unknown): void {
     values = { ...values, [name]: value };
+  }
+
+  function jsonText(def: PluginSettingDef): string {
+    const value = values[def.name];
+    if (typeof value === "string") return value;
+    return JSON.stringify(value ?? def.default ?? [], null, 2);
+  }
+
+  function updateJsonField(name: string, text: string): void {
+    set(name, text);
+    try {
+      JSON.parse(text);
+      jsonFieldErrors = { ...jsonFieldErrors, [name]: "" };
+    } catch (error) {
+      jsonFieldErrors = {
+        ...jsonFieldErrors,
+        [name]: error instanceof Error ? error.message : "Invalid JSON.",
+      };
+    }
+    valid = Object.values(jsonFieldErrors).every((message) => !message);
   }
 
   function updateJson(text: string): void {
@@ -58,6 +79,18 @@
               <option value={option}>{option}</option>
             {/each}
           </select>
+        {:else if def.type === "json"}
+          <textarea
+            class="json"
+            rows="4"
+            value={jsonText(def)}
+            oninput={(event) =>
+              updateJsonField(def.name, event.currentTarget.value)}
+            spellcheck="false"
+          ></textarea>
+          {#if jsonFieldErrors[def.name]}
+            <span class="hint text-danger">{jsonFieldErrors[def.name]}</span>
+          {/if}
         {:else if def.type === "number"}
           <input
             type="number"

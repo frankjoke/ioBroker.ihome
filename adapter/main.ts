@@ -57,6 +57,7 @@ import {
   type AdapterPlugin,
   type PluginReply,
 } from "./plugin-ops";
+import { createHttpPlugins } from "./plugins/http-in";
 import { createNetworkPlugins } from "./plugins/network";
 import {
   locationText,
@@ -2060,6 +2061,10 @@ class IHome extends utils.Adapter {
               string,
               unknown
             > | null,
+          setObject: async (id, object) =>
+            this.setObjectAsync(id, object as ioBroker.SettableObject),
+          setForeignObject: async (id, object) =>
+            this.setForeignObjectAsync(id, object as ioBroker.SettableObject),
           sendTo: (instance, command, payload) =>
             this.sendToAsync(instance, command, payload),
           settings: () => runtime.settings,
@@ -2071,7 +2076,7 @@ class IHome extends utils.Adapter {
             error: (message) => this.log.error(message),
           },
         }),
-      createNetworkPlugins(),
+      { ...createNetworkPlugins(), ...createHttpPlugins() },
       (level, message) => this.log[level](message),
     );
     await this.pluginHost.start();

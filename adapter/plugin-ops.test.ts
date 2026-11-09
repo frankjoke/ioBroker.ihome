@@ -246,6 +246,19 @@ describe("settingsProblem", () => {
     expect(settingsProblem(schema, { extra: "ok" })).toBeNull();
     expect(settingsProblem(undefined, { anything: [1, 2] })).toBeNull();
   });
+
+  it("validates JSON text settings", () => {
+    const jsonSchema = [
+      { name: "endpoints", label: "Endpoints", type: "json" as const },
+    ];
+    expect(settingsProblem(jsonSchema, { endpoints: "[]" })).toBeNull();
+    expect(settingsProblem(jsonSchema, { endpoints: "{oops" })).toContain(
+      "endpoints",
+    );
+    expect(
+      settingsProblem(jsonSchema, { endpoints: [] as unknown as string }),
+    ).toContain("endpoints");
+  });
 });
 
 describe("seedBuiltinPlugins", () => {
@@ -290,6 +303,18 @@ describe("seedBuiltinPlugins", () => {
         debug: false,
         help: BUILTIN_PLUGINS[1].help,
         usage: BUILTIN_PLUGINS[1].usage,
+        code: undefined,
+      },
+      {
+        id: "http.in",
+        name: BUILTIN_PLUGINS[2].name,
+        enabled: true,
+        builtin: true,
+        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
+        help: BUILTIN_PLUGINS[2].help,
+        usage: BUILTIN_PLUGINS[2].usage,
+        settingsSchema: BUILTIN_PLUGINS[2].settingsSchema,
         code: undefined,
       },
     ]);

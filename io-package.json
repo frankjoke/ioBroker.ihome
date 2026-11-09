@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "news": {
+      "0.3.3": {
+        "en": "HTTP input plugin: receive GET, POST or PUT data from devices and webhooks and write it to one JSON state or directly to a list of target states, with per-target transforms. Wake-on-LAN accepts a direct MAC/IP payload.",
+        "de": "HTTP-Input-Plugin: GET-, POST- oder PUT-Daten von Geräten und Webhooks empfangen und in einen JSON-State oder direkt in eine Liste von Ziel-States mit Transformationen schreiben. Wake-on-LAN akzeptiert direkte MAC/IP-Optionen."
+      },
       "0.3.2": {
         "en": "Plugins page: list built-in and user plugins, enable/disable them, manage per-plugin settings and debug logs, read help/usage, export user plugins and stage JSON imports. Imported plugins start disabled and need an adapter restart from Admin; code changes stay in Admin.",
         "de": "Plugin-Seite: integrierte und Benutzer-Plugins auflisten, aktivieren/deaktivieren, Einstellungen und Debug-Logs pro Plugin verwalten, Hilfe/Nutzung lesen, Benutzer-Plugins exportieren und JSON-Importe vorbereiten. Importierte Plugins starten deaktiviert und brauchen einen Adapter-Neustart aus Admin; Code-Änderungen bleiben in Admin."

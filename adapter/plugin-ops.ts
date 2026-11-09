@@ -21,7 +21,7 @@ export interface AdapterPlugin {
 export interface PluginSettingDef {
   name: string;
   label: string;
-  type: "string" | "number" | "boolean" | "select";
+  type: "string" | "number" | "boolean" | "select" | "json";
   default?: string | number | boolean;
   description?: string;
   options?: string[];
@@ -125,6 +125,76 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "An IP address cannot find the MAC of a switched-off device; WoL needs the MAC. `ip` only chooses the broadcast target.",
     ].join("\n"),
   },
+  {
+    id: "http.in",
+    name: "HTTP input",
+    help: "Receives data from devices or webhooks and writes it to iHome states.",
+    usage: [
+      "**From a weather station (GET)**",
+      "",
+      "```text",
+      "http://iobroker:8095/easyweather?tempf=70&humidity=55",
+      "```",
+      "",
+      "**From IFTTT or another webhook (POST)**",
+      "",
+      "```text",
+      'curl -X POST http://iobroker:8095/ifttt -H "Content-Type: application/json" -d \'{"kind":"test","tempf":70}\'',
+      "```",
+      "",
+      "**Endpoints (JSON)**",
+      "",
+      "```json",
+      "[",
+      '  { "path": "easyweather", "method": "GET", "target": "0_userdata.0.Weather.json" },',
+      '  { "path": "ifttt", "method": "POST", "targets": [',
+      '    { "state": "0_userdata.0.Inbound.last", "type": "string", "value": "$" },',
+      '    { "state": "0_userdata.0.Weather.temp", "type": "number",',
+      '      "role": "value.temperature", "unit": "°C",',
+      '      "value": "$.tempf", "transform": "(Number(value) - 32) * 5 / 9" }',
+      "  ] }",
+      "]",
+      "```",
+      "",
+      "- `target` writes the whole request as JSON to one state; a logic/template distributes it.",
+      "- `targets` writes values directly. `value` and `transform` are JS expressions; `$` is the request object.",
+      "- `name`, `type`, `role` and `unit` are used only when the target state is missing.",
+      "- Set a `token` and send it as `?token=...` or `X-iHome-Token` when the endpoint is reachable from outside.",
+      "- Bind `127.0.0.1` when only the ioBroker proxy should reach it; `0.0.0.0` for LAN devices.",
+    ].join("\n"),
+    settingsSchema: [
+      {
+        name: "bind",
+        label: "Bind address",
+        type: "string",
+        default: "0.0.0.0",
+        description:
+          "0.0.0.0 for LAN devices; 127.0.0.1 when only the ioBroker proxy should reach it.",
+      },
+      {
+        name: "port",
+        label: "Port",
+        type: "number",
+        default: 8095,
+        description: "Port the HTTP server listens on.",
+      },
+      {
+        name: "token",
+        label: "Token",
+        type: "string",
+        description:
+          "Optional shared secret. Send it as ?token=... or X-iHome-Token.",
+      },
+      {
+        name: "endpoints",
+        label: "Endpoints (JSON)",
+        type: "json",
+        default: "[]",
+        description:
+          "JSON array of endpoints and targets. See Usage for the format.",
+      },
+    ],
+  },
 ];
 
 export const DEFAULT_PLUGIN_TIMEOUT_MS = 5000;
@@ -137,7 +207,13 @@ export const MAX_PLUGIN_SETTINGS = 20_000;
 export const MAX_SETTING_FIELDS = 40;
 
 const ID = /^[a-z][a-z0-9._-]{0,63}$/;
-const SETTING_TYPES = ["string", "number", "boolean", "select"] as const;
+const SETTING_TYPES = [
+  "string",
+  "number",
+  "boolean",
+  "select",
+  "json",
+] as const;
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -232,6 +308,9 @@ function settingDef(value: unknown): PluginSettingDef | null {
     }
     def.options = value.options as string[];
   }
+  if (type === "json" && value.default !== undefined) {
+    if (typeof value.default !== "string") return null;
+  }
   return def;
 }
 
@@ -278,6 +357,16 @@ export function settingsProblem(
       (typeof value !== "string" || !def.options?.includes(value))
     ) {
       return `settings.${def.name} must be one of ${def.options?.join(", ")}`;
+    }
+    if (def.type === "json") {
+      if (typeof value !== "string") {
+        return `settings.${def.name} must be a JSON string`;
+      }
+      try {
+        JSON.parse(value);
+      } catch {
+        return `settings.${def.name} must be valid JSON`;
+      }
     }
   }
   return null;

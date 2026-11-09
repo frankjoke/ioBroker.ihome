@@ -26,6 +26,8 @@ function fakeDeps(): PluginApiDeps {
     setForeignState: async () => {},
     getObject: async (id) => ({ _id: id }),
     getForeignObject: async (id) => ({ _id: id }),
+    setObject: async () => {},
+    setForeignObject: async () => {},
     sendTo: async (instance, command, payload) => ({
       instance,
       command,
@@ -64,6 +66,20 @@ describe("createPluginApi", () => {
       command: "cmd",
       payload: { a: 1 },
     });
+  });
+
+  it("writes own and foreign objects", async () => {
+    const calls: unknown[] = [];
+    const deps = fakeDeps();
+    deps.setObject = async (id, obj) => calls.push(["own", id, obj]);
+    deps.setForeignObject = async (id, obj) => calls.push(["foreign", id, obj]);
+    const api = createPluginApi("demo", deps);
+    await api.objects.set("0_userdata.0.X", { type: "state" });
+    await api.objects.setForeign("other.0.X", { type: "state" });
+    expect(calls).toEqual([
+      ["own", "0_userdata.0.X", { type: "state" }],
+      ["foreign", "other.0.X", { type: "state" }],
+    ]);
   });
 
   it("exposes network devices and hides protected config", () => {

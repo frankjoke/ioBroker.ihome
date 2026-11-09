@@ -32,6 +32,8 @@ export interface PluginApi {
   objects: {
     get(id: string): Promise<Record<string, unknown> | undefined>;
     getForeign(id: string): Promise<Record<string, unknown> | undefined>;
+    set(id: string, object: Record<string, unknown>): Promise<void>;
+    setForeign(id: string, object: Record<string, unknown>): Promise<void>;
   };
   network: {
     list(): NetworkDeviceInfo[];
@@ -56,6 +58,12 @@ export interface PluginApiDeps {
   getForeignObject(
     id: string,
   ): Promise<Record<string, unknown> | null | undefined>;
+  setObject(id: string, object: Record<string, unknown>): Promise<unknown>;
+  setForeignObject(
+    id: string,
+    object: Record<string, unknown>,
+  ): Promise<unknown>;
+
   sendTo(instance: string, command: string, payload: unknown): Promise<unknown>;
   settings(): Record<string, unknown>;
   debug(): boolean;
@@ -120,6 +128,12 @@ export function createPluginApi(
     objects: {
       get: async (id) => (await deps.getObject(id)) ?? undefined,
       getForeign: async (id) => (await deps.getForeignObject(id)) ?? undefined,
+      set: async (id, object) => {
+        await deps.setObject(id, object);
+      },
+      setForeign: async (id, object) => {
+        await deps.setForeignObject(id, object);
+      },
     },
     network: {
       list: () => devices.map((device) => ({ ...device })),
