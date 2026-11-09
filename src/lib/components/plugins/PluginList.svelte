@@ -110,13 +110,30 @@
     gap: 0.5rem;
   }
 
+  .item {
+    gap: 0;
+    padding: 0;
+  }
+
   .plugin-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
-    padding: 0.4rem 0.25rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* The card inside is the only white surface: no second box/border between
+     the grey row and the editor. */
+  .item-editor {
+    display: contents;
+  }
+
+  .item > :global(.plugin-editor) {
+    border: 0;
+    border-radius: 0 0 var(--border-radius-sm, 6px) var(--border-radius-sm, 6px);
+    box-shadow: none;
   }
 
   .plugin-main {
