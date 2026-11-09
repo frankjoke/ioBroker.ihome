@@ -17,13 +17,13 @@ One plugin per file. Import keeps the plugin switched off until the next restart
     "id": "demo.echo",
     "name": "Demo echo",
     "timeoutMs": 5000,
-    "help": "Returns its payload.",
-    "usage": "Payload: any JSON. Result: { echo, prefix }.",
+    "help": "Returns its options.",
+    "usage": "Options: any JSON. Result: { echo, prefix }.",
     "settingsSchema": [
       { "name": "prefix", "label": "Prefix", "type": "string", "default": "echo" }
     ],
     "settings": { "prefix": "hello" },
-    "code": "module.exports = (api) => ({ async call(payload) { return { echo: payload, prefix: api.settings.prefix }; } });"
+    "code": "module.exports = (api) => ({ async call(options) { return { echo: options, prefix: api.settings.prefix }; } });"
   }
 }
 \`\`\`
@@ -35,9 +35,9 @@ module.exports = (api) => {
   let prefix = api.settings.prefix ?? "echo";
   return {
     async start() { api.log.info("ready"); },
-    async call(payload) {
-      api.log.debug("echo " + JSON.stringify(payload));
-      return { echo: payload, prefix };
+    async call(options) {
+      api.log.debug("echo " + JSON.stringify(options));
+      return { echo: options, prefix };
     },
     async reload(api) { prefix = api.settings.prefix ?? prefix; },
     async stop() { api.log.info("stopped"); },
@@ -61,7 +61,7 @@ module.exports = (api) => {
 1. Import the plugin file; it stays switched off.
 2. Restart iHome in ioBroker Admin. New or changed plugin code needs a restart.
 3. Enable the plugin on this page.
-4. Call it from a logic with \`call("demo.echo", payload, (data, error) => { ... })\` or from HTML with \`await ihome.call("demo.echo", payload)\`.
+4. Call it from a logic with \`call("demo.echo", options, (data, error) => { ... })\` or from HTML with \`await ihome.call("demo.echo", options)\`.
 
 Settings changes take effect immediately when the plugin supports it; otherwise the page asks for a restart. Code changes always need the Admin edit and restart.
 
