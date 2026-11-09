@@ -62,7 +62,7 @@
 {#if schema?.length}
   <div class="settings-form">
     {#each schema as def (def.name)}
-      <label class="field">
+      <label class="field" class:wide={def.type === "json"}>
         <span class="label-mono">{def.label}</span>
         {#if def.type === "boolean"}
           <input
@@ -82,7 +82,7 @@
         {:else if def.type === "json"}
           <textarea
             class="json"
-            rows="4"
+            rows="10"
             value={jsonText(def)}
             oninput={(event) =>
               updateJsonField(def.name, event.currentTarget.value)}
@@ -149,9 +149,15 @@
     gap: 4px;
   }
 
+  .wide {
+    grid-column: 1 / -1;
+  }
+
   .json {
+    width: 100%;
     font-family: var(--font-mono);
     font-size: var(--body-sm);
+    resize: vertical;
   }
 
   .text-danger {
