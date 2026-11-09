@@ -76,7 +76,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "network.wake",
     name: "Wake-on-LAN",
-    help: "Switches a device on over the network (Wake-on-LAN). Give a Network devices id, or the device's MAC address directly. An IP address alone is not enough — the MAC is required.",
+    help: "Try to switch a device on using the Wake-on-LAN protocol. The MAC address of the device is required; it can come from Network devices or be passed directly.",
     usage: [
       "**Options**",
       "",

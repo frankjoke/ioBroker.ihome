@@ -117,6 +117,13 @@
     <span class="mono text-muted">{plugin.id}</span>
   </div>
 
+  {#if plugin.usage}
+    <div class="plugin-usage">
+      <span class="label-mono">Usage</span>
+      <HelpSection help={plugin.usage} static plain />
+    </div>
+  {/if}
+
   {#if plugin.restartRequired}
     <p class="restart hint">
       Restart iHome in Admin to apply this change.
@@ -163,7 +170,6 @@
 
   <div class="help-blocks">
     <HelpSection help={plugin.help} />
-    <HelpSection help={plugin.usage} label="Usage" />
   </div>
 
   {#if !plugin.builtin}
@@ -244,6 +250,13 @@
   .editor-head h2 {
     margin: 0;
     font-size: var(--body-lg);
+  }
+
+  .plugin-usage {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: -0.25rem 0 0;
   }
 
   .fields {

@@ -1,23 +1,30 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { renderHelp } from "$lib/markdown";
 
   let {
     help,
     label = "Help",
+    static: always = false,
+    plain = false,
   }: {
     /** Markdown source; nothing renders when it is empty. */
     help?: string;
     label?: string;
+    /** Show the body without a toggle (used for the plugin description). */
+    static?: boolean;
+    /** Drop the boxed help surface and render as normal page text. */
+    plain?: boolean;
   } = $props();
 
-  let open = $state(false);
+  // svelte-ignore state_referenced_locally
+  let open = $state(always);
   let loading = $state(false);
   let html = $state("");
   let rendered = $state("");
 
-  async function toggle() {
-    open = !open;
-    if (!open || !help?.trim() || help === rendered) return;
+  async function load() {
+    if (!help?.trim() || help === rendered) return;
     loading = true;
     try {
       html = await renderHelp(help);
@@ -26,29 +33,40 @@
       loading = false;
     }
   }
+
+  async function toggle() {
+    open = !open;
+    if (open) await load();
+  }
+
+  onMount(() => {
+    if (always) void load();
+  });
 </script>
 
 {#if help?.trim()}
-  <div class="help">
-    <button
-      type="button"
-      class="help-toggle"
-      aria-expanded={open}
-      onclick={toggle}
-    >
-      <span class="material-symbols-outlined">help</span>
-      <span>{label}</span>
-      <span class="material-symbols-outlined"
-        >{open ? "expand_less" : "expand_more"}</span
+  <div class="help" class:static={always}>
+    {#if !always}
+      <button
+        type="button"
+        class="help-toggle"
+        aria-expanded={open}
+        onclick={toggle}
       >
-    </button>
-    {#if open}
+        <span class="material-symbols-outlined">help</span>
+        <span>{label}</span>
+        <span class="material-symbols-outlined"
+          >{open ? "expand_less" : "expand_more"}</span
+        >
+      </button>
+    {/if}
+    {#if always || open}
       {#if loading}
         <p class="hint text-muted">Loading help…</p>
       {:else}
         <!-- renderHelp escapes HTML and validates link schemes. -->
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        <div class="help-body">{@html html}</div>
+        <div class="help-body" class:plain>{@html html}</div>
       {/if}
     {/if}
   </div>
@@ -57,6 +75,10 @@
 <style>
   .help {
     margin: 0 0 0.6rem;
+  }
+
+  .help.static {
+    margin: 0;
   }
 
   .help-toggle {
@@ -87,6 +109,13 @@
     background: var(--surface-container-low);
     font-size: var(--body-sm);
     line-height: 1.45;
+  }
+
+  .help-body.plain {
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    background: none;
   }
 
   /* Rendered Markdown is injected, so these selectors cannot be scoped. */
