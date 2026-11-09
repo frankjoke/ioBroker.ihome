@@ -162,6 +162,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "- `name`, `type`, `role` and `unit` are used only when the target state is missing.",
       "- Set a `token` and send it as `?token=...` or `X-iHome-Token` when the endpoint is reachable from outside.",
       "- Bind `127.0.0.1` when only the ioBroker proxy should reach it; `0.0.0.0` for LAN devices.",
+      "- Enable **Debug logs** to see each request, its status and the number of states written; request values are not logged.",
     ].join("\n"),
     settingsSchema: [
       {

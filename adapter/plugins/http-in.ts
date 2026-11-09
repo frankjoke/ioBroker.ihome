@@ -408,16 +408,19 @@ async function handleRequest(
           error instanceof Error ? error.message : String(error),
         );
       }
-      if (result.reply !== undefined) {
-        const text = typeof result.reply === "string";
-        res.writeHead(200, {
-          "content-type": text
-            ? "text/plain; charset=utf-8"
-            : "application/json; charset=utf-8",
-        });
-        res.end(text ? result.reply : JSON.stringify(result.reply));
-        return;
-      }
+    }
+    api.log.debug(
+      `http.in ${req.method} ${url.pathname} -> ${result.status} wrote=${result.writes.length} from ${req.socket.remoteAddress ?? "?"}`,
+    );
+    if (result.status === 200 && result.reply !== undefined) {
+      const text = typeof result.reply === "string";
+      res.writeHead(200, {
+        "content-type": text
+          ? "text/plain; charset=utf-8"
+          : "application/json; charset=utf-8",
+      });
+      res.end(text ? result.reply : JSON.stringify(result.reply));
+      return;
     }
     res.writeHead(result.status, {
       "content-type": "application/json; charset=utf-8",
