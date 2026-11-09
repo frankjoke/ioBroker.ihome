@@ -32,6 +32,12 @@ export const pages = [
   },
   { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
   {
+    id: "/plugins",
+    label: "Plugins",
+    icon: "extension",
+    title: "Plugins",
+  },
+  {
     id: "/ui",
     label: "User Interface",
     icon: "palette",

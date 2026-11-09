@@ -276,35 +276,36 @@ export function pluginView(
 
 function parsePatch(value: unknown): PluginPatch | null {
   if (!record(value)) return null;
-  if (!validPluginId(value.id)) return null;
-  if (value.name !== undefined && typeof value.name !== "string") return null;
-  if (value.enabled !== undefined && typeof value.enabled !== "boolean") {
-    return null;
-  }
+  const id = value.id;
+  if (!validPluginId(id)) return null;
+  const name = value.name;
+  if (name !== undefined && typeof name !== "string") return null;
+  const enabled = value.enabled;
+  if (enabled !== undefined && typeof enabled !== "boolean") return null;
+  const timeoutMs = value.timeoutMs;
   if (
-    value.timeoutMs !== undefined &&
-    (typeof value.timeoutMs !== "number" || !Number.isFinite(value.timeoutMs))
+    timeoutMs !== undefined &&
+    (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs))
   ) {
     return null;
   }
-  if (value.debug !== undefined && typeof value.debug !== "boolean") {
-    return null;
-  }
-  if (value.help !== undefined && typeof value.help !== "string") return null;
-  if (value.usage !== undefined && typeof value.usage !== "string") return null;
-  if (value.settings !== undefined && !record(value.settings)) return null;
-  return {
-    id: value.id,
-    ...(value.name !== undefined ? { name: value.name } : {}),
-    ...(value.enabled !== undefined ? { enabled: value.enabled } : {}),
-    ...(value.timeoutMs !== undefined ? { timeoutMs: value.timeoutMs } : {}),
-    ...(value.debug !== undefined ? { debug: value.debug } : {}),
-    ...(value.help !== undefined ? { help: value.help } : {}),
-    ...(value.usage !== undefined ? { usage: value.usage } : {}),
-    ...(value.settings !== undefined
-      ? { settings: value.settings as Record<string, unknown> }
-      : {}),
-  };
+  const debug = value.debug;
+  if (debug !== undefined && typeof debug !== "boolean") return null;
+  const help = value.help;
+  if (help !== undefined && typeof help !== "string") return null;
+  const usage = value.usage;
+  if (usage !== undefined && typeof usage !== "string") return null;
+  const settings = value.settings;
+  if (settings !== undefined && !record(settings)) return null;
+  const patch: PluginPatch = { id };
+  if (typeof name === "string") patch.name = name;
+  if (typeof enabled === "boolean") patch.enabled = enabled;
+  if (typeof timeoutMs === "number") patch.timeoutMs = timeoutMs;
+  if (typeof debug === "boolean") patch.debug = debug;
+  if (typeof help === "string") patch.help = help;
+  if (typeof usage === "string") patch.usage = usage;
+  if (record(settings)) patch.settings = settings;
+  return patch;
 }
 
 export function parsePluginsCommand(

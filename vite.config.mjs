@@ -26,6 +26,7 @@ export default defineConfig({
       // imports exactly the code the adapter runs.
       alias: {
         $logic: "adapter/logic",
+        $adapter: "adapter",
       },
       serviceWorker: {
         // registered in +layout.svelte, with updateViaCache: "none"
