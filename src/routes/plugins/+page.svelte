@@ -1,7 +1,6 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import PluginList from "$lib/components/plugins/PluginList.svelte";
-  import PluginEditor from "$lib/components/plugins/PluginEditor.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import { PLUGIN_GUIDE } from "$lib/config/plugin-guide";
@@ -15,14 +14,10 @@
   import type { PluginView } from "$adapter/plugin-admin";
 
   let busy = $state(false);
-  let selectedId = $state("");
   let importOpen = $state(false);
   const plugins = $derived(getPlugins());
   const loading = $derived(pluginsLoading());
   const error = $derived(pluginsError());
-  const selected = $derived(
-    plugins.find((plugin) => plugin.id === selectedId) ?? null,
-  );
 
   let wasConnected = false;
   $effect(() => {
@@ -60,10 +55,6 @@
     } finally {
       busy = false;
     }
-  }
-
-  function edit(plugin: PluginView): void {
-    selectedId = selectedId === plugin.id ? "" : plugin.id;
   }
 </script>
 
@@ -114,18 +105,7 @@
   {:else if plugins.length === 0}
     <p class="hint text-muted">No plugins found.</p>
   {:else}
-    <PluginList {plugins} {busy} onToggle={toggle} onEdit={edit} />
-  {/if}
-
-  {#if selected}
-    {#key selected.id}
-      <PluginEditor
-        plugin={selected}
-        onClose={() => (selectedId = "")}
-        onSaved={() => (selectedId = "")}
-        onDeleted={() => (selectedId = "")}
-      />
-    {/key}
+    <PluginList {plugins} {busy} onToggle={toggle} />
   {/if}
 </div>
 

@@ -1,11 +1,11 @@
 <script lang="ts">
+  import PluginEditor from "./PluginEditor.svelte";
   import type { PluginView } from "$adapter/plugin-admin";
 
   let {
     plugins,
     busy = false,
     onToggle,
-    onEdit,
   }: {
     plugins: PluginView[];
     busy?: boolean;
@@ -14,8 +14,13 @@
       field: "enabled" | "debug",
       value: boolean,
     ) => void;
-    onEdit: (plugin: PluginView) => void;
   } = $props();
+
+  let selectedId = $state("");
+
+  function edit(plugin: PluginView): void {
+    selectedId = selectedId === plugin.id ? "" : plugin.id;
+  }
 
   function statusLabel(status: PluginView["status"]): string {
     if (status === "restart-required") return "restart required";
@@ -25,61 +30,74 @@
 
 <div class="plugin-list">
   {#each plugins as plugin (plugin.id)}
-    <div class="plugin-row">
-      <div class="plugin-main">
-        <button
-          type="button"
-          class="plugin-name"
-          onclick={() => onEdit(plugin)}
-        >
-          {plugin.name}
-        </button>
-        <span class="plugin-id mono">{plugin.id}</span>
-        <span class="badge">{plugin.builtin ? "built-in" : "user"}</span>
-        <span class="badge status-{plugin.status}"
-          >{statusLabel(plugin.status)}</span
-        >
+    <div class="item" class:open={selectedId === plugin.id}>
+      <div class="plugin-row">
+        <div class="plugin-main">
+          <button
+            type="button"
+            class="plugin-name"
+            onclick={() => edit(plugin)}
+          >
+            {plugin.name}
+          </button>
+          <span class="plugin-id mono">{plugin.id}</span>
+          <span class="badge">{plugin.builtin ? "built-in" : "user"}</span>
+          <span class="badge status-{plugin.status}"
+            >{statusLabel(plugin.status)}</span
+          >
+        </div>
+        <div class="plugin-actions">
+          <label class="switch">
+            <input
+              type="checkbox"
+              checked={plugin.enabled}
+              disabled={busy ||
+                (plugin.status === "restart-required" && !plugin.enabled)}
+              onchange={(event) =>
+                onToggle(plugin, "enabled", event.currentTarget.checked)}
+            />
+            <span>Enabled</span>
+          </label>
+          <label
+            class="switch"
+            title={plugin.staged
+              ? "Available after an adapter restart"
+              : undefined}
+          >
+            <input
+              type="checkbox"
+              checked={plugin.debug}
+              disabled={busy || plugin.staged}
+              onchange={(event) =>
+                onToggle(plugin, "debug", event.currentTarget.checked)}
+            />
+            <span>Debug logs</span>
+          </label>
+          <button type="button" class="btn btn-sm" onclick={() => edit(plugin)}>
+            Edit
+          </button>
+        </div>
+        {#if plugin.removalPending}
+          <p class="restart hint">
+            Removal pending after an adapter restart.
+            <a href="#/admin">Open Admin</a>
+          </p>
+        {:else if plugin.restartRequired}
+          <p class="restart hint">
+            Needs an adapter restart. <a href="#/admin">Open Admin</a>
+          </p>
+        {/if}
       </div>
-      <div class="plugin-actions">
-        <label class="switch">
-          <input
-            type="checkbox"
-            checked={plugin.enabled}
-            disabled={busy ||
-              (plugin.status === "restart-required" && !plugin.enabled)}
-            onchange={(event) =>
-              onToggle(plugin, "enabled", event.currentTarget.checked)}
+
+      {#if selectedId === plugin.id}
+        <div class="item-editor">
+          <PluginEditor
+            {plugin}
+            onClose={() => (selectedId = "")}
+            onSaved={() => (selectedId = "")}
+            onDeleted={() => (selectedId = "")}
           />
-          <span>Enabled</span>
-        </label>
-        <label
-          class="switch"
-          title={plugin.staged
-            ? "Available after an adapter restart"
-            : undefined}
-        >
-          <input
-            type="checkbox"
-            checked={plugin.debug}
-            disabled={busy || plugin.staged}
-            onchange={(event) =>
-              onToggle(plugin, "debug", event.currentTarget.checked)}
-          />
-          <span>Debug logs</span>
-        </label>
-        <button type="button" class="btn btn-sm" onclick={() => onEdit(plugin)}>
-          Edit
-        </button>
-      </div>
-      {#if plugin.removalPending}
-        <p class="restart hint">
-          Removal pending after an adapter restart.
-          <a href="#/admin">Open Admin</a>
-        </p>
-      {:else if plugin.restartRequired}
-        <p class="restart hint">
-          Needs an adapter restart. <a href="#/admin">Open Admin</a>
-        </p>
+        </div>
       {/if}
     </div>
   {/each}
@@ -98,10 +116,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-lg);
-    background: var(--surface-container-lowest);
+    padding: 0.4rem 0.25rem;
   }
 
   .plugin-main {
