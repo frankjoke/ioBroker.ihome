@@ -39,6 +39,7 @@
   import BundleApplyModal from "./BundleApplyModal.svelte";
   import DeviceApplyModal from "./DeviceApplyModal.svelte";
   import LogicApplyModal from "./LogicApplyModal.svelte";
+  import HelpSection from "./HelpSection.svelte";
   import { exportTemplate } from "$lib/template-export";
   import type { Template } from "$lib/types/display";
   import type { TemplateBundle } from "$lib/types/templates";
@@ -201,6 +202,13 @@
       ? BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id)
       : (bundles.find((bundle) => bundle.id === entry.id) ??
           BUILTIN_BUNDLES.find((bundle) => bundle.id === entry.id));
+  }
+
+  function helpFor(entry: TemplateEntry): string | undefined {
+    if (entry.kind === "bundle" && bundleDraft?.id === entry.id) {
+      return bundleDraft.help;
+    }
+    return definitionFor(entry)?.help;
   }
 
   function exportEntry(entry: TemplateEntry) {
@@ -643,6 +651,7 @@
           </div>
           {#if isOpen(entry)}
             <div class="item-editor">
+              <HelpSection help={helpFor(entry)} />
               {#if entry.kind === "device"}
                 <VisualTemplates
                   bind:this={editorRef}

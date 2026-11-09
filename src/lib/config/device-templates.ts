@@ -168,6 +168,11 @@ export const BUILTIN_DEVICE_TEMPLATES: DeviceTemplate[] = [
     name: "Generic REST device",
     description:
       "Polls a JSON status endpoint and writes changed values back to /set.",
+    help: `Creates a device from a JSON HTTP endpoint.
+
+**Before applying:** know the URL that returns a JSON object and, if the device accepts commands, the URL that accepts a value. The template polls the endpoint, maps the fields you name into states and writes changes back.
+
+Use it for simple LAN devices, ESPHome bridges or vendor APIs with a JSON status page.`,
     source: GENERIC_REST,
   },
   {
@@ -175,6 +180,9 @@ export const BUILTIN_DEVICE_TEMPLATES: DeviceTemplate[] = [
     name: "PowerMeter from state",
     description:
       "Reads a power meter's JSON state and creates a Meter device with energy, power, voltage and current.",
+    help: `Builds a Meter device from an existing JSON state — for example the state an MQTT power meter writes.
+
+**Before applying:** pick the state that carries the meter JSON. The generated logic reads it, and the device exposes energy, power, voltage and current.`,
     source: SHRDZM_METER,
   },
 ];

@@ -59,6 +59,7 @@
 
   let name = $state("");
   let description = $state("");
+  let help = $state("");
   let source = $state("");
   let error = $state("");
   let deleting = $state(false);
@@ -102,6 +103,7 @@
     !!selected &&
       (name !== selected.name ||
         description !== (selected.description ?? "") ||
+        help !== (selected.help ?? "") ||
         source !== selected.source),
   );
   $effect(() => {
@@ -128,6 +130,7 @@
     if (!selected) return;
     name = selected.name;
     description = selected.description ?? "";
+    help = selected.help ?? "";
     source = selected.source;
     error = "";
     deleting = false;
@@ -302,6 +305,7 @@
       id: uniqueId(`${selected.id}-copy`),
       name: `${selected.name} copy`,
       description: selected.description,
+      help: selected.help,
       source: selected.source,
     };
     if (
@@ -334,6 +338,7 @@
       id: selected.id,
       name: name.trim() || selected.id,
       description: description.trim() || undefined,
+      help: help.trim() || undefined,
       source,
     };
     const next = [
@@ -395,6 +400,17 @@
         readonly={isBuiltin}
         aria-label="Template description"
       />
+    </label>
+
+    <label class="field">
+      <span class="label-mono">Help (Markdown)</span>
+      <textarea
+        rows="4"
+        bind:value={help}
+        readonly={isBuiltin}
+        aria-label="Template help"
+        placeholder="What it does, what to configure first, and links to docs."
+      ></textarea>
     </label>
 
     {#if !isBuiltin}

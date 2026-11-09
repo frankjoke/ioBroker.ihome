@@ -11,6 +11,11 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     name: "Switch light with off-delay",
     description:
       "Switches a light on when the switch turns on and off again after the delay without a new on signal.",
+    help: `Turns a light on when a switch turns on, and off again after the delay without a new "on" signal.
+
+Every new on signal restarts the countdown. Use it for bathroom fans, stair lights or a light tied to a door contact.
+
+**Parameters:** the trigger state, the light state and the off-delay (for example 5m).`,
     params: [
       {
         name: "switch",
@@ -67,6 +72,11 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     name: "Motion light with off-delay",
     description:
       "Switches a light on on motion and off again after the delay without new motion.",
+    help: `Turns a light on when motion is detected and off again after the delay without new motion.
+
+Every new motion restarts the countdown, so the light stays on while someone is moving. Use it for hallways, basements or outdoor lights.
+
+**Parameters:** the motion state, the light state and the off-delay (for example 2m).`,
     params: [
       {
         name: "motion",
@@ -123,6 +133,11 @@ export const BUILTIN_TEMPLATES: LogicTemplate[] = [
     name: "Computed value",
     description:
       "Writes the source value multiplied by a factor into a state whenever it changes.",
+    help: `Writes one state's value multiplied by a factor into another state whenever the source changes.
+
+Use it to convert units (for example Wh to kWh with a factor of 0.001), scale a sensor, or copy a value to a state another adapter expects.
+
+**Parameters:** source state, target state and factor.`,
     params: [
       {
         name: "source",

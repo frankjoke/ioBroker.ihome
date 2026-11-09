@@ -7,6 +7,7 @@ import { filterTemplateEntries, templateEntries } from "./template-entries";
 const device = {
   id: "d",
   name: "Lamp",
+  help: "visualhelp",
   type: "Light",
   features: [],
   slots: [],
@@ -14,13 +15,20 @@ const device = {
 const logic = {
   id: "l",
   name: "Zulu",
+  help: "logichelp",
   params: [],
   logic: {},
 } as unknown as LogicTemplate;
-const api = { id: "a", name: "Meter", source: "({})" } as DeviceTemplate;
+const api = {
+  id: "a",
+  name: "Meter",
+  help: "apihelp",
+  source: "({})",
+} as DeviceTemplate;
 const bundle = {
   id: "b",
   name: "TV",
+  help: "bundlehelp",
   items: [],
   device: { type: "Custom", features: [], slots: [] },
   logic: { logic: {} },
@@ -64,5 +72,28 @@ describe("templateEntries", () => {
       filterTemplateEntries(entries, "lamp", "asc").map((entry) => entry.id),
     ).toEqual(["d"]);
     expect(filterTemplateEntries(entries, "", "desc")[0].id).toBe("l");
+  });
+
+  it("finds templates by help text", () => {
+    const entries = templateEntries({
+      presets: [],
+      visual: [device],
+      logicBuiltins: [],
+      logicUser: [logic],
+      apiBuiltins: [],
+      apiUser: [api],
+      bundleBuiltins: [],
+      bundleUser: [bundle],
+    });
+    for (const [query, id] of [
+      ["visualhelp", "d"],
+      ["logichelp", "l"],
+      ["apihelp", "a"],
+      ["bundlehelp", "b"],
+    ]) {
+      expect(
+        filterTemplateEntries(entries, query, "asc").map((entry) => entry.id),
+      ).toEqual([id]);
+    }
   });
 });

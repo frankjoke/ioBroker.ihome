@@ -42,6 +42,7 @@
   import type { Device } from "$lib/types/device";
   import type { TemplateBundle } from "$lib/types/templates";
   import type { DeviceTemplateShape, LogicTemplate } from "$logic/types";
+  import HelpSection from "./HelpSection.svelte";
   import TemplateParamForm from "./TemplateParamForm.svelte";
 
   let {
@@ -290,6 +291,7 @@
           {applyPartLabel(part)}
         {/each}.
       </p>
+      <HelpSection help={bundle.help} />
       <TemplateParamForm params={bundle.params ?? []} bind:values />
       {#if bundle.api}
         <label class="field">

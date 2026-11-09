@@ -5,6 +5,7 @@
   } from "$lib/config/template-apply";
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
+  import HelpSection from "./HelpSection.svelte";
   import type { Template } from "$lib/types/display";
 
   let {
@@ -47,6 +48,7 @@
         Apply <strong>{template.name}</strong> to a
         <strong>{template.type}</strong> device.
       </p>
+      <HelpSection help={template.help} />
       {#if targets.length > 0}
         <label class="field">
           <span class="label-mono">Target device</span>

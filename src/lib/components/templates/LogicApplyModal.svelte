@@ -12,6 +12,7 @@
     logicBlocked,
   } from "$lib/stores/logics.svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import HelpSection from "./HelpSection.svelte";
   import TemplateParamForm from "./TemplateParamForm.svelte";
   import type { LogicTemplate } from "$logic/types";
 
@@ -81,6 +82,7 @@
       {#if template.description}
         <p class="hint text-muted">{template.description}</p>
       {/if}
+      <HelpSection help={template.help} />
       <TemplateParamForm params={template.params} bind:values />
       {#if !writable}
         <p class="text-danger hint">

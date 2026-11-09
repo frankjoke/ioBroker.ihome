@@ -243,6 +243,8 @@ export interface Slot {
 export interface Template {
   id: string;
   name: string;
+  /** Long-form Markdown help shown in the browser and apply dialog. */
+  help?: string;
   builtin?: boolean;
   basedOn?: string; // preset id this was copied from
   type: DeviceType;

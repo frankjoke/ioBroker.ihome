@@ -229,6 +229,8 @@ export interface LogicTemplate {
   id: string;
   name: string;
   description?: string;
+  /** Long-form Markdown help shown in the browser and apply dialog. */
+  help?: string;
   params: TemplateParam[];
   /** String fields may contain {{param}} placeholders. */
   logic: LogicDef;
@@ -292,6 +294,8 @@ export interface DeviceTemplate {
   id: string;
   name: string;
   description?: string;
+  /** Long-form Markdown help shown in the browser and apply dialog. */
+  help?: string;
   source: string;
 }
 

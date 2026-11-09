@@ -57,7 +57,7 @@ export function templateEntries(input: {
         template.name,
         ["device"],
         true,
-        template.type,
+        `${template.type} ${template.help ?? ""}`,
       ),
     ),
     ...input.visual.map((template) =>
@@ -67,7 +67,7 @@ export function templateEntries(input: {
         template.name,
         ["device"],
         false,
-        template.type,
+        `${template.type} ${template.help ?? ""}`,
       ),
     ),
     ...input.logicBuiltins.map((template) =>
@@ -77,7 +77,7 @@ export function templateEntries(input: {
         template.name,
         ["logic"],
         true,
-        template.description ?? "",
+        `${template.description ?? ""} ${template.help ?? ""}`,
       ),
     ),
     ...input.logicUser.map((template) =>
@@ -87,14 +87,28 @@ export function templateEntries(input: {
         template.name,
         ["logic"],
         false,
-        template.description ?? "",
+        `${template.description ?? ""} ${template.help ?? ""}`,
       ),
     ),
     ...input.apiBuiltins.map((template) =>
-      entry("api", template.id, template.name, ["logic", "api"], true, ""),
+      entry(
+        "api",
+        template.id,
+        template.name,
+        ["logic", "api"],
+        true,
+        `${template.description ?? ""} ${template.help ?? ""}`,
+      ),
     ),
     ...input.apiUser.map((template) =>
-      entry("api", template.id, template.name, ["logic", "api"], false, ""),
+      entry(
+        "api",
+        template.id,
+        template.name,
+        ["logic", "api"],
+        false,
+        `${template.description ?? ""} ${template.help ?? ""}`,
+      ),
     ),
     ...input.bundleBuiltins.map((bundle) =>
       entry(
@@ -103,7 +117,7 @@ export function templateEntries(input: {
         bundle.name,
         bundleParts(bundle),
         true,
-        bundle.description ?? "",
+        `${bundle.description ?? ""} ${bundle.help ?? ""}`,
       ),
     ),
     ...input.bundleUser.map((bundle) =>
@@ -113,7 +127,7 @@ export function templateEntries(input: {
         bundle.name,
         bundleParts(bundle),
         false,
-        bundle.description ?? "",
+        `${bundle.description ?? ""} ${bundle.help ?? ""}`,
       ),
     ),
   ];

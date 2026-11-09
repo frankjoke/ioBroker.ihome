@@ -40,6 +40,8 @@ export interface TemplateBundle {
   id: string;
   name: string;
   description?: string;
+  /** Long-form Markdown help shown in the browser and apply dialog. */
+  help?: string;
   params?: TemplateParameter[];
   /** Shared state/item definitions. */
   items?: TemplateItem[];

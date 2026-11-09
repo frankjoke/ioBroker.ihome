@@ -33,6 +33,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Switch: {
     id: "Switch",
     name: "Switch",
+    help: `A simple on/off device: a switch, plug or relay.
+
+**Configure:** add a device of type Switch under Devices and map its **power** control to the state that switches it. Extra readings, such as consumption, appear as a badge.
+
+The tile glows green while the device is on and the badge tells you when it was last seen.`,
     builtin: true,
     type: "Switch",
     size: { w: 1, h: 1 },
@@ -64,6 +69,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   Button: {
     id: "Button",
     name: "Button",
+    help: `A tile for a momentary push button: a doorbell, a scene button or a physical remote.
+
+**Configure:** map the **press** control to the state that triggers the action. Pressing the tile writes that state.`,
     builtin: true,
     type: "Button",
     size: { w: 1, h: 1 },
@@ -77,6 +85,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Light: {
     id: "Light",
     name: "Light",
+    help: `A light tile with power, brightness and colour.
+
+**Configure:** map **power**, **brightness** and **colour** to your light's states. Only map the controls your device really has.
+
+The tile glows amber while the light is on; the slider and colour picker write back to the device.`,
     builtin: true,
     type: "Light",
     size: { w: 1, h: 1 },
@@ -112,6 +125,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Thermostat: {
     id: "Thermostat",
     name: "Thermostat",
+    help: `A thermostat tile with the measured temperature, a setpoint and a mode.
+
+**Configure:** map **actual** and **setpoint** to the measured and target temperature states, and **mode** to the operating mode if the device has one.
+
+The slider writes the setpoint; the dropdown writes the mode.`,
     builtin: true,
     type: "Thermostat",
     size: { w: 2, h: 1 },
@@ -127,6 +145,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Thermometer: {
     id: "Thermometer",
     name: "Thermometer",
+    help: `A read-only tile for a temperature sensor: temperature first, humidity second, both chosen by their role.
+
+**Configure:** add the sensor under Devices and map its controls. Dew point, wind chill and other readings stay available when you enlarge the tile.
+
+A low battery appears as a warning badge.`,
     builtin: true,
     type: "Thermometer",
     size: { w: 1, h: 1 },
@@ -152,6 +175,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Blind: {
     id: "Blind",
     name: "Blind",
+    help: `A roller blind or shutter tile.
+
+**Configure:** map **position** to the percentage state (0 and 100 mean open or closed, depending on the actuator) and **stop** to its stop command.
+
+Moving the slider writes the position; the stop button halts movement.`,
     builtin: true,
     type: "Blind",
     size: { w: 2, h: 1 },
@@ -165,6 +193,11 @@ export const PRESETS: Record<DeviceType, Template> = {
   Window: {
     id: "Window",
     name: "Window",
+    help: `A window or door contact tile: open or closed.
+
+**Configure:** map **open** to the contact state. An open window shows in amber, a closed one is dimmed.
+
+The badge tells you when the state last changed.`,
     builtin: true,
     type: "Window",
     size: { w: 1, h: 1 },
@@ -195,6 +228,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   Motion: {
     id: "Motion",
     name: "Motion",
+    help: `A motion detector tile.
+
+**Configure:** map **motion** to the sensor state. The tile shows when motion is detected and how long ago the last motion was — not when the battery last reported.`,
     builtin: true,
     type: "Motion",
     size: { w: 1, h: 1 },
@@ -227,6 +263,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   AC: {
     id: "AC",
     name: "AC",
+    help: `An air-conditioner tile: target temperature, mode, fan speed and power.
+
+**Configure:** map each control your unit supports; leave the others unmapped. The tile is 2×2, and the sliders and dropdown write the matching states.`,
     builtin: true,
     type: "AC",
     size: { w: 2, h: 2 },
@@ -243,6 +282,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   Meter: {
     id: "Meter",
     name: "Meter",
+    help: `A power meter tile: current consumption plus an energy total.
+
+**Configure:** map **power** and **energy** to the meter's states. The large reading is current power; the badge shows the energy counter.`,
     builtin: true,
     type: "Meter",
     size: { w: 2, h: 1 },
@@ -257,6 +299,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   Value: {
     id: "Value",
     name: "Value",
+    help: `A generic tile for a single reading: pressure, speed, a text status.
+
+**Configure:** map one control and set its unit under Devices. For timestamps, set the unit to a date format such as "ago" so the tile keeps the time current.`,
     builtin: true,
     type: "Value",
     size: { w: 1, h: 1 },
@@ -266,6 +311,9 @@ export const PRESETS: Record<DeviceType, Template> = {
   Custom: {
     id: "Custom",
     name: "Custom",
+    help: `A starter layout with one value, one slider and one button.
+
+Use it when no preset fits: add the device under Devices, then open the layout editor and keep, change or delete each slot. Every control you map is available to the slots.`,
     builtin: true,
     type: "Custom",
     size: { w: 1, h: 1 },

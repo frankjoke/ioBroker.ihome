@@ -224,6 +224,15 @@
       readonly={builtin}
     /></label
   >
+  <label class="field"
+    ><span class="label-mono">Help (Markdown)</span>
+    <textarea
+      rows="4"
+      bind:value={draft.help}
+      readonly={builtin}
+      placeholder="What it does, what to configure first, and links to docs."
+    ></textarea></label
+  >
 
   {#if !writable}
     <p class="text-danger hint">
