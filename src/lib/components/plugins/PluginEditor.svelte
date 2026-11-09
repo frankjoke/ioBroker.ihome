@@ -122,7 +122,7 @@
 
   {#if plugin.restartRequired}
     <p class="restart hint">
-      This plugin needs an adapter restart before the change is active.
+      Restart iHome in Admin to apply this change.
       <a href="#/admin">Open Admin</a>.
     </p>
   {/if}
@@ -143,7 +143,7 @@
         type="checkbox"
         bind:checked={debug}
         disabled={plugin.staged}
-        title={plugin.staged ? "Available after an adapter restart" : undefined}
+        title={plugin.staged ? "Available after a restart in Admin" : undefined}
       />
       <span>Debug logs</span>
     </label>
@@ -172,7 +172,8 @@
       </label>
     </div>
     <p class="hint text-muted">
-      Code: {plugin.codeLength} bytes (imported). Export to change it outside iHome.
+      Plugin file: {plugin.codeLength} bytes (imported). Export to change it outside
+      iHome.
     </p>
   {/if}
 

@@ -61,7 +61,7 @@
           <label
             class="switch"
             title={plugin.staged
-              ? "Available after an adapter restart"
+              ? "Available after a restart in Admin"
               : undefined}
           >
             <input
@@ -79,12 +79,12 @@
         </div>
         {#if plugin.removalPending}
           <p class="restart hint">
-            Removal pending after an adapter restart.
+            Removal pending — restart iHome in Admin.
             <a href="#/admin">Open Admin</a>
           </p>
         {:else if plugin.restartRequired}
           <p class="restart hint">
-            Needs an adapter restart. <a href="#/admin">Open Admin</a>
+            Restart iHome in Admin to apply. <a href="#/admin">Open Admin</a>
           </p>
         {/if}
       </div>

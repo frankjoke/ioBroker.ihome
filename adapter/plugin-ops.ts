@@ -47,16 +47,16 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "network.info",
     name: "Network device info",
-    help: "Lists the network devices configured in the adapter, or returns one device by id.",
+    help: "Shows the network devices iHome knows about — for example a phone, tablet or TV — or one device by its id.",
     usage:
-      "Payload `{ id?: string }`. Without an id it returns `{ devices: [...] }`; with an id it returns that device. The Samsung remote uses it to fill in the TV host.",
+      "Payload `{ id?: string }`. Without an id it lists all devices; with an id it returns that device. The Samsung TV remote uses it to find the TV's address.",
   },
   {
     id: "network.wake",
     name: "Wake-on-LAN",
-    help: "Sends a Wake-on-LAN magic packet to a configured network device.",
+    help: "Switches a device on over the network (Wake-on-LAN). The device must be entered under Network devices with its MAC address.",
     usage:
-      "Payload `{ id: string, port?: number }`. The device must have a MAC address. The Samsung remote's Power button uses it when the TV is off.",
+      "Payload `{ id: string, port?: number }`. The Samsung TV remote's Power button uses it when the TV is off.",
   },
 ];
 

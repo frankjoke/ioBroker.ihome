@@ -102,7 +102,7 @@
         "plugins": {
           "type": "table",
           "label": "Adapter plugins",
-          "help": "Built-in code lives in the adapter. User plugins are trusted Node code. The SPA manages availability, settings, help and imports; adding or changing code here saves and restarts the adapter. Page-managed values override these native defaults.",
+          "help": "Built-in plugins are part of iHome. User plugins run inside the iHome adapter and can do what the adapter can, so only add code you trust. The Plugins page manages availability, settings, help and imports; adding or changing plugin code here saves and restarts the adapter. Page-managed values override these defaults.",
           "xs": 12,
           "sm": 12,
           "md": 12,

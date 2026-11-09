@@ -1,11 +1,13 @@
 /** Static help for writing, installing and debugging an iHome plugin. */
 export const PLUGIN_GUIDE = `## What a plugin is
 
-A plugin is trusted Node code that the adapter loads at start. It gets the iHome plugin API and a timeout, and may implement start, call, reload and stop. **Only import plugins you trust.**
+A plugin adds a function to iHome. It runs inside the iHome adapter alongside ioBroker, so **only import plugins you trust**. The adapter loads plugins when it starts.
+
+The rest of this guide is for people who write or update a plugin. To install one, use Import and follow the steps below.
 
 ## File format
 
-One plugin per JSON file. Import stages it disabled.
+One plugin per file. Import keeps the plugin switched off until the next restart.
 
 \`\`\`json
 {
@@ -56,12 +58,12 @@ module.exports = (api) => {
 
 ## Install and run
 
-1. Import the JSON file; it is staged **disabled**.
-2. Restart the adapter from ioBroker Admin (adding code requires a restart).
-3. Enable the plugin on this page. It starts from the code the adapter loaded.
+1. Import the plugin file; it stays switched off.
+2. Restart iHome in ioBroker Admin. New or changed plugin code needs a restart.
+3. Enable the plugin on this page.
 4. Call it from a logic with \`call("demo.echo", payload, (data, error) => { ... })\` or from HTML with \`await ihome.call("demo.echo", payload)\`.
 
-Settings changes apply live when the plugin implements \`reload\`; otherwise the page marks a restart required. Code changes always need the Admin edit and restart.
+Settings changes take effect immediately when the plugin supports it; otherwise the page asks for a restart. Code changes always need the Admin edit and restart.
 
 Use **Export** in the plugin editor to download a user plugin as the same JSON file. Built-ins cannot be exported because their code lives in the adapter.
 
@@ -71,4 +73,4 @@ Turn on **Debug logs** for one plugin; its \`api.log.debug\` lines appear in the
 
 ## Secrets
 
-Settings are stored in ioBroker and visible to anyone with broker read access. Passwords and tokens belong in the adapter's native config, not in plugin settings.`;
+Settings are not secret: anyone who can read your ioBroker objects can see them. Keep passwords and tokens in the adapter settings, not in plugin settings.`;

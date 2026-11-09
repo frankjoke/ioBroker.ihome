@@ -48,8 +48,8 @@
   <div class="modal-card card">
     <h3>Import plugin</h3>
     <p class="hint text-muted">
-      Choose an <span class="mono">ihome-plugin</span> JSON file. Nothing runs until
-      you restart the adapter and enable the plugin.
+      Choose an iHome plugin file. The plugin stays switched off until you
+      restart iHome in Admin and enable it here.
     </p>
 
     <label class="field">
@@ -82,7 +82,7 @@
     {/if}
 
     <p class="warning-banner">
-      Imported plugins are staged disabled. Restart the adapter in Admin, then
+      The imported plugin stays switched off. Restart iHome in Admin, then
       enable it here.
     </p>
 

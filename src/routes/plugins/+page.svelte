@@ -86,9 +86,9 @@
   </div>
 
   <p class="warning-banner">
-    User plugins run as Node code inside the adapter. Only import plugins you
-    trust. Settings are visible in ioBroker — do not store passwords or tokens
-    there.
+    Plugins add extra functions to iHome. They run inside the iHome adapter
+    alongside ioBroker, so only import plugins you trust. Settings are visible
+    in ioBroker — do not store passwords or tokens there.
   </p>
 
   <HelpSection help={PLUGIN_GUIDE} label="Plugin guide" />
