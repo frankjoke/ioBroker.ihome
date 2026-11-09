@@ -31,6 +31,12 @@ export interface PluginHost {
   canHotEnable(id: string, code?: string): boolean;
   setEnabled(entry: AdapterPlugin): Promise<PluginReply>;
   hasReload(id: string): boolean;
+  updateSettings(
+    id: string,
+    settings: Record<string, unknown>,
+  ): Promise<PluginReply>;
+  updateMeta(id: string, patch: { timeoutMs?: number; debug?: boolean }): void;
+  needsSettingsRestart(id: string): boolean;
 }
 
 type PluginLog = (level: "info" | "warn" | "error", message: string) => void;
@@ -104,6 +110,7 @@ export function createPluginHost(
   const records = new Map<string, Loaded>();
   const failed = new Set<string>();
   const disabled = new Set<string>();
+  const settingsRestart = new Set<string>();
   const snapshot = new Map<string, string | undefined>(
     plugins.map((plugin) => [plugin.id, plugin.code]),
   );
@@ -164,6 +171,39 @@ export function createPluginHost(
       return typeof records.get(id)?.reload === "function";
     },
 
+    needsSettingsRestart(id) {
+      return settingsRestart.has(id);
+    },
+
+    updateMeta(id, patch) {
+      const record = records.get(id);
+      if (!record) return;
+      if (patch.timeoutMs !== undefined) record.timeoutMs = patch.timeoutMs;
+      if (patch.debug !== undefined) record.runtime.debug = patch.debug;
+    },
+
+    async updateSettings(id, settings) {
+      const record = records.get(id);
+      if (!record) return pluginReply(undefined);
+      record.runtime.settings = { ...settings };
+      if (!record.reload) {
+        settingsRestart.add(id);
+        return pluginReply(undefined);
+      }
+      try {
+        await withTimeout(
+          Promise.resolve(record.reload(record.api)),
+          record.timeoutMs,
+          "reload ",
+        );
+        settingsRestart.delete(id);
+        return pluginReply(undefined);
+      } catch (error) {
+        settingsRestart.add(id);
+        return pluginError(error);
+      }
+    },
+
     async setEnabled(entry) {
       const id = entry.id;
       if (!entry.enabled) {
@@ -178,6 +218,7 @@ export function createPluginHost(
         }
         failed.delete(id);
         disabled.add(id);
+        settingsRestart.delete(id);
         return pluginReply(undefined);
       }
       if (records.has(id)) return pluginReply(undefined);
@@ -192,6 +233,7 @@ export function createPluginHost(
         records.set(id, loaded);
         failed.delete(id);
         disabled.delete(id);
+        settingsRestart.delete(id);
         return pluginReply(undefined);
       } catch (error) {
         failed.add(id);
@@ -205,6 +247,7 @@ export function createPluginHost(
       records.clear();
       failed.clear();
       disabled.clear();
+      settingsRestart.clear();
       for (const plugin of plugins) {
         if (!plugin.enabled) {
           disabled.add(plugin.id);
@@ -260,6 +303,7 @@ export function createPluginHost(
       records.clear();
       failed.clear();
       disabled.clear();
+      settingsRestart.clear();
     },
   };
 }

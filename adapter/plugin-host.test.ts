@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { AdapterPlugin } from "./plugin-ops";
-import { createPluginHost, type PluginFactory } from "./plugin-host";
+import {
+  createPluginHost,
+  type PluginFactory,
+  type PluginRuntime,
+} from "./plugin-host";
 import type { PluginApi } from "./plugin-api";
 
 const logs: string[] = [];
@@ -46,6 +50,17 @@ function fakeApi(): PluginApi {
     network: { list: () => [], get: () => undefined },
     sendTo: async () => undefined,
   };
+}
+
+function liveApi(runtime: PluginRuntime): PluginApi {
+  const api = fakeApi();
+  Object.defineProperty(api, "settings", {
+    get: () => ({ ...runtime.settings }),
+  });
+  api.log.debug = (message) => {
+    if (runtime.debug) logs.push(`debug:${message}`);
+  };
+  return api;
 }
 
 describe("createPluginHost", () => {
@@ -410,5 +425,94 @@ describe("createPluginHost", () => {
     await host.start();
     expect(host.hasReload("u")).toBe(true);
     expect(host.hasReload("missing")).toBe(false);
+  });
+
+  it("calls reload with the new settings and keeps the plugin running", async () => {
+    const reloaded: unknown[] = [];
+    (globalThis as { __reload?: (settings: unknown) => void }).__reload = (
+      settings,
+    ) => reloaded.push(settings);
+    const code = `module.exports = () => ({
+      async call() { return 1; },
+      async reload(api) { globalThis.__reload(api.settings); },
+    });`;
+    const host = createPluginHost(
+      [plugin("u", code)],
+      (_plugin, runtime) => liveApi(runtime),
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(await host.updateSettings("u", { prefix: "new" })).toEqual({
+      ok: true,
+      result: undefined,
+    });
+    expect(reloaded).toEqual([{ prefix: "new" }]);
+    expect(host.needsSettingsRestart("u")).toBe(false);
+    expect(host.status("u")).toBe("running");
+  });
+
+  it("marks settings restart-required without reload", async () => {
+    const host = createPluginHost(
+      [plugin("u", `module.exports = () => ({ async call() { return 1; } });`)],
+      fakeApi,
+      {},
+      () => {},
+    );
+    await host.start();
+    await host.updateSettings("u", { prefix: "new" });
+    expect(host.needsSettingsRestart("u")).toBe(true);
+    expect(host.status("u")).toBe("running");
+  });
+
+  it("returns an error and marks restart-required when reload fails", async () => {
+    const host = createPluginHost(
+      [
+        plugin(
+          "u",
+          `module.exports = () => ({
+            async call() { return 1; },
+            async reload() { throw new Error("reload failed"); },
+          });`,
+        ),
+      ],
+      fakeApi,
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(await host.updateSettings("u", {})).toEqual({
+      ok: false,
+      error: "reload failed",
+    });
+    expect(host.needsSettingsRestart("u")).toBe(true);
+  });
+
+  it("updates timeout and debug live", async () => {
+    const host = createPluginHost(
+      [
+        plugin(
+          "u",
+          `module.exports = (api) => ({
+            async call() {
+              api.log.debug("called");
+              await new Promise((resolve) => setTimeout(resolve, 30));
+              return "ok";
+            },
+          });`,
+          10,
+        ),
+      ],
+      (_plugin, runtime) => liveApi(runtime),
+      {},
+      () => {},
+    );
+    logs.length = 0;
+    await host.start();
+    expect(await host.call("u", null)).toMatchObject({ ok: false });
+    host.updateMeta("u", { timeoutMs: 1000, debug: true });
+    expect(await host.call("u", null)).toEqual({ ok: true, result: "ok" });
+    expect(logs).toContain("debug:called");
+    expect(host.status("u")).toBe("running");
   });
 });
