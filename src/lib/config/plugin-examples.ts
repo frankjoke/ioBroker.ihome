@@ -1,0 +1,66 @@
+import type { ImportedPlugin } from "$adapter/plugin-file";
+import nutCode from "../../../examples/nut-ups.js?raw";
+
+/** Ready-to-import user plugins shown in the import dialog. */
+export const NUT_EXAMPLE: ImportedPlugin = {
+  id: "nut.ups",
+  name: "NUT UPS",
+  timeoutMs: 8000,
+  help: "Read-only monitor for one Network UPS Tools (NUT) UPS. Polls its variables and writes them to iHome states.",
+  usage: [
+    "**Settings**",
+    "",
+    "```ts",
+    '{ host: "localhost", port: 3493, ups: "piups", interval: 30 }',
+    "```",
+    "",
+    "Writes one state per NUT variable under `ihome.0.nut.*` — for example",
+    "`nut.ups.status`, `nut.battery.charge`, `nut.output.voltage` — plus",
+    "`nut.connected`, `nut.online`, `nut.onBattery`, `nut.lowBattery`,",
+    "`nut.charging`, `nut.discharging`, `nut.error` and `nut.lastUpdate`.",
+    "",
+    "**From a logic**",
+    "",
+    "```js",
+    'call("nut.ups", { refresh: true }, (data, error) => {',
+    '  if (error) return log(error, "warn");',
+    '  log(data.status + " · " + data.batteryCharge + "%");',
+    "});",
+    "```",
+    "",
+    "Read-only: the example uses no credentials. The NUT server must allow",
+    "`LIST VAR` (normal on the LAN). Beeper and load commands are not included.",
+  ].join("\n"),
+  settingsSchema: [
+    {
+      name: "host",
+      label: "NUT host",
+      type: "string",
+      default: "localhost",
+      description: "Host running upsd (the NUT server).",
+    },
+    {
+      name: "port",
+      label: "Port",
+      type: "number",
+      default: 3493,
+      description: "NUT server port; default 3493.",
+    },
+    {
+      name: "ups",
+      label: "UPS name",
+      type: "string",
+      default: "ups",
+      description: "UPS name from ups.conf, e.g. piups.",
+    },
+    {
+      name: "interval",
+      label: "Poll interval (s)",
+      type: "number",
+      default: 30,
+      description: "Seconds between polls; minimum 5.",
+    },
+  ],
+  settings: { host: "localhost", port: 3493, ups: "ups", interval: 30 },
+  code: nutCode,
+};

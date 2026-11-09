@@ -71,6 +71,7 @@
   "files": [
     "admin/",
     "www/",
+    "examples/",
     "io-package.json",
     "LICENSE",
     "README.md",

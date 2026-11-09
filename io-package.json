@@ -4,8 +4,8 @@
     "version": "0.3.3",
     "news": {
       "0.3.3": {
-        "en": "HTTP input plugin: receive GET, POST or PUT data from devices and webhooks and write it to one JSON state or directly to a list of target states, with per-target transforms. Wake-on-LAN accepts a direct MAC/IP payload.",
-        "de": "HTTP-Input-Plugin: GET-, POST- oder PUT-Daten von Geräten und Webhooks empfangen und in einen JSON-State oder direkt in eine Liste von Ziel-States mit Transformationen schreiben. Wake-on-LAN akzeptiert direkte MAC/IP-Optionen."
+        "en": "HTTP input plugin: receive GET, POST or PUT data from devices and webhooks and write it to one JSON state or directly to a list of target states, with per-target transforms; endpoints can set their own bind, port, token and enabled flag. Built-in plugins export their settings, and the import dialog includes a ready-to-import read-only NUT UPS example. Wake-on-LAN accepts a direct MAC/IP payload.",
+        "de": "HTTP-Input-Plugin: GET-, POST- oder PUT-Daten von Geräten und Webhooks empfangen und in einen JSON-State oder direkt in eine Liste von Ziel-States mit Transformationen schreiben; Endpunkte können eigenes Bind, Port, Token und Enabled setzen. Integrierte Plugins exportieren ihre Einstellungen, und der Import-Dialog enthält ein direkt importierbares Read-only-Beispiel für eine NUT-USV. Wake-on-LAN akzeptiert direkte MAC/IP-Optionen."
       },
       "0.3.2": {
         "en": "Plugins page: list built-in and user plugins, enable/disable them, manage per-plugin settings and debug logs, read help/usage, export user plugins and stage JSON imports. Imported plugins start disabled and need an adapter restart from Admin; code changes stay in Admin.",

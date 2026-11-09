@@ -1,6 +1,7 @@
 <script lang="ts">
   import { importPlugin } from "$lib/stores/plugins.svelte";
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
+  import { NUT_EXAMPLE } from "$lib/config/plugin-examples";
 
   let {
     onClose,
@@ -27,6 +28,12 @@
       return;
     }
     plugin = parsed.plugin;
+  }
+
+  function loadExample(): void {
+    error = "";
+    fileName = "NUT UPS example";
+    plugin = NUT_EXAMPLE;
   }
 
   async function confirm(): Promise<void> {
@@ -99,6 +106,14 @@
     {/if}
 
     <div class="actions">
+      <button
+        type="button"
+        class="btn example"
+        disabled={busy}
+        onclick={loadExample}
+      >
+        <span class="material-symbols-outlined">lightbulb</span> NUT example
+      </button>
       <button type="button" class="btn" disabled={busy} onclick={onClose}>
         Cancel
       </button>
@@ -166,5 +181,9 @@
     justify-content: flex-end;
     gap: 0.5rem;
     flex-wrap: wrap;
+  }
+
+  .example {
+    margin-right: auto;
   }
 </style>

@@ -58,6 +58,9 @@ module.exports = (api) => {
 
 ## Install and run
 
+The Import dialog has a **NUT example** button — a read-only Network UPS Tools
+monitor you can load, inspect and adapt.
+
 1. Import the plugin file; it stays switched off.
 2. Restart iHome in ioBroker Admin. New or changed plugin code needs a restart.
 3. Enable the plugin on this page.
@@ -65,7 +68,7 @@ module.exports = (api) => {
 
 Settings changes take effect immediately when the plugin supports it; otherwise the page asks for a restart. Code changes always need the Admin edit and restart.
 
-Use **Export** in the plugin editor to download a user plugin as the same JSON file. Built-ins cannot be exported because their code lives in the adapter.
+Use **Export** in the plugin editor to download a user plugin as the same JSON file. Built-ins export their settings only; their code lives in the adapter.
 
 ## Debug logs
 
