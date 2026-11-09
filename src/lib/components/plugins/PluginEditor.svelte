@@ -2,9 +2,15 @@
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
-  import { deletePlugin, savePlugin } from "$lib/stores/plugins.svelte";
-  import type { PluginView } from "$adapter/plugin-admin";
-  import type { PluginPatch } from "$adapter/plugin-admin";
+  import {
+    deletePlugin,
+    exportPlugin,
+    savePlugin,
+  } from "$lib/stores/plugins.svelte";
+  import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
+  import { downloadJson } from "$lib/utils/download";
+  import { slugify } from "$lib/config/slug";
+  import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 
   let {
     plugin,
@@ -67,6 +73,23 @@
     try {
       await savePlugin(patch);
       onSaved();
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function exportFile(): Promise<void> {
+    error = "";
+    if (busy) return;
+    busy = true;
+    try {
+      const exported = await exportPlugin(plugin.id);
+      downloadJson(
+        `ihome-plugin-${slugify(exported.name) || "plugin"}.json`,
+        serializePluginFile(pluginFile(exported)),
+      );
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -159,6 +182,9 @@
         onclick={() => (confirmDelete = true)}
       >
         Delete
+      </button>
+      <button type="button" class="btn" disabled={busy} onclick={exportFile}>
+        Export
       </button>
     {/if}
     <button

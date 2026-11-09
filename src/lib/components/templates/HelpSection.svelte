@@ -115,6 +115,19 @@
     font-family: var(--font-mono);
   }
 
+  .help-body :global(pre) {
+    margin: 0 0 0.5rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    border-radius: var(--border-radius);
+    background: var(--surface-container-high);
+  }
+
+  .help-body :global(pre code) {
+    padding: 0;
+    background: none;
+  }
+
   .help-body :global(h1),
   .help-body :global(h2),
   .help-body :global(h3) {

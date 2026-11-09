@@ -69,6 +69,17 @@ function renderBlocks(source: string): string {
       blocks.push(`<h${level}>${inline(heading[2])}</h${level}>`);
       continue;
     }
+    if (/^```/.test(line)) {
+      flush();
+      const code: string[] = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) {
+        code.push(lines[i]);
+        i++;
+      }
+      blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+      continue;
+    }
     if (/^\s*[-*]\s+/.test(line)) {
       flush();
       const items: string[] = [];

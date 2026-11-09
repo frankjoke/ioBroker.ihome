@@ -49,6 +49,12 @@ describe("renderHelp", () => {
     expect(await renderHelp("one\ntwo")).toBe("<p>one<br>two</p>\n");
   });
 
+  it("renders fenced code blocks as escaped preformatted text", async () => {
+    const html = await renderHelp("```js\nconst x = **1**;\n```");
+    expect(html).toContain("<pre><code>const x = **1**;</code></pre>");
+    expect(html).not.toContain("<strong>");
+  });
+
   it("leaves Markdown inside inline code alone", async () => {
     const html = await renderHelp("`**not bold**`");
     expect(html).toContain("<code>**not bold**</code>");
