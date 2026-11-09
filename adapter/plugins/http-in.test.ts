@@ -3,8 +3,10 @@ import type { PluginApi } from "../plugin-api";
 import {
   applyHttpWrites,
   buildRequestData,
+  httpServerGroups,
   matchHttpEndpoint,
   parseHttpEndpoints,
+  parseHttpSettings,
   processHttpRequest,
   targetWrites,
 } from "./http-in";
@@ -51,6 +53,69 @@ describe("parseHttpEndpoints", () => {
         '[{"path":"x","method":"GET","targets":[{"state":"","value":"$"}]}]',
       ),
     ).toThrow();
+    expect(() =>
+      parseHttpEndpoints(
+        '[{"path":"x","method":"GET","target":"0_userdata.0.X","port":70000}]',
+      ),
+    ).toThrow();
+    expect(() =>
+      parseHttpEndpoints(
+        '[{"path":"x","method":"GET","target":"0_userdata.0.X","enabled":"no"}]',
+      ),
+    ).toThrow();
+  });
+
+  it("parses per-endpoint bind, port, token and enabled", () => {
+    const [endpoint] = parseHttpEndpoints(
+      '[{"path":"x","method":"GET","target":"0_userdata.0.X","bind":"127.0.0.1","port":9000,"token":"t","enabled":false}]',
+    );
+    expect(endpoint).toMatchObject({
+      bind: "127.0.0.1",
+      port: 9000,
+      token: "t",
+      enabled: false,
+    });
+  });
+});
+
+describe("httpServerGroups", () => {
+  it("groups enabled endpoints by bind and port", () => {
+    const settings = parseHttpSettings({
+      bind: "0.0.0.0",
+      port: 8095,
+      endpoints: JSON.stringify([
+        { path: "a", method: "GET", target: "0_userdata.0.A" },
+        {
+          path: "b",
+          method: "GET",
+          target: "0_userdata.0.B",
+          port: 9000,
+        },
+        {
+          path: "c",
+          method: "GET",
+          target: "0_userdata.0.C",
+          bind: "127.0.0.1",
+        },
+        {
+          path: "d",
+          method: "GET",
+          target: "0_userdata.0.D",
+          enabled: false,
+        },
+      ]),
+    });
+    expect(
+      httpServerGroups(settings).map((group) => [
+        group.bind,
+        group.port,
+        group.endpoints.map((endpoint) => endpoint.path),
+      ]),
+    ).toEqual([
+      ["0.0.0.0", 8095, ["/a"]],
+      ["0.0.0.0", 9000, ["/b"]],
+      ["127.0.0.1", 8095, ["/c"]],
+    ]);
   });
 });
 
@@ -233,5 +298,43 @@ describe("processHttpRequest", () => {
     );
     expect(result.status).toBe(500);
     expect(result.writes).toEqual([]);
+  });
+
+  it("uses per-endpoint tokens and skips disabled endpoints", () => {
+    const custom = parseHttpEndpoints(
+      JSON.stringify([
+        {
+          path: "own",
+          method: "GET",
+          target: "0_userdata.0.Own",
+          token: "own-token",
+        },
+        {
+          path: "open",
+          method: "GET",
+          target: "0_userdata.0.Open",
+          token: "",
+        },
+        {
+          path: "off",
+          method: "GET",
+          target: "0_userdata.0.Off",
+          enabled: false,
+        },
+      ]),
+    );
+    const perEndpoint = { endpoints: custom, token: "global-token" };
+    const call = (path: string, token: string) =>
+      processHttpRequest(perEndpoint, {
+        method: "GET",
+        path,
+        query: {},
+        body: undefined,
+        token,
+      }).status;
+    expect(call("/own", "own-token")).toBe(200);
+    expect(call("/own", "global-token")).toBe(401);
+    expect(call("/open", "")).toBe(200);
+    expect(call("/off", "global-token")).toBe(404);
   });
 });

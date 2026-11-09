@@ -22,6 +22,14 @@ export interface HttpTarget {
 export interface HttpEndpoint {
   path: string;
   method: string;
+  /** Overrides the plugin bind setting for this endpoint. */
+  bind?: string;
+  /** Overrides the plugin port setting for this endpoint. */
+  port?: number;
+  /** Overrides the plugin token setting; empty text means no token. */
+  token?: string;
+  /** false keeps the endpoint configured but not served. Default true. */
+  enabled?: boolean;
   target?: string;
   targets?: HttpTarget[];
   /** Sent on success; a string is text, anything else JSON. */
@@ -32,6 +40,12 @@ export interface HttpSettings {
   bind: string;
   port: number;
   token: string;
+  endpoints: HttpEndpoint[];
+}
+
+export interface HttpServerGroup {
+  bind: string;
+  port: number;
   endpoints: HttpEndpoint[];
 }
 
@@ -142,13 +156,40 @@ export function parseHttpEndpoints(value: unknown): HttpEndpoint[] {
     if (!target && !targets?.length) {
       throw new Error(`endpoint ${path} needs a target or targets list`);
     }
-    return {
-      path: normalizeHttpPath(path),
-      method,
-      ...(target ? { target } : {}),
-      ...(targets?.length ? { targets } : {}),
-      ...(entry.reply !== undefined ? { reply: entry.reply } : {}),
-    };
+    const endpoint: HttpEndpoint = { path: normalizeHttpPath(path), method };
+    if (entry.bind !== undefined) {
+      if (typeof entry.bind !== "string" || !entry.bind.trim()) {
+        throw new Error(`endpoint ${path}: bind must be text`);
+      }
+      endpoint.bind = entry.bind.trim();
+    }
+    if (entry.port !== undefined) {
+      if (
+        typeof entry.port !== "number" ||
+        !Number.isInteger(entry.port) ||
+        entry.port <= 0 ||
+        entry.port > 65_535
+      ) {
+        throw new Error(`endpoint ${path}: port must be 1-65535`);
+      }
+      endpoint.port = entry.port;
+    }
+    if (entry.token !== undefined) {
+      if (typeof entry.token !== "string") {
+        throw new Error(`endpoint ${path}: token must be text`);
+      }
+      endpoint.token = entry.token;
+    }
+    if (entry.enabled !== undefined) {
+      if (typeof entry.enabled !== "boolean") {
+        throw new Error(`endpoint ${path}: enabled must be true or false`);
+      }
+      endpoint.enabled = entry.enabled;
+    }
+    if (target) endpoint.target = target;
+    if (targets?.length) endpoint.targets = targets;
+    if (entry.reply !== undefined) endpoint.reply = entry.reply;
+    return endpoint;
   });
 }
 
@@ -169,6 +210,24 @@ export function parseHttpSettings(
   return { bind, port, token, endpoints };
 }
 
+/** Enabled endpoints grouped by the bind/port each HTTP server listens on. */
+export function httpServerGroups(settings: HttpSettings): HttpServerGroup[] {
+  const groups = new Map<string, HttpServerGroup>();
+  for (const endpoint of settings.endpoints) {
+    if (endpoint.enabled === false) continue;
+    const bind = endpoint.bind ?? settings.bind;
+    const port = endpoint.port ?? settings.port;
+    const key = `${bind}\u0000${port}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { bind, port, endpoints: [] };
+      groups.set(key, group);
+    }
+    group.endpoints.push(endpoint);
+  }
+  return [...groups.values()];
+}
+
 export function matchHttpEndpoint(
   endpoints: HttpEndpoint[],
   method: string,
@@ -177,7 +236,10 @@ export function matchHttpEndpoint(
   const normalized = normalizeHttpPath(path);
   const upper = method.toUpperCase();
   return endpoints.find(
-    (endpoint) => endpoint.path === normalized && endpoint.method === upper,
+    (endpoint) =>
+      endpoint.enabled !== false &&
+      endpoint.path === normalized &&
+      endpoint.method === upper,
   );
 }
 
@@ -262,15 +324,16 @@ export function processHttpRequest(
   settings: Pick<HttpSettings, "endpoints" | "token">,
   input: HttpRequestInput,
 ): HttpRequestResult {
-  if (settings.token && input.token !== settings.token) {
-    return { status: 401, error: "invalid token", writes: [] };
-  }
   const normalized = normalizeHttpPath(input.path);
   const endpoint = settings.endpoints.find(
-    (entry) => entry.path === normalized,
+    (entry) => entry.enabled !== false && entry.path === normalized,
   );
   if (!endpoint) {
     return { status: 404, error: "unknown path", writes: [] };
+  }
+  const token = endpoint.token ?? settings.token;
+  if (token && input.token !== token) {
+    return { status: 401, error: "invalid token", writes: [] };
   }
   if (endpoint.method !== input.method.toUpperCase()) {
     return { status: 405, error: "method not allowed", writes: [] };
@@ -377,6 +440,7 @@ function requestToken(
 async function handleRequest(
   api: PluginApi,
   settings: HttpSettings,
+  endpoints: HttpEndpoint[],
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -392,13 +456,16 @@ async function handleRequest(
             await readBody(req),
             String(req.headers["content-type"] ?? ""),
           );
-    const result = processHttpRequest(settings, {
-      method: req.method ?? "GET",
-      path: url.pathname,
-      query,
-      body,
-      token,
-    });
+    const result = processHttpRequest(
+      { endpoints, token: settings.token },
+      {
+        method: req.method ?? "GET",
+        path: url.pathname,
+        query,
+        body,
+        token,
+      },
+    );
     if (result.status === 200) {
       try {
         await applyHttpWrites(api, result.writes);
@@ -410,7 +477,7 @@ async function handleRequest(
       }
     }
     api.log.debug(
-      `http.in ${req.method} ${url.pathname} -> ${result.status} wrote=${result.writes.length} from ${req.socket.remoteAddress ?? "?"}`,
+      `http.in :${req.socket.localPort ?? "?"} ${req.method} ${url.pathname} -> ${result.status} wrote=${result.writes.length} from ${req.socket.remoteAddress ?? "?"}`,
     );
     if (result.status === 200 && result.reply !== undefined) {
       const text = typeof result.reply === "string";
@@ -450,41 +517,57 @@ async function handleRequest(
 export function createHttpPlugins(): Record<string, PluginFactory> {
   return {
     "http.in": (api) => {
-      let server: Server | null = null;
-      let current: HttpSettings | null = null;
+      let servers: { server: Server; group: HttpServerGroup }[] = [];
 
       async function start(): Promise<void> {
         const settings = parseHttpSettings(api.settings);
-        const next = createServer((req, res) => {
-          void handleRequest(api, settings, req, res);
-        });
-        await new Promise<void>((resolve, reject) => {
-          const onError = (error: Error) => reject(error);
-          next.once("error", onError);
-          next.listen(settings.port, settings.bind, () => {
-            next.removeListener("error", onError);
-            resolve();
+        const groups = httpServerGroups(settings);
+        const started: { server: Server; group: HttpServerGroup }[] = [];
+        let firstError: unknown;
+        for (const group of groups) {
+          const server = createServer((req, res) => {
+            void handleRequest(api, settings, group.endpoints, req, res);
           });
-        });
-        next.on("error", (error) => {
-          api.log.error(`http.in: ${error.message}`);
-        });
-        server = next;
-        current = settings;
-        api.log.info(
-          `http.in listening on ${settings.bind}:${settings.port} (${settings.endpoints.length} endpoint(s))`,
-        );
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const onError = (error: Error) => reject(error);
+              server.once("error", onError);
+              server.listen(group.port, group.bind, () => {
+                server.removeListener("error", onError);
+                resolve();
+              });
+            });
+          } catch (error) {
+            firstError ??= error;
+            api.log.error(
+              `http.in ${group.bind}:${group.port}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            continue;
+          }
+          server.on("error", (error) => {
+            api.log.error(`http.in: ${error.message}`);
+          });
+          started.push({ server, group });
+          api.log.info(
+            `http.in listening on ${group.bind}:${group.port} (${group.endpoints.length} endpoint(s))`,
+          );
+        }
+        servers = started;
+        if (groups.length > 0 && started.length === 0) throw firstError;
       }
 
       async function stop(): Promise<void> {
-        const active = server;
-        server = null;
-        current = null;
-        if (!active) return;
-        await new Promise<void>((resolve) => {
-          active.close(() => resolve());
-          active.closeAllConnections?.();
-        });
+        const active = servers;
+        servers = [];
+        await Promise.all(
+          active.map(
+            ({ server }) =>
+              new Promise<void>((resolve) => {
+                server.close(() => resolve());
+                server.closeAllConnections?.();
+              }),
+          ),
+        );
       }
 
       return {
@@ -492,7 +575,11 @@ export function createHttpPlugins(): Record<string, PluginFactory> {
           await start();
         },
         async call() {
-          return { ok: true, listening: !!server, port: current?.port };
+          return {
+            ok: true,
+            listening: servers.length > 0,
+            ports: servers.map(({ group }) => group.port),
+          };
         },
         async reload() {
           await stop();
