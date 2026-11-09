@@ -24,9 +24,15 @@
     plugins.find((plugin) => plugin.id === selectedId) ?? null,
   );
 
+  let wasConnected = false;
   $effect(() => {
-    if (ioBroker.connected && plugins.length === 0) {
-      void loadPlugins().catch(() => {});
+    if (ioBroker.connected) {
+      if (!wasConnected) {
+        wasConnected = true;
+        void loadPlugins().catch(() => {});
+      }
+    } else {
+      wasConnected = false;
     }
   });
 

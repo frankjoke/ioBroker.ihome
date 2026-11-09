@@ -24,15 +24,28 @@ import {
   applyPluginPatches,
   parsePluginsCommand,
   pluginView as makePluginView,
-  removeUserPlugin,
-  stagePluginImport,
   type PluginView,
   type PluginsCommand,
 } from "./plugin-admin";
-import { parsePluginFile, pluginFile } from "./plugin-file";
+import {
+  importStaged,
+  mergePluginSettings,
+  normalizeSettingsDoc,
+  pluginSettingsChanged,
+  pluginSettingsDoc,
+  removeStaged,
+  stageRemoval,
+  type PluginSettingsDocument,
+} from "./plugin-config";
+import {
+  parsePluginFile,
+  pluginFile,
+  type ImportedPlugin,
+} from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
   BUILTIN_PLUGINS,
+  DEFAULT_PLUGIN_TIMEOUT_MS,
   parsePluginMessage,
   pluginConfigWithBuiltins,
   pluginError,
@@ -79,6 +92,7 @@ const DOCS = [
   "variableList",
   "settings",
   "logicList",
+  "pluginSettings",
 ] as const;
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
@@ -223,6 +237,15 @@ class IHome extends utils.Adapter {
   private pluginHost?: PluginHost;
   /** The plugin list as the adapter currently knows it. */
   private pluginConfig: AdapterPlugin[] = [];
+  /** Page-managed plugin settings, staged imports and removals. */
+  private pluginSettings: PluginSettingsDocument = {
+    version: 1,
+    settings: {},
+    staged: [],
+    removals: [],
+  };
+  /** The last settings document this adapter wrote, to ignore its own echo. */
+  private pluginSettingsText = "";
   /** Serializes plugin management commands. */
   private pluginsTail: Promise<unknown> = Promise.resolve();
 
@@ -1045,9 +1068,59 @@ class IHome extends utils.Adapter {
     );
   }
 
+  private pluginSettingsStateId(): string {
+    return `${this.namespace}.${CONFIG_FOLDER}.pluginSettings`;
+  }
+
+  private async readPluginSettings(): Promise<PluginSettingsDocument | null> {
+    const state = await this.getStateAsync(this.pluginSettingsStateId());
+    return normalizeSettingsDoc(state?.val);
+  }
+
+  private async savePluginSettings(): Promise<void> {
+    const text = JSON.stringify(this.pluginSettings);
+    this.pluginSettingsText = text;
+    await this.setStateAsync(this.pluginSettingsStateId(), {
+      val: text,
+      ack: true,
+    });
+  }
+
+  private async applyPluginSettings(
+    doc: PluginSettingsDocument,
+    text = JSON.stringify(doc),
+  ): Promise<void> {
+    const previous = this.pluginConfig;
+    const next = mergePluginSettings(previous, doc);
+    const host = this.pluginHost;
+    for (const plugin of next) {
+      const old = previous.find((entry) => entry.id === plugin.id);
+      if (!old) continue;
+      if (old.enabled !== plugin.enabled) await host?.setEnabled(plugin);
+      if (pluginSettingsChanged(old.settings, plugin.settings)) {
+        await host?.updateSettings(plugin.id, plugin.settings ?? {});
+      }
+      if (old.timeoutMs !== plugin.timeoutMs || old.debug !== plugin.debug) {
+        host?.updateMeta(plugin.id, {
+          timeoutMs: plugin.timeoutMs,
+          debug: plugin.debug,
+        });
+      }
+    }
+    for (const id of doc.removals) {
+      const old = previous.find((entry) => entry.id === id);
+      if (old?.enabled) await host?.setEnabled({ ...old, enabled: false });
+    }
+    this.pluginConfig = next;
+    this.pluginSettings = doc;
+    this.pluginSettingsText = text;
+  }
+
   private pluginViewOf(plugin: AdapterPlugin): PluginView {
     const host = this.pluginHost;
     const restartRequired =
+      this.pluginSettings.staged.some((entry) => entry.id === plugin.id) ||
+      this.pluginSettings.removals.includes(plugin.id) ||
       !host ||
       !host.canHotEnable(plugin.id, plugin.code) ||
       host.needsSettingsRestart(plugin.id);
@@ -1062,7 +1135,36 @@ class IHome extends utils.Adapter {
   }
 
   private pluginViews(): PluginView[] {
-    return this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
+    const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
+    const views = this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
+    for (const imported of this.pluginSettings.staged) {
+      if (activeIds.has(imported.id)) continue;
+      views.push(
+        makePluginView(
+          {
+            id: imported.id,
+            name: imported.name,
+            enabled: false,
+            builtin: false,
+            timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
+            debug: false,
+            ...(imported.help ? { help: imported.help } : {}),
+            ...(imported.usage ? { usage: imported.usage } : {}),
+            ...(imported.settings ? { settings: imported.settings } : {}),
+            ...(imported.settingsSchema
+              ? { settingsSchema: imported.settingsSchema }
+              : {}),
+            code: imported.code,
+          },
+          {
+            status: "restart-required",
+            hotSettings: false,
+            restartRequired: true,
+          },
+        ),
+      );
+    }
+    return views;
   }
 
   private async onPluginsMessage(obj: ioBroker.Message): Promise<void> {
@@ -1097,28 +1199,100 @@ class IHome extends utils.Adapter {
     }
 
     if (command.action === "save") {
-      const { plugins, problems } = applyPluginPatches(
-        this.pluginConfig,
-        command.patches,
-        BUILTIN_PLUGINS,
+      const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
+      const stagedIds = new Set(
+        this.pluginSettings.staged.map((plugin) => plugin.id),
       );
-      if (problems.length > 0) return pluginError(problems.join("; "));
-      await this.updateConfig({ plugins });
-      this.pluginConfig = plugins;
+      const activePatches = [];
+      const stagedPatches = [];
       for (const patch of command.patches) {
-        const entry = plugins.find((plugin) => plugin.id === patch.id);
-        if (!entry) continue;
-        if (patch.enabled !== undefined) await host.setEnabled(entry);
-        if (patch.settings !== undefined) {
-          await host.updateSettings(entry.id, entry.settings ?? {});
+        if (activeIds.has(patch.id)) activePatches.push(patch);
+        else if (stagedIds.has(patch.id)) stagedPatches.push(patch);
+        else return pluginError(`unknown plugin: ${patch.id}`);
+      }
+      if (stagedPatches.some((patch) => patch.enabled === true)) {
+        return pluginError(
+          "a staged plugin needs an adapter restart before it can be enabled",
+        );
+      }
+
+      let staged = this.pluginSettings.staged;
+      if (stagedPatches.length > 0) {
+        const temporary = staged.map((entry): AdapterPlugin => ({
+          id: entry.id,
+          name: entry.name,
+          enabled: false,
+          builtin: false,
+          timeoutMs: entry.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
+          debug: false,
+          ...(entry.help ? { help: entry.help } : {}),
+          ...(entry.usage ? { usage: entry.usage } : {}),
+          ...(entry.settings ? { settings: entry.settings } : {}),
+          ...(entry.settingsSchema
+            ? { settingsSchema: entry.settingsSchema }
+            : {}),
+          code: entry.code,
+        }));
+        const patched = applyPluginPatches(
+          temporary,
+          stagedPatches,
+          BUILTIN_PLUGINS,
+        );
+        if (patched.problems.length > 0) {
+          return pluginError(patched.problems.join("; "));
         }
-        if (patch.timeoutMs !== undefined || patch.debug !== undefined) {
-          host.updateMeta(entry.id, {
-            timeoutMs: entry.timeoutMs,
-            debug: entry.debug,
-          });
+        staged = patched.plugins.map((entry): ImportedPlugin => ({
+          id: entry.id,
+          name: entry.name,
+          timeoutMs: entry.timeoutMs,
+          ...(entry.help ? { help: entry.help } : {}),
+          ...(entry.usage ? { usage: entry.usage } : {}),
+          ...(entry.settings ? { settings: entry.settings } : {}),
+          ...(entry.settingsSchema
+            ? { settingsSchema: entry.settingsSchema }
+            : {}),
+          code: entry.code ?? "",
+        }));
+      }
+
+      let active = this.pluginConfig;
+      if (activePatches.length > 0) {
+        const previous = this.pluginConfig;
+        const patched = applyPluginPatches(
+          active,
+          activePatches,
+          BUILTIN_PLUGINS,
+        );
+        if (patched.problems.length > 0) {
+          return pluginError(patched.problems.join("; "));
+        }
+        active = patched.plugins;
+        for (const patch of activePatches) {
+          const entry = active.find((plugin) => plugin.id === patch.id);
+          const before = previous.find((plugin) => plugin.id === patch.id);
+          if (!entry) continue;
+          if (patch.enabled !== undefined) await host.setEnabled(entry);
+          if (
+            patch.settings !== undefined &&
+            pluginSettingsChanged(before?.settings, entry.settings)
+          ) {
+            await host.updateSettings(entry.id, entry.settings ?? {});
+          }
+          if (patch.timeoutMs !== undefined || patch.debug !== undefined) {
+            host.updateMeta(entry.id, {
+              timeoutMs: entry.timeoutMs,
+              debug: entry.debug,
+            });
+          }
         }
       }
+      this.pluginConfig = active;
+      this.pluginSettings = {
+        ...pluginSettingsDoc(active),
+        staged,
+        removals: this.pluginSettings.removals,
+      };
+      await this.savePluginSettings();
       const views = this.pluginViews();
       return pluginReply({
         plugins: views,
@@ -1135,10 +1309,8 @@ class IHome extends utils.Adapter {
         plugin: command.plugin,
       });
       if ("problem" in parsed) return pluginError(parsed.problem);
-      const staged = stagePluginImport(this.pluginConfig, parsed.plugin);
-      if (staged.problem) return pluginError(staged.problem);
-      await this.updateConfig({ plugins: staged.plugins });
-      this.pluginConfig = staged.plugins;
+      this.pluginSettings = importStaged(this.pluginSettings, parsed.plugin);
+      await this.savePluginSettings();
       return pluginReply({
         plugins: this.pluginViews(),
         restartRequired: [parsed.plugin.id],
@@ -1146,6 +1318,10 @@ class IHome extends utils.Adapter {
     }
 
     if (command.action === "export") {
+      const staged = this.pluginSettings.staged.find(
+        (entry) => entry.id === command.id,
+      );
+      if (staged) return pluginReply(pluginFile(staged));
       const plugin = this.pluginConfig.find((entry) => entry.id === command.id);
       if (!plugin) return pluginError(`unknown plugin: ${command.id}`);
       if (plugin.builtin) {
@@ -1169,14 +1345,33 @@ class IHome extends utils.Adapter {
       );
     }
 
-    const removed = removeUserPlugin(this.pluginConfig, command.id);
-    if (removed.problem) return pluginError(removed.problem);
-    const old = this.pluginConfig.find((entry) => entry.id === command.id);
-    if (old && host.status(command.id) === "running") {
-      await host.setEnabled({ ...old, enabled: false });
+    const stagedPlugin = this.pluginSettings.staged.find(
+      (entry) => entry.id === command.id,
+    );
+    if (stagedPlugin) {
+      this.pluginSettings = removeStaged(this.pluginSettings, command.id);
+      await this.savePluginSettings();
+      return pluginReply({ plugins: this.pluginViews() });
     }
-    await this.updateConfig({ plugins: removed.plugins });
-    this.pluginConfig = removed.plugins;
+    const old = this.pluginConfig.find((entry) => entry.id === command.id);
+    if (!old) return pluginError(`unknown plugin: ${command.id}`);
+    if (old.builtin) {
+      return pluginError(
+        `plugin ${command.id} is built-in and cannot be deleted`,
+      );
+    }
+    this.pluginSettings = stageRemoval(this.pluginSettings, command.id);
+    if (this.pluginSettings.settings[command.id]) {
+      this.pluginSettings.settings[command.id] = {
+        ...this.pluginSettings.settings[command.id],
+        enabled: false,
+      };
+    }
+    this.pluginConfig = this.pluginConfig.map((entry) =>
+      entry.id === command.id ? { ...entry, enabled: false } : entry,
+    );
+    await this.savePluginSettings();
+    if (old.enabled) await host.setEnabled({ ...old, enabled: false });
     return pluginReply({ plugins: this.pluginViews() });
   }
 
@@ -1649,6 +1844,7 @@ class IHome extends utils.Adapter {
     await this.loadVariables();
     this.subscribeStates(`${CONFIG_FOLDER}.variableList`);
     this.subscribeStates(`${CONFIG_FOLDER}.logicList`);
+    this.subscribeStates(`${CONFIG_FOLDER}.pluginSettings`);
     this.on("stateChange", (id, state) => {
       if (!state) return;
       // Compare against the cached value before overwriting it: ack-only
@@ -1719,6 +1915,15 @@ class IHome extends utils.Adapter {
             ack: true,
           }).catch(() => {});
         }
+      } else if (id === this.pluginSettingsStateId()) {
+        const text = typeof state.val === "string" ? state.val : "";
+        if (text === this.pluginSettingsText) return;
+        const doc = normalizeSettingsDoc(text);
+        if (doc) {
+          void this.applyPluginSettings(doc, text).catch((error) =>
+            this.log.warn(`plugin settings: ${String(error)}`),
+          );
+        }
       } else if (id === `${this.namespace}.${CONFIG_FOLDER}.variableList`) {
         this.log.debug(`${CONFIG_FOLDER}.variableList changed; reloading`);
         // A variable edit can change what a logic ref resolves to.
@@ -1735,10 +1940,9 @@ class IHome extends utils.Adapter {
     );
 
     const rawPlugins = (this.config as { plugins?: unknown }).plugins;
-    const plugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
+    const nativePlugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
       this.log.warn(message),
     );
-    this.pluginConfig = plugins;
     const persistedPlugins = pluginConfigWithBuiltins(rawPlugins);
     if (JSON.stringify(persistedPlugins) !== JSON.stringify(rawPlugins)) {
       try {
@@ -1747,8 +1951,72 @@ class IHome extends utils.Adapter {
         this.log.warn(`cannot store the plugin list: ${String(error)}`);
       }
     }
+
+    // Page-managed settings live outside native config, so availability,
+    // settings and debug changes do not restart the adapter. Imports and
+    // removals are applied here, at the next start.
+    let native = nativePlugins.map((plugin) => ({ ...plugin }));
+    let doc = (await this.readPluginSettings()) ?? pluginSettingsDoc(native);
+    let nativeDirty = false;
+    for (const imported of doc.staged) {
+      if (BUILTIN_PLUGINS.some((builtin) => builtin.id === imported.id)) {
+        this.log.warn(`staged plugin ${imported.id}: built-in id is reserved`);
+        continue;
+      }
+      const entry: AdapterPlugin = {
+        id: imported.id,
+        name: imported.name,
+        enabled: false,
+        builtin: false,
+        timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
+        debug: false,
+        ...(imported.help ? { help: imported.help } : {}),
+        ...(imported.usage ? { usage: imported.usage } : {}),
+        ...(imported.settings ? { settings: imported.settings } : {}),
+        ...(imported.settingsSchema
+          ? { settingsSchema: imported.settingsSchema }
+          : {}),
+        code: imported.code,
+      };
+      const existing = native.find((plugin) => plugin.id === entry.id);
+      if (existing) Object.assign(existing, entry);
+      else native.push(entry);
+      doc.settings[entry.id] = {
+        enabled: false,
+        timeoutMs: entry.timeoutMs,
+        debug: false,
+        ...(entry.help ? { help: entry.help } : {}),
+        ...(entry.usage ? { usage: entry.usage } : {}),
+        ...(entry.settings ? { settings: entry.settings } : {}),
+        ...(entry.settingsSchema
+          ? { settingsSchema: entry.settingsSchema }
+          : {}),
+      };
+      nativeDirty = true;
+      this.log.info(`staged plugin ${entry.id}: installed disabled`);
+    }
+    for (const id of doc.removals) {
+      const plugin = native.find((entry) => entry.id === id);
+      if (!plugin || plugin.builtin) continue;
+      native = native.filter((entry) => entry.id !== id);
+      delete doc.settings[id];
+      nativeDirty = true;
+      this.log.info(`staged removal ${id}: plugin removed`);
+    }
+    doc = { ...doc, staged: [], removals: [] };
+    if (nativeDirty) {
+      try {
+        await this.updateConfig({ plugins: native });
+      } catch (error) {
+        this.log.warn(`cannot store the plugin list: ${String(error)}`);
+      }
+    }
+    this.pluginConfig = mergePluginSettings(native, doc);
+    this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+    await this.savePluginSettings();
+
     this.pluginHost = createPluginHost(
-      plugins,
+      this.pluginConfig,
       (plugin, runtime) =>
         createPluginApi(plugin.id, {
           namespace: this.namespace,
