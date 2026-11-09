@@ -14,10 +14,12 @@ const config = [
     path: "weather",
     method: "GET",
     target: "0_userdata.0.Weather.json",
+    reply: "success",
   },
   {
     path: "hook",
     method: "POST",
+    reply: { ok: "hook" },
     targets: [
       { state: "0_userdata.0.Hook.kind", value: "$.kind" },
       {
@@ -37,6 +39,7 @@ describe("parseHttpEndpoints", () => {
       "/weather",
       "/hook",
     ]);
+    expect(endpoints[0].reply).toBe("success");
   });
 
   it("rejects invalid endpoint lists", () => {
@@ -180,7 +183,16 @@ describe("processHttpRequest", () => {
     ).toBe(405);
   });
 
-  it("returns writes for a valid request", () => {
+  it("returns writes and the configured reply for a valid request", () => {
+    const weather = processHttpRequest(settings, {
+      method: "GET",
+      path: "/weather",
+      query: { tempf: "70" },
+      body: undefined,
+      token: "secret",
+    });
+    expect(weather.status).toBe(200);
+    expect(weather.reply).toBe("success");
     const result = processHttpRequest(settings, {
       method: "POST",
       path: "/hook",
@@ -189,6 +201,7 @@ describe("processHttpRequest", () => {
       token: "secret",
     });
     expect(result.status).toBe(200);
+    expect(result.reply).toEqual({ ok: "hook" });
     expect(result.writes).toHaveLength(2);
   });
 

@@ -24,6 +24,8 @@ export interface HttpEndpoint {
   method: string;
   target?: string;
   targets?: HttpTarget[];
+  /** Sent on success; a string is text, anything else JSON. */
+  reply?: unknown;
 }
 
 export interface HttpSettings {
@@ -54,6 +56,7 @@ export interface HttpRequestResult {
   status: number;
   error?: string;
   writes: HttpTargetWrite[];
+  reply?: unknown;
 }
 
 const DEFAULT_PORT = 8095;
@@ -144,6 +147,7 @@ export function parseHttpEndpoints(value: unknown): HttpEndpoint[] {
       method,
       ...(target ? { target } : {}),
       ...(targets?.length ? { targets } : {}),
+      ...(entry.reply !== undefined ? { reply: entry.reply } : {}),
     };
   });
 }
@@ -271,7 +275,11 @@ export function processHttpRequest(
   }
   try {
     const data = buildRequestData(input.query, input.body);
-    return { status: 200, writes: targetWrites(endpoint, data) };
+    return {
+      status: 200,
+      writes: targetWrites(endpoint, data),
+      ...(endpoint.reply !== undefined ? { reply: endpoint.reply } : {}),
+    };
   } catch (error) {
     return {
       status: 500,
@@ -397,6 +405,16 @@ async function handleRequest(
           500,
           error instanceof Error ? error.message : String(error),
         );
+      }
+      if (result.reply !== undefined) {
+        const text = typeof result.reply === "string";
+        res.writeHead(200, {
+          "content-type": text
+            ? "text/plain; charset=utf-8"
+            : "application/json; charset=utf-8",
+        });
+        res.end(text ? result.reply : JSON.stringify(result.reply));
+        return;
       }
     }
     res.writeHead(result.status, {
