@@ -20,6 +20,19 @@ function portOf(payload: unknown): number | undefined {
     : undefined;
 }
 
+function textOf(payload: unknown, key: string): string | undefined {
+  if (!record(payload)) return undefined;
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function timeoutOf(payload: unknown): number | undefined {
+  if (!record(payload)) return undefined;
+  return typeof payload.timeout === "number" && Number.isFinite(payload.timeout)
+    ? payload.timeout
+    : undefined;
+}
+
 /** The shipped `network.info` and `network.wake` plugins. */
 export function createNetworkPlugins(
   wake: WakeFn = sendWake,
@@ -39,16 +52,32 @@ export function createNetworkPlugins(
     "network.wake": (api) => ({
       async call(payload) {
         const id = deviceId(payload);
-        if (!id) throw new Error("network.wake needs a device id");
-        const device = api.network.get(id);
-        if (!device) throw new Error(`unknown network device: ${id}`);
-        if (!device.mac) {
-          throw new Error(`network device ${id} has no MAC`);
+        if (id) {
+          const device = api.network.get(id);
+          if (!device) throw new Error(`unknown network device: ${id}`);
+          if (!device.mac) {
+            throw new Error(`network device ${id} has no MAC`);
+          }
+          return wake({
+            host: device.host,
+            mac: device.mac,
+            port: portOf(payload),
+          });
         }
+        const mac = textOf(payload, "mac");
+        if (!mac) {
+          throw new Error(
+            "network.wake needs a network device id or a MAC address",
+          );
+        }
+        const broadcast = textOf(payload, "broadcast");
+        const timeout = timeoutOf(payload);
         return wake({
-          host: device.host,
-          mac: device.mac,
+          host: textOf(payload, "host") ?? "255.255.255.255",
+          mac,
           port: portOf(payload),
+          ...(broadcast ? { broadcast } : {}),
+          ...(timeout !== undefined ? { timeout } : {}),
         });
       },
     }),

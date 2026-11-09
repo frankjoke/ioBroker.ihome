@@ -5,16 +5,33 @@ export interface WakeOptions {
   host: string;
   mac: string;
   port?: number;
+  /** Directed broadcast; defaults to the host's /24 broadcast. */
+  broadcast?: string;
+  /** UDP send timeout in ms. */
+  timeout?: number;
 }
 
 export type WakeSender = (
   packet: Buffer,
   port: number,
   targets: string[],
+  timeoutMs: number,
 ) => Promise<void>;
 
 const DEFAULT_PORT = 9;
-const SEND_TIMEOUT_MS = 2000;
+const DEFAULT_SEND_TIMEOUT_MS = 2000;
+const MIN_SEND_TIMEOUT_MS = 100;
+const MAX_SEND_TIMEOUT_MS = 10_000;
+
+function timeoutOf(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SEND_TIMEOUT_MS;
+  }
+  return Math.min(
+    MAX_SEND_TIMEOUT_MS,
+    Math.max(MIN_SEND_TIMEOUT_MS, Math.round(value)),
+  );
+}
 
 function clampPort(value: unknown): number {
   const number = typeof value === "number" ? value : Number(value);
@@ -42,8 +59,16 @@ export function broadcastOf(host: string): string {
   return host.replace(/\.\d+$/, ".255");
 }
 
-/** Both the subnet broadcast (or limited broadcast) and the host itself. */
-export function wakeTargets(host: string): string[] {
+/** Both the broadcast (directed or limited) and the host itself. */
+export function wakeTargets(host: string, broadcast?: string): string[] {
+  if (broadcast !== undefined) {
+    if (isIP(broadcast) !== 4) {
+      throw new Error("Wake-on-LAN needs an IPv4 broadcast");
+    }
+    const targets = [broadcast];
+    if (isIP(host) === 4 && host !== broadcast) targets.push(host);
+    return targets;
+  }
   const family = isIP(host);
   if (family === 6) {
     throw new Error("Wake-on-LAN needs an IPv4 host");
@@ -51,13 +76,13 @@ export function wakeTargets(host: string): string[] {
   return family === 4 ? [broadcastOf(host), host] : ["255.255.255.255", host];
 }
 
-const defaultWakeSender: WakeSender = (packet, port, targets) =>
+const defaultWakeSender: WakeSender = (packet, port, targets, timeoutMs) =>
   new Promise((resolve, reject) => {
     const socket = dgram.createSocket("udp4");
     let settled = false;
     const timer = setTimeout(() => {
       finish(new Error("Wake-on-LAN send timed out"));
-    }, SEND_TIMEOUT_MS);
+    }, timeoutMs);
 
     const finish = (error?: Error): void => {
       if (settled) return;
@@ -99,7 +124,12 @@ export async function sendWake(
   send: WakeSender = defaultWakeSender,
 ): Promise<{ host: string; port: number; targets: string[] }> {
   const port = clampPort(options.port);
-  const targets = wakeTargets(options.host);
-  await send(magicPacket(options.mac), port, targets);
+  const targets = wakeTargets(options.host, options.broadcast);
+  await send(
+    magicPacket(options.mac),
+    port,
+    targets,
+    timeoutOf(options.timeout),
+  );
   return { host: options.host, port, targets };
 }

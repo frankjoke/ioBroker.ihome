@@ -155,6 +155,18 @@
     bind:valid={settingsValid}
   />
 
+  <div class="call-examples">
+    <span class="label-mono">Call it from a logic</span>
+    <pre><code
+        >{`call("${plugin.id}", payload, (data, error) => {
+  if (error) return;
+  // use data
+});`}</code
+      ></pre>
+    <span class="label-mono">Call it from an HTML tile</span>
+    <pre><code>{`await ihome.call("${plugin.id}", payload);`}</code></pre>
+  </div>
+
   <div class="help-blocks">
     <HelpSection help={plugin.help} />
     <HelpSection help={plugin.usage} label="Usage" />
@@ -264,6 +276,21 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .call-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .call-examples pre {
+    margin: 0 0 0.25rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    border-radius: var(--border-radius);
+    background: var(--surface-container-high);
+    font-size: var(--body-sm);
   }
 
   .restart {

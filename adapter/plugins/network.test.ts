@@ -88,6 +88,37 @@ describe("createNetworkPlugins", () => {
     ).rejects.toThrow("MAC");
   });
 
+  it("wakes a device directly by MAC, host, broadcast, port and timeout", async () => {
+    const sent: unknown[] = [];
+    const plugins = createNetworkPlugins(async (options) => {
+      sent.push(options);
+      return { sent: true };
+    });
+    const api = fakeNetworkApi();
+    await plugins["network.wake"](api).call!({
+      mac: "aa:bb:cc:dd:ee:ff",
+      host: "192.168.1.3",
+      port: 7,
+      timeout: 500,
+    });
+    expect(sent[0]).toEqual({
+      host: "192.168.1.3",
+      mac: "aa:bb:cc:dd:ee:ff",
+      port: 7,
+      timeout: 500,
+    });
+    await plugins["network.wake"](api).call!({
+      mac: "aa:bb:cc:dd:ee:ff",
+      broadcast: "192.168.1.255",
+    });
+    expect(sent[1]).toMatchObject({
+      host: "255.255.255.255",
+      mac: "aa:bb:cc:dd:ee:ff",
+      broadcast: "192.168.1.255",
+    });
+    await expect(plugins["network.wake"](api).call!({})).rejects.toThrow("MAC");
+  });
+
   it("rejects a missing network device", async () => {
     const plugins = createNetworkPlugins(async () => ({ ok: true }));
     await expect(

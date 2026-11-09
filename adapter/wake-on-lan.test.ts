@@ -20,7 +20,12 @@ describe("wakeTargets", () => {
       "192.168.178.23",
     ]);
     expect(wakeTargets("tv.local")).toEqual(["255.255.255.255", "tv.local"]);
+    expect(wakeTargets("192.168.178.23", "192.168.178.255")).toEqual([
+      "192.168.178.255",
+      "192.168.178.23",
+    ]);
     expect(() => wakeTargets("fe80::1")).toThrow("IPv4");
+    expect(() => wakeTargets("192.168.178.23", "fe80::1")).toThrow("IPv4");
   });
 });
 
@@ -57,6 +62,41 @@ describe("sendWake", () => {
         )
       ).port,
     ).toBe(65_535);
+  });
+
+  it("passes a clamped timeout to the sender", async () => {
+    const timeouts: number[] = [];
+    await sendWake(
+      {
+        host: "192.168.178.23",
+        mac: "cc:b1:1a:72:c6:bc",
+        timeout: 500,
+      },
+      async (_packet, _port, _targets, timeoutMs) => {
+        timeouts.push(timeoutMs);
+      },
+    );
+    await sendWake(
+      {
+        host: "192.168.178.23",
+        mac: "cc:b1:1a:72:c6:bc",
+        timeout: 1,
+      },
+      async (_packet, _port, _targets, timeoutMs) => {
+        timeouts.push(timeoutMs);
+      },
+    );
+    await sendWake(
+      {
+        host: "192.168.178.23",
+        mac: "cc:b1:1a:72:c6:bc",
+        timeout: 99_999,
+      },
+      async (_packet, _port, _targets, timeoutMs) => {
+        timeouts.push(timeoutMs);
+      },
+    );
+    expect(timeouts).toEqual([500, 100, 10_000]);
   });
 
   it("propagates a sender error", async () => {
