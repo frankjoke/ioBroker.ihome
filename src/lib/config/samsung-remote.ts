@@ -65,6 +65,7 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
     background: #1c1c1c;
     color: #eee;
     font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
     touch-action: manipulation
   }
@@ -74,9 +75,9 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
     color: #000
   }
 
-  .round {
-    width: 100%;
-    aspect-ratio: 1
+  button:disabled {
+    opacity: .45;
+    cursor: default
   }
 
   .wide {
@@ -100,12 +101,6 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
   button.small {
     padding: 8px 4px;
     font-size: 12px
-  }
-
-  button.round.small {
-    width: 72%;
-    justify-self: center;
-    align-self: center
   }
 
   .ok {
@@ -137,15 +132,15 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
     <button id="power">Power</button>
     <button data-key="KEY_HOME" class="small">Home</button>
     <button data-key="KEY_RETURN" class="small">Zurück</button>
-    <button data-key="KEY_INFO" class="round small">i</button>
-    <button data-key="KEY_UP" class="round">▲</button>
-    <button data-key="KEY_VOLUMEUP" class="round">Vol +</button>
-    <button data-key="KEY_LEFT" class="round">◀</button>
-    <button data-key="KEY_ENTER" class="round">OK</button>
-    <button data-key="KEY_RIGHT" class="round">▶</button>
-    <button data-key="KEY_MUTE" class="round">Mute</button>
-    <button data-key="KEY_DOWN" class="round">▼</button>
-    <button data-key="KEY_VOLUMEDOWN" class="round">Vol −</button>
+    <button data-key="KEY_INFO" class="small">i</button>
+    <button data-key="KEY_UP">▲</button>
+    <button data-key="KEY_VOLUMEUP">Vol +</button>
+    <button data-key="KEY_LEFT">◀</button>
+    <button data-key="KEY_ENTER">OK</button>
+    <button data-key="KEY_RIGHT">▶</button>
+    <button data-key="KEY_MUTE">Mute</button>
+    <button data-key="KEY_DOWN">▼</button>
+    <button data-key="KEY_VOLUMEDOWN">Vol −</button>
   </div>
   <div id="num">
     <button data-key="KEY_1">1</button>
@@ -179,6 +174,9 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
   const $status = document.getElementById("status");
   const setStatus = (t, cls = "") => { $status.textContent = t; $status.className = cls; };
   const host = () => document.getElementById("host").value.trim();
+  // Everything except Power and Verbinden needs the remote socket.
+  const setEnabled = (on) => document.querySelectorAll("[data-key], #apps").forEach(b => b.disabled = !on);
+  setEnabled(false);
 
   // Ein Verbindungsversuch: löst auf, sobald der TV ms.channel.connect schickt.
   function openSocket(timeout = 8000) {
@@ -194,8 +192,9 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
         if (m.event === "ms.channel.connect") {
           clearTimeout(timer);
           ws = s;
-          s.onclose = () => { ws = null; setStatus("Verbindung getrennt"); };
+          s.onclose = () => { ws = null; setStatus("Verbindung getrennt"); setEnabled(false); };
           setStatus("verbunden mit " + host(), "ok");
+          setEnabled(true);
           resolve(s);
         } else if (m.event === "ms.channel.unauthorized") {
           clearTimeout(timer); s.close();
