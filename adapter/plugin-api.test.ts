@@ -84,6 +84,8 @@ describe("createPluginApi", () => {
 
   it("exposes network devices and hides protected config", () => {
     const api = createPluginApi("demo", fakeDeps());
+    expect(api.id).toBe("demo");
+    expect(api.namespace).toBe("ihome.0");
     expect(api.network.get("tv")).toMatchObject({
       id: "tv",
       host: "192.168.1.2",

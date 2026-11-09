@@ -8,6 +8,8 @@ export interface NetworkDeviceInfo {
 }
 
 export interface PluginApi {
+  /** This plugin's id, e.g. `nut.ups`. */
+  id: string;
   namespace: string;
   /** Read-only native config snapshot; protected secrets and plugins omitted. */
   config: Readonly<Record<string, unknown>>;
@@ -101,6 +103,7 @@ export function createPluginApi(
   const prefix = (message: string) => `plugin ${pluginId}: ${message}`;
   const devices = deps.networkDevices.map(deviceInfo);
   return {
+    id: pluginId,
     namespace: deps.namespace,
     config: sanitizedConfig(deps.config),
     get settings() {

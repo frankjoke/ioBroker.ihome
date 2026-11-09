@@ -2,7 +2,8 @@
  * iHome user plugin: read-only Network UPS Tools (NUT) monitor.
  *
  * Polls `LIST VAR <ups>` over TCP and writes one state per NUT variable under
- * `nut.<variable>` in the iHome namespace. Derived states make logic simple:
+ * `plugins.<id>.<variable>` in the iHome namespace (default
+ * `ihome.0.plugins.nut.ups.*`; `base` can move it). Derived states make logic simple:
  * `nut.connected`, `nut.online`, `nut.onBattery`, `nut.lowBattery`,
  * `nut.charging`, `nut.discharging`, `nut.error`, `nut.lastUpdate`.
  *
@@ -69,10 +70,13 @@ module.exports = (api) => {
     },
   };
 
+  const pluginId = api.id || "nut.ups";
+  const namespace = api.namespace;
   let current = api;
   let timer = null;
   let polling = null;
   let settings = readSettings(api.settings);
+  let target = targetOf(settings.base);
   let last = {
     connected: false,
     status: "",
@@ -92,10 +96,55 @@ module.exports = (api) => {
       host: String((raw && raw.host) || "localhost").trim() || "localhost",
       port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 3493,
       ups: String((raw && raw.ups) || "ups").trim() || "ups",
+      base:
+        String((raw && raw.base) || "plugins." + pluginId).trim() ||
+        "plugins." + pluginId,
       interval:
         (Number.isFinite(interval) ? Math.max(5, Math.round(interval)) : 30) *
         1000,
     };
+  }
+
+  /**
+   * `base` may be relative (`nut` -> ihome.0.nut) or an absolute state folder
+   * (`0_userdata.0.nut` -> foreign states).
+   */
+  function targetOf(base) {
+    const value = base.replace(/^\.+|\.+$/g, "") || "nut";
+    const absolute = /^[A-Za-z0-9_-]+\.[0-9]+(?:\.|$)/.test(value);
+    if (!absolute || value === namespace || value.startsWith(namespace + ".")) {
+      const prefix =
+        value === namespace
+          ? ""
+          : value.startsWith(namespace + ".")
+            ? value.slice(namespace.length + 1)
+            : value;
+      return { prefix, foreign: false };
+    }
+    return { prefix: value, foreign: true };
+  }
+
+  function stateId(id) {
+    return target.prefix ? target.prefix + "." + id : id;
+  }
+
+  async function setValue(id, value) {
+    if (target.foreign) {
+      await current.state.setForeign(id, value, { ack: true });
+    } else {
+      await current.state.set(id, value, { ack: true });
+    }
+  }
+
+  async function getObject(id) {
+    return target.foreign
+      ? current.objects.getForeign(id)
+      : current.objects.get(id);
+  }
+
+  async function setObject(id, object) {
+    if (target.foreign) await current.objects.setForeign(id, object);
+    else await current.objects.set(id, object);
   }
 
   function toNumber(value) {
@@ -119,23 +168,24 @@ module.exports = (api) => {
   }
 
   async function ensureFolder() {
-    if (known.has("nut")) return;
-    const existing = await current.objects.get("nut");
+    const id = target.prefix;
+    if (!id || known.has("::" + id)) return;
+    const existing = await getObject(id);
     if (!existing) {
-      await current.objects.set("nut", {
+      await setObject(id, {
         type: "folder",
         common: { name: "NUT UPS" },
         native: {},
       });
     }
-    known.add("nut");
+    known.add("::" + id);
   }
 
   async function ensureObject(id, common) {
     if (known.has(id)) return;
-    const existing = await current.objects.get(id);
+    const existing = await getObject(id);
     if (!existing) {
-      await current.objects.set(id, {
+      await setObject(id, {
         type: "state",
         common: { ...common, read: true, write: false },
         native: {},
@@ -194,7 +244,7 @@ module.exports = (api) => {
   async function pollOnce() {
     await ensureFolder();
     for (const [id, definition] of Object.entries(DERIVED)) {
-      await ensureObject("nut." + id, {
+      await ensureObject(stateId(id), {
         name: definition.name,
         type: definition.type,
         role: definition.role,
@@ -209,19 +259,16 @@ module.exports = (api) => {
     }
 
     for (const [name, value] of Object.entries(vars)) {
+      const id = stateId(name);
       const meta = NUMERIC[name];
       const type = meta ? "number" : "string";
-      await ensureObject("nut." + name, {
+      await ensureObject(id, {
         name,
         type,
         role: meta ? meta.role : "text",
         ...(meta && meta.unit ? { unit: meta.unit } : {}),
       });
-      await current.state.set(
-        "nut." + name,
-        type === "number" ? toNumber(value) : value,
-        { ack: true },
-      );
+      await setValue(id, type === "number" ? toNumber(value) : value);
     }
 
     const flags = new Set(String(vars["ups.status"]).split(/\s+/));
@@ -233,13 +280,13 @@ module.exports = (api) => {
       discharging: flags.has("DISCHRG"),
     };
     for (const [id, value] of Object.entries(booleans)) {
-      await current.state.set("nut." + id, value, { ack: true });
+      await setValue(stateId(id), value);
     }
 
     const stamp = new Date().toISOString();
-    await current.state.set("nut.lastUpdate", stamp, { ack: true });
-    await current.state.set("nut.connected", true, { ack: true });
-    await current.state.set("nut.error", "", { ack: true });
+    await setValue(stateId("lastUpdate"), stamp);
+    await setValue(stateId("connected"), true);
+    await setValue(stateId("error"), "");
 
     if (!last.connected && last.error && last.error !== "not polled yet") {
       current.log.info("NUT " + settings.ups + " reconnected");
@@ -268,18 +315,18 @@ module.exports = (api) => {
         last = { ...last, connected: false, error: message };
         try {
           await ensureFolder();
-          await ensureObject("nut.connected", {
+          await ensureObject(stateId("connected"), {
             name: DERIVED.connected.name,
             type: DERIVED.connected.type,
             role: DERIVED.connected.role,
           });
-          await ensureObject("nut.error", {
+          await ensureObject(stateId("error"), {
             name: DERIVED.error.name,
             type: DERIVED.error.type,
             role: DERIVED.error.role,
           });
-          await current.state.set("nut.connected", false, { ack: true });
-          await current.state.set("nut.error", message, { ack: true });
+          await setValue(stateId("connected"), false);
+          await setValue(stateId("error"), message);
         } catch {
           // Nothing to write yet; the next interval retries.
         }
@@ -298,22 +345,29 @@ module.exports = (api) => {
     timer = setInterval(() => void poll(), settings.interval);
   }
 
+  function logStart(log) {
+    log.info(
+      "NUT monitor " +
+        settings.ups +
+        " on " +
+        settings.host +
+        ":" +
+        settings.port +
+        " -> " +
+        (target.prefix || namespace) +
+        " every " +
+        settings.interval / 1000 +
+        "s",
+    );
+  }
+
   return {
     async start() {
       current = api;
       settings = readSettings(api.settings);
+      target = targetOf(settings.base);
       startTimer();
-      current.log.info(
-        "NUT monitor " +
-          settings.ups +
-          " on " +
-          settings.host +
-          ":" +
-          settings.port +
-          " every " +
-          settings.interval / 1000 +
-          "s",
-      );
+      logStart(current.log);
       void poll();
     },
 
@@ -325,18 +379,9 @@ module.exports = (api) => {
     async reload(next) {
       current = next;
       settings = readSettings(next.settings);
+      target = targetOf(settings.base);
       startTimer();
-      next.log.info(
-        "NUT monitor " +
-          settings.ups +
-          " on " +
-          settings.host +
-          ":" +
-          settings.port +
-          " every " +
-          settings.interval / 1000 +
-          "s",
-      );
+      logStart(next.log);
       await poll();
     },
 

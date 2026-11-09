@@ -47,6 +47,7 @@ module.exports = (api) => {
 
 ## API
 
+- \`id\` — this plugin's id, e.g. \`nut.ups\`.
 - \`namespace\` — this adapter instance, e.g. \`ihome.0\`.
 - \`config\` — read-only native config; secrets are removed.
 - \`settings\` — live non-secret settings; a fresh object per read.
@@ -55,6 +56,14 @@ module.exports = (api) => {
 - \`objects.get\` / \`objects.getForeign\`.
 - \`network.list\` / \`network.get\` — the adapter's configured network devices.
 - \`sendTo(instance, command, payload)\`.
+
+## State folder
+
+A plugin that creates its own states puts them under \`plugins.<plugin-id>\` in
+the iHome namespace — for example \`ihome.0.plugins.nut.ups.*\`. Use
+\`api.id\` to build that prefix. Offer a configurable base folder if users may
+want the data elsewhere. \`http.in\` is the exception: it writes exactly the
+\`target\` or \`targets\` you configure.
 
 ## Install and run
 
