@@ -24,7 +24,12 @@ describe("snippetChoices", () => {
       ),
     ).toBe(true);
     expect(snippetChoices(user, "statements").map((entry) => entry.id)).toEqual(
-      ["u-stmt"],
+      [
+        ...BUILTIN_FUNCTIONS.filter((entry) => entry.mode === "statements").map(
+          (entry) => entry.id,
+        ),
+        "u-stmt",
+      ],
     );
     expect(snippetChoices(user, "both")).toHaveLength(
       BUILTIN_FUNCTIONS.length + 2,
