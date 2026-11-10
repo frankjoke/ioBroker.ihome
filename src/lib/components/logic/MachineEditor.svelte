@@ -776,8 +776,6 @@
                         mode="statements"
                         label="On enter"
                         minRows={3}
-                        allowGoto
-                        {stateNames}
                         {logics}
                         inputs={logic.inputs}
                         onchange={(code) =>
@@ -792,8 +790,6 @@
                         mode="statements"
                         label="On exit"
                         minRows={3}
-                        allowGoto
-                        {stateNames}
                         {logics}
                         inputs={logic.inputs}
                         onchange={(code) =>
