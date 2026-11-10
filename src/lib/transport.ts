@@ -122,6 +122,12 @@ export function adminPageUrl(sources: {
   ) {
     return `${secure ? "https" : "http"}://${pageHost}/admin/index.html#tab-overview`;
   }
+  // A `*.ts.net` page is only reachable through Tailscale, where this
+  // installation serves iHome on 443 and admin on its own HTTPS port 8443.
+  // The page context beats a stored LAN host:port, which is unreachable away.
+  if (pageHost.endsWith(".ts.net")) {
+    return `${secure ? "https" : "http"}://${pageHost}:8443/#tab-overview`;
+  }
   const stored = (sources.hostPort ?? "").trim();
   const brokerHost = /^[a-z]+:\/\/([^/]+)/i.exec(brokerUrl)?.[1];
   const authority = stored || `${hostnameOf(brokerHost || sources.host)}:8081`;

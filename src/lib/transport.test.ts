@@ -239,6 +239,31 @@ it("uses the proxied admin path on a cloud host", () => {
   ).toBe("https://home.example/admin/index.html#tab-overview");
 });
 
+it("uses the Tailscale admin port on a ts.net page", () => {
+  expect(
+    adminPageUrl({
+      hostPort: "192.168.178.9:8081",
+      protocol: "https:",
+      host: "iobroker.tailcc5c5d.ts.net",
+    }),
+  ).toBe("https://iobroker.tailcc5c5d.ts.net:8443/#tab-overview");
+  expect(
+    adminPageUrl({
+      protocol: "https:",
+      host: "iobroker.example.ts.net",
+    }),
+  ).toBe("https://iobroker.example.ts.net:8443/#tab-overview");
+});
+
+it("does not mistake a lookalike host for Tailscale", () => {
+  expect(
+    adminPageUrl({
+      protocol: "https:",
+      host: "notatsnet.example",
+    }),
+  ).toBe("https://notatsnet.example:8081/#tab-overview");
+});
+
 it("falls back to the page host and keeps an https page on https", () => {
   expect(adminPageUrl({ protocol: "http:", host: "192.168.178.9:8082" })).toBe(
     "http://192.168.178.9:8081/#tab-overview",
