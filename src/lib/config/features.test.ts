@@ -5,6 +5,7 @@ import {
   suggestDeviceType,
   suggestDeviceName,
   roleLabel,
+  stateLabel,
   widgetFor,
   featureDef,
   featureForType,
@@ -20,6 +21,16 @@ it("handles a single-segment role", () => {
 });
 it("returns empty when there is no role", () => {
   expect(roleLabel({ common: {} })).toBe("");
+});
+
+it("uses the last state id segment as a control label", () => {
+  expect(
+    stateLabel("mqtt.0.FJTor2.openDoor", {
+      common: { role: "variable", name: "FJTor2/openDoor" },
+    }),
+  ).toBe("openDoor");
+  expect(stateLabel("MyVar")).toBe("MyVar");
+  expect(stateLabel("", { common: { name: "Name" } })).toBe("Name");
 });
 
 it("names a device Room.Type", () => {

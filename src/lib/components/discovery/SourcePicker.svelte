@@ -22,7 +22,7 @@
   import { getVariables } from "$lib/stores/variables.svelte";
   import { stateIdFor } from "$lib/config/variables";
   import { localizeName } from "$lib/config/format";
-  import { suggestFeature, roleLabel } from "$lib/config/features";
+  import { suggestFeature, stateLabel } from "$lib/config/features";
   import { defaultUnit } from "$lib/config/units";
   import { newId } from "$lib/utils/ids";
   import type { Control, Device, DeviceType } from "$lib/types/device";
@@ -377,7 +377,7 @@
       feature: suggestFeature(obj, deviceType) ?? "value",
       stateId: id,
       writable: !!obj?.common?.write,
-      label: variable ? id : roleLabel(obj),
+      label: variable ? id : stateLabel(realId, obj),
       unit: defaultUnit(obj),
     };
   }

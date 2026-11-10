@@ -276,6 +276,20 @@ export function roleLabel(obj: any): string {
   return tail ? tail[0].toUpperCase() + tail.slice(1) : "";
 }
 
+/** A new control's default label from a picked state: the last id segment.
+ *  MQTT states carry only the role "variable", which is not a useful label;
+ *  the object name is the fallback for an id without a segment. */
+export function stateLabel(id: string, obj?: any): string {
+  const tail =
+    String(id ?? "")
+      .trim()
+      .split(".")
+      .pop()
+      ?.trim() ?? "";
+  if (tail) return tail;
+  return String(obj?.common?.name ?? "").trim();
+}
+
 const ROLE_TYPE_RULES: { test: RegExp; type: DeviceType }[] = [
   { test: /button|taste/, type: "Button" },
   { test: /light|dimmer|lamp/, type: "Light" },

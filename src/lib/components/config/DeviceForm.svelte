@@ -12,7 +12,7 @@
     uniqueControlLabels,
   } from "$lib/config/control-ops";
   import {
-    roleLabel,
+    stateLabel,
     suggestDeviceType,
     suggestDeviceName,
     DEVICE_TYPES,
@@ -241,7 +241,7 @@
     updateControl(
       i,
       applyPickedState(row, picked, {
-        label: roleLabel(previous),
+        label: stateLabel(row.stateId ?? "", previous),
         unit: defaultUnit(previous),
       }),
     );
