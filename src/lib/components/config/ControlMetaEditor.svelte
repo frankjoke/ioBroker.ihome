@@ -53,6 +53,13 @@
       ),
     ].sort(),
   );
+  const roleOptions = $derived.by(() => {
+    const list = [...roles];
+    for (const value of [control.role, meta.role]) {
+      if (value && !list.includes(value)) list.unshift(value);
+    }
+    return list;
+  });
   const roomOptions = $derived(
     (ioBroker.enums?.getList?.("rooms") ?? []).map((e: any) => ({
       value: e._id,
@@ -115,20 +122,18 @@
     >
     <label class="field"
       ><span class="label-mono">Role</span>
-      <input
-        type="text"
-        list="ihome-roles"
+      <select
         value={control.role ?? ""}
-        placeholder={meta.role ?? "— inherit —"}
-        oninput={(e) =>
-          patch({
-            role: e.currentTarget.value.trim() || undefined,
-          })}
-      /></label
+        title="The role this control reads; inherit keeps the broker object's role"
+        onchange={(e) =>
+          patch({ role: e.currentTarget.value.trim() || undefined })}
+      >
+        <option value="">— inherit ({meta.role ?? "—"}) —</option>
+        {#each roleOptions as role (role)}
+          <option value={role}>{role}</option>
+        {/each}
+      </select></label
     >
-    <datalist id="ihome-roles">
-      {#each roles as role (role)}<option value={role}>{role}</option>{/each}
-    </datalist>
     <label class="field"
       ><span class="label-mono">Type</span>
       <select
