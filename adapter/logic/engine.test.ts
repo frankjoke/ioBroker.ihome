@@ -74,6 +74,107 @@ it("runs on change only by default and writes only on change", () => {
   expect(h.writes).toHaveLength(base + 1);
 });
 
+it("seeds state inputs at start so a same-value first update is not an edge", () => {
+  const machine: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "seeded",
+        name: "Seeded",
+        kind: "machine",
+        inputs: {
+          e: {
+            from: { type: "state", ref: "0_userdata.0.E" },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory", name: "seeded" },
+        start: "Run",
+        states: {
+          Run: {
+            on: [
+              {
+                on: "e",
+                edge: "change",
+                mode: "function",
+                do: code('set("0_userdata.0.OUT", get("e"))'),
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 0 });
+  const engine = createEngine(machine, h.deps, {
+    ownFrom: "system.adapter.ihome.0",
+  });
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toHaveLength(0);
+  h.change("0_userdata.0.E", 0);
+  expect(h.writes).toHaveLength(0);
+  h.change("0_userdata.0.E", 1);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 1, ack: false }]);
+});
+
+it("seeds rising/falling baselines from the state at start", () => {
+  const machine: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "edges",
+        name: "Edges",
+        kind: "machine",
+        inputs: {
+          e: {
+            from: { type: "state", ref: "0_userdata.0.E" },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory", name: "edges" },
+        start: "Run",
+        states: {
+          Run: {
+            on: [
+              {
+                on: "e",
+                edge: "rising",
+                mode: "function",
+                do: code('set("0_userdata.0.FLAG", "rise")'),
+              },
+              {
+                on: "e",
+                edge: "falling",
+                mode: "function",
+                do: code('set("0_userdata.0.FLAG", "fall")'),
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": true });
+  const engine = createEngine(machine, h.deps, {
+    ownFrom: "system.adapter.ihome.0",
+  });
+  h.attach(engine);
+  engine.start();
+  expect(h.writes).toHaveLength(0);
+  h.change("0_userdata.0.E", true);
+  expect(h.writes).toHaveLength(0);
+  h.change("0_userdata.0.E", false);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: "fall", ack: false },
+  ]);
+  h.change("0_userdata.0.E", true);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.FLAG", value: "fall", ack: false },
+    { id: "0_userdata.0.FLAG", value: "rise", ack: false },
+  ]);
+});
+
 it("writes a logic output to the adapter-created state", () => {
   const d = doc({ output: { scope: "logic", type: "number" } });
   const { h, engine } = engineWith(d);

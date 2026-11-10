@@ -1493,6 +1493,26 @@ export function createEngine(
           changed: false,
         });
       }
+      // Seed every state-backed input from the warmed cache: old = current,
+      // no event. The first real update then compares against the state at
+      // start (the EState pattern), instead of counting as an edge.
+      for (const rt of runtimes) {
+        for (const input of rt.inputs.values()) {
+          for (const id of input.stateIds) {
+            const cached = deps.readState?.(id);
+            const value = cached ? cached.val : deps.read(id);
+            if (!cached && value === undefined) continue;
+            input.lastById.set(id, value);
+            input.last = value;
+            input.hasLast = true;
+            input.lastChanged = false;
+            input.lastTs = cached?.ts;
+            input.lastFrom = cached?.from;
+            input.lastAck = cached?.ack;
+            input.lastStateId = id;
+          }
+        }
+      }
       // Two passes (D17): computed memory is available to machines.
       for (const rt of runtimes) {
         if (rt.def.kind !== "function") continue;
