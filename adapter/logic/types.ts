@@ -277,6 +277,9 @@ export interface DeviceTemplateShape {
   readFrom?: "http" | "state";
   /** Device type for the optional device entry; unknown types fall back to Custom. */
   deviceType?: string;
+  /** Icon for the device the apply form creates, e.g. a material symbol or
+   *  `/ihome/icons/fluent/fluent_gate_opened.png`. */
+  icon?: string;
   params?: DeviceParam[];
   itemList: DeviceItem[];
   readRequest?(params: Record<string, unknown>): {

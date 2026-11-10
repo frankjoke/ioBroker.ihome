@@ -97,6 +97,7 @@ export function planDeviceTemplate(
       id: deviceId ?? newId(),
       name: trimmed,
       type,
+      icon: template.icon,
       controls,
     });
   }

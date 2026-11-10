@@ -81,6 +81,21 @@ it("plans states and a valid machine", () => {
   ).toEqual([]);
 });
 
+it("carries the template icon into the created device", () => {
+  const template = new Function("return (" + SOURCE + ")")();
+  template.icon = "/ihome/icons/fluent/fluent_gate_opened.png";
+  const plan = planDeviceTemplate(
+    template,
+    SOURCE,
+    {},
+    "ihome.0.Variables.Garten",
+    "garden",
+    "Garden",
+    "Garden Tor",
+  );
+  expect(plan.device?.icon).toBe("/ihome/icons/fluent/fluent_gate_opened.png");
+});
+
 it("rejects an invalid template before planning", () => {
   const template = new Function("return (" + SOURCE + ")")();
   const bad = { ...template, itemList: [] };

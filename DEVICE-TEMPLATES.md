@@ -27,6 +27,8 @@ functions. It is stored as text and evaluated when applied.
   readFrom: "http",
   // optional: known device type, default "Custom"
   deviceType: "Switch",
+  // optional: icon for the device created by the apply form
+  icon: "/ihome/icons/fluent/fluent_gate_opened.png",
 
   params: [
     { name: "baseUrl", label: "Base URL", type: "string",
@@ -278,6 +280,8 @@ device registry:
 - `id`: fresh unique id; `name`: the entered name.
 - `type`: `template.deviceType` when it is a known device type, otherwise
   `Custom`.
+- `icon`: `template.icon` when set. The device icon is the default face of a
+  tile created from this device; a tile's own icon overrides it.
 - `controls`: one per `itemList` entry:
   - `stateId`: `<baseState>.<item.name>`
   - `feature`: `item.feature` when set, otherwise derived from the role/type
