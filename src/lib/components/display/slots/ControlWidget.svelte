@@ -10,18 +10,24 @@
   } from "$lib/config/state-meta";
   import { levelRange } from "$lib/config/features";
   import { valueShown } from "$lib/config/tile-parts";
-  import type { EnrichedControl } from "$lib/types/device";
+  import type { EnrichedControl, Widget } from "$lib/types/device";
 
   let {
     control,
     options = {},
     home = "tile",
+    widget: widgetOverride,
+    label,
   }: {
     control: EnrichedControl;
     /** The slot's own knobs (min/max/step): what the user set in the tile editor. */
     options?: Record<string, unknown>;
     /** Which surface renders this control: the tile or the detail page. */
     home?: "tile" | "modal";
+    /** The slot kind the tile asked for; it wins over the control feature. */
+    widget?: Widget;
+    /** The slot's caption, used as the button text when it is a button. */
+    label?: string;
   } = $props();
 
   function truthy(v: unknown): boolean {
@@ -70,7 +76,12 @@
   const showValue = $derived(valueShown(options, home));
   /** A read-only level is a reading, not a disabled slider. */
   const widget = $derived(
-    effectiveWidget(control.widget, control.writable === true),
+    widgetOverride ??
+      (control.writable === true &&
+      control.type === "boolean" &&
+      (control.widget ?? "value") === "value"
+        ? "switch"
+        : effectiveWidget(control.widget, control.writable === true)),
   );
 
   // Keep a drag on a slider from reaching the tile underneath it.
@@ -135,10 +146,11 @@
       <option value={opt.value}>{opt.label}</option>
     {/each}
   </select>
-{:else if showValue && widget === "button"}
+{:else if widget === "button"}
   <button
     type="button"
     class="btn"
+    aria-label={label || control.label || control.feature}
     disabled={!control.writable}
     onclick={(e) => {
       e.stopPropagation();
@@ -148,7 +160,7 @@
       setTimeout(() => write(false), 300);
     }}
   >
-    Press
+    {label || "Press"}
   </button>
 {:else if showValue}
   <span class="mono">{readout()}</span>

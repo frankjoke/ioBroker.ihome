@@ -83,6 +83,14 @@
       control={control as EnrichedControl}
       options={slot.options}
       {home}
+      label={name}
+      widget={slot.kind === "switch" ||
+      slot.kind === "level" ||
+      slot.kind === "color" ||
+      slot.kind === "enum" ||
+      slot.kind === "button"
+        ? slot.kind
+        : undefined}
     />
   {/if}
 {/snippet}
