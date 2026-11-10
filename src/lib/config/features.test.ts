@@ -62,6 +62,10 @@ it("uses a parent folder's light role", () => {
     ]),
   ).toBe("Light");
 });
+it("gives a Custom device a button function", () => {
+  expect(widgetFor("Custom", "press")).toBe("button");
+});
+
 it("suggests Switch for a plain boolean", () => {
   expect(suggestDeviceType({ common: { type: "boolean" } })).toBe("Switch");
 });

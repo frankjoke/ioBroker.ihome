@@ -446,6 +446,7 @@
         <ControlRow
           control={row.control}
           siblings={controls}
+          deviceType={type}
           autoOpen={row.control.id === autoOpenId}
           open={row.control.id === openControlId}
           onToggle={() =>

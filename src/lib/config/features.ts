@@ -211,6 +211,12 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       roleHints: ["switch", "power"],
     },
     { feature: "level", label: "Level", widget: "level", roleHints: ["level"] },
+    {
+      feature: "press",
+      label: "Button",
+      widget: "button",
+      roleHints: ["button", "press"],
+    },
   ],
 };
 

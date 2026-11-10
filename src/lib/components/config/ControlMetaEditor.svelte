@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Control } from "$lib/types/device";
+  import type { Control, DeviceType } from "$lib/types/device";
   import { effectiveCommon, normalizeStates } from "$lib/config/state-meta";
   import { enumLabelFromObject } from "$lib/config/rooms";
+  import { DEVICE_FEATURES } from "$lib/config/features";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -14,9 +15,11 @@
    */
   let {
     control,
+    deviceType = "Custom",
     onChange,
   }: {
     control: Control;
+    deviceType?: DeviceType;
     onChange: (c: Control) => void;
   } = $props();
 
@@ -27,6 +30,19 @@
   );
   const meta = $derived(effectiveCommon(control, object));
   const states = $derived(normalizeStates(control.states) ?? meta.states ?? {});
+  const featureOptions = $derived.by(() => {
+    const list = (DEVICE_FEATURES[deviceType] ?? []).map((entry) => ({
+      value: entry.feature,
+      label: entry.label,
+    }));
+    if (
+      control.feature &&
+      !list.some((entry) => entry.value === control.feature)
+    ) {
+      list.unshift({ value: control.feature, label: control.feature });
+    }
+    return list;
+  });
 
   const roles = $derived(
     [
@@ -85,6 +101,18 @@
 
 <div class="meta">
   <div class="row">
+    <label class="field"
+      ><span class="label-mono">Function</span>
+      <select
+        value={control.feature ?? ""}
+        title="What this control is: a reading, a switch, a button …"
+        onchange={(e) => patch({ feature: e.currentTarget.value })}
+      >
+        {#each featureOptions as option (option.value)}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select></label
+    >
     <label class="field"
       ><span class="label-mono">Role</span>
       <input

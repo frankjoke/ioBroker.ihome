@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Control } from "$lib/types/device";
+  import type { Control, DeviceType } from "$lib/types/device";
   import { getPickerValue } from "$lib/picker-values.svelte.js";
   import { formatAge, formatValue, splitReading } from "$lib/config/format";
   import { time } from "$lib/time.svelte.js";
@@ -20,6 +20,7 @@
   let {
     control,
     siblings = [],
+    deviceType = "Custom",
     autoOpen = false,
     open = false,
     onToggle,
@@ -29,6 +30,7 @@
   }: {
     control: Control;
     siblings?: Control[];
+    deviceType?: DeviceType;
     autoOpen?: boolean;
     /** Whether this row's editor is open; the parent owns the one-open rule. */
     open?: boolean;
@@ -329,7 +331,11 @@
       </div>
 
       {#if !isVirtual}
-        <ControlMetaEditor {control} onChange={(c) => onChange(c)} />
+        <ControlMetaEditor
+          {control}
+          {deviceType}
+          onChange={(c) => onChange(c)}
+        />
       {/if}
 
       {#if !isVirtual && control.history && control.stateId}
