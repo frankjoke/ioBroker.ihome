@@ -213,16 +213,16 @@ export function faceGlyph(
   return look.glyph ?? tileIcon ?? slotGlyph;
 }
 
-/** The icon before the tile name (detail header): the tile's own icon, then
- *  the state's look, then the headline slot's icon, then the device's face. */
+/** The icon before the tile name (detail header): the state's look, then the
+ *  tile's own icon, then the headline slot's icon, then the device's face. */
 export function headerIcon(
   tileIcon: string | undefined,
   look: StateLook,
   headline?: { glyph: string; color?: string; disabled?: boolean },
   deviceIcon?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
-  if (tileIcon) return { glyph: tileIcon };
   if (look.glyph) return { glyph: look.glyph, color: look.color };
+  if (tileIcon) return { glyph: tileIcon };
   if (headline) return headline;
   return deviceIcon ? { glyph: deviceIcon } : undefined;
 }

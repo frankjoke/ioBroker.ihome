@@ -689,10 +689,10 @@ it("the tile icon is separate from the headline slot icon", () => {
   expect(faceGlyph({ glyph: "look" }, "tile", "slot")).toBe("look");
   expect(faceGlyph({}, "tile", "slot")).toBe("tile");
   expect(faceGlyph({}, undefined, "slot")).toBe("slot");
-  // Header: tile icon → state look → headline slot icon → device icon.
+  // Header: state look → tile icon → headline slot icon → device icon.
   expect(
     headerIcon("tile", { glyph: "look" }, { glyph: "slot" }, "device"),
-  ).toEqual({ glyph: "tile" });
+  ).toEqual({ glyph: "look" });
   expect(
     headerIcon(undefined, { glyph: "look", color: "red" }, { glyph: "slot" }),
   ).toEqual({ glyph: "look", color: "red" });

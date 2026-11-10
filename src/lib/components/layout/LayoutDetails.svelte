@@ -230,6 +230,10 @@
 
   /** The rows the pane lists: the tile's own slots (v2: always these). */
   const shownSlots = $derived(tile?.tile?.slots ?? []);
+  /** The headline slot: the first value slot, whose icon is the tile's big glyph. */
+  const mainSlotIndex = $derived(
+    shownSlots.findIndex((slot) => slot.kind === "value"),
+  );
 
   /** The states the look block edits (A71): the inactive one is also the
    *  tile's default, so a tile with no active condition edits just that. */
@@ -1873,7 +1877,7 @@
                     <span class="setting-group">
                       <label
                         class="check"
-                        title="Off keeps the glyph and its rules but renders nothing"
+                        title="Off hides this slot's own icon; the tile Look and device icon still show"
                       >
                         <input
                           type="checkbox"
@@ -1955,7 +1959,14 @@
                   </div>
                   {#if slot.icon && slot.icon.enabled !== false && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
                     <p class="note text-muted">
-                      No glyph yet — choose one, or let a rule supply it.
+                      No glyph yet — choose one, let a rule supply it, or use
+                      the device icon.
+                    </p>
+                  {/if}
+                  {#if i === mainSlotIndex && slot.icon?.enabled === false}
+                    <p class="note text-muted">
+                      The tile Look and device icon still show; this switch
+                      hides only the slot's own fallback.
                     </p>
                   {/if}
                 {/if}

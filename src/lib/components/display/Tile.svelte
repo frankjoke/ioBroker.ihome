@@ -320,17 +320,12 @@
   function bodyIcon(r: SlotRow) {
     const main = r.slot === headline;
     const lk = main ? look : {};
-    // A look glyph may stand where the descriptor had none, but an icon turned
-    // off — or homed away from the tile — stays off.
-    if (r.slot.icon?.enabled === false) return undefined;
-    const where = r.slot.icon?.where ?? "both";
-    if (where !== "both" && where !== "tile") return undefined;
+    // Look and tile icons are tile-level; the slot's own icon toggle cannot
+    // hide them. The slot icon comes next, then the device's face as fallback.
     const icon = rowIcon(r, "tile", device.objectIcon);
-    const glyph = faceGlyph(
-      lk,
-      main ? workingTile?.icon : undefined,
-      icon?.glyph,
-    );
+    const glyph =
+      faceGlyph(lk, main ? workingTile?.icon : undefined, icon?.glyph) ??
+      (main ? device.objectIcon : undefined);
     if (!glyph) return undefined;
     return {
       glyph,
