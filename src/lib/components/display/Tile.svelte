@@ -313,25 +313,28 @@
   );
   const chartHeight = $derived(chartConfig?.height ?? 56);
 
-  /** The body-row icon (A51/A53): the headline's is the big glyph, the rest read small.
-   *  A tile that draws a chart blends its big glyph out whatever the state says
-   *  (a reading with history is usually not a switch), so the line reads over it.
-   *  The active state's look (A71) speaks over the rules, field by field. */
-  function bodyIcon(r: SlotRow) {
+  /** The icon a row shows: state Look → tile icon → the row's own icon →
+   *  the device's face. The look/tile/device are tile-level and survive a
+   *  disabled slot icon. */
+  function rowGlyph(r: SlotRow, home: "tile" | "modal") {
     const main = r.slot === headline;
     const lk = main ? look : {};
-    // Look and tile icons are tile-level; the slot's own icon toggle cannot
-    // hide them. The slot icon comes next, then the device's face as fallback.
-    const icon = rowIcon(r, "tile", device.objectIcon);
+    const icon = rowIcon(r, home, device.objectIcon);
     const glyph =
       faceGlyph(lk, main ? workingTile?.icon : undefined, icon?.glyph) ??
       (main ? device.objectIcon : undefined);
     if (!glyph) return undefined;
+    return { glyph, color: lk.color ?? icon?.color, disabled: icon?.disabled };
+  }
+
+  function bodyIcon(r: SlotRow) {
+    const main = r.slot === headline;
+    const icon = rowGlyph(r, "tile");
+    if (!icon) return undefined;
     return {
-      glyph,
-      color: lk.color ?? icon?.color,
+      ...icon,
       size: main ? 34 : 17,
-      disabled: icon?.disabled === true || (main && chart.length > 0),
+      disabled: icon.disabled === true || (main && chart.length > 0),
     };
   }
 
@@ -411,7 +414,7 @@
       slot: r.slot,
       control: r.control,
       style: r.style,
-      icon: rowIcon(r, "modal", device.objectIcon),
+      icon: rowGlyph(r, "modal"),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
