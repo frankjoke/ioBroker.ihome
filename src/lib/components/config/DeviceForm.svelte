@@ -5,6 +5,8 @@
   import ControlRow from "./ControlRow.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
+  import IconPicker from "$lib/components/common/IconPicker.svelte";
   import { projectDevice } from "$lib/config/project";
   import { ancestorObjects, parentName } from "$lib/config/state-tree";
   import {
@@ -74,6 +76,7 @@
   let section = $state(init?.section ?? "");
   let panel = $state(init?.panel ?? "");
   let icon = $state(init?.icon ?? "");
+  let iconPicker = $state(false);
   let controls = $state<Control[]>(init?.controls ?? []);
   // auto-open the picker for a brand-new (empty) device
   let showPicker = $state(untrack(() => autoPick && !device));
@@ -229,6 +232,8 @@
   }
 
   let autoOpenId = $state<string | null>(null);
+  /** The one control row whose editor is open (the list-editor pattern). */
+  let openControlId = $state<string | null>(null);
   // index of the row whose state is being changed; null while adding new ones
   let replaceIndex = $state<number | null>(null);
 
@@ -261,6 +266,7 @@
       },
     ];
     autoOpenId = id;
+    openControlId = id;
   }
 
   /** Save lives on the item's line when embedded, so the host calls this. */
@@ -342,6 +348,20 @@
         placeholder="defaults to the name"
       /></label
     >
+    <div class="field">
+      <span class="label-mono">Icon</span>
+      <div class="icon-row">
+        <button type="button" class="btn" onclick={() => (iconPicker = true)}>
+          {#if icon}<Icon value={icon} size={20} />{/if}
+          <span>{icon ? "Change icon" : "Choose icon"}</span>
+        </button>
+        {#if icon}
+          <button type="button" class="btn" onclick={() => (icon = "")}
+            >Clear</button
+          >
+        {/if}
+      </div>
+    </div>
     <label class="field"
       ><span class="label-mono">Type</span>
       <select
@@ -427,6 +447,10 @@
           control={row.control}
           siblings={controls}
           autoOpen={row.control.id === autoOpenId}
+          open={row.control.id === openControlId}
+          onToggle={() =>
+            (openControlId =
+              openControlId === row.control.id ? null : row.control.id)}
           onChange={(c) => updateControl(row.index, c)}
           onChangeState={() => (replaceIndex = row.index)}
           onRemove={() => removeControl(row.index)}
@@ -460,6 +484,17 @@
   />
 {/if}
 
+{#if iconPicker}
+  <IconPicker
+    {icon}
+    onPick={(value) => {
+      icon = value;
+      iconPicker = false;
+    }}
+    onClose={() => (iconPicker = false)}
+  />
+{/if}
+
 <style>
   .device-form {
     display: flex;
@@ -489,6 +524,13 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+
+  .icon-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
   }
 
   .controls {

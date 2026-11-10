@@ -21,6 +21,8 @@
     control,
     siblings = [],
     autoOpen = false,
+    open = false,
+    onToggle,
     onChange,
     onChangeState,
     onRemove,
@@ -28,6 +30,9 @@
     control: Control;
     siblings?: Control[];
     autoOpen?: boolean;
+    /** Whether this row's editor is open; the parent owns the one-open rule. */
+    open?: boolean;
+    onToggle: () => void;
     onChange: (c: Control) => void;
     onChangeState: () => void;
     onRemove: () => void;
@@ -36,8 +41,6 @@
   let showTransform = $state(false);
   let showFormula = $state(false);
   let showHistory = $state(false);
-  /** The row's fold-out: label/unit, metadata and the editors live in it. */
-  let open = $state(false);
 
   /** The metadata keys a control may override on top of the broker object. */
   const OVERRIDE_KEYS = [
@@ -77,7 +80,7 @@
     ) {
       return;
     }
-    open = !open;
+    onToggle();
   }
 
   const isVirtual = $derived(control.kind === "virtual");
@@ -90,7 +93,6 @@
 
   $effect(() => {
     if (autoOpen) {
-      open = true;
       showFormula = true;
     }
   });
@@ -218,7 +220,6 @@
           title="Edit formula"
           aria-label="Edit formula"
           onclick={() => {
-            open = true;
             showFormula = true;
           }}
         >
@@ -267,7 +268,7 @@
           title="History"
           aria-label="History"
           onclick={() => {
-            open = true;
+            if (!open) onToggle();
             showHistory = true;
           }}
         >
@@ -282,7 +283,7 @@
         title="Transform"
         aria-label="Toggle transform"
         onclick={() => {
-          open = true;
+          if (!open) onToggle();
           showTransform = !showTransform;
         }}
       >
