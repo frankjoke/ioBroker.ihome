@@ -230,13 +230,9 @@
       : [],
   );
 
-  /** What a device starts selected: the recipe's bound controls, else the
-   *  first bound one. Empty template controls never count. */
+  /** What a device starts selected: every control that carries data. */
   function defaultControlIds(device: Device): string[] {
-    return preselectedControlIds(
-      device,
-      resolveTemplate(device, templates).slots,
-    );
+    return preselectedControlIds(device);
   }
 
   // A picker opened on a device (a slot's own device, a tile's first) starts

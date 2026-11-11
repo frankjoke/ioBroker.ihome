@@ -346,6 +346,36 @@
     inactive: "inactive only",
   } as const;
 
+  const DETAIL_GLYPH = {
+    hidden: "visibility_off",
+    half: "splitscreen",
+    full: "open_in_full",
+  } as const;
+
+  const DETAIL_LABEL = {
+    hidden: "not shown",
+    half: "small (half)",
+    full: "full line",
+  } as const;
+
+  function nextDetail(slot: Slot): "full" | "half" | "hidden" {
+    const cur = detailSpan(slot);
+    return cur === "hidden" ? "half" : cur === "half" ? "full" : "hidden";
+  }
+
+  function tileTitle(slot: Slot): string {
+    if (!onTile(slot)) return "Not on the tile — click to show";
+    return tileVisibleCount <= 1
+      ? "On the tile (one slot must stay on the tile)"
+      : "On the tile — click to remove";
+  }
+
+  function detailTitle(slot: Slot): string {
+    return `Detail: ${DETAIL_LABEL[detailSpan(slot)]} — click for ${
+      DETAIL_LABEL[nextDetail(slot)]
+    }`;
+  }
+
   function nextShow(slot: Slot): "both" | "active" | "inactive" {
     const cur = slot.showWhen ?? "both";
     return cur === "both" ? "active" : cur === "active" ? "inactive" : "both";
@@ -1415,6 +1445,28 @@
                 {/if}
               </button>
               <span class="item-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  class:on={onTile(slot)}
+                  title={tileTitle(slot)}
+                  aria-label={tileTitle(slot)}
+                  disabled={onTile(slot) && tileVisibleCount <= 1}
+                  onclick={() => setOnTile(i, !onTile(slot))}
+                >
+                  <span class="material-symbols-outlined">grid_view</span>
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  title={detailTitle(slot)}
+                  aria-label={detailTitle(slot)}
+                  onclick={() => setDetailWidth(i, nextDetail(slot))}
+                >
+                  <span class="material-symbols-outlined"
+                    >{DETAIL_GLYPH[detailSpan(slot)]}</span
+                  >
+                </button>
                 <button
                   type="button"
                   class="icon-btn"

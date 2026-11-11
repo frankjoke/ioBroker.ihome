@@ -103,7 +103,7 @@ it("keeps only controls the device actually has", () => {
   });
 });
 
-it("preselects the recipe's bound controls, not every control", () => {
+it("preselects every control that carries data", () => {
   const light = device({
     type: "Light",
     controls: [
@@ -113,14 +113,15 @@ it("preselects the recipe's bound controls, not every control", () => {
       ctl("time", "time", { stateId: "x.time" }),
     ],
   });
-  expect(preselectedControlIds(light, PRESETS.Light.slots)).toEqual([
+  expect(preselectedControlIds(light)).toEqual([
     "power",
     "bright",
     "color",
+    "time",
   ]);
 });
 
-it("skips empty template controls and falls back to the first bound one", () => {
+it("skips empty template controls and keeps virtual ones", () => {
   const dev = device({
     type: "Light",
     controls: [
@@ -133,14 +134,12 @@ it("skips empty template controls and falls back to the first bound one", () => 
       }),
     ],
   });
-  // The recipe names power/brightness, but they carry no data.
-  expect(preselectedControlIds(dev, PRESETS.Light.slots)).toEqual(["read"]);
-  expect(preselectedControlIds(dev, [])).toEqual(["read"]);
+  expect(preselectedControlIds(dev)).toEqual(["read", "virtual"]);
 });
 
 it("preselects nothing when no control is bound", () => {
   expect(
-    preselectedControlIds(device({ controls: [ctl("a", "power")] }), []),
+    preselectedControlIds(device({ controls: [ctl("a", "power")] })),
   ).toEqual([]);
 });
 

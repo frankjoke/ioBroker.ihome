@@ -159,31 +159,13 @@ function isBoundControl(control: Control): boolean {
 }
 
 /**
- * The controls a new tile starts with: the ones its type recipe resolves *and*
- * that carry real data, else the first bound control. A recipe is a curated
- * subset, so a device's times and counters do not all land on the tile.
+ * The controls a new tile starts with: every control that names real data.
+ * Controls a template left empty (no state, no virtual/formula) are skipped.
  */
-export function preselectedControlIds(
-  device: Device,
-  recipe: Slot[],
-): string[] {
-  const bound = new Map(
-    (device.controls ?? [])
-      .filter((c) => !c.hidden && isBoundControl(c))
-      .map((c) => [c.id, c]),
-  );
-  const fromRecipe = suggestedSlots(device, recipe)
-    .map((slot) =>
-      slot.source &&
-      typeof slot.source === "object" &&
-      slot.source.kind === "control"
-        ? slot.source.control
-        : "",
-    )
-    .filter((id) => id && bound.has(id));
-  if (fromRecipe.length) return fromRecipe;
-  const first = bound.values().next().value;
-  return first ? [first.id] : [];
+export function preselectedControlIds(device: Device): string[] {
+  return (device.controls ?? [])
+    .filter((c) => !c.hidden && isBoundControl(c))
+    .map((c) => c.id);
 }
 
 /** What a brand-new tile inherits from its first slot: a name, the type's size
