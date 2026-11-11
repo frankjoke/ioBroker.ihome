@@ -348,8 +348,8 @@
 
   const DETAIL_GLYPH = {
     hidden: "visibility_off",
-    half: "splitscreen",
-    full: "open_in_full",
+    half: "sync_alt",
+    full: "view_agenda",
   } as const;
 
   const DETAIL_LABEL = {
