@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  preselectedControlIds,
   suggestedSlots,
   slotFromControl,
   slotFromState,
@@ -100,6 +101,47 @@ it("keeps only controls the device actually has", () => {
     device: light.id,
     control: "c1",
   });
+});
+
+it("preselects the recipe's bound controls, not every control", () => {
+  const light = device({
+    type: "Light",
+    controls: [
+      ctl("power", "power", { stateId: "x.power" }),
+      ctl("bright", "brightness", { stateId: "x.bright" }),
+      ctl("color", "color", { stateId: "x.color" }),
+      ctl("time", "time", { stateId: "x.time" }),
+    ],
+  });
+  expect(preselectedControlIds(light, PRESETS.Light.slots)).toEqual([
+    "power",
+    "bright",
+    "color",
+  ]);
+});
+
+it("skips empty template controls and falls back to the first bound one", () => {
+  const dev = device({
+    type: "Light",
+    controls: [
+      ctl("empty", "power"),
+      ctl("empty2", "brightness"),
+      ctl("read", "value", { stateId: "x.read" }),
+      ctl("virtual", "computed", {
+        kind: "virtual",
+        virtual: { expr: "1" },
+      }),
+    ],
+  });
+  // The recipe names power/brightness, but they carry no data.
+  expect(preselectedControlIds(dev, PRESETS.Light.slots)).toEqual(["read"]);
+  expect(preselectedControlIds(dev, [])).toEqual(["read"]);
+});
+
+it("preselects nothing when no control is bound", () => {
+  expect(
+    preselectedControlIds(device({ controls: [ctl("a", "power")] }), []),
+  ).toEqual([]);
 });
 
 it("uses the state's role/type over the device type's feature", () => {

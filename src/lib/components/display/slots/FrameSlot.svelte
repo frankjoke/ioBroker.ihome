@@ -1,6 +1,11 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { frameUrl, safeFrameUrl } from "$lib/config/frame-url";
+  import { renderHtmlTemplate } from "$lib/config/html-template";
+  import {
+    placeholderValue,
+    subscribePlaceholders,
+  } from "$lib/slot-placeholders";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
   import type { Slot } from "$lib/types/display";
@@ -29,16 +34,28 @@
   const stateValue = $derived(
     stateId ? ioBroker.states.get(stateId)?.val : undefined,
   );
-  const staged = $derived(
+  const rawUrl = $derived(
     stateId && typeof stateValue === "string" && stateValue.trim()
-      ? safeFrameUrl(stateValue)
+      ? stateValue
       : typeof slot.options?.url === "string"
         ? slot.options.url
         : "",
   );
+  /** Subscribe the states the URL names, so a token keeps up. */
+  $effect(() => {
+    subscribePlaceholders(rawUrl);
+  });
+  // `{{name}}` fills first, so the scheme check sees what the frame actually
+  // loads, including a URL a state supplied. A missing value keeps its
+  // placeholder visible (the editor's preview flags it).
+  const checked = $derived(
+    rawUrl.trim()
+      ? safeFrameUrl(renderHtmlTemplate(rawUrl, placeholderValue))
+      : "",
+  );
   const url = $derived(
-    staged
-      ? frameUrl(staged, {
+    checked
+      ? frameUrl(checked, {
           dev: import.meta.env.DEV,
           origin:
             import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",

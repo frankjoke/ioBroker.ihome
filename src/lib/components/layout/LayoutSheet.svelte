@@ -724,6 +724,7 @@
     templates={getTemplateRegistry().templates ?? []}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
+    showBadge={target.kind !== "newTile"}
     onSlots={(slots) => {
       // Snapshot before closing: `target` reads the reactive value, which
       // becomes null the moment `pickerFor` is cleared.

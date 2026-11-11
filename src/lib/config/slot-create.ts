@@ -147,6 +147,45 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
   return out;
 }
 
+/** A control that names real data: a state, a virtual or a formula. A control
+ *  left empty by a template is not bound and never preselected. */
+function isBoundControl(control: Control): boolean {
+  return !!(
+    control.stateId ||
+    control.kind === "virtual" ||
+    control.virtual ||
+    control.formulaId
+  );
+}
+
+/**
+ * The controls a new tile starts with: the ones its type recipe resolves *and*
+ * that carry real data, else the first bound control. A recipe is a curated
+ * subset, so a device's times and counters do not all land on the tile.
+ */
+export function preselectedControlIds(
+  device: Device,
+  recipe: Slot[],
+): string[] {
+  const bound = new Map(
+    (device.controls ?? [])
+      .filter((c) => !c.hidden && isBoundControl(c))
+      .map((c) => [c.id, c]),
+  );
+  const fromRecipe = suggestedSlots(device, recipe)
+    .map((slot) =>
+      slot.source &&
+      typeof slot.source === "object" &&
+      slot.source.kind === "control"
+        ? slot.source.control
+        : "",
+    )
+    .filter((id) => id && bound.has(id));
+  if (fromRecipe.length) return fromRecipe;
+  const first = bound.values().next().value;
+  return first ? [first.id] : [];
+}
+
 /** What a brand-new tile inherits from its first slot: a name, the type's size
  *  and one default glyph. An offer frozen at creation, never a live link (S11). */
 export interface TileSeed {

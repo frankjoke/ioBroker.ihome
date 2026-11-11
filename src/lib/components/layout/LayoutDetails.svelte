@@ -56,6 +56,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
@@ -595,6 +596,21 @@
     return source && typeof source === "object" && source.kind === "state"
       ? source.stateId
       : "Choose a state…";
+  }
+
+  /** The text a frame's URL really comes from: its state while that holds a
+   *  string, else the fixed URL. */
+  function framePreviewText(slot: Slot): string {
+    if (
+      slot.source &&
+      typeof slot.source === "object" &&
+      slot.source.kind === "state"
+    ) {
+      const id = stateIdFor(slot.source.stateId, getVariables());
+      const value = ioBroker.states.get(id)?.val;
+      if (typeof value === "string" && value.trim()) return value;
+    }
+    return String(slot.options?.url ?? "");
   }
 
   /**
@@ -1640,6 +1656,9 @@
                     </div>
                   {/if}
                 </div>
+                {#if slot.kind === "frame"}
+                  <UrlTemplatePreview text={framePreviewText(slot)} />
+                {/if}
                 <div class="row">
                   <label class="small grow">
                     <span class="label-mono">Label</span>

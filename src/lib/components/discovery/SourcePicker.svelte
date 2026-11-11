@@ -12,11 +12,13 @@
   import DeviceEditorPane from "$lib/components/config/DeviceEditorPane.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import {
+    preselectedControlIds,
     slotFromControl,
     slotFromState,
     slotKindForWidget,
     suggestedSlots,
   } from "$lib/config/slot-create";
+  import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
   import { resolveTemplate } from "$lib/config/template-ops";
   import { widgetForState } from "$lib/config/slot-source";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -47,6 +49,8 @@
     deviceType = "Custom",
     /** Preselect the device this picker was opened for, so its controls show. */
     activeDeviceId = "",
+    /** A new tile starts from values, not badges (the slot part adds those). */
+    showBadge = true,
     single = false,
     onSlots,
     onSource,
@@ -67,6 +71,9 @@
     deviceType?: DeviceType;
     /** The device the picker opened for (tile/slot/control). */
     activeDeviceId?: string;
+    /** Show the Badge tab. A new tile starts from values; an added slot may be
+     *  a badge. */
+    showBadge?: boolean;
     /** control mode: picking replaces one state instead of adding. */
     single?: boolean;
     onSlots?: (slots: Slot[]) => void;
@@ -100,7 +107,9 @@
     ],
     state: [{ id: "state", label: "Any state" }],
   };
-  const tabs = $derived(TABS[mode]);
+  const tabs = $derived(
+    TABS[mode].filter((entry) => showBadge || entry.id !== "badge"),
+  );
 
   let tab = $state<Tab>(untrack(() => (mode === "state" ? "state" : "device")));
   let search = $state("");
@@ -221,6 +230,23 @@
       : [],
   );
 
+  /** What a device starts selected: the recipe's bound controls, else the
+   *  first bound one. Empty template controls never count. */
+  function defaultControlIds(device: Device): string[] {
+    return preselectedControlIds(
+      device,
+      resolveTemplate(device, templates).slots,
+    );
+  }
+
+  // A picker opened on a device (a slot's own device, a tile's first) starts
+  // with its default controls ticked; the user can untick before adding.
+  untrack(() => {
+    if (!selectedDevice) return;
+    for (const id of defaultControlIds(selectedDevice))
+      selectedControls.add(id);
+  });
+
   /** A tree leaf may be a variable name; its metadata is the real state's
    *  object, while the slot keeps the name (the alias resolves it live). */
   function objectForState(id: string): any {
@@ -311,6 +337,11 @@
     selectedDeviceId = selectedDeviceId === id ? "" : id;
     selectedControls.clear();
     badgeControlId = "";
+    const device = allDevices.find((d) => d.id === selectedDeviceId);
+    if (device) {
+      for (const controlId of defaultControlIds(device))
+        selectedControls.add(controlId);
+    }
   }
 
   function toggleControl(id: string): void {
@@ -462,41 +493,30 @@
     onSlots?.([{ kind: "html", where: "modal", options: { html: html } }]);
   }
 
-  /** A badge reads a control (value or time since), or the device itself. */
+  /** A badge is a value in a corner: it reads the chosen control or state.
+   *  `ago` uses that source's timestamp, `offline` its false/empty value. */
   function addBadge(): void {
     const device = selectedDevice;
     if (!device) return;
-    if (badgeKind === "offline") {
-      onSlots?.([
-        { kind: "badge", source: { kind: "device", device: device.id } },
-      ]);
-      return;
-    }
     const stateId = badgeState.trim();
-    if (stateId) {
-      const base = slotFromState(stateId, objectForState(stateId), "badge");
-      onSlots?.([
-        {
-          ...base,
-          ...(badgeKind === "ago"
-            ? {
-                options: { ...(base.options ?? {}), derive: "ago", from: "ts" },
-              }
-            : {}),
-        },
-      ]);
-      return;
-    }
     const control = controls.find((c) => c.id === badgeControlId);
-    if (!control) return;
-    const base = slotFromControl(device, control);
+    const base = stateId
+      ? slotFromState(stateId, objectForState(stateId), "badge")
+      : control
+        ? slotFromControl(device, control)
+        : undefined;
+    if (!base) return;
+    const derive =
+      badgeKind === "ago"
+        ? { derive: "ago", from: "ts" }
+        : badgeKind === "offline"
+          ? { derive: "offline" }
+          : undefined;
     onSlots?.([
       {
         ...base,
         kind: "badge",
-        ...(badgeKind === "ago"
-          ? { options: { derive: "ago", from: "ts" } }
-          : {}),
+        ...(derive ? { options: { ...(base.options ?? {}), ...derive } } : {}),
       },
     ]);
   }
@@ -508,6 +528,8 @@
     if (wasNew) {
       selectedDeviceId = d.id;
       selectedControls.clear();
+      for (const controlId of defaultControlIds(d))
+        selectedControls.add(controlId);
     }
     deviceForm = null;
   }
@@ -604,6 +626,7 @@
             onclick={addPage}>Add page</button
           >
         </div>
+        <UrlTemplatePreview text={url} />
         <p class="text-muted hint-note">
           The page loads in a frame (A38) — the tile's own space, or the modal's
           wide row, as this slot's destination says.
@@ -837,45 +860,39 @@
                 <select bind:value={badgeKind}>
                   <option value="value">value</option>
                   <option value="ago">time since</option>
-                  <option value="offline">device offline</option>
+                  <option value="offline">offline (state false)</option>
                 </select>
               </label>
-              {#if badgeKind !== "offline"}
-                <label class="small grow">
-                  <span class="label-mono">Control</span>
-                  <select bind:value={badgeControlId}>
-                    <option value="">choose…</option>
-                    {#each controls as c (c.id)}
-                      <option value={c.id}
-                        >{c.label || c.feature || c.id}</option
-                      >
-                    {/each}
-                  </select>
-                </label>
-                <label class="small grow">
-                  <span class="label-mono">or state</span>
-                  <input
-                    type="text"
-                    placeholder="state id or variable"
-                    bind:value={badgeState}
-                  />
-                </label>
-              {/if}
+              <label class="small grow">
+                <span class="label-mono">Control</span>
+                <select bind:value={badgeControlId}>
+                  <option value="">choose…</option>
+                  {#each controls as c (c.id)}
+                    <option value={c.id}>{c.label || c.feature || c.id}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="small grow">
+                <span class="label-mono">or state</span>
+                <input
+                  type="text"
+                  placeholder="state id or variable"
+                  bind:value={badgeState}
+                />
+              </label>
             </div>
             <div class="actions">
               <span class="text-muted">
                 {badgeKind === "offline"
-                  ? "Shown while the device has no reachable state"
+                  ? "Shown while that state is false — pick the online flag"
                   : badgeKind === "ago"
-                    ? "Shown as the time since that control last reported"
-                    : "Shown as that control's value in a corner"}
+                    ? "Shown as the time since that state last reported"
+                    : "Shown as that state's value in a corner"}
               </span>
               <button
                 type="button"
                 class="btn btn-primary"
-                disabled={badgeKind !== "offline" &&
-                  !badgeControlId &&
-                  !badgeState.trim()}
+                disabled={!badgeControlId && !badgeState.trim()}
                 onclick={addBadge}>Add badge</button
               >
             </div>

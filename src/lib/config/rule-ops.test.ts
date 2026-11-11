@@ -103,6 +103,56 @@ it("resolves badge slots and skips ones with no source", () => {
   expect(badges[1].tone).toBe("info");
 });
 
+it("derives ago and offline from the badge's own control", () => {
+  const device = {
+    controls: [
+      { id: "power", feature: "power", liveValue: 12 },
+      { id: "online", feature: "online", liveValue: false },
+    ],
+  };
+  const clock = {
+    at: (source?: string) => (source === "power" ? NOW - 1000 : undefined),
+  };
+  const badges = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: { kind: "control", device: "d", control: "power" },
+        options: { derive: "ago" },
+      },
+      {
+        kind: "badge",
+        source: { kind: "control", device: "d", control: "online" },
+        options: { derive: "offline" },
+      },
+    ],
+    device as any,
+    clock,
+    NOW,
+  );
+  expect(badges.map((b) => b.source)).toEqual(["ago", "offline"]);
+  expect(badges[0].label).toBe("now");
+  expect(badges[1].tone).toBe("danger");
+});
+
+it("hides an offline badge while its state is true", () => {
+  const badges = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: { kind: "control", device: "d", control: "online" },
+        options: { derive: "offline" },
+      },
+    ],
+    {
+      controls: [{ id: "online", feature: "online", liveValue: true }],
+    } as any,
+    undefined,
+    NOW,
+  );
+  expect(badges).toEqual([]);
+});
+
 it("falls back to info for a junk tone and honours a rule's tone", () => {
   const badges = resolveBadges(
     [

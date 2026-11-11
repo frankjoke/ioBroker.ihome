@@ -392,6 +392,24 @@ export function resolveBadges(
       : undefined;
   };
   const out: ResolvedBadge[] = [];
+  /** The object source a slot names, with the key the badge clock reads: a
+   *  control id or a raw state id. `raw` resolves a state to a pseudo-control. */
+  const objectSource = (
+    slot: Slot,
+  ): { control?: BadgeControl; key?: string } | undefined => {
+    const source = slot.source;
+    if (!source || typeof source !== "object") return undefined;
+    if (source.kind === "control") {
+      const control = (device.controls ?? []).find(
+        (c) => c.id === source.control,
+      ) as BadgeControl | undefined;
+      return { control: control ?? raw?.(source.control), key: source.control };
+    }
+    if (source.kind === "state") {
+      return { control: raw?.(source.stateId), key: source.stateId };
+    }
+    return undefined;
+  };
   for (const slot of slots ?? []) {
     if (slot.kind !== "badge") continue;
     // A badge hidden by its own rules produces nothing — including the derived
@@ -404,6 +422,8 @@ export function resolveBadges(
     const of =
       typeof slot.options?.of === "string" ? slot.options.of : undefined;
     const offline = offlineFor(of);
+    const derive = slot.options?.derive;
+    const object = objectSource(slot);
     let badge: ResolvedBadge | undefined;
     // An offline device says *that*, not a misleading "how long ago it was".
     if (slot.source === "ago") {
@@ -416,6 +436,23 @@ export function resolveBadges(
       if (badge && color) badge.color = color;
     } else if (slot.source === "offline") {
       badge = offline ? { ...offline, ...(color ? { color } : {}) } : undefined;
+    } else if (derive === "ago") {
+      // The slot names its own source: time since that control/state reported.
+      const from = slot.options?.from === "lc" ? "lc" : "ts";
+      badge = agoBadge(clock.at(object?.key, from), now);
+      if (badge && color) badge.color = color;
+    } else if (derive === "offline") {
+      // The source is an online flag: the badge appears while it is falsy.
+      badge =
+        object?.control && !truthy(object.control.liveValue)
+          ? {
+              source: "offline",
+              icon: "cloud_off",
+              tone: "danger",
+              label: "offline",
+              ...(color ? { color } : {}),
+            }
+          : undefined;
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).
