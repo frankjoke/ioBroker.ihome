@@ -30,8 +30,29 @@
     failed = false;
   });
 
+  /** The icon document cannot see the app's CSS variables: resolve a theme
+   *  token to a concrete colour first. */
+  function concreteColor(value: unknown): string {
+    const text = String(value ?? "").trim() || "var(--text-color)";
+    if (!text.startsWith("var(") || typeof document === "undefined") {
+      return text;
+    }
+    const probe = document.createElement("span");
+    probe.style.color = text;
+    probe.style.display = "none";
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color || text;
+  }
+
   const html = $derived(
-    value && isHtmlIcon(value) ? iconHtmlDocument(value, data ?? {}) : "",
+    value && isHtmlIcon(value)
+      ? iconHtmlDocument(value, {
+          ...(data ?? {}),
+          $color: concreteColor(data?.$color),
+        })
+      : "",
   );
 </script>
 

@@ -1906,6 +1906,22 @@
                         </select>
                       </label>
                     {/if}
+                    <label
+                      class="check"
+                      title="Show the reading next to the icon; off keeps a compact icon-only badge"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.badgeLabel !== false}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            badgeLabel: e.currentTarget.checked
+                              ? undefined
+                              : false,
+                          })}
+                      />
+                      <span>value</span>
+                    </label>
                   </div>
                   <div class="row">
                     <label class="small">

@@ -112,8 +112,11 @@ it("a slot's tile mode and detail width are independent (A34)", () => {
     "hidden",
   );
   expect(onTile(badge.slots![0])).toBe(false);
-  // A value promoted to the corner keeps its body form off the tile.
-  expect(slotTileMode(setSlotTile(tile, 0, "badge").slots![0])).toBe("badge");
+  // A value promoted to the corner keeps its body form off the tile, and its
+  // reading moves into the detail page.
+  const promoted = setSlotTile(tile, 0, "badge");
+  expect(slotTileMode(promoted.slots![0])).toBe("badge");
+  expect(detailSpan(promoted.slots![0])).toBe("half");
   // A badge-kind slot has no body form: normal is its badge.
   expect(
     slotTileMode(

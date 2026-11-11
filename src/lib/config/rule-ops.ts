@@ -13,6 +13,7 @@ import {
 import { formatAge, splitReading } from "$lib/config/format";
 import { normalizeStates, unitFor } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
+import { isHtmlIcon } from "$lib/config/icon-html";
 import { isImageIcon } from "$lib/utils/icon-url";
 import type { ControlMeta } from "$lib/types/device";
 
@@ -146,6 +147,11 @@ export interface ResolvedBadge {
   /** An explicit colour (rule colour, or the slot's named/hex colour) — wins
    *  over the tone class. */
   color?: string;
+  /** The raw reading, for an HTML icon's `{{$value}}`. */
+  value?: unknown;
+  /** The chip shows its icon only; the reading stays in the title and the
+   *  detail page. */
+  labelHidden?: boolean;
 }
 
 /** The device shape a badge needs — `EnrichedDevice` satisfies it structurally. */
@@ -386,16 +392,16 @@ function controlBadge(
     normalizeStates(control.meta?.states ?? control.states),
     control.meta?.role ?? control.role,
   );
-  // A promoted value keeps its symbol as the chip's face; an image icon cannot
-  // draw in a badge (BadgeChip renders Material symbols only).
+  // A promoted value keeps its symbol or HTML as the chip's face; an image
+  // icon cannot draw in a badge.
+  const glyph = slot.icon?.glyph;
   const ownGlyph =
-    slot.icon?.glyph && !isImageIcon(slot.icon.glyph)
-      ? slot.icon.glyph
-      : undefined;
+    glyph && (isHtmlIcon(glyph) || !isImageIcon(glyph)) ? glyph : undefined;
   return {
     source: object?.key ?? String(slot.source),
     icon: style.icon ?? ownGlyph ?? "info",
     tone: toneOf(style),
+    value: control.liveValue,
     label: parts.unit ? `${parts.value} ${parts.unit}` : parts.value,
     color:
       style.color ??
@@ -480,7 +486,12 @@ export function resolveBadges(
       // both, a raw state id through the caller's resolver (A21).
       badge = controlBadge(slot, device, scope, raw);
     }
-    if (badge) out.push(badge);
+    if (badge) {
+      // The chip can show just its icon; the value stays in the title and the
+      // detail page.
+      if (slot.options?.badgeLabel === false) badge.labelHidden = true;
+      out.push(badge);
+    }
   }
   return out;
 }

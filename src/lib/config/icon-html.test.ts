@@ -33,6 +33,14 @@ it("uses 0 for a missing $value so a width percentage stays valid", () => {
   );
 });
 
+it("fills the resolved $color", () => {
+  expect(
+    iconHtmlDocument('<rect fill="{{$color}}"/>', {
+      $color: "rgb(1, 2, 3)",
+    }),
+  ).toContain('fill="rgb(1, 2, 3)"');
+});
+
 it("reads other placeholders through the resolver, missing as empty", () => {
   const doc = iconHtmlDocument("<p>{{name}} {{missing}}</p>", {}, (key) =>
     key === "name" ? "WZ" : undefined,

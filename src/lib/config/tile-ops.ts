@@ -178,6 +178,10 @@ export function setSlotTile(
       if (next === "normal") delete copy.tile;
       else if (next === "badge" && slot.kind === "badge") delete copy.tile;
       else copy.tile = next;
+      // A badge is the compact face; its reading belongs in the detail page.
+      if (next === "badge" && detailSpan(slot) === "hidden") {
+        copy.detail = "half";
+      }
       return copy;
     }),
   );

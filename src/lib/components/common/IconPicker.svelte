@@ -28,6 +28,30 @@
     { id: "url", label: "URL / SVG / HTML" },
   ] as const;
 
+  /** Ready-made icon markup: the slot's reading and its resolved colour. */
+  const SNIPPETS = [
+    {
+      id: "battery",
+      label: "Battery",
+      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.5"><rect x="2" y="7" width="18" height="10" rx="2"/><rect x="20" y="10" width="2" height="4" rx="0.5" fill="{{$color}}" stroke="none"/><svg x="4" y="9" width="14" height="6"><rect width="{{$value}}%" height="6" fill="{{$color}}" stroke="none"/></svg></svg>`,
+    },
+    {
+      id: "scale",
+      label: "Scale",
+      html: `<svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="6" rx="3" fill="none" stroke="{{$color}}" stroke-width="1.5"/><svg x="4" y="11" width="16" height="2"><rect width="{{$value}}%" height="2" rx="1" fill="{{$color}}"/></svg></svg>`,
+    },
+    {
+      id: "power-on",
+      label: "Power on",
+      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>`,
+    },
+    {
+      id: "power-off",
+      label: "Power off",
+      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9" opacity="0.5"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0" opacity="0.5"/><path d="M4 20 20 4"/></svg>`,
+    },
+  ] as const;
+
   let tab = $state<(typeof TABS)[number]["id"]>("symbols");
   let search = $state("");
   // The picker is mounted fresh per open, so capturing the initial value is the
@@ -163,6 +187,16 @@
           </ul>
         {/if}
       {:else}
+        <div class="snippets">
+          <span class="label-mono">Snippets</span>
+          {#each SNIPPETS as snippet (snippet.id)}
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => (url = snippet.html)}>{snippet.label}</button
+            >
+          {/each}
+        </div>
         <div class="url-row">
           <textarea
             rows="5"
@@ -180,14 +214,10 @@
           >
         </div>
         <p class="hint text-muted">
-          SVG/HTML fragments fill the icon box. <span class="mono"
-            >&#123;&#123;$value&#125;&#125;</span
-          >
-          is the slot's reading — e.g.
-          <span class="mono"
-            >&lt;svg&gt;&lt;rect width="&#123;&#123;$value&#125;&#125;%"…
-            /&gt;&lt;/svg&gt;</span
-          >. The preview uses 50.
+          SVG/HTML fragments fill the icon box.
+          <span class="mono">&#123;&#123;$value&#125;&#125;</span> is the slot's
+          reading, <span class="mono">&#123;&#123;$color&#125;&#125;</span> its resolved
+          colour from a rule or the look. The preview uses 50.
         </p>
       {/if}
     </div>
@@ -313,6 +343,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.75rem;
+  }
+
+  .snippets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
   }
 
   .url-row {

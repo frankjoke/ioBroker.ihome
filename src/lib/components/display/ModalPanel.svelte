@@ -72,7 +72,7 @@
             value={headIcon.glyph}
             size={26}
             dim={headIcon.disabled}
-            data={{ $value: headValue }}
+            data={{ $value: headValue, $color: headIcon.color }}
           />
         </span>
       {/if}
@@ -116,7 +116,15 @@
             <div class="row frame-cap">
               {#if r.icon}
                 <span class="row-icon" style:color={r.icon.color}>
-                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                  <Icon
+                    value={r.icon.glyph}
+                    size={18}
+                    dim={r.icon.disabled}
+                    data={{
+                      $value: r.control?.liveValue,
+                      $color: r.icon.color,
+                    }}
+                  />
                 </span>
               {/if}
               {#if r.slot.label && labelShown(r.slot, "modal")}
@@ -160,7 +168,10 @@
                     value={r.icon.glyph}
                     size={18}
                     dim={r.icon.disabled}
-                    data={{ $value: r.control?.liveValue }}
+                    data={{
+                      $value: r.control?.liveValue,
+                      $color: r.icon.color,
+                    }}
                   />
                 </button>
               {:else}
@@ -169,7 +180,10 @@
                     value={r.icon.glyph}
                     size={18}
                     dim={r.icon.disabled}
-                    data={{ $value: r.control?.liveValue }}
+                    data={{
+                      $value: r.control?.liveValue,
+                      $color: r.icon.color,
+                    }}
                   />
                 </span>
               {/if}

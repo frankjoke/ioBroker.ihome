@@ -19,6 +19,8 @@
         tone={b.tone}
         color={b.color}
         title={b.title}
+        value={b.value}
+        labelHidden={b.labelHidden}
       />
     {/each}
     {#if rest.length}

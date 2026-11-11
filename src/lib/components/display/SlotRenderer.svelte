@@ -109,7 +109,7 @@
                 value={icon.glyph}
                 size={icon.size ?? 17}
                 dim={icon.disabled}
-                data={{ $value: control?.liveValue }}
+                data={{ $value: control?.liveValue, $color: icon.color }}
               />
             </span>
           {/if}
@@ -147,7 +147,7 @@
             value={icon.glyph}
             size={icon.size ?? 17}
             dim={icon.disabled}
-            data={{ $value: control?.liveValue }}
+            data={{ $value: control?.liveValue, $color: icon.color }}
           />
         </button>
       {:else}
@@ -156,7 +156,7 @@
             value={icon.glyph}
             size={icon.size ?? 17}
             dim={icon.disabled}
-            data={{ $value: control?.liveValue }}
+            data={{ $value: control?.liveValue, $color: icon.color }}
           />
         </span>
       {/if}

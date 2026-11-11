@@ -129,6 +129,25 @@ it("renders a value slot promoted to a badge", () => {
   expect(badge.label).toBe("21.5 °C");
 });
 
+it("keeps an HTML icon on a promoted badge and can hide its label", () => {
+  const badge = resolveBadges(
+    [
+      {
+        kind: "value",
+        source: { kind: "control", device: "d", control: "soc" },
+        icon: { glyph: '<svg><rect width="{{$value}}%"/></svg>' },
+        options: { badgeLabel: false },
+      },
+    ],
+    { controls: [{ id: "soc", feature: "soc", liveValue: 55 }] } as any,
+    undefined,
+    NOW,
+  )[0];
+  expect(badge.icon).toContain("<svg>");
+  expect(badge.value).toBe(55);
+  expect(badge.labelHidden).toBe(true);
+});
+
 it("derives ago and offline from the badge's own control", () => {
   const device = {
     controls: [
