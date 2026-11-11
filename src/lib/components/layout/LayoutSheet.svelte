@@ -27,7 +27,11 @@
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
-  import { addSlot, editTile } from "$lib/config/tile-ops";
+  import {
+    addSlot,
+    editTile,
+    withPlacementDefaults,
+  } from "$lib/config/tile-ops";
   import { tileSeed } from "$lib/config/slot-create";
   import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
   import {
@@ -277,7 +281,11 @@
       editTile(registry, anchor, (t) =>
         slots.reduce(
           (tile, slot, i) =>
-            addSlot(tile, slot, at === undefined ? undefined : at + i),
+            addSlot(
+              tile,
+              withPlacementDefaults(tile, slot),
+              at === undefined ? undefined : at + i,
+            ),
           t,
         ),
       ),
@@ -335,7 +343,12 @@
     }
     if (slots.length > 1) {
       next = editTile(next, { pageId, sectionId, placementId: added.id }, (t) =>
-        slots.slice(1).reduce((tile, slot) => addSlot(tile, slot), t),
+        slots
+          .slice(1)
+          .reduce(
+            (tile, slot) => addSlot(tile, withPlacementDefaults(tile, slot)),
+            t,
+          ),
       );
     }
     commitLayout(next);

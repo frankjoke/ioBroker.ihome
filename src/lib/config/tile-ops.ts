@@ -7,6 +7,7 @@ import type {
   Placement,
   Rule,
   Slot,
+  SlotDetail,
   SlotIcon,
   SlotSpark,
   StateLook,
@@ -112,48 +113,100 @@ export function setSlotSource(
   );
 }
 
-/** Where a slot lives (A34): the tile by default, or the modal, or both. */
-export function slotWhere(slot: Slot): "tile" | "both" | "modal" {
-  return slot.where ?? "tile";
+/** Does the slot live on the tile? Absent = yes, unless the legacy `where`
+ *  said modal-only. */
+export function onTile(slot: Slot): boolean {
+  if (slot.tile !== undefined) return slot.tile;
+  return slot.where !== "modal";
+}
+
+/** How the slot appears in the detail page: a full line, half a line, or no
+ *  row. The legacy `where` maps to full/hidden. */
+export function detailSpan(slot: Slot): SlotDetail {
+  if (
+    slot.detail === "full" ||
+    slot.detail === "half" ||
+    slot.detail === "hidden"
+  ) {
+    return slot.detail;
+  }
+  return slot.where === "both" || slot.where === "modal" ? "full" : "hidden";
+}
+
+/** The slot has a detail row at all. */
+export function inDetail(slot: Slot): boolean {
+  return detailSpan(slot) !== "hidden";
 }
 
 /**
- * Set where a slot lives (A34). Refused — the tile comes back untouched — when
- * it would leave no slot on the main tile: the modal is an enlargement, never
- * a slot's only home. A bad index leaves the list alone, like `moveItem`.
+ * Set the tile presence (A34). Refused — the tile comes back untouched — when
+ * it would leave no slot on the main tile: the detail page is an enlargement,
+ * never a slot's only home. The write drops the legacy `where`.
  */
-export function setSlotWhere(
+export function setSlotTile(
   tile: TileConfig,
   index: number,
-  where: "tile" | "both" | "modal",
+  on: boolean,
 ): TileConfig {
   const slots = tile.slots ?? [];
   if (index < 0 || index >= slots.length) return tile;
-  const next = slots.map((slot, i) => {
-    if (i !== index) return slot;
-    const copy = { ...slot };
-    // Absent means tile, and an absent field is what the documents carry —
-    // switching back to the default drops it instead of storing "tile".
-    if (where === "tile") delete copy.where;
-    else copy.where = where;
-    return copy;
-  });
-  if (!next.some((slot) => slotWhere(slot) !== "modal")) return tile;
-  return withSlots(tile, next);
+  if (!on && !slots.some((slot, i) => i !== index && onTile(slot))) return tile;
+  return withSlots(
+    tile,
+    slots.map((slot, i) => {
+      if (i !== index) return slot;
+      const copy = { ...slot };
+      delete copy.where;
+      // Absent means on, and an absent field is what the documents carry.
+      if (on) delete copy.tile;
+      else copy.tile = false;
+      return copy;
+    }),
+  );
 }
 
-/**
- * The next home a click on the slot row's destination button moves to (A34):
- * tile → both → modal → tile, except that "modal" is skipped while this is the
- * only slot left on the main tile — so the cycle never lands on a refused move.
- */
-export function nextSlotWhere(
-  slot: Slot,
-  tileVisible: number,
-): "tile" | "both" | "modal" {
-  const cur = slotWhere(slot);
-  const next = cur === "tile" ? "both" : cur === "both" ? "modal" : "tile";
-  return next === "modal" && tileVisible <= 1 ? "tile" : next;
+/** Set the detail row's width. `hidden` is the default, so it stores nothing. */
+export function setSlotDetail(
+  tile: TileConfig,
+  index: number,
+  detail: SlotDetail,
+): TileConfig {
+  const slots = tile.slots ?? [];
+  if (index < 0 || index >= slots.length) return tile;
+  return withSlots(
+    tile,
+    slots.map((slot, i) => {
+      if (i !== index) return slot;
+      const copy = { ...slot };
+      delete copy.where;
+      if (detail === "hidden") delete copy.detail;
+      else copy.detail = detail;
+      return copy;
+    }),
+  );
+}
+
+/** Placement a slot gets when it enters this tile: the first three body slots
+ *  stay on the tile, later ones become small detail rows. A badge keeps its
+ *  corner unless it says otherwise. An explicit placement wins. */
+export function withPlacementDefaults(tile: TileConfig, slot: Slot): Slot {
+  if (
+    slot.tile !== undefined ||
+    slot.detail !== undefined ||
+    slot.where !== undefined
+  ) {
+    return slot;
+  }
+  if (slot.kind === "badge") return slot;
+  const bodyOnTile = (tile.slots ?? []).filter(
+    (s) => s.kind !== "badge" && onTile(s),
+  ).length;
+  if (bodyOnTile < 3) return slot;
+  return {
+    ...slot,
+    tile: false,
+    detail: slot.kind === "frame" || slot.kind === "html" ? "full" : "half",
+  };
 }
 
 // ------------------------------------------------------------------- icons

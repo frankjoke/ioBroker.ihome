@@ -23,11 +23,13 @@
   import {
     addRule,
     clearRuleIcons,
+    detailSpan,
     editTile,
     evalActive,
+    inDetail,
     moveRule,
     moveSlot,
-    nextSlotWhere,
+    onTile,
     patchIcon,
     patchRule,
     patchSlot,
@@ -35,9 +37,9 @@
     removeRule,
     removeSlot,
     setLook,
+    setSlotDetail,
     setSlotSource,
-    setSlotWhere,
-    slotWhere,
+    setSlotTile,
   } from "$lib/config/tile-ops";
   import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
@@ -248,9 +250,7 @@
   );
 
   /** How many of them still live on the tile — the guard for A34. */
-  const tileVisibleCount = $derived(
-    shownSlots.filter((s) => slotWhere(s) !== "modal").length,
-  );
+  const tileVisibleCount = $derived(shownSlots.filter(onTile).length);
 
   /** The tile's active reading, and the scope the rules' live dots evaluate in. */
   const tileActive = $derived(evalActive(activeCond, activeValue));
@@ -351,10 +351,6 @@
     return cur === "both" ? "active" : cur === "active" ? "inactive" : "both";
   }
 
-  function cycleWhere(i: number, slot: Slot): void {
-    edit((t) => setSlotWhere(t, i, nextSlotWhere(slot, tileVisibleCount)));
-  }
-
   function cycleShowWhen(i: number, slot: Slot): void {
     const next = nextShow(slot);
     edit((t) =>
@@ -362,14 +358,12 @@
     );
   }
 
-  /** What a click does, said in full — the guard included when it skips modal. */
-  function whereTitle(slot: Slot): string {
-    const cur = slotWhere(slot);
-    const next = nextSlotWhere(slot, tileVisibleCount);
-    const base = `Lives in: ${WHERE_LABEL[cur]} — click for ${WHERE_LABEL[next]}`;
-    return cur === "both" && next === "tile"
-      ? `${base} (one slot must stay on the tile)`
-      : base;
+  function setOnTile(i: number, on: boolean): void {
+    edit((t) => setSlotTile(t, i, on));
+  }
+
+  function setDetailWidth(i: number, detail: "full" | "half" | "hidden"): void {
+    edit((t) => setSlotDetail(t, i, detail));
   }
 
   function showTitle(slot: Slot): string {
@@ -675,8 +669,8 @@
       if (where === undefined) delete options.valueWhere;
       else options.valueWhere = where;
       let next = patchSlot(t, i, { options });
-      if (where && where !== "tile" && slotWhere(slot) === "tile") {
-        next = setSlotWhere(next, i, "both");
+      if (where && where !== "tile" && !inDetail(slot)) {
+        next = setSlotDetail(next, i, "full");
       }
       return next;
     });
@@ -825,9 +819,7 @@
     const slot = shownSlots[i];
     const cur = slot?.icon?.where ?? "both";
     const next = cur === "both" ? "tile" : cur === "tile" ? "modal" : "both";
-    return next === "tile" && slot && slotWhere(slot) === "modal"
-      ? "modal"
-      : next;
+    return next === "tile" && slot && !onTile(slot) ? "modal" : next;
   }
 
   function iconWhereTitle(i: number): string {
@@ -1423,12 +1415,6 @@
                 {/if}
               </button>
               <span class="item-actions">
-                <WhereButton
-                  where={slotWhere(slot)}
-                  title={whereTitle(slot)}
-                  active={slotWhere(slot) !== "tile"}
-                  onCycle={() => cycleWhere(i, slot)}
-                />
                 <button
                   type="button"
                   class="icon-btn"
@@ -1656,6 +1642,36 @@
                     </div>
                   {/if}
                 </div>
+                <div class="row placement">
+                  <label
+                    class="check"
+                    title="Show this slot on the tile (the first three are on by default)"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={onTile(slot)}
+                      disabled={onTile(slot) && tileVisibleCount <= 1}
+                      onchange={(e) => setOnTile(i, e.currentTarget.checked)}
+                    />
+                    <span>on tile</span>
+                  </label>
+                  <label class="small grow">
+                    <span class="label-mono">Detail</span>
+                    <select
+                      value={detailSpan(slot)}
+                      title="Full line, a small half line (pairs with the next small one), or no row"
+                      onchange={(e) =>
+                        setDetailWidth(
+                          i,
+                          e.currentTarget.value as "full" | "half" | "hidden",
+                        )}
+                    >
+                      <option value="hidden">not shown</option>
+                      <option value="half">small (half)</option>
+                      <option value="full">full line</option>
+                    </select>
+                  </label>
+                </div>
                 {#if slot.kind === "frame"}
                   <UrlTemplatePreview text={framePreviewText(slot)} />
                 {/if}
@@ -1728,12 +1744,6 @@
                       />
                       <span>unit</span>
                     </label>
-                    <WhereButton
-                      where={slotWhere(slot)}
-                      title={whereTitle(slot)}
-                      active={slotWhere(slot) !== "tile"}
-                      onCycle={() => cycleWhere(i, slot)}
-                    />
                   </div>
                 {/if}
                 {#if slot.kind === "level"}

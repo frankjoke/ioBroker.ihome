@@ -260,6 +260,10 @@ export type SlotSource =
   | { kind: "state"; stateId: string }
   | { kind: "device"; device: string };
 
+/** How a slot appears in the detail page: a full line, half a line (pairs with
+ *  the next half), or no row at all. */
+export type SlotDetail = "full" | "half" | "hidden";
+
 export interface Slot {
   kind: SlotKind;
   source?: string | SlotSource; // v1 string during the migration; v2 union
@@ -274,8 +278,14 @@ export interface Slot {
   /** Where the row's name shows: the tile, the detail row, or both. Absent =
    *  the detail row only — the tile shows just its own title by default. */
   labelWhere?: "tile" | "both" | "modal";
-  /** Where the slot lives (A34): the tile (default), the modal, or both. */
+  /** Where the slot lives (A34): tile by default, the detail page, or both.
+   *  Legacy: read as a fallback by `onTile` / `detailSpan`, never written. */
   where?: "tile" | "both" | "modal";
+  /** Show this slot on the tile (default true). */
+  tile?: boolean;
+  /** The detail row's width (default hidden). `full` takes the whole line,
+   *  `half` pairs with the next half, `hidden` leaves it out. */
+  detail?: SlotDetail;
   /** The slot's own icon (A51); absent = no icon. */
   icon?: SlotIcon;
   /** The slot's chart (A59); absent = no chart. */

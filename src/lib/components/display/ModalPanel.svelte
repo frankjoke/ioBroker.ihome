@@ -1,6 +1,7 @@
 <script lang="ts">
   import { backgroundCss } from "$lib/config/appearance";
   import { tileTitle } from "$lib/config/template-ops";
+  import { detailSpan } from "$lib/config/tile-ops";
   import Icon from "$lib/components/common/Icon.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
@@ -128,7 +129,10 @@
             />
           </div>
         {:else}
-          <div class="row">
+          <div
+            class="row"
+            class:half={detailSpan(r.slot) === "half" && !r.spark}
+          >
             {#if r.icon}
               {#if r.onPrimary}
                 <!-- The row's icon is its value's action in the detail view
@@ -264,12 +268,36 @@
     flex-wrap: wrap;
   }
 
+  /* Two half rows share a line; a full row takes both columns and starts the
+   * next line. Below 640px the grid is one column and every row is full. */
   .panel-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0.5rem 0.75rem;
     padding: 0.85rem 1rem;
     overflow-y: auto;
+  }
+
+  .panel-body > .row,
+  .panel-body > .frame-cap,
+  .panel-body > .row-frame,
+  .panel-body > p {
+    grid-column: 1 / -1;
+  }
+
+  .panel-body > .row.half {
+    grid-column: span 1;
+  }
+
+  @media (max-width: 640px) {
+    .panel-body {
+      grid-template-columns: 1fr;
+    }
+
+    .panel-body > .row.half {
+      grid-column: 1 / -1;
+    }
   }
 
   .row {
@@ -277,6 +305,18 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  .row.half {
+    gap: 0.5rem;
+  }
+
+  /* A half row has no room for the full-line label column. */
+  .row.half .row-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* The frame's row: full width and no label column. Its height is the panel's

@@ -9,12 +9,13 @@ import {
   addRule,
   addSlot,
   clearRuleIcons,
+  detailSpan,
   editTile,
   ensureTile,
   evalActive,
   moveRule,
   moveSlot,
-  nextSlotWhere,
+  onTile,
   patchIcon,
   patchSpark,
   patchRule,
@@ -23,9 +24,10 @@ import {
   removeSlot,
   resetTile,
   setLook,
+  setSlotDetail,
   setSlotSource,
-  setSlotWhere,
-  slotWhere,
+  setSlotTile,
+  withPlacementDefaults,
 } from "./tile-ops";
 
 it("ensureTile leaves a materialised placement alone and keeps a legacy size", () => {
@@ -72,45 +74,87 @@ it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
   expect(removeSlot(tile, 0)).toBe(tile);
 });
 
-it("a slot's where picks its home; the last tile slot cannot move to the modal (A34)", () => {
+it("a slot's tile presence and detail width are independent (A34)", () => {
+  expect(onTile({ kind: "value" })).toBe(true);
+  expect(detailSpan({ kind: "value" })).toBe("hidden");
+  // The legacy `where` still reads: modal-only, or a full detail row.
+  expect(onTile({ kind: "value", where: "modal" })).toBe(false);
+  expect(detailSpan({ kind: "value", where: "both" })).toBe("full");
+  expect(detailSpan({ kind: "value", where: "modal" })).toBe("full");
+
   const tile: TileConfig = {
     slots: [
       { kind: "value", source: "power" },
       { kind: "button", source: "boost" },
     ],
   };
-  expect(slotWhere({ kind: "value" })).toBe("tile"); // absent = tile
-  const both = setSlotWhere(tile, 0, "both");
-  expect(slotWhere(both.slots!.at(0)!)).toBe("both");
-  expect(slotWhere(both.slots!.at(1)!)).toBe("tile");
-  // The second slot can leave the tile because the first still lives there.
-  const modal = setSlotWhere(both, 1, "modal");
-  expect(slotWhere(modal.slots!.at(1)!)).toBe("modal");
-  // A badge renders on the tile too, so it alone keeps a tile from emptying.
-  const badge = setSlotWhere(
-    { slots: [{ kind: "value", source: "a" }, { kind: "badge" }] },
-    0,
-    "modal",
-  );
-  expect(slotWhere(badge.slots!.at(0)!)).toBe("modal");
-  // The only slot cannot move out: refused, the tile comes back untouched.
-  const lone = setSlotWhere(
+  const off = setSlotTile(tile, 0, false);
+  expect(onTile(off.slots![0])).toBe(false);
+  expect(onTile(off.slots![1])).toBe(true);
+  // The last slot on the tile cannot leave it: refused, the tile untouched.
+  const lone = setSlotTile(
     { slots: [{ kind: "value", source: "power" }] },
     0,
-    "modal",
+    false,
   );
-  expect(lone.slots?.at(0)?.where).toBeUndefined();
-  // Back to the default drops the field instead of storing "tile".
-  const back = setSlotWhere(both, 0, "tile");
-  expect(back.slots?.at(0)).toEqual({ kind: "value", source: "power" });
-  // A bad index leaves the tile alone.
-  expect(setSlotWhere(tile, 9, "modal")).toBe(tile);
-  // The row button's cycle: tile → both → modal → tile, but "modal" is skipped
-  // while this is the only slot on the tile (2 = it plus one more).
-  expect(nextSlotWhere({ kind: "value" }, 2)).toBe("both");
-  expect(nextSlotWhere({ kind: "value", where: "both" }, 2)).toBe("modal");
-  expect(nextSlotWhere({ kind: "value", where: "both" }, 1)).toBe("tile");
-  expect(nextSlotWhere({ kind: "value", where: "modal" }, 1)).toBe("tile");
+  expect(lone.slots?.[0]?.tile).toBeUndefined();
+  // Back on drops the field instead of storing `true`.
+  const back = setSlotTile(off, 0, true);
+  expect(back.slots?.[0]).toEqual({ kind: "value", source: "power" });
+  // A badge keeps a tile from emptying, as it renders on the tile.
+  const badge = setSlotTile(
+    { slots: [{ kind: "value", source: "a" }, { kind: "badge" }] },
+    0,
+    false,
+  );
+  expect(onTile(badge.slots![0])).toBe(false);
+  // Detail spans: only the non-default is stored.
+  expect(detailSpan(setSlotDetail(tile, 0, "half").slots![0])).toBe("half");
+  expect(setSlotDetail(tile, 0, "hidden").slots?.[0]?.detail).toBeUndefined();
+  // A legacy `where` is dropped on the first new write.
+  const legacy = setSlotDetail(
+    { slots: [{ kind: "value", where: "both" }] },
+    0,
+    "half",
+  );
+  expect(legacy.slots?.[0]).toEqual({ kind: "value", detail: "half" });
+  expect(setSlotTile(tile, 9, false)).toBe(tile);
+});
+
+it("new slots keep the first three on the tile, the rest become small detail rows", () => {
+  let tile: TileConfig = { slots: [] };
+  for (let i = 0; i < 5; i++) {
+    tile = addSlot(
+      tile,
+      withPlacementDefaults(tile, { kind: "value", source: `v${i}` }),
+    );
+  }
+  expect(tile.slots?.map(onTile)).toEqual([true, true, true, false, false]);
+  expect(tile.slots?.map(detailSpan)).toEqual([
+    "hidden",
+    "hidden",
+    "hidden",
+    "half",
+    "half",
+  ]);
+  // A badge keeps its corner and never consumes a body line.
+  const badge = addSlot(tile, withPlacementDefaults(tile, { kind: "badge" }));
+  expect(onTile(badge.slots!.at(-1)!)).toBe(true);
+  // An explicit placement wins.
+  expect(
+    withPlacementDefaults(tile, {
+      kind: "value",
+      tile: false,
+      detail: "full",
+    }),
+  ).toEqual({ kind: "value", tile: false, detail: "full" });
+  // A page that defaults off the tile gets the whole detail line.
+  const page = withPlacementDefaults(tile, {
+    kind: "frame",
+    options: { url: "x" },
+  });
+  expect(onTile(page)).toBe(false);
+  expect(detailSpan(page)).toBe("full");
 });
 
 it("setSlotSource pins one source and drops the dead hint beside it (A36)", () => {

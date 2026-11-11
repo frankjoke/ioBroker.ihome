@@ -6,7 +6,7 @@ import {
   resolveTemplate,
   slotVisible,
 } from "$lib/config/template-ops";
-import { slotWhere } from "$lib/config/tile-ops";
+import { inDetail, onTile } from "$lib/config/tile-ops";
 import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   resolveBadges,
@@ -129,17 +129,15 @@ export function tileParts(
 
   // The body is every row that lives on the tile (A59: nothing draws as a
   // layer of its own any more — the chart comes from the rows).
-  const body = rows.filter((r) => slotWhere(r.slot) !== "modal");
-  const modal = rows.filter((r) => slotWhere(r.slot) !== "tile");
+  const body = rows.filter((r) => onTile(r.slot));
+  const modal = rows.filter((r) => inDetail(r.slot));
 
   const badgeSlots = slots.filter(
-    (s) =>
-      s.kind === "badge" && slotVisible(s, active) && slotWhere(s) !== "modal",
+    (s) => s.kind === "badge" && slotVisible(s, active) && onTile(s),
   );
-  // Badges leave the tile for the modal's chip strip (A34).
+  // Badges that also live in the modal become its chip strip (A34).
   const modalBadgeSlots = slots.filter(
-    (s) =>
-      s.kind === "badge" && slotVisible(s, active) && slotWhere(s) !== "tile",
+    (s) => s.kind === "badge" && slotVisible(s, active) && inDetail(s),
   );
   const modalBadges = raw
     ? modalBadgeSlots.flatMap((s) =>
