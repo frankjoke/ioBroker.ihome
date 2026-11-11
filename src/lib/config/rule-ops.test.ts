@@ -103,6 +103,32 @@ it("resolves badge slots and skips ones with no source", () => {
   expect(badges[1].tone).toBe("info");
 });
 
+it("renders a value slot promoted to a badge", () => {
+  const badge = resolveBadges(
+    [
+      {
+        kind: "value",
+        source: { kind: "control", device: "d", control: "temp" },
+        icon: { glyph: "thermostat" },
+      },
+    ],
+    {
+      controls: [
+        {
+          id: "temp",
+          feature: "temperature",
+          liveValue: 21.5,
+          unit: "°C",
+        },
+      ],
+    } as any,
+    undefined,
+    NOW,
+  )[0];
+  expect(badge.icon).toBe("thermostat");
+  expect(badge.label).toBe("21.5 °C");
+});
+
 it("derives ago and offline from the badge's own control", () => {
   const device = {
     controls: [

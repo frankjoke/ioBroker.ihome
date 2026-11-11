@@ -10,7 +10,7 @@
   import {
     faceGlyph,
     headerIcon,
-    headlineSlot,
+    tileHeadlineSlot,
     rowIcon,
     rowSpark,
     singleSurface,
@@ -281,7 +281,7 @@
   // The accent the tile wears (A52): the headline slot's resolved style. The
   // *style* carries, so "glow when on" keeps working with the icon disabled;
   // the values reach CSS through custom properties (spec §6).
-  const headline = $derived(headlineSlot(slots));
+  const headline = $derived(tileHeadlineSlot(slots));
   const accent = $derived(headline ?? { kind: "value" as const });
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
   // What the tile's own active state says (A71). A field set here wins over the

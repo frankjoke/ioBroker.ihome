@@ -13,6 +13,7 @@ import {
 import { formatAge, splitReading } from "$lib/config/format";
 import { normalizeStates, unitFor } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
+import { isImageIcon } from "$lib/utils/icon-url";
 import type { ControlMeta } from "$lib/types/device";
 
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
@@ -331,6 +332,27 @@ function badgeControl(
   );
 }
 
+/** The control a slot's object source names, with the badge clock's key. `raw`
+ *  resolves a raw state to a pseudo-control. */
+function objectSource(
+  slot: Slot,
+  device: BadgeDevice,
+  raw?: (source: string) => BadgeControl | undefined,
+): { control?: BadgeControl; key?: string } | undefined {
+  const source = slot.source;
+  if (!source || typeof source !== "object") return undefined;
+  if (source.kind === "control") {
+    const control = (device.controls ?? []).find(
+      (c) => c.id === source.control,
+    ) as BadgeControl | undefined;
+    return { control: control ?? raw?.(source.control), key: source.control };
+  }
+  if (source.kind === "state") {
+    return { control: raw?.(source.stateId), key: source.stateId };
+  }
+  return undefined;
+}
+
 function controlBadge(
   slot: Slot,
   device: BadgeDevice,
@@ -340,8 +362,11 @@ function controlBadge(
   const pick =
     typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
   const source = typeof slot.source === "string" ? slot.source : undefined;
+  const object = objectSource(slot, device, raw);
   const control =
-    badgeControl(device, source, pick) ?? (source ? raw?.(source) : undefined);
+    object?.control ??
+    badgeControl(device, source, pick) ??
+    (source ? raw?.(source) : undefined);
   if (!control) return undefined;
   // Slot rules first, the control's own defaults last (spec §4.1.1).
   const style = resolveStyle(
@@ -361,9 +386,15 @@ function controlBadge(
     normalizeStates(control.meta?.states ?? control.states),
     control.meta?.role ?? control.role,
   );
+  // A promoted value keeps its symbol as the chip's face; an image icon cannot
+  // draw in a badge (BadgeChip renders Material symbols only).
+  const ownGlyph =
+    slot.icon?.glyph && !isImageIcon(slot.icon.glyph)
+      ? slot.icon.glyph
+      : undefined;
   return {
-    source: String(slot.source),
-    icon: style.icon ?? "info",
+    source: object?.key ?? String(slot.source),
+    icon: style.icon ?? ownGlyph ?? "info",
     tone: toneOf(style),
     label: parts.unit ? `${parts.value} ${parts.unit}` : parts.value,
     color:
@@ -401,26 +432,7 @@ export function resolveBadges(
       : undefined;
   };
   const out: ResolvedBadge[] = [];
-  /** The object source a slot names, with the key the badge clock reads: a
-   *  control id or a raw state id. `raw` resolves a state to a pseudo-control. */
-  const objectSource = (
-    slot: Slot,
-  ): { control?: BadgeControl; key?: string } | undefined => {
-    const source = slot.source;
-    if (!source || typeof source !== "object") return undefined;
-    if (source.kind === "control") {
-      const control = (device.controls ?? []).find(
-        (c) => c.id === source.control,
-      ) as BadgeControl | undefined;
-      return { control: control ?? raw?.(source.control), key: source.control };
-    }
-    if (source.kind === "state") {
-      return { control: raw?.(source.stateId), key: source.stateId };
-    }
-    return undefined;
-  };
   for (const slot of slots ?? []) {
-    if (slot.kind !== "badge") continue;
     // A badge hidden by its own rules produces nothing — including the derived
     // ago/offline badges, which resolve no control and so never reach
     // `controlBadge`'s own guard.
@@ -432,7 +444,7 @@ export function resolveBadges(
       typeof slot.options?.of === "string" ? slot.options.of : undefined;
     const offline = offlineFor(of);
     const derive = slot.options?.derive;
-    const object = objectSource(slot);
+    const object = objectSource(slot, device, raw);
     let badge: ResolvedBadge | undefined;
     // An offline device says *that*, not a misleading "how long ago it was".
     if (slot.source === "ago") {

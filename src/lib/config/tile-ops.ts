@@ -10,6 +10,7 @@ import type {
   SlotDetail,
   SlotIcon,
   SlotSpark,
+  SlotTile,
   StateLook,
   TileConfig,
 } from "$lib/types/display";
@@ -113,11 +114,19 @@ export function setSlotSource(
   );
 }
 
-/** Does the slot live on the tile? Absent = yes, unless the legacy `where`
- *  said modal-only. */
+/** How the slot appears on the tile. A badge-kind slot has no body form, so
+ *  its default and its "normal" both mean badge. */
+export function slotTileMode(slot: Slot): SlotTile {
+  if (slot.tile === "hidden" || slot.tile === false) return "hidden";
+  if (slot.tile === "badge") return "badge";
+  if (slot.tile === "normal") return slot.kind === "badge" ? "badge" : "normal";
+  if (slot.where === "modal") return "hidden";
+  return slot.kind === "badge" ? "badge" : "normal";
+}
+
+/** Does the slot live on the tile at all (body or badge)? */
 export function onTile(slot: Slot): boolean {
-  if (slot.tile !== undefined) return slot.tile;
-  return slot.where !== "modal";
+  return slotTileMode(slot) !== "hidden";
 }
 
 /** How the slot appears in the detail page: a full line, half a line, or no
@@ -139,27 +148,36 @@ export function inDetail(slot: Slot): boolean {
 }
 
 /**
- * Set the tile presence (A34). Refused — the tile comes back untouched — when
- * it would leave no slot on the main tile: the detail page is an enlargement,
- * never a slot's only home. The write drops the legacy `where`.
+ * Set the tile representation (A34). Refused — the tile comes back untouched —
+ * when it would leave no slot on the main tile. The write drops the legacy
+ * `where`. An absent field means the slot's default (body for a value, badge
+ * for a badge slot).
  */
 export function setSlotTile(
   tile: TileConfig,
   index: number,
-  on: boolean,
+  mode: SlotTile,
 ): TileConfig {
   const slots = tile.slots ?? [];
   if (index < 0 || index >= slots.length) return tile;
-  if (!on && !slots.some((slot, i) => i !== index && onTile(slot))) return tile;
+  const current = slots[index];
+  // A badge-kind slot has no body form; "normal" is its badge.
+  const next = current.kind === "badge" && mode === "normal" ? "badge" : mode;
+  if (
+    next === "hidden" &&
+    !slots.some((slot, i) => i !== index && onTile(slot))
+  ) {
+    return tile;
+  }
   return withSlots(
     tile,
     slots.map((slot, i) => {
       if (i !== index) return slot;
       const copy = { ...slot };
       delete copy.where;
-      // Absent means on, and an absent field is what the documents carry.
-      if (on) delete copy.tile;
-      else copy.tile = false;
+      if (next === "normal") delete copy.tile;
+      else if (next === "badge" && slot.kind === "badge") delete copy.tile;
+      else copy.tile = next;
       return copy;
     }),
   );
@@ -199,12 +217,12 @@ export function withPlacementDefaults(tile: TileConfig, slot: Slot): Slot {
   }
   if (slot.kind === "badge") return slot;
   const bodyOnTile = (tile.slots ?? []).filter(
-    (s) => s.kind !== "badge" && onTile(s),
+    (s) => slotTileMode(s) === "normal",
   ).length;
   if (bodyOnTile < 3) return slot;
   return {
     ...slot,
-    tile: false,
+    tile: "hidden",
     detail: slot.kind === "frame" || slot.kind === "html" ? "full" : "half",
   };
 }

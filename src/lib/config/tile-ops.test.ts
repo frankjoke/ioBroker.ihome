@@ -27,6 +27,7 @@ import {
   setSlotDetail,
   setSlotSource,
   setSlotTile,
+  slotTileMode,
   withPlacementDefaults,
 } from "./tile-ops";
 
@@ -74,8 +75,11 @@ it("slot ops keep order, copy the tile and bail out on bad indexes", () => {
   expect(removeSlot(tile, 0)).toBe(tile);
 });
 
-it("a slot's tile presence and detail width are independent (A34)", () => {
-  expect(onTile({ kind: "value" })).toBe(true);
+it("a slot's tile mode and detail width are independent (A34)", () => {
+  expect(slotTileMode({ kind: "value" })).toBe("normal");
+  expect(slotTileMode({ kind: "badge" })).toBe("badge");
+  expect(slotTileMode({ kind: "value", tile: false })).toBe("hidden");
+  expect(slotTileMode({ kind: "value", where: "modal" })).toBe("hidden");
   expect(detailSpan({ kind: "value" })).toBe("hidden");
   // The legacy `where` still reads: modal-only, or a full detail row.
   expect(onTile({ kind: "value", where: "modal" })).toBe(false);
@@ -88,26 +92,34 @@ it("a slot's tile presence and detail width are independent (A34)", () => {
       { kind: "button", source: "boost" },
     ],
   };
-  const off = setSlotTile(tile, 0, false);
+  const off = setSlotTile(tile, 0, "hidden");
   expect(onTile(off.slots![0])).toBe(false);
   expect(onTile(off.slots![1])).toBe(true);
   // The last slot on the tile cannot leave it: refused, the tile untouched.
   const lone = setSlotTile(
     { slots: [{ kind: "value", source: "power" }] },
     0,
-    false,
+    "hidden",
   );
   expect(lone.slots?.[0]?.tile).toBeUndefined();
-  // Back on drops the field instead of storing `true`.
-  const back = setSlotTile(off, 0, true);
+  // Back to the body drops the field instead of storing `normal`.
+  const back = setSlotTile(off, 0, "normal");
   expect(back.slots?.[0]).toEqual({ kind: "value", source: "power" });
   // A badge keeps a tile from emptying, as it renders on the tile.
   const badge = setSlotTile(
     { slots: [{ kind: "value", source: "a" }, { kind: "badge" }] },
     0,
-    false,
+    "hidden",
   );
   expect(onTile(badge.slots![0])).toBe(false);
+  // A value promoted to the corner keeps its body form off the tile.
+  expect(slotTileMode(setSlotTile(tile, 0, "badge").slots![0])).toBe("badge");
+  // A badge-kind slot has no body form: normal is its badge.
+  expect(
+    slotTileMode(
+      setSlotTile({ slots: [{ kind: "badge" }] }, 0, "normal").slots![0],
+    ),
+  ).toBe("badge");
   // Detail spans: only the non-default is stored.
   expect(detailSpan(setSlotDetail(tile, 0, "half").slots![0])).toBe("half");
   expect(setSlotDetail(tile, 0, "hidden").slots?.[0]?.detail).toBeUndefined();
@@ -118,7 +130,7 @@ it("a slot's tile presence and detail width are independent (A34)", () => {
     "half",
   );
   expect(legacy.slots?.[0]).toEqual({ kind: "value", detail: "half" });
-  expect(setSlotTile(tile, 9, false)).toBe(tile);
+  expect(setSlotTile(tile, 9, "hidden")).toBe(tile);
 });
 
 it("new slots keep the first three on the tile, the rest become small detail rows", () => {
@@ -129,7 +141,13 @@ it("new slots keep the first three on the tile, the rest become small detail row
       withPlacementDefaults(tile, { kind: "value", source: `v${i}` }),
     );
   }
-  expect(tile.slots?.map(onTile)).toEqual([true, true, true, false, false]);
+  expect(tile.slots?.map(slotTileMode)).toEqual([
+    "normal",
+    "normal",
+    "normal",
+    "hidden",
+    "hidden",
+  ]);
   expect(tile.slots?.map(detailSpan)).toEqual([
     "hidden",
     "hidden",
@@ -139,21 +157,21 @@ it("new slots keep the first three on the tile, the rest become small detail row
   ]);
   // A badge keeps its corner and never consumes a body line.
   const badge = addSlot(tile, withPlacementDefaults(tile, { kind: "badge" }));
-  expect(onTile(badge.slots!.at(-1)!)).toBe(true);
+  expect(slotTileMode(badge.slots!.at(-1)!)).toBe("badge");
   // An explicit placement wins.
   expect(
     withPlacementDefaults(tile, {
       kind: "value",
-      tile: false,
+      tile: "badge",
       detail: "full",
     }),
-  ).toEqual({ kind: "value", tile: false, detail: "full" });
+  ).toEqual({ kind: "value", tile: "badge", detail: "full" });
   // A page that defaults off the tile gets the whole detail line.
   const page = withPlacementDefaults(tile, {
     kind: "frame",
     options: { url: "x" },
   });
-  expect(onTile(page)).toBe(false);
+  expect(slotTileMode(page)).toBe("hidden");
   expect(detailSpan(page)).toBe("full");
 });
 

@@ -6,7 +6,7 @@ import {
   resolveTemplate,
   slotVisible,
 } from "$lib/config/template-ops";
-import { inDetail, onTile } from "$lib/config/tile-ops";
+import { inDetail, slotTileMode } from "$lib/config/tile-ops";
 import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   resolveBadges,
@@ -129,11 +129,13 @@ export function tileParts(
 
   // The body is every row that lives on the tile (A59: nothing draws as a
   // layer of its own any more — the chart comes from the rows).
-  const body = rows.filter((r) => onTile(r.slot));
+  // The body is every row that draws as a tile body element; a badge-mode
+  // slot leaves it for a corner chip (A34).
+  const body = rows.filter((r) => slotTileMode(r.slot) === "normal");
   const modal = rows.filter((r) => inDetail(r.slot));
 
   const badgeSlots = slots.filter(
-    (s) => s.kind === "badge" && slotVisible(s, active) && onTile(s),
+    (s) => slotVisible(s, active) && slotTileMode(s) === "badge",
   );
   // Badges that also live in the modal become its chip strip (A34).
   const modalBadgeSlots = slots.filter(
@@ -187,6 +189,14 @@ export function headlineSlot(slots: Slot[]): Slot | undefined {
     ) ??
     slots[0]
   );
+}
+
+/** The tile's face: the first body slot of a face kind. A badge-mode slot is
+ *  not the face while a body slot exists; with only badges, one stands in so
+ *  the header still has an icon. */
+export function tileHeadlineSlot(slots: Slot[]): Slot | undefined {
+  const body = slots.filter((s) => slotTileMode(s) === "normal");
+  return headlineSlot(body.length ? body : slots);
 }
 
 /** The look of the tile's current state (A71). A tile with no active condition

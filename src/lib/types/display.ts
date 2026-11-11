@@ -264,6 +264,10 @@ export type SlotSource =
  *  the next half), or no row at all. */
 export type SlotDetail = "full" | "half" | "hidden";
 
+/** How a slot appears on the tile: its own body widget, a corner badge, or not
+ *  at all. The boolean form of `Slot.tile` is the earlier on/off field. */
+export type SlotTile = "normal" | "badge" | "hidden";
+
 export interface Slot {
   kind: SlotKind;
   source?: string | SlotSource; // v1 string during the migration; v2 union
@@ -281,8 +285,9 @@ export interface Slot {
   /** Where the slot lives (A34): tile by default, the detail page, or both.
    *  Legacy: read as a fallback by `onTile` / `detailSpan`, never written. */
   where?: "tile" | "both" | "modal";
-  /** Show this slot on the tile (default true). */
-  tile?: boolean;
+  /** Show this slot on the tile: its own body widget (default), a corner
+   *  badge, or not at all. A badge-kind slot cannot be a body widget. */
+  tile?: SlotTile | boolean;
   /** The detail row's width (default hidden). `full` takes the whole line,
    *  `half` pairs with the next half, `hidden` leaves it out. */
   detail?: SlotDetail;

@@ -10,6 +10,7 @@ import {
   rowSpark,
   singleSurface,
   stateLook,
+  tileHeadlineSlot,
   tileParts,
   tileSeries,
   valueShown,
@@ -336,6 +337,25 @@ it("picks the headline: the first face slot, never a badge or frame", () => {
   const badge: Slot = { kind: "badge" };
   expect(headlineSlot([badge, { kind: "frame" }])).toBe(badge);
   expect(headlineSlot([])).toBeUndefined();
+});
+
+it("does not make a badge-mode value the tile face", () => {
+  const valueBadge: Slot = { kind: "value", source: "humidity", tile: "badge" };
+  const button: Slot = { kind: "button" };
+  expect(tileHeadlineSlot([valueBadge, button])).toBe(button);
+  expect(tileHeadlineSlot([valueBadge])).toBe(valueBadge);
+});
+
+it("moves a badge-mode slot to the corner, keeping its detail row", () => {
+  const t = tile([
+    { kind: "value", source: "temperature" },
+    { kind: "value", source: "humidity", tile: "badge", detail: "full" },
+  ]);
+  const parts = tileParts(device(), t, none);
+  expect(parts.body.map((r) => r.slot.source)).toEqual(["temperature"]);
+  expect(parts.badgeSlots.map((s) => s.source)).toEqual(["humidity"]);
+  expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
+  expect(tileHeadlineSlot(t.slots!)).toBe(t.slots![0]);
 });
 
 it("reads a row's icon from the descriptor, the rule icon winning", () => {

@@ -40,8 +40,9 @@
     setSlotDetail,
     setSlotSource,
     setSlotTile,
+    slotTileMode,
   } from "$lib/config/tile-ops";
-  import { hasHistory, headlineSlot } from "$lib/config/tile-parts";
+  import { hasHistory, tileHeadlineSlot } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import { stateIdFor } from "$lib/config/variables";
@@ -74,6 +75,7 @@
     SlotKind,
     SlotSource,
     SlotSpark,
+    SlotTile,
     StateLook,
     TileConfig,
   } from "$lib/types/display";
@@ -246,7 +248,7 @@
 
   /** What the headline icon shows while the look sets no glyph (A67). */
   const defaultGlyph = $derived(
-    tile?.tile?.icon ?? headlineSlot(shownSlots)?.icon?.glyph,
+    tile?.tile?.icon ?? tileHeadlineSlot(shownSlots)?.icon?.glyph,
   );
 
   /** How many of them still live on the tile — the guard for A34. */
@@ -358,16 +360,40 @@
     full: "full line",
   } as const;
 
+  const TILE_GLYPH = {
+    hidden: "grid_off",
+    normal: "grid_view",
+    badge: "label",
+  } as const;
+
+  const TILE_LABEL = {
+    hidden: "not shown",
+    normal: "value / button",
+    badge: "badge",
+  } as const;
+
   function nextDetail(slot: Slot): "full" | "half" | "hidden" {
     const cur = detailSpan(slot);
     return cur === "hidden" ? "half" : cur === "half" ? "full" : "hidden";
   }
 
+  function nextTileMode(slot: Slot): SlotTile {
+    // A badge-kind slot has no body form: badge → hidden → badge.
+    const modes: SlotTile[] =
+      slot.kind === "badge"
+        ? ["badge", "hidden"]
+        : ["normal", "badge", "hidden"];
+    const cur = slotTileMode(slot);
+    return modes[(modes.indexOf(cur) + 1) % modes.length];
+  }
+
   function tileTitle(slot: Slot): string {
-    if (!onTile(slot)) return "Not on the tile — click to show";
-    return tileVisibleCount <= 1
-      ? "On the tile (one slot must stay on the tile)"
-      : "On the tile — click to remove";
+    const cur = slotTileMode(slot);
+    const next = nextTileMode(slot);
+    const base = `Tile: ${TILE_LABEL[cur]} — click for ${TILE_LABEL[next]}`;
+    return next === "hidden" && cur !== "hidden" && tileVisibleCount <= 1
+      ? `${base} (one slot must stay on the tile)`
+      : base;
   }
 
   function detailTitle(slot: Slot): string {
@@ -388,8 +414,8 @@
     );
   }
 
-  function setOnTile(i: number, on: boolean): void {
-    edit((t) => setSlotTile(t, i, on));
+  function setTileMode(i: number, mode: SlotTile): void {
+    edit((t) => setSlotTile(t, i, mode));
   }
 
   function setDetailWidth(i: number, detail: "full" | "half" | "hidden"): void {
@@ -1436,7 +1462,7 @@
                 <span class="slot-summary" title={slotLabel(slot)}>
                   <span class="slot-name">{slotLabel(slot)}</span>
                 </span>
-                {#if slot === headlineSlot(shownSlots)}
+                {#if slot === tileHeadlineSlot(shownSlots)}
                   <span
                     class="hint-badge"
                     title="The tile's face: its icon is the big one, the detail header's and the accent's."
@@ -1448,13 +1474,14 @@
                 <button
                   type="button"
                   class="icon-btn"
-                  class:on={onTile(slot)}
+                  class:on={slotTileMode(slot) !== "hidden"}
                   title={tileTitle(slot)}
                   aria-label={tileTitle(slot)}
-                  disabled={onTile(slot) && tileVisibleCount <= 1}
-                  onclick={() => setOnTile(i, !onTile(slot))}
+                  onclick={() => setTileMode(i, nextTileMode(slot))}
                 >
-                  <span class="material-symbols-outlined">grid_view</span>
+                  <span class="material-symbols-outlined"
+                    >{TILE_GLYPH[slotTileMode(slot)]}</span
+                  >
                 </button>
                 <button
                   type="button"
@@ -1695,17 +1722,20 @@
                   {/if}
                 </div>
                 <div class="row placement">
-                  <label
-                    class="check"
-                    title="Show this slot on the tile (the first three are on by default)"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={onTile(slot)}
-                      disabled={onTile(slot) && tileVisibleCount <= 1}
-                      onchange={(e) => setOnTile(i, e.currentTarget.checked)}
-                    />
-                    <span>on tile</span>
+                  <label class="small grow">
+                    <span class="label-mono">Tile</span>
+                    <select
+                      value={slotTileMode(slot)}
+                      title="Value/button in the tile body, a corner badge, or no tile entry"
+                      onchange={(e) =>
+                        setTileMode(i, e.currentTarget.value as SlotTile)}
+                    >
+                      <option value="hidden">not shown</option>
+                      {#if slot.kind !== "badge"}
+                        <option value="normal">value / button</option>
+                      {/if}
+                      <option value="badge">badge</option>
+                    </select>
                   </label>
                   <label class="small grow">
                     <span class="label-mono">Detail</span>
@@ -1834,7 +1864,7 @@
                     </label>
                   </div>
                 {/if}
-                {#if slot.kind === "badge"}
+                {#if slot.kind === "badge" || slotTileMode(slot) === "badge"}
                   <div class="row">
                     <label class="small">
                       <span class="label-mono">shows</span>
