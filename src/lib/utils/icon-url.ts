@@ -3,6 +3,7 @@
 // a broker-relative path ("adapter/name.png", served by the ioBroker web server).
 import type { PageRegistry, TemplateRegistry } from "$lib/types/display";
 import { FALLBACK_BROKER } from "$lib/broker-config";
+import { isHtmlIcon } from "$lib/config/icon-html";
 
 export interface IconOwner {
   adapter: string;
@@ -14,6 +15,9 @@ export interface IconOwner {
 export function isImageIcon(raw: string | undefined): boolean {
   const value = String(raw ?? "").trim();
   if (!value) return false;
+  // HTML/SVG markup is an icon, not a path: its closing tags contain slashes,
+  // so the path heuristics below would otherwise turn it into an image URL.
+  if (isHtmlIcon(value)) return false;
   // A symbol name is snake_case and never contains a path separator.
   if (value.includes("/")) return true;
   return /\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)([?#].*)?$/i.test(value);

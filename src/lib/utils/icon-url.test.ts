@@ -19,6 +19,9 @@ it("classifies symbols vs images", () => {
   expect(isImageIcon("adapter/thing.png")).toBe(true);
   expect(isImageIcon("adapter/thing")).toBe(true); // broker-relative path
   expect(isImageIcon("two words")).toBe(false); // not a path, not a symbol - rendered as text
+  // Markup is an icon, not an image path (its closing tags contain slashes).
+  expect(isImageIcon('<svg viewBox="0 0 24 24"><rect/></svg>')).toBe(false);
+  expect(isImageIcon('  <div class="x">y</div>')).toBe(false);
 });
 
 it("iconSrc resolves against the ioBroker base (A66)", () => {
@@ -59,6 +62,9 @@ it("iconSrc resolves against the ioBroker base (A66)", () => {
   expect(iconSrc("")).toBe("");
   expect(iconSrc(undefined)).toBe("");
   expect(iconSrc("x.png", "a.0.b", "")).toBe("/adapter/a/x.png");
+  // Markup stays markup; it is rendered in the icon iframe, never requested.
+  const html = '<svg viewBox="0 0 24 24"><rect/></svg>';
+  expect(iconSrc(html, "ihome.0", b)).toBe(html);
 });
 
 it("iconBase reads the footer host, else this origin (A66)", () => {

@@ -126,6 +126,9 @@ it("keeps a broker icon portable for a document (A66)", () => {
   expect(brokerIconPath("lightbulb", "a.0.b")).toBe("lightbulb");
   expect(brokerIconPath("/icons/a.png", "a.0.b")).toBe("/icons/a.png");
   expect(brokerIconPath("", "a.0.b")).toBe("");
+  // Markup is not a filename and must not gain an adapter prefix.
+  const html = '<svg viewBox="0 0 24 24"><rect/></svg>';
+  expect(brokerIconPath(html, "a.0.b")).toBe(html);
 });
 
 it("takes the device's first control that resolves (A65)", () => {
@@ -159,6 +162,11 @@ it("uses the device type's preset glyph instead of the adapter fallback", () => 
     ),
   ).toContain("lamp.svg");
   expect(deviceFaceIcon("own-icon", undefined, "Button")).toBe("own-icon");
+  // Markup stays markup; it is not resolved as a broker-relative image.
+  const html = '<svg viewBox="0 0 24 24"><rect/></svg>';
+  expect(
+    deviceFaceIcon(undefined, { from: "a.0.b", value: html }, "Custom"),
+  ).toBe(html);
 });
 
 it("ignores page and adapter logos on the state's path", () => {
