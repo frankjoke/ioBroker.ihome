@@ -24,6 +24,7 @@
     rows,
     badges,
     headIcon,
+    headValue,
     onClose,
     bodyMaxHeight,
   }: {
@@ -51,6 +52,8 @@
     badges?: ResolvedBadge[];
     /** The headline slot's icon (A54): the detail page greets the name with it. */
     headIcon?: { glyph: string; color?: string; disabled?: boolean };
+    /** The headline's reading, for an HTML icon's `{{$value}}`. */
+    headValue?: unknown;
     /** Given → a close button in the header (the dialog); absent → a preview. */
     onClose?: () => void;
     /** How far the rows may grow before scrolling (the preview leaves less). */
@@ -65,7 +68,12 @@
     <div class="head-main">
       {#if headIcon}
         <span class="head-icon" style:color={headIcon.color}>
-          <Icon value={headIcon.glyph} size={26} dim={headIcon.disabled} />
+          <Icon
+            value={headIcon.glyph}
+            size={26}
+            dim={headIcon.disabled}
+            data={{ $value: headValue }}
+          />
         </span>
       {/if}
       <h2>{heading}</h2>
@@ -148,11 +156,21 @@
                     r.onPrimary?.();
                   }}
                 >
-                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                  <Icon
+                    value={r.icon.glyph}
+                    size={18}
+                    dim={r.icon.disabled}
+                    data={{ $value: r.control?.liveValue }}
+                  />
                 </button>
               {:else}
                 <span class="row-icon" style:color={r.icon.color}>
-                  <Icon value={r.icon.glyph} size={18} dim={r.icon.disabled} />
+                  <Icon
+                    value={r.icon.glyph}
+                    size={18}
+                    dim={r.icon.disabled}
+                    data={{ $value: r.control?.liveValue }}
+                  />
                 </span>
               {/if}
             {/if}

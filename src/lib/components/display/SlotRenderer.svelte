@@ -109,6 +109,7 @@
                 value={icon.glyph}
                 size={icon.size ?? 17}
                 dim={icon.disabled}
+                data={{ $value: control?.liveValue }}
               />
             </span>
           {/if}
@@ -142,11 +143,21 @@
             onPrimary();
           }}
         >
-          <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
+          <Icon
+            value={icon.glyph}
+            size={icon.size ?? 17}
+            dim={icon.disabled}
+            data={{ $value: control?.liveValue }}
+          />
         </button>
       {:else}
         <span class="slot-icon" style:color={icon.color}>
-          <Icon value={icon.glyph} size={icon.size ?? 17} dim={icon.disabled} />
+          <Icon
+            value={icon.glyph}
+            size={icon.size ?? 17}
+            dim={icon.disabled}
+            data={{ $value: control?.liveValue }}
+          />
         </span>
       {/if}
       {@render content()}

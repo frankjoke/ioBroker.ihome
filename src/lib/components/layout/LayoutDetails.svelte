@@ -55,6 +55,7 @@
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
+  import { iconTitle } from "$lib/config/icon-html";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
@@ -1302,7 +1303,7 @@
                       type="button"
                       class="btn btn-sm glyph-pick"
                       title={lk.glyph
-                        ? `Glyph: ${lk.glyph} — click to change`
+                        ? `Glyph: ${iconTitle(lk.glyph)} — click to change`
                         : defaultGlyph
                           ? `Default glyph: ${defaultGlyph} — click to change`
                           : "Choose a glyph"}
@@ -2006,7 +2007,7 @@
                           type="button"
                           class="btn btn-sm glyph-pick"
                           title={slot.icon.glyph
-                            ? `Glyph: ${slot.icon.glyph} — click to change`
+                            ? `Glyph: ${iconTitle(slot.icon.glyph)} — click to change`
                             : "Choose a glyph"}
                           onclick={() => (iconPickerFor = i)}
                         >

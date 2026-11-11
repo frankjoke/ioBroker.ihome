@@ -13,6 +13,7 @@
     rows,
     badges,
     headIcon,
+    headValue,
     inline = false,
     onClose,
   }: {
@@ -37,6 +38,8 @@
     badges?: ResolvedBadge[];
     /** The headline slot's icon (A54): the detail page greets the name with it. */
     headIcon?: { glyph: string; color?: string; disabled?: boolean };
+    /** The headline's reading, for an HTML icon's `{{$value}}`. */
+    headValue?: unknown;
     /** Shown *non-modally* (`show()`): it does not block the page, which is what
      *  the layout sheet wants — the modal view is something to look at while
      *  editing, not something that stops the editing. */
@@ -75,6 +78,7 @@
     {rows}
     {badges}
     {headIcon}
+    {headValue}
     {onClose}
     bodyMaxHeight="70vh"
   />

@@ -282,6 +282,10 @@
   // *style* carries, so "glow when on" keeps working with the icon disabled;
   // the values reach CSS through custom properties (spec §6).
   const headline = $derived(tileHeadlineSlot(slots));
+  /** The headline's reading, for an HTML icon's `{{$value}}` in the header. */
+  const headValue = $derived(
+    parts.rows.find((r) => r.slot === headline)?.control?.liveValue,
+  );
   const accent = $derived(headline ?? { kind: "value" as const });
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
   // What the tile's own active state says (A71). A field set here wins over the
@@ -666,6 +670,7 @@
     rows={modalRows}
     badges={modalBadges}
     {headIcon}
+    {headValue}
     inline={modalInline}
     onClose={() => {
       modalOpen = false;

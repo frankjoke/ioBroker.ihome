@@ -4,6 +4,7 @@
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
+  import { iconTitle, isHtmlIcon } from "$lib/config/icon-html";
   import { brokerIconPath } from "$lib/config/icon-ops";
   import Icon from "$lib/components/common/Icon.svelte";
   import symbolNames from "$lib/assets/material-symbol-names.json";
@@ -24,7 +25,7 @@
     { id: "symbols", label: "Symbols" },
     { id: "document", label: "Document" },
     { id: "broker", label: "Broker" },
-    { id: "url", label: "URL/SVG" },
+    { id: "url", label: "URL / SVG / HTML" },
   ] as const;
 
   let tab = $state<(typeof TABS)[number]["id"]>("symbols");
@@ -32,7 +33,7 @@
   // The picker is mounted fresh per open, so capturing the initial value is the
   // point; a later `icon` change never arrives while it is up.
   // svelte-ignore state_referenced_locally
-  let url = $state(icon && isImageIcon(icon) ? icon : "");
+  let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
   /** The first 120 matches — the full list is thousands long. */
   const matches = $derived(
@@ -129,7 +130,7 @@
                 type="button"
                 class="cell"
                 class:current={value === icon}
-                title={value}
+                title={iconTitle(value)}
                 aria-label={value}
                 onclick={() => onPick(value)}
               >
@@ -163,13 +164,13 @@
         {/if}
       {:else}
         <div class="url-row">
-          <input
-            type="text"
-            placeholder="https://…, adapter/name.png or data:image/svg+xml,…"
+          <textarea
+            rows="5"
+            placeholder="https://…, adapter/name.png, data:image/svg+xml,… or <svg>…"
             bind:value={url}
-          />
+          ></textarea>
           <span class="preview" aria-hidden="true">
-            <Icon value={url} size={22} />
+            <Icon value={url} size={22} data={{ $value: 50 }} />
           </span>
           <button
             type="button"
@@ -178,6 +179,16 @@
             onclick={() => onPick(url.trim())}>Use</button
           >
         </div>
+        <p class="hint text-muted">
+          SVG/HTML fragments fill the icon box. <span class="mono"
+            >&#123;&#123;$value&#125;&#125;</span
+          >
+          is the slot's reading — e.g.
+          <span class="mono"
+            >&lt;svg&gt;&lt;rect width="&#123;&#123;$value&#125;&#125;%"…
+            /&gt;&lt;/svg&gt;</span
+          >. The preview uses 50.
+        </p>
       {/if}
     </div>
 
@@ -306,14 +317,25 @@
 
   .url-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
   }
 
-  .url-row input {
+  .url-row textarea {
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 5rem;
     padding: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+    resize: vertical;
+  }
+
+  .hint {
+    margin: 0.35rem 0 0;
+    font-size: var(--body-sm);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
 
   .preview {
