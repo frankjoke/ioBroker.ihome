@@ -58,7 +58,7 @@ Presence can lag a few minutes on Wi-Fi; a device that sleeps may look offline.`
   ],
   device: {
     type: "Custom",
-    size: { w: 1, h: 1 },
+    size: { w: 2, h: 2 },
     features: [],
     slots: [
       {
@@ -111,7 +111,7 @@ export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
   ],
   device: {
     type: "Custom",
-    size: { w: 2, h: 2 },
+    size: { w: 4, h: 4 },
     features: [],
     slots: [
       {

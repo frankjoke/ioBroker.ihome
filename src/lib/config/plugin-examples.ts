@@ -88,7 +88,7 @@ export const NUT_EXAMPLE: ImportedPlugin = {
       name: "NUT UPS",
       type: "Custom",
       icon: "battery_charging_full",
-      size: { w: 2, h: 1 },
+      size: { w: 4, h: 2 },
       controls: [
         {
           state: "battery.charge",

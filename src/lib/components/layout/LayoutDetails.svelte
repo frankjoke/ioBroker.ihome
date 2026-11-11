@@ -480,7 +480,7 @@
    * editing one axis silently changes the other.
    */
   function effectiveTileSpan(): TileSpan {
-    if (!tile) return { w: 1, h: 1 };
+    if (!tile) return { w: 2, h: 2 };
     return effectiveSpan(tile.tile, bp);
   }
 

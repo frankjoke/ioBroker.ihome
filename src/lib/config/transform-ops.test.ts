@@ -208,4 +208,46 @@ describe("migrateRegistry", () => {
     // An unknown type is left alone (there is no feature list to align to).
     expect(out.devices[2].controls[0].feature).toBe("power");
   });
+
+  it("doubles device sizes once for the finer module", () => {
+    const raw = {
+      version: 7,
+      updatedAt: 0,
+      devices: [
+        {
+          id: "d1",
+          name: "D",
+          type: "Light",
+          size: { w: 2, h: 1 },
+          controls: [],
+        },
+      ],
+    };
+    const out = migrateRegistry(raw);
+    expect(out.sizeUnit).toBe(2);
+    expect(out.devices[0].size).toEqual({ w: 4, h: 2 });
+    // A second pass must not double again.
+    const again = migrateRegistry(out);
+    expect(again.sizeUnit).toBe(2);
+    expect(again.devices[0].size).toEqual({ w: 4, h: 2 });
+  });
+
+  it("does not double when the installation is already on the fine unit", () => {
+    const raw = {
+      version: 7,
+      updatedAt: 0,
+      devices: [
+        {
+          id: "d1",
+          name: "D",
+          type: "Light",
+          size: { w: 2, h: 1 },
+          controls: [],
+        },
+      ],
+    };
+    const out = migrateRegistry(raw, true);
+    expect(out.sizeUnit).toBe(2);
+    expect(out.devices[0].size).toEqual({ w: 2, h: 1 });
+  });
 });

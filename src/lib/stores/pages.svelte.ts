@@ -38,6 +38,8 @@ import {
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
+import { getSettings } from "$lib/stores/settings.svelte";
+import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { Device } from "$lib/types/device";
 import type { PageRegistry, Template } from "$lib/types/display";
 
@@ -301,6 +303,7 @@ export async function migrateLayout(
   const bridge = migratePageRegistry(
     getPageRegistry(),
     devices.map((d) => toFilterable(d)),
+    getSettings().sizeUnit === SIZE_UNIT,
   );
   // The bridge bumps to v2 itself; the v2 gate in migratePagesV2 must see the
   // document as it was read (v1), not the bridge's output.
@@ -314,7 +317,10 @@ export async function migrateLayout(
     return false;
   }
   if (!write) {
-    setPageRegistry({ ...registry, version: PAGE_REGISTRY_VERSION });
+    setPageRegistry({
+      ...registry,
+      version: Math.max(version, PAGE_REGISTRY_VERSION),
+    });
     return false;
   }
   if (changed) {
@@ -323,7 +329,11 @@ export async function migrateLayout(
   // Never write v2 without the one-time v1 document: a failed backup aborts.
   const backup = rawPages ?? JSON.stringify(getPageRegistry());
   if (!(await writeBackupOnce(backup))) return false;
-  return commitLayout({ ...registry, version: PAGE_REGISTRY_VERSION });
+  // A newer document keeps its version: this build never downgrades it.
+  return commitLayout({
+    ...registry,
+    version: Math.max(version, registry.version ?? 0, PAGE_REGISTRY_VERSION),
+  });
 }
 
 /**

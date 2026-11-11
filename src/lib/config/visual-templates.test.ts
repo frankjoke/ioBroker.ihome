@@ -52,4 +52,13 @@ describe("visualTemplateProblem", () => {
       visualTemplateProblem({ ...valid, size: { w: 0, h: 1 } }, []),
     ).toMatch(/size/i);
   });
+
+  it("accepts the doubled size limits", () => {
+    expect(
+      visualTemplateProblem({ ...valid, size: { w: 40, h: 20 } }, []),
+    ).toBeNull();
+    expect(
+      visualTemplateProblem({ ...valid, size: { w: 41, h: 21 } }, []),
+    ).toMatch(/size/i);
+  });
 });

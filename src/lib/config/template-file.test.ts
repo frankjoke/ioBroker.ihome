@@ -123,7 +123,7 @@ describe("templateFile round trip", () => {
     expect(
       parseTemplateFile({
         format: "ihome-template",
-        version: 2,
+        version: 3,
         kind: "formula",
         definition: formula,
       }),
@@ -199,6 +199,54 @@ describe("templateFile round trip", () => {
     expect(
       "file" in parseTemplateFile(templateFile("bundle", sideEffectBundle)),
     ).toBe(true);
+  });
+
+  it("scales a version-1 definition's size once on import", () => {
+    const legacyDevice = {
+      format: "ihome-template",
+      version: 1,
+      kind: "device",
+      definition: device,
+    };
+    const deviceFile = parseTemplateFile(legacyDevice);
+    expect("file" in deviceFile).toBe(true);
+    if (!("file" in deviceFile)) return;
+    expect(deviceFile.file.version).toBe(2);
+    expect((deviceFile.file.definition as { size: unknown }).size).toEqual({
+      w: 4,
+      h: 4,
+    });
+
+    const legacyBundle = {
+      format: "ihome-template",
+      version: 1,
+      kind: "bundle",
+      definition: {
+        id: "b",
+        name: "B",
+        device: {
+          type: "Custom",
+          features: [],
+          slots: [],
+          size: { w: 1, h: 1 },
+        },
+      },
+    };
+    const bundleFile = parseTemplateFile(legacyBundle);
+    expect("file" in bundleFile).toBe(true);
+    if (!("file" in bundleFile)) return;
+    expect(
+      (bundleFile.file.definition as { device: { size: unknown } }).device.size,
+    ).toEqual({ w: 2, h: 2 });
+
+    // A version-2 file already carries the fine unit and is left alone.
+    const fresh = parseTemplateFile({ ...legacyDevice, version: 2 });
+    expect("file" in fresh).toBe(true);
+    if (!("file" in fresh)) return;
+    expect((fresh.file.definition as { size: unknown }).size).toEqual({
+      w: 2,
+      h: 2,
+    });
   });
 });
 

@@ -11,6 +11,7 @@
   } from "$lib/ioBrokerConnect.svelte.js";
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
+  import { SIZE_UNIT } from "$lib/config/size-ops";
   import { defineStorage, onEditorPage } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
@@ -27,6 +28,7 @@
   import { initTemplateBundles } from "$lib/template-bundles.svelte.js";
   import { initVariables } from "$lib/variables.svelte.js";
   import {
+    getPageRegistry,
     initPages,
     loadViewState,
     migrateLayout,
@@ -47,7 +49,11 @@
     unlock,
   } from "$lib/config/pin.svelte";
   import { effectiveUi, uiCss } from "$lib/config/ui-settings";
-  import { getSettings, initSettings } from "$lib/stores/settings.svelte";
+  import {
+    getSettings,
+    initSettings,
+    updateSettings,
+  } from "$lib/stores/settings.svelte";
   import AppBar from "$lib/components/AppBar.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import ToastHost from "$lib/components/common/ToastHost.svelte";
@@ -275,6 +281,9 @@
     void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).
     void (async () => {
+      // Settings carry the installation's size-unit marker; load them before
+      // the registries so a migrated document is never doubled a second time.
+      await initSettings(applySettings);
       // both gates: the registry must be loaded and the enum cache populated
       await initRegistry();
       await waitForEnumCache();
@@ -296,6 +305,17 @@
       const canonical = getCanonicalRegistry().devices ?? [];
       if (canonical.length) {
         await migrateLayout(canonical, getTemplateRegistry().templates);
+      }
+      // The per-document markers are the durable record; this installation
+      // marker stops an older client (whose parse drops them) from making the
+      // next load double the sizes again.
+      if (
+        getSettings().sizeUnit !== SIZE_UNIT &&
+        getPageRegistry().sizeUnit === SIZE_UNIT &&
+        getCanonicalRegistry().sizeUnit === SIZE_UNIT &&
+        getTemplateRegistry().sizeUnit === SIZE_UNIT
+      ) {
+        await updateSettings({ sizeUnit: SIZE_UNIT });
       }
     })();
   });

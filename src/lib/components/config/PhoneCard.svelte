@@ -132,6 +132,7 @@
       common: { role, type, read: true, write: false },
     }));
     setCanonicalRegistry({
+      ...reg,
       version: (reg.version ?? 0) + 1,
       updatedAt: Date.now(),
       devices: [

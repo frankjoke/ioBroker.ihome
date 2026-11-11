@@ -1,7 +1,7 @@
 import type { DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
 
-/** Tile size hint, 1–20 half-modules wide and 1–10 modules high. Clamped per breakpoint — never a coordinate. */
+/** Tile size hint, 1–40 fine modules wide and 1–20 high. Clamped per breakpoint — never a coordinate. */
 export type SizeW =
   | 1
   | 2
@@ -22,8 +22,48 @@ export type SizeW =
   | 17
   | 18
   | 19
+  | 20
+  | 21
+  | 22
+  | 23
+  | 24
+  | 25
+  | 26
+  | 27
+  | 28
+  | 29
+  | 30
+  | 31
+  | 32
+  | 33
+  | 34
+  | 35
+  | 36
+  | 37
+  | 38
+  | 39
+  | 40;
+export type SizeH =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
   | 20;
-export type SizeH = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type Size = {
   w: SizeW;
   h: SizeH;
@@ -156,6 +196,8 @@ export interface PageRegistry {
   version: number;
   updatedAt: number;
   seeded?: boolean;
+  /** Present once the fine module (unit 2) has been applied to every size. */
+  sizeUnit?: 2;
   pages: Page[];
 }
 
@@ -258,5 +300,7 @@ export interface Template {
 export interface TemplateRegistry {
   version: number;
   updatedAt: number;
+  /** Present once the fine module (unit 2) has been applied to every size. */
+  sizeUnit?: 2;
   templates: Template[];
 }

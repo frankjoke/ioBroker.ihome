@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   PRESETS,
   mergeSlots,
+  migrateTemplateRegistry,
   parseTemplateRegistry,
   pickControl,
   pickSlotControls,
@@ -14,7 +15,7 @@ import {
   tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
-import type { Slot, Template } from "$lib/types/display";
+import type { Slot, Template, TemplateRegistry } from "$lib/types/display";
 
 it("merges slots by kind+source with later winning and rules concatenated", () => {
   const merged = mergeSlots([
@@ -183,15 +184,14 @@ it("gives every device type a preset", () => {
 });
 
 it("carries the preset sizes", () => {
-  // A readout is one half-module wide and one module high; multi-control
-  // devices stay wide.
-  expect(PRESETS.Switch.size).toEqual({ w: 1, h: 1 });
-  expect(PRESETS.Light.size).toEqual({ w: 1, h: 1 });
-  expect(PRESETS.Thermometer.size).toEqual({ w: 1, h: 1 });
-  expect(PRESETS.Motion.size).toEqual({ w: 1, h: 1 });
-  expect(PRESETS.Thermostat.size).toEqual({ w: 2, h: 1 });
-  expect(PRESETS.Blind.size).toEqual({ w: 2, h: 1 });
-  expect(PRESETS.AC.size).toEqual({ w: 2, h: 2 });
+  // A readout is today's half-width card; multi-control devices stay wide.
+  expect(PRESETS.Switch.size).toEqual({ w: 2, h: 2 });
+  expect(PRESETS.Light.size).toEqual({ w: 2, h: 2 });
+  expect(PRESETS.Thermometer.size).toEqual({ w: 2, h: 2 });
+  expect(PRESETS.Motion.size).toEqual({ w: 2, h: 2 });
+  expect(PRESETS.Thermostat.size).toEqual({ w: 4, h: 2 });
+  expect(PRESETS.Blind.size).toEqual({ w: 4, h: 2 });
+  expect(PRESETS.AC.size).toEqual({ w: 4, h: 4 });
 });
 
 it("dims an idle motion sensor", () => {
@@ -256,6 +256,50 @@ it("parses a template registry and rejects junk", () => {
     parseTemplateRegistry({ val: { templates: [{ id: "t" }] } })?.templates
       .length,
   ).toBe(1);
+});
+
+it("doubles template sizes once for the finer module", () => {
+  const reg = {
+    version: 0,
+    updatedAt: 1,
+    templates: [
+      {
+        id: "t",
+        name: "T",
+        type: "Light",
+        size: { w: 1, h: 2 },
+        features: [],
+        slots: [],
+      },
+    ],
+  } as unknown as TemplateRegistry;
+  const { registry, changed } = migrateTemplateRegistry(reg);
+  expect(changed).toBe(true);
+  expect(registry.sizeUnit).toBe(2);
+  expect(registry.templates[0].size).toEqual({ w: 2, h: 4 });
+  const again = migrateTemplateRegistry(registry);
+  expect(again.changed).toBe(false);
+  expect(again.registry).toBe(registry);
+});
+
+it("does not double a template when the installation is already on the fine unit", () => {
+  const reg = {
+    version: 0,
+    updatedAt: 1,
+    templates: [
+      {
+        id: "t",
+        name: "T",
+        type: "Light",
+        size: { w: 1, h: 2 },
+        features: [],
+        slots: [],
+      },
+    ],
+  } as unknown as TemplateRegistry;
+  const { registry } = migrateTemplateRegistry(reg, true);
+  expect(registry.sizeUnit).toBe(2);
+  expect(registry.templates[0].size).toEqual({ w: 1, h: 2 });
 });
 
 it("resolves an explicit built-in preset id", () => {

@@ -2,21 +2,40 @@ import type { Size } from "$lib/types/display";
 
 export type Breakpoint = "phone" | "tablet" | "desktop";
 
-/** Modules a tile occupies. A hint, clamped per breakpoint — never a coordinate. */
+/**
+ * Modules a tile occupies. A hint, clamped per breakpoint — never a coordinate.
+ * A unit is half of the card an older document called 1×1: `w: 2, h: 2` is that
+ * card, `w: 2, h: 1` a short button, `w: 1, h: 1` a small one.
+ */
 export interface TileSpan {
   w: number;
   h: number;
 }
 
-export const DEFAULT_SPAN: Size = { w: 1, h: 1 };
+export const DEFAULT_SPAN: Size = { w: 2, h: 2 };
 
 /**
  * The largest hint a document may carry (A2). A breakpoint may still clamp to
- * less than this — the editor writes up to here, the type names it. The width
- * is larger because a web-page tile often needs twice the old 10-module width.
+ * less than this — the editor writes up to here, the type names it. Doubled for
+ * the finer module (the old 20×10 cap).
  */
-export const SIZE_MAX_W = 20;
-export const SIZE_MAX_H = 10;
+export const SIZE_MAX_W = 40;
+export const SIZE_MAX_H = 20;
+
+/**
+ * The stored unit of every size in a document. Bumped from 1 when the module
+ * was halved; a registry without the marker carries the old unit and is
+ * migrated once (a 2×2 is that old 1×1).
+ */
+export const SIZE_UNIT = 2;
+
+/** A stored size in the current fine unit, for a document still on unit 1. */
+export function scaleSize(size: Size): Size {
+  return {
+    w: Math.min(size.w * SIZE_UNIT, SIZE_MAX_W),
+    h: Math.min(size.h * SIZE_UNIT, SIZE_MAX_H),
+  } as Size;
+}
 
 export interface BreakpointDef {
   name: Breakpoint;
@@ -25,10 +44,10 @@ export interface BreakpointDef {
   /**
    * Column module (`--tile-w`) and row module (`--tile-h`).
    *
-   * The column module is **half** the row module, because a tile's `w` is
-   * counted in half-modules: `w: 1` is a half-width card, `w: 2` the width a
-   * plain tile used to have. CSS `span` only takes integers, so a finer column
-   * is how a "0.5 wide" tile is expressed.
+   * A module is half of the old one, so a 2×2 tile is the card an old document
+   * called 1×1. It is `(old − 6px gap) / 2 + 1`: the gap is part of every span,
+   * so absorbing it keeps a 2-span within 2px of the old card instead of 6px
+   * wider (the approved +2px width; height stays exact).
    *
    * These are *minimums*: the row track is `minmax(--tile-h, auto)`, so a tile
    * with more content grows instead of clipping its values. Font and icon sizes
@@ -55,24 +74,24 @@ export const BREAKPOINTS: BreakpointDef[] = [
   {
     name: "phone",
     minWidth: 0,
-    tileW: 61,
-    tileH: 122,
+    tileW: 28.5,
+    tileH: 58,
     maxW: SIZE_MAX_W,
     maxH: SIZE_MAX_H,
   },
   {
     name: "tablet",
     minWidth: 600,
-    tileW: 51,
-    tileH: 102,
+    tileW: 23.5,
+    tileH: 48,
     maxW: SIZE_MAX_W,
     maxH: SIZE_MAX_H,
   },
   {
     name: "desktop",
     minWidth: 1025,
-    tileW: 57,
-    tileH: 114,
+    tileW: 26.5,
+    tileH: 54,
     maxW: SIZE_MAX_W,
     maxH: SIZE_MAX_H,
   },
@@ -96,7 +115,8 @@ function cap(value: number | undefined, max: number): number {
 /** Clamp a size hint to what the breakpoint can actually show. */
 export function clampSpan(size: Size | undefined, bp: Breakpoint): TileSpan {
   const def = BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0];
-  return { w: cap(size?.w, def.maxW), h: cap(size?.h, def.maxH) };
+  const hint = size ?? DEFAULT_SPAN;
+  return { w: cap(hint.w, def.maxW), h: cap(hint.h, def.maxH) };
 }
 
 /**

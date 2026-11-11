@@ -134,6 +134,7 @@
   function commit(next: Device[]) {
     const reg = getCanonicalRegistry();
     setCanonicalRegistry({
+      ...reg,
       version: (reg.version ?? 0) + 1,
       updatedAt: Date.now(),
       devices: next,

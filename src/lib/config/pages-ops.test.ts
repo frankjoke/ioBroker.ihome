@@ -15,7 +15,7 @@ import {
   toFilterable,
   type FilterableDevice,
 } from "$lib/config/pages-ops";
-import type { Page } from "$lib/types/display";
+import type { Page, PageRegistry } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import { DEVICE_TYPES } from "$lib/config/features";
 const dev = (over: Partial<FilterableDevice>): FilterableDevice => ({
@@ -419,6 +419,68 @@ it("is idempotent and leaves an already-migrated registry alone", () => {
   const twice = migratePageRegistry(once, wzDevices);
   expect(twice.changed).toBe(false);
   expect(twice.registry).toEqual(once);
+});
+
+it("does not double a document when the installation is already on the fine unit", () => {
+  const reg = {
+    version: 3,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [
+          {
+            id: "g",
+            tiles: [{ id: "t", device: "a", tile: { size: { w: 1, h: 2 } } }],
+          },
+        ],
+      },
+    ],
+  } as unknown as PageRegistry;
+  const { registry, changed } = migratePageRegistry(reg, wzDevices, true);
+  expect(changed).toBe(true);
+  expect(registry.sizeUnit).toBe(2);
+  expect(registry.pages[0].groups[0].tiles?.[0].tile?.size).toEqual({
+    w: 1,
+    h: 2,
+  });
+});
+
+it("doubles placement sizes once and never lowers a newer version", () => {
+  const reg = {
+    version: 3,
+    updatedAt: 1,
+    pages: [
+      {
+        id: "p",
+        title: "P",
+        groups: [
+          {
+            id: "g",
+            tiles: [
+              {
+                id: "t",
+                device: "a",
+                tile: { size: { w: 1, h: 2 } },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } as unknown as PageRegistry;
+  const { registry, changed } = migratePageRegistry(reg, wzDevices);
+  expect(changed).toBe(true);
+  expect(registry.sizeUnit).toBe(2);
+  expect(registry.version).toBe(3);
+  expect(registry.pages[0].groups[0].tiles?.[0].tile?.size).toEqual({
+    w: 2,
+    h: 4,
+  });
+  const again = migratePageRegistry(registry, wzDevices);
+  expect(again.changed).toBe(false);
+  expect(again.registry).toBe(registry);
 });
 
 it("migrates an empty section to an empty list and never invents placements", () => {

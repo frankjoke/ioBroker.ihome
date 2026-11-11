@@ -12,6 +12,8 @@ import {
 import { loadUsedStates } from "$lib/states.svelte.js";
 import { migrateRegistry } from "$lib/config/transform-ops";
 import { backfillEnumFields } from "$lib/config/pages-ops";
+import { SIZE_UNIT } from "$lib/config/size-ops";
+import { getSettings } from "$lib/stores/settings.svelte";
 
 let initPromise = null;
 let saveTimer = null;
@@ -30,6 +32,7 @@ function parseRegistry(raw) {
     return {
       version: raw.version ?? 0,
       updatedAt: raw.updatedAt ?? Date.now(),
+      ...(raw.sizeUnit === 2 ? { sizeUnit: 2 } : {}),
       devices: raw.devices,
     };
   }
@@ -72,6 +75,7 @@ export function backfillDeviceEnums() {
   if (!changed) return;
   console.log("[registry] filled enum fields on", changed, "device(s)");
   setCanonicalRegistry({
+    ...reg,
     version: (reg.version ?? 0) + 1,
     updatedAt: Date.now(),
     devices,
@@ -99,6 +103,7 @@ export function upsertDevice(device) {
   const reg = getCanonicalRegistry();
   const known = (reg.devices ?? []).some((d) => d.id === device.id);
   setCanonicalRegistry({
+    ...reg,
     version: (reg.version ?? 0) + 1,
     updatedAt: Date.now(),
     devices: known
@@ -131,13 +136,19 @@ export function initRegistry() {
             return true;
           }
           console.log("[registry] onUpdate -> apply");
-          setCanonicalRegistry(migrateRegistry(parsed));
+          setCanonicalRegistry(
+            migrateRegistry(parsed, getSettings().sizeUnit === SIZE_UNIT),
+          );
+          if (parsed.sizeUnit !== SIZE_UNIT) saveRegistry();
           void loadUsedStates();
           return true;
         };
         const parsed = parseRegistry(st.value);
         if (parsed) {
-          setCanonicalRegistry(migrateRegistry(parsed));
+          setCanonicalRegistry(
+            migrateRegistry(parsed, getSettings().sizeUnit === SIZE_UNIT),
+          );
+          if (parsed.sizeUnit !== SIZE_UNIT) saveRegistry();
           console.log(
             "[registry] init loaded:",
             parsed.devices?.length ?? 0,

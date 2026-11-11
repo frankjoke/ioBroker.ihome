@@ -49,7 +49,7 @@ const file = (
   definition: unknown,
 ): TemplateFile => ({
   format: "ihome-template",
-  version: 1,
+  version: 2,
   kind,
   definition,
 });

@@ -142,7 +142,7 @@ it("a new tile takes its name, size and glyph from the first control", () => {
   const slots = [slotFromControl(dev, dev.controls[0])];
   expect(tileSeed(slots, [dev], [])).toEqual({
     title: "Brunnen",
-    size: { w: 1, h: 1 },
+    size: { w: 2, h: 2 },
     icon: "power_settings_new",
   });
 });

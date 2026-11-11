@@ -10,6 +10,7 @@ import type {
 import { enumsOfState } from "$lib/config/rooms";
 import { num, parseDoc, unwrapDoc } from "$lib/config/doc-parse";
 import { slugify, uniqueSlug } from "$lib/config/slug";
+import { SIZE_UNIT, scaleSize } from "$lib/config/size-ops";
 
 /** A device reduced to what filtering needs. */
 export interface FilterableDevice {
@@ -155,6 +156,7 @@ export const PAGE_REGISTRY_VERSION = 2;
 export function migratePageRegistry(
   reg: PageRegistry,
   devices: FilterableDevice[],
+  sizeUnitDone = false,
 ): { registry: PageRegistry; changed: boolean } {
   const pages = reg.pages ?? [];
   // Never migrate a registry that was never loaded: the store's initial value is
@@ -178,20 +180,23 @@ export function migratePageRegistry(
     (page.groups ?? []).some((group) => !Array.isArray(group.tiles)),
   );
   const needsVersion = (reg.version ?? 0) < PAGE_REGISTRY_VERSION;
-  if (!needsTiles && !needsVersion) return { registry: reg, changed: false };
+  const needsSizeMarker = reg.sizeUnit !== SIZE_UNIT;
+  // The installation-level marker also guards a document an older client saved
+  // after the migration: its parse drops `sizeUnit`, but the sizes are fine.
+  const doubleSizes = needsSizeMarker && !sizeUnitDone;
+  if (!needsTiles && !needsVersion && !needsSizeMarker) {
+    return { registry: reg, changed: false };
+  }
 
   const migrated = pages.map((page) => {
-    if ((page.groups ?? []).every((group) => Array.isArray(group.tiles))) {
-      return page;
-    }
     // The order the display showed yesterday is the order the placements get.
     const resolved = new Map(
       resolveByMember(page, devices).map((r) => [r.group.id, r.devices]),
     );
     return {
       ...page,
-      groups: (page.groups ?? []).map((group) =>
-        Array.isArray(group.tiles)
+      groups: (page.groups ?? []).map((group) => {
+        let next: Group = Array.isArray(group.tiles)
           ? group
           : {
               ...group,
@@ -199,15 +204,34 @@ export function migratePageRegistry(
                 id: newId(),
                 device: d.id,
               })),
-            },
-      ),
+            };
+        if (doubleSizes) {
+          next = {
+            ...next,
+            tiles: (next.tiles ?? []).map((placement) =>
+              placement.tile?.size
+                ? {
+                    ...placement,
+                    tile: {
+                      ...placement.tile,
+                      size: scaleSize(placement.tile.size),
+                    },
+                  }
+                : placement,
+            ),
+          };
+        }
+        return next;
+      }),
     };
   });
 
   return {
     registry: {
       ...reg,
-      version: PAGE_REGISTRY_VERSION,
+      // A newer document keeps its version; this migration never downgrades it.
+      version: Math.max(reg.version ?? 0, PAGE_REGISTRY_VERSION),
+      sizeUnit: SIZE_UNIT,
       updatedAt: Date.now(),
       pages: migrated,
     },
@@ -362,6 +386,7 @@ export function parsePageRegistry(raw: unknown): PageRegistry | null {
       version: num(value.version, 0),
       updatedAt: num(value.updatedAt, Date.now()),
       ...(value.seeded ? { seeded: true } : {}),
+      ...(value.sizeUnit === 2 ? { sizeUnit: 2 } : {}),
       pages: pages as Page[],
     };
   });

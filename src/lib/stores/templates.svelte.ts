@@ -3,11 +3,16 @@
 // a copy (`basedOn`) that this document owns. Same registry pattern and the same
 // no-module-global-client rule as `pages.svelte.ts`.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { parseTemplateRegistry } from "$lib/config/template-ops";
+import {
+  parseTemplateRegistry,
+  migrateTemplateRegistry,
+} from "$lib/config/template-ops";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
+import { getSettings } from "$lib/stores/settings.svelte";
+import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { TemplateRegistry } from "$lib/types/display";
 
 export const TEMPLATE_LIST_ID = "ihome.0.config.templateList";
@@ -163,17 +168,27 @@ export function initTemplates(): Promise<void> {
       st.onUpdate = (_cl, state) => {
         const parsed = parseTemplateRegistry(state?.val);
         if (!parsed) return true;
-        const asString = JSON.stringify(parsed);
+        const migrated = migrateTemplateRegistry(
+          parsed,
+          getSettings().sizeUnit === SIZE_UNIT,
+        );
+        const asString = JSON.stringify(migrated.registry);
         if (lastSent !== null && lastSent === asString) return true;
-        setTemplateRegistry(parsed);
+        setTemplateRegistry(migrated.registry);
+        if (migrated.changed) saveTemplates();
         return true;
       };
       const parsed = parseTemplateRegistry(st.value);
       // Templates are only ever absent (never seeded), so nothing is written
       // here: an unreadable document must not be replaced by an empty one.
       if (parsed) {
+        const migrated = migrateTemplateRegistry(
+          parsed,
+          getSettings().sizeUnit === SIZE_UNIT,
+        );
         templatesLoadKind = "loaded";
-        setTemplateRegistry(parsed);
+        setTemplateRegistry(migrated.registry);
+        if (migrated.changed) saveTemplates();
       } else if (st.value != null && st.value !== "") {
         templatesLoadKind = "unreadable";
         console.error(

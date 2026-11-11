@@ -1,5 +1,6 @@
 import type { Transform, TransformStep } from "$lib/types/device";
 import { DEVICE_FEATURES, featureForType } from "$lib/config/features";
+import { SIZE_UNIT, scaleSize } from "$lib/config/size-ops";
 
 export interface StepResult {
   value: unknown;
@@ -124,12 +125,16 @@ export function migrateTransform(old: unknown): Transform | undefined {
 /** Migrate every control transform in a raw registry object, and repair a
  *  control feature its device type does not define (a new device starts as
  *  Custom, whose boolean fallback is "power"; a Button only has "press"). */
-export function migrateRegistry(raw: any): any {
+export function migrateRegistry(raw: any, sizeUnitDone = false): any {
   if (!raw || !Array.isArray(raw.devices)) return raw;
+  const sizes = raw.sizeUnit !== SIZE_UNIT;
+  const doubleSizes = sizes && !sizeUnitDone;
   return {
     ...raw,
+    ...(sizes ? { sizeUnit: SIZE_UNIT } : {}),
     devices: raw.devices.map((d: any) => ({
       ...d,
+      ...(doubleSizes && d.size ? { size: scaleSize(d.size) } : {}),
       controls: Array.isArray(d.controls)
         ? d.controls.map((c: any) => {
             const feature =

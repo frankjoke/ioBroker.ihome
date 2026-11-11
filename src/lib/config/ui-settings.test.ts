@@ -77,9 +77,9 @@ it("uiCss emits colours only when set and always the sizes", () => {
   expect(custom).toContain("--ui-secondary-size: 1rem");
 });
 
-it("scaledTile scales the 1×1 module and rounds to 0.1 px", () => {
+it("scaledTile scales the fine module and rounds to 0.1 px", () => {
   const desktop = BREAKPOINTS.find((b) => b.name === "desktop")!;
-  expect(scaledTile(desktop, 1)).toEqual({ w: 57, h: 114 });
-  expect(scaledTile(desktop, 2)).toEqual({ w: 114, h: 228 });
-  expect(scaledTile(desktop, 1.05)).toEqual({ w: 59.9, h: 119.7 });
+  expect(scaledTile(desktop, 1)).toEqual({ w: 26.5, h: 54 });
+  expect(scaledTile(desktop, 2)).toEqual({ w: 53, h: 108 });
+  expect(scaledTile(desktop, 1.05)).toEqual({ w: 27.8, h: 56.7 });
 });

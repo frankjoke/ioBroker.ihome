@@ -168,6 +168,8 @@ export interface DeviceRegistry {
   version: number;
   updatedAt: number;
   devices: Device[];
+  /** Present once the fine module (unit 2) has been applied to every size. */
+  sizeUnit?: 2;
 }
 
 export interface LiveState {

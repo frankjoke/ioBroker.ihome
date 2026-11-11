@@ -113,7 +113,7 @@
     (device.controls ?? []).filter((c) => !c.hidden),
   );
 
-  const span = $derived(clampSpan(workingTile?.size ?? { w: 1, h: 1 }, bp));
+  const span = $derived(clampSpan(workingTile?.size ?? { w: 2, h: 2 }, bp));
   /** What the grid actually gives it — never more columns than the section has. */
   const columns = $derived(tileColumns(span.w, limit ?? 0));
   // The name the tile shows: its own, else the placement's — and nothing at all

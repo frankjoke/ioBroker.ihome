@@ -1,4 +1,5 @@
 import { DEVICE_TYPES } from "$lib/config/features";
+import { SIZE_MAX_H, SIZE_MAX_W } from "$lib/config/size-ops";
 import type { DeviceType } from "$lib/types/device";
 import type { Template } from "$lib/types/display";
 
@@ -55,11 +56,11 @@ export function visualTemplateProblem(
       typeof size.w !== "number" ||
       typeof size.h !== "number" ||
       size.w < 1 ||
-      size.w > 20 ||
+      size.w > SIZE_MAX_W ||
       size.h < 1 ||
-      size.h > 10
+      size.h > SIZE_MAX_H
     ) {
-      return "size needs w between 1 and 20 and h between 1 and 10.";
+      return `size needs w between 1 and ${SIZE_MAX_W} and h between 1 and ${SIZE_MAX_H}.`;
     }
   }
   return null;

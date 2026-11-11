@@ -5,7 +5,9 @@ import type { TemplateRegistry } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import {
   DEFAULT_SPAN,
+  SIZE_UNIT,
   clampSpan,
+  scaleSize,
   type Breakpoint,
   type TileSpan,
 } from "$lib/config/size-ops";
@@ -394,9 +396,37 @@ export function parseTemplateRegistry(raw: unknown): TemplateRegistry | null {
     return {
       version: num(value.version, 0),
       updatedAt: num(value.updatedAt, Date.now()),
+      ...(value.sizeUnit === 2 ? { sizeUnit: 2 } : {}),
       templates: templates as Template[],
     };
   });
+}
+
+/**
+ * Move a stored template document to the fine module once: every explicit size
+ * doubles (today's 1×1 becomes 2×2). The `sizeUnit` marker makes the pass
+ * idempotent; a document that already carries it is returned as it is.
+ */
+export function migrateTemplateRegistry(
+  reg: TemplateRegistry,
+  sizeUnitDone = false,
+): {
+  registry: TemplateRegistry;
+  changed: boolean;
+} {
+  if (reg.sizeUnit === SIZE_UNIT) return { registry: reg, changed: false };
+  return {
+    registry: {
+      ...reg,
+      sizeUnit: SIZE_UNIT,
+      templates: (reg.templates ?? []).map((template) =>
+        template.size && !sizeUnitDone
+          ? { ...template, size: scaleSize(template.size) }
+          : template,
+      ),
+    },
+    changed: true,
+  };
 }
 
 /**
@@ -411,5 +441,5 @@ export function effectiveSpan(
   tile: { size?: Size } | undefined,
   bp: Breakpoint,
 ): TileSpan {
-  return clampSpan(tile?.size ?? { w: 1, h: 1 }, bp);
+  return clampSpan(tile?.size ?? DEFAULT_SPAN, bp);
 }

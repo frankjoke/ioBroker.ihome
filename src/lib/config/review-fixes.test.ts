@@ -144,12 +144,12 @@ it("makes an id even where crypto.randomUUID is missing (plain HTTP)", () => {
 });
 
 // ------------------------------------------- I3/I10: one effective size everywhere
-it("a tile without a size is 1×1; its own size wins", () => {
+it("a tile without a size is 2×2; its own size wins", () => {
   // The size comes from the tile only; there is no device/template chain.
-  expect(effectiveSpan(undefined, "phone")).toEqual({ w: 1, h: 1 });
+  expect(effectiveSpan(undefined, "phone")).toEqual({ w: 2, h: 2 });
   // the placement's size wins
-  expect(effectiveSpan({ size: { w: 2, h: 2 } }, "desktop")).toEqual({
-    w: 2,
-    h: 2,
+  expect(effectiveSpan({ size: { w: 4, h: 4 } }, "desktop")).toEqual({
+    w: 4,
+    h: 4,
   });
 });

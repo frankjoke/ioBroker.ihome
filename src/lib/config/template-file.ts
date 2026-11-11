@@ -5,8 +5,13 @@ import { logicTemplateProblem } from "$lib/config/logic-templates";
 import { slugify } from "$lib/config/slug";
 import { templateBundleProblem } from "$lib/config/template-bundles";
 import { visualTemplateProblem } from "$lib/config/visual-templates";
+import { scaleSize } from "$lib/config/size-ops";
 import { newId } from "$lib/utils/ids";
+import type { Size } from "$lib/types/display";
 import type { FunctionTemplate } from "$lib/types/device";
+
+/** Template files before 2 carry sizes in the old coarse module. */
+export const TEMPLATE_FILE_VERSION = 2;
 
 export const TEMPLATE_KINDS = [
   "formula",
@@ -21,7 +26,7 @@ export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
 
 export interface TemplateFile {
   format: "ihome-template";
-  version: 1;
+  version: typeof TEMPLATE_FILE_VERSION;
   kind: TemplateKind;
   definition: unknown;
 }
@@ -30,7 +35,12 @@ export function templateFile(
   kind: TemplateKind,
   definition: unknown,
 ): TemplateFile {
-  return { format: "ihome-template", version: 1, kind, definition };
+  return {
+    format: "ihome-template",
+    version: TEMPLATE_FILE_VERSION,
+    kind,
+    definition,
+  };
 }
 
 export function serializeTemplateFile(file: TemplateFile): string {
@@ -65,6 +75,20 @@ function definitionProblem(kind: TemplateKind, value: unknown): string | null {
   }
 }
 
+/** A v1 file stores the coarse module; scale its size to the fine unit once. */
+function scaleLegacyDefinition(kind: TemplateKind, value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const clone = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  if (kind === "device" && clone.size) {
+    clone.size = scaleSize(clone.size as Size);
+  }
+  if (kind === "bundle") {
+    const device = clone.device as Record<string, unknown> | undefined;
+    if (device?.size) device.size = scaleSize(device.size as Size);
+  }
+  return clone;
+}
+
 export function parseTemplateFile(
   raw: unknown,
 ): { file: TemplateFile } | { problem: string } {
@@ -85,7 +109,7 @@ export function parseTemplateFile(
       problem: 'Not an iHome template file (format must be "ihome-template").',
     };
   }
-  if (wrapper.version !== 1) {
+  if (wrapper.version !== 1 && wrapper.version !== TEMPLATE_FILE_VERSION) {
     return {
       problem: `Unsupported template file version: ${String(wrapper.version)}.`,
     };
@@ -94,14 +118,18 @@ export function parseTemplateFile(
     return { problem: `Unknown template kind: ${String(wrapper.kind)}.` };
   }
   const kind = wrapper.kind as TemplateKind;
-  const problem = definitionProblem(kind, wrapper.definition);
+  const definition =
+    wrapper.version === 1
+      ? scaleLegacyDefinition(kind, wrapper.definition)
+      : wrapper.definition;
+  const problem = definitionProblem(kind, definition);
   if (problem) return { problem };
   return {
     file: {
       format: "ihome-template",
-      version: 1,
+      version: TEMPLATE_FILE_VERSION,
       kind,
-      definition: wrapper.definition,
+      definition,
     },
   };
 }
