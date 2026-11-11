@@ -24,7 +24,7 @@ it("fills $value and escapes it", () => {
 it("wraps the markup so it fills the icon box", () => {
   const doc = iconHtmlDocument("<svg/>");
   expect(doc).toContain("width:100%;height:100%");
-  expect(doc).toContain("<body><svg/></body>");
+  expect(doc).toContain('<body data-on="false"><svg/></body>');
 });
 
 it("uses 0 for a missing $value so a width percentage stays valid", () => {
@@ -39,6 +39,23 @@ it("fills the resolved $color", () => {
       $color: "rgb(1, 2, 3)",
     }),
   ).toContain('fill="rgb(1, 2, 3)"');
+});
+
+it("marks the document on/off from the reading", () => {
+  for (const value of [true, 1, "1", "on", "online", "Open"]) {
+    expect(iconHtmlDocument("<svg/>", { $value: value })).toContain(
+      'data-on="true"',
+    );
+  }
+  for (const value of [false, 0, "0", "off", "false", 50, undefined]) {
+    expect(iconHtmlDocument("<svg/>", { $value: value })).toContain(
+      'data-on="false"',
+    );
+  }
+  // The picker previews the on style with a non-boolean sample reading.
+  expect(iconHtmlDocument("<svg/>", { $value: 50, $on: true })).toContain(
+    'data-on="true"',
+  );
 });
 
 it("reads other placeholders through the resolver, missing as empty", () => {

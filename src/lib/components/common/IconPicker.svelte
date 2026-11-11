@@ -28,7 +28,8 @@
     { id: "url", label: "URL / SVG / HTML" },
   ] as const;
 
-  /** Ready-made icon markup: the slot's reading and its resolved colour. */
+  /** Ready-made icon markup: the slot's reading, its resolved colour and its
+   *  on/off state (the snippet's own CSS switches on `data-on`). */
   const SNIPPETS = [
     {
       id: "battery",
@@ -36,19 +37,24 @@
       html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.5"><rect x="2" y="7" width="18" height="10" rx="2"/><rect x="20" y="10" width="2" height="4" rx="0.5" fill="{{$color}}" stroke="none"/><svg x="4" y="9" width="14" height="6"><rect width="{{$value}}%" height="6" fill="{{$color}}" stroke="none"/></svg></svg>`,
     },
     {
-      id: "scale",
-      label: "Scale",
+      id: "gauge",
+      label: "Gauge",
+      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="2" stroke-linecap="round"><path d="M4 17a8 8 0 0 1 16 0" opacity="0.2"/><path d="M4 17a8 8 0 0 1 16 0" pathLength="100" stroke-dasharray="{{$value}} 100"/><path d="M4 17h1M19 17h1M12 9v1" stroke-width="1" opacity="0.5"/></svg>`,
+    },
+    {
+      id: "bar",
+      label: "Bar",
       html: `<svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="6" rx="3" fill="none" stroke="{{$color}}" stroke-width="1.5"/><svg x="4" y="11" width="16" height="2"><rect width="{{$value}}%" height="2" rx="1" fill="{{$color}}"/></svg></svg>`,
     },
     {
-      id: "power-on",
-      label: "Power on",
-      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>`,
+      id: "power",
+      label: "Power",
+      html: `<style>.on{display:none}[data-on="true"] .on{display:inline}[data-on="true"] .off{display:none}</style><svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.8" stroke-linecap="round"><g class="off"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></g><g class="on"><circle cx="12" cy="13" r="8" fill="{{$color}}" stroke="none" opacity="0.18"/><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></g></svg>`,
     },
     {
-      id: "power-off",
-      label: "Power off",
-      html: `<svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9" opacity="0.5"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0" opacity="0.5"/><path d="M4 20 20 4"/></svg>`,
+      id: "bulb",
+      label: "Bulb",
+      html: `<style>.on{display:none}[data-on="true"] .on{display:inline}[data-on="true"] .off{display:none}</style><svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g class="off"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z"/></g><g class="on"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z" fill="{{$color}}" opacity="0.35"/><path d="M12 1v1M5.5 4.5l.7.7M18.5 4.5l-.7.7M3 11h1M20 11h1" stroke-width="1.2"/></g></svg>`,
     },
   ] as const;
 
@@ -204,7 +210,7 @@
             bind:value={url}
           ></textarea>
           <span class="preview" aria-hidden="true">
-            <Icon value={url} size={22} data={{ $value: 50 }} />
+            <Icon value={url} size={22} data={{ $value: 50, $on: true }} />
           </span>
           <button
             type="button"
@@ -217,7 +223,8 @@
           SVG/HTML fragments fill the icon box.
           <span class="mono">&#123;&#123;$value&#125;&#125;</span> is the slot's
           reading, <span class="mono">&#123;&#123;$color&#125;&#125;</span> its resolved
-          colour from a rule or the look. The preview uses 50.
+          colour. Power and Bulb switch themselves by `data-on`; the preview uses
+          50 and the on state.
         </p>
       {/if}
     </div>
