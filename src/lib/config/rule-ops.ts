@@ -211,6 +211,15 @@ export function truthy(v: unknown): boolean {
   return v === true || v === 1 || v === "1" || v === "true";
 }
 
+/** An online flag as integrations publish it: a boolean or "online"/"connected". */
+function isOnline(value: unknown): boolean {
+  if (truthy(value)) return true;
+  return (
+    typeof value === "string" &&
+    /^(online|connected|up|ok)$/i.test(value.trim())
+  );
+}
+
 /**
  * Does a rule apply? Exact `true` only — an expression that evaluates to
  * `undefined`, or one that throws, does not match. A tile must never fail to
@@ -442,9 +451,10 @@ export function resolveBadges(
       badge = agoBadge(clock.at(object?.key, from), now);
       if (badge && color) badge.color = color;
     } else if (derive === "offline") {
-      // The source is an online flag: the badge appears while it is falsy.
+      // The source is an online flag: the badge appears while it is not
+      // online. MQTT-style strings ("online"/"offline") count too.
       badge =
-        object?.control && !truthy(object.control.liveValue)
+        object?.control && !isOnline(object.control.liveValue)
           ? {
               source: "offline",
               icon: "cloud_off",
