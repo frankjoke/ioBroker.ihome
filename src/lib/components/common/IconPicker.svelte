@@ -54,7 +54,7 @@
     {
       id: "bulb",
       label: "Bulb",
-      html: `<style>.on{display:none}[data-on="true"] .on{display:inline}[data-on="true"] .off{display:none}</style><svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g class="off"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z"/></g><g class="on"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z" fill="{{$color}}" opacity="0.35"/><path d="M12 1v1M5.5 4.5l.7.7M18.5 4.5l-.7.7M3 11h1M20 11h1" stroke-width="1.2"/></g></svg>`,
+      html: `<style>:root{--bulb:#b8860b}.on{display:none}[data-on="true"] .on{display:inline}[data-on="true"] .off{display:none}</style><svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g class="off"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z"/></g><g class="on"><path d="M9 18h6M10 21h4" stroke="{{$color}}"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z" fill="var(--bulb)" fill-opacity="0.65" stroke="var(--bulb)"/><path d="M12 3V1M5.5 4.5 4.3 3.3M18.5 4.5 19.7 3.3M3 11h2M19 11h2" stroke="var(--bulb)" stroke-width="1.4"/></g></svg>`,
     },
   ] as const;
 
