@@ -52,6 +52,17 @@ export function iconBase(): string {
   return `${g.location?.protocol === "https:" ? "https:" : "http:"}//${hostPort}`;
 }
 
+/** A document icon is stored as the deployed path (`/ihome/icons/…`). The Vite
+ *  dev server serves the app at `/`, so the base segment must go there. A
+ *  broker-owned path keeps its meaning (it hangs off the broker, not the app). */
+function documentIconPath(value: string): string {
+  if (!import.meta.env.DEV) return value;
+  if (value === "/ihome" || value.startsWith("/ihome/")) {
+    return value.slice("/ihome".length) || "/";
+  }
+  return value;
+}
+
 /** The `src` for an image icon (A66): absolutes and data URIs pass through, a
  *  broker path gets the ioBroker base, and a bare filename the file's adapter.
  *  A symbol name is returned untouched — it is not a path. */
@@ -68,7 +79,9 @@ export function iconSrc(
   const root = base ?? iconBase();
   // A leading slash is broker-root-relative for a broker value; a document
   // value keeps meaning the app's own origin.
-  if (value.startsWith("/")) return owner ? root + value : value;
+  if (value.startsWith("/")) {
+    return owner ? root + value : documentIconPath(value);
+  }
   if (value.startsWith("adapter/")) return `${root}/${value}`;
   const adapter = owner ? ownerOf(owner).adapter : "";
   return `${root}/${adapter ? `adapter/${adapter}/` : ""}${value}`;

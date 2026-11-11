@@ -50,6 +50,11 @@ it("iconSrc resolves against the ioBroker base (A66)", () => {
   // for a document value.
   expect(iconSrc("/icons/a.png", undefined, b)).toBe("/icons/a.png");
   expect(iconSrc("/icons/a.png", "a.0.b", b)).toBe(b + "/icons/a.png");
+  // The deployed `/ihome/…` path works on the dev server, which serves the app
+  // at `/` (vitest runs with `import.meta.env.DEV`).
+  expect(iconSrc("/ihome/icons/fluent/gate.png")).toBe(
+    "/icons/fluent/gate.png",
+  );
   // Nothing, and no base (a bare test environment) are both safe.
   expect(iconSrc("")).toBe("");
   expect(iconSrc(undefined)).toBe("");
