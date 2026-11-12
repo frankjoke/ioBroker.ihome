@@ -173,6 +173,11 @@
   const isDisplay = $derived(
     current === "/" || current.startsWith("/p/") || current === "/layout",
   );
+  /** A page that is one embedded frame (Admin, a plugin page) owns the
+   *  viewport too: no max width, padding or card frame inside app-main. */
+  const isFramePage = $derived(
+    current === "/admin" || current === "/plugin/[id]",
+  );
 
   /**
    * Everything but the display is configuration and sits behind the PIN
@@ -394,7 +399,7 @@
   <ToastHost />
   <MessageToasts />
 
-  <main class="app-main">
+  <main class="app-main" class:full-bleed={isFramePage}>
     {#if configLocked}
       <PinModal
         title="Enter PIN for the configuration"
@@ -463,6 +468,16 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 8px;
+  }
+
+  /* An embedded page is the whole page: the frame reads as the window below
+     the bar, not as a card in the middle of the configuration background. */
+  .app-main.full-bleed {
+    display: flex;
+    flex-direction: column;
+    max-width: none;
+    margin: 0;
+    padding: 0;
   }
 
   /* The logic log drawer is a split view only where it leaves enough page. */

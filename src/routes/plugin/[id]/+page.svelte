@@ -63,10 +63,10 @@
 
 <style>
   .plugin-page {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    height: calc(100vh - 70px);
     min-height: 24rem;
   }
 
