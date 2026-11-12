@@ -14,6 +14,7 @@
     initPhone,
     pausePhone,
     phone,
+    phoneDeviceLabel,
     requestPhoneLocation,
     setPhoneEnabled,
     setPhoneHome,
@@ -139,7 +140,7 @@
         ...reg.devices,
         {
           id: newId(),
-          name: `Phone ${phone.name}`,
+          name: phoneDeviceLabel(phone.name),
           type: "Custom",
           icon: "smartphone",
           controls,

@@ -554,6 +554,14 @@
     font-size: 1em;
   }
 
+  /* Long readings are flex items. Without min-width:0 they refuse to shrink,
+     make the whole page wider than the phone and the fixed modal looks
+     off-screen. Let the summary wrap instead. */
+  .device-values {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .empty-state {
     padding: 2rem;
     text-align: center;

@@ -13,6 +13,9 @@ const BASE = process.env.IOBROKER_MCP || "http://localhost:8082/mcp/";
 const ROOT = process.argv[2] || "www";
 const NS = process.argv[3] || "ihome"; // file namespace the adapter's www lives in
 const BINARY = new Set([".png", ".ico", ".jpg", ".jpeg", ".woff", ".woff2"]);
+// The MCP HTTP body limit is smaller than the SPA's big files; larger files
+// go through prepare_upload instead of an inline write_file.
+const UPLOAD_LIMIT = 150_000;
 
 /** Local build tree, with paths relative to ROOT and POSIX slashes. */
 function walk(dir) {
@@ -125,11 +128,23 @@ let written = 0;
 for (const file of localFiles) {
   const ext = file.rel.slice(file.rel.lastIndexOf(".")).toLowerCase();
   const buf = readFileSync(file.abs);
-  await call("write_file", {
-    path: `${NS}/${file.rel}`,
-    content: BINARY.has(ext) ? buf.toString("base64") : buf.toString("utf8"),
-    ...(BINARY.has(ext) ? { base64: true } : {}),
-  });
+  const path = `${NS}/${file.rel}`;
+  if (buf.length > UPLOAD_LIMIT) {
+    const upload = await call("prepare_upload", { name: file.rel });
+    const put = await fetch(upload.url, {
+      method: upload.method || "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: buf,
+    });
+    if (!put.ok) throw new Error(`upload ${file.rel}: HTTP ${put.status}`);
+    await call("write_file", { path, upload_id: upload.upload_id });
+  } else {
+    await call("write_file", {
+      path,
+      content: BINARY.has(ext) ? buf.toString("base64") : buf.toString("utf8"),
+      ...(BINARY.has(ext) ? { base64: true } : {}),
+    });
+  }
   written++;
 }
 
