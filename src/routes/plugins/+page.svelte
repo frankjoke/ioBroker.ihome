@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import PluginList from "$lib/components/plugins/PluginList.svelte";
+  import PluginPagesList from "$lib/components/plugins/PluginPagesList.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
@@ -148,6 +149,8 @@
   {:else}
     <PluginList {plugins} {busy} onToggle={toggle} />
   {/if}
+
+  <PluginPagesList />
 </div>
 
 {#if importOpen}

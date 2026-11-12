@@ -2,6 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import {
     effectivePin,
     isDefaultPin,
@@ -17,6 +18,9 @@
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
+
+  /** One collapsible item per form; the line keeps what fits, the editor the rest. */
+  let openSection = $state("");
 
   /** What local frame/HTML links should start with in this view: relative in
    *  production (follows the page origin, so it works locally and through
@@ -39,6 +43,21 @@
 
   function applyAndReload() {
     location.reload();
+  }
+
+  function toggle(id: string) {
+    openSection = openSection === id ? "" : id;
+  }
+
+  /** The free line is a mouse convenience; controls keep their own hit areas. */
+  function onLineClick(event: MouseEvent, id: string) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggle(id);
   }
 
   let askingPin = $state(false);
@@ -83,120 +102,176 @@
   </div>
 
   <fieldset class="lock-zone" disabled={!isUnlocked()}>
-    <section class="card settings-card">
-      <div class="card-header">
-        <span class="material-symbols-outlined">lan</span>
-        <h2 class="card-title">Connection</h2>
-      </div>
-      <div class="card-body settings-card-body">
-        <div class="field">
-          <label class="label-mono" for="settings-host">Host:Port</label>
-          <input
-            id="settings-host"
-            type="text"
-            bind:value={storage.hostPort}
-            placeholder="e.g. 192.168.1.10:8081"
-          />
-          <span class="hint text-muted"
-            >Leave empty to use the configured broker fallback, or the host
-            serving this page when no fallback is set (socket.io on port 8081).
-            Editing this while connected is fine — saving reconnects.</span
+    <div class="settings-list">
+      <div class="item" class:open={openSection === "connection"}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onLineClick(e, "connection")}>
+          <Icon value="lan" size={18} />
+          <button
+            type="button"
+            class="name"
+            aria-expanded={openSection === "connection"}
+            onclick={() => toggle("connection")}>Connection</button
           >
-          <span class="hint text-muted"
-            >Page base for local links: <span class="mono">{pageBase}</span>.
-            Relative in production, so frames/HTML work locally and through
-            iobroker.pro; in dev it points at the broker.</span
+          <span class="meta mono conn-host"
+            >{storage.hostPort || "this server"}</span
           >
+          <span class="item-actions">
+            {#if isConnected}
+              <span class="badge badge-success">connected</span>
+            {/if}
+          </span>
         </div>
-        <div class="field">
-          <label class="label-mono" for="settings-ns">Namespace</label>
-          <input id="settings-ns" type="text" bind:value={storage.namespace} />
-          <span class="hint text-muted"
-            >Identity stamped as "from" on every write, e.g. ihome.0 — the
-            adapter's io-package name plus instance.</span
-          >
-        </div>
+        {#if openSection === "connection"}
+          <div class="item-editor settings-card-body">
+            <div class="field">
+              <label class="label-mono" for="settings-host">Host:Port</label>
+              <input
+                id="settings-host"
+                type="text"
+                bind:value={storage.hostPort}
+                placeholder="e.g. 192.168.1.10:8081"
+              />
+              <span class="hint text-muted"
+                >Leave empty to use the configured broker fallback, or the host
+                serving this page when no fallback is set (socket.io on port
+                8081). Editing this while connected is fine — saving reconnects.</span
+              >
+              <span class="hint text-muted"
+                >Page base for local links: <span class="mono">{pageBase}</span
+                >. Relative in production, so frames/HTML work locally and
+                through iobroker.pro; in dev it points at the broker.</span
+              >
+            </div>
+            <div class="field">
+              <label class="label-mono" for="settings-ns">Namespace</label>
+              <input
+                id="settings-ns"
+                type="text"
+                bind:value={storage.namespace}
+              />
+              <span class="hint text-muted"
+                >Identity stamped as "from" on every write, e.g. ihome.0 — the
+                adapter's io-package name plus instance.</span
+              >
+            </div>
 
-        <div class="field">
-          <label class="check">
-            <input type="checkbox" bind:checked={storage.cloudFallback} />
+            <div class="field">
+              <label class="check">
+                <input type="checkbox" bind:checked={storage.cloudFallback} />
+                <span
+                  >Jump to iobroker.pro when the local ioBroker is unreachable</span
+                >
+              </label>
+              <span class="hint text-muted"
+                >For a phone or a PWA that is used at home and away: after a
+                failed local attempt the app opens its own page on the cloud,
+                where the browser's iobroker.pro session is the login. Nothing
+                is stored here — off by default, so a wall display stays put and
+                shows offline.</span
+              >
+            </div>
+            <div class="field">
+              <label class="label-mono" for="settings-cloud"
+                >Cloud address</label
+              >
+              <input
+                id="settings-cloud"
+                type="text"
+                bind:value={storage.cloudHost}
+                placeholder="iobroker.pro"
+              />
+            </div>
+
+            {#if isConnected}
+              <p class="conn-note">
+                <span class="badge badge-success">connected</span>
+                <span class="text-muted"
+                  >{ioBroker.namespace} via {activeBrokerUrl()} ({transportLabel()})</span
+                >
+              </p>
+            {/if}
+            <button class="btn btn-primary" onclick={saveConnection}>
+              {isConnected ? "Save & reconnect" : "Apply & reload"}
+            </button>
+          </div>
+        {/if}
+      </div>
+
+      <div class="item" class:open={openSection === "security"}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onLineClick(e, "security")}>
+          <Icon value="lock" size={18} />
+          <button
+            type="button"
+            class="name"
+            aria-expanded={openSection === "security"}
+            onclick={() => toggle("security")}>Security</button
+          >
+          <span class="item-actions">
             <span
-              >Jump to iobroker.pro when the local ioBroker is unreachable</span
+              class="badge"
+              class:badge-warning={pinIsDefault}
+              class:badge-secondary={!pinIsDefault}
+              >{pinIsDefault ? "default PIN" : "PIN set"}</span
             >
-          </label>
-          <span class="hint text-muted"
-            >For a phone or a PWA that is used at home and away: after a failed
-            local attempt the app opens its own page on the cloud, where the
-            browser's iobroker.pro session is the login. Nothing is stored here
-            — off by default, so a wall display stays put and shows offline.</span
+          </span>
+        </div>
+        {#if openSection === "security"}
+          <div class="item-editor settings-card-body">
+            <p class="text-muted hint">
+              {pinIsDefault
+                ? "The shipped default PIN is still in use — change it to your own. It guards the whole configuration of this ioBroker for every device, and it is a convenience lock, not a security boundary."
+                : "A PIN guards the whole configuration of this ioBroker for every device. It is a convenience lock, not a security boundary."}
+            </p>
+            <label class="check">
+              <input
+                type="checkbox"
+                bind:checked={storage.lockPencil}
+                onchange={() =>
+                  void updateSettings({ lockPencil: storage.lockPencil })}
+              />
+              <span
+                >Ask for the PIN before the layout editor (the pencil) opens</span
+              >
+            </label>
+            <label class="check">
+              <input
+                type="checkbox"
+                bind:checked={storage.pinDisabled}
+                onchange={() =>
+                  void updateSettings({ pinDisabled: storage.pinDisabled })}
+              />
+              <span
+                >Skip the PIN for the configuration pages (testing only — anyone
+                on this browser can change the setup)</span
+              >
+            </label>
+            {#if settingsSaveFailed()}
+              <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+            {/if}
+            <button class="btn btn-primary" onclick={() => (pinStep = "verify")}
+              >Change PIN</button
+            >
+          </div>
+        {/if}
+      </div>
+
+      <div class="item">
+        <div class="item-line about-line">
+          <Icon value="info" size={18} />
+          <span class="name static-name">About</span>
+          <span class="meta"
+            >Visual interface for ioBroker smart home control</span
+          >
+          <span class="item-actions mono hint text-muted"
+            >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
           >
         </div>
-        <div class="field">
-          <label class="label-mono" for="settings-cloud">Cloud address</label>
-          <input
-            id="settings-cloud"
-            type="text"
-            bind:value={storage.cloudHost}
-            placeholder="iobroker.pro"
-          />
-        </div>
-
-        {#if isConnected}
-          <p class="conn-note">
-            <span class="badge badge-success">connected</span>
-            <span class="text-muted"
-              >{ioBroker.namespace} via {activeBrokerUrl()} ({transportLabel()})</span
-            >
-          </p>
-        {/if}
-        <button class="btn btn-primary" onclick={saveConnection}>
-          {isConnected ? "Save & reconnect" : "Apply & reload"}
-        </button>
       </div>
-    </section>
-
-    <section class="card settings-card">
-      <div class="card-header">
-        <span class="material-symbols-outlined">lock</span>
-        <h2 class="card-title">Security</h2>
-      </div>
-      <div class="card-body settings-card-body">
-        <p class="text-muted hint">
-          {pinIsDefault
-            ? "The shipped default PIN is still in use — change it to your own. It guards the whole configuration of this ioBroker for every device, and it is a convenience lock, not a security boundary."
-            : "A PIN guards the whole configuration of this ioBroker for every device. It is a convenience lock, not a security boundary."}
-        </p>
-        <label class="check">
-          <input
-            type="checkbox"
-            bind:checked={storage.lockPencil}
-            onchange={() =>
-              void updateSettings({ lockPencil: storage.lockPencil })}
-          />
-          <span
-            >Ask for the PIN before the layout editor (the pencil) opens</span
-          >
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            bind:checked={storage.pinDisabled}
-            onchange={() =>
-              void updateSettings({ pinDisabled: storage.pinDisabled })}
-          />
-          <span
-            >Skip the PIN for the configuration pages (testing only — anyone on
-            this browser can change the setup)</span
-          >
-        </label>
-        {#if settingsSaveFailed()}
-          <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
-        {/if}
-        <button class="btn btn-primary" onclick={() => (pinStep = "verify")}
-          >Change PIN</button
-        >
-      </div>
-    </section>
+    </div>
 
     {#if askingPin}
       <PinModal
@@ -242,21 +317,6 @@
         onCancel={() => (pinStep = "off")}
       />
     {/if}
-
-    <section class="card settings-card">
-      <div class="card-header">
-        <span class="material-symbols-outlined">info</span>
-        <h2 class="card-title">About</h2>
-      </div>
-      <div class="card-body about-body">
-        <span class="text-muted"
-          >Visual interface for ioBroker smart home control</span
-        >
-        <span class="about-version mono"
-          >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
-        >
-      </div>
-    </section>
   </fieldset>
 
   <!-- Per-device, not a broker setting: reachable without the config PIN
@@ -277,13 +337,13 @@
     margin: 0 auto;
   }
 
-  /* The cards, as one all-or-nothing group: `disabled` on the fieldset reaches
+  /* The items, as one all-or-nothing group: `disabled` on the fieldset reaches
      every input and button inside it, so a locked page cannot be typed into —
      which matters, because the fields write straight to localStorage. */
   .lock-zone {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.25rem;
     border: 0;
     margin: 0;
     padding: 0;
@@ -300,15 +360,10 @@
     margin: 0;
   }
 
-  .settings-card .card-header {
+  .settings-list {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .settings-card .card-header .material-symbols-outlined {
-    font-size: 18px;
-    color: var(--text-muted);
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .settings-card-body {
@@ -343,23 +398,32 @@
     cursor: pointer;
   }
 
+  .meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
+  }
+
+  .conn-host {
+    max-width: 14rem;
+  }
+
+  .about-line {
+    cursor: default;
+  }
+
+  .static-name {
+    font-weight: 600;
+  }
+
   .conn-note {
     display: flex;
     align-items: center;
     gap: 0.6rem;
     margin: 0;
     font-size: var(--body-sm);
-  }
-
-  .about-body {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    font-size: var(--body-md);
-  }
-
-  .about-version {
-    color: var(--text-muted);
   }
 </style>

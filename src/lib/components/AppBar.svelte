@@ -26,7 +26,11 @@
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
-  import { CONFIG_LAST_KEY, cogTarget } from "$lib/config/config-nav";
+  import { pluginPageHref } from "$lib/config/plugin-pages";
+  import {
+    getPluginPages,
+    initPluginPages,
+  } from "$lib/stores/plugin-pages.svelte";
   import { getStorage } from "$lib/tools.svelte";
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
   import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
@@ -45,12 +49,49 @@
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
   const currentConfig = $derived(configPages.find((p) => p.id === routeId));
-  /** Small screens: many pages live in a menu, not a tab strip. */
-  let configMenuOpen = $state(false);
+  const pluginPageList = $derived(getPluginPages().pages);
+  const currentPluginPage = $derived.by(() => {
+    if (routeId !== "/plugin/[id]") return undefined;
+    const id = route.params?.id ?? "";
+    return getPluginPages().pages.find((page) => page.id === id);
+  });
+  const currentLabel = $derived(
+    isDisplay
+      ? ""
+      : currentPluginPage
+        ? `Plugins › ${currentPluginPage.title}`
+        : routeId === "/admin"
+          ? "Plugins › Admin"
+          : (currentConfig?.label ?? "Configuration"),
+  );
+  const currentIcon = $derived(
+    currentPluginPage
+      ? currentPluginPage.icon || "web_asset"
+      : routeId === "/admin"
+        ? "settings_applications"
+        : (currentConfig?.icon ?? "settings"),
+  );
+
+  // The cog menu: the static config pages around one Plugins group.
+  const pluginGroupIndex = $derived(
+    configPages.findIndex((p) => p.id === "/plugins"),
+  );
+  const menuBefore = $derived(
+    configPages.slice(0, pluginGroupIndex).filter((p) => p.id !== "/admin"),
+  );
+  const menuAfter = $derived(
+    configPages
+      .slice(pluginGroupIndex + 1)
+      .filter((p) => p.id !== "/admin" && p.id !== "/plugins"),
+  );
+  const pluginsPage = $derived(configPages.find((p) => p.id === "/plugins"));
+  const adminPage = $derived(configPages.find((p) => p.id === "/admin"));
+  /** The cog menu is the configuration navigation on every screen size. */
+  let cogMenuOpen = $state(false);
   let pageMenuOpen = $state(false);
   $effect(() => {
     routeId;
-    configMenuOpen = false;
+    cogMenuOpen = false;
     pageMenuOpen = false;
   });
 
@@ -93,6 +134,10 @@
   $effect(() => {
     registerAliveState();
   });
+  $effect(() => {
+    if (!ioBroker.connected) return;
+    void initPluginPages();
+  });
   /** The UI page can hide the pencil for everyone; until the settings document
    *  is read, hide it — an unauthorized pencil must not flash in. */
   const hidePencil = $derived(
@@ -127,44 +172,6 @@
 
   const storage = getStorage();
   const storedPin = $derived(effectivePin(storage.pin));
-
-  function lastConfig(): string | null {
-    try {
-      return sessionStorage.getItem(CONFIG_LAST_KEY);
-    } catch {
-      return null; // private mode: the cog just opens the UI page
-    }
-  }
-  function rememberConfig(id: string) {
-    try {
-      sessionStorage.setItem(CONFIG_LAST_KEY, id);
-    } catch {
-      /* private mode: the memory is simply not kept */
-    }
-  }
-
-  // The tab remembers the last config page it showed; the cog returns there
-  // after the first entry, which lands on the UI page.
-  $effect(() => {
-    if (isDisplay) return;
-    if (!configPages.some((p) => p.id === routeId)) return;
-    rememberConfig(routeId);
-  });
-
-  // In config mode the cog points at the page being shown (the stored value is
-  // written by the effect above, one render later); on the display it returns
-  // to the remembered page, or to the UI page when this tab has not visited one.
-  const cogHref = $derived(
-    pageHref(
-      !isDisplay && configPages.some((p) => p.id === routeId)
-        ? routeId
-        : cogTarget(
-            lastConfig(),
-            configPages.map((p) => p.id),
-          ),
-      base,
-    ),
-  );
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
    *  Capture phase: SvelteKit's router listens earlier than a delegated
@@ -215,7 +222,7 @@
 <svelte:window
   onkeydown={(e) => {
     if (e.key === "Escape") {
-      configMenuOpen = false;
+      cogMenuOpen = false;
       pageMenuOpen = false;
     }
   }}
@@ -248,19 +255,12 @@
         </a>
       {/each}
     {:else}
-      {#each configPages as p (p.id)}
-        <a
-          class="tab"
-          class:active={routeId === p.id}
-          href={pageHref(p.id, base)}
-          aria-current={routeId === p.id ? "page" : undefined}
+      <div class="current-page">
+        <span class="material-symbols-outlined" aria-hidden="true"
+          >{currentIcon}</span
         >
-          <span class="material-symbols-outlined" aria-hidden="true"
-            >{p.icon}</span
-          >
-          <span class="tab-label">{p.label}</span>
-        </a>
-      {/each}
+        <span class="menu-current">{currentLabel}</span>
+      </div>
     {/if}
   </nav>
 
@@ -306,54 +306,6 @@
     </div>
   {/if}
 
-  {#if !isDisplay}
-    <div class="config-menu">
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Configuration menu"
-        aria-haspopup="true"
-        aria-expanded={configMenuOpen}
-        aria-controls="config-menu-panel"
-        title="Configuration pages"
-        onclick={() => (configMenuOpen = !configMenuOpen)}
-      >
-        <span class="material-symbols-outlined">menu</span>
-      </button>
-      <span class="menu-current">{currentConfig?.label ?? "Configuration"}</span
-      >
-
-      {#if configMenuOpen}
-        <button
-          type="button"
-          class="menu-backdrop"
-          aria-label="Close the configuration menu"
-          onclick={() => (configMenuOpen = false)}
-        ></button>
-        <nav
-          id="config-menu-panel"
-          class="menu-panel"
-          aria-label="Configuration pages"
-        >
-          {#each configPages as p (p.id)}
-            <a
-              class="menu-item"
-              class:active={routeId === p.id}
-              href={pageHref(p.id, base)}
-              aria-current={routeId === p.id ? "page" : undefined}
-              onclick={() => (configMenuOpen = false)}
-            >
-              <span class="material-symbols-outlined" aria-hidden="true"
-                >{p.icon}</span
-              >
-              <span>{p.label}</span>
-            </a>
-          {/each}
-        </nav>
-      {/if}
-    </div>
-  {/if}
-
   <div class="actions">
     <!-- The editor's mode switch: it sits with the other action icons, not in
          the tab row, so the tabs stay pages and nothing else. The eye is the
@@ -385,21 +337,139 @@
       </a>
     {/if}
 
-    {#if isDisplay}
-      <a
+    <div class="cog-menu">
+      <button
+        type="button"
         class="icon-btn status-btn"
         class:ok={status === "ok"}
         class:warning={status === "warning"}
         class:error={status === "error"}
-        href={cogHref}
         title={statusText.title}
-        aria-label={statusText.label}
+        aria-label="Configuration menu"
+        aria-haspopup="true"
+        aria-expanded={cogMenuOpen}
+        aria-controls="cog-menu-panel"
+        onclick={() => (cogMenuOpen = !cogMenuOpen)}
       >
         <span class="material-symbols-outlined">
           {status === "error" ? "construction" : "settings"}
         </span>
-      </a>
-    {/if}
+      </button>
+
+      {#if cogMenuOpen}
+        <button
+          type="button"
+          class="menu-backdrop"
+          aria-label="Close the configuration menu"
+          onclick={() => (cogMenuOpen = false)}
+        ></button>
+        <nav id="cog-menu-panel" class="menu-panel" aria-label="Configuration">
+          <a
+            class="menu-item"
+            class:active={isDisplay}
+            href={`${base}/#/`}
+            aria-current={isDisplay ? "page" : undefined}
+            onclick={() => (cogMenuOpen = false)}
+          >
+            <span class="material-symbols-outlined" aria-hidden="true"
+              >visibility</span
+            >
+            <span>UI</span>
+          </a>
+          <div class="menu-sep"></div>
+
+          {#each menuBefore as p (p.id)}
+            <a
+              class="menu-item"
+              class:active={routeId === p.id}
+              href={pageHref(p.id, base)}
+              aria-current={routeId === p.id ? "page" : undefined}
+              onclick={() => (cogMenuOpen = false)}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{p.icon}</span
+              >
+              <span>{p.label}</span>
+            </a>
+          {/each}
+
+          <a
+            class="menu-item"
+            class:active={routeId === "/plugins"}
+            href={pageHref("/plugins", base)}
+            aria-current={routeId === "/plugins" ? "page" : undefined}
+            onclick={() => (cogMenuOpen = false)}
+          >
+            <span class="material-symbols-outlined" aria-hidden="true"
+              >extension</span
+            >
+            <span>Plugins</span>
+          </a>
+          {#if adminPage}
+            <a
+              class="menu-item sub"
+              class:active={routeId === "/admin"}
+              href={pageHref("/admin", base)}
+              aria-current={routeId === "/admin" ? "page" : undefined}
+              onclick={() => (cogMenuOpen = false)}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >settings_applications</span
+              >
+              <span>Admin</span>
+            </a>
+          {/if}
+          {#each pluginPageList as page (page.id)}
+            {#if page.open === "tab"}
+              <a
+                class="menu-item sub"
+                href={page.url}
+                target="_blank"
+                rel="noopener"
+                onclick={() => (cogMenuOpen = false)}
+              >
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >{page.icon || "web_asset"}</span
+                >
+                <span>{page.title}</span>
+              </a>
+            {:else}
+              <a
+                class="menu-item sub"
+                class:active={routeId === "/plugin/[id]" &&
+                  route.params?.id === page.id}
+                href={pluginPageHref(page.id, base)}
+                aria-current={routeId === "/plugin/[id]" &&
+                route.params?.id === page.id
+                  ? "page"
+                  : undefined}
+                onclick={() => (cogMenuOpen = false)}
+              >
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >{page.icon || "web_asset"}</span
+                >
+                <span>{page.title}</span>
+              </a>
+            {/if}
+          {/each}
+
+          {#each menuAfter as p (p.id)}
+            <a
+              class="menu-item"
+              class:active={routeId === p.id}
+              href={pageHref(p.id, base)}
+              aria-current={routeId === p.id ? "page" : undefined}
+              onclick={() => (cogMenuOpen = false)}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{p.icon}</span
+              >
+              <span>{p.label}</span>
+            </a>
+          {/each}
+        </nav>
+      {/if}
+    </div>
   </div>
 </header>
 
@@ -510,10 +580,6 @@
     margin-bottom: 0;
     color: var(--tab-fg, var(--text-color));
   }
-  .tab .material-symbols-outlined {
-    font-size: 18px;
-  }
-
   /* On a phone the tabs keep their labels and give up the page icons. */
   @media (max-width: 820px) {
     .tab :global(.material-symbols-outlined),
@@ -527,6 +593,45 @@
     align-items: center;
     gap: 2px;
     margin-left: auto;
+  }
+
+  .current-page {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 0.25rem 0.1rem;
+  }
+
+  .current-page .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--text-muted);
+  }
+
+  .current-page .menu-current {
+    max-width: none;
+  }
+
+  .cog-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .cog-menu .menu-panel {
+    left: auto;
+    right: 0;
+  }
+
+  .menu-sep {
+    border-top: 1px solid var(--border-color);
+    margin: 0.2rem 0;
+  }
+
+  .menu-item.sub {
+    padding-left: 2.1rem;
+    font-weight: 400;
   }
 
   /* ------------------------------------------------- config menu (small) */
@@ -609,7 +714,6 @@
   }
 
   @media (max-width: 820px) {
-    .tabs.config,
     .tabs.pages-menu {
       display: none;
     }

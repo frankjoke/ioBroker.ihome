@@ -11,10 +11,14 @@
     settingsSaveFailed,
     updateSettings,
   } from "$lib/stores/settings.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import ThemeToggle from "$lib/ThemeToggle.svelte";
 
   const ui = $derived(effectiveUi(getSettings()));
   const hidePencil = $derived(getSettings().hidePencil === true);
+
+  // One collapsible item per form; the line keeps what fits, the editor the rest.
+  let openSection = $state("");
 
   // Local drafts: dragging a slider must not write the document on every tick.
   // They follow the document (also a change from another device); the write
@@ -48,6 +52,24 @@
       value: ui.tileBackground,
     },
   ]);
+  const customColours = $derived(
+    colours.filter((c) => c.value !== undefined).length,
+  );
+
+  function toggle(id: string) {
+    openSection = openSection === id ? "" : id;
+  }
+
+  /** The free line is a mouse convenience; controls keep their own hit areas. */
+  function onLineClick(event: MouseEvent, id: string) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggle(id);
+  }
 
   function set(key: string, value: unknown) {
     void updateSettings({ [key]: value });
@@ -75,211 +97,274 @@
     </div>
   </div>
 
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">contrast</span>
-      <h2 class="card-title">Theme</h2>
-    </div>
-    <div class="card-body ui-body">
-      <div class="ui-row">
-        <span class="label-mono row-label">Colour theme</span>
-        <ThemeToggle />
+  <div class="settings-list">
+    <div class="item" class:open={openSection === "theme"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "theme")}>
+        <Icon value="contrast" size={18} />
+        <button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "theme"}
+          onclick={() => toggle("theme")}>Theme</button
+        >
+        <span class="item-actions">
+          <ThemeToggle />
+        </span>
       </div>
-      <p class="hint text-muted">
-        Saved in this browser only. Auto follows the ioBroker admin theme, then
-        the operating system.
-      </p>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">edit_off</span>
-      <h2 class="card-title">Layout editor</h2>
-    </div>
-    <div class="card-body ui-body">
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={hidePencil}
-          onchange={(e) =>
-            void updateSettings({ hidePencil: e.currentTarget.checked })}
-        />
-        <span>Hide the layout pencil in the main bar</span>
-      </label>
-      <p class="hint text-muted">
-        Applies to every device using this ioBroker. The editor can still be
-        opened with the PIN-gated shortcut (Ctrl/Cmd+click a page tab), so this
-        hides the easy entrance; it is not a security boundary.
-      </p>
-      {#if settingsSaveFailed()}
-        <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+      {#if openSection === "theme"}
+        <div class="item-editor">
+          <p class="hint text-muted">
+            Saved in this browser only. Auto follows the ioBroker admin theme,
+            then the operating system.
+          </p>
+        </div>
       {/if}
     </div>
-  </section>
 
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">autorenew</span>
-      <h2 class="card-title">Automatic reload</h2>
-    </div>
-    <div class="card-body ui-body">
-      <div class="ui-row">
-        <label class="label-mono row-label" for="reload-minutes"
-          >Reload every</label
+    <div class="item" class:open={openSection === "editor"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "editor")}>
+        <Icon value="edit_off" size={18} />
+        <button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "editor"}
+          onclick={() => toggle("editor")}>Layout editor</button
         >
-        <input
-          id="reload-minutes"
-          type="number"
-          min={UI_LIMITS.reloadMinutes.min}
-          max={UI_LIMITS.reloadMinutes.max}
-          step={UI_LIMITS.reloadMinutes.step}
-          value={ui.reloadMinutes}
-          onchange={(e) =>
-            set("ui.reloadMinutes", Number(e.currentTarget.value))}
-        />
-        <span class="hint text-muted">minutes — 0 = off</span>
+        <span class="item-actions">
+          <label class="check" title="Hide the layout pencil in the main bar">
+            <input
+              type="checkbox"
+              checked={hidePencil}
+              onchange={(e) =>
+                void updateSettings({ hidePencil: e.currentTarget.checked })}
+            />
+            <span>Hide layout pencil</span>
+          </label>
+        </span>
       </div>
-      <p class="hint text-muted">
-        For a wall display that runs for days: it reloads itself on this
-        interval, clearing a connection that died without an event. The count
-        restarts whenever a config document is saved, so configuring never meets
-        a reload — and it only runs while the page is visible, never on a config
-        page (its edits are only in memory until Save).
-      </p>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">palette</span>
-      <h2 class="card-title">Colours</h2>
-    </div>
-    <div class="card-body ui-body">
-      {#each colours as c (c.key)}
-        <div class="ui-row">
-          <span class="label-mono row-label">{c.label}</span>
-          <input
-            type="color"
-            aria-label={c.label}
-            value={c.value ?? "#ffffff"}
-            onchange={(e) => set(c.key, e.currentTarget.value)}
-          />
-          <button
-            class="btn btn-sm"
-            disabled={c.value === undefined}
-            onclick={() => reset(c.key)}>Reset</button
-          >
-          {#if c.value === undefined}
-            <span class="hint text-muted">{c.hint}</span>
-          {/if}
+      {#if openSection === "editor"}
+        <div class="item-editor">
+          <p class="hint text-muted">
+            Applies to every device using this ioBroker. The editor can still be
+            opened with the PIN-gated shortcut (Ctrl/Cmd+click a page tab), so
+            this hides the easy entrance; it is not a security boundary.
+          </p>
         </div>
-      {/each}
+      {/if}
     </div>
-  </section>
 
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">text_fields</span>
-      <h2 class="card-title">Tile text</h2>
-    </div>
-    <div class="card-body ui-body">
-      <div class="ui-row">
-        <span class="label-mono row-label">Primary text</span>
-        <input
-          type="range"
-          aria-label="Primary text size"
-          min={UI_LIMITS.primary.min}
-          max={UI_LIMITS.primary.max}
-          step={UI_LIMITS.primary.step}
-          value={primary}
-          oninput={(e) => (primary = Number(e.currentTarget.value))}
-          onchange={() => set("ui.primaryText", primary)}
-        />
-        <span class="ui-value mono"
-          >{primary.toFixed(2)} rem
-          <span class="text-muted">({px(primary)})</span></span
-        >
+    <div class="item" class:open={openSection === "reload"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "reload")}>
+        <Icon value="autorenew" size={18} />
         <button
-          class="btn btn-sm"
-          disabled={primary === UI_DEFAULTS.primary}
-          onclick={() => reset("ui.primaryText")}>Reset</button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "reload"}
+          onclick={() => toggle("reload")}>Automatic reload</button
         >
+        <span class="item-actions">
+          <input
+            class="reload-input"
+            type="number"
+            aria-label="Reload every (minutes)"
+            min={UI_LIMITS.reloadMinutes.min}
+            max={UI_LIMITS.reloadMinutes.max}
+            step={UI_LIMITS.reloadMinutes.step}
+            value={ui.reloadMinutes}
+            onchange={(e) =>
+              set("ui.reloadMinutes", Number(e.currentTarget.value))}
+          />
+          <span class="hint text-muted">min</span>
+        </span>
       </div>
-      <div class="ui-row">
-        <span class="label-mono row-label">Secondary text</span>
-        <input
-          type="range"
-          aria-label="Secondary text size"
-          min={UI_LIMITS.secondary.min}
-          max={UI_LIMITS.secondary.max}
-          step={UI_LIMITS.secondary.step}
-          value={secondary}
-          oninput={(e) => (secondary = Number(e.currentTarget.value))}
-          onchange={() => set("ui.secondaryText", secondary)}
-        />
-        <span class="ui-value mono"
-          >{secondary.toFixed(2)} rem
-          <span class="text-muted">({px(secondary)})</span></span
-        >
-        <button
-          class="btn btn-sm"
-          disabled={secondary === UI_DEFAULTS.secondary}
-          onclick={() => reset("ui.secondaryText")}>Reset</button
-        >
-      </div>
-      <div class="sample" aria-label="Text sample">
-        <span
-          class="sample-name"
-          style:font-size={`${(primary * 12) / 14.4}rem`}>Kitchen light</span
-        >
-        <span class="sample-value mono" style:font-size={`${primary}rem`}
-          >21.5<span style:font-size={`${primary * 0.8}rem`}> °C</span></span
-        >
-        <span class="sample-secondary mono" style:font-size={`${secondary}rem`}
-          >44.8 %</span
-        >
-      </div>
+      {#if openSection === "reload"}
+        <div class="item-editor">
+          <p class="hint text-muted">
+            For a wall display that runs for days: it reloads itself on this
+            interval, clearing a connection that died without an event. 0 = off.
+            The count restarts whenever a config document is saved, so
+            configuring never meets a reload — and it only runs while the page
+            is visible, never on a config page (its edits are only in memory
+            until Save).
+          </p>
+        </div>
+      {/if}
     </div>
-  </section>
 
-  <section class="card">
-    <div class="card-header">
-      <span class="material-symbols-outlined">grid_view</span>
-      <h2 class="card-title">Tile size</h2>
-    </div>
-    <div class="card-body ui-body">
-      <div class="ui-row">
-        <span class="label-mono row-label">1×1 tile scale</span>
-        <input
-          type="range"
-          aria-label="1×1 tile scale"
-          min={UI_LIMITS.tileScale.min}
-          max={UI_LIMITS.tileScale.max}
-          step={UI_LIMITS.tileScale.step}
-          value={scale}
-          oninput={(e) => (scale = Number(e.currentTarget.value))}
-          onchange={() => set("ui.tileScale", scale)}
-        />
-        <span class="ui-value mono">{Math.round(scale * 100)} %</span>
+    <div class="item" class:open={openSection === "colours"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "colours")}>
+        <Icon value="palette" size={18} />
         <button
-          class="btn btn-sm"
-          disabled={scale === UI_DEFAULTS.tileScale}
-          onclick={() => reset("ui.tileScale")}>Reset</button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "colours"}
+          onclick={() => toggle("colours")}>Colours</button
+        >
+        <span class="meta mono">{customColours} of 3 set</span>
+      </div>
+      {#if openSection === "colours"}
+        <div class="item-editor ui-body">
+          {#each colours as c (c.key)}
+            <div class="ui-row">
+              <span class="label-mono row-label">{c.label}</span>
+              <input
+                type="color"
+                aria-label={c.label}
+                value={c.value ?? "#ffffff"}
+                onchange={(e) => set(c.key, e.currentTarget.value)}
+              />
+              <button
+                class="btn btn-sm"
+                disabled={c.value === undefined}
+                onclick={() => reset(c.key)}>Reset</button
+              >
+              {#if c.value === undefined}
+                <span class="hint text-muted">{c.hint}</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <div class="item" class:open={openSection === "text"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "text")}>
+        <Icon value="text_fields" size={18} />
+        <button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "text"}
+          onclick={() => toggle("text")}>Tile text</button
+        >
+        <span class="meta mono"
+          >{primary.toFixed(2)} / {secondary.toFixed(2)} rem</span
         >
       </div>
-      <ul class="sizes">
-        {#each BREAKPOINTS as def (def.name)}
-          <li>
-            <span class="label-mono row-label">{def.name}</span>
-            <span class="mono"
-              >{scaledTile(def, scale).w} × {scaledTile(def, scale).h} px</span
+      {#if openSection === "text"}
+        <div class="item-editor ui-body">
+          <div class="ui-row">
+            <span class="label-mono row-label">Primary text</span>
+            <input
+              type="range"
+              aria-label="Primary text size"
+              min={UI_LIMITS.primary.min}
+              max={UI_LIMITS.primary.max}
+              step={UI_LIMITS.primary.step}
+              value={primary}
+              oninput={(e) => (primary = Number(e.currentTarget.value))}
+              onchange={() => set("ui.primaryText", primary)}
+            />
+            <span class="ui-value mono"
+              >{primary.toFixed(2)} rem
+              <span class="text-muted">({px(primary)})</span></span
             >
-          </li>
-        {/each}
-      </ul>
+            <button
+              class="btn btn-sm"
+              disabled={primary === UI_DEFAULTS.primary}
+              onclick={() => reset("ui.primaryText")}>Reset</button
+            >
+          </div>
+          <div class="ui-row">
+            <span class="label-mono row-label">Secondary text</span>
+            <input
+              type="range"
+              aria-label="Secondary text size"
+              min={UI_LIMITS.secondary.min}
+              max={UI_LIMITS.secondary.max}
+              step={UI_LIMITS.secondary.step}
+              value={secondary}
+              oninput={(e) => (secondary = Number(e.currentTarget.value))}
+              onchange={() => set("ui.secondaryText", secondary)}
+            />
+            <span class="ui-value mono"
+              >{secondary.toFixed(2)} rem
+              <span class="text-muted">({px(secondary)})</span></span
+            >
+            <button
+              class="btn btn-sm"
+              disabled={secondary === UI_DEFAULTS.secondary}
+              onclick={() => reset("ui.secondaryText")}>Reset</button
+            >
+          </div>
+          <div class="sample" aria-label="Text sample">
+            <span
+              class="sample-name"
+              style:font-size={`${(primary * 12) / 14.4}rem`}
+              >Kitchen light</span
+            >
+            <span class="sample-value mono" style:font-size={`${primary}rem`}
+              >21.5<span style:font-size={`${primary * 0.8}rem`}>
+                °C</span
+              ></span
+            >
+            <span
+              class="sample-secondary mono"
+              style:font-size={`${secondary}rem`}>44.8 %</span
+            >
+          </div>
+        </div>
+      {/if}
     </div>
-  </section>
+
+    <div class="item" class:open={openSection === "size"}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="item-line" onclick={(e) => onLineClick(e, "size")}>
+        <Icon value="grid_view" size={18} />
+        <button
+          type="button"
+          class="name"
+          aria-expanded={openSection === "size"}
+          onclick={() => toggle("size")}>Tile size</button
+        >
+        <span class="meta mono">{Math.round(scale * 100)} %</span>
+      </div>
+      {#if openSection === "size"}
+        <div class="item-editor ui-body">
+          <div class="ui-row">
+            <span class="label-mono row-label">1×1 tile scale</span>
+            <input
+              type="range"
+              aria-label="1×1 tile scale"
+              min={UI_LIMITS.tileScale.min}
+              max={UI_LIMITS.tileScale.max}
+              step={UI_LIMITS.tileScale.step}
+              value={scale}
+              oninput={(e) => (scale = Number(e.currentTarget.value))}
+              onchange={() => set("ui.tileScale", scale)}
+            />
+            <span class="ui-value mono">{Math.round(scale * 100)} %</span>
+            <button
+              class="btn btn-sm"
+              disabled={scale === UI_DEFAULTS.tileScale}
+              onclick={() => reset("ui.tileScale")}>Reset</button
+            >
+          </div>
+          <ul class="sizes">
+            {#each BREAKPOINTS as def (def.name)}
+              <li>
+                <span class="label-mono row-label">{def.name}</span>
+                <span class="mono"
+                  >{scaledTile(def, scale).w} × {scaledTile(def, scale).h}
+                  px</span
+                >
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+    </div>
+  </div>
 
   {#if settingsSaveFailed()}
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
@@ -316,22 +401,31 @@
     font-size: var(--body-sm);
   }
 
+  .settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
   .check {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    font-size: var(--body-sm);
     cursor: pointer;
   }
 
-  .card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  .meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 
-  .card-header .material-symbols-outlined {
-    font-size: 18px;
-    color: var(--text-muted);
+  .reload-input {
+    width: 5.5rem;
   }
 
   .ui-body {
