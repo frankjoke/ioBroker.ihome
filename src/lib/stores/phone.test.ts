@@ -38,6 +38,7 @@ beforeEach(() => {
   });
   vi.stubGlobal("navigator", {
     onLine: true,
+    userAgent: "",
     connection: { type: "wifi" },
     geolocation: {
       getCurrentPosition: vi.fn(),
@@ -324,4 +325,51 @@ it("uses the local broker as home without asking for a location", async () => {
     (navigator as any).geolocation.getCurrentPosition,
   ).not.toHaveBeenCalled();
   setPhoneEnabled(false);
+});
+
+it("uses the detected model as the default name on a fresh install", async () => {
+  (navigator as any).userAgentData = {
+    getHighEntropyValues: vi.fn(async () => ({
+      model: "Pixel 7",
+      platform: "Android",
+    })),
+  };
+  const { initPhone, phone } = await load();
+  initPhone();
+  await vi.waitFor(() => expect(phone.name).toBe("Pixel 7"));
+});
+
+it("keeps a stored custom name instead of the detected model", async () => {
+  h.store.set(
+    "__VISUAL__:phone",
+    JSON.stringify({ deviceId: "phone-1", name: "Kitchen", enabled: false }),
+  );
+  (navigator as any).userAgentData = {
+    getHighEntropyValues: vi.fn(async () => ({ model: "Pixel 7" })),
+  };
+  const { initPhone, phone } = await load();
+  initPhone();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(phone.name).toBe("Kitchen");
+});
+
+it("falls back to the Android model in the User-Agent", async () => {
+  (navigator as any).userAgent =
+    "Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/AP1A.240505.005) AppleWebKit/537.36";
+  const { detectPhoneName } = await load();
+  await expect(detectPhoneName()).resolves.toBe("Pixel 7");
+});
+
+it("falls back to iPhone for an iOS User-Agent", async () => {
+  (navigator as any).userAgent =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15";
+  const { detectPhoneName } = await load();
+  await expect(detectPhoneName()).resolves.toBe("iPhone");
+});
+
+it("builds a space-free device label", async () => {
+  const { phoneDeviceLabel } = await load();
+  expect(phoneDeviceLabel("Pixel 7")).toBe("Phone-Pixel-7");
+  expect(phoneDeviceLabel("This phone")).toBe("Phone-This-phone");
+  expect(phoneDeviceLabel("  ")).toBe("Phone");
 });

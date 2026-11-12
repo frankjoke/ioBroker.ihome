@@ -82,17 +82,28 @@
     gap: 0.5rem;
     font-size: var(--body-sm);
     padding-left: 0.5rem;
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   .name {
     font-weight: 600;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .config,
+  .status {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .spark {
     width: 120px;
     height: 24px;
     display: block;
-    flex: none;
+    flex: 0 1 120px;
+    max-width: 100%;
     color: var(--primary-color);
   }
 

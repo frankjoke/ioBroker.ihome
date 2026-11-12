@@ -76,11 +76,13 @@ function newDeviceId(): string {
   }
 }
 
-function readSettings(): void {
+function readSettings(): boolean {
+  let stored = false;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const value = raw ? JSON.parse(raw) : null;
     if (value && typeof value === "object") {
+      stored = true;
       phone.deviceId = validDeviceId(value.deviceId) ?? newDeviceId();
       phone.name =
         typeof value.name === "string" && value.name.trim()
@@ -95,6 +97,54 @@ function readSettings(): void {
     // corrupt storage: start fresh
   }
   if (!phone.deviceId) phone.deviceId = newDeviceId();
+  return stored;
+}
+
+/** Best-effort model name: Client Hints, then the User-Agent. The Android
+ * device name set in Settings is not exposed to the browser. */
+export async function detectPhoneName(): Promise<string> {
+  const nav = navigator as any;
+  try {
+    const values = await nav.userAgentData?.getHighEntropyValues?.([
+      "model",
+      "platform",
+    ]);
+    const model = typeof values?.model === "string" ? values.model.trim() : "";
+    if (model) return model;
+  } catch {
+    // fall through to the User-Agent
+  }
+  const ua = typeof navigator.userAgent === "string" ? navigator.userAgent : "";
+  const android = ua.match(/Android[^;]*;\s*([^;)]+?)(?:\s+Build|\))/i);
+  if (android) {
+    const model = android[1].replace(/^[a-z]{2}[-_][a-z]{2};\s*/i, "").trim();
+    if (model && model.toLowerCase() !== "wv") return model;
+  }
+  if (/iPhone/i.test(ua)) return "iPhone";
+  if (/iPad/i.test(ua)) return "iPad";
+  if (/Windows/i.test(ua)) return "Windows PC";
+  if (/Macintosh|Mac OS X/i.test(ua)) return "Mac";
+  if (/Linux/i.test(ua)) return "Linux";
+  return "";
+}
+
+async function applyDetectedName(): Promise<void> {
+  if (phone.name !== DEFAULT_NAME) return;
+  const detected = await detectPhoneName();
+  if (!detected || phone.name !== DEFAULT_NAME) return;
+  phone.name = detected;
+  saveSettings();
+  send("update", {
+    action: "update",
+    deviceId: phone.deviceId,
+    data: { name: detected },
+  });
+}
+
+/** Device-list label: no spaces, e.g. Phone-Pixel-7. */
+export function phoneDeviceLabel(name: string): string {
+  const label = name.trim().replace(/\s+/g, "-");
+  return label ? `Phone-${label}` : "Phone";
 }
 
 function saveSettings(): void {
@@ -239,8 +289,9 @@ function attachListeners(): void {
 export function initPhone(): void {
   if (initialized) return;
   initialized = true;
-  readSettings();
+  const hadSettings = readSettings();
   saveSettings();
+  if (!hadSettings) void applyDetectedName();
   phone.status.online = navigator.onLine;
   phone.status.connection = normalizeConnection((navigator as any).connection);
   phone.status.local = isLocalBroker();
