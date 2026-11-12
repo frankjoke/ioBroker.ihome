@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page as route } from "$app/state";
+  import { base } from "$app/paths";
   import { onMount } from "svelte";
+  import { frameUrl } from "$lib/config/frame-url";
   import {
     getPluginPages,
     initPluginPages,
@@ -13,11 +15,14 @@
   const src = $derived.by(() => {
     const raw = entry?.url?.trim();
     if (!raw) return "";
-    try {
-      return new URL(raw, location.origin).href;
-    } catch {
-      return "";
-    }
+    // Stored for the deployed app; in dev the broker's origin is the source
+    // for root-relative pages such as /iqontrol/.
+    return frameUrl(raw, {
+      dev: import.meta.env.DEV,
+      origin: import.meta.env.VITE_IOBROKER_ORIGIN || "http://localhost:8082",
+      pageOrigin: typeof location === "undefined" ? "" : location.origin,
+      base: base ? `${base}/` : "/",
+    });
   });
 
   onMount(() => {
