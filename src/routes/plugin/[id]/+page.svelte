@@ -36,15 +36,6 @@
 
 <div class="plugin-page">
   {#if entry && src}
-    <div class="page-header">
-      <div class="page-heading">
-        <h1>{entry.title}</h1>
-        <span class="hint text-muted mono">{entry.url}</span>
-      </div>
-      <a class="btn" href={src} target="_blank" rel="noopener">
-        Open in new tab
-      </a>
-    </div>
     <iframe {src} title={entry.title}></iframe>
   {:else if loadKind === "pending"}
     <div class="card empty-state">
@@ -71,43 +62,14 @@
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
     min-height: 24rem;
-  }
-
-  .page-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .page-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-
-  h1 {
-    margin: 0;
-  }
-
-  .mono {
-    font-family: var(--font-mono);
-    font-size: var(--body-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   iframe {
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md, 12px);
+    border: 0;
     background-color: var(--surface-color, #fff);
   }
 </style>
