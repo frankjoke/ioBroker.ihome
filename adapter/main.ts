@@ -262,6 +262,7 @@ class IHome extends utils.Adapter {
       if (obj.command === "phone") void this.onPhoneMessage(obj);
       else if (obj.command === "push") void this.onPushMessage(obj);
       else if (obj.command === "notify") void this.onNotifyMessage(obj);
+      else if (obj.command === "logicTest") void this.onLogicTestMessage(obj);
       else if (obj.command === "plugin") void this.onPluginMessage(obj);
       else if (obj.command === "plugins") void this.onPluginsMessage(obj);
     });
@@ -1583,6 +1584,35 @@ class IHome extends utils.Adapter {
       reply({ ok: true, ...result });
     } catch (error) {
       this.log.warn(`notify message: ${String(error)}`);
+      reply({ ok: false, error: String(error) });
+    }
+  }
+
+  /** Run the saved action once (the editor's Test button). */
+  private onLogicTestMessage(obj: ioBroker.Message): void {
+    const reply = (result: unknown): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    const id =
+      typeof obj.message === "string"
+        ? obj.message.trim()
+        : isRecord(obj.message) && typeof obj.message.id === "string"
+          ? obj.message.id.trim()
+          : "";
+    if (!id) {
+      reply({ ok: false, error: "missing logic id" });
+      return;
+    }
+    try {
+      reply(
+        this.engine?.test(id) ?? {
+          ok: false,
+          error: "logic engine is not ready",
+        },
+      );
+    } catch (error) {
+      this.log.warn(`logic test: ${String(error)}`);
       reply({ ok: false, error: String(error) });
     }
   }

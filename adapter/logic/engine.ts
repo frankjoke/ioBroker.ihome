@@ -96,12 +96,19 @@ export interface EngineOptions {
   maxDepth?: number;
 }
 
+export interface LogicTestResult {
+  ok: boolean;
+  value?: unknown;
+  error?: string;
+}
+
 export interface Engine {
   subscriptions(): string[];
   start(): void;
   stop(): void;
   onStateChange(change: StateChange): void;
   memoryValue(name: string): unknown;
+  test(logicId: string): LogicTestResult;
 }
 
 interface InputRuntime {
@@ -991,23 +998,29 @@ export function createEngine(
     deps.write(id, value, ack);
   }
 
-  function runFunction(rt: Runtime, depth: number, cause = ""): void {
+  function runFunction(
+    rt: Runtime,
+    depth: number,
+    cause = "",
+  ): LogicTestResult {
     const def = rt.def as FunctionLogic;
     let value: unknown;
     try {
       value = runExpr(rt, def.expr, depth);
     } catch (error) {
-      warn(def.id, `expression failed: ${errorText(error)}`);
-      return;
+      const message = errorText(error);
+      warn(def.id, `expression failed: ${message}`);
+      return { ok: false, error: message };
     }
-    if (isNoop(value)) return;
+    if (isNoop(value)) return { ok: true, value: undefined };
     if (value && typeof (value as { then?: unknown }).then === "function") {
       // Consume a rejection: an unhandled one would terminate the adapter.
       void Promise.resolve(value).catch(() => {});
       warn(def.id, "expression failed: async is not supported");
-      return;
+      return { ok: false, error: "async is not supported" };
     }
     writeOutput(rt, value, depth, cause);
+    return { ok: true, value };
   }
 
   function coerce(value: unknown, type: OutputType): unknown {
@@ -1482,6 +1495,20 @@ export function createEngine(
   return {
     subscriptions,
     memoryValue: (name) => memory.get(name),
+    test(logicId: string): LogicTestResult {
+      if (!started) return { ok: false, error: "logic engine is not started" };
+      const rt = runtimes.find((entry) => entry.def.id === logicId);
+      if (!rt) {
+        return {
+          ok: false,
+          error: "logic is not active — enable and save it first",
+        };
+      }
+      if (rt.def.kind !== "function") {
+        return { ok: false, error: "only action logics can be tested" };
+      }
+      return runFunction(rt, 0, "test");
+    },
     start() {
       if (started) return;
       started = true;

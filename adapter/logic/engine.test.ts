@@ -74,6 +74,63 @@ it("runs on change only by default and writes only on change", () => {
   expect(h.writes).toHaveLength(base + 1);
 });
 
+it("test runs the saved function action once", () => {
+  const { h, engine } = engineWith(
+    doc({
+      output: {
+        scope: "state",
+        ref: "0_userdata.0.OUT",
+        type: "number",
+        forward: "always",
+      },
+    }),
+  );
+  engine.start();
+  const base = h.writes.length;
+  expect(engine.test("calc")).toEqual({ ok: true, value: 6 });
+  expect(h.writes.slice(base)).toContainEqual({
+    id: "0_userdata.0.OUT",
+    value: 6,
+    ack: false,
+  });
+});
+
+it("test reports an expression error", () => {
+  const { engine } = engineWith(doc({ expr: code("missing") }));
+  engine.start();
+  const result = engine.test("calc");
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain("not defined");
+});
+
+it("test refuses disabled and machine logics", () => {
+  const disabled = engineWith(doc({ enabled: false }));
+  disabled.engine.start();
+  expect(disabled.engine.test("calc")).toEqual({
+    ok: false,
+    error: "logic is not active — enable and save it first",
+  });
+
+  const machine: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        states: { Idle: {} },
+        start: "Idle",
+      },
+    ],
+  };
+  const m = engineWith(machine);
+  m.engine.start();
+  expect(m.engine.test("m")).toEqual({
+    ok: false,
+    error: "only action logics can be tested",
+  });
+});
+
 it("seeds state inputs at start so a same-value first update is not an edge", () => {
   const machine: LogicDocument = {
     version: 3,

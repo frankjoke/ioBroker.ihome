@@ -23,11 +23,14 @@
     draft = $bindable(),
     issues = [],
     logics = [],
+    dirty = false,
   }: {
     draft: LogicDef;
     issues: Issue[];
     /** The whole document's logics: their outputs are event sources (D29). */
     logics?: LogicDef[];
+    /** The draft differs from the saved logic: testing would run the old one. */
+    dirty?: boolean;
   } = $props();
 
   const output = $derived<Output>(
@@ -119,6 +122,45 @@
       inputs: rebuilt,
     } as LogicDef;
   }
+
+  let testing = $state(false);
+  let testMessage = $state("");
+  let testError = $state(false);
+
+  function formatTestValue(value: unknown): string {
+    if (typeof value === "string") return value;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "(unprintable)";
+    }
+  }
+
+  async function testAction() {
+    if (dirty || draft.enabled === false || testing) return;
+    testing = true;
+    testMessage = "";
+    testError = false;
+    try {
+      const result = (await ioBroker.sendTo(ioBroker.namespace, "logicTest", {
+        id: draft.id,
+      })) as { ok?: boolean; value?: unknown; error?: string } | undefined;
+      if (result?.ok) {
+        testMessage =
+          result.value === undefined
+            ? "Action ran."
+            : `Result: ${formatTestValue(result.value)}`;
+      } else {
+        testMessage = `Test failed: ${result?.error ?? "no reply"}`;
+        testError = true;
+      }
+    } catch (error) {
+      testMessage = `Test failed: ${error instanceof Error ? error.message : String(error)}`;
+      testError = true;
+    } finally {
+      testing = false;
+    }
+  }
 </script>
 
 <div class="editor-body">
@@ -169,7 +211,25 @@
 
   {#if draft.kind === "function"}
     <div class="block">
-      <span class="label-mono">Result expression</span>
+      <div class="test-head">
+        <span class="label-mono">Result expression</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline"
+          disabled={dirty || draft.enabled === false || testing}
+          onclick={() => void testAction()}
+          title={dirty
+            ? "Save the logic first"
+            : draft.enabled === false
+              ? "Enable the logic first"
+              : "Run the saved action once"}
+        >
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >play_arrow</span
+          >
+          {testing ? "Testing…" : "Test"}
+        </button>
+      </div>
       <CodeField
         code={draft.expr.code}
         label="Result expression"
@@ -180,6 +240,14 @@
         inputs={draft.inputs}
         onchange={(code) => patch({ expr: { code } })}
       />
+      {#if dirty}
+        <p class="test-hint">Save the logic before testing.</p>
+      {:else if draft.enabled === false}
+        <p class="test-hint">Enable the logic before testing.</p>
+      {/if}
+      {#if testMessage}
+        <p class="test-result" class:text-danger={testError}>{testMessage}</p>
+      {/if}
     </div>
   {:else}
     <MachineEditor logic={draft} {logics} onchange={(next) => (draft = next)} />
@@ -213,6 +281,20 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+  }
+
+  .test-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .test-hint,
+  .test-result {
+    margin: 0;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 
   .issues {
