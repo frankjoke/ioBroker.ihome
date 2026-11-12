@@ -657,7 +657,7 @@
           {/if}
           {#if open && draft}
             <div class="item-editor" bind:this={inlineForm}>
-              <LogicEditor bind:draft {issues} logics={doc.logics} />
+              <LogicEditor bind:draft {issues} logics={doc.logics} {dirty} />
             </div>
           {/if}
         </div>
