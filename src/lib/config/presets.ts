@@ -41,7 +41,7 @@ The tile glows green while the device is on and the badge tells you when it was 
     builtin: true,
     type: "Switch",
     size: { w: 2, h: 2 },
-    features: DEVICE_FEATURES.Switch,
+    features: [...DEVICE_FEATURES.Switch, ...COMMON_FEATURES],
     slots: [
       // A switch glows green when it is on (a light glows amber): the accent is
       // the headline slot's resolved colour, so this rule colours both — the
@@ -62,8 +62,8 @@ The tile glows green while the device is on and the badge tells you when it was 
       // The watts, in the top-left reading corner — a switch's second question
       // after "is it on".
       { kind: "badge", options: { pick: "power" } },
-      ago,
-      offline,
+      agoSince("power"),
+      { kind: "badge", source: "connected", options: { derive: "offline" } },
     ],
   },
   Button: {
@@ -136,14 +136,8 @@ The tile glows amber while the light is on; the slider and colour picker write b
         source: "battery",
         rules: [{ when: "battery < 20", tone: "danger" }],
       },
-      {
-        kind: "badge",
-        label: "Connected",
-        source: "connected",
-        rules: [{ when: "!truthy(connected)", tone: "danger" }],
-      },
-      ago,
-      offline,
+      agoSince("power"),
+      { kind: "badge", source: "connected", options: { derive: "offline" } },
     ],
   },
   Thermostat: {

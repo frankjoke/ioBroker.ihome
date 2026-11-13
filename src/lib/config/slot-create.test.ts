@@ -398,3 +398,44 @@ it("fills active, look and background from the seed without overwriting", () => 
     ).look?.inactive,
   ).toEqual({ color: "red", glyph: "x" });
 });
+
+it("binds a switch's ago badge to its main switch", () => {
+  const sw = device({
+    id: "plug",
+    name: "Plug",
+    type: "Switch",
+    controls: [
+      ctl("c-power", "power", { stateId: "shelly.1.plug.Relay0.Switch" }),
+      ctl("c-connected", "connected", {
+        stateId: "shelly.1.plug.available",
+      }),
+    ],
+  });
+  const result = materializeTemplateTile(PRESETS.Switch, sw, [PRESETS.Switch]);
+  const ago = result.slots.find((slot) => slot.source === "ago");
+  expect(ago?.options).toMatchObject({
+    of: "shelly.1.plug.Relay0.Switch",
+    from: "lc",
+  });
+  expect(
+    result.slots.some(
+      (slot) =>
+        slot.options?.derive === "offline" &&
+        typeof slot.source === "object" &&
+        slot.source.kind === "control",
+    ),
+  ).toBe(true);
+});
+
+it("drops a switch's offline badge when there is no connected control", () => {
+  const sw = device({
+    id: "plug2",
+    name: "Plug",
+    type: "Switch",
+    controls: [ctl("c-power", "power", { stateId: "x.Switch" })],
+  });
+  const result = materializeTemplateTile(PRESETS.Switch, sw, [PRESETS.Switch]);
+  expect(result.slots.some((slot) => slot.options?.derive === "offline")).toBe(
+    false,
+  );
+});

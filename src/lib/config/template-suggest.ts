@@ -168,6 +168,23 @@ function groupStates(
   return out;
 }
 
+/** The nearest device object, else the adapter instance (a channel group's
+ *  parent device carries availability/battery states). */
+function deviceGroupOfState(
+  stateId: string,
+  objects: Map<string, any>,
+): string {
+  const parts = String(stateId ?? "")
+    .split(".")
+    .filter(Boolean);
+  if (parts.length < 3) return parts.slice(0, 2).join(".");
+  for (let n = parts.length - 1; n >= 2; n--) {
+    const id = parts.slice(0, n).join(".");
+    if (objects.get(id)?.type === "device") return id;
+  }
+  return parts.slice(0, 2).join(".");
+}
+
 /** Match the remaining template features against the main state's group. */
 export function autoFillTemplate(
   template: Template,
@@ -191,7 +208,15 @@ export function autoFillTemplate(
   const aliasPool = groupStates(aliasGroup, objects).filter(
     (entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry),
   );
+  const deviceGroup = deviceGroupOfState(main.stateId, objects);
+  const devicePool =
+    deviceGroup !== aliasGroup
+      ? groupStates(deviceGroup, objects).filter(
+          (entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry),
+        )
+      : [];
   const pools = basePool.length > 0 ? [basePool, aliasPool] : [aliasPool];
+  const GLOBAL_FEATURES = new Set(["connected", "battery"]);
 
   function matching(
     feature: FeatureDef,
@@ -200,6 +225,17 @@ export function autoFillTemplate(
     for (const pool of pools) {
       const hit = pool.filter(predicate);
       if (hit.length > 0) return hit;
+    }
+    // A channel group (Shelly Relay0) does not carry the device-wide
+    // availability/battery states; fall back to the parent device for those.
+    if (
+      devicePool.length > 0 &&
+      (GLOBAL_FEATURES.has(feature.feature) ||
+        feature.roleHints.some(
+          (hint) => hint.startsWith("indicator.") || hint.includes("battery"),
+        ))
+    ) {
+      return devicePool.filter(predicate);
     }
     return [];
   }
@@ -331,17 +367,12 @@ export function suggestTemplatesForState(
     if (best) scored.push(best);
   }
   const hasRole = scored.some((entry) => entry.score >= 3);
-  let list = hasRole ? scored.filter((entry) => entry.score >= 3) : scored;
-  if (!hasRole) {
-    // A plain boolean should offer Switch/Button, not every multi-feature
-    // template that happens to accept a switch.
-    const simple = list.filter(
-      (entry) => templateFeatures(entry.template).length === 1,
-    );
-    if (simple.length > 0) list = simple;
-  }
+  const list = hasRole ? scored.filter((entry) => entry.score >= 3) : scored;
   return list.sort(
     (a, b) =>
-      b.score - a.score || a.template.name.localeCompare(b.template.name),
+      b.score - a.score ||
+      templateFeatures(a.template).length -
+        templateFeatures(b.template).length ||
+      a.template.name.localeCompare(b.template.name),
   );
 }

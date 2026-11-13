@@ -253,3 +253,28 @@ it("does not suggest templates for infrastructure states", () => {
     ),
   ).toEqual([]);
 });
+
+it("finds connected/battery on the parent device for a Shelly relay", () => {
+  const relayMain = {
+    ref: "shelly.1.plug.Relay0.Switch",
+    stateId: "shelly.1.plug.Relay0.Switch",
+    object: state("switch", "boolean"),
+  };
+  const relayObjects = new Map<string, any>([
+    ["shelly.1.plug", { type: "device", common: { name: "Plug" } }],
+    ["shelly.1.plug.available", state("indicator.reachable", "boolean")],
+    ["shelly.1.plug.Relay0", { type: "channel", common: { name: "Relay0" } }],
+    ["shelly.1.plug.Relay0.Switch", state("switch", "boolean")],
+    ["shelly.1.plug.Relay0.Power", state("value.power", "number")],
+  ]);
+  expect(groupOfState(relayMain.stateId, relayObjects)).toBe(
+    "shelly.1.plug.Relay0",
+  );
+  const result = autoFillTemplate(PRESETS.Switch, relayMain, relayObjects);
+  expect(
+    result.fills.find((f) => f.feature.feature === "connected")?.stateId,
+  ).toBe("shelly.1.plug.available");
+  expect(result.fills.find((f) => f.feature.feature === "power")?.stateId).toBe(
+    "shelly.1.plug.Relay0.Switch",
+  );
+});

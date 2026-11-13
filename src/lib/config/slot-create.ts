@@ -225,6 +225,33 @@ function materializeSlots(template: Template, device: Device): Slot[] {
   return out;
 }
 
+/** Point a template's `ago` badge at the primary control (usually power). */
+function materializeAgo(
+  slots: Slot[],
+  template: Template,
+  device: Device,
+): Slot[] {
+  const features = templateFeatures(template);
+  const primary = features.find((feature) => feature.primary) ?? features[0];
+  const control =
+    device.controls?.find((entry) => entry.feature === primary?.feature) ??
+    device.controls?.[0];
+  const keys = new Set(features.map((feature) => feature.feature));
+  return slots.map((slot) => {
+    if (slot.source !== "ago") return slot;
+    const of = typeof slot.options?.of === "string" ? slot.options.of : "";
+    const nextOf = of && keys.has(of) ? (control?.stateId ?? control?.id) : of;
+    return {
+      ...slot,
+      options: {
+        ...slot.options,
+        ...(nextOf ? { of: nextOf } : {}),
+        ...(slot.options?.from ? {} : { from: "lc" }),
+      },
+    };
+  });
+}
+
 /** A complete tile for a device created from this template. */
 export function materializeTemplateTile(
   template: Template,
@@ -239,7 +266,11 @@ export function materializeTemplateTile(
   title?: string;
   icon?: string;
 } {
-  const slots = materializeSlots(template, device);
+  const slots = materializeAgo(
+    materializeSlots(template, device),
+    template,
+    device,
+  );
   const seed = tileSeed(slots, [device], templates);
   const active = materializeActive(
     template.active,
