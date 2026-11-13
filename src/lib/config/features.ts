@@ -240,7 +240,12 @@ export const COMMON_FEATURES: readonly FeatureDef[] = [
     feature: "connected",
     label: "Connected",
     widget: "value",
-    roleHints: ["indicator.connected", "indicator.state", "connected"],
+    roleHints: [
+      "indicator.connected",
+      "indicator.reachable",
+      "indicator.state",
+      "connected",
+    ],
   },
 ];
 

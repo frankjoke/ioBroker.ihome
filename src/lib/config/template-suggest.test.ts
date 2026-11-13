@@ -199,7 +199,7 @@ it("follows an alias base into its device for the remaining controls", () => {
     ["zigbee.0.cc86.color", state("level.color.rgb", "string")],
     ["zigbee.0.cc86.colorTemp", state("level.color.temperature", "number")],
     ["zigbee.0.cc86.battery", state("value.battery", "number")],
-    ["zigbee.0.cc86.connected", state("indicator.connected", "boolean")],
+    ["zigbee.0.cc86.connected", state("indicator.reachable", "boolean")],
   ]);
   expect(groupOfState("zigbee.0.cc86.state", aliasObjects, true)).toBe(
     "zigbee.0.cc86",
@@ -216,5 +216,8 @@ it("follows an alias base into its device for the remaining controls", () => {
   expect(
     result.fills.find((f) => f.feature.feature === "battery")?.stateId,
   ).toBe("zigbee.0.cc86.battery");
+  expect(
+    result.fills.find((f) => f.feature.feature === "connected")?.stateId,
+  ).toBe("zigbee.0.cc86.connected");
   expect(result.conflicts).toEqual([]);
 });
