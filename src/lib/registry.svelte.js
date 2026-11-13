@@ -19,7 +19,7 @@ let initPromise = null;
 let saveTimer = null;
 let lastSent = null;
 /** How the stored device document last loaded. `pending`/`unreadable` block writes. */
-let loadKind = "pending";
+let loadKind = $state("pending");
 
 export function registryLoadKind() {
   return loadKind;

@@ -137,7 +137,7 @@
         ? isTemplateBundlesWritable()
         : isLogicsWritable(),
   );
-  const deviceWritable = isRegistryWritable();
+  const deviceWritable = $derived(isRegistryWritable());
   const blocked = $derived(
     selected?.kind === "logic" || selected?.kind === "api"
       ? logicBlocked()

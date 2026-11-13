@@ -73,10 +73,24 @@ function matchFeature(feature: FeatureDef, object: any): Match {
   return null;
 }
 
-/** The nearest channel/folder ancestor, else the adapter instance. */
+/** The state ids an alias object points at (`common.alias.id`). */
+export function aliasBaseIds(object: any): string[] {
+  const alias = object?.common?.alias;
+  if (!alias) return [];
+  const value = alias.id ?? alias.read ?? alias.write;
+  return (Array.isArray(value) ? value : [value]).filter(
+    (entry): entry is string =>
+      typeof entry === "string" && entry.includes("."),
+  );
+}
+
+/** The nearest channel/folder ancestor, else the adapter instance. With
+ *  `includeDevice`, a real ioBroker device object also ends the walk — used
+ *  when following an alias base, whose parent is often the device. */
 export function groupOfState(
   stateId: string,
   objects: Map<string, any>,
+  includeDevice = false,
 ): string {
   const parts = String(stateId ?? "")
     .split(".")
@@ -85,7 +99,13 @@ export function groupOfState(
   for (let n = parts.length - 1; n >= 2; n--) {
     const id = parts.slice(0, n).join(".");
     const object = objects.get(id);
-    if (object?.type === "channel" || object?.type === "folder") return id;
+    if (
+      object?.type === "channel" ||
+      object?.type === "folder" ||
+      (includeDevice && object?.type === "device")
+    ) {
+      return id;
+    }
   }
   return parts.slice(0, 2).join(".");
 }
@@ -114,15 +134,36 @@ export function autoFillTemplate(
   const anchor =
     features.find((feature) => feature.feature === anchorFeature) ??
     primaryFeature(features);
-  const group = groupOfState(main.stateId, objects);
-  const pool = groupStates(group, objects).filter(
-    (entry) => entry.stateId !== main.stateId,
+  const bases = aliasBaseIds(main.object);
+  const aliasGroup = groupOfState(main.stateId, objects);
+  const baseGroups = bases
+    .map((id) => groupOfState(id, objects, true))
+    .filter((id) => id !== aliasGroup);
+  const exclude = new Set([main.stateId, ...bases]);
+  const basePool = [
+    ...new Set(baseGroups.flatMap((group) => groupStates(group, objects))),
+  ].filter((entry) => !exclude.has(entry.stateId));
+  const aliasPool = groupStates(aliasGroup, objects).filter(
+    (entry) => !exclude.has(entry.stateId),
   );
+  const pools = basePool.length > 0 ? [basePool, aliasPool] : [aliasPool];
+
+  function matching(
+    feature: FeatureDef,
+    predicate: (entry: TemplateReference) => boolean,
+  ): TemplateReference[] {
+    for (const pool of pools) {
+      const hit = pool.filter(predicate);
+      if (hit.length > 0) return hit;
+    }
+    return [];
+  }
+
   const roleCandidates = new Map<FeatureDef, TemplateReference[]>();
   const claimed = new Set<string>();
   for (const feature of features) {
     if (feature === anchor) continue;
-    const candidates = pool.filter((entry) =>
+    const candidates = matching(feature, (entry) =>
       specificRoleMatches(
         String(entry.object?.common?.role ?? ""),
         feature.roleHints,
@@ -156,7 +197,8 @@ export function autoFillTemplate(
     if (roles.length > 1) {
       return { feature, candidates: roles, ambiguous: true };
     }
-    const type = pool.filter(
+    const type = matching(
+      feature,
       (entry) =>
         !claimed.has(entry.stateId) &&
         feature.roleHints.includes(feature.widget) &&
@@ -185,7 +227,7 @@ export function autoFillTemplate(
   }
   for (const [stateId, groupFills] of byState) {
     if (groupFills.length < 2) continue;
-    const entry = pool.find((item) => item.stateId === stateId) ?? {
+    const entry = pools.flat().find((item) => item.stateId === stateId) ?? {
       ref: stateId,
       stateId,
       object: groupFills[0].object,

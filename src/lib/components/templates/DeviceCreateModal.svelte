@@ -43,7 +43,7 @@
   const variables = $derived(getVariables());
   const templates = $derived(getTemplateRegistry().templates ?? []);
   const logics = $derived(getLogicDocument().logics);
-  const deviceWritable = isRegistryWritable();
+  const deviceWritable = $derived(isRegistryWritable());
 
   let main = $state<TemplateReference | null>(null);
   let anchor = $state("");

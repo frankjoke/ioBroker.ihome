@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  aliasBaseIds,
   autoFillTemplate,
   groupOfState,
   suggestTemplatesForState,
@@ -170,4 +171,50 @@ it("suggests the temperature templates and both boolean templates", () => {
       .map((s) => s.template.id)
       .sort(),
   ).toEqual(["Button", "Switch"]);
+});
+
+it("follows an alias base into its device for the remaining controls", () => {
+  const aliasState = {
+    type: "state",
+    common: {
+      role: "switch.light",
+      type: "boolean",
+      alias: { id: "zigbee.0.cc86.state" },
+    },
+  };
+  const aliasMain = {
+    ref: "alias.0.1Stock.FSZLampe.SET",
+    stateId: "alias.0.1Stock.FSZLampe.SET",
+    object: aliasState,
+  };
+  const aliasObjects = new Map<string, any>([
+    [
+      "alias.0.1Stock.FSZLampe",
+      { type: "channel", common: { name: "FSZLampe" } },
+    ],
+    ["alias.0.1Stock.FSZLampe.SET", aliasState],
+    ["zigbee.0.cc86", { type: "device", common: { name: "RB 248 T" } }],
+    ["zigbee.0.cc86.state", state("switch.light", "boolean")],
+    ["zigbee.0.cc86.brightness", state("level.dimmer", "number")],
+    ["zigbee.0.cc86.color", state("level.color.rgb", "string")],
+    ["zigbee.0.cc86.colorTemp", state("level.color.temperature", "number")],
+    ["zigbee.0.cc86.battery", state("value.battery", "number")],
+    ["zigbee.0.cc86.connected", state("indicator.connected", "boolean")],
+  ]);
+  expect(groupOfState("zigbee.0.cc86.state", aliasObjects, true)).toBe(
+    "zigbee.0.cc86",
+  );
+  expect(groupOfState("zigbee.0.cc86.state", aliasObjects)).toBe("zigbee.0");
+  expect(aliasBaseIds(aliasState)).toEqual(["zigbee.0.cc86.state"]);
+  const result = autoFillTemplate(PRESETS.Light, aliasMain, aliasObjects);
+  expect(
+    result.fills.find((f) => f.feature.feature === "brightness")?.stateId,
+  ).toBe("zigbee.0.cc86.brightness");
+  expect(result.fills.find((f) => f.feature.feature === "color")?.stateId).toBe(
+    "zigbee.0.cc86.color",
+  );
+  expect(
+    result.fills.find((f) => f.feature.feature === "battery")?.stateId,
+  ).toBe("zigbee.0.cc86.battery");
+  expect(result.conflicts).toEqual([]);
 });
