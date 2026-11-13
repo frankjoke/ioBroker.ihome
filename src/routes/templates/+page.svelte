@@ -16,7 +16,7 @@
   } from "$lib/config/template-file";
   import { installTemplateFile } from "$lib/template-import";
 
-  type Group = "code" | "templates";
+  type Group = "code" | "templates" | "help";
 
   const tabs: Array<{ id: Group; label: string; hint: string }> = [
     {
@@ -28,6 +28,11 @@
       id: "templates",
       label: "Templates",
       hint: "Device, logic, both or API templates.",
+    },
+    {
+      id: "help",
+      label: "Help",
+      hint: "About the Templates page.",
     },
   ];
 
@@ -50,7 +55,6 @@
   let pendingGroup = $state<Group | null>(null);
   let askSwitch = $state(false);
   let importOpen = $state(false);
-  let showHelp = $state(false);
   let importError = $state("");
   let pendingImport = $state<{
     file: TemplateFile;
@@ -155,7 +159,7 @@
 </svelte:head>
 
 <div class="templates-page">
-  <div class="item" class:open={showHelp}>
+  <div class="item">
     <div class="item-line title-line">
       <div class="tabs-line">
         <OptionTabs
@@ -165,129 +169,119 @@
           collapsible={false}
           onchange={onTabChange}
         />
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          aria-expanded={showHelp}
-          onclick={() => (showHelp = !showHelp)}
-        >
-          <span class="material-symbols-outlined">help</span>
-          Help
-          <span class="material-symbols-outlined"
-            >{showHelp ? "expand_less" : "expand_more"}</span
-          >
-        </button>
       </div>
-      <div class="page-actions">
-        {#if group === "code"}
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onclick={() => codeRef?.startNew("formula")}
-          >
-            + Formula
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => codeRef?.startNew("function")}
-          >
-            + Function
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onclick={() => templateRef?.startNew("device")}
-          >
-            + Device
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => templateRef?.startNew("logic")}
-          >
-            + Logic
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => templateRef?.startNew("api")}
-          >
-            + API
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => templateRef?.startNew("both")}
-          >
-            + Both
-          </button>
-        {/if}
-        <IconButton
-          icon="upload"
-          label="Import template"
-          title="Import"
-          onclick={() => {
-            importError = "";
-            importOpen = true;
-          }}
-        />
-      </div>
+      {#if group !== "help"}
+        <div class="page-actions">
+          {#if group === "code"}
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick={() => codeRef?.startNew("formula")}
+            >
+              + Formula
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => codeRef?.startNew("function")}
+            >
+              + Function
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick={() => templateRef?.startNew("device")}
+            >
+              + Device
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => templateRef?.startNew("logic")}
+            >
+              + Logic
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => templateRef?.startNew("api")}
+            >
+              + API
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => templateRef?.startNew("both")}
+            >
+              + Both
+            </button>
+          {/if}
+          <IconButton
+            icon="upload"
+            label="Import template"
+            title="Import"
+            onclick={() => {
+              importError = "";
+              importOpen = true;
+            }}
+          />
+        </div>
+      {/if}
     </div>
-
-    {#if showHelp}
-      <div class="item-editor">
-        <HelpSection help={TEMPLATES_GUIDE} static plain />
-      </div>
-    {/if}
   </div>
 
   {#if importError}
     <p class="text-danger hint">{importError}</p>
   {/if}
 
-  <div class="list-toolbar">
-    <div class="list-filter">
-      <span class="label-mono filter-label">Filters</span>
-      <input
-        type="search"
-        placeholder={group === "code"
-          ? "Search name or code…"
-          : "Search name or part…"}
-        bind:value={search}
-      />
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        title="Sort by name"
-        aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
-        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-      >
-        Sort {sortDir === "asc" ? "↑" : "↓"}
-      </button>
+  {#if group === "help"}
+    <div class="card help-panel">
+      <HelpSection help={TEMPLATES_GUIDE} static plain />
     </div>
-  </div>
-
-  {#if group === "code"}
-    <CodeTemplates
-      embedded
-      bind:this={codeRef}
-      bind:dirty
-      bind:search
-      bind:sortDir
-      focus={codeFocus}
-      onFocusApplied={() => (focus = null)}
-    />
   {:else}
-    <TemplateBrowser
-      bind:this={templateRef}
-      bind:dirty
-      bind:search
-      bind:sortDir
-      focus={templateFocus}
-      onFocusApplied={() => (focus = null)}
-    />
+    <div class="list-toolbar">
+      <div class="list-filter">
+        <span class="label-mono filter-label">Filters</span>
+        <input
+          type="search"
+          placeholder={group === "code"
+            ? "Search name or code…"
+            : "Search name or part…"}
+          bind:value={search}
+        />
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          title="Sort by name"
+          aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
+        >
+          Sort {sortDir === "asc" ? "↑" : "↓"}
+        </button>
+      </div>
+    </div>
+
+    {#if group === "code"}
+      <CodeTemplates
+        embedded
+        bind:this={codeRef}
+        bind:dirty
+        bind:search
+        bind:sortDir
+        focus={codeFocus}
+        onFocusApplied={() => (focus = null)}
+      />
+    {:else}
+      <TemplateBrowser
+        bind:this={templateRef}
+        bind:dirty
+        bind:search
+        bind:sortDir
+        focus={templateFocus}
+        onFocusApplied={() => (focus = null)}
+      />
+    {/if}
   {/if}
 
   {#if importOpen}
@@ -333,6 +327,10 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-left: auto;
+  }
+
+  .help-panel {
+    padding: 1rem;
   }
 
   .list-toolbar {

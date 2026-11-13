@@ -160,9 +160,8 @@
   let pendingSelect = $state<LogicDef | null>(null);
 
   let search = $state("");
-  let kindTab = $state<"machine" | "function">("machine");
-  let tabValue = $state<"machine" | "function" | null>("machine");
-  let showHelp = $state(false);
+  let view = $state<"machine" | "function" | "help">("machine");
+  let tabValue = $state<"machine" | "function" | "help" | null>("machine");
   let roomFilter = $state("");
   let functionFilter = $state("");
 
@@ -177,16 +176,21 @@
       label: "Actions",
       hint: "Computed values and reusable functions.",
     },
+    {
+      id: "help" as const,
+      label: "Help",
+      hint: "About the Logic page.",
+    },
   ];
 
-  function onKindTab(next: "machine" | "function" | null) {
-    kindTab = next ?? "machine";
-    tabValue = kindTab;
+  function onKindTab(next: "machine" | "function" | "help" | null) {
+    view = next ?? "machine";
+    tabValue = view;
   }
 
   function startCreate(kind: "machine" | "action") {
-    kindTab = kind === "machine" ? "machine" : "function";
-    tabValue = kindTab;
+    view = kind === "machine" ? "machine" : "function";
+    tabValue = view;
     pendingCreate = kind;
   }
 
@@ -227,7 +231,7 @@
     const q = search.trim().toLowerCase();
     return doc.logics.filter((logic) => {
       if (q && !logic.name.toLowerCase().includes(q)) return false;
-      if (logic.kind !== kindTab) return false;
+      if (logic.kind !== view) return false;
       if (roomFilter || functionFilter) {
         const enums = logicEnums(logic);
         if (roomFilter && !enums.includes(roomFilter)) return false;
@@ -514,7 +518,7 @@
 </svelte:head>
 
 <div class="logic-page">
-  <div class="item" class:open={showHelp}>
+  <div class="item">
     <div class="item-line title-line">
       <div class="tabs-line">
         <OptionTabs
@@ -524,199 +528,202 @@
           collapsible={false}
           onchange={onKindTab}
         />
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          aria-expanded={showHelp}
-          onclick={() => (showHelp = !showHelp)}
-        >
-          <span class="material-symbols-outlined">help</span>
-          Help
-          <span class="material-symbols-outlined"
-            >{showHelp ? "expand_less" : "expand_more"}</span
+      </div>
+      {#if view !== "help"}
+        <div class="page-actions">
+          <label class="check" title="Show the adapter log">
+            <input type="checkbox" bind:checked={showLog} />
+            Show log
+          </label>
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => (inserting = true)}
           >
-        </button>
-      </div>
-      <div class="page-actions">
-        <label class="check" title="Show the adapter log">
-          <input type="checkbox" bind:checked={showLog} />
-          Show log
-        </label>
-        <button
-          type="button"
-          class="btn btn-sm"
-          onclick={() => (inserting = true)}
-        >
-          <span class="material-symbols-outlined">dashboard_customize</span>
-          From template
-        </button>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onclick={() => startCreate("machine")}
-        >
-          + Logic
-        </button>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onclick={() => startCreate("action")}
-        >
-          + Action
-        </button>
-      </div>
+            <span class="material-symbols-outlined">dashboard_customize</span>
+            From template
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => startCreate("machine")}
+          >
+            + Logic
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => startCreate("action")}
+          >
+            + Action
+          </button>
+        </div>
+      {/if}
     </div>
-    {#if showHelp}
-      <div class="item-editor">
-        <HelpSection help={LOGIC_GUIDE} static plain />
-      </div>
-    {/if}
   </div>
 
-  {#if logicsLoadKind() === "unreadable"}
-    <p class="text-danger hint">
-      The stored logic document is unreadable — nothing can be saved until it is
-      repaired.
-    </p>
-  {:else if logicsLoadKind() === "pending"}
-    <p class="text-muted hint">Loading the logic document…</p>
-  {/if}
-
-  {#if doc.logics.length === 0}
-    <div class="card empty-state">
-      <p class="text-muted">No logics yet — use From template or add one.</p>
+  {#if view === "help"}
+    <div class="card help-panel">
+      <HelpSection help={LOGIC_GUIDE} static plain />
     </div>
   {:else}
-    <div class="filter-block">
-      <span class="label-mono">Filters</span>
-      <div class="filter-bar">
-        <input type="search" placeholder="Search logic…" bind:value={search} />
-        <select bind:value={roomFilter} aria-label="Filter by room">
-          <option value="">All rooms</option>
-          {#each roomOptions as r (r.value)}
-            <option value={r.value}>{r.label}</option>
-          {/each}
-        </select>
-        <select bind:value={functionFilter} aria-label="Filter by function">
-          <option value="">All functions</option>
-          {#each functionOptions as f (f.value)}
-            <option value={f.value}>{f.label}</option>
-          {/each}
-        </select>
-      </div>
-    </div>
+    {#if logicsLoadKind() === "unreadable"}
+      <p class="text-danger hint">
+        The stored logic document is unreadable — nothing can be saved until it
+        is repaired.
+      </p>
+    {:else if logicsLoadKind() === "pending"}
+      <p class="text-muted hint">Loading the logic document…</p>
+    {/if}
 
-    {#if shownLogics.length === 0}
+    {#if doc.logics.length === 0}
       <div class="card empty-state">
-        <p class="text-muted">No logics match the filters.</p>
+        <p class="text-muted">No logics yet — use From template or add one.</p>
+      </div>
+    {:else}
+      <div class="filter-block">
+        <span class="label-mono">Filters</span>
+        <div class="filter-bar">
+          <input
+            type="search"
+            placeholder="Search logic…"
+            bind:value={search}
+          />
+          <select bind:value={roomFilter} aria-label="Filter by room">
+            <option value="">All rooms</option>
+            {#each roomOptions as r (r.value)}
+              <option value={r.value}>{r.label}</option>
+            {/each}
+          </select>
+          <select bind:value={functionFilter} aria-label="Filter by function">
+            <option value="">All functions</option>
+            {#each functionOptions as f (f.value)}
+              <option value={f.value}>{f.label}</option>
+            {/each}
+          </select>
+        </div>
+      </div>
+
+      {#if shownLogics.length === 0}
+        <div class="card empty-state">
+          <p class="text-muted">No logics match the filters.</p>
+        </div>
+      {/if}
+
+      <div class="logic-list">
+        {#each shownLogics as logic (logic.id)}
+          {@const open = selectedId === logic.id}
+          {@const reading = readingText(logic)}
+          {@const ago = agoText(logic)}
+          <div class="item" class:open>
+            <!-- The free line area is a mouse convenience: keyboard users open/close
+               with the name button and close with the ×. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="item-line" onclick={(e) => onLineClick(e, logic)}>
+              <span
+                class="kind text-muted"
+                role="img"
+                aria-label={logic.kind === "machine" ? "Logic" : "Action"}
+                title={logic.kind === "machine" ? "Logic" : "Action"}
+              >
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >{logic.kind === "machine"
+                    ? "account_tree"
+                    : "calculate"}</span
+                >
+              </span>
+              {#if open && draft}
+                <input
+                  class="name-input"
+                  value={draft.name}
+                  aria-label="Logic name"
+                  oninput={(e) => renameLogic(e.currentTarget.value)}
+                />
+              {:else}
+                <button
+                  type="button"
+                  class="name"
+                  onclick={() => select(logic)}
+                >
+                  {logic.name}
+                </button>
+              {/if}
+              <span class="mono hint text-muted">{outputLabel(logic)}</span>
+              {#if reading}
+                <span class="reading mono">{reading}</span>
+              {/if}
+              {#if ago}
+                <span class="updated text-muted">
+                  <span class="material-symbols-outlined" aria-hidden="true"
+                    >schedule</span
+                  >{ago}</span
+                >
+              {/if}
+              <span class="item-actions">
+                <label class="inline"
+                  >enabled <input
+                    type="checkbox"
+                    checked={open && draft
+                      ? draft.enabled !== false
+                      : logic.enabled !== false}
+                    onchange={(e) => setEnabled(logic, e.currentTarget.checked)}
+                  /></label
+                >
+                <label
+                  class="inline"
+                  title="Log state changes to the adapter log"
+                  >log <input
+                    type="checkbox"
+                    checked={open && draft
+                      ? draft.log === true
+                      : logic.log === true}
+                    onchange={(e) => setLog(logic, e.currentTarget.checked)}
+                  /></label
+                >
+                {#if open}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={!canSave}
+                    onclick={save}>Save</button
+                  >
+                {/if}
+                <IconButton
+                  icon="content_copy"
+                  label={`Duplicate ${logic.name}`}
+                  title="Duplicate"
+                  onclick={() => duplicate(logic)}
+                />
+                <IconButton
+                  icon="delete"
+                  danger
+                  label={`Delete ${logic.name}`}
+                  onclick={() => (pendingDelete = logic)}
+                />
+              </span>
+            </div>
+            {#if open && nameError}
+              <p class="text-danger hint">{nameError}</p>
+            {/if}
+            {#if open && draft}
+              <div class="item-editor" bind:this={inlineForm}>
+                <LogicEditor bind:draft {issues} logics={doc.logics} {dirty} />
+              </div>
+            {/if}
+          </div>
+        {/each}
       </div>
     {/if}
 
-    <div class="logic-list">
-      {#each shownLogics as logic (logic.id)}
-        {@const open = selectedId === logic.id}
-        {@const reading = readingText(logic)}
-        {@const ago = agoText(logic)}
-        <div class="item" class:open>
-          <!-- The free line area is a mouse convenience: keyboard users open/close
-               with the name button and close with the ×. -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="item-line" onclick={(e) => onLineClick(e, logic)}>
-            <span
-              class="kind text-muted"
-              role="img"
-              aria-label={logic.kind === "machine" ? "Logic" : "Action"}
-              title={logic.kind === "machine" ? "Logic" : "Action"}
-            >
-              <span class="material-symbols-outlined" aria-hidden="true"
-                >{logic.kind === "machine" ? "account_tree" : "calculate"}</span
-              >
-            </span>
-            {#if open && draft}
-              <input
-                class="name-input"
-                value={draft.name}
-                aria-label="Logic name"
-                oninput={(e) => renameLogic(e.currentTarget.value)}
-              />
-            {:else}
-              <button type="button" class="name" onclick={() => select(logic)}>
-                {logic.name}
-              </button>
-            {/if}
-            <span class="mono hint text-muted">{outputLabel(logic)}</span>
-            {#if reading}
-              <span class="reading mono">{reading}</span>
-            {/if}
-            {#if ago}
-              <span class="updated text-muted">
-                <span class="material-symbols-outlined" aria-hidden="true"
-                  >schedule</span
-                >{ago}</span
-              >
-            {/if}
-            <span class="item-actions">
-              <label class="inline"
-                >enabled <input
-                  type="checkbox"
-                  checked={open && draft
-                    ? draft.enabled !== false
-                    : logic.enabled !== false}
-                  onchange={(e) => setEnabled(logic, e.currentTarget.checked)}
-                /></label
-              >
-              <label class="inline" title="Log state changes to the adapter log"
-                >log <input
-                  type="checkbox"
-                  checked={open && draft
-                    ? draft.log === true
-                    : logic.log === true}
-                  onchange={(e) => setLog(logic, e.currentTarget.checked)}
-                /></label
-              >
-              {#if open}
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  disabled={!canSave}
-                  onclick={save}>Save</button
-                >
-              {/if}
-              <IconButton
-                icon="content_copy"
-                label={`Duplicate ${logic.name}`}
-                title="Duplicate"
-                onclick={() => duplicate(logic)}
-              />
-              <IconButton
-                icon="delete"
-                danger
-                label={`Delete ${logic.name}`}
-                onclick={() => (pendingDelete = logic)}
-              />
-            </span>
-          </div>
-          {#if open && nameError}
-            <p class="text-danger hint">{nameError}</p>
-          {/if}
-          {#if open && draft}
-            <div class="item-editor" bind:this={inlineForm}>
-              <LogicEditor bind:draft {issues} logics={doc.logics} {dirty} />
-            </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  {#if logicBlocked()}
-    <p class="text-danger hint">
-      Not saved yet — fix the errors above. The adapter keeps the last valid
-      version.
-    </p>
-  {:else if logicSaveFailed()}
-    <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+    {#if logicBlocked()}
+      <p class="text-danger hint">
+        Not saved yet — fix the errors above. The adapter keeps the last valid
+        version.
+      </p>
+    {:else if logicSaveFailed()}
+      <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+    {/if}
   {/if}
 </div>
 
@@ -739,8 +746,8 @@
   <TemplateInsert
     taken={doc.logics.map((logic) => logic.id)}
     onInsert={(logic) => {
-      kindTab = logic.kind === "machine" ? "machine" : "function";
-      tabValue = kindTab;
+      view = logic.kind === "machine" ? "machine" : "function";
+      tabValue = view;
       if (commit([...doc.logics, logic])) select(logic);
     }}
     onClose={() => (inserting = false)}
@@ -824,6 +831,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+  }
+
+  .help-panel {
+    padding: 1rem;
   }
 
   .filter-bar {
