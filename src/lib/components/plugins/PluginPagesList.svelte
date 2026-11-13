@@ -307,7 +307,7 @@
               >
             {/if}
             <IconButton
-              icon={page.open === "tab" ? "open_in_new" : "visibility"}
+              icon="open_in_new"
               label={`Open ${page.title}`}
               onclick={() => openPage(page)}
             />
