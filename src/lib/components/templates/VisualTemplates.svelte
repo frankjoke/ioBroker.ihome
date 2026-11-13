@@ -3,6 +3,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import TemplateControlsEditor from "./TemplateControlsEditor.svelte";
   import { PRESETS } from "$lib/config/presets";
   import { parseTemplateRegistry } from "$lib/config/template-ops";
   import { visualTemplateProblem } from "$lib/config/visual-templates";
@@ -45,6 +46,18 @@
     !!selected && (selected.builtin === true || presetIds.has(selected.id)),
   );
   const isDirty = $derived(!!selected && json !== loadedJson);
+  const draft = $derived.by(() => {
+    try {
+      return JSON.parse(json) as Template;
+    } catch {
+      return null;
+    }
+  });
+
+  function setFeatures(features: Template["features"]): void {
+    if (!draft) return;
+    json = JSON.stringify({ ...draft, features }, null, 2);
+  }
 
   $effect(() => {
     if (!selected) return;
@@ -123,6 +136,18 @@
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       return;
+    }
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const template = parsed as Template;
+      if (
+        Array.isArray(template.features) &&
+        template.features.length > 0 &&
+        !template.features.some((feature) => feature.primary === true)
+      ) {
+        template.features = template.features.map((feature, index) =>
+          index === 0 ? { ...feature, primary: true } : feature,
+        );
+      }
     }
     const problem = visualTemplateProblem(
       parsed,
@@ -293,6 +318,16 @@
             </span>
           {/if}
         </div>
+      {/if}
+      {#if draft && Array.isArray(draft.features)}
+        <TemplateControlsEditor
+          features={draft.features}
+          type={draft.type}
+          disabled={isBuiltin || !writable}
+          onchange={setFeatures}
+        />
+      {:else if json.trim()}
+        <p class="hint text-muted">Fix the JSON to edit controls.</p>
       {/if}
       <textarea
         class="json"
