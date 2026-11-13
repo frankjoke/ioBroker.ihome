@@ -1,6 +1,8 @@
 import { it, expect } from "vitest";
 import {
+  COMMON_FEATURES,
   DEVICE_FEATURES,
+  featureCatalog,
   suggestFeature,
   suggestDeviceType,
   suggestDeviceName,
@@ -190,4 +192,27 @@ it("levelRange: falls back to 0/100/1 and ignores a bad step", () => {
     max: 100,
     step: 2,
   });
+});
+
+it("marks the primary feature per built-in type", () => {
+  expect(
+    DEVICE_FEATURES.Light.find((f) => f.feature === "power")?.primary,
+  ).toBe(true);
+  expect(
+    DEVICE_FEATURES.Thermostat.find((f) => f.feature === "setpoint")?.primary,
+  ).toBe(true);
+  expect(
+    DEVICE_FEATURES.Thermometer.find((f) => f.feature === "temperature")
+      ?.primary,
+  ).toBe(true);
+});
+
+it("adds common extras without duplicating the type features", () => {
+  const keys = featureCatalog("Light").map((f) => f.feature);
+  expect(keys).toEqual(expect.arrayContaining(["power", "battery", "connected"]));
+  expect(new Set(keys).size).toBe(keys.length);
+  expect(COMMON_FEATURES.map((f) => f.feature)).toEqual([
+    "battery",
+    "connected",
+  ]);
 });

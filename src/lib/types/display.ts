@@ -308,6 +308,9 @@ export interface Template {
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */
   background?: Background;
+  /** Defaults for a placement created from a device with this template. */
+  active?: ActiveCondition;
+  look?: TileLook;
   features: FeatureDef[]; // what a device of this type must supply
   slots: Slot[];
 }

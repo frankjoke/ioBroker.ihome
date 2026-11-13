@@ -8,13 +8,16 @@ import {
   pickSlotControls,
   presetForType,
   primaryControl,
+  primaryFeature,
   resolveControl,
   resolveTemplate,
+  templateFeatures,
   slotVisible,
   sourceForControl,
   tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
+import type { FeatureDef } from "$lib/config/features";
 import type { Slot, Template, TemplateRegistry } from "$lib/types/display";
 
 it("merges slots by kind+source with later winning and rules concatenated", () => {
@@ -542,4 +545,53 @@ it("keeps duplicate slots apart instead of merging them", () => {
   const out = pickSlotControls(slots, [ctl("a")], {});
   expect(out.length).toBe(2);
   expect(out[0].slot).not.toBe(out[1].slot);
+});
+
+it("falls back to the type preset when a template has no features", () => {
+  expect(
+    templateFeatures({ ...PRESETS.Light, features: [] }).map((f) => f.feature),
+  ).toEqual(PRESETS.Light.features.map((f) => f.feature));
+});
+
+it("uses the flagged primary, else the first feature", () => {
+  const features: FeatureDef[] = [
+    {
+      feature: "power",
+      label: "Power",
+      widget: "switch",
+      roleHints: [],
+    },
+    {
+      feature: "press",
+      label: "Press",
+      widget: "button",
+      roleHints: [],
+      primary: true,
+    },
+  ];
+  expect(primaryFeature(features)?.feature).toBe("press");
+  expect(
+    primaryFeature(features.map((f) => ({ ...f, primary: false })))?.feature,
+  ).toBe("power");
+});
+
+it("resolves active and look from the user template over the preset", () => {
+  const user = {
+    ...PRESETS.Light,
+    id: "u",
+    builtin: false,
+    basedOn: "Light",
+    active: { source: "power", op: "eq" as const, value: "on" },
+    look: { active: { glow: "red" } },
+  } as Template;
+  const device = {
+    ...PRESETS.Light,
+    id: "d",
+    name: "Lamp",
+    template: "u",
+    controls: [],
+  } as any;
+  const resolved = resolveTemplate(device, [user]);
+  expect(resolved.active).toEqual(user.active);
+  expect(resolved.look).toEqual(user.look);
 });
