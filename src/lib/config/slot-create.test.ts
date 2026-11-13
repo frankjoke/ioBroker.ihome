@@ -421,14 +421,20 @@ it("binds a switch's ago badge to its main switch", () => {
   expect(
     result.slots.some(
       (slot) =>
-        slot.options?.derive === "offline" &&
+        slot.options?.derive === "ago" &&
         typeof slot.source === "object" &&
         slot.source.kind === "control",
     ),
   ).toBe(true);
+  const offline = result.slots.find(
+    (slot) => slot.options?.derive === "ago" && slot.rules?.length,
+  );
+  expect(offline?.rules).toEqual([
+    { when: "!isOnline(connected)", only: true, tone: "danger" },
+  ]);
 });
 
-it("drops a switch's offline badge when there is no connected control", () => {
+it("drops a switch's availability badge when there is no connected control", () => {
   const sw = device({
     id: "plug2",
     name: "Plug",
@@ -436,7 +442,7 @@ it("drops a switch's offline badge when there is no connected control", () => {
     controls: [ctl("c-power", "power", { stateId: "x.Switch" })],
   });
   const result = materializeTemplateTile(PRESETS.Switch, sw, [PRESETS.Switch]);
-  expect(result.slots.some((slot) => slot.options?.derive === "offline")).toBe(
+  expect(result.slots.some((slot) => slot.options?.derive === "ago")).toBe(
     false,
   );
 });
@@ -496,7 +502,7 @@ it("builds a Light tile from a state without creating a device", () => {
     "power",
   );
   // The same slots the device tile has: power, dimmer, colour temperature,
-  // ago and offline; colour and battery have no state here.
+  // ago and availability ago; colour and battery have no state here.
   expect(result.slots.map((slot) => slot.kind)).toEqual([
     "switch",
     "level",
@@ -525,13 +531,14 @@ it("builds a Light tile from a state without creating a device", () => {
     of: "alias.0.Lamp.SET",
     from: "lc",
   });
-  const offline = result.slots.find(
-    (slot) => slot.options?.derive === "offline",
-  );
+  const offline = result.slots.find((slot) => slot.options?.derive === "ago");
   expect(offline?.source).toEqual({
     kind: "state",
     stateId: "alias.0.Lamp.available",
   });
+  expect(offline?.rules).toEqual([
+    { when: "!isOnline(connected)", only: true, tone: "danger" },
+  ]);
   expect(result.title).toBe("Lamp");
   expect(result.active).toMatchObject({
     source: { kind: "state", stateId: "alias.0.Lamp.SET" },

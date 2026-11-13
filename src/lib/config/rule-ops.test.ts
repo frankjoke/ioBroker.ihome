@@ -29,6 +29,26 @@ it("applies the last matching rule", () => {
   expect(style).toEqual({ color: "amber" });
 });
 
+it("reads online flags as booleans and integration strings", () => {
+  for (const value of [
+    true,
+    1,
+    "1",
+    "true",
+    "online",
+    "Connected",
+    "up",
+    "ok",
+  ]) {
+    const scope = ruleScope([{ feature: "connected", liveValue: value }], []);
+    expect(evalRule({ when: "isOnline(connected)" }, scope)).toBe(true);
+  }
+  for (const value of [false, 0, "0", "false", "offline", "disconnected", ""]) {
+    const scope = ruleScope([{ feature: "connected", liveValue: value }], []);
+    expect(evalRule({ when: "!isOnline(connected)" }, scope)).toBe(true);
+  }
+});
+
 it("does not match a broken expression and keeps the tile renderable", () => {
   const scope = ruleScope([{ feature: "power", liveValue: true }], []);
   expect(evalRule({ when: "power >" }, scope)).toBe(false); // Review Focus 3

@@ -27,6 +27,15 @@ const agoSince = (of: string, from: "ts" | "lc" = "lc"): Slot => ({
   source: "ago",
   options: { of, from },
 });
+/** Age since the availability state changed; shown only while offline, red.
+ *  `isOnline` accepts booleans and the "online"/"offline" strings integrations
+ *  publish. */
+const offlineAgo: Slot = {
+  kind: "badge",
+  source: "connected",
+  options: { derive: "ago", from: "lc" },
+  rules: [{ when: "!isOnline(connected)", only: true, tone: "danger" }],
+};
 const offline = badge("offline");
 
 export const PRESETS: Record<DeviceType, Template> = {
@@ -64,7 +73,7 @@ The tile glows green while the device is on and the badge tells you when it was 
       // after "is it on".
       { kind: "badge", options: { pick: "power" } },
       agoSince("power"),
-      { kind: "badge", source: "connected", options: { derive: "offline" } },
+      offlineAgo,
     ],
   },
   Button: {
@@ -140,7 +149,7 @@ The tile glows amber while the light is on; the slider and colour picker write b
         rules: [{ when: "battery < 20", tone: "danger" }],
       },
       agoSince("power"),
-      { kind: "badge", source: "connected", options: { derive: "offline" } },
+      offlineAgo,
     ],
   },
   Thermostat: {

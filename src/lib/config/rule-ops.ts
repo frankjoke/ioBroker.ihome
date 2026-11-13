@@ -210,7 +210,7 @@ export function ruleScope(
   for (const c of controls ?? []) {
     locals[sanitizeLabel(c.label, taken)] = c.liveValue;
   }
-  return { locals, helpers: { ...base.helpers, truthy } };
+  return { locals, helpers: { ...base.helpers, truthy, isOnline } };
 }
 
 /** On/off values as ioBroker stores them: true, 1, "1", "true". */
@@ -219,7 +219,7 @@ export function truthy(v: unknown): boolean {
 }
 
 /** An online flag as integrations publish it: a boolean or "online"/"connected". */
-function isOnline(value: unknown): boolean {
+export function isOnline(value: unknown): boolean {
   if (truthy(value)) return true;
   return (
     typeof value === "string" &&
