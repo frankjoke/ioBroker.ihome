@@ -28,6 +28,20 @@ export function objectIconValue(
   return undefined;
 }
 
+/** The adapter's own icon: its instance object first, then the package. */
+export function adapterIcon(
+  objects: Map<string, any>,
+  adapter: string,
+): { value: string; owner: string } | undefined {
+  const name = String(adapter ?? "").trim();
+  if (!name) return undefined;
+  for (const id of [`system.adapter.${name}.0`, `system.adapter.${name}`]) {
+    const hit = objectIconValue(objects.get(id));
+    if (hit) return { value: hit.value, owner: id };
+  }
+  return undefined;
+}
+
 /**
  * The icon an object id resolves to (A65): walk the id's own path upward and
  * take the nearest object that carries any icon field; with none, the adapter —

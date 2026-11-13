@@ -8,6 +8,8 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
+  import { adapterIcon } from "$lib/config/icon-ops";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     commitPluginPages,
     getPluginPages,
@@ -22,6 +24,9 @@
   } from "$lib/config/plugin-pages";
 
   const pages = $derived(getPluginPages().pages);
+  const adminIcon = $derived(
+    adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
+  );
 
   let selectedId = $state("");
   let draft = $state<PluginPageEntry | null>(null);
@@ -221,7 +226,11 @@
   <div class="page-list">
     <div class="item">
       <div class="item-line">
-        <Icon value="settings_applications" size={18} />
+        {#if adminIcon}
+          <Icon value={adminIcon.value} owner={adminIcon.owner} size={18} />
+        {:else}
+          <Icon value="settings_applications" size={18} />
+        {/if}
         <span class="name static-name">Admin</span>
         <span class="badge badge-secondary">built-in</span>
         <span class="meta mono">/admin</span>

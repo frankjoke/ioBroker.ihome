@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  adapterIcon,
   brokerIconPath,
   deviceFaceIcon,
   deviceObjectIcon,
@@ -203,4 +204,22 @@ it("suggests a default glyph for a bare state's role", () => {
   expect(glyphForRole("button")).toBe("touch_app");
   expect(glyphForRole("state", "boolean")).toBe("toggle_on");
   expect(glyphForRole("state", "string")).toBeUndefined();
+});
+
+it("reads an adapter's own icon, instance first", () => {
+  const objects = new Map<string, any>([
+    ["system.adapter.admin.0", { common: { icon: "admin-instance.svg" } }],
+    ["system.adapter.admin", { common: { icon: "admin.svg" } }],
+    ["system.adapter.ihome", { common: { extIcon: "https://x/ihome.png" } }],
+  ]);
+  expect(adapterIcon(objects, "admin")).toEqual({
+    value: "admin-instance.svg",
+    owner: "system.adapter.admin.0",
+  });
+  expect(adapterIcon(objects, "ihome")).toEqual({
+    value: "https://x/ihome.png",
+    owner: "system.adapter.ihome",
+  });
+  expect(adapterIcon(objects, "nope")).toBeUndefined();
+  expect(adapterIcon(objects, "")).toBeUndefined();
 });

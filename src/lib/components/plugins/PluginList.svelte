@@ -1,12 +1,15 @@
 <script lang="ts">
   import PluginEditor from "./PluginEditor.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deletePlugin, exportPlugin } from "$lib/stores/plugins.svelte";
   import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
   import { downloadJson } from "$lib/utils/download";
   import { slugify } from "$lib/config/slug";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { adapterIcon } from "$lib/config/icon-ops";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import type { PluginView } from "$adapter/plugin-admin";
 
   let {
@@ -22,6 +25,11 @@
       value: boolean,
     ) => void;
   } = $props();
+
+  const homeAdapter = ioBroker.namespace.split(".")[0] ?? "ihome";
+  const homeIcon = $derived(
+    adapterIcon(ioBroker.objects as Map<string, any>, homeAdapter),
+  );
 
   let selectedId = $state("");
   let editorEl = $state<{ save: () => void } | undefined>();
@@ -113,6 +121,11 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="item-line" onclick={(event) => onLineClick(event, plugin)}>
+        {#if plugin.builtin && homeIcon}
+          <Icon value={homeIcon.value} owner={homeIcon.owner} size={18} />
+        {:else}
+          <Icon value="extension" size={18} />
+        {/if}
         <button
           type="button"
           class="name"

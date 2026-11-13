@@ -23,6 +23,7 @@
     wantsDeviceConfig,
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
+  import { adapterIcon } from "$lib/config/icon-ops";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
@@ -70,6 +71,16 @@
       : routeId === "/admin"
         ? "settings_applications"
         : (currentConfig?.icon ?? "settings"),
+  );
+  const homeAdapter = ioBroker.namespace.split(".")[0] ?? "ihome";
+  const pluginsIcon = $derived(
+    adapterIcon(ioBroker.objects as Map<string, any>, homeAdapter),
+  );
+  const adminIcon = $derived(
+    adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
+  );
+  const currentIconImage = $derived(
+    routeId === "/admin" ? adminIcon : undefined,
   );
 
   // The cog menu: the static config pages around one Plugins group.
@@ -256,9 +267,17 @@
       {/each}
     {:else}
       <div class="current-page">
-        <span class="material-symbols-outlined" aria-hidden="true"
-          >{currentIcon}</span
-        >
+        {#if currentIconImage}
+          <Icon
+            value={currentIconImage.value}
+            owner={currentIconImage.owner}
+            size={18}
+          />
+        {:else}
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >{currentIcon}</span
+          >
+        {/if}
         <span class="menu-current">{currentLabel}</span>
       </div>
     {/if}
@@ -400,9 +419,17 @@
             aria-current={routeId === "/plugins" ? "page" : undefined}
             onclick={() => (cogMenuOpen = false)}
           >
-            <span class="material-symbols-outlined" aria-hidden="true"
-              >extension</span
-            >
+            {#if pluginsIcon}
+              <Icon
+                value={pluginsIcon.value}
+                owner={pluginsIcon.owner}
+                size={18}
+              />
+            {:else}
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >extension</span
+              >
+            {/if}
             <span>Plugins</span>
           </a>
           {#if adminPage}
@@ -413,9 +440,17 @@
               aria-current={routeId === "/admin" ? "page" : undefined}
               onclick={() => (cogMenuOpen = false)}
             >
-              <span class="material-symbols-outlined" aria-hidden="true"
-                >settings_applications</span
-              >
+              {#if adminIcon}
+                <Icon
+                  value={adminIcon.value}
+                  owner={adminIcon.owner}
+                  size={18}
+                />
+              {:else}
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >settings_applications</span
+                >
+              {/if}
               <span>Admin</span>
             </a>
           {/if}
