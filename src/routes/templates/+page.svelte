@@ -155,91 +155,93 @@
 </svelte:head>
 
 <div class="templates-page">
-  <div class="page-heading">
-    <div class="tabs-line">
-      <OptionTabs
-        bind:value={tabValue}
-        label="Template group"
-        {tabs}
-        collapsible={false}
-        onchange={onTabChange}
-      />
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        aria-expanded={showHelp}
-        onclick={() => (showHelp = !showHelp)}
-      >
-        <span class="material-symbols-outlined">help</span>
-        Help
-        <span class="material-symbols-outlined"
-          >{showHelp ? "expand_less" : "expand_more"}</span
+  <div class="item" class:open={showHelp}>
+    <div class="item-line title-line">
+      <div class="tabs-line">
+        <OptionTabs
+          bind:value={tabValue}
+          label="Template group"
+          {tabs}
+          collapsible={false}
+          onchange={onTabChange}
+        />
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          aria-expanded={showHelp}
+          onclick={() => (showHelp = !showHelp)}
         >
-      </button>
+          <span class="material-symbols-outlined">help</span>
+          Help
+          <span class="material-symbols-outlined"
+            >{showHelp ? "expand_less" : "expand_more"}</span
+          >
+        </button>
+      </div>
+      <div class="page-actions">
+        {#if group === "code"}
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => codeRef?.startNew("formula")}
+          >
+            + Formula
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            onclick={() => codeRef?.startNew("function")}
+          >
+            + Function
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => templateRef?.startNew("device")}
+          >
+            + Device
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            onclick={() => templateRef?.startNew("logic")}
+          >
+            + Logic
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            onclick={() => templateRef?.startNew("api")}
+          >
+            + API
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            onclick={() => templateRef?.startNew("both")}
+          >
+            + Both
+          </button>
+        {/if}
+        <IconButton
+          icon="upload"
+          label="Import template"
+          title="Import"
+          onclick={() => {
+            importError = "";
+            importOpen = true;
+          }}
+        />
+      </div>
     </div>
-    <div class="page-actions">
-      {#if group === "code"}
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onclick={() => codeRef?.startNew("formula")}
-        >
-          + Formula
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          onclick={() => codeRef?.startNew("function")}
-        >
-          + Function
-        </button>
-      {:else}
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onclick={() => templateRef?.startNew("device")}
-        >
-          + Device
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          onclick={() => templateRef?.startNew("logic")}
-        >
-          + Logic
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          onclick={() => templateRef?.startNew("api")}
-        >
-          + API
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          onclick={() => templateRef?.startNew("both")}
-        >
-          + Both
-        </button>
-      {/if}
-      <IconButton
-        icon="upload"
-        label="Import template"
-        title="Import"
-        onclick={() => {
-          importError = "";
-          importOpen = true;
-        }}
-      />
-    </div>
-  </div>
 
-  {#if showHelp}
-    <div class="item-editor">
-      <HelpSection help={TEMPLATES_GUIDE} static plain />
-    </div>
-  {/if}
+    {#if showHelp}
+      <div class="item-editor">
+        <HelpSection help={TEMPLATES_GUIDE} static plain />
+      </div>
+    {/if}
+  </div>
 
   {#if importError}
     <p class="text-danger hint">{importError}</p>
@@ -314,12 +316,8 @@
     --option-tab-bg: var(--background-color);
   }
 
-  .page-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+  .title-line {
+    cursor: default;
   }
 
   .tabs-line {
