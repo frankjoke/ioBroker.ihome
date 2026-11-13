@@ -41,16 +41,46 @@ export const BUILTIN_FUNCTIONS: FunctionTemplate[] = [
     id: "message-push",
     name: "Message + push",
     description:
-      "Log a notification and push it to every phone subscribed to iHome.",
+      "Log and push to every phone; the lock screen stays private (app name only).",
     mode: "statements",
     code: 'notify("Title", "Body")',
   },
   {
     id: "phone-push",
-    name: "Phone push",
+    name: "Visible push",
     description:
-      "Raw push state: title on the first line, body on the rest. Use the Message + push snippet unless you need the exact payload.",
+      "Raw adapter command state: shows the title and body on the lock screen. Use Message + push for the private standard.",
     mode: "statements",
+    code: 'set("ihome.0.phone.pushMessage", "Title\\nBody")',
+  },
+  {
+    id: "log-expr",
+    name: "Log line",
+    description: "Write a line to the iHome log.",
+    mode: "expression",
+    code: 'log("text")',
+  },
+  {
+    id: "message-expr",
+    name: "UI toast",
+    description: "Self-disposing toast in the iHome UI (seconds).",
+    mode: "expression",
+    code: 'message("text", "info", 5)',
+  },
+  {
+    id: "push-private-expr",
+    name: "Push (private)",
+    description:
+      "Log and push to every phone; the lock screen stays private (app name only).",
+    mode: "expression",
+    code: 'notify("Title", "Body")',
+  },
+  {
+    id: "push-visible-expr",
+    name: "Push (visible)",
+    description:
+      "Shows the title and body on the lock screen; writes the raw adapter command state.",
+    mode: "expression",
     code: 'set("ihome.0.phone.pushMessage", "Title\\nBody")',
   },
 ];

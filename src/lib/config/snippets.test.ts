@@ -36,4 +36,16 @@ describe("snippetChoices", () => {
     );
     expect(snippetChoices(user, "both")[0].id).toBe(BUILTIN_FUNCTIONS[0].id);
   });
+
+  it("offers the side-effect snippets to action expressions", () => {
+    const ids = snippetChoices([], "expression").map((entry) => entry.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        "log-expr",
+        "message-expr",
+        "push-private-expr",
+        "push-visible-expr",
+      ]),
+    );
+  });
 });
