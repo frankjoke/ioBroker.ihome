@@ -149,7 +149,7 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.3.4 (2026-11-13)
 
 Cog menu instead of the configuration tab strip, plugin pages under Plugins (built-in Admin, iqontrol and custom links) embedded or in a new tab, frame-only embedded pages, fold-out User Interface/Server & Security forms, and the page name in the bar instead of a content title.
 
