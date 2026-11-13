@@ -28,6 +28,7 @@
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { pluginPageHref } from "$lib/config/plugin-pages";
+  import { BUILTIN_PAGES, adminPageHref } from "$lib/config/builtin-pages";
   import {
     getPluginPages,
     initPluginPages,
@@ -49,6 +50,15 @@
    */
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
+
+  /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
+  const adminTab = $derived.by(() => {
+    if (routeId !== "/admin") return "overview";
+    const hash = route.url.hash;
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const tab = new URLSearchParams(query).get("tab") ?? "";
+    return tab === "objects" || tab === "enums" ? tab : "overview";
+  });
   const currentConfig = $derived(configPages.find((p) => p.id === routeId));
   const pluginPageList = $derived(getPluginPages().pages);
   const currentPluginPage = $derived.by(() => {
@@ -62,7 +72,10 @@
       : currentPluginPage
         ? `Plugins › ${currentPluginPage.title}`
         : routeId === "/admin"
-          ? "Plugins › Admin"
+          ? `Plugins › ${
+              BUILTIN_PAGES.find((page) => page.tab === adminTab)?.title ??
+              "Admin"
+            }`
           : (currentConfig?.label ?? "Configuration"),
   );
   const currentIcon = $derived(
@@ -442,26 +455,35 @@
             <span>Plugins</span>
           </a>
           {#if adminPage}
-            <a
-              class="menu-item sub"
-              class:active={routeId === "/admin"}
-              href={pageHref("/admin", base)}
-              aria-current={routeId === "/admin" ? "page" : undefined}
-              onclick={() => (cogMenuOpen = false)}
-            >
-              {#if adminIcon}
-                <Icon
-                  value={adminIcon.value}
-                  owner={adminIcon.owner}
-                  size={18}
-                />
-              {:else}
-                <span class="material-symbols-outlined" aria-hidden="true"
-                  >settings_applications</span
-                >
-              {/if}
-              <span>Admin</span>
-            </a>
+            {#each BUILTIN_PAGES as entry (entry.id)}
+              {@const active = routeId === "/admin" && adminTab === entry.tab}
+              <a
+                class="menu-item sub"
+                class:active
+                href={adminPageHref(entry.tab, base)}
+                aria-current={active ? "page" : undefined}
+                onclick={() => (cogMenuOpen = false)}
+              >
+                {#if entry.id === "admin" && adminIcon}
+                  <Icon
+                    value={adminIcon.value}
+                    owner={adminIcon.owner}
+                    size={18}
+                  />
+                {:else if entry.svg}
+                  <Icon
+                    value={entry.svg}
+                    data={{ $color: "var(--text-color)" }}
+                    size={18}
+                  />
+                {:else}
+                  <span class="material-symbols-outlined" aria-hidden="true"
+                    >{entry.glyph}</span
+                  >
+                {/if}
+                <span>{entry.title}</span>
+              </a>
+            {/each}
           {/if}
           {#each pluginPageList as page (page.id)}
             {@const pageIcon = pageMenuIcon(page)}

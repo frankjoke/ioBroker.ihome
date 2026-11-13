@@ -9,6 +9,11 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
+  import {
+    BUILTIN_PAGES,
+    adminPageHref,
+    type BuiltinPage,
+  } from "$lib/config/builtin-pages";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     commitPluginPages,
@@ -34,44 +39,15 @@
   const adminIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
   );
-  /** ioBroker Admin's own Categories icon: a house for rooms and a bulb for
-   *  functions, as drawn by `src-admin/src/icons/IconCategories.tsx`. */
-  const ENUMS_ICON = `<svg viewBox="0 0 24 24" fill="{{$color}}"><g transform="translate(-1 -1.4) scale(0.78)"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></g><g transform="translate(14.5 13.5) scale(0.42)"><path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7"/></g></svg>`;
-
-  type Builtin = {
-    id: string;
-    title: string;
-    tab: string;
-    meta: string;
+  type BuiltinRow = BuiltinPage & {
     icon?: { value: string; owner?: string };
-    glyph?: string;
-    svg?: string;
   };
 
-  /** The fixed ioBroker Admin tabs, always first in the list. */
-  const builtins: Builtin[] = $derived([
-    {
-      id: "admin",
-      title: "Admin",
-      tab: "overview",
-      meta: "/admin",
-      icon: adminIcon,
-    },
-    {
-      id: "objects",
-      title: "Objects",
-      tab: "objects",
-      meta: "/admin/#tab-objects",
-      glyph: "account_tree",
-    },
-    {
-      id: "enums",
-      title: "Enums",
-      tab: "enums",
-      meta: "/admin/#tab-enums",
-      svg: ENUMS_ICON,
-    },
-  ]);
+  const builtins: BuiltinRow[] = $derived(
+    BUILTIN_PAGES.map((page): BuiltinRow =>
+      page.id === "admin" ? { ...page, icon: adminIcon } : page,
+    ),
+  );
 
   let selectedId = $state("");
   let draft = $state<PluginPageEntry | null>(null);
