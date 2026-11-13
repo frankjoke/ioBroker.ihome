@@ -39,6 +39,7 @@
   import BundleEditor from "./BundleEditor.svelte";
   import BundleApplyModal from "./BundleApplyModal.svelte";
   import DeviceApplyModal from "./DeviceApplyModal.svelte";
+  import DeviceCreateModal from "./DeviceCreateModal.svelte";
   import LogicApplyModal from "./LogicApplyModal.svelte";
   import HelpSection from "./HelpSection.svelte";
   import { exportTemplate } from "$lib/template-export";
@@ -75,6 +76,7 @@
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
   let deviceApplyTemplate = $state<Template | null>(null);
+  let deviceCreateTemplate = $state<Template | null>(null);
   let logicApplyTemplate = $state<LogicTemplate | null>(null);
   let bundleApplyTemplate = $state<TemplateBundle | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
@@ -228,6 +230,11 @@
   function openDeviceApply(entry: TemplateEntry) {
     const definition = definitionFor(entry);
     if (definition) deviceApplyTemplate = definition as Template;
+  }
+
+  function openDeviceCreate(entry: TemplateEntry) {
+    const definition = definitionFor(entry);
+    if (definition) deviceCreateTemplate = definition as Template;
   }
 
   function openLogicApply(entry: TemplateEntry) {
@@ -599,6 +606,15 @@
                     type="button"
                     class="btn btn-primary btn-sm"
                     disabled={editorDirty || !applyWritable || blocked}
+                    onclick={() => openDeviceCreate(entry)}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                    New device
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    disabled={editorDirty || !applyWritable || blocked}
                     onclick={() => openDeviceApply(entry)}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>
@@ -720,6 +736,13 @@
         askSwitch = false;
         pendingAction = null;
       }}
+    />
+  {/if}
+
+  {#if deviceCreateTemplate}
+    <DeviceCreateModal
+      template={deviceCreateTemplate}
+      onClose={() => (deviceCreateTemplate = null)}
     />
   {/if}
 

@@ -86,6 +86,15 @@
   }
 
   const isVirtual = $derived(control.kind === "virtual");
+  const referenceMissing = $derived.by(() => {
+    if (isVirtual || !control.stateId) return false;
+    const id = stateIdFor(control.stateId, getVariables());
+    if (ioBroker.objects.get(id)) return false;
+    const variable = getVariables().find(
+      (entry) => entry.name === control.stateId,
+    );
+    return variable?.kind !== "constant";
+  });
   const canHistory = $derived(
     !!control.stateId &&
       historyEnabled(
@@ -235,6 +244,9 @@
             >{stateParts.tail}</span
           ></span
         >
+        {#if referenceMissing}
+          <span class="err" title="Reference not found">not found</span>
+        {/if}
         <span class="state-val"
           >{#if labelDiffers}<strong class="state-label">{rowLabel}:</strong
             >{/if}{valueLabel}</span

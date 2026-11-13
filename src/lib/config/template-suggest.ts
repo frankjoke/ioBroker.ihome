@@ -5,6 +5,8 @@ import type { TemplateReference } from "./template-reference";
 
 export interface FeatureCandidate {
   feature: FeatureDef;
+  /** The stored reference (state id or variable name). */
+  ref?: string;
   stateId?: string;
   object?: any;
   candidates: TemplateReference[];
@@ -98,17 +100,21 @@ export function autoFillTemplate(
   template: Template,
   main: TemplateReference,
   objects: Map<string, any>,
+  anchorFeature?: string,
 ): AutoFillResult {
   const features = templateFeatures(template);
-  const primary = primaryFeature(features);
+  const anchor =
+    features.find((feature) => feature.feature === anchorFeature) ??
+    primaryFeature(features);
   const group = groupOfState(main.stateId, objects);
   const pool = groupStates(group, objects).filter(
     (entry) => entry.stateId !== main.stateId,
   );
   const fills: FeatureCandidate[] = features.map((feature) => {
-    if (feature === primary) {
+    if (feature === anchor) {
       return {
         feature,
+        ref: main.ref,
         stateId: main.stateId,
         object: main.object,
         candidates: [main],
@@ -119,6 +125,7 @@ export function autoFillTemplate(
     if (candidates.length === 1) {
       return {
         feature,
+        ref: candidates[0].ref,
         stateId: candidates[0].stateId,
         object: candidates[0].object,
         candidates,
@@ -144,6 +151,7 @@ export function autoFillTemplate(
       object: groupFills[0].object,
     };
     for (const fill of groupFills) {
+      fill.ref = undefined;
       fill.stateId = undefined;
       fill.object = undefined;
       fill.ambiguous = true;

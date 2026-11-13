@@ -71,6 +71,26 @@ it("auto-fills unique role matches and reports ambiguity/required", () => {
   expect(result.conflicts).toEqual([]);
 });
 
+it("can anchor a secondary feature and auto-fill the primary", () => {
+  const secondary = {
+    ref: "hue.0.lamp.1.t1",
+    stateId: "hue.0.lamp.1.t1",
+    object: objects.get("hue.0.lamp.1.t1"),
+  };
+  const result = autoFillTemplate(
+    lightTemplate(),
+    secondary,
+    objects,
+    "temperature",
+  );
+  expect(
+    result.fills.find((f) => f.feature.feature === "temperature")?.stateId,
+  ).toBe("hue.0.lamp.1.t1");
+  expect(
+    result.fills.find((f) => f.feature.feature === "power")?.stateId,
+  ).toBe("hue.0.lamp.1.on");
+});
+
 it("reports a conflict when two features resolve to one state", () => {
   const template = {
     ...PRESETS.Light,
