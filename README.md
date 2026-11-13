@@ -151,6 +151,8 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 ## Changelog
 ### **WORK IN PROGRESS**
 
+Cog menu instead of the configuration tab strip, plugin pages under Plugins (built-in Admin, iqontrol and custom links) embedded or in a new tab, frame-only embedded pages, fold-out User Interface/Server & Security forms, and the page name in the bar instead of a content title.
+
 ### 0.3.1 (2026-11-08)
 
 Samsung TV remote: compact the Home/Zurück/Info buttons and move the connection status into the title.
