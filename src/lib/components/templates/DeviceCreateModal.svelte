@@ -14,7 +14,7 @@
   import { planDeviceCreate } from "$lib/config/device-template-create";
   import { primaryFeature, templateFeatures } from "$lib/config/template-ops";
   import { roomsOf } from "$lib/config/rooms";
-  import { upsertDevice } from "$lib/registry.svelte.js";
+  import { isRegistryWritable, upsertDevice } from "$lib/registry.svelte.js";
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
@@ -43,6 +43,7 @@
   const variables = $derived(getVariables());
   const templates = $derived(getTemplateRegistry().templates ?? []);
   const logics = $derived(getLogicDocument().logics);
+  const deviceWritable = isRegistryWritable();
 
   let main = $state<TemplateReference | null>(null);
   let anchor = $state("");
@@ -67,7 +68,10 @@
     ),
   );
   const canCreate = $derived(
-    !!name.trim() && missing.length === 0 && fills.some((fill) => fill.stateId),
+    deviceWritable &&
+      !!name.trim() &&
+      missing.length === 0 &&
+      fills.some((fill) => fill.stateId),
   );
 
   function applyMain(reference: TemplateReference, featureKey: string): void {
@@ -126,6 +130,22 @@
     );
   }
 
+  function clearFill(feature: string): void {
+    fills = fills.map((fill) =>
+      fill.feature.feature === feature
+        ? {
+            ...fill,
+            ref: undefined,
+            stateId: undefined,
+            object: undefined,
+            candidates: [],
+            ambiguous: false,
+            conflict: false,
+          }
+        : fill,
+    );
+  }
+
   function chooseCandidate(
     feature: FeatureCandidate,
     reference: TemplateReference,
@@ -173,7 +193,10 @@
       error = plan.problem;
       return;
     }
-    upsertDevice(plan.device);
+    if (!upsertDevice(plan.device)) {
+      error = "The device document is not readable — nothing was saved.";
+      return;
+    }
     onCreated?.(plan.device);
     onClose();
   }
@@ -274,6 +297,11 @@
                   </span>
                 {/if}
               </div>
+              {#if fill.conflict}
+                <span class="text-danger hint">
+                  Also matched by another feature — choose one.
+                </span>
+              {/if}
               <button
                 type="button"
                 class="btn btn-outline btn-sm"
@@ -281,6 +309,15 @@
               >
                 {fill.stateId ? "Change" : "Choose"}
               </button>
+              {#if fill.stateId || fill.candidates.length > 0}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() => clearFill(fill.feature.feature)}
+                >
+                  Clear
+                </button>
+              {/if}
             </div>
           {/each}
         </div>

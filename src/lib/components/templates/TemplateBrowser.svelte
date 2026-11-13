@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRegistryWritable } from "$lib/registry.svelte.js";
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -136,6 +137,7 @@
         ? isTemplateBundlesWritable()
         : isLogicsWritable(),
   );
+  const deviceWritable = isRegistryWritable();
   const blocked = $derived(
     selected?.kind === "logic" || selected?.kind === "api"
       ? logicBlocked()
@@ -605,7 +607,10 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={editorDirty || !applyWritable || blocked}
+                    disabled={editorDirty ||
+                      !applyWritable ||
+                      blocked ||
+                      !deviceWritable}
                     onclick={() => openDeviceCreate(entry)}
                   >
                     <span class="material-symbols-outlined">add</span>
@@ -614,7 +619,10 @@
                   <button
                     type="button"
                     class="btn btn-outline btn-sm"
-                    disabled={editorDirty || !applyWritable || blocked}
+                    disabled={editorDirty ||
+                      !applyWritable ||
+                      blocked ||
+                      !deviceWritable}
                     onclick={() => openDeviceApply(entry)}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>

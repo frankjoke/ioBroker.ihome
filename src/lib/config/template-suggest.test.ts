@@ -71,6 +71,30 @@ it("auto-fills unique role matches and reports ambiguity/required", () => {
   expect(result.conflicts).toEqual([]);
 });
 
+it("keeps a clear role match when another feature falls back to the same type", () => {
+  const dimmer = new Map<string, any>([
+    ["hue.0.lamp.1", { type: "channel", common: { name: "Lamp" } }],
+    ["hue.0.lamp.1.on", state("switch.light", "boolean")],
+    ["hue.0.lamp.1.brightness", state("level.dimmer", "number")],
+  ]);
+  const result = autoFillTemplate(PRESETS.Light, main, dimmer);
+  expect(
+    result.fills.find((f) => f.feature.feature === "brightness")?.stateId,
+  ).toBe("hue.0.lamp.1.brightness");
+  expect(
+    result.fills.find((f) => f.feature.feature === "colorTemp")?.stateId,
+  ).toBeUndefined();
+  expect(result.conflicts).not.toContain("brightness");
+});
+
+it("offers Switch and Button for a plain boolean among all presets", () => {
+  const ids = suggestTemplatesForState(
+    { stateId: "x.b", object: state("state", "boolean") },
+    Object.values(PRESETS),
+  ).map((suggestion) => suggestion.template.id);
+  expect(ids.slice(0, 2).sort()).toEqual(["Button", "Switch"]);
+});
+
 it("can anchor a secondary feature and auto-fill the primary", () => {
   const secondary = {
     ref: "hue.0.lamp.1.t1",
@@ -105,6 +129,14 @@ it("reports a conflict when two features resolve to one state", () => {
   );
   const result = autoFillTemplate(template, main, conflictObjects);
   expect(result.conflicts).toEqual(["a", "b"]);
+  expect(
+    result.fills
+      .filter((fill) => fill.conflict)
+      .map((fill) => fill.feature.feature),
+  ).toEqual(["a", "b"]);
+  expect(
+    result.fills.every((fill) => !fill.conflict || fill.candidates.length > 0),
+  ).toBe(true);
 });
 
 it("suggests the temperature templates and both boolean templates", () => {

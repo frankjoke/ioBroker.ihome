@@ -18,6 +18,17 @@ import { getSettings } from "$lib/stores/settings.svelte";
 let initPromise = null;
 let saveTimer = null;
 let lastSent = null;
+/** How the stored device document last loaded. `pending`/`unreadable` block writes. */
+let loadKind = "pending";
+
+export function registryLoadKind() {
+  return loadKind;
+}
+
+/** False until the device document was read successfully, and on a broken one. */
+export function isRegistryWritable() {
+  return loadKind === "loaded" || loadKind === "absent";
+}
 
 function parseRegistry(raw) {
   if (raw && typeof raw === "object" && "val" in raw) raw = raw.val;
@@ -84,6 +95,7 @@ export function backfillDeviceEnums() {
 }
 
 export function saveRegistry() {
+  if (!isRegistryWritable()) return;
   // New state ids may have entered the used set — load their current values.
   void loadUsedStates();
   clearTimeout(saveTimer);
@@ -100,6 +112,7 @@ export function saveRegistry() {
 /** Insert a device or replace the one with the same id, and persist. The one
  *  write path for the device editors, including the pickers' inline form. */
 export function upsertDevice(device) {
+  if (!isRegistryWritable()) return false;
   const reg = getCanonicalRegistry();
   const known = (reg.devices ?? []).some((d) => d.id === device.id);
   setCanonicalRegistry({
@@ -111,6 +124,7 @@ export function upsertDevice(device) {
       : [...(reg.devices ?? []), device],
   });
   saveRegistry();
+  return true;
 }
 
 export function initRegistry() {
@@ -143,8 +157,13 @@ export function initRegistry() {
           void loadUsedStates();
           return true;
         };
-        const parsed = parseRegistry(st.value);
-        if (parsed) {
+        const raw = st.value;
+        const empty = raw === null || raw === undefined || raw === "";
+        const parsed = empty ? null : parseRegistry(raw);
+        if (empty) {
+          loadKind = "absent";
+        } else if (parsed) {
+          loadKind = "loaded";
           setCanonicalRegistry(
             migrateRegistry(parsed, getSettings().sizeUnit === SIZE_UNIT),
           );
@@ -153,6 +172,11 @@ export function initRegistry() {
             "[registry] init loaded:",
             parsed.devices?.length ?? 0,
             "devices",
+          );
+        } else {
+          loadKind = "unreadable";
+          console.error(
+            "[registry] deviceList is unreadable — refusing to overwrite it",
           );
         }
         void loadUsedStates();

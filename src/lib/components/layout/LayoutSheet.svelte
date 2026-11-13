@@ -339,6 +339,10 @@
   function onTileStatePicked(id: string, object: any): void {
     const target = pickerFor;
     if (!target || target.kind !== "newTile") return;
+    if (!writable) {
+      actionError = "The page document is not editable — nothing was created.";
+      return;
+    }
     const resolved = resolveTemplateReference(
       id,
       ioBroker.objects as Map<string, any>,

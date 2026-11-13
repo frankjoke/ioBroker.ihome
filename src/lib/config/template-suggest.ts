@@ -11,6 +11,8 @@ export interface FeatureCandidate {
   object?: any;
   candidates: TemplateReference[];
   ambiguous: boolean;
+  /** Two features resolved to the same state; the user must choose one. */
+  conflict?: boolean;
 }
 
 export interface AutoFillResult {
@@ -25,7 +27,10 @@ export interface TemplateSuggestion {
   score: number;
 }
 
-type Match = "role" | "type" | null;
+type Match = "role" | "generic" | "type" | null;
+
+/** Hints so broad that they say nothing about the device family. */
+const GENERIC_HINTS = new Set(["value", "state"]);
 
 function roleMatches(role: string, hints: string[]): boolean {
   const value = role.trim().toLowerCase();
@@ -40,6 +45,14 @@ function roleMatches(role: string, hints: string[]): boolean {
   });
 }
 
+function specificRoleMatches(role: string, hints: string[]): boolean {
+  return hints.some(
+    (hint) =>
+      !GENERIC_HINTS.has(hint.trim().toLowerCase()) &&
+      roleMatches(role, [hint]),
+  );
+}
+
 function typeFits(type: string, widget: FeatureDef["widget"]): boolean {
   if (type === "boolean") return widget === "switch" || widget === "button";
   if (type === "number") return widget === "level" || widget === "value";
@@ -49,9 +62,14 @@ function typeFits(type: string, widget: FeatureDef["widget"]): boolean {
 
 function matchFeature(feature: FeatureDef, object: any): Match {
   const role = String(object?.common?.role ?? "");
-  if (roleMatches(role, feature.roleHints)) return "role";
-  if (typeFits(String(object?.common?.type ?? ""), feature.widget))
+  if (specificRoleMatches(role, feature.roleHints)) return "role";
+  if (roleMatches(role, feature.roleHints)) return "generic";
+  if (
+    typeFits(String(object?.common?.type ?? ""), feature.widget) &&
+    feature.roleHints.includes(feature.widget)
+  ) {
     return "type";
+  }
   return null;
 }
 
@@ -85,20 +103,6 @@ function groupStates(
   return out;
 }
 
-function candidatesFor(
-  feature: FeatureDef,
-  pool: TemplateReference[],
-): TemplateReference[] {
-  const role = pool.filter((entry) =>
-    roleMatches(String(entry.object?.common?.role ?? ""), feature.roleHints),
-  );
-  if (role.length > 0) return role;
-  const type = pool.filter((entry) =>
-    typeFits(String(entry.object?.common?.type ?? ""), feature.widget),
-  );
-  return type.length === 1 ? type : [];
-}
-
 /** Match the remaining template features against the main state's group. */
 export function autoFillTemplate(
   template: Template,
@@ -114,6 +118,19 @@ export function autoFillTemplate(
   const pool = groupStates(group, objects).filter(
     (entry) => entry.stateId !== main.stateId,
   );
+  const roleCandidates = new Map<FeatureDef, TemplateReference[]>();
+  const claimed = new Set<string>();
+  for (const feature of features) {
+    if (feature === anchor) continue;
+    const candidates = pool.filter((entry) =>
+      specificRoleMatches(
+        String(entry.object?.common?.role ?? ""),
+        feature.roleHints,
+      ),
+    );
+    roleCandidates.set(feature, candidates);
+    for (const candidate of candidates) claimed.add(candidate.stateId);
+  }
   const fills: FeatureCandidate[] = features.map((feature) => {
     if (feature === anchor) {
       return {
@@ -125,18 +142,37 @@ export function autoFillTemplate(
         ambiguous: false,
       };
     }
-    const candidates = candidatesFor(feature, pool);
-    if (candidates.length === 1) {
+    const roles = roleCandidates.get(feature) ?? [];
+    if (roles.length === 1) {
       return {
         feature,
-        ref: candidates[0].ref,
-        stateId: candidates[0].stateId,
-        object: candidates[0].object,
-        candidates,
+        ref: roles[0].ref,
+        stateId: roles[0].stateId,
+        object: roles[0].object,
+        candidates: roles,
         ambiguous: false,
       };
     }
-    return { feature, candidates, ambiguous: candidates.length > 1 };
+    if (roles.length > 1) {
+      return { feature, candidates: roles, ambiguous: true };
+    }
+    const type = pool.filter(
+      (entry) =>
+        !claimed.has(entry.stateId) &&
+        feature.roleHints.includes(feature.widget) &&
+        typeFits(String(entry.object?.common?.type ?? ""), feature.widget),
+    );
+    if (type.length === 1) {
+      return {
+        feature,
+        ref: type[0].ref,
+        stateId: type[0].stateId,
+        object: type[0].object,
+        candidates: type,
+        ambiguous: false,
+      };
+    }
+    return { feature, candidates: type, ambiguous: type.length > 1 };
   });
 
   const conflicts: string[] = [];
@@ -159,7 +195,8 @@ export function autoFillTemplate(
       fill.stateId = undefined;
       fill.object = undefined;
       fill.ambiguous = true;
-      fill.candidates = [entry];
+      fill.conflict = true;
+      fill.candidates = fill.candidates.length > 0 ? fill.candidates : [entry];
       conflicts.push(fill.feature.feature);
     }
   }
@@ -198,7 +235,16 @@ export function suggestTemplatesForState(
     if (best) scored.push(best);
   }
   const hasRole = scored.some((entry) => entry.score >= 3);
-  return (hasRole ? scored.filter((entry) => entry.score >= 3) : scored).sort(
+  let list = hasRole ? scored.filter((entry) => entry.score >= 3) : scored;
+  if (!hasRole) {
+    // A plain boolean should offer Switch/Button, not every multi-feature
+    // template that happens to accept a switch.
+    const simple = list.filter(
+      (entry) => templateFeatures(entry.template).length === 1,
+    );
+    if (simple.length > 0) list = simple;
+  }
+  return list.sort(
     (a, b) =>
       b.score - a.score || a.template.name.localeCompare(b.template.name),
   );
