@@ -526,6 +526,7 @@
           label="Logic type"
           tabs={kindTabs}
           collapsible={false}
+          showHint={false}
           onchange={onKindTab}
         />
       </div>

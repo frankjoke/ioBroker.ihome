@@ -167,6 +167,7 @@
           label="Template group"
           {tabs}
           collapsible={false}
+          showHint={false}
           onchange={onTabChange}
         />
       </div>

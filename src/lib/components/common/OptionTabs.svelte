@@ -9,6 +9,7 @@
     value = $bindable(null),
     label,
     collapsible = true,
+    showHint = true,
     children,
     onchange,
   }: {
@@ -19,6 +20,9 @@
     label: string;
     /** True: clicking the open tab closes it. False: one tab is always open. */
     collapsible?: boolean;
+    /** Print the open tab's hint under the strip on touch. Off when the host
+     *  already explains the page (page headers). */
+    showHint?: boolean;
     /** The open group's body, called with the open id. */
     children?: Snippet<[T | null]>;
     /** Called after a click with the new open id (null when closed). */
@@ -47,7 +51,7 @@
       </button>
     {/each}
   </div>
-  {#if openHint}
+  {#if showHint && openHint}
     <p class="option-tab-hint touch-only">{openHint}</p>
   {/if}
   {@render children?.(value)}
