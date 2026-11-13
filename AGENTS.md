@@ -23,6 +23,9 @@
 
 - **Before any UI change, read `docs/UI-DESIGN.md` and follow it.** It is the
   source of truth for tokens, page anatomy, lists/rows and buttons.
+- **For data-model or cross-layer work, read `docs/App-structure.md`.** It
+  defines states, objects, devices, controls, pages/sections/tiles/slots,
+  variables, templates, logic and how they reference each other.
 - Every configuration ("cog") page uses the one list-editor pattern from §5:
   an `.item` with a clickable `.item-line`, the name as the open/close control,
   and right-aligned `.item-actions` (IconButton for export/duplicate/delete, a
