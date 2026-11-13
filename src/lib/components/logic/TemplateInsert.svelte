@@ -63,9 +63,9 @@
   }
 </script>
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Insert template">
+<div class="modal" role="dialog" aria-modal="true" aria-label="From template">
   <div class="modal-card card">
-    <h3>Insert template</h3>
+    <h3>From template</h3>
     <div class="body">
       <label class="label-mono" for="template-select">Template</label>
       <select

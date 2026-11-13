@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import type { LogicDef } from "$logic/types";
   import type { LogicReading } from "$logic/engine";
   import {
@@ -35,6 +37,7 @@
     getPickerValue,
   } from "$lib/picker-values.svelte.js";
   import { takeRequestedLogicConfig } from "$lib/pages.js";
+  import { LOGIC_GUIDE } from "$lib/config/page-guides";
 
   const doc = $derived(getLogicDocument());
   let selectedId = $state<string | null>(null);
@@ -157,9 +160,35 @@
   let pendingSelect = $state<LogicDef | null>(null);
 
   let search = $state("");
-  let kindFilter = $state<"" | "machine" | "function">("");
+  let kindTab = $state<"machine" | "function">("machine");
+  let tabValue = $state<"machine" | "function" | null>("machine");
+  let showHelp = $state(false);
   let roomFilter = $state("");
   let functionFilter = $state("");
+
+  const kindTabs = [
+    {
+      id: "machine" as const,
+      label: "Logic",
+      hint: "Logics that react to events.",
+    },
+    {
+      id: "function" as const,
+      label: "Actions",
+      hint: "Computed values and reusable functions.",
+    },
+  ];
+
+  function onKindTab(next: "machine" | "function" | null) {
+    kindTab = next ?? "machine";
+    tabValue = kindTab;
+  }
+
+  function startCreate(kind: "machine" | "action") {
+    kindTab = kind === "machine" ? "machine" : "function";
+    tabValue = kindTab;
+    pendingCreate = kind;
+  }
 
   const roomOptions = $derived(
     roomList(ioBroker.enums).map((r) => ({
@@ -198,7 +227,7 @@
     const q = search.trim().toLowerCase();
     return doc.logics.filter((logic) => {
       if (q && !logic.name.toLowerCase().includes(q)) return false;
-      if (kindFilter && logic.kind !== kindFilter) return false;
+      if (logic.kind !== kindTab) return false;
       if (roomFilter || functionFilter) {
         const enums = logicEnums(logic);
         if (roomFilter && !enums.includes(roomFilter)) return false;
@@ -485,8 +514,29 @@
 </svelte:head>
 
 <div class="logic-page">
-  <div class="page-heading">
-    <div class="title-line">
+  <div class="item" class:open={showHelp}>
+    <div class="item-line title-line">
+      <div class="tabs-line">
+        <OptionTabs
+          bind:value={tabValue}
+          label="Logic type"
+          tabs={kindTabs}
+          collapsible={false}
+          onchange={onKindTab}
+        />
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          aria-expanded={showHelp}
+          onclick={() => (showHelp = !showHelp)}
+        >
+          <span class="material-symbols-outlined">help</span>
+          Help
+          <span class="material-symbols-outlined"
+            >{showHelp ? "expand_less" : "expand_more"}</span
+          >
+        </button>
+      </div>
       <div class="page-actions">
         <label class="check" title="Show the adapter log">
           <input type="checkbox" bind:checked={showLog} />
@@ -498,29 +548,29 @@
           onclick={() => (inserting = true)}
         >
           <span class="material-symbols-outlined">dashboard_customize</span>
-          Insert template
+          From template
         </button>
         <button
           type="button"
           class="btn btn-primary btn-sm"
-          onclick={() => (pendingCreate = "machine")}
+          onclick={() => startCreate("machine")}
         >
-          <span class="material-symbols-outlined">add</span> State machine
+          + Logic
         </button>
         <button
           type="button"
           class="btn btn-primary btn-sm"
-          onclick={() => (pendingCreate = "action")}
+          onclick={() => startCreate("action")}
         >
-          <span class="material-symbols-outlined">add</span> Action
+          + Action
         </button>
       </div>
     </div>
-    <p class="text-muted hint">
-      Automations the adapter runs: switches and sensors with timers, or a
-      computed value. A logic without an external output works inside the
-      adapter only.
-    </p>
+    {#if showHelp}
+      <div class="item-editor">
+        <HelpSection help={LOGIC_GUIDE} static plain />
+      </div>
+    {/if}
   </div>
 
   {#if logicsLoadKind() === "unreadable"}
@@ -534,20 +584,13 @@
 
   {#if doc.logics.length === 0}
     <div class="card empty-state">
-      <p class="text-muted">
-        No logics yet — insert a template or add an empty one.
-      </p>
+      <p class="text-muted">No logics yet — use From template or add one.</p>
     </div>
   {:else}
     <div class="filter-block">
       <span class="label-mono">Filters</span>
       <div class="filter-bar">
         <input type="search" placeholder="Search logic…" bind:value={search} />
-        <select bind:value={kindFilter} aria-label="Filter by kind">
-          <option value="">Everything</option>
-          <option value="machine">State machines</option>
-          <option value="function">Actions</option>
-        </select>
         <select bind:value={roomFilter} aria-label="Filter by room">
           <option value="">All rooms</option>
           {#each roomOptions as r (r.value)}
@@ -583,8 +626,8 @@
             <span
               class="kind text-muted"
               role="img"
-              aria-label={logic.kind === "machine" ? "State machine" : "Action"}
-              title={logic.kind === "machine" ? "State machine" : "Action"}
+              aria-label={logic.kind === "machine" ? "Logic" : "Action"}
+              title={logic.kind === "machine" ? "Logic" : "Action"}
             >
               <span class="material-symbols-outlined" aria-hidden="true"
                 >{logic.kind === "machine" ? "account_tree" : "calculate"}</span
@@ -679,7 +722,7 @@
 
 {#if pendingCreate}
   <NameModal
-    title={pendingCreate === "machine" ? "New state machine" : "New action"}
+    title={pendingCreate === "machine" ? "New logic" : "New action"}
     confirmLabel="Create"
     validate={(name) => nameProblem(name)}
     onSubmit={(name) => {
@@ -696,6 +739,8 @@
   <TemplateInsert
     taken={doc.logics.map((logic) => logic.id)}
     onInsert={(logic) => {
+      kindTab = logic.kind === "machine" ? "machine" : "function";
+      tabValue = kindTab;
       if (commit([...doc.logics, logic])) select(logic);
     }}
     onClose={() => (inserting = false)}
@@ -747,17 +792,8 @@
     margin: 0 auto;
   }
 
-  .page-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
   .title-line {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    cursor: default;
   }
 
   .page-actions {
@@ -792,7 +828,7 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) 7.5rem 7.5rem;
     gap: 0.5rem;
   }
 
@@ -802,15 +838,13 @@
     padding: 0.35rem;
   }
 
-  @media (max-width: 820px) {
-    .filter-bar {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
   @media (max-width: 640px) {
     .filter-bar {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .filter-bar input {
+      grid-column: 1 / -1;
     }
   }
 
@@ -855,9 +889,4 @@
 
   /* "Logic" is short, so the buttons share its line and wrap one by one at their
      own width — the title never drops to a line of its own and no button stretches. */
-  @media (max-width: 820px) {
-    .page-actions {
-      display: contents;
-    }
-  }
 </style>

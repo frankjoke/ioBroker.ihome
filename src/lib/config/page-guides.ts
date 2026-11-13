@@ -72,3 +72,28 @@ Code templates are selected from their entry forms; they are not applied here.
 
 One definition is reused by devices, tiles, logic and formulas. Import and
 export share a template as a JSON file; an applied copy stays independent.`;
+
+export const LOGIC_GUIDE = `## What this page is for
+
+Logics are the automations the adapter runs. A **Logic** reacts to switches,
+sensors and timers; an **Action** computes a value. A logic without an external
+output works inside the adapter only.
+
+**Functions**
+
+- Add a **Logic** and give it states, events and actions.
+- Add an **Action** for a computed value or a reusable function.
+- Start from a built-in logic with **From template**.
+- Open a row to edit it; Save sits on its line.
+- Show the adapter log, and filter by room or function.
+
+**Usages**
+
+Motion lights, timers, heating and blind automations, computed sensors and
+values that other tiles or logics reuse.
+
+**Benefits**
+
+The same logic can read regular states, variables and other logics, and can
+write states or memory. The editor validates the document before the adapter
+runs it.`;
