@@ -674,6 +674,22 @@
     const source = slot.source;
     if (!source) return true;
     if (typeof source === "string") {
+      // The derived ago/offline badges name their source in `options.of` (or
+      // fall back to the tile's own controls), not in the slot source.
+      if (source === "ago" || source === "offline") {
+        const of = typeof slot.options?.of === "string" ? slot.options.of : "";
+        if (!of) return (device?.controls ?? []).length === 0;
+        const id = stateIdFor(of, getVariables());
+        return (
+          !sourceLook.objects.get(id) &&
+          !sourceLook.states.get(id) &&
+          !devices.some((d) =>
+            (d.controls ?? []).some(
+              (c) => c.id === of || c.stateId === of || c.feature === of,
+            ),
+          )
+        );
+      }
       const id = stateIdFor(source, getVariables());
       return (
         !devices.some((d) =>
