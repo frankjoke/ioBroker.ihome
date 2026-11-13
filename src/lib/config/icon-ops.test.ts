@@ -6,6 +6,8 @@ import {
   deviceObjectIcon,
   objectIconValue,
   glyphForRole,
+  pluginPageAdapter,
+  pluginPageIcon,
   presetGlyph,
   resolveIcon,
 } from "$lib/config/icon-ops";
@@ -222,4 +224,25 @@ it("reads an adapter's own icon, instance first", () => {
   });
   expect(adapterIcon(objects, "nope")).toBeUndefined();
   expect(adapterIcon(objects, "")).toBeUndefined();
+});
+
+it("derives a plugin page's adapter icon from its URL", () => {
+  expect(pluginPageAdapter("/iqontrol/")).toBe("iqontrol");
+  expect(
+    pluginPageAdapter("http://192.168.178.9:8082/iqontrol/index.html"),
+  ).toBe("iqontrol");
+  expect(pluginPageAdapter("https://example.com/")).toBeUndefined();
+
+  const objects = new Map<string, any>([
+    ["system.adapter.iqontrol", { common: { icon: "iqontrol.png" } }],
+  ]);
+  expect(
+    pluginPageIcon(objects, { icon: "web_asset", url: "/iqontrol/" }),
+  ).toEqual({ value: "iqontrol.png", owner: "system.adapter.iqontrol" });
+  expect(
+    pluginPageIcon(objects, { icon: "custom.png", url: "/iqontrol/" }),
+  ).toEqual({ value: "custom.png" });
+  expect(pluginPageIcon(objects, { icon: "web_asset", url: "/nope/" })).toEqual(
+    { value: "web_asset" },
+  );
 });

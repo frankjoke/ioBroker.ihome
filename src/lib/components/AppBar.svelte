@@ -23,7 +23,7 @@
     wantsDeviceConfig,
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
-  import { adapterIcon } from "$lib/config/icon-ops";
+  import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import { contrastColor } from "$lib/config/format";
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
@@ -79,9 +79,18 @@
   const adminIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
   );
-  const currentIconImage = $derived(
-    routeId === "/admin" ? adminIcon : undefined,
+  const currentPluginIcon = $derived(
+    currentPluginPage
+      ? pluginPageIcon(ioBroker.objects as Map<string, any>, currentPluginPage)
+      : undefined,
   );
+  const currentIconImage = $derived(
+    routeId === "/admin" ? adminIcon : currentPluginIcon,
+  );
+
+  function pageMenuIcon(page: { icon: string; url: string }) {
+    return pluginPageIcon(ioBroker.objects as Map<string, any>, page);
+  }
 
   // The cog menu: the static config pages around one Plugins group.
   const pluginGroupIndex = $derived(
@@ -455,6 +464,7 @@
             </a>
           {/if}
           {#each pluginPageList as page (page.id)}
+            {@const pageIcon = pageMenuIcon(page)}
             {#if page.open === "tab"}
               <a
                 class="menu-item sub"
@@ -463,9 +473,11 @@
                 rel="noopener"
                 onclick={() => (cogMenuOpen = false)}
               >
-                <span class="material-symbols-outlined" aria-hidden="true"
-                  >{page.icon || "web_asset"}</span
-                >
+                <Icon
+                  value={pageIcon?.value ?? "web_asset"}
+                  owner={pageIcon?.owner}
+                  size={18}
+                />
                 <span>{page.title}</span>
               </a>
             {:else}
@@ -480,9 +492,11 @@
                   : undefined}
                 onclick={() => (cogMenuOpen = false)}
               >
-                <span class="material-symbols-outlined" aria-hidden="true"
-                  >{page.icon || "web_asset"}</span
-                >
+                <Icon
+                  value={pageIcon?.value ?? "web_asset"}
+                  owner={pageIcon?.owner}
+                  size={18}
+                />
                 <span>{page.title}</span>
               </a>
             {/if}

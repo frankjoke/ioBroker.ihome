@@ -28,6 +28,39 @@ export function objectIconValue(
   return undefined;
 }
 
+/** The adapter a plugin page URL points at: the first path segment. */
+export function pluginPageAdapter(url: string): string | undefined {
+  const value = String(url ?? "").trim();
+  if (!value) return undefined;
+  let path = value;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      path = new URL(value).pathname;
+    } catch {
+      return undefined;
+    }
+  }
+  const segment = path.split("/").filter(Boolean)[0] ?? "";
+  return /^[A-Za-z0-9_-]+$/.test(segment) ? segment : undefined;
+}
+
+/** The icon a plugin page shows: its configured icon, else the adapter's own. */
+export function pluginPageIcon(
+  objects: Map<string, any>,
+  page: { icon?: string; url: string },
+): { value: string; owner?: string } | undefined {
+  const configured = String(page.icon ?? "").trim();
+  if (configured && configured !== "web_asset") {
+    return { value: configured };
+  }
+  const adapter = pluginPageAdapter(page.url);
+  if (adapter) {
+    const hit = adapterIcon(objects, adapter);
+    if (hit) return hit;
+  }
+  return configured ? { value: configured } : undefined;
+}
+
 /** The adapter's own icon: its instance object first, then the package. */
 export function adapterIcon(
   objects: Map<string, any>,

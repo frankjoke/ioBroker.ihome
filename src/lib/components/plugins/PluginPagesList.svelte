@@ -8,7 +8,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
-  import { adapterIcon } from "$lib/config/icon-ops";
+  import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     commitPluginPages,
@@ -246,11 +246,19 @@
 
     {#each pages as page (page.id)}
       {@const open = selectedId === page.id}
+      {@const pageIcon = pluginPageIcon(
+        ioBroker.objects as Map<string, any>,
+        page,
+      )}
       <div class="item" class:open>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="item-line" onclick={(event) => onLineClick(event, page)}>
-          <Icon value={page.icon || "web_asset"} size={18} />
+          <Icon
+            value={pageIcon?.value ?? "web_asset"}
+            owner={pageIcon?.owner}
+            size={18}
+          />
           <button
             type="button"
             class="name"
