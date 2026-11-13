@@ -58,6 +58,7 @@
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { newId } from "$lib/utils/ids";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
@@ -551,18 +552,67 @@
     pendingDelete = null;
     if (!target) return;
     if (target.kind === "page") {
-      commitLayout(deletePage(registry, target.pageId));
-    } else if (target.kind === "section") {
-      commitLayout(deleteSection(registry, target.pageId, target.sectionId));
-    } else if (target.kind === "tile") {
-      commitLayout(
-        deletePlacement(
-          registry,
-          target.pageId,
-          target.sectionId,
-          target.placementId,
-        ),
+      const neighbor = nextAfterRemoval(
+        registry.pages,
+        target.pageId,
+        (page) => page.id,
       );
+      if (!commitLayout(deletePage(registry, target.pageId))) return;
+      if (!neighbor) return;
+      onPage(neighbor.id);
+      selection = { kind: "page", pageId: neighbor.id };
+    } else if (target.kind === "section") {
+      const page = registry.pages.find((p) => p.id === target.pageId);
+      const neighbor = nextAfterRemoval(
+        page?.groups ?? [],
+        target.sectionId,
+        (group) => group.id,
+      );
+      if (
+        !commitLayout(deleteSection(registry, target.pageId, target.sectionId))
+      ) {
+        return;
+      }
+      selection = neighbor
+        ? {
+            kind: "section",
+            pageId: target.pageId,
+            sectionId: neighbor.id,
+          }
+        : { kind: "page", pageId: target.pageId };
+    } else if (target.kind === "tile") {
+      const section = registry.pages
+        .find((p) => p.id === target.pageId)
+        ?.groups.find((g) => g.id === target.sectionId);
+      const neighbor = nextAfterRemoval(
+        section?.tiles ?? [],
+        target.placementId,
+        (tile) => tile.id,
+      );
+      if (
+        !commitLayout(
+          deletePlacement(
+            registry,
+            target.pageId,
+            target.sectionId,
+            target.placementId,
+          ),
+        )
+      ) {
+        return;
+      }
+      selection = neighbor
+        ? {
+            kind: "tile",
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+            placementId: neighbor.id,
+          }
+        : {
+            kind: "section",
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+          };
     }
   }
 

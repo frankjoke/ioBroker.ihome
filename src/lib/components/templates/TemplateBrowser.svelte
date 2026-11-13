@@ -5,6 +5,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
@@ -503,6 +504,11 @@
     const entry = pendingDelete;
     pendingDelete = null;
     if (entry.builtin) return;
+    const neighbor = nextAfterRemoval(
+      rows,
+      `${entry.kind}:${entry.id}`,
+      (item) => `${item.kind}:${item.id}`,
+    );
     if (entry.kind === "device") {
       if (
         !commitTemplates({
@@ -556,7 +562,8 @@
     }
     if (selected?.kind === entry.kind && selected?.id === entry.id) {
       bundleDraft = null;
-      closeNow();
+      if (neighbor) start(neighbor);
+      else closeNow();
     }
   }
 </script>

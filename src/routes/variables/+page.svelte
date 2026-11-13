@@ -25,6 +25,7 @@
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
@@ -352,11 +353,17 @@
   }
 
   function confirmDelete() {
-    if (pendingDelete) {
-      deleteVariable(pendingDelete.id);
-      saveVariables();
-    }
+    const removed = pendingDelete;
     pendingDelete = null;
+    if (!removed) return;
+    const neighbor = nextAfterRemoval(rows, removed.id, (v) => v.id);
+    const wasEditing = editing?.id === removed.id;
+    deleteVariable(removed.id);
+    saveVariables();
+    if (wasEditing) {
+      if (neighbor) startEdit(neighbor);
+      else editing = null;
+    }
   }
 </script>
 

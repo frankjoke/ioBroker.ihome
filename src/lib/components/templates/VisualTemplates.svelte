@@ -2,6 +2,7 @@
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import TemplateControlsEditor from "./TemplateControlsEditor.svelte";
   import { PRESETS } from "$lib/config/presets";
@@ -187,6 +188,7 @@
 
   function remove(): void {
     if (!selected || isBuiltin || !writable) return;
+    const neighbor = nextAfterRemoval(shown, selected.id, (item) => item.id);
     const next = (registry.templates ?? []).filter(
       (template) => template.id !== selected.id,
     );
@@ -194,7 +196,7 @@
       error = "The template document could not be saved.";
       return;
     }
-    selectedId = presets[0].id;
+    selectedId = neighbor?.id ?? presets[0].id;
     pendingDelete = null;
   }
 </script>

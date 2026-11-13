@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import {
     BUILTIN_DEVICE_TEMPLATES,
     evaluateDeviceTemplate,
@@ -363,6 +364,11 @@
       deleting = true;
       return;
     }
+    const neighbor = nextAfterRemoval(
+      [...BUILTIN_DEVICE_TEMPLATES, ...(doc.deviceTemplates ?? [])],
+      selected.id,
+      (item) => item.id,
+    );
     const next = (doc.deviceTemplates ?? []).filter(
       (item) => item.id !== selected.id,
     );
@@ -370,7 +376,7 @@
       error = "The logic document could not be saved.";
       return;
     }
-    selectedId = BUILTIN_DEVICE_TEMPLATES[0].id;
+    selectedId = neighbor?.id ?? BUILTIN_DEVICE_TEMPLATES[0].id;
   }
 </script>
 

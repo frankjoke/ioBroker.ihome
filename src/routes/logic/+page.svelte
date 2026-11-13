@@ -18,6 +18,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import NameModal from "$lib/components/common/NameModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { renameMemoryRefs, renameLogicRefs } from "$lib/config/logic-rename";
   import { validateLogicDocument } from "$logic/validate";
   import type { Issue } from "$logic/validate";
@@ -145,11 +146,22 @@
   }
 
   function confirmDelete() {
-    if (pendingDelete) {
-      commit(doc.logics.filter((logic) => logic.id !== pendingDelete!.id));
-      if (selectedId === pendingDelete.id) selectedId = null;
-    }
+    const removed = pendingDelete;
     pendingDelete = null;
+    if (!removed) return;
+    const neighbor = nextAfterRemoval(
+      shownLogics,
+      removed.id,
+      (logic) => logic.id,
+    );
+    commit(doc.logics.filter((logic) => logic.id !== removed.id));
+    if (selectedId === removed.id) {
+      if (neighbor) openLogic(neighbor);
+      else {
+        selectedId = null;
+        draft = null;
+      }
+    }
   }
 
   /** The row being edited: edits happen on a copy, so the adapter only sees them
