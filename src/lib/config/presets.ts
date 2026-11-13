@@ -49,6 +49,7 @@ The tile glows green while the device is on and the badge tells you when it was 
       {
         kind: "value",
         source: "power",
+        options: { valueWhere: "modal" },
         icon: { glyph: "power_settings_new" },
         rules: [
           { when: "truthy(power)", color: "var(--success-color)", glow: true },
@@ -112,6 +113,7 @@ The tile glows amber while the light is on; the slider and colour picker write b
       {
         kind: "value",
         source: "power",
+        options: { valueWhere: "modal" },
         icon: { glyph: "lightbulb" },
         rules: [
           {
@@ -130,6 +132,7 @@ The tile glows amber while the light is on; the slider and colour picker write b
       },
       { kind: "level", source: "brightness" },
       { kind: "color", source: "color" },
+      { kind: "level", source: "colorTemp" },
       {
         kind: "badge",
         label: "Battery",

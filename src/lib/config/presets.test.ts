@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { PRESETS } from "./presets";
-import { suggestedSlots } from "./slot-create";
+import { materializeTemplateTile, suggestedSlots } from "./slot-create";
 import type { Control, Device } from "$lib/types/device";
 
 const powerControl: Control = {
@@ -40,4 +40,34 @@ it("drops the optional badges when the device has no such controls", () => {
       (slot) => slot.label === "Battery" || slot.label === "Connected",
     ),
   ).toBe(false);
+});
+
+it("includes the colour-temperature control in the Light template", () => {
+  const colorTemp: Control = {
+    id: "c-ct",
+    feature: "colorTemp",
+    stateId: "zigbee.0.lamp.colortemp",
+    writable: true,
+  };
+  const light = deviceWithControls([powerControl, colorTemp]);
+  const slots = suggestedSlots(light, PRESETS.Light.slots);
+  expect(
+    slots.some(
+      (slot) =>
+        typeof slot.source === "object" &&
+        slot.source.kind === "control" &&
+        slot.source.control === "c-ct",
+    ),
+  ).toBe(true);
+  const materialized = materializeTemplateTile(PRESETS.Light, light, [
+    PRESETS.Light,
+  ]);
+  expect(
+    materialized.slots.some(
+      (slot) =>
+        typeof slot.source === "object" &&
+        slot.source.kind === "control" &&
+        slot.source.control === "c-ct",
+    ),
+  ).toBe(true);
 });

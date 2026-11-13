@@ -8,6 +8,8 @@ import {
   tileTitle,
 } from "$lib/config/template-ops";
 import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
+import { autoFillTemplate } from "$lib/config/template-suggest";
+import type { TemplateReference } from "$lib/config/template-reference";
 import type { Control, Device, Widget } from "$lib/types/device";
 import type {
   ActiveCondition,
@@ -19,6 +21,17 @@ import type {
   TileConfig,
   TileLook,
 } from "$lib/types/display";
+
+/** The slot kinds that render a control widget: the live state's shape wins
+ *  over a recipe's kind for these. */
+const WIDGET_KINDS: SlotKind[] = [
+  "value",
+  "level",
+  "switch",
+  "color",
+  "enum",
+  "button",
+];
 
 /** The slot that renders a control widget. */
 export function slotKindForWidget(widget: Widget): SlotKind {
@@ -130,15 +143,7 @@ export function suggestedSlots(device: Device, recipe: Slot[]): Slot[] {
     // The live state's shape wins over the recipe's kind: a recipe's "switch"
     // hint on a Wh reading must still render as a value. Non-widget kinds
     // (history-list, icon, …) are the recipe's own and stay.
-    const widgetKinds: SlotKind[] = [
-      "value",
-      "level",
-      "switch",
-      "color",
-      "enum",
-      "button",
-    ];
-    const kind = widgetKinds.includes(slot.kind) ? base.kind : slot.kind;
+    const kind = WIDGET_KINDS.includes(slot.kind) ? base.kind : slot.kind;
     // The hint is dead weight once the source pins the control (A36).
     const options: Record<string, unknown> = { ...(base.options ?? {}) };
     for (const [key, value] of Object.entries(slot.options ?? {})) {
@@ -283,6 +288,109 @@ export function materializeTemplateTile(
     ...(template.active !== undefined ? { active } : {}),
     ...(template.look ? { look: template.look } : {}),
     ...(template.background ? { background: template.background } : {}),
+  };
+}
+
+/**
+ * A complete tile for a state + template, with no device created: the same
+ * slots as the device tile, bound to the broker states around the main one.
+ */
+export function materializeTemplateTileFromState(
+  template: Template,
+  main: TemplateReference,
+  objects: Map<string, any>,
+  anchorFeature?: string,
+): {
+  slots: Slot[];
+  active?: ActiveCondition;
+  look?: TileLook;
+  size?: Size;
+  background?: Background;
+  title?: string;
+  icon?: string;
+} {
+  const features = templateFeatures(template);
+  const byName = new Map(features.map((feature) => [feature.feature, feature]));
+  const { fills } = autoFillTemplate(template, main, objects, anchorFeature);
+  const filled = new Map<string, TemplateReference>();
+  for (const fill of fills) {
+    if (!fill.ref || !fill.object) continue;
+    filled.set(fill.feature.feature, {
+      ref: fill.ref,
+      stateId: fill.stateId ?? fill.ref,
+      object: fill.object,
+    });
+  }
+
+  const slots: Slot[] = [];
+  for (const slot of template.slots ?? []) {
+    const source = typeof slot.source === "string" ? slot.source : "";
+    const pick =
+      typeof slot.options?.pick === "string" ? slot.options.pick : "";
+    const hint = byName.has(source) ? source : byName.has(pick) ? pick : "";
+    if (!hint) {
+      slots.push(slot);
+      continue;
+    }
+    const entry = filled.get(hint);
+    if (!entry) continue;
+    const def = byName.get(hint)!;
+    const kind = WIDGET_KINDS.includes(slot.kind)
+      ? slotKindForWidget(widgetForMeta(entry.object?.common ?? {}, def.widget))
+      : slot.kind;
+    const base = slotFromState(entry.ref, entry.object, kind);
+    const options: Record<string, unknown> = { ...(base.options ?? {}) };
+    for (const [key, value] of Object.entries(slot.options ?? {})) {
+      if (key !== "pick" && value !== undefined) options[key] = value;
+    }
+    slots.push({
+      ...base,
+      ...slot,
+      kind,
+      source: base.source,
+      // Same caption the device tile gets: the recipe's, else the feature's.
+      label: slot.label ?? def.label,
+      unit: slot.unit ?? base.unit,
+      ...(Object.keys(options).length ? { options } : { options: undefined }),
+    });
+  }
+
+  // The ago badge tracks the main control, exactly as the device tile does.
+  const primary = features.find((feature) => feature.primary) ?? features[0];
+  const mainRef = (primary && filled.get(primary.feature)?.ref) ?? main.ref;
+  const bound = slots.map((slot) =>
+    slot.source === "ago"
+      ? {
+          ...slot,
+          options: {
+            ...slot.options,
+            of: mainRef,
+            ...(slot.options?.from ? {} : { from: "lc" }),
+          },
+        }
+      : slot,
+  );
+
+  const activeSource = template.active?.source;
+  const activeFill =
+    typeof activeSource === "string" ? filled.get(activeSource) : undefined;
+  const name = localizeName(main.object?.common?.name);
+  const glyph = bound[0]?.icon?.glyph ?? presetGlyph(template.type);
+  return {
+    slots: bound,
+    ...(activeFill && template.active
+      ? {
+          active: {
+            ...template.active,
+            source: { kind: "state", stateId: activeFill.ref },
+          },
+        }
+      : {}),
+    ...(template.look ? { look: template.look } : {}),
+    ...(template.size ? { size: template.size } : {}),
+    ...(template.background ? { background: template.background } : {}),
+    ...(name ? { title: name } : {}),
+    ...(glyph ? { icon: glyph } : {}),
   };
 }
 

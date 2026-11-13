@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   applyTileSeed,
   materializeTemplateTile,
+  materializeTemplateTileFromState,
   preselectedControlIds,
   suggestedSlots,
   slotFromControl,
@@ -438,4 +439,102 @@ it("drops a switch's offline badge when there is no connected control", () => {
   expect(result.slots.some((slot) => slot.options?.derive === "offline")).toBe(
     false,
   );
+});
+
+it("builds a Light tile from a state without creating a device", () => {
+  const main = {
+    ref: "alias.0.Lamp.SET",
+    stateId: "alias.0.Lamp.SET",
+    object: {
+      type: "state",
+      common: { name: "Lamp", role: "switch.light", type: "boolean" },
+    },
+  };
+  const objects = new Map<string, any>([
+    ["alias.0.Lamp", { type: "channel", common: { name: "Lamp" } }],
+    ["alias.0.Lamp.SET", main.object],
+    [
+      "alias.0.Lamp.brightness",
+      {
+        type: "state",
+        common: {
+          name: "Brightness",
+          role: "level.dimmer",
+          type: "number",
+          min: 0,
+          max: 100,
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.colortemp",
+      {
+        type: "state",
+        common: {
+          name: "Color temperature",
+          role: "level.color.temperature",
+          type: "number",
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.available",
+      {
+        type: "state",
+        common: {
+          name: "Available",
+          role: "indicator.reachable",
+          type: "boolean",
+        },
+      },
+    ],
+  ]);
+  const result = materializeTemplateTileFromState(
+    PRESETS.Light,
+    main,
+    objects,
+    "power",
+  );
+  // The same slots the device tile has: power, dimmer, colour temperature,
+  // ago and offline; colour and battery have no state here.
+  expect(result.slots.map((slot) => slot.kind)).toEqual([
+    "switch",
+    "level",
+    "level",
+    "badge",
+    "badge",
+  ]);
+  expect(result.slots[0].source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.SET",
+  });
+  expect(result.slots[2].source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.colortemp",
+  });
+  // The same captions the device tile gets from its feature controls.
+  expect(result.slots.map((slot) => slot.label)).toEqual([
+    "Power",
+    "Brightness",
+    "Color Temp",
+    undefined,
+    "Connected",
+  ]);
+  const ago = result.slots.find((slot) => slot.source === "ago");
+  expect(ago?.options).toMatchObject({
+    of: "alias.0.Lamp.SET",
+    from: "lc",
+  });
+  const offline = result.slots.find(
+    (slot) => slot.options?.derive === "offline",
+  );
+  expect(offline?.source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.available",
+  });
+  expect(result.title).toBe("Lamp");
+  expect(result.active).toMatchObject({
+    source: { kind: "state", stateId: "alias.0.Lamp.SET" },
+    op: "truthy",
+  });
 });

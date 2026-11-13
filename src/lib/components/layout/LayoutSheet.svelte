@@ -8,7 +8,6 @@
   import MoveSectionModal from "$lib/components/layout/MoveSectionModal.svelte";
   import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
-  import DeviceCreateModal from "$lib/components/templates/DeviceCreateModal.svelte";
   import TemplateSuggestionModal from "$lib/components/templates/TemplateSuggestionModal.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
@@ -35,9 +34,11 @@
     editTile,
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
+  import { templateById } from "$lib/config/template-ops";
   import {
     applyTileSeed,
     materializeTemplateTile,
+    materializeTemplateTileFromState,
     slotFromControl,
     slotFromState,
     slotKindForWidget,
@@ -105,13 +106,6 @@
   let pendingTileState = $state<{
     reference: TemplateReference;
     suggestions: TemplateSuggestion[];
-    pageId: string;
-    sectionId: string;
-    at?: number;
-  } | null>(null);
-  let pendingDevice = $state<{
-    template: Template;
-    initial: { reference: TemplateReference; feature?: string };
     pageId: string;
     sectionId: string;
     at?: number;
@@ -369,25 +363,14 @@
     };
   }
 
-  function addMaterializedTile(
+  function commitMaterializedTile(
     pageId: string,
     sectionId: string,
-    template: Template,
-    device: Device,
+    materialized: ReturnType<typeof materializeTemplateTile>,
     at?: number,
   ): void {
-    const materialized = materializeTemplateTile(
-      template,
-      device,
-      getTemplateRegistry().templates ?? [],
-    );
-    let slots = materialized.slots;
-    if (slots.length === 0) {
-      const primary = device.controls?.[0];
-      if (primary) slots = [slotFromControl(device, primary)];
-    }
     const tile: TileConfig = {
-      slots,
+      slots: materialized.slots,
       ...(materialized.size ? { size: materialized.size } : {}),
       ...(materialized.background
         ? { background: materialized.background }
@@ -413,7 +396,56 @@
       !commitLayout(appendPlacement(registry, pageId, sectionId, placement, at))
     ) {
       actionError = "The tile was created but the page could not be saved.";
+      return;
     }
+    pickerFor = null;
+    selection = { kind: "tile", pageId, sectionId, placementId: placement.id };
+  }
+
+  function addMaterializedTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    device: Device,
+    at?: number,
+  ): void {
+    const materialized = materializeTemplateTile(
+      template,
+      device,
+      getTemplateRegistry().templates ?? [],
+    );
+    if (materialized.slots.length === 0) {
+      const primary = device.controls?.[0];
+      if (primary) materialized.slots = [slotFromControl(device, primary)];
+    }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
+  }
+
+  /** A tile picked for a state: no device is created, only the tile. */
+  function addStateTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    reference: TemplateReference,
+    anchorFeature: string | undefined,
+    at?: number,
+  ): void {
+    const materialized = materializeTemplateTileFromState(
+      template,
+      reference,
+      ioBroker.objects as Map<string, any>,
+      anchorFeature,
+    );
+    if (materialized.slots.length === 0) {
+      materialized.slots = [
+        slotFromState(
+          reference.ref,
+          reference.object,
+          slotKindForWidget(widgetForState(reference.object)),
+        ),
+      ];
+    }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
   function addSlotsTo(
@@ -445,6 +477,18 @@
     at?: number,
   ): void {
     if (!slots.length) return;
+    const source = slots[0]?.source;
+    const device =
+      source && typeof source === "object" && source.kind === "control"
+        ? devices.find((entry) => entry.id === source.device)
+        : undefined;
+    const template = device?.template
+      ? templateById(device.template, getTemplateRegistry().templates ?? [])
+      : undefined;
+    if (device && template) {
+      addMaterializedTile(pageId, sectionId, template, device, at);
+      return;
+    }
     const sectionIn = (reg: PageRegistry) =>
       reg.pages
         .find((p) => p.id === pageId)
@@ -909,16 +953,15 @@
     state={pendingTileState.reference}
     templates={allTemplates}
     onPick={(template, feature) => {
-      pendingDevice = {
+      const target = pendingTileState!;
+      addStateTile(
+        target.pageId,
+        target.sectionId,
         template,
-        initial: {
-          reference: pendingTileState!.reference,
-          feature: feature.feature,
-        },
-        pageId: pendingTileState!.pageId,
-        sectionId: pendingTileState!.sectionId,
-        at: pendingTileState!.at,
-      };
+        target.reference,
+        feature.feature,
+        target.at,
+      );
       pendingTileState = null;
     }}
     onBlank={() => {
@@ -932,25 +975,6 @@
       pendingTileState = null;
     }}
     onClose={() => (pendingTileState = null)}
-  />
-{/if}
-
-{#if pendingDevice}
-  <DeviceCreateModal
-    template={pendingDevice.template}
-    initial={pendingDevice.initial}
-    onClose={() => (pendingDevice = null)}
-    onCreated={(device) => {
-      const target = pendingDevice!;
-      addMaterializedTile(
-        target.pageId,
-        target.sectionId,
-        target.template,
-        device,
-        target.at,
-      );
-      pendingDevice = null;
-    }}
   />
 {/if}
 
