@@ -82,11 +82,13 @@
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort((a, b) => dir * a.name.localeCompare(b.name));
   });
-  const countLabel = $derived(
-    shown.length === variables.length
-      ? `${variables.length} ${variables.length === 1 ? "entry" : "entries"}`
-      : `${shown.length} of ${variables.length} entries`,
-  );
+  const countLabel = $derived.by(() => {
+    const states = variables.filter((v) => v.kind !== "constant").length;
+    const constants = variables.filter((v) => v.kind === "constant").length;
+    return `${states} ${states === 1 ? "state" : "states"} · ${constants} ${
+      constants === 1 ? "constant" : "constants"
+    }`;
+  });
 
   const rooms = $derived(roomList(ioBroker.enums));
   function roomsOf(id: string): string[] {
