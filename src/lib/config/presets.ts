@@ -1,6 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { Slot, Template } from "$lib/types/display";
-import { DEVICE_FEATURES } from "$lib/config/features";
+import { COMMON_FEATURES, DEVICE_FEATURES } from "$lib/config/features";
 
 /**
  * Frozen built-in templates — one per device type (spec §4.2). They are the
@@ -93,7 +93,19 @@ The tile glows amber while the light is on; the slider and colour picker write b
     builtin: true,
     type: "Light",
     size: { w: 2, h: 2 },
-    features: DEVICE_FEATURES.Light,
+    features: [...DEVICE_FEATURES.Light, ...COMMON_FEATURES],
+    active: { source: "power", op: "truthy" },
+    look: {
+      active: {
+        color: "var(--warning-color)",
+        glow: "var(--warning-color)",
+        glyph: "lightbulb",
+      },
+      inactive: {
+        color: "var(--text-muted)",
+        glyph: "lightbulb_outline",
+      },
+    },
     slots: [
       // `truthy(...)`: power arrives as true, 1, "1" or "true" depending on the
       // adapter. Colours are theme tokens — "amber" is not a CSS colour.
@@ -118,6 +130,18 @@ The tile glows amber while the light is on; the slider and colour picker write b
       },
       { kind: "level", source: "brightness" },
       { kind: "color", source: "color" },
+      {
+        kind: "badge",
+        label: "Battery",
+        source: "battery",
+        rules: [{ when: "battery < 20", tone: "danger" }],
+      },
+      {
+        kind: "badge",
+        label: "Connected",
+        source: "connected",
+        rules: [{ when: "!truthy(connected)", tone: "danger" }],
+      },
       ago,
       offline,
     ],
