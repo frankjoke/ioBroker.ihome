@@ -375,6 +375,21 @@ export function appendTile(
   });
 }
 
+/** Append an already-complete placement (a materialised template tile). */
+export function appendPlacement(
+  reg: PageRegistry,
+  pageId: string,
+  sectionId: string,
+  placement: Placement,
+  at?: number,
+): PageRegistry {
+  return mapSection(reg, pageId, sectionId, (section) => {
+    const tiles = [...(section.tiles ?? [])];
+    tiles.splice(at ?? tiles.length, 0, placement);
+    return { ...section, tiles };
+  });
+}
+
 export function deletePlacement(
   reg: PageRegistry,
   pageId: string,
