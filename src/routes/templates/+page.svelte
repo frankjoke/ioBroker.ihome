@@ -50,6 +50,7 @@
   let pendingGroup = $state<Group | null>(null);
   let askSwitch = $state(false);
   let importOpen = $state(false);
+  let showHelp = $state(false);
   let importError = $state("");
   let pendingImport = $state<{
     file: TemplateFile;
@@ -155,13 +156,27 @@
 
 <div class="templates-page">
   <div class="page-heading">
-    <OptionTabs
-      bind:value={tabValue}
-      label="Template group"
-      {tabs}
-      collapsible={false}
-      onchange={onTabChange}
-    />
+    <div class="tabs-line">
+      <OptionTabs
+        bind:value={tabValue}
+        label="Template group"
+        {tabs}
+        collapsible={false}
+        onchange={onTabChange}
+      />
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        aria-expanded={showHelp}
+        onclick={() => (showHelp = !showHelp)}
+      >
+        <span class="material-symbols-outlined">help</span>
+        Help
+        <span class="material-symbols-outlined"
+          >{showHelp ? "expand_less" : "expand_more"}</span
+        >
+      </button>
+    </div>
     <div class="page-actions">
       {#if group === "code"}
         <button
@@ -220,7 +235,11 @@
     </div>
   </div>
 
-  <HelpSection help={TEMPLATES_GUIDE} label="About templates" />
+  {#if showHelp}
+    <div class="item-editor">
+      <HelpSection help={TEMPLATES_GUIDE} static plain />
+    </div>
+  {/if}
 
   {#if importError}
     <p class="text-danger hint">{importError}</p>
@@ -300,6 +319,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .tabs-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     flex-wrap: wrap;
   }
 
