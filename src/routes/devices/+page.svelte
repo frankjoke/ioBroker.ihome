@@ -17,6 +17,7 @@
   import EnumBadge from "$lib/components/common/EnumBadge.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import IconButton from "$lib/components/common/IconButton.svelte";
@@ -27,6 +28,7 @@
   } from "$lib/config/rooms";
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortDir } from "$lib/config/sort";
+  import { DEVICES_GUIDE } from "$lib/config/page-guides";
   import { slotsReferencingDevice } from "$lib/config/layout-ops";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { onMount, tick } from "svelte";
@@ -46,6 +48,7 @@
   let pendingOpen = $state<Device | null>(null);
   let askClose = $state(false);
   let showForm = $state(false);
+  let showPageHelp = $state(false);
   /** The inline form's card, scrolled into view when an edit opens. */
   let inlineForm = $state<HTMLDivElement | null>(null);
   let roomFilter = $state<string[]>([]);
@@ -114,6 +117,11 @@
         return false;
       return true;
     }),
+  );
+  const countLabel = $derived(
+    filteredDevices.length === devices.length
+      ? `${devices.length} ${devices.length === 1 ? "device" : "devices"}`
+      : `${filteredDevices.length} of ${devices.length} devices`,
   );
 
   const sortedDevices = $derived(
@@ -192,6 +200,20 @@
     toggleDevice(d);
   }
 
+  function togglePageHelp() {
+    showPageHelp = !showPageHelp;
+  }
+
+  function onPageHeaderClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    togglePageHelp();
+  }
+
   function duplicateDevice(d: Device) {
     const copy = JSON.parse(JSON.stringify(d)) as Device;
     copy.id = newId();
@@ -254,34 +276,65 @@
 </svelte:head>
 
 <div class="devices-page">
-  <div class="page-header">
-    <div class="page-actions">
-      {#if backToTile}
-        <button
-          type="button"
-          class="btn btn-outline"
-          title="Back to the tile editor"
-          onclick={() => {
-            openSheet();
-            // `goto`, not `location.hash = …`: a direct hash edit makes the
-            // hash router reload, and the sheet opened just above — module
-            // state — would not survive it.
-            void goto("#/");
-          }}
-        >
-          <span class="material-symbols-outlined">arrow_back</span>Back to the
-          tile
-        </button>
-      {/if}
+  <div class="item" class:open={showPageHelp}>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="item-line" onclick={onPageHeaderClick}>
+      <Icon value="devices" size={18} />
       <button
         type="button"
-        class="btn btn-primary btn-sm"
-        disabled={showForm}
-        onclick={addDevice}
+        class="name"
+        aria-expanded={showPageHelp}
+        onclick={togglePageHelp}
       >
-        <span class="material-symbols-outlined">add</span> Device
+        Devices
       </button>
+      <span class="badge">{countLabel}</span>
+      <span class="item-actions">
+        {#if backToTile}
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            title="Back to the tile editor"
+            onclick={() => {
+              openSheet();
+              // `goto`, not `location.hash = …`: a direct hash edit makes the
+              // hash router reload, and the sheet opened just above — module
+              // state — would not survive it.
+              void goto("#/");
+            }}
+          >
+            <span class="material-symbols-outlined">arrow_back</span>Back to the
+            tile
+          </button>
+        {/if}
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          title="Sort by name"
+          aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
+        >
+          <span class="material-symbols-outlined"
+            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+          >
+          Sort
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          disabled={showForm}
+          onclick={addDevice}
+        >
+          <span class="material-symbols-outlined">add</span> Device
+        </button>
+      </span>
     </div>
+    {#if showPageHelp}
+      <div class="item-editor">
+        <HelpSection help={DEVICES_GUIDE} static plain />
+      </div>
+    {/if}
   </div>
 
   {#if showForm && (!editing || !editingShown)}
@@ -322,17 +375,6 @@
           placeholder="All types"
           onChange={(v) => (typeFilter = v)}
         />
-        <button
-          type="button"
-          class="sort-dir"
-          title="Toggle sort direction"
-          aria-label="Toggle sort direction"
-          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-        >
-          <span class="material-symbols-outlined"
-            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
-          >
-        </button>
       </div>
     </div>
 
@@ -466,20 +508,6 @@
     gap: 0.75rem;
   }
 
-  .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .page-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
   .filter-block {
     display: flex;
     flex-direction: column;
@@ -488,7 +516,7 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr auto;
+    grid-template-columns: minmax(0, 1fr) 7.5rem 7.5rem;
     gap: 0.5rem;
   }
 
@@ -497,29 +525,9 @@
     padding: 0.35rem;
   }
 
-  .sort-dir {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .sort-dir:hover {
-    background: var(--surface-container);
-  }
-
-  .sort-dir .material-symbols-outlined {
-    font-size: 18px;
-  }
-
   @media (max-width: 640px) {
     .filter-bar {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr) 6.5rem 6.5rem;
     }
   }
 
