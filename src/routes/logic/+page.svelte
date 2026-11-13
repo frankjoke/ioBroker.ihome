@@ -539,25 +539,28 @@
       </p>
     </div>
   {:else}
-    <div class="filter-bar">
-      <input type="search" placeholder="Search logic…" bind:value={search} />
-      <select bind:value={kindFilter} aria-label="Filter by kind">
-        <option value="">Everything</option>
-        <option value="machine">State machines</option>
-        <option value="function">Actions</option>
-      </select>
-      <select bind:value={roomFilter} aria-label="Filter by room">
-        <option value="">All rooms</option>
-        {#each roomOptions as r (r.value)}
-          <option value={r.value}>{r.label}</option>
-        {/each}
-      </select>
-      <select bind:value={functionFilter} aria-label="Filter by function">
-        <option value="">All functions</option>
-        {#each functionOptions as f (f.value)}
-          <option value={f.value}>{f.label}</option>
-        {/each}
-      </select>
+    <div class="filter-block">
+      <span class="label-mono">Filters</span>
+      <div class="filter-bar">
+        <input type="search" placeholder="Search logic…" bind:value={search} />
+        <select bind:value={kindFilter} aria-label="Filter by kind">
+          <option value="">Everything</option>
+          <option value="machine">State machines</option>
+          <option value="function">Actions</option>
+        </select>
+        <select bind:value={roomFilter} aria-label="Filter by room">
+          <option value="">All rooms</option>
+          {#each roomOptions as r (r.value)}
+            <option value={r.value}>{r.label}</option>
+          {/each}
+        </select>
+        <select bind:value={functionFilter} aria-label="Filter by function">
+          <option value="">All functions</option>
+          {#each functionOptions as f (f.value)}
+            <option value={f.value}>{f.label}</option>
+          {/each}
+        </select>
+      </div>
     </div>
 
     {#if shownLogics.length === 0}
@@ -779,6 +782,12 @@
 
   .hint {
     font-size: var(--body-sm);
+  }
+
+  .filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .filter-bar {

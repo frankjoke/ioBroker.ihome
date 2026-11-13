@@ -418,40 +418,43 @@
       <p class="text-muted">No variables yet — add one to get started.</p>
     </div>
   {:else}
-    <div class="filter-bar">
-      <input
-        type="search"
-        placeholder="Search name, value or state…"
-        bind:value={search}
-      />
-      <select bind:value={roomFilter} aria-label="Filter by room">
-        <option value="">All rooms</option>
-        {#each roomOptions as r (r.value)}
-          <option value={r.value}>{r.label}</option>
-        {/each}
-      </select>
-      <select bind:value={functionFilter} aria-label="Filter by function">
-        <option value="">All functions</option>
-        {#each functionOptions as f (f.value)}
-          <option value={f.value}>{f.label}</option>
-        {/each}
-      </select>
-      <select bind:value={kindFilter} aria-label="Filter by kind">
-        <option value="">Everything</option>
-        <option value="state">States</option>
-        <option value="constant">Constants</option>
-      </select>
-      <button
-        type="button"
-        class="sort-dir"
-        title="Toggle sort direction"
-        aria-label="Toggle sort direction"
-        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-      >
-        <span class="material-symbols-outlined"
-          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+    <div class="filter-block">
+      <span class="label-mono">Filters</span>
+      <div class="filter-bar">
+        <input
+          type="search"
+          placeholder="Search name, value or state…"
+          bind:value={search}
+        />
+        <select bind:value={roomFilter} aria-label="Filter by room">
+          <option value="">All rooms</option>
+          {#each roomOptions as r (r.value)}
+            <option value={r.value}>{r.label}</option>
+          {/each}
+        </select>
+        <select bind:value={functionFilter} aria-label="Filter by function">
+          <option value="">All functions</option>
+          {#each functionOptions as f (f.value)}
+            <option value={f.value}>{f.label}</option>
+          {/each}
+        </select>
+        <select bind:value={kindFilter} aria-label="Filter by kind">
+          <option value="">Everything</option>
+          <option value="state">States</option>
+          <option value="constant">Constants</option>
+        </select>
+        <button
+          type="button"
+          class="sort-dir"
+          title="Toggle sort direction"
+          aria-label="Toggle sort direction"
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
         >
-      </button>
+          <span class="material-symbols-outlined"
+            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+          >
+        </button>
+      </div>
     </div>
 
     {#if shown.length === 0}
@@ -798,6 +801,12 @@
   .error {
     color: var(--danger-color, #c0392b);
     margin: 0;
+  }
+
+  .filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .filter-bar {

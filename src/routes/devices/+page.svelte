@@ -305,32 +305,35 @@
       <p class="text-muted">No devices yet — add one to get started.</p>
     </div>
   {:else}
-    <div class="filter-bar">
-      <input type="search" placeholder="Search name…" bind:value={search} />
-      <MultiSelect
-        options={roomOptions}
-        selected={roomFilter}
-        enums={ioBroker.enums}
-        placeholder="All rooms"
-        onChange={(v) => (roomFilter = v)}
-      />
-      <MultiSelect
-        options={typeOptions}
-        selected={typeFilter}
-        placeholder="All types"
-        onChange={(v) => (typeFilter = v)}
-      />
-      <button
-        type="button"
-        class="sort-dir"
-        title="Toggle sort direction"
-        aria-label="Toggle sort direction"
-        onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-      >
-        <span class="material-symbols-outlined"
-          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+    <div class="filter-block">
+      <span class="label-mono">Filters</span>
+      <div class="filter-bar">
+        <input type="search" placeholder="Search name…" bind:value={search} />
+        <MultiSelect
+          options={roomOptions}
+          selected={roomFilter}
+          enums={ioBroker.enums}
+          placeholder="All rooms"
+          onChange={(v) => (roomFilter = v)}
+        />
+        <MultiSelect
+          options={typeOptions}
+          selected={typeFilter}
+          placeholder="All types"
+          onChange={(v) => (typeFilter = v)}
+        />
+        <button
+          type="button"
+          class="sort-dir"
+          title="Toggle sort direction"
+          aria-label="Toggle sort direction"
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
         >
-      </button>
+          <span class="material-symbols-outlined"
+            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
+          >
+        </button>
+      </div>
     </div>
 
     {#if filteredDevices.length === 0}
@@ -475,6 +478,12 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .filter-bar {

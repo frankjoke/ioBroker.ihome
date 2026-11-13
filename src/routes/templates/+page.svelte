@@ -224,6 +224,7 @@
       onchange={onTabChange}
     />
     <div class="list-filter">
+      <span class="label-mono filter-label">Filters</span>
       <input
         type="search"
         placeholder={group === "code"
@@ -314,9 +315,13 @@
   .list-filter {
     display: grid;
     grid-template-columns: minmax(10rem, 1fr) auto;
-    gap: 0.5rem;
+    gap: 0.35rem 0.5rem;
     flex: 0 1 20rem;
     margin-left: auto;
+  }
+
+  .filter-label {
+    grid-column: 1 / -1;
   }
 
   .list-filter input {
