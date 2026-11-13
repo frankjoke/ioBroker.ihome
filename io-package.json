@@ -3,6 +3,10 @@
     "name": "ihome",
     "version": "0.3.3",
     "news": {
+      "NEXT": {
+        "en": "New cog menu instead of the configuration tabs: plugin pages (built-in Admin, iqontrol and custom links) open embedded or in a new tab, embedded pages are frame-only, and User Interface/Server & Security use fold-out lists with the page name in the bar.",
+        "de": "Neues Zahnrad-Menü statt der Konfigurations-Tabs: Plugin-Seiten (eingebautes Admin, iqontrol und eigene Links) öffnen eingebettet oder in einem neuen Tab, eingebettete Seiten sind nur noch Frame, und Benutzeroberfläche/Server & Sicherheit nutzen aufklappbare Listen mit dem Seitennamen in der Leiste."
+      },
       "0.3.3": {
         "en": "HTTP input plugin: receive GET, POST or PUT data from devices and webhooks and write it to one JSON state or directly to a list of target states, with per-target transforms; endpoints can set their own bind, port, token and enabled flag. Built-in plugins export their settings, and plugins may bundle a device template that the UI creates when they are enabled; the import dialog includes a read-only NUT UPS example with such a device. Wake-on-LAN accepts a direct MAC/IP payload.",
         "de": "HTTP-Input-Plugin: GET-, POST- oder PUT-Daten von Geräten und Webhooks empfangen und in einen JSON-State oder direkt in eine Liste von Ziel-States mit Transformationen schreiben; Endpunkte können eigenes Bind, Port, Token und Enabled setzen. Integrierte Plugins exportieren ihre Einstellungen, und Plugins können eine Gerätevorlage mitbringen, die die UI beim Aktivieren erzeugt; der Import-Dialog enthält ein Read-only-Beispiel für eine NUT-USV mit solch einem Gerät. Wake-on-LAN akzeptiert direkte MAC/IP-Optionen."
