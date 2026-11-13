@@ -32,6 +32,51 @@ type Match = "role" | "generic" | "type" | null;
 /** Hints so broad that they say nothing about the device family. */
 const GENERIC_HINTS = new Set(["value", "state"]);
 
+/** Adapter bookkeeping states that are never a device control. */
+const INFRASTRUCTURE_LEAVES = new Set([
+  "device_query",
+  "send_payload",
+  "msg_from_zigbee",
+  "link_quality",
+  "restart_device",
+  "identify",
+  "trigger_indicator",
+  "enabled",
+  "switch.enable",
+  "Event",
+  "ChannelName",
+  "clientId",
+  "rpcNotifications",
+  "statusNotifications",
+  "topicPrefix",
+  "debugEnabled",
+  "eco",
+  "sntp",
+  "timezone",
+  "apEnabled",
+  "authEnabled",
+  "firmware",
+  "firmwareupdate",
+  "attributeList",
+  "acceptedCommandList",
+  "generatedCommandList",
+  "featureMap",
+  "clusterRevision",
+  "supportedFeatures",
+  "serverList",
+  "clientList",
+  "partsList",
+  "deviceTypeList",
+]);
+
+function isInfrastructure(entry: TemplateReference): boolean {
+  const leaf =
+    String(entry.stateId ?? "")
+      .split(".")
+      .pop() ?? "";
+  return INFRASTRUCTURE_LEAVES.has(leaf);
+}
+
 function roleMatches(role: string, hints: string[]): boolean {
   const value = role.trim().toLowerCase();
   if (!value) return false;
@@ -142,9 +187,9 @@ export function autoFillTemplate(
   const exclude = new Set([main.stateId, ...bases]);
   const basePool = [
     ...new Set(baseGroups.flatMap((group) => groupStates(group, objects))),
-  ].filter((entry) => !exclude.has(entry.stateId));
+  ].filter((entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry));
   const aliasPool = groupStates(aliasGroup, objects).filter(
-    (entry) => !exclude.has(entry.stateId),
+    (entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry),
   );
   const pools = basePool.length > 0 ? [basePool, aliasPool] : [aliasPool];
 
@@ -263,6 +308,15 @@ export function suggestTemplatesForState(
   state: { stateId: string; object: any },
   templates: Template[],
 ): TemplateSuggestion[] {
+  if (
+    isInfrastructure({
+      ref: state.stateId,
+      stateId: state.stateId,
+      object: state.object,
+    })
+  ) {
+    return [];
+  }
   const scored: TemplateSuggestion[] = [];
   for (const template of templates) {
     let best: TemplateSuggestion | undefined;

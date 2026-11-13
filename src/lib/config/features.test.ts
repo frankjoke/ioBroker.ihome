@@ -207,6 +207,12 @@ it("marks the primary feature per built-in type", () => {
   ).toBe(true);
 });
 
+it("maps low-battery indicators to the battery feature", () => {
+  expect(
+    COMMON_FEATURES.find((f) => f.feature === "battery")?.roleHints,
+  ).toContain("indicator.lowbat");
+});
+
 it("does not let a broad level hint swallow colour states", () => {
   expect(
     DEVICE_FEATURES.Light.find((f) => f.feature === "brightness")?.roleHints,

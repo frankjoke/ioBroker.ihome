@@ -234,7 +234,7 @@ export const COMMON_FEATURES: readonly FeatureDef[] = [
     feature: "battery",
     label: "Battery",
     widget: "value",
-    roleHints: ["value.battery", "battery"],
+    roleHints: ["value.battery", "indicator.lowbat", "battery"],
   },
   {
     feature: "connected",

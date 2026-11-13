@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import IconPicker from "$lib/components/common/IconPicker.svelte";
   import HelpSection from "./HelpSection.svelte";
   import {
     referenceFromSource,
@@ -8,12 +9,14 @@
     type TemplateReference,
   } from "$lib/config/template-reference";
   import {
+    aliasBaseIds,
     autoFillTemplate,
     type FeatureCandidate,
   } from "$lib/config/template-suggest";
   import { planDeviceCreate } from "$lib/config/device-template-create";
   import { primaryFeature, templateFeatures } from "$lib/config/template-ops";
-  import { roomsOf } from "$lib/config/rooms";
+  import { roomForState, roomList } from "$lib/config/rooms";
+  import { brokerIconPath, resolveIcon } from "$lib/config/icon-ops";
   import { isRegistryWritable, upsertDevice } from "$lib/registry.svelte.js";
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
@@ -54,7 +57,9 @@
   let error = $state("");
   let picking = $state(false);
   let pickingFor = $state<string | null>(null);
+  let iconPicker = $state(false);
   let started = false;
+  const rooms = $derived(roomList(ioBroker.enums));
 
   const missing = $derived(
     features.filter(
@@ -78,8 +83,19 @@
     main = reference;
     fills = autoFillTemplate(template, reference, objects, featureKey).fills;
     if (!name) name = String(reference.object?.common?.name ?? template.name);
-    if (!room)
-      room = roomsOf(ioBroker.enums as any, reference.stateId)[0] ?? "";
+    const base = aliasBaseIds(reference.object)[0];
+    if (!room) {
+      room =
+        roomForState(ioBroker.enums, reference.stateId) ??
+        (base ? roomForState(ioBroker.enums, base) : undefined) ??
+        "";
+    }
+    if (!icon) {
+      const hit =
+        resolveIcon(objects, reference.stateId) ??
+        (base ? resolveIcon(objects, base) : undefined);
+      if (hit) icon = brokerIconPath(hit.value, hit.from);
+    }
   }
 
   $effect(() => {
@@ -329,21 +345,30 @@
           </label>
           <label class="field">
             <span class="label-mono">Room</span>
-            <input
-              type="text"
-              bind:value={room}
-              placeholder="enum.rooms.…"
-              aria-label="Room"
-            />
+            <select bind:value={room} aria-label="Room">
+              <option value="">No room</option>
+              {#each rooms as entry (entry.id)}
+                <option value={entry.id}>{entry.label}</option>
+              {/each}
+            </select>
           </label>
           <label class="field">
             <span class="label-mono">Icon</span>
-            <input
-              type="text"
-              bind:value={icon}
-              placeholder="optional glyph or URL"
-              aria-label="Icon"
-            />
+            <span class="icon-line">
+              <input
+                type="text"
+                bind:value={icon}
+                placeholder="optional glyph or URL"
+                aria-label="Icon"
+              />
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                onclick={() => (iconPicker = true)}
+              >
+                Pick
+              </button>
+            </span>
           </label>
         </div>
       {/if}
@@ -372,6 +397,17 @@
     </div>
   </div>
 </div>
+
+{#if iconPicker}
+  <IconPicker
+    {icon}
+    onPick={(value) => {
+      icon = value;
+      iconPicker = false;
+    }}
+    onClose={() => (iconPicker = false)}
+  />
+{/if}
 
 {#if picking}
   <SourcePicker
@@ -494,9 +530,21 @@
     min-width: 0;
   }
 
-  .field input {
+  .field input,
+  .field select {
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .icon-line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .icon-line input {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .actions {

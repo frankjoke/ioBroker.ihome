@@ -221,3 +221,35 @@ it("follows an alias base into its device for the remaining controls", () => {
   ).toBe("zigbee.0.cc86.connected");
   expect(result.conflicts).toEqual([]);
 });
+
+it("suggests Light for a switch.light state", () => {
+  const ids = suggestTemplatesForState(
+    {
+      stateId: "zigbee.0.cc86.state",
+      object: state("switch.light", "boolean"),
+    },
+    Object.values(PRESETS),
+  ).map((suggestion) => suggestion.template.id);
+  expect(ids).toContain("Light");
+});
+
+it("does not suggest templates for infrastructure states", () => {
+  expect(
+    suggestTemplatesForState(
+      {
+        stateId: "zigbee.0.cc86.device_query",
+        object: state("button", "boolean"),
+      },
+      [PRESETS.Button, PRESETS.Switch],
+    ),
+  ).toEqual([]);
+  expect(
+    suggestTemplatesForState(
+      {
+        stateId: "shelly.1.device.enabled",
+        object: state("switch.enable", "boolean"),
+      },
+      [PRESETS.Switch, PRESETS.Light],
+    ),
+  ).toEqual([]);
+});
