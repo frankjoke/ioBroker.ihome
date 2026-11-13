@@ -103,7 +103,6 @@
 
 <div class="plugins-page">
   <div class="page-heading">
-    <h1>Plugins</h1>
     <div class="page-actions">
       <button
         type="button"
@@ -188,13 +187,9 @@
   .page-heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 1rem;
     flex-wrap: wrap;
-  }
-
-  .page-heading h1 {
-    margin: 0;
   }
 
   .page-actions {

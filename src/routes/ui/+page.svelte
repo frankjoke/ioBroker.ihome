@@ -89,7 +89,6 @@
 <div class="ui-page">
   <div class="page-header">
     <div class="page-heading">
-      <h1>User Interface</h1>
       <p class="text-muted hint">
         These defaults apply to every device using this ioBroker. A page,
         section or tile with its own background keeps it.
@@ -391,10 +390,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-  }
-
-  .page-header h1 {
-    margin: 0;
   }
 
   .hint {

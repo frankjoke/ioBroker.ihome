@@ -152,7 +152,6 @@
 
 <div class="templates-page">
   <div class="page-heading">
-    <h1>Templates</h1>
     <div class="page-actions">
       {#if group === "code"}
         <button
@@ -293,13 +292,9 @@
   .page-heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 1rem;
     flex-wrap: wrap;
-  }
-
-  .page-heading h1 {
-    margin: 0;
   }
 
   .page-actions {

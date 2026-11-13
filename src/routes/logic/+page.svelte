@@ -487,7 +487,6 @@
 <div class="logic-page">
   <div class="page-heading">
     <div class="title-line">
-      <h1>Logic</h1>
       <div class="page-actions">
         <label class="check" title="Show the adapter log">
           <input type="checkbox" bind:checked={showLog} />
@@ -751,19 +750,11 @@
     gap: 0.35rem;
   }
 
-  .page-heading h1 {
-    margin: 0;
-  }
-
   .title-line {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-  }
-
-  .title-line h1 {
-    margin: 0;
   }
 
   .page-actions {

@@ -385,9 +385,6 @@
 
 <div class="variables-page">
   <div class="page-header">
-    <div class="page-heading">
-      <h1>Variables & Constants</h1>
-    </div>
     <div class="page-actions">
       <button
         type="button"
@@ -782,24 +779,10 @@
 
   .page-header {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: flex-end;
     gap: 1rem;
-    /* No forced stacking: when the title and the actions do not fit on one line,
-       the actions move down as a block and the title keeps its full width. */
     flex-wrap: wrap;
-  }
-
-  .page-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    flex: 1 1 14rem;
-    min-width: 0;
-  }
-
-  .page-header h1 {
-    margin: 0;
   }
 
   .page-actions {

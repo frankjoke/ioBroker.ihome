@@ -48,7 +48,29 @@
    */
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
+  const currentConfig = $derived(configPages.find((p) => p.id === routeId));
   const pluginPageList = $derived(getPluginPages().pages);
+  const currentPluginPage = $derived.by(() => {
+    if (routeId !== "/plugin/[id]") return undefined;
+    const id = route.params?.id ?? "";
+    return getPluginPages().pages.find((page) => page.id === id);
+  });
+  const currentLabel = $derived(
+    isDisplay
+      ? ""
+      : currentPluginPage
+        ? `Plugins › ${currentPluginPage.title}`
+        : routeId === "/admin"
+          ? "Plugins › Admin"
+          : (currentConfig?.label ?? "Configuration"),
+  );
+  const currentIcon = $derived(
+    currentPluginPage
+      ? currentPluginPage.icon || "web_asset"
+      : routeId === "/admin"
+        ? "settings_applications"
+        : (currentConfig?.icon ?? "settings"),
+  );
 
   // The cog menu: the static config pages around one Plugins group.
   const pluginGroupIndex = $derived(
@@ -232,6 +254,13 @@
           <span class="tab-label">{p.title}</span>
         </a>
       {/each}
+    {:else}
+      <div class="current-page">
+        <span class="material-symbols-outlined" aria-hidden="true"
+          >{currentIcon}</span
+        >
+        <span class="menu-current">{currentLabel}</span>
+      </div>
     {/if}
   </nav>
 
@@ -564,6 +593,25 @@
     align-items: center;
     gap: 2px;
     margin-left: auto;
+  }
+
+  .current-page {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 0.25rem 0.1rem;
+    cursor: default;
+  }
+
+  .current-page .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--text-muted);
+  }
+
+  .current-page .menu-current {
+    max-width: none;
   }
 
   .cog-menu {

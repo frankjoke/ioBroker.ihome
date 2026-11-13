@@ -99,10 +99,6 @@
 </svelte:head>
 
 <div class="server-page">
-  <div class="page-header">
-    <h1>Server &amp; Security</h1>
-  </div>
-
   <fieldset class="lock-zone" disabled={locked}>
     <div class="settings-list">
       <div class="item" class:open={openSection === "connection"}>
@@ -361,16 +357,6 @@
     margin: 0;
     padding: 0;
     min-inline-size: 0;
-  }
-
-  .page-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .page-header h1 {
-    margin: 0;
   }
 
   .settings-list {
