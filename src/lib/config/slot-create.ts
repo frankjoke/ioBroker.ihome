@@ -16,6 +16,7 @@ import type {
   Slot,
   SlotKind,
   Template,
+  TileConfig,
   TileLook,
 } from "$lib/types/display";
 
@@ -284,5 +285,32 @@ export function tileSeed(
     ...(active ? { active } : {}),
     ...(resolved.look ? { look: resolved.look } : {}),
     ...(resolved.background ? { background: resolved.background } : {}),
+  };
+}
+
+/** Merge a template's tile defaults into a new placement. */
+export function applyTileSeed(tile: TileConfig, seed: TileSeed): TileConfig {
+  const look = seed.look
+    ? {
+        ...seed.look,
+        ...tile.look,
+        ...(seed.look.active || tile.look?.active
+          ? { active: { ...seed.look.active, ...tile.look?.active } }
+          : {}),
+        ...(seed.look.inactive || tile.look?.inactive
+          ? { inactive: { ...seed.look.inactive, ...tile.look?.inactive } }
+          : {}),
+      }
+    : tile.look;
+  return {
+    ...tile,
+    ...(tile.size ? {} : seed.size ? { size: seed.size } : {}),
+    ...(tile.background
+      ? {}
+      : seed.background
+        ? { background: seed.background }
+        : {}),
+    ...(tile.active ? {} : seed.active ? { active: seed.active } : {}),
+    ...(look ? { look } : {}),
   };
 }

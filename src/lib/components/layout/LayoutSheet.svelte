@@ -36,6 +36,7 @@
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
   import {
+    applyTileSeed,
     materializeTemplateTile,
     slotFromControl,
     slotFromState,
@@ -481,6 +482,7 @@
         },
       }));
     }
+    next = editTile(next, anchor, (t) => applyTileSeed(t, seed));
     if (slots.length > 1) {
       next = editTile(next, { pageId, sectionId, placementId: added.id }, (t) =>
         slots

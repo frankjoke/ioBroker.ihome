@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  applyTileSeed,
   materializeTemplateTile,
   preselectedControlIds,
   suggestedSlots,
@@ -362,5 +363,38 @@ it("tileSeed carries the template active and look", () => {
   const slot: Slot = slotFromControl(light, power);
   const seed = tileSeed([slot], [light], [template]);
   expect(seed.active).toEqual(expect.objectContaining({ op: "truthy" }));
-  expect(seed.look).toEqual(expect.objectContaining({ active: expect.any(Object) }));
+  expect(seed.look).toEqual(
+    expect.objectContaining({ active: expect.any(Object) }),
+  );
+});
+
+it("fills active, look and background from the seed without overwriting", () => {
+  const seed = {
+    active: { source: "power", op: "truthy" as const },
+    look: { active: { glow: "red" } },
+    size: { w: 2 as const, h: 2 as const },
+    background: { kind: "solid" as const, value: "#000" },
+  };
+  expect(applyTileSeed({ slots: [] }, seed)).toMatchObject({
+    active: seed.active,
+    look: seed.look,
+    size: seed.size,
+    background: seed.background,
+  });
+  expect(
+    applyTileSeed(
+      {
+        slots: [],
+        active: { source: "x", op: "truthy" },
+        look: { inactive: { glyph: "x" } },
+      },
+      seed,
+    ).active,
+  ).toEqual({ source: "x", op: "truthy" });
+  expect(
+    applyTileSeed(
+      { slots: [], look: { inactive: { glyph: "x" } } },
+      { look: { inactive: { color: "red" } } },
+    ).look?.inactive,
+  ).toEqual({ color: "red", glyph: "x" });
 });
