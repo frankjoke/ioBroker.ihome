@@ -816,6 +816,15 @@
     font-size: 18px;
   }
 
+  @media (max-width: 640px) {
+    /* On a phone, let the actions wrap one by one: the tabs plus the small
+       "Show log" fit on the first line, instead of pushing the whole action
+       group down as one unbreakable block. */
+    .page-actions {
+      display: contents;
+    }
+  }
+
   .check {
     display: inline-flex;
     align-items: center;
