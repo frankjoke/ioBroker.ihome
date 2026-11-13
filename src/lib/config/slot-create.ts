@@ -4,11 +4,20 @@ import { glyphForRole, presetGlyph } from "$lib/config/icon-ops";
 import {
   resolveControl,
   resolveTemplate,
+  templateFeatures,
   tileTitle,
 } from "$lib/config/template-ops";
 import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
 import type { Control, Device, Widget } from "$lib/types/device";
-import type { Size, Slot, SlotKind, Template } from "$lib/types/display";
+import type {
+  ActiveCondition,
+  Background,
+  Size,
+  Slot,
+  SlotKind,
+  Template,
+  TileLook,
+} from "$lib/types/display";
 
 /** The slot that renders a control widget. */
 export function slotKindForWidget(widget: Widget): SlotKind {
@@ -174,6 +183,75 @@ export interface TileSeed {
   title?: string;
   size?: Size;
   icon?: string;
+  active?: ActiveCondition;
+  look?: TileLook;
+  background?: Background;
+}
+
+/** A template's active condition with its feature name bound to the control. */
+function materializeActive(
+  active: ActiveCondition | undefined,
+  features: Set<string>,
+  device: Device,
+): ActiveCondition | undefined {
+  if (!active) return undefined;
+  if (typeof active.source !== "string") return active;
+  if (!features.has(active.source)) return active;
+  const control = resolveControl(device.controls ?? [], active.source);
+  if (!control) return undefined;
+  return {
+    ...active,
+    source: { kind: "control", device: device.id, control: control.id },
+  };
+}
+
+/** A template's slots with feature names bound to the device's controls. */
+function materializeSlots(template: Template, device: Device): Slot[] {
+  const features = new Set(templateFeatures(template).map((f) => f.feature));
+  const out: Slot[] = [];
+  for (const slot of template.slots ?? []) {
+    const source = typeof slot.source === "string" ? slot.source : "";
+    const pick =
+      typeof slot.options?.pick === "string" ? slot.options.pick : "";
+    const hint = features.has(source) ? source : features.has(pick) ? pick : "";
+    if (!hint) {
+      out.push(slot);
+      continue;
+    }
+    const [mapped] = suggestedSlots(device, [slot]);
+    if (mapped) out.push(mapped);
+  }
+  return out;
+}
+
+/** A complete tile for a device created from this template. */
+export function materializeTemplateTile(
+  template: Template,
+  device: Device,
+  templates: Template[],
+): {
+  slots: Slot[];
+  active?: ActiveCondition;
+  look?: TileLook;
+  size?: Size;
+  background?: Background;
+  title?: string;
+  icon?: string;
+} {
+  const slots = materializeSlots(template, device);
+  const seed = tileSeed(slots, [device], templates);
+  const active = materializeActive(
+    template.active,
+    new Set(templateFeatures(template).map((f) => f.feature)),
+    device,
+  );
+  return {
+    slots,
+    ...seed,
+    ...(template.active !== undefined ? { active } : {}),
+    ...(template.look ? { look: template.look } : {}),
+    ...(template.background ? { background: template.background } : {}),
+  };
 }
 
 export function tileSeed(
@@ -193,12 +271,18 @@ export function tileSeed(
   const device = devices.find((d) => d.id === source.device);
   if (!device) return first.label ? { title: first.label } : {};
   const typeGlyph = presetGlyph(device.type);
+  const resolved = resolveTemplate(device, templates);
+  const features = new Set(resolved.features.map((f) => f.feature));
+  const active = materializeActive(resolved.active, features, device);
   return {
     title: tileTitle(device) || undefined,
-    size: resolveTemplate(device, templates).size,
+    size: resolved.size,
     // A Custom device has no face of its own: the first control's glyph is the
     // meaningful one, not the type preset's generic "widgets" placeholder.
     icon:
       device.type === "Custom" ? (first.icon?.glyph ?? typeGlyph) : typeGlyph,
+    ...(active ? { active } : {}),
+    ...(resolved.look ? { look: resolved.look } : {}),
+    ...(resolved.background ? { background: resolved.background } : {}),
   };
 }

@@ -2,6 +2,7 @@ import type { Device, DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
 import type {
   ActiveCondition,
+  Background,
   Size,
   Slot,
   Template,
@@ -28,6 +29,7 @@ export interface ResolvedTemplate {
   slots: Slot[];
   active?: ActiveCondition;
   look?: TileLook;
+  background?: Background;
 }
 
 /** A template's control schema: its own features, else the type preset's. */
@@ -154,6 +156,7 @@ export function resolveTemplate(
     ]),
     active: user?.active ?? base.active,
     look: user?.look ?? base.look,
+    background: user?.background ?? base.background,
   };
 }
 

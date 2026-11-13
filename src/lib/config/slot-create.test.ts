@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  materializeTemplateTile,
   preselectedControlIds,
   suggestedSlots,
   slotFromControl,
@@ -10,6 +11,7 @@ import {
 import { PRESETS } from "$lib/config/presets";
 import { labelShown } from "$lib/config/tile-parts";
 import type { Control, Device } from "$lib/types/device";
+import type { Slot, Template } from "$lib/types/display";
 
 const ctl = (
   id: string,
@@ -269,4 +271,96 @@ it("maps widgets to their slot kind", () => {
   expect(slotKindForWidget("enum")).toBe("enum");
   expect(slotKindForWidget("button")).toBe("button");
   expect(slotKindForWidget("value")).toBe("value");
+});
+
+const power = ctl("c-power", "power");
+const brightness = ctl("c-brightness", "brightness");
+const light = device({
+  id: "lamp",
+  name: "Lamp",
+  type: "Light",
+  template: "u",
+  controls: [power, brightness],
+});
+
+const template = {
+  ...PRESETS.Light,
+  id: "u",
+  name: "U",
+  builtin: false,
+  basedOn: "Light",
+  features: PRESETS.Light.features,
+  active: { source: "power", op: "truthy" },
+  look: { active: { glow: "red" } },
+} as Template;
+
+it("materialises feature slots and keeps raw state slots", () => {
+  const render = {
+    ...template,
+    features: [
+      ...PRESETS.Light.features,
+      {
+        feature: "missing",
+        label: "Missing",
+        widget: "value" as const,
+        roleHints: [],
+      },
+    ],
+    slots: [
+      { kind: "switch", source: "power" },
+      { kind: "value", source: { kind: "state", stateId: "hue.0.other" } },
+      { kind: "value", source: "missing" },
+      { kind: "value", source: "hue.0.raw" },
+    ],
+  } as Template;
+  const result = materializeTemplateTile(render, light, [render]);
+  expect(result.slots).toEqual([
+    expect.objectContaining({
+      kind: "switch",
+      source: { kind: "control", device: "lamp", control: "c-power" },
+    }),
+    expect.objectContaining({
+      source: { kind: "state", stateId: "hue.0.other" },
+    }),
+    expect.objectContaining({ source: "hue.0.raw" }),
+  ]);
+});
+
+it("rewrites the active feature and drops an unfilled one", () => {
+  const withBattery = {
+    ...template,
+    features: [
+      ...PRESETS.Light.features,
+      {
+        feature: "battery",
+        label: "Battery",
+        widget: "value" as const,
+        roleHints: ["value.battery"],
+      },
+    ],
+  } as Template;
+  expect(
+    materializeTemplateTile(
+      { ...template, active: { source: "power", op: "truthy" } },
+      light,
+      [template],
+    ).active,
+  ).toEqual({
+    source: { kind: "control", device: "lamp", control: "c-power" },
+    op: "truthy",
+  });
+  expect(
+    materializeTemplateTile(
+      { ...withBattery, active: { source: "battery", op: "lt", value: "20" } },
+      device({ ...light, controls: [power, brightness] }),
+      [withBattery],
+    ).active,
+  ).toBeUndefined();
+});
+
+it("tileSeed carries the template active and look", () => {
+  const slot: Slot = slotFromControl(light, power);
+  const seed = tileSeed([slot], [light], [template]);
+  expect(seed.active).toEqual(expect.objectContaining({ op: "truthy" }));
+  expect(seed.look).toEqual(expect.objectContaining({ active: expect.any(Object) }));
 });
