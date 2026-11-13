@@ -127,6 +127,17 @@ it("resolves room and functions control -> enum (parent walk) -> device", () => 
 it("infers a widget from the effective shape, then the fallback", () => {
   expect(widgetForMeta({ states: { "0": "a" } })).toBe("enum");
   expect(widgetForMeta({ role: "level.dimmer", type: "number" })).toBe("level");
+  expect(
+    widgetForMeta({
+      role: "level.color.temperature",
+      type: "number",
+      min: 2000,
+      max: 6500,
+    }),
+  ).toBe("level");
+  expect(widgetForMeta({ role: "level.color.rgb", type: "string" })).toBe(
+    "color",
+  );
   // A value role beats a switch preset: a Wh reading is not a switch.
   expect(
     widgetForMeta(
