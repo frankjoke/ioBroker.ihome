@@ -315,10 +315,7 @@
           aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
           onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
         >
-          <span class="material-symbols-outlined"
-            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
-          >
-          Sort
+          Sort {sortDir === "asc" ? "↑" : "↓"}
         </button>
         <button
           type="button"
@@ -326,7 +323,7 @@
           disabled={showForm}
           onclick={addDevice}
         >
-          <span class="material-symbols-outlined">add</span> Device
+          + Device
         </button>
       </span>
     </div>
