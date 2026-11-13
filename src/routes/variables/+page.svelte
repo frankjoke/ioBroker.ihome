@@ -82,13 +82,12 @@
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort((a, b) => dir * a.name.localeCompare(b.name));
   });
-  const countLabel = $derived.by(() => {
-    const states = variables.filter((v) => v.kind !== "constant").length;
-    const constants = variables.filter((v) => v.kind === "constant").length;
-    return `${states} ${states === 1 ? "state" : "states"} · ${constants} ${
-      constants === 1 ? "constant" : "constants"
-    }`;
-  });
+  const stateCount = $derived(
+    variables.filter((v) => v.kind !== "constant").length,
+  );
+  const constantCount = $derived(
+    variables.filter((v) => v.kind === "constant").length,
+  );
 
   const rooms = $derived(roomList(ioBroker.enums));
   function roomsOf(id: string): string[] {
@@ -422,7 +421,6 @@
       >
         Variables<span class="title-tail"> &amp; Constants</span>
       </button>
-      <span class="badge">{countLabel}</span>
       <span class="item-actions">
         <button
           type="button"
@@ -453,6 +451,11 @@
     </div>
     {#if showPageHelp}
       <div class="item-editor">
+        <p class="hint text-muted">
+          You have currently {stateCount}
+          {stateCount === 1 ? "variable" : "variables"} and {constantCount}
+          {constantCount === 1 ? "constant" : "constants"} defined.
+        </p>
         <HelpSection help={VARIABLES_GUIDE} static plain />
       </div>
     {/if}
