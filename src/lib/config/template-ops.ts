@@ -40,9 +40,7 @@ export function templateFeatures(template: Template): FeatureDef[] {
 }
 
 /** The feature whose state is picked first; old templates use the first. */
-export function primaryFeature(
-  features: FeatureDef[],
-): FeatureDef | undefined {
+export function primaryFeature(features: FeatureDef[]): FeatureDef | undefined {
   return features.find((feature) => feature.primary === true) ?? features[0];
 }
 

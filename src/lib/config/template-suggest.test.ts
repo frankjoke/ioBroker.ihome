@@ -86,9 +86,9 @@ it("can anchor a secondary feature and auto-fill the primary", () => {
   expect(
     result.fills.find((f) => f.feature.feature === "temperature")?.stateId,
   ).toBe("hue.0.lamp.1.t1");
-  expect(
-    result.fills.find((f) => f.feature.feature === "power")?.stateId,
-  ).toBe("hue.0.lamp.1.on");
+  expect(result.fills.find((f) => f.feature.feature === "power")?.stateId).toBe(
+    "hue.0.lamp.1.on",
+  );
 });
 
 it("reports a conflict when two features resolve to one state", () => {

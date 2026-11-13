@@ -50,7 +50,8 @@ function typeFits(type: string, widget: FeatureDef["widget"]): boolean {
 function matchFeature(feature: FeatureDef, object: any): Match {
   const role = String(object?.common?.role ?? "");
   if (roleMatches(role, feature.roleHints)) return "role";
-  if (typeFits(String(object?.common?.type ?? ""), feature.widget)) return "type";
+  if (typeFits(String(object?.common?.type ?? ""), feature.widget))
+    return "type";
   return null;
 }
 
@@ -59,7 +60,9 @@ export function groupOfState(
   stateId: string,
   objects: Map<string, any>,
 ): string {
-  const parts = String(stateId ?? "").split(".").filter(Boolean);
+  const parts = String(stateId ?? "")
+    .split(".")
+    .filter(Boolean);
   if (parts.length < 3) return parts.slice(0, 2).join(".");
   for (let n = parts.length - 1; n >= 2; n--) {
     const id = parts.slice(0, n).join(".");
@@ -90,9 +93,10 @@ function candidatesFor(
     roleMatches(String(entry.object?.common?.role ?? ""), feature.roleHints),
   );
   if (role.length > 0) return role;
-  return pool.filter((entry) =>
+  const type = pool.filter((entry) =>
     typeFits(String(entry.object?.common?.type ?? ""), feature.widget),
   );
+  return type.length === 1 ? type : [];
 }
 
 /** Match the remaining template features against the main state's group. */
@@ -199,4 +203,3 @@ export function suggestTemplatesForState(
       b.score - a.score || a.template.name.localeCompare(b.template.name),
   );
 }
-

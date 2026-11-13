@@ -47,9 +47,7 @@ it("stores a variable name as the reference", () => {
     ...base,
     fills: [fill("power", "wifiSsid", { common: { write: false } })],
   });
-  expect("device" in plan && plan.device.controls[0].stateId).toBe(
-    "wifiSsid",
-  );
+  expect("device" in plan && plan.device.controls[0].stateId).toBe("wifiSsid");
 });
 
 it("blocks a missing required feature and ignores optional omissions", () => {
@@ -59,9 +57,9 @@ it("blocks a missing required feature and ignores optional omissions", () => {
       feature.feature === "power" ? { ...feature, required: true } : feature,
     ),
   };
-  expect(
-    planDeviceCreate({ ...base, template: required, fills: [] }),
-  ).toEqual({ problem: "Power is required." });
+  expect(planDeviceCreate({ ...base, template: required, fills: [] })).toEqual({
+    problem: "Power is required.",
+  });
 });
 
 it("rejects unknown and duplicate fills", () => {

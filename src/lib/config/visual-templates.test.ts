@@ -18,10 +18,7 @@ it("rejects duplicate feature keys", () => {
     visualTemplateProblem(
       {
         ...PRESETS.Light,
-        features: [
-          feature(),
-          feature({ label: "Power 2" }),
-        ],
+        features: [feature(), feature({ label: "Power 2" })],
       },
       [],
     ),
@@ -59,7 +56,10 @@ it("accepts active and look", () => {
 it("rejects malformed features and active conditions", () => {
   expect(
     visualTemplateProblem(
-      { ...PRESETS.Light, features: [{ feature: "", label: "", roleHints: [] }] },
+      {
+        ...PRESETS.Light,
+        features: [{ feature: "", label: "", roleHints: [] }],
+      },
       [],
     ),
   ).not.toBeNull();

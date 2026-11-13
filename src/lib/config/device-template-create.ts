@@ -29,7 +29,10 @@ export function planDeviceCreate(
   if (!name) return { problem: "Give the device a name." };
 
   const features = new Map(
-    templateFeatures(input.template).map((feature) => [feature.feature, feature]),
+    templateFeatures(input.template).map((feature) => [
+      feature.feature,
+      feature,
+    ]),
   );
   const seen = new Set<string>();
   for (const fill of input.fills) {

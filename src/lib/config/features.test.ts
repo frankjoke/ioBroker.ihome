@@ -207,9 +207,17 @@ it("marks the primary feature per built-in type", () => {
   ).toBe(true);
 });
 
+it("does not let a broad level hint swallow colour states", () => {
+  expect(
+    DEVICE_FEATURES.Light.find((f) => f.feature === "brightness")?.roleHints,
+  ).not.toContain("level");
+});
+
 it("adds common extras without duplicating the type features", () => {
   const keys = featureCatalog("Light").map((f) => f.feature);
-  expect(keys).toEqual(expect.arrayContaining(["power", "battery", "connected"]));
+  expect(keys).toEqual(
+    expect.arrayContaining(["power", "battery", "connected"]),
+  );
   expect(new Set(keys).size).toBe(keys.length);
   expect(COMMON_FEATURES.map((f) => f.feature)).toEqual([
     "battery",

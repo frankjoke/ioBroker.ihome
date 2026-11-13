@@ -57,7 +57,7 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "brightness",
       label: "Brightness",
       widget: "level",
-      roleHints: ["level.dimmer", "level.brightness", "level", "dimmer", "brightness"],
+      roleHints: ["level.dimmer", "level.brightness", "dimmer", "brightness"],
     },
     {
       feature: "color",
@@ -69,11 +69,7 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "colorTemp",
       label: "Color Temp",
       widget: "level",
-      roleHints: [
-        "level.color.temperature",
-        "colortemp",
-        "color.temperature",
-      ],
+      roleHints: ["level.color.temperature", "colortemp", "color.temperature"],
     },
   ],
   Thermostat: [
@@ -252,7 +248,10 @@ export const COMMON_FEATURES: readonly FeatureDef[] = [
 export function featureCatalog(type: DeviceType): FeatureDef[] {
   const out: FeatureDef[] = [];
   const seen = new Set<string>();
-  for (const feature of [...(DEVICE_FEATURES[type] ?? []), ...COMMON_FEATURES]) {
+  for (const feature of [
+    ...(DEVICE_FEATURES[type] ?? []),
+    ...COMMON_FEATURES,
+  ]) {
     if (seen.has(feature.feature)) continue;
     seen.add(feature.feature);
     out.push(feature);
