@@ -5,6 +5,12 @@ A plugin adds a function to iHome. It runs inside the iHome adapter alongside io
 
 The rest of this guide is for people who write or update a plugin. To install one, use Import and follow the steps below.
 
+## Pages
+
+**Pages** adds shortcuts to the cog menu's Plugins group. Built-in entries open ioBroker Admin directly: **Admin**, **Objects** and **Enums**.
+
+Add your own page for an installed adapter's page (for example iqontrol or the alias manager), an external site, or HTML you put in \`www\`. An embedded page opens inside iHome with the bar and cog menu; a site that refuses to be framed can open in a new tab.
+
 ## File format
 
 One plugin per file. Import keeps the plugin switched off until the next restart.

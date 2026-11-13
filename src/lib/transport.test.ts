@@ -199,6 +199,17 @@ it("puts the admin UI on the stored host:port", () => {
   ).toBe("http://10.0.0.5:8081/#tab-overview");
 });
 
+it("opens the requested admin tab", () => {
+  expect(
+    adminPageUrl({
+      hostPort: "10.0.0.5:8081",
+      protocol: "http:",
+      host: "192.168.178.9:8082",
+      tab: "objects",
+    }),
+  ).toBe("http://10.0.0.5:8081/#tab-objects");
+});
+
 it("derives the admin host from the broker, on the admin port", () => {
   // Dev: the page is on localhost, the broker elsewhere.
   expect(

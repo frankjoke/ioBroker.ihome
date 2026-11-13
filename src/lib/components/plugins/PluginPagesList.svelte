@@ -23,10 +23,46 @@
     type PluginPageEntry,
   } from "$lib/config/plugin-pages";
 
+  let {
+    canCreate = $bindable(false),
+  }: {
+    /** Whether the parent's + Page button can open the create dialog. */
+    canCreate?: boolean;
+  } = $props();
+
   const pages = $derived(getPluginPages().pages);
   const adminIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
   );
+  /** The fixed ioBroker Admin tabs, always first in the list. */
+  const builtins = $derived([
+    {
+      id: "admin",
+      title: "Admin",
+      tab: "overview",
+      meta: "/admin",
+      icon: adminIcon,
+    },
+    {
+      id: "objects",
+      title: "Objects",
+      tab: "objects",
+      meta: "/admin/#tab-objects",
+      icon: undefined,
+    },
+    {
+      id: "enums",
+      title: "Enums",
+      tab: "enums",
+      meta: "/admin/#tab-enums",
+      icon: undefined,
+    },
+  ]);
+  const builtinGlyph: Record<string, string> = {
+    admin: "settings_applications",
+    objects: "data_object",
+    enums: "category",
+  };
 
   let selectedId = $state("");
   let draft = $state<PluginPageEntry | null>(null);
@@ -45,6 +81,10 @@
   const canSave = $derived(
     dirty && urlOk && isPluginPagesWritable() && !!draft?.title.trim(),
   );
+
+  $effect(() => {
+    canCreate = !dirty && isPluginPagesWritable();
+  });
 
   onMount(() => {
     void initPluginPages();
@@ -188,34 +228,18 @@
     void goto(pluginPageHref(page.id, base));
   }
 
-  function openAdmin() {
-    void goto(`${base}/#/admin`);
+  export function startCreate() {
+    askCreate = true;
+  }
+
+  function openBuiltin(tab: string) {
+    void goto(
+      tab === "overview" ? `${base}/#/admin` : `${base}/#/admin?tab=${tab}`,
+    );
   }
 </script>
 
 <section class="pages-section">
-  <div class="section-head">
-    <div class="section-heading">
-      <h2>Pages</h2>
-      <p class="hint text-muted">
-        Extra pages in the cog menu's Plugins group: ioBroker pages such as
-        iqontrol or the alias manager, external sites, or your own HTML page in
-        <code>www</code>. Embedded pages open inside iHome with the bar and cog
-        menu; external pages can open in a new tab.
-      </p>
-    </div>
-    <button
-      type="button"
-      class="btn btn-sm btn-outline"
-      disabled={dirty || !isPluginPagesWritable()}
-      title={dirty ? "Save the open page first" : "Add a page"}
-      onclick={() => (askCreate = true)}
-    >
-      <span class="material-symbols-outlined" aria-hidden="true">add</span>
-      Page
-    </button>
-  </div>
-
   {#if !isPluginPagesWritable()}
     <p class="text-danger hint">
       The page list could not be read — nothing is saved. Fix the
@@ -224,25 +248,27 @@
   {/if}
 
   <div class="page-list">
-    <div class="item">
-      <div class="item-line">
-        {#if adminIcon}
-          <Icon value={adminIcon.value} owner={adminIcon.owner} size={18} />
-        {:else}
-          <Icon value="settings_applications" size={18} />
-        {/if}
-        <span class="name static-name">Admin</span>
-        <span class="badge badge-secondary">built-in</span>
-        <span class="meta mono">/admin</span>
-        <span class="item-actions">
-          <IconButton
-            icon="open_in_new"
-            label="Open Admin"
-            onclick={openAdmin}
-          />
-        </span>
+    {#each builtins as entry (entry.id)}
+      <div class="item">
+        <div class="item-line">
+          {#if entry.icon}
+            <Icon value={entry.icon.value} owner={entry.icon.owner} size={18} />
+          {:else}
+            <Icon value={builtinGlyph[entry.id] ?? "web_asset"} size={18} />
+          {/if}
+          <span class="name static-name">{entry.title}</span>
+          <span class="badge badge-secondary">built-in</span>
+          <span class="meta mono">{entry.meta}</span>
+          <span class="item-actions">
+            <IconButton
+              icon="open_in_new"
+              label={`Open ${entry.title}`}
+              onclick={() => openBuiltin(entry.tab)}
+            />
+          </span>
+        </div>
       </div>
-    </div>
+    {/each}
 
     {#each pages as page (page.id)}
       {@const open = selectedId === page.id}
@@ -393,30 +419,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-
-  .section-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .section-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1 1 18rem;
-    min-width: 0;
-  }
-
-  .section-heading h2 {
-    margin: 0;
-  }
-
-  .section-heading .hint {
-    margin: 0;
   }
 
   .page-list {

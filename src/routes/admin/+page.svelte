@@ -1,9 +1,18 @@
 <script lang="ts">
+  import { page as route } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import { adminPageUrl } from "$lib/transport";
 
   const storage = getStorage();
+
+  /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
+  function adminTab(): string {
+    const hash = route.url.hash;
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const tab = new URLSearchParams(query).get("tab") ?? "";
+    return tab === "objects" || tab === "enums" ? tab : "overview";
+  }
 
   /** The stored Host:Port may hold an unsaved edit; when it is empty the live
    *  broker address decides where the admin UI is. */
@@ -14,6 +23,7 @@
       cloudHost: storage.cloudHost,
       protocol: typeof location === "undefined" ? "http:" : location.protocol,
       host: typeof location === "undefined" ? "" : location.host,
+      tab: adminTab(),
     }),
   );
 </script>

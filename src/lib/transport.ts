@@ -102,7 +102,9 @@ export function adminPageUrl(sources: {
   cloudHost?: string;
   protocol: string;
   host: string;
+  tab?: string;
 }): string {
+  const tab = /^[a-z-]+$/i.test(sources.tab ?? "") ? sources.tab : "overview";
   const brokerUrl = String(sources.brokerUrl ?? "");
   const secure =
     sources.protocol === "https:" || /^(https|wss):/i.test(brokerUrl);
@@ -113,6 +115,7 @@ export function adminPageUrl(sources: {
       .replace(/^https?:\/\//i, "")
       .replace(/\/.*$/, ""),
   ).toLowerCase();
+  const hash = `#tab-${tab}`;
   // Through iobroker.pro (or another configured cloud host) the admin is
   // proxied under /admin/, not exposed on the socket's :8081.
   if (
@@ -120,18 +123,18 @@ export function adminPageUrl(sources: {
     pageHost.endsWith(".iobroker.pro") ||
     (cloudHost && pageHost === cloudHost)
   ) {
-    return `${secure ? "https" : "http"}://${pageHost}/admin/index.html#tab-overview`;
+    return `${secure ? "https" : "http"}://${pageHost}/admin/index.html${hash}`;
   }
   // A `*.ts.net` page is only reachable through Tailscale, where this
   // installation serves iHome on 443 and admin on its own HTTPS port 8443.
   // The page context beats a stored LAN host:port, which is unreachable away.
   if (pageHost.endsWith(".ts.net")) {
-    return `${secure ? "https" : "http"}://${pageHost}:8443/#tab-overview`;
+    return `${secure ? "https" : "http"}://${pageHost}:8443/${hash}`;
   }
   const stored = (sources.hostPort ?? "").trim();
   const brokerHost = /^[a-z]+:\/\/([^/]+)/i.exec(brokerUrl)?.[1];
   const authority = stored || `${hostnameOf(brokerHost || sources.host)}:8081`;
-  return `${secure ? "https" : "http"}://${authority}/#tab-overview`;
+  return `${secure ? "https" : "http"}://${authority}/${hash}`;
 }
 
 /** A host as something to compare: scheme and path stripped, lower-cased. */
