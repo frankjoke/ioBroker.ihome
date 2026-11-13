@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from "$app/state";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import CodeTemplates from "$lib/components/templates/CodeTemplates.svelte";
   import TemplateBrowser from "$lib/components/templates/TemplateBrowser.svelte";
@@ -152,6 +153,13 @@
 
 <div class="templates-page">
   <div class="page-heading">
+    <OptionTabs
+      bind:value={tabValue}
+      label="Template group"
+      {tabs}
+      collapsible={false}
+      onchange={onTabChange}
+    />
     <div class="page-actions">
       {#if group === "code"}
         <button
@@ -159,14 +167,14 @@
           class="btn btn-primary btn-sm"
           onclick={() => codeRef?.startNew("formula")}
         >
-          <span class="material-symbols-outlined">add</span> Formula
+          + Formula
         </button>
         <button
           type="button"
-          class="btn btn-sm"
+          class="btn btn-outline btn-sm"
           onclick={() => codeRef?.startNew("function")}
         >
-          <span class="material-symbols-outlined">add</span> Function
+          + Function
         </button>
       {:else}
         <button
@@ -174,40 +182,39 @@
           class="btn btn-primary btn-sm"
           onclick={() => templateRef?.startNew("device")}
         >
-          <span class="material-symbols-outlined">add</span> Device
+          + Device
         </button>
         <button
           type="button"
-          class="btn btn-sm"
+          class="btn btn-outline btn-sm"
           onclick={() => templateRef?.startNew("logic")}
         >
-          <span class="material-symbols-outlined">add</span> Logic
+          + Logic
         </button>
         <button
           type="button"
-          class="btn btn-sm"
+          class="btn btn-outline btn-sm"
           onclick={() => templateRef?.startNew("api")}
         >
-          <span class="material-symbols-outlined">add</span> API
+          + API
         </button>
         <button
           type="button"
-          class="btn btn-sm"
+          class="btn btn-outline btn-sm"
           onclick={() => templateRef?.startNew("both")}
         >
-          <span class="material-symbols-outlined">add</span> Both
+          + Both
         </button>
       {/if}
-      <button
-        type="button"
-        class="btn btn-sm"
+      <IconButton
+        icon="upload"
+        label="Import template"
+        title="Import"
         onclick={() => {
           importError = "";
           importOpen = true;
         }}
-      >
-        <span class="material-symbols-outlined">upload</span> Import
-      </button>
+      />
     </div>
   </div>
 
@@ -216,13 +223,6 @@
   {/if}
 
   <div class="list-toolbar">
-    <OptionTabs
-      bind:value={tabValue}
-      label="Template group"
-      {tabs}
-      collapsible={false}
-      onchange={onTabChange}
-    />
     <div class="list-filter">
       <span class="label-mono filter-label">Filters</span>
       <input
@@ -234,14 +234,12 @@
       />
       <button
         type="button"
-        class="sort-dir"
-        title="Toggle sort direction"
-        aria-label="Toggle sort direction"
+        class="btn btn-outline btn-sm"
+        title="Sort by name"
+        aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
         onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
       >
-        <span class="material-symbols-outlined"
-          >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
-        >
+        Sort {sortDir === "asc" ? "↑" : "↓"}
       </button>
     </div>
   </div>
@@ -293,8 +291,8 @@
   .page-heading {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 1rem;
+    justify-content: space-between;
+    gap: 0.75rem;
     flex-wrap: wrap;
   }
 
@@ -303,21 +301,19 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    margin-left: auto;
   }
 
   .list-toolbar {
     display: flex;
-    align-items: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .list-filter {
     display: grid;
     grid-template-columns: minmax(10rem, 1fr) auto;
     gap: 0.35rem 0.5rem;
-    flex: 0 1 20rem;
-    margin-left: auto;
   }
 
   .filter-label {
@@ -327,26 +323,6 @@
   .list-filter input {
     min-width: 0;
     padding: 0.35rem;
-  }
-
-  .sort-dir {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .sort-dir:hover {
-    background: var(--surface-container);
-  }
-
-  .sort-dir .material-symbols-outlined {
-    font-size: 18px;
   }
 
   .hint {
