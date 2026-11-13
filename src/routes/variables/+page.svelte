@@ -25,14 +25,17 @@
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import {
     enumLabelFromObject,
     roomList,
     roomsOf as roomsOfEnum,
   } from "$lib/config/rooms";
+  import { VARIABLES_GUIDE } from "$lib/config/page-guides";
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const variables = $derived(getVariables());
@@ -55,6 +58,7 @@
   let search = $state("");
   let kindFilter = $state<"" | "state" | "constant">("");
   let sortDir = $state<"asc" | "desc">("asc");
+  let showPageHelp = $state(false);
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();
@@ -78,6 +82,11 @@
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort((a, b) => dir * a.name.localeCompare(b.name));
   });
+  const countLabel = $derived(
+    shown.length === variables.length
+      ? `${variables.length} ${variables.length === 1 ? "entry" : "entries"}`
+      : `${shown.length} of ${variables.length} entries`,
+  );
 
   const rooms = $derived(roomList(ioBroker.enums));
   function roomsOf(id: string): string[] {
@@ -223,6 +232,20 @@
       return;
     }
     requestOpen(v);
+  }
+
+  function togglePageHelp() {
+    showPageHelp = !showPageHelp;
+  }
+
+  function onPageHeaderClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    togglePageHelp();
   }
 
   function startAdd(kind: "state" | "constant") {
@@ -384,34 +407,54 @@
 {/snippet}
 
 <div class="variables-page">
-  <div class="page-header">
-    <div class="page-actions">
+  <div class="item" class:open={showPageHelp}>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="item-line" onclick={onPageHeaderClick}>
+      <Icon value="data_object" size={18} />
       <button
         type="button"
-        class="btn btn-primary btn-sm"
-        disabled={!!editing}
-        onclick={() => startAdd("state")}
+        class="name"
+        aria-expanded={showPageHelp}
+        onclick={togglePageHelp}
       >
-        <span class="material-symbols-outlined">add</span> Variable
+        Variables &amp; Constants
       </button>
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        disabled={!!editing}
-        onclick={() => startAdd("constant")}
-      >
-        <span class="material-symbols-outlined">add</span> Constant
-      </button>
+      <span class="badge">{countLabel}</span>
+      <span class="item-actions">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          title="Sort by name"
+          aria-label={`Sort by name ${sortDir === "asc" ? "descending" : "ascending"}`}
+          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
+        >
+          Sort {sortDir === "asc" ? "↑" : "↓"}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          disabled={!!editing}
+          onclick={() => startAdd("state")}
+        >
+          + Variable
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          disabled={!!editing}
+          onclick={() => startAdd("constant")}
+        >
+          + Constant
+        </button>
+      </span>
     </div>
+    {#if showPageHelp}
+      <div class="item-editor">
+        <HelpSection help={VARIABLES_GUIDE} static plain />
+      </div>
+    {/if}
   </div>
-
-  <p class="text-muted hint">
-    Constants live only in iHome. A state variable names one ioBroker state — in <code
-      >ihome.0.Variables</code
-    >
-    or anywhere else, e.g.
-    <code>0_userdata.0</code>. New states are created when you save.
-  </p>
 
   {#if variables.length === 0}
     <div class="card empty-state">
@@ -443,17 +486,6 @@
           <option value="state">States</option>
           <option value="constant">Constants</option>
         </select>
-        <button
-          type="button"
-          class="sort-dir"
-          title="Toggle sort direction"
-          aria-label="Toggle sort direction"
-          onclick={() => (sortDir = sortDir === "asc" ? "desc" : "asc")}
-        >
-          <span class="material-symbols-outlined"
-            >{sortDir === "asc" ? "arrow_upward" : "arrow_downward"}</span
-          >
-        </button>
       </div>
     </div>
 
@@ -780,20 +812,6 @@
     margin: 0 auto;
   }
 
-  .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .page-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
   .hint {
     font-size: var(--body-sm);
   }
@@ -811,19 +829,17 @@
 
   .filter-bar {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    grid-template-columns: minmax(0, 1fr) 7.5rem 7.5rem 6.5rem;
     gap: 0.5rem;
   }
 
   @media (max-width: 820px) {
     .filter-bar {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-  }
 
-  @media (max-width: 640px) {
-    .filter-bar {
-      grid-template-columns: 1fr;
+    .filter-bar input {
+      grid-column: 1 / -1;
     }
   }
 
@@ -831,26 +847,6 @@
   .filter-bar select {
     min-width: 0;
     padding: 0.35rem;
-  }
-
-  .sort-dir {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--text-color);
-    cursor: pointer;
-  }
-
-  .sort-dir:hover {
-    background: var(--surface-container);
-  }
-
-  .sort-dir .material-symbols-outlined {
-    font-size: 18px;
   }
 
   .var-list {
