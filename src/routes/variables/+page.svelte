@@ -420,7 +420,7 @@
         aria-expanded={showPageHelp}
         onclick={togglePageHelp}
       >
-        Variables &amp; Constants
+        Variables<span class="title-tail"> &amp; Constants</span>
       </button>
       <span class="badge">{countLabel}</span>
       <span class="item-actions">
@@ -484,7 +484,7 @@
           {/each}
         </select>
         <select bind:value={kindFilter} aria-label="Filter by kind">
-          <option value="">Everything</option>
+          <option value="">All</option>
           <option value="state">States</option>
           <option value="constant">Constants</option>
         </select>
@@ -816,6 +816,12 @@
 
   .hint {
     font-size: var(--body-sm);
+  }
+
+  @media (max-width: 640px) {
+    .title-tail {
+      display: none;
+    }
   }
 
   .error {
