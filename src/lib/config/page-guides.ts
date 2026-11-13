@@ -48,3 +48,27 @@ and logic that use the variable keep working.
 Constants live only in iHome. A state variable names one ioBroker state — in
 \`ihome.0.Variables\` or anywhere else, e.g. \`0_userdata.0\`. New states are
 created when you save.`;
+
+export const TEMPLATES_GUIDE = `## What this page is for
+
+Templates are reusable definitions. Build one once, then apply it or insert it
+instead of repeating the same device, logic or snippet.
+
+**Code**
+
+- **Formula** — the expression used by a device-control formula.
+- **Function** — a reusable code snippet for formula, action or function fields.
+
+Code templates are selected from their entry forms; they are not applied here.
+
+**Templates**
+
+- **Device** — a visual tile/control template applied to a device.
+- **Logic** — a logic definition inserted into the logic document.
+- **Both / API** — a logic plus a visual device, or the API states + logic +
+  optional device flow.
+
+**Benefits**
+
+One definition is reused by devices, tiles, logic and formulas. Import and
+export share a template as a JSON file; an applied copy stays independent.`;

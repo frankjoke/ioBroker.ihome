@@ -1,6 +1,7 @@
 <script lang="ts">
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { BUILTIN_FUNCTIONS } from "$lib/config/function-presets";
@@ -86,6 +87,10 @@
 
   function isOpen(entry: CodeEntry) {
     return selected?.kind === entry.kind && selected?.id === entry.id;
+  }
+
+  function typeIcon(entry: CodeEntry): string {
+    return entry.kind === "formula" ? "functions" : "code";
   }
 
   function definitionFor(entry: CodeEntry) {
@@ -355,6 +360,7 @@
               class="item-line"
               onclick={(event) => onLineClick(event, entry)}
             >
+              <Icon value={typeIcon(entry)} size={18} />
               <button type="button" class="name" onclick={() => open(entry)}>
                 {entry.name}
               </button>

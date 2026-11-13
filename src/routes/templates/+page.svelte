@@ -6,7 +6,9 @@
   import CodeTemplates from "$lib/components/templates/CodeTemplates.svelte";
   import TemplateBrowser from "$lib/components/templates/TemplateBrowser.svelte";
   import ImportTemplateModal from "$lib/components/templates/ImportTemplateModal.svelte";
+  import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import { templateKind } from "$lib/config/config-nav";
+  import { TEMPLATES_GUIDE } from "$lib/config/page-guides";
   import {
     templateGroup,
     type TemplateFile,
@@ -218,6 +220,8 @@
     </div>
   </div>
 
+  <HelpSection help={TEMPLATES_GUIDE} label="About templates" />
+
   {#if importError}
     <p class="text-danger hint">{importError}</p>
   {/if}
@@ -285,6 +289,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
     --option-tab-bg: var(--background-color);
   }
 

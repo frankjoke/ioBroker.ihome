@@ -1,6 +1,7 @@
 <script lang="ts">
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { PRESETS } from "$lib/config/presets";
@@ -177,6 +178,13 @@
       );
     }
     return entry.kind === "device" ? "Device" : "Logic";
+  }
+
+  function typeIcon(entry: TemplateEntry): string {
+    if (entry.kind === "device") return "devices";
+    if (entry.kind === "logic") return "account_tree";
+    if (entry.kind === "api") return "api";
+    return "layers";
   }
 
   function definitionFor(entry: TemplateEntry) {
@@ -563,6 +571,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
+            <Icon value={typeIcon(entry)} size={18} />
             <button type="button" class="name" onclick={() => open(entry)}>
               {entry.name}
             </button>
