@@ -34,8 +34,22 @@
   const adminIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
   );
+  /** ioBroker Admin's own Categories icon: a house for rooms and a bulb for
+   *  functions, as drawn by `src-admin/src/icons/IconCategories.tsx`. */
+  const ENUMS_ICON = `<svg viewBox="0 0 24 24" fill="{{$color}}"><g transform="translate(-1 -1.4) scale(0.78)"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></g><g transform="translate(14.5 13.5) scale(0.42)"><path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7"/></g></svg>`;
+
+  type Builtin = {
+    id: string;
+    title: string;
+    tab: string;
+    meta: string;
+    icon?: { value: string; owner?: string };
+    glyph?: string;
+    svg?: string;
+  };
+
   /** The fixed ioBroker Admin tabs, always first in the list. */
-  const builtins = $derived([
+  const builtins: Builtin[] = $derived([
     {
       id: "admin",
       title: "Admin",
@@ -48,21 +62,16 @@
       title: "Objects",
       tab: "objects",
       meta: "/admin/#tab-objects",
-      icon: undefined,
+      glyph: "account_tree",
     },
     {
       id: "enums",
       title: "Enums",
       tab: "enums",
       meta: "/admin/#tab-enums",
-      icon: undefined,
+      svg: ENUMS_ICON,
     },
   ]);
-  const builtinGlyph: Record<string, string> = {
-    admin: "settings_applications",
-    objects: "data_object",
-    enums: "category",
-  };
 
   let selectedId = $state("");
   let draft = $state<PluginPageEntry | null>(null);
@@ -253,8 +262,14 @@
         <div class="item-line">
           {#if entry.icon}
             <Icon value={entry.icon.value} owner={entry.icon.owner} size={18} />
+          {:else if entry.svg}
+            <Icon
+              value={entry.svg}
+              data={{ $color: "var(--text-color)" }}
+              size={18}
+            />
           {:else}
-            <Icon value={builtinGlyph[entry.id] ?? "web_asset"} size={18} />
+            <Icon value={entry.glyph ?? "web_asset"} size={18} />
           {/if}
           <span class="name static-name">{entry.title}</span>
           <span class="badge badge-secondary">built-in</span>
