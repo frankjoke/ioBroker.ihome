@@ -29,6 +29,18 @@
 
   let message = $state("");
   let pushMessage = $state("");
+  let open = $state(false);
+
+  /** The free line is a mouse convenience; controls keep their own hit areas. */
+  function onLineClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    open = !open;
+  }
   const systemHome = $derived(homeFromSystemConfig(ioBroker.systemConfig));
   const secure = $derived(
     location.protocol === "https:" ||
@@ -152,197 +164,210 @@
   }
 </script>
 
-<section class="card settings-card phone-card">
-  <div class="card-header">
-    <span class="material-symbols-outlined">smartphone</span>
-    <h2 class="card-title">This phone</h2>
-  </div>
-  <div class="card-body phone-body">
-    <div class="field">
-      <label class="label-mono" for="phone-name">Device name</label>
-      <input
-        id="phone-name"
-        type="text"
-        value={phone.name}
-        maxlength="64"
-        onchange={(event) => setPhoneName(event.currentTarget.value)}
-      />
-    </div>
-
-    <label class="check">
-      <input
-        type="checkbox"
-        checked={phone.enabled}
-        onchange={(event) => {
-          const enabled = event.currentTarget.checked;
-          setPhoneEnabled(enabled);
-          if (enabled) void requestPhoneLocation();
-        }}
-      />
-      <span>Report this phone's presence to ioBroker</span>
-    </label>
-
-    {#if phone.enabled}
-      <div class="phone-actions">
-        <button
-          class="btn"
-          type="button"
-          onclick={() => pausePhone(!phone.paused)}
-        >
-          {phone.paused ? "Resume" : "Pause"}
-        </button>
-        <button
-          class="btn"
-          type="button"
-          onclick={() => void requestPhoneLocation()}
-        >
-          Request location
-        </button>
-      </div>
-    {/if}
-
-    {#if !secure}
-      <p class="hint warning">
-        Location needs HTTPS — use iobroker.pro or a local HTTPS proxy. The LAN
-        HTTP URL can still report online/connection only.
-      </p>
-    {/if}
-
-    <div class="phone-status">
-      <div>
-        <span class="label-mono">Status</span><span>{statusText()}</span>
-      </div>
-      <div>
-        <span class="label-mono">Source</span><span
-          >{phone.status.homeSource}</span
-        >
-      </div>
-      <div>
-        <span class="label-mono">Network</span><span
-          >{phone.status.local ? "local" : "cloud"} · {phone.status
-            .connection}</span
-        >
-      </div>
-      <div>
-        <span class="label-mono">Permission</span><span
-          >{phone.status.permission}</span
-        >
-      </div>
-      <div>
-        <span class="label-mono">Distance</span><span
-          >{phone.status.distance == null
-            ? "—"
-            : `${Math.round(phone.status.distance)} m`}</span
-        >
-      </div>
-      <div>
-        <span class="label-mono">Last sent</span><span>{lastSeenText()}</span>
-      </div>
-    </div>
-
-    <div class="home-row">
-      <div>
-        <span class="label-mono">Home point</span>
-        <span class="home-value">
-          {#if homePoint()}
-            {homePoint()!.lat.toFixed(4)}, {homePoint()!.lon.toFixed(4)}
-          {:else}
-            not set
-          {/if}
-        </span>
-      </div>
-      <label class="radius">
-        <span class="label-mono">radius</span>
+<div class="item" class:open>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="item-line" onclick={onLineClick}>
+    <span class="material-symbols-outlined" aria-hidden="true">smartphone</span>
+    <button
+      type="button"
+      class="name"
+      aria-expanded={open}
+      onclick={() => (open = !open)}>{phone.name || "This phone"}</button
+    >
+    <span class="item-actions">
+      <label class="inline" title="Report this phone's presence to ioBroker">
+        reported
         <input
-          type="number"
-          min="10"
-          max="10000"
-          value={homePoint()?.radius ?? 150}
-          onchange={(event) => setRadius(event.currentTarget.value)}
+          type="checkbox"
+          checked={phone.enabled}
+          onchange={(event) => {
+            const enabled = event.currentTarget.checked;
+            setPhoneEnabled(enabled);
+            if (enabled) void requestPhoneLocation();
+          }}
         />
-        <span class="text-muted">m</span>
       </label>
-    </div>
-    <div class="phone-actions">
-      <button class="btn" type="button" onclick={() => void setHomeHere()}>
-        Set home from this phone
-      </button>
-      {#if systemHome}
-        <button class="btn" type="button" onclick={useSystemHome}>
-          Use system location
-        </button>
-      {/if}
-    </div>
-
-    <div class="phone-actions">
-      <button
-        class="btn btn-primary"
-        type="button"
-        disabled={deviceExists}
-        onclick={createPhoneDevice}
+      <label
+        class="inline"
+        title={push.supported
+          ? "Push notifications on this phone"
+          : "Push is not supported in this browser"}
       >
-        {deviceExists ? "Phone device created" : "Create phone device"}
-      </button>
-    </div>
+        notifications
+        <input
+          type="checkbox"
+          checked={push.subscribed}
+          disabled={!push.supported || push.busy}
+          onchange={(event) =>
+            void (event.currentTarget.checked ? enablePush() : disablePush())}
+        />
+      </label>
+    </span>
+  </div>
 
-    <div class="push-block">
-      <span class="label-mono">Notifications</span>
-      <p class="hint text-muted">
-        Notifications need HTTPS and, on iPhone, the PWA installed on the home
-        screen.
-      </p>
-      {#if push.supported}
+  {#if open}
+    <div class="item-editor phone-body">
+      <div class="field">
+        <label class="label-mono" for="phone-name">Device name</label>
+        <input
+          id="phone-name"
+          type="text"
+          value={phone.name}
+          maxlength="64"
+          onchange={(event) => setPhoneName(event.currentTarget.value)}
+        />
+      </div>
+
+      {#if phone.enabled}
         <div class="phone-actions">
           <button
             class="btn"
             type="button"
-            disabled={push.busy}
-            onclick={() =>
-              void (push.subscribed ? disablePush() : enablePush())}
+            onclick={() => pausePhone(!phone.paused)}
           >
-            {push.busy
-              ? "Working…"
-              : push.subscribed
-                ? "Disable notifications"
-                : "Enable notifications"}
+            {phone.paused ? "Resume" : "Pause"}
           </button>
           <button
             class="btn"
             type="button"
-            disabled={!push.subscribed || push.busy}
-            onclick={() => void sendTestPush()}
+            onclick={() => void requestPhoneLocation()}
           >
-            Send test notification
+            Request location
           </button>
         </div>
-        <div class="phone-status">
-          <div>
-            <span class="label-mono">Permission</span><span
-              >{push.permission}</span
-            >
-          </div>
-          <div>
-            <span class="label-mono">Subscription</span><span
-              >{push.subscribed ? "active" : "none"}</span
-            >
-          </div>
+      {/if}
+
+      {#if !secure}
+        <p class="hint warning">
+          Location needs HTTPS — use iobroker.pro or a local HTTPS proxy. The
+          LAN HTTP URL can still report online/connection only.
+        </p>
+      {/if}
+
+      <div class="phone-status">
+        <div>
+          <span class="label-mono">Status</span><span>{statusText()}</span>
         </div>
-      {:else}
-        <p class="hint warning">Push is not supported in this browser.</p>
-      {/if}
-      {#if push.error}
-        <p class="hint danger">{push.error}</p>
-      {/if}
-      {#if pushMessage}
-        <p class="hint text-muted">{pushMessage}</p>
+        <div>
+          <span class="label-mono">Source</span><span
+            >{phone.status.homeSource}</span
+          >
+        </div>
+        <div>
+          <span class="label-mono">Network</span><span
+            >{phone.status.local ? "local" : "cloud"} · {phone.status
+              .connection}</span
+          >
+        </div>
+        <div>
+          <span class="label-mono">Permission</span><span
+            >{phone.status.permission}</span
+          >
+        </div>
+        <div>
+          <span class="label-mono">Distance</span><span
+            >{phone.status.distance == null
+              ? "—"
+              : `${Math.round(phone.status.distance)} m`}</span
+          >
+        </div>
+        <div>
+          <span class="label-mono">Last sent</span><span>{lastSeenText()}</span>
+        </div>
+      </div>
+
+      <div class="home-row">
+        <div>
+          <span class="label-mono">Home point</span>
+          <span class="home-value">
+            {#if homePoint()}
+              {homePoint()!.lat.toFixed(4)}, {homePoint()!.lon.toFixed(4)}
+            {:else}
+              not set
+            {/if}
+          </span>
+        </div>
+        <label class="radius">
+          <span class="label-mono">radius</span>
+          <input
+            type="number"
+            min="10"
+            max="10000"
+            value={homePoint()?.radius ?? 150}
+            onchange={(event) => setRadius(event.currentTarget.value)}
+          />
+          <span class="text-muted">m</span>
+        </label>
+      </div>
+      <div class="phone-actions">
+        <button class="btn" type="button" onclick={() => void setHomeHere()}>
+          Set home from this phone
+        </button>
+        {#if systemHome}
+          <button class="btn" type="button" onclick={useSystemHome}>
+            Use system location
+          </button>
+        {/if}
+      </div>
+
+      <div class="phone-actions">
+        <button
+          class="btn btn-primary"
+          type="button"
+          disabled={deviceExists}
+          onclick={createPhoneDevice}
+        >
+          {deviceExists ? "Phone device created" : "Create phone device"}
+        </button>
+      </div>
+
+      <div class="push-block">
+        <span class="label-mono">Notifications</span>
+        <p class="hint text-muted">
+          Notifications need HTTPS and, on iPhone, the PWA installed on the home
+          screen.
+        </p>
+        {#if push.supported}
+          <div class="phone-actions">
+            <button
+              class="btn"
+              type="button"
+              disabled={!push.subscribed || push.busy}
+              onclick={() => void sendTestPush()}
+            >
+              Send test notification
+            </button>
+          </div>
+          <div class="phone-status">
+            <div>
+              <span class="label-mono">Permission</span><span
+                >{push.permission}</span
+              >
+            </div>
+            <div>
+              <span class="label-mono">Subscription</span><span
+                >{push.subscribed ? "active" : "none"}</span
+              >
+            </div>
+          </div>
+        {:else}
+          <p class="hint warning">Push is not supported in this browser.</p>
+        {/if}
+        {#if push.error}
+          <p class="hint danger">{push.error}</p>
+        {/if}
+        {#if pushMessage}
+          <p class="hint text-muted">{pushMessage}</p>
+        {/if}
+      </div>
+
+      {#if message}
+        <p class="hint text-muted">{message}</p>
       {/if}
     </div>
-
-    {#if message}
-      <p class="hint text-muted">{message}</p>
-    {/if}
-  </div>
-</section>
+  {/if}
+</div>
 
 <style>
   .phone-body {
@@ -350,6 +375,14 @@
     flex-direction: column;
     gap: 1rem;
     align-items: stretch;
+  }
+
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--body-sm);
+    cursor: pointer;
   }
 
   .phone-actions {

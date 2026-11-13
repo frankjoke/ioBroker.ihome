@@ -18,6 +18,8 @@
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
+  /** The fieldset is editable after an unlock, or when the PIN is skipped. */
+  const locked = $derived(!isUnlocked() && storage.pinDisabled !== true);
 
   /** One collapsible item per form; the line keeps what fits, the editor the rest. */
   let openSection = $state("");
@@ -101,7 +103,7 @@
     <h1>Server &amp; Security</h1>
   </div>
 
-  <fieldset class="lock-zone" disabled={!isUnlocked()}>
+  <fieldset class="lock-zone" disabled={locked}>
     <div class="settings-list">
       <div class="item" class:open={openSection === "connection"}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -259,17 +261,28 @@
         {/if}
       </div>
 
-      <div class="item">
-        <div class="item-line about-line">
+      <div class="item" class:open={openSection === "about"}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onLineClick(e, "about")}>
           <Icon value="info" size={18} />
-          <span class="name static-name">About</span>
-          <span class="meta"
-            >Visual interface for ioBroker smart home control</span
+          <button
+            type="button"
+            class="name"
+            aria-expanded={openSection === "about"}
+            onclick={() => toggle("about")}>About</button
           >
           <span class="item-actions mono hint text-muted"
-            >{ioPackage.common.titleLang.en} v{ioPackage.common.version}</span
+            >v{ioPackage.common.version}</span
           >
         </div>
+        {#if openSection === "about"}
+          <div class="item-editor">
+            <p class="hint text-muted">
+              Visual interface for ioBroker smart home control
+            </p>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -409,14 +422,6 @@
 
   .conn-host {
     max-width: 14rem;
-  }
-
-  .about-line {
-    cursor: default;
-  }
-
-  .static-name {
-    font-weight: 600;
   }
 
   .conn-note {
