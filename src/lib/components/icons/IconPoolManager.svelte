@@ -324,12 +324,12 @@
             <span class="label-mono">Default</span>
             <button
               type="button"
-              class="glyph-pick"
+              class="btn btn-sm glyph-pick"
               title={`Change the default icon of ${entry.name}`}
               onclick={() =>
                 (pickerTarget = { id: entry.id, builtin, field: "value" })}
             >
-              <Icon value={openEntry.value} size={28} />
+              <Icon value={openEntry.value} size={18} />
             </button>
           </div>
           <div class="icon-slot">
@@ -337,7 +337,7 @@
             <div class="active-line">
               <button
                 type="button"
-                class="glyph-pick"
+                class="btn btn-sm glyph-pick"
                 title={`Set the active icon of ${entry.name}`}
                 onclick={() =>
                   (pickerTarget = {
@@ -347,7 +347,7 @@
                   })}
               >
                 {#if openEntry.activeValue}
-                  <Icon value={openEntry.activeValue} size={28} />
+                  <Icon value={openEntry.activeValue} size={18} />
                 {:else}
                   <span class="material-symbols-outlined">add</span>
                 {/if}
@@ -623,21 +623,8 @@
     gap: 0.25rem;
   }
 
-  .glyph-pick {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    min-height: 40px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-container);
-    color: inherit;
-    cursor: pointer;
-  }
-
-  .glyph-pick:hover {
-    background-color: var(--surface-container-high, var(--surface-container));
+  .glyph-pick .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .reset-btn {
