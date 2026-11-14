@@ -132,5 +132,9 @@
   .template-row .badge {
     font-size: 11px;
     color: var(--text-muted);
+    white-space: nowrap;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0 0.4rem;
   }
 </style>

@@ -172,6 +172,12 @@
   });
 
   function badge(entry: TemplateEntry): string {
+    if (entry.kind === "device") {
+      const definition = definitionFor(entry);
+      const type =
+        definition && "type" in definition ? String(definition.type) : "";
+      return type ? `Device · ${type}` : "Device";
+    }
     if (entry.kind === "api") return "Logic + Device (API)";
     if (entry.kind === "bundle") {
       return (
@@ -182,7 +188,7 @@
           .join(" + ") || "Bundle"
       );
     }
-    return entry.kind === "device" ? "Device" : "Logic";
+    return "Logic";
   }
 
   function typeIcon(entry: TemplateEntry): string {
