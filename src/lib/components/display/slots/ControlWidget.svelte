@@ -123,23 +123,27 @@
   </button>
 {:else if widget === "level"}
   <div class="level">
-    <input
-      type="range"
-      aria-label={control.label || control.feature}
-      min={range.min}
-      max={range.max}
-      step={range.step}
-      value={control.liveValue ?? 0}
-      disabled={!control.writable}
-      onpointerdown={stop}
-      onclick={stop}
-      oninput={(e) => (dragValue = Number(e.currentTarget.value))}
-      onchange={(e) => settle(Number(e.currentTarget.value))}
-      onblur={() => (dragValue = null)}
-    />
-    {#if showValue}
-      <span class="level-value">{readout(dragValue ?? control.liveValue)}</span>
-    {/if}
+    <div class="level-track">
+      <input
+        type="range"
+        aria-label={control.label || control.feature}
+        min={range.min}
+        max={range.max}
+        step={range.step}
+        value={control.liveValue ?? 0}
+        disabled={!control.writable}
+        onpointerdown={stop}
+        onclick={stop}
+        oninput={(e) => (dragValue = Number(e.currentTarget.value))}
+        onchange={(e) => settle(Number(e.currentTarget.value))}
+        onblur={() => (dragValue = null)}
+      />
+      {#if showValue}
+        <span class="level-value"
+          >{readout(dragValue ?? control.liveValue)}</span
+        >
+      {/if}
+    </div>
   </div>
 {:else if showValue && widget === "color"}
   <input
@@ -202,26 +206,26 @@
   }
 
   .level {
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
+    display: block;
     min-width: 0;
     width: 100%;
   }
 
-  /* The slider's 6rem basis keeps the reading beside it while there is room;
-     on a narrow tile both no longer fit on one line and the reading wraps
-     underneath, centred, instead of squeezing the slider to nothing. */
-  .level input {
-    flex: 1 1 6rem;
+  /* The track is the label's box: centring the value on it stays right even
+     though the bottom gap is larger. The native range's 8px vertical padding
+     and 2px margin are the gap that made the slider look detached from its
+     icon; the top is pulled in more than the bottom. */
+  .level-track {
+    position: relative;
+    width: 100%;
+    margin: -2px 0 5px;
+  }
+
+  .level-track input {
+    display: block;
+    width: 100%;
     min-width: 0;
-    /* The browser's native 8px vertical padding is the gap that made the
-       slider look detached from its icon. Pull the top in a little more than
-       the bottom so the thumb reads as part of its own slot row. */
-    margin: -2px 0 0;
+    margin: 0;
     padding: 0;
   }
 
