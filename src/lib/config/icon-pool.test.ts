@@ -6,9 +6,11 @@ import {
   POOL_CAP,
   filterPoolIcons,
   mdiIconValue,
+  clearBaseOverride,
   parseIconPool,
   poolEntries,
   removePoolIcon,
+  setBaseOverride,
   upsertPoolIcon,
 } from "./icon-pool";
 
@@ -82,6 +84,66 @@ it("upserts and removes one icon by id", () => {
   expect(replaced.icons).toEqual([{ id: "a", name: "B", value: "y" }]);
   expect(replaced.updatedAt).toBeGreaterThan(0);
   expect(removePoolIcon(replaced, "a").icons).toHaveLength(0);
+});
+
+it("keeps a pair through a parse round-trip", () => {
+  const parsed = parseIconPool(
+    JSON.stringify({
+      version: 1,
+      icons: [
+        { id: "g", name: "Gate", value: "gate", activeValue: "gate_open" },
+      ],
+    }),
+  );
+  expect(parsed?.icons[0]).toEqual({
+    id: "g",
+    name: "Gate",
+    value: "gate",
+    activeValue: "gate_open",
+  });
+});
+
+it("applies overrides to base entries and resets them", () => {
+  const base = BUILTIN_POOL[0];
+  const pool = setBaseOverride(
+    { version: 1, updatedAt: 0, icons: [] },
+    base.id,
+    { value: "power", activeValue: "power_off" },
+  );
+  const entry = poolEntries(pool).find((item) => item.id === base.id);
+  expect(entry?.value).toBe("power");
+  expect(entry?.activeValue).toBe("power_off");
+  const reset = poolEntries(clearBaseOverride(pool, base.id)).find(
+    (item) => item.id === base.id,
+  );
+  expect(reset?.value).toBe(base.value);
+  expect(reset?.activeValue).toBeUndefined();
+});
+
+it("drops invalid and unknown overrides", () => {
+  const parsed = parseIconPool(
+    JSON.stringify({
+      version: 1,
+      icons: [],
+      overrides: {
+        nope: { value: "x" },
+        [BUILTIN_POOL[0].id]: { value: "" },
+      },
+    }),
+  );
+  expect(parsed?.overrides).toBeUndefined();
+});
+
+it("preserves overrides across user upsert and remove", () => {
+  const base = BUILTIN_POOL[0];
+  const pool = setBaseOverride(
+    { version: 1, updatedAt: 0, icons: [] },
+    base.id,
+    { activeValue: "power_off" },
+  );
+  const added = upsertPoolIcon(pool, { id: "u", name: "U", value: "x" });
+  expect(added.overrides).toEqual(pool.overrides);
+  expect(removePoolIcon(added, "u").overrides).toEqual(pool.overrides);
 });
 
 it("exposes base entries without storing them", () => {

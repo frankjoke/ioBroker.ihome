@@ -6,8 +6,17 @@ export interface PoolIcon {
   id: string;
   name: string;
   group?: string;
+  /** Default/inactive icon. */
   value: string;
+  /** Active twin; absent means a single icon. */
+  activeValue?: string;
   keywords?: string[];
+}
+
+/** Edits on a code-defined base entry; absent keys keep the code default. */
+export interface PoolOverride {
+  value?: string;
+  activeValue?: string;
 }
 
 /** The document shared with the adapter and the icon manager. */
@@ -16,6 +25,8 @@ export interface IconPool {
   updatedAt: number;
   /** User additions only; the base pool is code-defined. */
   icons: PoolIcon[];
+  /** Base edits keyed by base entry id. */
+  overrides?: Record<string, PoolOverride>;
 }
 
 /** What the picker shows: the code-defined base plus the user additions. */
@@ -73,6 +84,35 @@ function baseEntries(): PoolEntry[] {
 /** The device-type and role defaults; never written to the config state. */
 export const BUILTIN_POOL: PoolEntry[] = baseEntries();
 
+const BASE_IDS = new Set(BUILTIN_POOL.map((entry) => entry.id));
+
+function parseOverrides(
+  raw: unknown,
+): Record<string, PoolOverride> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const overrides: Record<string, PoolOverride> = {};
+  for (const [id, patch] of Object.entries(raw as Record<string, unknown>)) {
+    if (
+      !BASE_IDS.has(id) ||
+      !patch ||
+      typeof patch !== "object" ||
+      Array.isArray(patch)
+    ) {
+      continue;
+    }
+    const record = patch as Record<string, unknown>;
+    const value = typeof record.value === "string" ? record.value.trim() : "";
+    const activeValue =
+      typeof record.activeValue === "string" ? record.activeValue.trim() : "";
+    if (!value && !activeValue) continue;
+    overrides[id] = {
+      ...(value ? { value } : {}),
+      ...(activeValue ? { activeValue } : {}),
+    };
+  }
+  return Object.keys(overrides).length ? overrides : undefined;
+}
+
 /** Parse the stored user document. Null means the document is unreadable. */
 export function parseIconPool(raw: unknown): IconPool | null {
   if (raw === undefined || raw === null || raw === "") return emptyPool();
@@ -106,10 +146,13 @@ export function parseIconPool(raw: unknown): IconPool | null {
           .filter(Boolean)
       : undefined;
     const group = typeof entry.group === "string" ? entry.group.trim() : "";
+    const activeValue =
+      typeof entry.activeValue === "string" ? entry.activeValue.trim() : "";
     icons.push({
       id,
       name,
       value: iconValue,
+      ...(activeValue ? { activeValue } : {}),
       ...(group ? { group } : {}),
       ...(keywords?.length ? { keywords } : {}),
     });
@@ -119,12 +162,16 @@ export function parseIconPool(raw: unknown): IconPool | null {
     typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
       ? record.updatedAt
       : 0;
-  return { version: 1, updatedAt, icons };
+  const overrides = parseOverrides(record.overrides);
+  return { version: 1, updatedAt, icons, ...(overrides ? { overrides } : {}) };
 }
 
-/** Base first, then user additions; a value already present is not repeated. */
+/** Base first (with overrides), then user additions; no repeated value. */
 export function poolEntries(pool?: IconPool | null): PoolEntry[] {
-  const entries = BUILTIN_POOL.map((entry) => ({ ...entry }));
+  const entries = BUILTIN_POOL.map((entry) => {
+    const patch = pool?.overrides?.[entry.id];
+    return patch ? { ...entry, ...patch } : { ...entry };
+  });
   const seen = new Set(entries.map((entry) => entry.value));
   for (const icon of pool?.icons ?? []) {
     if (!icon.id || !icon.name || !icon.value || seen.has(icon.value)) continue;
@@ -161,6 +208,37 @@ export function removePoolIcon(pool: IconPool, id: string): IconPool {
     ...pool,
     updatedAt: Date.now(),
     icons: pool.icons.filter((entry) => entry.id !== id),
+  };
+}
+
+/** Set or clear fields on one base entry; unknown ids are ignored. */
+export function setBaseOverride(
+  pool: IconPool,
+  baseId: string,
+  patch: PoolOverride,
+): IconPool {
+  if (!BASE_IDS.has(baseId)) return pool;
+  const overrides = { ...(pool.overrides ?? {}) };
+  const merged: PoolOverride = { ...(overrides[baseId] ?? {}), ...patch };
+  for (const key of Object.keys(merged) as (keyof PoolOverride)[]) {
+    if (!merged[key]) delete merged[key];
+  }
+  if (Object.keys(merged).length) overrides[baseId] = merged;
+  else delete overrides[baseId];
+  return {
+    ...pool,
+    updatedAt: Date.now(),
+    overrides: Object.keys(overrides).length ? overrides : undefined,
+  };
+}
+
+export function clearBaseOverride(pool: IconPool, baseId: string): IconPool {
+  const overrides = { ...(pool.overrides ?? {}) };
+  delete overrides[baseId];
+  return {
+    ...pool,
+    updatedAt: Date.now(),
+    overrides: Object.keys(overrides).length ? overrides : undefined,
   };
 }
 
