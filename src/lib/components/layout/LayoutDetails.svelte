@@ -22,6 +22,7 @@
   import { effectiveSpan, slotVisible } from "$lib/config/template-ops";
   import {
     addRule,
+    applyPoolIcon,
     clearRuleIcons,
     detailSpan,
     editTile,
@@ -2917,10 +2918,9 @@
   {#if tileIconPicker}
     <IconPicker
       icon={tile?.tile?.icon}
-      onPick={(value) => {
-        const glyph = value.trim();
+      onPick={(value, meta) => {
         tileIconPicker = false;
-        edit((t) => ({ ...t, icon: glyph || undefined }));
+        edit((t) => applyPoolIcon(t, value, meta?.active));
       }}
       onClose={() => (tileIconPicker = false)}
     />
@@ -2929,11 +2929,14 @@
   {#if lookIconFor !== null}
     <IconPicker
       icon={tile?.tile?.look?.[lookIconFor]?.glyph}
-      onPick={(value) => {
+      onPick={(value, meta) => {
         const target = lookIconFor;
         lookIconFor = null;
         if (target === null) return;
-        patchLook(target, { glyph: value.trim() || undefined });
+        const glyph = (
+          target === "active" ? (meta?.active ?? value) : value
+        ).trim();
+        patchLook(target, { glyph: glyph || undefined });
       }}
       onClose={() => (lookIconFor = null)}
     />

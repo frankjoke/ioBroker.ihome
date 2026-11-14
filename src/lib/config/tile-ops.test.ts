@@ -8,6 +8,7 @@ import type {
 import {
   addRule,
   addSlot,
+  applyPoolIcon,
   clearRuleIcons,
   detailSpan,
   editTile,
@@ -396,4 +397,34 @@ it("sets and clears one state's look without touching the other (A71)", () => {
   expect(bare).toEqual({ ...tile, look: undefined });
   // A patch that clears nothing makes no empty state.
   expect(setLook(tile, "active", { glyph: undefined }).look).toEqual(tile.look);
+});
+
+it("fills both look glyphs from a pool pair and keeps styling", () => {
+  const tile: TileConfig = {
+    icon: "old",
+    look: {
+      active: { color: "red", glyph: "old_on" },
+      inactive: { glow: "x" },
+    },
+  };
+  const next = applyPoolIcon(tile, " gate ", "gate_open");
+  expect(next.icon).toBe("gate");
+  expect(next.look?.inactive?.glyph).toBe("gate");
+  expect(next.look?.active?.glyph).toBe("gate_open");
+  expect(next.look?.active?.color).toBe("red");
+  expect(next.look?.inactive?.glow).toBe("x");
+});
+
+it("leaves the look alone when the pool icon has no twin", () => {
+  const tile: TileConfig = { icon: "old", look: { active: { glyph: "on" } } };
+  const next = applyPoolIcon(tile, "gate");
+  expect(next.icon).toBe("gate");
+  expect(next.look).toEqual({ active: { glyph: "on" } });
+});
+
+it("clears only the tile icon for an empty pick", () => {
+  const tile: TileConfig = { icon: "old", look: { inactive: { glyph: "x" } } };
+  const next = applyPoolIcon(tile, "  ");
+  expect(next.icon).toBeUndefined();
+  expect(next.look).toEqual({ inactive: { glyph: "x" } });
 });

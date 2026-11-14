@@ -280,6 +280,23 @@ export function setLook(
   };
 }
 
+/** A pool pick: an unpaired icon replaces the tile icon only. A pair also
+ *  fills both look glyphs, preserving the look's colours/glow/background. */
+export function applyPoolIcon(
+  tile: TileConfig,
+  value: string,
+  active?: string,
+): TileConfig {
+  const glyph = value.trim();
+  const twin = active?.trim();
+  let next: TileConfig = { ...tile, icon: glyph || undefined };
+  if (glyph && twin) {
+    next = setLook(next, "inactive", { glyph });
+    next = setLook(next, "active", { glyph: twin });
+  }
+  return next;
+}
+
 // ------------------------------------------------------------------- charts
 
 /** Set or clear one spark field (A59): the `patchIcon` shape — `undefined`
