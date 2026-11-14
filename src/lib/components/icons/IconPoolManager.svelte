@@ -47,11 +47,15 @@
     openId ? draft.icons.find((icon) => icon.id === openId) : undefined,
   );
 
+  function clonePool(pool: IconPool): IconPool {
+    return JSON.parse(JSON.stringify(pool)) as IconPool;
+  }
+
   $effect(() => {
     if (started) return;
     started = true;
     void initIconPool().then(() => {
-      draft = structuredClone(getIconPool());
+      draft = clonePool(getIconPool());
       baseUpdatedAt = draft.updatedAt;
       loaded = true;
     });
@@ -126,7 +130,7 @@
       hint = "The icon pool could not be saved.";
       return;
     }
-    draft = structuredClone(next);
+    draft = clonePool(next);
     baseUpdatedAt = next.updatedAt;
     savedHint = "Saved.";
   }

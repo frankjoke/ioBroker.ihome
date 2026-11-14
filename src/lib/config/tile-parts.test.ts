@@ -22,6 +22,7 @@ import type {
 } from "$lib/types/device";
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
+import { TEMPERATURE_ICON } from "$lib/config/presets";
 import { resolveTile } from "$lib/config/tile-resolve";
 import { resolveBadges } from "$lib/config/rule-ops";
 
@@ -462,9 +463,7 @@ it("a found device icon stands in for a template's glyph (A67)", () => {
     undefined,
     none,
   );
-  const head = chain.rows.find(
-    (r) => r.slot.icon?.glyph === "device_thermostat",
-  );
+  const head = chain.rows.find((r) => r.slot.icon?.glyph === TEMPERATURE_ICON);
   expect(head?.iconIsTemplate).toBe(true);
   expect(rowIcon(head!, "tile", "https://x/dev.png")?.glyph).toBe(
     "https://x/dev.png",
@@ -498,7 +497,7 @@ it("a found device icon stands in for a template's glyph (A67)", () => {
     "bolt",
   );
   // With no found icon, the template's own glyph stays.
-  expect(rowIcon(head!, "tile")?.glyph).toBe("device_thermostat");
+  expect(rowIcon(head!, "tile")?.glyph).toBe(TEMPERATURE_ICON);
 });
 
 const withHistory = (id: string, feature: string) =>
