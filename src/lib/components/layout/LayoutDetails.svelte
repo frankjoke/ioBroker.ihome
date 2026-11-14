@@ -146,7 +146,7 @@
     {
       id: "look",
       label: "Look",
-      hint: "The base tile icon plus per-state glyph, glow, icon colour and background — a state look wins over the base icon.",
+      hint: "The base tile icon plus per-state glyph, glow, icon colour, dim and background — a state look wins over the base icon.",
     },
     {
       id: "pin",
@@ -1427,6 +1427,32 @@
               {/if}
             </div>
             <div class="row">
+              <label class="check" title="Draw the tile's border">
+                <input
+                  type="checkbox"
+                  checked={tile?.tile?.border !== false}
+                  onchange={(e) =>
+                    edit((t) => ({
+                      ...t,
+                      border: e.currentTarget.checked ? undefined : false,
+                    }))}
+                />
+                <span>Border</span>
+              </label>
+              <label class="check" title="Keep padding around the tile content">
+                <input
+                  type="checkbox"
+                  checked={tile?.tile?.padding !== false}
+                  onchange={(e) =>
+                    edit((t) => ({
+                      ...t,
+                      padding: e.currentTarget.checked ? undefined : false,
+                    }))}
+                />
+                <span>Padding</span>
+              </label>
+            </div>
+            <div class="row">
               <span class="label-mono">Tile icon</span>
               <button
                 type="button"
@@ -1497,6 +1523,22 @@
                       `${state} icon colour`,
                       (v) => patchLook(state, { color: v }),
                     )}
+                    <label
+                      class="check"
+                      title="Dim the whole tile in this state (opt-in)"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={lk.disabled === true}
+                        onchange={(e) =>
+                          patchLook(state, {
+                            disabled: e.currentTarget.checked
+                              ? true
+                              : undefined,
+                          })}
+                      />
+                      <span>Dim</span>
+                    </label>
                   </div>
                   <div
                     class="look-bg"

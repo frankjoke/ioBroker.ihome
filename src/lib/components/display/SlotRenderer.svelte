@@ -24,6 +24,7 @@
     stack = false,
     anchor = false,
     single = false,
+    face = false,
     home = "tile",
   }: {
     slot: Slot;
@@ -41,6 +42,8 @@
     anchor?: boolean;
     /** The tile has only this surface slot; its name would be redundant. */
     single?: boolean;
+    /** Draw the headline icon alone, above the tile name and reading. */
+    face?: boolean;
     /** The surface this renderer draws on: the tile or the detail page. */
     home?: "tile" | "modal";
   } = $props();
@@ -95,7 +98,47 @@
   {/if}
 {/snippet}
 
-{#if show}
+{#snippet slotIcon()}
+  {#if icon}
+    {#if onPrimary}
+      <!-- The slot's own action (A51/A53): the icon toggles with the value,
+           as the retired IconSlot's button did. -->
+      <button
+        type="button"
+        class="slot-icon action"
+        title="Toggle"
+        aria-label="Toggle"
+        style:color={icon.color}
+        onclick={(e) => {
+          e.stopPropagation();
+          onPrimary();
+        }}
+      >
+        <Icon
+          value={icon.glyph}
+          size={icon.size ?? 17}
+          dim={icon.disabled}
+          data={{ $value: control?.liveValue, $color: icon.color }}
+        />
+      </button>
+    {:else}
+      <span class="slot-icon" style:color={icon.color}>
+        <Icon
+          value={icon.glyph}
+          size={icon.size ?? 17}
+          dim={icon.disabled}
+          data={{ $value: control?.liveValue, $color: icon.color }}
+        />
+      </span>
+    {/if}
+  {/if}
+{/snippet}
+
+{#if face}
+  <div class="slot-face" data-chart-anchor>
+    {@render slotIcon()}
+  </div>
+{:else if show}
   {#if (slot.kind === "frame" || slot.kind === "html") && home === "tile"}
     <!-- A frame/html is a surface: its icon and label sit above it, as on the
          detail page. Beside it they would squeeze the frame out of the tile
@@ -129,37 +172,7 @@
       class:stack
       data-chart-anchor={anchor ? "" : undefined}
     >
-      {#if onPrimary}
-        <!-- The slot's own action (A51/A53): the icon toggles with the value,
-             as the retired IconSlot's button did. -->
-        <button
-          type="button"
-          class="slot-icon action"
-          title="Toggle"
-          aria-label="Toggle"
-          style:color={icon.color}
-          onclick={(e) => {
-            e.stopPropagation();
-            onPrimary();
-          }}
-        >
-          <Icon
-            value={icon.glyph}
-            size={icon.size ?? 17}
-            dim={icon.disabled}
-            data={{ $value: control?.liveValue, $color: icon.color }}
-          />
-        </button>
-      {:else}
-        <span class="slot-icon" style:color={icon.color}>
-          <Icon
-            value={icon.glyph}
-            size={icon.size ?? 17}
-            dim={icon.disabled}
-            data={{ $value: control?.liveValue, $color: icon.color }}
-          />
-        </span>
-      {/if}
+      {@render slotIcon()}
       {@render content()}
       {#if showName && name}<span class="slot-name">{name}</span>{/if}
     </div>
@@ -174,6 +187,13 @@
 {/if}
 
 <style>
+  .slot-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+
   .slot-cluster {
     display: flex;
     flex-wrap: wrap;

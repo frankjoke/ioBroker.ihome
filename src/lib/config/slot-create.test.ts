@@ -3,6 +3,7 @@ import {
   applyTileSeed,
   materializeTemplateTile,
   materializeTemplateTileFromState,
+  materializedTileConfig,
   preselectedControlIds,
   suggestedSlots,
   slotFromControl,
@@ -32,6 +33,12 @@ const device = (over: Partial<Device> = {}): Device => ({
   type: "Light",
   controls: [],
   ...over,
+});
+
+it("carries the bare-face options into the tile", () => {
+  expect(
+    materializedTileConfig({ slots: [], border: false, padding: false }),
+  ).toMatchObject({ slots: [], border: false, padding: false });
 });
 
 it("copies label/min/max/step into the slot, not the unit", () => {

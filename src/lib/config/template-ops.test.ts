@@ -14,6 +14,7 @@ import {
   templateFeatures,
   slotVisible,
   sourceForControl,
+  tileActionControl,
   tileTitle,
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
@@ -168,6 +169,21 @@ it("never prunes the device's own badge slots", () => {
   ).toEqual(["ago", "offline"]);
 });
 
+it("acts on a whole switch or button tile, never on a level", () => {
+  const switchCtl = { widget: "switch", writable: true };
+  const buttonCtl = { widget: "button", writable: true };
+  const levelCtl = { widget: "level", writable: true };
+  expect(tileActionControl([levelCtl, switchCtl])).toBe(switchCtl);
+  expect(tileActionControl([levelCtl, buttonCtl])).toBe(buttonCtl);
+  expect(tileActionControl([levelCtl])).toBeUndefined();
+  expect(
+    tileActionControl([{ widget: "switch", writable: false }]),
+  ).toBeUndefined();
+  expect(
+    tileActionControl([{ widget: "button", writable: false }]),
+  ).toBeUndefined();
+});
+
 it("picks a writable switch as the tile's primary control", () => {
   expect(
     primaryControl([{ widget: "value" }, { widget: "switch", writable: true }])
@@ -197,14 +213,18 @@ it("carries the preset sizes", () => {
   expect(PRESETS.AC.size).toEqual({ w: 4, h: 4 });
 });
 
-it("dims an idle motion sensor", () => {
+it("marks an idle motion sensor with its icon and colour, not a dim", () => {
   const motion = PRESETS.Motion.slots.find((s) => s.source === "motion");
   expect(motion?.icon?.glyph).toBe("sensors");
   expect(motion?.rules?.map((r) => r.when)).toEqual([
     "truthy(motion)",
     "!truthy(motion)",
   ]);
-  expect(motion?.rules?.[1].disabled).toBe(true);
+  expect(motion?.rules?.[1]).toMatchObject({
+    icon: "directions_walk",
+    color: "var(--text-muted)",
+  });
+  expect(motion?.rules?.[1].disabled).toBeUndefined();
 });
 
 it("gives the light its on/off icon rules and the thermometer its battery badge", () => {

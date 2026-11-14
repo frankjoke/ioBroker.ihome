@@ -3,7 +3,11 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
-  import { primaryControl, resolveControl } from "$lib/config/template-ops";
+  import {
+    primaryControl,
+    resolveControl,
+    tileActionControl,
+  } from "$lib/config/template-ops";
   import { evalActive } from "$lib/config/tile-ops";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
@@ -120,6 +124,8 @@
   // when the placement says `""` (A41).
   const tileName = $derived(title ?? placement?.title ?? "");
   const primary = $derived(primaryControl(shownControls));
+  /** What a body tap acts on when the tile has no detail page. */
+  const actionControl = $derived(tileActionControl(shownControls));
 
   // Spec §4.1 + label fallback: feature → control id → state id → label.
   function controlFor(slot: Slot): EnrichedControl | undefined {
@@ -308,6 +314,13 @@
 
   const chart = $derived(tileSeries(parts.rows));
   const bodySlots = $derived(parts.body);
+  /** The face icon sits above the name; its reading stays with the other rows. */
+  const headlineRow = $derived(bodySlots.find((r) => r.slot === headline));
+  const orderedBody = $derived(
+    headlineRow
+      ? [headlineRow, ...bodySlots.filter((r) => r !== headlineRow)]
+      : bodySlots,
+  );
   /** A lone frame/html slot is the whole face: no name, no padding. */
   const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
   /** Sparkline layout: a separate band instead of the icon overlay. */
@@ -328,7 +341,11 @@
       faceGlyph(lk, main ? workingTile?.icon : undefined, icon?.glyph) ??
       (main ? device.objectIcon : undefined);
     if (!glyph) return undefined;
-    return { glyph, color: lk.color ?? icon?.color, disabled: icon?.disabled };
+    return {
+      glyph,
+      color: lk.color ?? icon?.color,
+      disabled: main ? (lk.disabled ?? icon?.disabled) : icon?.disabled,
+    };
   }
 
   function bodyIcon(r: SlotRow) {
@@ -482,6 +499,11 @@
     };
   }
 
+  /** A tap anywhere acts only when nothing opens a detail page (see onActivate). */
+  const tileAction = $derived(
+    actionControl ? actionFor(actionControl) : undefined,
+  );
+
   /** The one action a tile can perform: toggle its primary switch. */
   function togglePrimary() {
     if (!primary || primary.widget !== "switch") return;
@@ -536,11 +558,12 @@
       suppressClick = false;
       return;
     }
-    // Body tap = enlarge (spec §7). The action lives on the control itself —
-    // the icon and the On/Off text — so nothing switches by accident. The
-    // modal only opens when slots live in it (A34); otherwise a stray tap on a
-    // light would be the last thing between you and a switched-on lamp.
+    // Body tap = enlarge (spec §7) when the tile has a detail page. With none,
+    // the whole face acts: a switch toggles, a button presses. Before that the
+    // action lived only on the icon/value, which left most of a button tile
+    // inert.
     if (hasModal) openDetail();
+    else tileAction?.();
   }
 
   let modalOpen = $state(false);
@@ -606,18 +629,20 @@
   class="tile"
   class:active
   class:glow={glowing}
-  class:disabled={tileStyle.disabled === true}
+  class:disabled={look.disabled ?? tileStyle.disabled === true}
   class:single-surface={surfaceOnly}
+  class:no-border={workingTile?.border === false}
+  class:no-padding={workingTile?.padding === false}
   data-page-id={anchor?.pageId}
   data-section-id={anchor?.sectionId}
   data-placement-id={anchor?.placementId}
   style="grid-column: {newLine
     ? '1'
     : 'auto'} / span {columns}; grid-row: span {span.h}; {tileVars}"
-  class:interactive={hasModal}
+  class:interactive={hasModal || !!tileAction}
   bind:this={tileEl}
-  role={primary?.widget === "switch" && primary.writable ? "button" : undefined}
-  tabindex={primary?.widget === "switch" && primary.writable ? 0 : undefined}
+  role={tileAction ? "button" : undefined}
+  tabindex={tileAction ? 0 : undefined}
   onclickcapture={onCapture}
   onclick={onActivate}
   onkeydown={onKey}
@@ -635,6 +660,20 @@
       <TileChart series={chart} />
     </div>
   {/if}
+  {#if headlineRow && !surfaceOnly}
+    {@const faceIcon = bodyIcon(headlineRow)}
+    {#if faceIcon}
+      <SlotRenderer
+        slot={headlineRow.slot}
+        {device}
+        control={headlineRow.control}
+        style={headlineRow.style}
+        icon={faceIcon}
+        onPrimary={actionFor(headlineRow.control)}
+        face
+      />
+    {/if}
+  {/if}
   {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
   {#if separatedChart}
     <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
@@ -642,15 +681,13 @@
     </div>
   {/if}
   <div class="tile-body">
-    {#each bodySlots as r, i (i)}
+    {#each orderedBody as r, i (i)}
       <SlotRenderer
         slot={r.slot}
         {device}
         control={r.control}
         style={slotStyle(r.slot, r.control)}
-        icon={bodyIcon(r)}
-        anchor={r.slot === headline}
-        stack={r.slot === headline && columns < 2}
+        icon={r === headlineRow ? undefined : bodyIcon(r)}
         single={surfaceOnly}
         onPrimary={actionFor(r.control)}
         emphasis={r === mainValueRow ? "primary" : "secondary"}
@@ -703,7 +740,8 @@
        baselines instead of floating to different heights. */
     justify-content: flex-start;
     gap: 0.2rem;
-    padding: 6px 3px 3px;
+    /* More air above and below the content, less at the sides. */
+    padding: 8px 2px 6px;
     min-width: 0;
     /* No overflow clipping: a badge is allowed to sit on the tile's own edge. */
     text-align: center;
@@ -732,6 +770,17 @@
   /* Active (A30): the accent border only — glow stays rule territory. */
   .tile.active {
     border-color: var(--tile-accent, var(--primary-color));
+  }
+
+  /* Look options: an explicit border/glow must not bring the edge back. */
+  .tile.no-border,
+  .tile.no-border.active,
+  .tile.no-border.glow {
+    border-color: transparent;
+  }
+
+  .tile.no-padding {
+    padding: 0;
   }
 
   /* The tile's chart (A61): the series of every value that charts here, drawn

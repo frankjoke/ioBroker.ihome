@@ -46,6 +46,16 @@ it("gives every preset the connected availability badge", () => {
   }
 });
 
+it("leaves dimming to the look, not the presets", () => {
+  for (const template of Object.values(PRESETS)) {
+    for (const slot of template.slots) {
+      expect(
+        slot.rules?.some((rule) => rule.disabled !== undefined) ?? false,
+      ).toBe(false);
+    }
+  }
+});
+
 it("drops the optional badges when the device has no such controls", () => {
   const slots = suggestedSlots(
     deviceWithControls([powerControl]),

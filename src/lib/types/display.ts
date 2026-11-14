@@ -110,6 +110,10 @@ export interface TileConfig {
   size?: Size;
   /** The tile's CSS background (solid/gradient/image), behind its content. */
   background?: Background;
+  /** Draw the tile's edge (A30); absent means yes. */
+  border?: boolean;
+  /** Keep the tile's content padding; absent means yes. */
+  padding?: boolean;
   /** Sparkline layout for this tile. */
   chart?: TileChartConfig;
   /** What "active" means for this tile (A30): evaluated live per render. */
@@ -136,6 +140,8 @@ export interface StateLook {
   color?: string;
   /** The headline icon's glyph. */
   glyph?: string;
+  /** Dim the whole tile in this state — an explicit opt-in (absent = no dim). */
+  disabled?: boolean;
   /** The tile's painted background in this state, over its own and the rules'. */
   background?: Background;
 }
@@ -308,6 +314,10 @@ export interface Template {
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */
   background?: Background;
+  /** A tile from this template draws its edge (absent = yes). */
+  border?: boolean;
+  /** A tile from this template keeps its content padding (absent = yes). */
+  padding?: boolean;
   /** Defaults for a placement created from a device with this template. */
   active?: ActiveCondition;
   look?: TileLook;

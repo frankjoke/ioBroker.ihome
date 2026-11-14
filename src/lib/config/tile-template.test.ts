@@ -230,6 +230,27 @@ it("maps a device control through its feature", () => {
   expect(result.template.slots[0].source).toBe("power");
 });
 
+it("keeps the border and padding options", () => {
+  const result = collectTileTemplate(
+    { ...lamp(), border: false, padding: false },
+    { id: "t3", name: "Bare light", type: "Light", look },
+  );
+  expect(result.template.border).toBe(false);
+  expect(result.template.padding).toBe(false);
+  const materialized = materializeTemplateTileFromState(
+    result.template,
+    {
+      ref: "alias.0.Lamp.SET",
+      stateId: "alias.0.Lamp.SET",
+      object: look.objects.get("alias.0.Lamp.SET"),
+    },
+    look.objects,
+    "power",
+  );
+  expect(materialized.border).toBe(false);
+  expect(materialized.padding).toBe(false);
+});
+
 it("round-trips a saved template into a state tile with its rules", () => {
   const result = collectTileTemplate(lamp(), {
     id: "t1",

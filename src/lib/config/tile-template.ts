@@ -324,6 +324,8 @@ export function collectTileTemplate(
       ...(tile.size ? { size: tile.size } : {}),
       ...(tile.look ? { look: tile.look } : {}),
       ...(tile.background ? { background: tile.background } : {}),
+      ...(tile.border === false ? { border: false } : {}),
+      ...(tile.padding === false ? { padding: false } : {}),
       ...(active ? { active } : {}),
     },
   };
