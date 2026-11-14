@@ -2405,6 +2405,20 @@
                                     }),
                                   )}
                               />
+                              <input
+                                type="color"
+                                class="color-input"
+                                aria-label="Rule background colour"
+                                value={isHexColor(rule.background)
+                                  ? rule.background
+                                  : "#000000"}
+                                oninput={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      background: e.currentTarget.value,
+                                    }),
+                                  )}
+                              />
                             </label>
                             <label class="small">
                               <span class="label-mono">tone</span>

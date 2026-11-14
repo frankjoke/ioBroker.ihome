@@ -200,6 +200,39 @@ it("derives ago and offline from the badge's own control", () => {
   expect(badges[1].tone).toBe("danger");
 });
 
+it("dresses a derived ago badge with its rule's style", () => {
+  const badge = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: { kind: "control", device: "d", control: "online" },
+        options: { derive: "ago" },
+        rules: [
+          {
+            when: "!isOnline(online)",
+            only: true,
+            tone: "danger",
+            color: "#ff0000",
+            background: "#330000",
+            icon: "cloud_off",
+          },
+        ],
+      },
+    ],
+    {
+      controls: [{ id: "online", feature: "online", liveValue: false }],
+    } as any,
+    { at: () => NOW - 1000 },
+    NOW,
+  )[0];
+  expect(badge).toMatchObject({
+    tone: "danger",
+    color: "#ff0000",
+    background: "#330000",
+    icon: "cloud_off",
+  });
+});
+
 it("hides an offline badge while its state is online", () => {
   const slot = {
     kind: "badge" as const,

@@ -147,6 +147,8 @@ export interface ResolvedBadge {
   /** An explicit colour (rule colour, or the slot's named/hex colour) — wins
    *  over the tone class. */
   color?: string;
+  /** An explicit chip background from a matching rule. */
+  background?: string;
   /** The raw reading, for an HTML icon's `{{$value}}`. */
   value?: unknown;
   /** The chip shows its icon only; the reading stays in the title and the
@@ -406,6 +408,7 @@ function controlBadge(
     color:
       style.color ??
       (explicitTone ? undefined : badgeColor(slot.options?.color)),
+    background: style.background,
   };
 }
 
@@ -442,10 +445,24 @@ export function resolveBadges(
     // A badge hidden by its own rules produces nothing — including the derived
     // ago/offline badges, which resolve no control and so never reach
     // `controlBadge`'s own guard.
-    if (resolveStyle(slot.rules ?? [], scope).hidden === true) continue;
-    // The derived ago/offline badges have no rules; their slot colour outranks
-    // the tone they are born with (a control badge resolves colour itself).
-    const color = badgeColor(slot.options?.color);
+    const style = resolveStyle(slot.rules ?? [], scope);
+    if (style.hidden === true) continue;
+    const tone = TONES.includes(style.tone as BadgeTone)
+      ? (style.tone as BadgeTone)
+      : undefined;
+    const color = style.color ?? badgeColor(slot.options?.color);
+    /** A derived badge is born with its own tone/icon; a matching slot rule
+     *  dresses it. Control badges resolve their own merged style instead. */
+    const dress = (
+      badge: ResolvedBadge | undefined,
+    ): ResolvedBadge | undefined => {
+      if (!badge) return badge;
+      if (tone) badge.tone = tone;
+      if (color) badge.color = color;
+      if (style.icon !== undefined) badge.icon = style.icon;
+      if (style.background !== undefined) badge.background = style.background;
+      return badge;
+    };
     const of =
       typeof slot.options?.of === "string" ? slot.options.of : undefined;
     const offline = offlineFor(of);
@@ -459,19 +476,17 @@ export function resolveBadges(
       // report. `options.from` picks `ts` (still reporting) or `lc` (last value
       // change); the default is the device-wide newest `ts`.
       const from = slot.options?.from === "lc" ? "lc" : "ts";
-      badge = offline ? undefined : agoBadge(clock.at(of, from), now);
-      if (badge && color) badge.color = color;
+      badge = dress(offline ? undefined : agoBadge(clock.at(of, from), now));
     } else if (slot.source === "offline") {
-      badge = offline ? { ...offline, ...(color ? { color } : {}) } : undefined;
+      badge = dress(offline);
     } else if (derive === "ago") {
       // The slot names its own source: time since that control/state reported.
       const from = slot.options?.from === "lc" ? "lc" : "ts";
-      badge = agoBadge(clock.at(object?.key, from), now);
-      if (badge && color) badge.color = color;
+      badge = dress(agoBadge(clock.at(object?.key, from), now));
     } else if (derive === "offline") {
       // The source is an online flag: the badge appears while it is not
       // online. MQTT-style strings ("online"/"offline") count too.
-      badge =
+      badge = dress(
         object?.control && !isOnline(object.control.liveValue)
           ? {
               source: "offline",
@@ -480,7 +495,8 @@ export function resolveBadges(
               label: "offline",
               ...(color ? { color } : {}),
             }
-          : undefined;
+          : undefined,
+      );
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).
