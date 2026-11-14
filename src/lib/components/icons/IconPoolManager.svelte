@@ -10,11 +10,13 @@
     poolEntries,
     removePoolIcon,
     setBaseOverride,
+    toggleKeyword,
     upsertPoolIcon,
     type IconPool,
     type PoolEntry,
     type PoolIcon,
   } from "$lib/config/icon-pool";
+  import { ROLE_GLYPH_DEFAULTS } from "$lib/config/icon-ops";
   import {
     commitIconPool,
     getIconPool,
@@ -135,6 +137,17 @@
       .map((word) => word.trim())
       .filter(Boolean);
     updateUser({ keywords: keywords.length ? keywords : undefined });
+  }
+
+  function roleSelected(role: string): boolean {
+    return (openUser?.keywords ?? []).some(
+      (word) => word.toLowerCase() === role.toLowerCase(),
+    );
+  }
+
+  function toggleRole(role: string): void {
+    if (!openUser) return;
+    updateUser({ keywords: toggleKeyword(openUser.keywords, role) });
   }
 
   function defaultTaken(id: string, value: string): boolean {
@@ -462,11 +475,24 @@
               <input
                 type="text"
                 value={(openEntry.keywords ?? []).join(", ")}
-                placeholder="comma separated"
+                placeholder="extra words"
                 disabled={!writable}
                 onchange={(e) => setKeywords(e.currentTarget.value)}
               />
             </label>
+          </div>
+          <div class="role-picks">
+            <span class="label-mono">Roles</span>
+            {#each ROLE_GLYPH_DEFAULTS as role (role.name)}
+              <button
+                type="button"
+                class="role-toggle"
+                class:on={roleSelected(role.name)}
+                aria-pressed={roleSelected(role.name)}
+                disabled={!writable}
+                onclick={() => toggleRole(role.name)}>{role.name}</button
+              >
+            {/each}
           </div>
         {/if}
       </div>
@@ -737,5 +763,38 @@
   .field input {
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .role-picks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .role-picks .label-mono {
+    margin-right: 0.15rem;
+  }
+
+  .role-toggle {
+    font: inherit;
+    font-size: var(--body-sm);
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .role-toggle.on {
+    background: var(--primary-container);
+    border-color: var(--primary-color);
+    color: var(--text-color);
+  }
+
+  .role-toggle:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 </style>

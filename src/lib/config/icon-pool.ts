@@ -196,6 +196,22 @@ export function filterPoolIcons(
   );
 }
 
+/** Add or remove one keyword; case-insensitive, and an empty list is absent. */
+export function toggleKeyword(
+  keywords: string[] | undefined,
+  keyword: string,
+): string[] | undefined {
+  const word = keyword.trim();
+  if (!word) return keywords;
+  const list = [...(keywords ?? [])];
+  const index = list.findIndex(
+    (item) => item.toLowerCase() === word.toLowerCase(),
+  );
+  if (index >= 0) list.splice(index, 1);
+  else list.push(word);
+  return list.length ? list : undefined;
+}
+
 export function upsertPoolIcon(pool: IconPool, icon: PoolIcon): IconPool {
   const exists = pool.icons.some((entry) => entry.id === icon.id);
   const icons = exists

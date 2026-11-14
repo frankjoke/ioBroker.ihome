@@ -11,6 +11,7 @@ import {
   poolEntries,
   removePoolIcon,
   setBaseOverride,
+  toggleKeyword,
   upsertPoolIcon,
 } from "./icon-pool";
 
@@ -191,6 +192,19 @@ it("combines base and user, base wins a duplicate value", () => {
   });
   expect(entries.some((entry) => entry.builtin)).toBe(true);
   expect(entries.filter((entry) => entry.value === base.value)).toHaveLength(1);
+});
+
+it("toggles a keyword case-insensitively and clears the last one", () => {
+  expect(toggleKeyword(undefined, "Lock")).toEqual(["Lock"]);
+  expect(toggleKeyword(["lock", "Door / window"], "Lock")).toEqual([
+    "Door / window",
+  ]);
+  expect(toggleKeyword(["Door / window"], "Lock")).toEqual([
+    "Door / window",
+    "Lock",
+  ]);
+  expect(toggleKeyword(["Lock"], " lock ")).toBeUndefined();
+  expect(toggleKeyword(["Lock"], "  ")).toEqual(["Lock"]);
 });
 
 it("filters name, group and keywords", () => {
