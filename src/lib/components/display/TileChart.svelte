@@ -13,7 +13,14 @@
     series,
     wide = false,
     area = false,
-  }: { series: ChartSeries[]; wide?: boolean; area?: boolean } = $props();
+    decimals,
+  }: {
+    series: ChartSeries[];
+    wide?: boolean;
+    area?: boolean;
+    /** Min/max label precision; absent → the slot's decimals, else 1. */
+    decimals?: number;
+  } = $props();
 
   // Fetch and feed every series (the store dedupes per state + spec), so the
   // tile chart and a row chart read one cache.
@@ -95,9 +102,10 @@
     if (!first || first.min === undefined || first.max === undefined) {
       return undefined;
     }
-    // One decimal keeps corner labels short; a slot's own precision wins.
-    const min = splitReading(first.min, first.unit, first.decimals ?? 1);
-    const max = splitReading(first.max, first.unit, first.decimals ?? 1);
+    // Chart precision wins, then the slot's own, then one decimal.
+    const precision = decimals ?? first.decimals ?? 1;
+    const min = splitReading(first.min, first.unit, precision);
+    const max = splitReading(first.max, first.unit, precision);
     return {
       min: min.unit ? `${min.value} ${min.unit}` : min.value,
       max: max.unit ? `${max.value} ${max.unit}` : max.value,

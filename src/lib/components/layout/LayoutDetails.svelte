@@ -1444,6 +1444,30 @@
                   />
                 </label>
               {/if}
+              <label class="small">
+                <span class="label-mono">Chart decimals</span>
+                <input
+                  type="number"
+                  class="num-input"
+                  min="0"
+                  max="4"
+                  step="1"
+                  placeholder="auto"
+                  value={tile?.tile?.chart?.decimals === undefined
+                    ? ""
+                    : String(tile.tile.chart.decimals)}
+                  oninput={(e) => {
+                    const raw = e.currentTarget.value.trim();
+                    const value =
+                      raw === "" ? undefined : Math.trunc(Number(raw));
+                    if (value === undefined)
+                      patchChart({ decimals: undefined });
+                    else if (Number.isFinite(value)) {
+                      patchChart({ decimals: Math.min(4, Math.max(0, value)) });
+                    }
+                  }}
+                />
+              </label>
               <label class="check" title="Fill each line with a soft gradient">
                 <input
                   type="checkbox"

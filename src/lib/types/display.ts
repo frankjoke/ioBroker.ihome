@@ -105,6 +105,8 @@ export interface TileChartConfig {
   separate?: boolean;
   /** Band height in px; absent → 56. Ignored when `full` is set. */
   height?: number;
+  /** Precision of the min/max labels; absent → the slot's decimals, else 1. */
+  decimals?: number;
   /** Fill each line with a 30% → 0% gradient. */
   area?: boolean;
 }

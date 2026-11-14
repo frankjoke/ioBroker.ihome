@@ -659,7 +659,12 @@
 >
   {#if chartFull && chart.length}
     <div class="tile-chart-full">
-      <TileChart series={chart} wide area={chartArea} />
+      <TileChart
+        series={chart}
+        wide
+        area={chartArea}
+        decimals={chartConfig?.decimals}
+      />
     </div>
   {/if}
   {#if headlineRow && !surfaceOnly}
@@ -679,7 +684,12 @@
   {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
   {#if !chartFull && chart.length}
     <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
-      <TileChart series={chart} wide area={chartArea} />
+      <TileChart
+        series={chart}
+        wide
+        area={chartArea}
+        decimals={chartConfig?.decimals}
+      />
     </div>
   {/if}
   <div class="tile-body">
