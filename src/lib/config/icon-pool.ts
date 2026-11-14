@@ -118,6 +118,7 @@ export function parseIconPool(raw: unknown): IconPool | null {
   if (raw === undefined || raw === null || raw === "") return emptyPool();
   let value: unknown = raw;
   if (typeof raw === "string") {
+    if (raw.trim() === "") return emptyPool();
     try {
       value = JSON.parse(raw);
     } catch {

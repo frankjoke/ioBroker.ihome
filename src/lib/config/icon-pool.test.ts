@@ -21,6 +21,7 @@ it("survives an empty document and rejects a broken one", () => {
     icons: [],
   });
   expect(parseIconPool("")).toEqual({ version: 1, updatedAt: 0, icons: [] });
+  expect(parseIconPool("   ")).toEqual({ version: 1, updatedAt: 0, icons: [] });
   expect(parseIconPool("not json")).toBeNull();
   expect(parseIconPool({ icons: "no" })).toBeNull();
 });
@@ -118,6 +119,20 @@ it("applies overrides to base entries and resets them", () => {
   );
   expect(reset?.value).toBe(base.value);
   expect(reset?.activeValue).toBeUndefined();
+});
+
+it("parses overrides and applies them on load", () => {
+  const base = BUILTIN_POOL[0];
+  const parsed = parseIconPool(
+    JSON.stringify({
+      version: 1,
+      icons: [],
+      overrides: { [base.id]: { value: "power", activeValue: "power_off" } },
+    }),
+  );
+  const entry = poolEntries(parsed).find((item) => item.id === base.id);
+  expect(entry?.value).toBe("power");
+  expect(entry?.activeValue).toBe("power_off");
 });
 
 it("drops invalid and unknown overrides", () => {

@@ -22,6 +22,7 @@
     iconPoolSaveFailed,
     initIconPool,
     isIconPoolWritable,
+    reloadIconPool,
   } from "$lib/stores/icon-pool.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
@@ -46,6 +47,7 @@
   let hint = $state("");
   let conflict = $state("");
   let savedHint = $state("");
+  let saving = $state(false);
   let started = false;
 
   const loadKind = $derived(iconPoolLoadKind());
@@ -60,10 +62,16 @@
     }),
   );
   // The draft, not `poolEntries`: an entry being edited must stay visible even
-  // while its name is empty, or clearing the field would delete the row.
-  const rows = $derived(
-    filterPoolIcons([...baseEntries, ...draft.icons], search),
-  );
+  // while its name is empty or stops matching the search.
+  const rows = $derived.by<PoolEntry[]>(() => {
+    const all: PoolEntry[] = [...baseEntries, ...draft.icons];
+    const filtered = filterPoolIcons(all, search);
+    if (!openId || filtered.some((entry) => entry.id === openId)) {
+      return filtered;
+    }
+    const open = all.find((entry) => entry.id === openId);
+    return open ? [...filtered, open] : filtered;
+  });
   const baseRows = $derived(rows.filter((entry) => entry.builtin));
   const userRows = $derived(rows.filter((entry) => !entry.builtin));
   const openBase = $derived(
@@ -104,7 +112,7 @@
 
   function updateUser(patch: Partial<PoolIcon>): void {
     const user = openUser;
-    if (!user) return;
+    if (!user || !writable) return;
     draft = {
       ...draft,
       icons: draft.icons.map((icon) =>
@@ -133,7 +141,7 @@
     meta?: { name?: string; group?: string; active?: string },
   ): void {
     const target = pickerTarget;
-    if (!target) return;
+    if (!target || !writable) return;
     pickerTarget = null;
     hint = "";
     savedHint = "";
@@ -171,6 +179,7 @@
   }
 
   function setActiveValue(target: PickerTarget, value: string): void {
+    if (!writable) return;
     const activeValue = value.trim() || undefined;
     if (target.builtin) {
       draft = setBaseOverride(draft, target.id, { activeValue });
@@ -186,6 +195,11 @@
   }
 
   function resetBase(entry: PoolEntry): void {
+    if (!writable) return;
+    if (!draft.overrides?.[entry.id]) {
+      hint = "This base icon already uses its default.";
+      return;
+    }
     draft = clearBaseOverride(draft, entry.id);
     savedHint = "";
   }
@@ -195,7 +209,7 @@
     meta?: { name?: string; group?: string },
   ): void {
     // The picker's Clear returns ""; it is not an icon to add.
-    if (!value.trim()) return;
+    if (!writable || !value.trim()) return;
     if (
       [...baseEntries, ...draft.icons].some((entry) => entry.value === value)
     ) {
@@ -216,11 +230,13 @@
     };
     draft = upsertPoolIcon(draft, icon);
     openId = icon.id;
+    search = "";
     hint = "";
     savedHint = "";
   }
 
   function remove(entry: PoolEntry): void {
+    if (!writable) return;
     const next = nextAfterRemoval(draft.icons, entry.id, (icon) => icon.id);
     draft = removePoolIcon(draft, entry.id);
     pendingRemove = null;
@@ -260,7 +276,17 @@
     };
   }
 
+  async function reload(): Promise<void> {
+    await reloadIconPool();
+    draft = clonePool(getIconPool());
+    baseUpdatedAt = draft.updatedAt;
+    conflict = "";
+    hint = "";
+    savedHint = "";
+  }
+
   async function save(): Promise<void> {
+    if (saving) return;
     hint = "";
     savedHint = "";
     conflict = "";
@@ -272,16 +298,23 @@
       hint = "Every icon needs a name and an icon.";
       return;
     }
-    if (getIconPool().updatedAt !== baseUpdatedAt) {
-      conflict = "The icon pool changed in another tab. Reload before saving.";
-      return;
-    }
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
-    const ok = await commitIconPool(next);
-    draft = clonePool(next);
-    baseUpdatedAt = next.updatedAt;
-    if (ok) savedHint = "Saved.";
-    else hint = "The icon pool could not be saved.";
+    const snapshot = JSON.stringify([next.icons, next.overrides ?? {}]);
+    saving = true;
+    const result = await commitIconPool(next, baseUpdatedAt);
+    saving = false;
+    if (result === "saved") {
+      baseUpdatedAt = next.updatedAt;
+      // Keep edits made while the write was in flight.
+      if (JSON.stringify([draft.icons, draft.overrides ?? {}]) === snapshot) {
+        draft = clonePool(next);
+      }
+      savedHint = "Saved.";
+    } else if (result === "conflict") {
+      conflict = "The icon pool changed in another tab. Reload before saving.";
+    } else {
+      hint = "The icon pool could not be saved.";
+    }
   }
 </script>
 
@@ -312,6 +345,7 @@
             icon="delete"
             danger
             label={`Delete ${entry.name}`}
+            disabled={!writable}
             onclick={() => (pendingRemove = entry)}
           />
         </span>
@@ -326,6 +360,8 @@
               type="button"
               class="btn btn-sm glyph-pick"
               title={`Change the default icon of ${entry.name}`}
+              aria-label={`Change the default icon of ${entry.name}`}
+              disabled={!writable}
               onclick={() =>
                 (pickerTarget = { id: entry.id, builtin, field: "value" })}
             >
@@ -339,6 +375,8 @@
                 type="button"
                 class="btn btn-sm glyph-pick"
                 title={`Set the active icon of ${entry.name}`}
+                aria-label={`Set the active icon of ${entry.name}`}
+                disabled={!writable}
                 onclick={() =>
                   (pickerTarget = {
                     id: entry.id,
@@ -356,6 +394,7 @@
                 <IconButton
                   icon="close"
                   label={`Clear the active icon of ${entry.name}`}
+                  disabled={!writable}
                   onclick={() =>
                     setActiveValue(
                       { id: entry.id, builtin, field: "activeValue" },
@@ -369,6 +408,7 @@
             <button
               type="button"
               class="btn btn-outline btn-sm reset-btn"
+              disabled={!writable}
               onclick={() => resetBase(entry)}>Reset</button
             >
           {/if}
@@ -380,6 +420,7 @@
               <input
                 type="text"
                 value={openEntry.name}
+                disabled={!writable}
                 oninput={(e) => updateUser({ name: e.currentTarget.value })}
               />
             </label>
@@ -388,6 +429,7 @@
               <input
                 type="text"
                 value={openEntry.group ?? ""}
+                disabled={!writable}
                 onchange={(e) =>
                   updateUser({
                     group: e.currentTarget.value.trim() || undefined,
@@ -400,6 +442,7 @@
                 type="text"
                 value={(openEntry.keywords ?? []).join(", ")}
                 placeholder="comma separated"
+                disabled={!writable}
                 onchange={(e) => setKeywords(e.currentTarget.value)}
               />
             </label>
@@ -418,6 +461,13 @@
         : "Loading icon pool…"}
     </p>
   </div>
+{:else if loadKind === "pending"}
+  <div class="card empty-state">
+    <p class="text-muted">The icon pool could not be loaded.</p>
+    <button type="button" class="btn btn-outline btn-sm" onclick={reload}>
+      Retry
+    </button>
+  </div>
 {:else}
   <div class="icon-pool-page">
     <div class="item">
@@ -431,22 +481,22 @@
           <button
             type="button"
             class="btn btn-primary btn-sm"
-            disabled={!writable || loadKind === "unreadable"}
+            disabled={!writable || saving}
             onclick={() => {
               hint = "";
               savedHint = "";
               pickerOpen = true;
             }}
           >
-            <span class="material-symbols-outlined">add</span> Icon
+            + Icon
           </button>
           <button
             type="button"
             class="btn btn-primary btn-sm"
-            disabled={!dirty || !writable || loadKind === "unreadable"}
+            disabled={!dirty || !writable || saving}
             onclick={save}
           >
-            <span class="material-symbols-outlined">save</span> Save
+            {saving ? "Saving…" : "Save"}
           </button>
         </span>
       </div>
@@ -458,10 +508,17 @@
       </p>
     {/if}
     {#if hint}<p class="text-danger hint">{hint}</p>{/if}
-    {#if conflict}<p class="text-warning hint">{conflict}</p>{/if}
+    {#if conflict}
+      <div class="conflict-line">
+        <p class="text-warning hint">{conflict}</p>
+        <button type="button" class="btn btn-outline btn-sm" onclick={reload}
+          >Reload</button
+        >
+      </div>
+    {/if}
     {#if savedHint}<p class="text-success hint">{savedHint}</p>{/if}
     {#if saveFailed}
-      <p class="text-danger hint">Not saved — the broker is unreachable.</p>
+      <p class="text-danger hint">Not saved — check the connection.</p>
     {/if}
 
     <div class="list-toolbar">
@@ -469,7 +526,7 @@
         <span class="label-mono filter-label">Filters</span>
         <input
           type="search"
-          placeholder="Search name or group…"
+          placeholder="Search name, group or keywords…"
           bind:value={search}
         />
       </div>
@@ -625,6 +682,17 @@
 
   .glyph-pick .material-symbols-outlined {
     font-size: 18px;
+  }
+
+  .conflict-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .conflict-line .hint {
+    flex: 1 1 auto;
   }
 
   .reset-btn {

@@ -415,6 +415,14 @@ it("fills both look glyphs from a pool pair and keeps styling", () => {
   expect(next.look?.inactive?.glow).toBe("x");
 });
 
+it("creates both look slots for a pair on a bare tile", () => {
+  const next = applyPoolIcon({}, "gate", "gate_open");
+  expect(next).toEqual({
+    icon: "gate",
+    look: { inactive: { glyph: "gate" }, active: { glyph: "gate_open" } },
+  });
+});
+
 it("leaves the look alone when the pool icon has no twin", () => {
   const tile: TileConfig = { icon: "old", look: { active: { glyph: "on" } } };
   const next = applyPoolIcon(tile, "gate");

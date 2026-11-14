@@ -6,12 +6,16 @@ import { parseIconPool, type IconPool } from "$lib/config/icon-pool";
 
 export const ICON_POOL_ID = "ihome.0.config.iconPool";
 
+/** The result of a save attempt, so the manager can word the outcome. */
+export type IconPoolSave = "saved" | "conflict" | "failed";
+
 const emptyIconPool: IconPool = { version: 1, updatedAt: 0, icons: [] };
 
 let iconPool = $state<IconPool>(emptyIconPool);
 let initPromise: Promise<void> | null = null;
 /** The updatedAt this tab last wrote; its own echo is not a remote change. */
 let lastSent: number | null = null;
+let subscribed = false;
 let saveFailed = $state(false);
 let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
   "pending",
@@ -35,10 +39,9 @@ export function iconPoolLoadKind():
   return loadKind;
 }
 
-/** Create the document when it is missing; true when it already existed. */
-async function ensureIconPoolObject(): Promise<boolean> {
+async function ensureIconPoolObject(): Promise<void> {
   const obj = await ioBroker.getObject(ICON_POOL_ID);
-  if (obj) return true;
+  if (obj) return;
   await ioBroker.emitAsync("setObject", ICON_POOL_ID, {
     type: "state",
     common: {
@@ -50,35 +53,85 @@ async function ensureIconPoolObject(): Promise<boolean> {
     },
     native: {},
   });
-  return false;
+}
+
+function attachUpdates(st: { onUpdate?: unknown }): void {
+  subscribed = true;
+  st.onUpdate = (_cl: unknown, state: { val?: unknown }) => {
+    const parsed = parseIconPool(state?.val);
+    if (!parsed) {
+      if (state?.val != null && state.val !== "") loadKind = "unreadable";
+      return true;
+    }
+    if (lastSent !== null && parsed.updatedAt === lastSent) return true;
+    iconPool = parsed;
+    loadKind = "loaded";
+    saveFailed = false;
+    return true;
+  };
 }
 
 /**
  * Write the whole document. Only the manager saves, and only on an explicit
- * Save, so there is no debounce; the promise settles with the write.
+ * Save, so there is no debounce; the promise settles with the write. The state
+ * is re-read first: an absent document that another tab has since created must
+ * not be overwritten by this tab's empty draft.
  */
-export function commitIconPool(next: IconPool): Promise<boolean> {
+export async function commitIconPool(
+  next: IconPool,
+  baseUpdatedAt: number,
+): Promise<IconPoolSave> {
   if (!isIconPoolWritable()) {
     console.error(
       "iconPool is not readable (no successful load) — the change was not saved",
     );
-    return Promise.resolve(false);
+    return "failed";
   }
-  iconPool = next;
   if (!ioBroker.connected) {
     saveFailed = true;
-    return Promise.resolve(false);
+    return "failed";
   }
+  let st;
+  try {
+    st = await ioBroker.getState(ICON_POOL_ID, true);
+  } catch (e) {
+    saveFailed = true;
+    console.error("re-read icon pool before save:", e);
+    return "failed";
+  }
+  if (!st && baseUpdatedAt !== 0) return "conflict";
+  const current = parseIconPool(st?.value);
+  if (st && !current) return "conflict";
+  if (current && current.updatedAt !== baseUpdatedAt) {
+    iconPool = current;
+    loadKind = "loaded";
+    attachUpdates(st!);
+    return "conflict";
+  }
+  iconPool = next;
   lastSent = next.updatedAt;
   saveFailed = false;
-  return ioBroker.setState(ICON_POOL_ID, JSON.stringify(next)).then(
-    () => true,
-    (e) => {
-      saveFailed = true;
-      console.error("save icon pool:", e);
-      return false;
-    },
-  );
+  try {
+    await ioBroker.setState(ICON_POOL_ID, JSON.stringify(next));
+  } catch (e) {
+    saveFailed = true;
+    console.error("save icon pool:", e);
+    return "failed";
+  }
+  if (!subscribed) {
+    // The first save created the state; subscribe to it from now on.
+    initPromise = null;
+    void initIconPool();
+  }
+  return "saved";
+}
+
+/** Re-read the document (the conflict banner's Reload action). */
+export function reloadIconPool(): Promise<void> {
+  initPromise = null;
+  subscribed = false;
+  lastSent = null;
+  return initIconPool();
 }
 
 /** Load the user pool; an absent document simply means "no additions yet". */
@@ -92,31 +145,26 @@ export function initIconPool(): Promise<void> {
       while (!ioBroker.connected && Date.now() < until) {
         await ioBroker.wait(200);
       }
-      let existed = false;
       try {
-        existed = await ensureIconPoolObject();
+        await ensureIconPoolObject();
       } catch (e) {
         console.error("initIconPool ensureIconPoolObject:", e);
       }
-      const st = await ioBroker.getState(ICON_POOL_ID, true);
+      let st = await ioBroker.getState(ICON_POOL_ID, true);
       if (!st) {
-        // A failed read of an existing document is not "no additions yet":
-        // treating it as absent would let an empty draft overwrite it.
-        loadKind = existed ? "unreadable" : "absent";
+        // A never-written state and a failed read both read as "not found";
+        // ask once more before treating the document as absent.
+        await ioBroker.wait(300);
+        st = await ioBroker.getState(ICON_POOL_ID, true);
+      }
+      if (!st) {
+        // The adapter creates the object but writes no value on a fresh
+        // install. That is an empty pool, not an unreadable one.
+        loadKind = "absent";
+        initPromise = null;
         return;
       }
-      st.onUpdate = (_cl, state) => {
-        const parsed = parseIconPool(state?.val);
-        if (!parsed) {
-          if (state?.val != null && state.val !== "") loadKind = "unreadable";
-          return true;
-        }
-        if (lastSent !== null && parsed.updatedAt === lastSent) return true;
-        iconPool = parsed;
-        loadKind = "loaded";
-        saveFailed = false;
-        return true;
-      };
+      attachUpdates(st);
       const parsed = parseIconPool(st.value);
       if (parsed) {
         loadKind = "loaded";
@@ -128,6 +176,7 @@ export function initIconPool(): Promise<void> {
         );
       } else {
         loadKind = "absent";
+        initPromise = null;
       }
     })().catch((e) => {
       console.error("initIconPool:", e);

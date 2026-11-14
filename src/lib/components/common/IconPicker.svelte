@@ -143,6 +143,12 @@
         ICON_LIBRARY: MdiIcon[];
         ICON_LIBRARY_CATEGORIES: MdiCategory[];
       };
+      if (
+        !Array.isArray(mod.ICON_LIBRARY) ||
+        !Array.isArray(mod.ICON_LIBRARY_CATEGORIES)
+      ) {
+        throw new Error("icon-library.js has an unexpected shape");
+      }
       mdiIcons = mod.ICON_LIBRARY;
       mdiCategories = mod.ICON_LIBRARY_CATEGORIES;
     } catch (e) {
@@ -549,7 +555,7 @@
 
   .pool-badge {
     flex: 0 0 auto;
-    font-size: 10px;
+    font-size: var(--label-mono-size);
     color: var(--text-muted);
     border: 1px solid var(--border-color);
     border-radius: 999px;
