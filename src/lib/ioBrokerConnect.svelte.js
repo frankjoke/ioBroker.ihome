@@ -13,6 +13,7 @@ import {
 } from "./tools.svelte";
 import { setContext, getContext } from "svelte";
 import { createDeferredPromise } from "./utils";
+import { setIconBrokerBase } from "./utils/icon-url";
 
 // import { toasts } from "$lib/ToastsClass.svelte.js";
 // import { setContext } from 'svelte';
@@ -309,6 +310,7 @@ async function connectIOBroker(options = {}) {
   // connectOptions.url: a non-empty url there means "an explicit address ⇒ the
   // ws client" (the check above), and this one is a resolved io2 origin.
   ioBroker.brokerUrl = connection.url;
+  setIconBrokerBase(connection.url);
   const plan = connectPlan(connection);
   ioBroker.connectedPromise = createDeferredPromise();
   // clear the timeout of a previous connect attempt, otherwise it rejects

@@ -35,6 +35,28 @@ export function ownerOf(id: string): IconOwner {
 /** The footer's host setting, where the app keeps the broker it talks to. */
 const HOST_KEY = "__VISUAL__:hostPort";
 
+/** The live connection's origin, for a dev server that is not the broker. */
+let liveBrokerBase = "";
+
+/** The connection layer publishes where it actually talks to ioBroker. */
+export function setIconBrokerBase(url: string): void {
+  try {
+    const parsed = new URL(String(url ?? ""));
+    const protocol =
+      parsed.protocol === "wss:"
+        ? "https:"
+        : parsed.protocol === "ws:"
+          ? "http:"
+          : parsed.protocol;
+    liveBrokerBase =
+      protocol === "http:" || protocol === "https:"
+        ? `${protocol}//${parsed.host}`
+        : "";
+  } catch {
+    liveBrokerBase = "";
+  }
+}
+
 /** The ioBroker base an icon path hangs off (A66): the configured Host:Port,
  *  else the configured broker fallback, else this origin — in production the
  *  app is served from `/adapter/ihome/…`, where root-relative already means the
@@ -52,6 +74,9 @@ export function iconBase(): string {
     hostPort = "";
   }
   if (!hostPort) hostPort = FALLBACK_BROKER;
+  // A dev server is not the broker; use the origin the socket actually uses.
+  // Production is served by the broker, so the page origin stays authoritative.
+  if (!hostPort && import.meta.env.DEV && liveBrokerBase) return liveBrokerBase;
   if (!hostPort) return g.location?.origin ?? "";
   return `${g.location?.protocol === "https:" ? "https:" : "http:"}//${hostPort}`;
 }

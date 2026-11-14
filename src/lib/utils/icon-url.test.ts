@@ -5,6 +5,7 @@ import {
   iconBase,
   iconSrc,
   isImageIcon,
+  setIconBrokerBase,
 } from "./icon-url";
 
 it("classifies symbols vs images", () => {
@@ -72,6 +73,7 @@ it("iconSrc resolves against the ioBroker base (A66)", () => {
 });
 
 it("iconBase reads the footer host, else this origin (A66)", () => {
+  setIconBrokerBase("");
   const g = globalThis as any;
   const hadLs = "localStorage" in g;
   const hadLoc = "location" in g;
@@ -101,6 +103,27 @@ it("iconBase reads the footer host, else this origin (A66)", () => {
     else delete g.localStorage;
     if (hadLoc) g.location = savedLoc;
     else delete g.location;
+  }
+});
+
+it("uses the live broker origin in dev when no host is stored", () => {
+  const g = globalThis as any;
+  const hadLs = "localStorage" in g;
+  const savedLs = g.localStorage;
+  const savedLoc = g.location;
+  try {
+    delete g.localStorage;
+    g.location = { origin: "http://localhost:5173", protocol: "http:" };
+    // The dev server is not the broker; the socket's origin is.
+    setIconBrokerBase("ws://192.168.178.9:8082/socket.io/");
+    expect(iconBase()).toBe("http://192.168.178.9:8082");
+    setIconBrokerBase("https://broker.example/");
+    expect(iconBase()).toBe("https://broker.example");
+  } finally {
+    setIconBrokerBase("");
+    if (hadLs) g.localStorage = savedLs;
+    else delete g.localStorage;
+    g.location = savedLoc;
   }
 });
 
