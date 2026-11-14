@@ -11,6 +11,8 @@ export interface TemplateEntry {
   parts: TemplatePart[];
   builtin: boolean;
   search: string;
+  /** The device type a device or bundle template creates. */
+  type?: string;
 }
 
 function entry(
@@ -20,6 +22,7 @@ function entry(
   parts: TemplatePart[],
   builtin: boolean,
   detail: string,
+  type?: string,
 ): TemplateEntry {
   return {
     id,
@@ -27,7 +30,8 @@ function entry(
     kind,
     parts,
     builtin,
-    search: `${name} ${detail}`.toLowerCase(),
+    search: `${name} ${type ?? ""} ${detail}`.toLowerCase(),
+    ...(type ? { type } : {}),
   };
 }
 
@@ -58,6 +62,7 @@ export function templateEntries(input: {
         ["device"],
         true,
         `${template.type} ${template.help ?? ""}`,
+        template.type,
       ),
     ),
     ...input.visual.map((template) =>
@@ -68,6 +73,7 @@ export function templateEntries(input: {
         ["device"],
         false,
         `${template.type} ${template.help ?? ""}`,
+        template.type,
       ),
     ),
     ...input.logicBuiltins.map((template) =>
@@ -118,6 +124,7 @@ export function templateEntries(input: {
         bundleParts(bundle),
         true,
         `${bundle.description ?? ""} ${bundle.help ?? ""}`,
+        bundle.device?.type,
       ),
     ),
     ...input.bundleUser.map((bundle) =>
@@ -128,6 +135,7 @@ export function templateEntries(input: {
         bundleParts(bundle),
         false,
         `${bundle.description ?? ""} ${bundle.help ?? ""}`,
+        bundle.device?.type,
       ),
     ),
   ];

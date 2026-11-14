@@ -66,6 +66,7 @@
   import {
     collectTileTemplate,
     inferTemplateType,
+    tileSourceCount,
   } from "$lib/config/tile-template";
   import {
     materializeTemplateTile,
@@ -538,6 +539,30 @@
     }
     return undefined;
   }
+
+  /** The anchor as the user knows it: a device name or a state's name. */
+  function sourceName(source: SlotSource | undefined): string {
+    if (!source) return "the tile's source";
+    if (source.kind === "state") {
+      const label = String(
+        sourceLook.objects.get(source.stateId)?.common?.name ?? "",
+      ).trim();
+      return label ? `“${label}”` : `“${source.stateId}”`;
+    }
+    const device = sourceLook.devices.find(
+      (entry) => entry.id === source.device,
+    );
+    if (device?.name) return `“${device.name}”`;
+    return source.kind === "control"
+      ? `“${source.control}”`
+      : "the tile's source";
+  }
+
+  const applyTemplateWarning = $derived.by(() => {
+    const config = tile?.tile;
+    if (!config || tileSourceCount(config) < 2) return "";
+    return `This tile reads more than one source. Applying a template keeps ${sourceName(templateAnchor(config))} as the anchor and replaces the other bindings.`;
+  });
 
   function saveTileTemplate(name: string, type: DeviceType): void {
     saveTemplateError = "";
@@ -2620,6 +2645,7 @@
     <ApplyTemplateModal
       templates={allTemplates}
       error={applyTemplateError}
+      warning={applyTemplateWarning}
       onPick={applyTemplate}
       onClose={() => (applyTemplateOpen = false)}
     />

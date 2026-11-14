@@ -434,6 +434,34 @@ it("binds a switch's ago badge to its main switch", () => {
   ]);
 });
 
+it("gives a non-switch preset the same availability badge", () => {
+  const motion = device({
+    id: "motion",
+    name: "Motion",
+    type: "Motion",
+    controls: [
+      ctl("m-motion", "motion", { stateId: "sensor.0.motion" }),
+      ctl("m-connected", "connected", {
+        stateId: "sensor.0.available",
+        writable: false,
+      }),
+    ],
+  });
+  const result = materializeTemplateTile(PRESETS.Motion, motion, [
+    PRESETS.Motion,
+  ]);
+  const availability = result.slots.find(
+    (slot) =>
+      typeof slot.source === "object" &&
+      slot.source.kind === "control" &&
+      slot.source.control === "m-connected",
+  );
+  expect(availability?.options).toMatchObject({ derive: "ago", from: "lc" });
+  expect(availability?.rules).toEqual([
+    { when: "!isOnline(connected)", only: true, tone: "danger" },
+  ]);
+});
+
 it("drops a switch's availability badge when there is no connected control", () => {
   const sw = device({
     id: "plug2",

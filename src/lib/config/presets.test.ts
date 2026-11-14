@@ -30,6 +30,22 @@ it("makes the Light preset a complete example", () => {
   expect(PRESETS.Light.slots.some((s) => s.source === "connected")).toBe(true);
 });
 
+it("gives every preset the connected availability badge", () => {
+  for (const template of Object.values(PRESETS)) {
+    expect(template.features.map((feature) => feature.feature)).toEqual(
+      expect.arrayContaining(["battery", "connected"]),
+    );
+    expect(
+      template.slots.some(
+        (slot) => slot.source === "connected" && slot.options?.derive === "ago",
+      ),
+    ).toBe(true);
+    expect(template.slots.some((slot) => slot.source === "offline")).toBe(
+      false,
+    );
+  }
+});
+
 it("drops the optional badges when the device has no such controls", () => {
   const slots = suggestedSlots(
     deviceWithControls([powerControl]),

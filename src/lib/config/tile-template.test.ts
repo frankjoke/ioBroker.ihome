@@ -1,10 +1,60 @@
 import { expect, it } from "vitest";
-import { collectTileTemplate, inferTemplateType } from "./tile-template";
+import {
+  collectTileTemplate,
+  inferTemplateType,
+  tileSourceCount,
+} from "./tile-template";
 import { materializeTemplateTileFromState } from "$lib/config/slot-create";
 import type { SourceLook } from "$lib/config/slot-source";
-import type { TileConfig } from "$lib/types/display";
+import type { SlotSource, TileConfig } from "$lib/types/display";
 
 const object = (common: Record<string, unknown>) => ({ type: "state", common });
+
+const controlSource = (device: string, control: string): SlotSource => ({
+  kind: "control",
+  device,
+  control,
+});
+const stateSource = (stateId: string): SlotSource => ({
+  kind: "state",
+  stateId,
+});
+
+it("counts a tile's distinct source origins", () => {
+  expect(tileSourceCount(undefined)).toBe(0);
+  // Several states from one device stay one origin.
+  expect(
+    tileSourceCount({
+      slots: [
+        { kind: "value", source: stateSource("alias.0.Lamp.SET") },
+        { kind: "level", source: stateSource("alias.0.Lamp.brightness") },
+      ],
+    }),
+  ).toBe(1);
+  expect(
+    tileSourceCount({
+      slots: [
+        { kind: "value", source: controlSource("lamp", "power") },
+        { kind: "level", source: controlSource("lamp", "brightness") },
+      ],
+    }),
+  ).toBe(1);
+  expect(
+    tileSourceCount({
+      slots: [
+        { kind: "value", source: controlSource("lamp", "power") },
+        { kind: "value", source: controlSource("sensor", "temperature") },
+      ],
+    }),
+  ).toBe(2);
+  // A raw state is its own origin next to a device control.
+  expect(
+    tileSourceCount({
+      active: { source: controlSource("lamp", "power"), op: "truthy" },
+      slots: [{ kind: "value", source: stateSource("alias.0.Lamp.SET") }],
+    }),
+  ).toBe(2);
+});
 
 const look: SourceLook = {
   devices: [],
