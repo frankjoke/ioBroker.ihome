@@ -9,14 +9,14 @@ import {
 
 it("effectiveUi returns the shipped defaults for an empty document", () => {
   expect(effectiveUi({})).toEqual({
-    primary: 0.9,
-    secondary: 0.84,
+    primary: 0.99,
+    secondary: 0.924,
     tileScale: 1,
     reloadMinutes: 0,
   });
   expect(UI_DEFAULTS).toEqual({
-    primary: 0.9,
-    secondary: 0.84,
+    primary: 0.99,
+    secondary: 0.924,
     tileScale: 1,
     reloadMinutes: 0,
   });
@@ -48,8 +48,8 @@ it("effectiveUi clamps the numbers and ignores non-numbers", () => {
   expect(effectiveUi({ "ui.secondaryText": 9 }).secondary).toBe(1.4);
   expect(effectiveUi({ "ui.tileScale": 0.5 }).tileScale).toBe(1);
   expect(effectiveUi({ "ui.tileScale": 3 }).tileScale).toBe(2);
-  expect(effectiveUi({ "ui.primaryText": "1.2" }).primary).toBe(0.9); // a string is not a number
-  expect(effectiveUi({ "ui.primaryText": Number.NaN }).primary).toBe(0.9);
+  expect(effectiveUi({ "ui.primaryText": "1.2" }).primary).toBe(0.99); // a string is not a number
+  expect(effectiveUi({ "ui.primaryText": Number.NaN }).primary).toBe(0.99);
   expect(effectiveUi({ "ui.reloadMinutes": -5 }).reloadMinutes).toBe(0);
   expect(effectiveUi({ "ui.reloadMinutes": 9999 }).reloadMinutes).toBe(1440);
   expect(effectiveUi({ "ui.reloadMinutes": 15.4 }).reloadMinutes).toBe(15);
@@ -60,9 +60,9 @@ it("uiCss emits colours only when set and always the sizes", () => {
   expect(plain).not.toContain("--ui-page-bg");
   expect(plain).not.toContain("--ui-section-bg");
   expect(plain).not.toContain("--ui-tile-bg");
-  expect(plain).toContain("--ui-value-size: 0.9rem");
-  expect(plain).toContain("--ui-name-size: 0.75rem"); // 0.9 × 12 / 14.4
-  expect(plain).toContain("--ui-secondary-size: 0.84rem");
+  expect(plain).toContain("--ui-value-size: 0.99rem");
+  expect(plain).toContain("--ui-name-size: 0.825rem"); // 0.99 × 12 / 14.4
+  expect(plain).toContain("--ui-secondary-size: 0.924rem");
 
   const custom = uiCss(
     effectiveUi({

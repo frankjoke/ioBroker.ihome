@@ -116,7 +116,7 @@
       >
         <Icon
           value={icon.glyph}
-          size={icon.size ?? 17}
+          size={icon.size ?? 22}
           dim={icon.disabled}
           data={{ $value: control?.liveValue, $color: icon.color }}
         />
@@ -125,7 +125,7 @@
       <span class="slot-icon" style:color={icon.color}>
         <Icon
           value={icon.glyph}
-          size={icon.size ?? 17}
+          size={icon.size ?? 22}
           dim={icon.disabled}
           data={{ $value: control?.liveValue, $color: icon.color }}
         />
@@ -150,7 +150,7 @@
             <span class="slot-icon" style:color={icon.color}>
               <Icon
                 value={icon.glyph}
-                size={icon.size ?? 17}
+                size={icon.size ?? 22}
                 dim={icon.disabled}
                 data={{ $value: control?.liveValue, $color: icon.color }}
               />

@@ -54,17 +54,16 @@ it("keeps the values the stylesheet needs", () => {
   expect(
     BREAKPOINTS.map((b) => [b.name, b.tileW, b.tileH, b.maxW, b.maxH]),
   ).toEqual([
-    ["phone", 30.5, 58, SIZE_MAX_W, SIZE_MAX_H],
+    ["phone", 30.5, 54, SIZE_MAX_W, SIZE_MAX_H],
     ["tablet", 23.5, 48, SIZE_MAX_W, SIZE_MAX_H],
     ["desktop", 26.5, 54, SIZE_MAX_W, SIZE_MAX_H],
   ]);
 });
 
 it("renders a 2×2 from its modules plus one grid gap", () => {
-  // A 2-span tile adds one 6px grid gap. The row module stays exactly half, so
-  // the height is unchanged; the phone width is 4px wider than before.
+  // A 2-span tile adds one 6px grid gap. The phone tile is 67×114 (was 63×122).
   expect(BREAKPOINTS.map((b) => [2 * b.tileW + 6, 2 * b.tileH + 6])).toEqual([
-    [67, 122],
+    [67, 114],
     [53, 102],
     [59, 114],
   ]);

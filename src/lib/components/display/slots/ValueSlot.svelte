@@ -78,7 +78,7 @@
      (0.95 → 0.90rem). */
   .value {
     font-family: var(--font-mono);
-    font-size: var(--ui-value-size, 0.9rem);
+    font-size: var(--ui-value-size, 0.99rem);
     font-weight: 800;
     line-height: 1.15;
     max-width: 100%;
@@ -90,19 +90,19 @@
 
   /* Its unit: 20% smaller again, and not bold. */
   .value .unit {
-    font-size: calc(var(--ui-value-size, 0.9rem) * 0.8);
+    font-size: calc(var(--ui-value-size, 0.99rem) * 0.8);
     font-weight: 400;
     margin-left: 0.15em;
   }
 
   /* Secondary readings (humidity, dew point, …): quiet, not bold. */
   .value.secondary {
-    font-size: var(--ui-secondary-size, 0.84rem);
+    font-size: var(--ui-secondary-size, 0.924rem);
     font-weight: 400;
   }
 
   .value.secondary .unit {
-    font-size: calc(var(--ui-secondary-size, 0.84rem) * 0.8);
+    font-size: calc(var(--ui-secondary-size, 0.924rem) * 0.8);
   }
 
   .value.action {

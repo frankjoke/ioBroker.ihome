@@ -8,8 +8,8 @@ import type { Settings } from "$lib/config/settings-ops";
 import type { BreakpointDef } from "$lib/config/size-ops";
 
 export const UI_DEFAULTS = {
-  primary: 0.9,
-  secondary: 0.84,
+  primary: 0.99,
+  secondary: 0.924,
   tileScale: 1,
   reloadMinutes: 0,
 };

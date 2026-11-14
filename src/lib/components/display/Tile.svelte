@@ -354,7 +354,7 @@
     if (!icon) return undefined;
     return {
       ...icon,
-      size: main ? 34 : 17,
+      size: main ? 42 : 22,
       disabled: icon.disabled === true || (main && chart.length > 0),
     };
   }
@@ -881,7 +881,7 @@
   }
 
   .tile-name {
-    font-size: var(--ui-name-size, var(--body-sm));
+    font-size: var(--ui-name-size, 0.825rem);
     font-weight: 700;
     overflow-wrap: anywhere;
     max-width: 100%;
