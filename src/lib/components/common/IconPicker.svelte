@@ -6,6 +6,7 @@
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { iconTitle, isHtmlIcon } from "$lib/config/icon-html";
   import { brokerIconPath } from "$lib/config/icon-ops";
+  import { TEMPERATURE_ICON } from "$lib/config/presets";
   import Icon from "$lib/components/common/Icon.svelte";
   import symbolNames from "$lib/assets/material-symbol-names.json";
 
@@ -55,6 +56,11 @@
       id: "bulb",
       label: "Bulb",
       html: `<style>:root{--bulb:#b8860b}.on{display:none}[data-on="true"] .on{display:inline}[data-on="true"] .off{display:none}</style><svg viewBox="0 0 24 24" fill="none" stroke="{{$color}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g class="off"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z"/></g><g class="on"><path d="M9 18h6M10 21h4" stroke="{{$color}}"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.4 2.5h5.2c.1-1 .6-1.8 1.4-2.5A6 6 0 0 0 12 3z" fill="var(--bulb)" fill-opacity="0.65" stroke="var(--bulb)"/><path d="M12 3V1M5.5 4.5 4.3 3.3M18.5 4.5 19.7 3.3M3 11h2M19 11h2" stroke="var(--bulb)" stroke-width="1.4"/></g></svg>`,
+    },
+    {
+      id: "temperature",
+      label: "Temperature",
+      html: TEMPERATURE_ICON,
     },
   ] as const;
 

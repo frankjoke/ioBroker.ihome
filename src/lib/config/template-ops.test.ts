@@ -19,6 +19,7 @@ import {
 } from "$lib/config/template-ops";
 import { DEVICE_TYPES } from "$lib/config/features";
 import type { FeatureDef } from "$lib/config/features";
+import { TEMPERATURE_ICON } from "$lib/config/presets";
 import type { Slot, Template, TemplateRegistry } from "$lib/types/display";
 
 it("merges slots by kind+source with later winning and rules concatenated", () => {
@@ -248,7 +249,7 @@ it("carries every preset's icon on the slot its source named (A55)", () => {
       { type: "Button", at: 0, glyph: "touch_app" },
       { type: "Light", at: 0, glyph: "lightbulb" },
       { type: "Thermostat", at: 0, glyph: "thermostat" },
-      { type: "Thermometer", at: 0, glyph: "device_thermostat" },
+      { type: "Thermometer", at: 0, glyph: TEMPERATURE_ICON },
       { type: "Blind", at: 0, glyph: "blinds" },
       { type: "Window", at: 0, glyph: "window" },
       { type: "Motion", at: 0, glyph: "sensors" },

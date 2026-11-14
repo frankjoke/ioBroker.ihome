@@ -37,6 +37,9 @@ const offlineAgo: Slot = {
   rules: [{ when: "!isOnline(connected)", only: true, tone: "danger" }],
 };
 
+/** A thermometer with a light red top fading to light blue at the bulb. */
+export const TEMPERATURE_ICON = `<svg viewBox="0 0 24 24"><defs><linearGradient id="temp-grad" gradientUnits="userSpaceOnUse" x1="0" y1="2.5" x2="0" y2="22.75"><stop offset="0" stop-color="#ff8a80"/><stop offset="0.55" stop-color="#ffd6d6"/><stop offset="1" stop-color="#80d8ff"/></linearGradient></defs><rect x="9.25" y="2.5" width="5.5" height="13" rx="2.75" fill="url(#temp-grad)"/><circle cx="12" cy="18" r="4.75" fill="url(#temp-grad)"/><path d="M12 8.2v10.2" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-opacity="0.55" stroke-width="1.2"/></svg>`;
+
 export const PRESETS: Record<DeviceType, Template> = {
   Switch: {
     id: "Switch",
@@ -188,7 +191,7 @@ A low battery appears as a warning badge.`,
       {
         kind: "value",
         options: { index: 1, pick: "temperature" },
-        icon: { glyph: "device_thermostat" },
+        icon: { glyph: TEMPERATURE_ICON },
       },
       { kind: "value", options: { index: 2, pick: "humidity" } },
       ago,
