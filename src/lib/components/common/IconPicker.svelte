@@ -15,7 +15,6 @@
   import { brokerIconPath } from "$lib/config/icon-ops";
   import { TEMPERATURE_ICON } from "$lib/config/presets";
   import Icon from "$lib/components/common/Icon.svelte";
-  import symbolNames from "$lib/assets/material-symbol-names.json";
 
   let {
     icon = undefined,
@@ -31,7 +30,8 @@
       meta?: { name?: string; group?: string; active?: string },
     ) => void;
     onClose: () => void;
-    /** The manager's add flow: also offers the lazy MDI source. */
+    /** The manager's picker: the full source browser (Symbols, Document,
+     *  Broker, MDI). Consumers get Pool + URL/SVG only. */
     manage?: boolean;
   } = $props();
 
@@ -43,6 +43,14 @@
     { id: "url", label: "URL / SVG / HTML" },
     { id: "mdi", label: "MDI" },
   ] as const;
+
+  /** Consumers see the curated pool and a one-off URL; only the manager
+   *  browses the source libraries. */
+  const visibleTabs = $derived(
+    manage
+      ? TABS
+      : TABS.filter((entry) => entry.id === "pool" || entry.id === "url"),
+  );
 
   /** Ready-made icon markup: the slot's reading, its resolved colour and its
    *  on/off state (the snippet's own CSS switches on `data-on`). */
@@ -86,12 +94,42 @@
   // svelte-ignore state_referenced_locally
   let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
+  // The symbol list is a large JSON: only the manager's Symbols tab loads it.
+  let symbolNames = $state.raw<string[]>([]);
+  let symbolsLoading = $state(false);
+  let symbolsError = $state("");
+  let symbolsStarted = false;
+
   /** The first 120 matches — the full list is thousands long. */
   const matches = $derived(
     symbolNames
       .filter((n) => !search.trim() || n.includes(search.trim().toLowerCase()))
       .slice(0, 120),
   );
+
+  async function loadSymbols(): Promise<void> {
+    if (symbolsStarted) return;
+    symbolsStarted = true;
+    symbolsLoading = true;
+    symbolsError = "";
+    try {
+      const mod = await import("$lib/assets/material-symbol-names.json");
+      const names = (mod as { default?: unknown }).default;
+      if (!Array.isArray(names)) {
+        throw new Error("unexpected symbol list");
+      }
+      symbolNames = names as string[];
+    } catch (e) {
+      symbolsStarted = false;
+      symbolsError = e instanceof Error ? e.message : String(e);
+    } finally {
+      symbolsLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (tab === "symbols" && manage) void loadSymbols();
+  });
 
   const pool = $derived(poolEntries(getIconPool()));
   const poolShown = $derived(filterPoolIcons(pool, search));
@@ -163,12 +201,16 @@
     if (tab === "mdi" && manage) void loadMdi();
   });
 
+  // Both source scans run only while their (manager-only) tab is open.
   const documentIcons = $derived(
-    collectDocumentIcons(getPageRegistry(), getTemplateRegistry()),
+    tab === "document"
+      ? collectDocumentIcons(getPageRegistry(), getTemplateRegistry())
+      : [],
   );
 
   /** Every `common.icon` the broker has, deduped by value (one id shown). */
   const brokerIcons = $derived.by(() => {
+    if (tab !== "broker") return [];
     const seen = new SvelteMap<string, string>();
     for (const [id, obj] of (ioBroker.objects as Map<string, any>) ?? []) {
       const value = obj?.common?.icon;
@@ -203,7 +245,7 @@
     </div>
 
     <div class="option-tabs" role="tablist">
-      {#each TABS.filter((entry) => manage || entry.id !== "mdi") as t (t.id)}
+      {#each visibleTabs as t (t.id)}
         <button
           type="button"
           role="tab"
@@ -260,6 +302,15 @@
                   {#if entry.builtin}
                     <span class="pool-badge">built-in</span>
                   {/if}
+                  {#if entry.templates?.length || entry.roles?.length}
+                    <span
+                      class="pool-badge auto"
+                      title={`Automatic default for ${[
+                        ...(entry.templates ?? []),
+                        ...(entry.roles ?? []),
+                      ].join(", ")}`}>auto</span
+                    >
+                  {/if}
                   {#if entry.group}
                     <span class="meta text-muted">{entry.group}</span>
                   {/if}
@@ -282,7 +333,21 @@
           >
         {/if}
       {:else if tab === "symbols"}
-        {#if matches.length === 0}
+        {#if symbolsLoading}
+          <p class="empty text-muted">Loading symbols…</p>
+        {:else if symbolsError}
+          <p class="empty text-danger">
+            Symbols failed to load: {symbolsError}
+          </p>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline"
+            onclick={() => {
+              symbolsStarted = false;
+              void loadSymbols();
+            }}>Retry</button
+          >
+        {:else if matches.length === 0}
           <p class="empty text-muted">No matching symbols.</p>
         {:else}
           <div class="grid">
@@ -551,6 +616,11 @@
   .pool-twin {
     display: flex;
     opacity: 0.7;
+  }
+
+  .pool-badge.auto {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
   }
 
   .pool-badge {

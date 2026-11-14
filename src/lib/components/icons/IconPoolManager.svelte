@@ -645,6 +645,7 @@
                   <option value={word}></option>
                 {/each}
               </datalist>
+              <p class="hint text-muted">Search only — never changes a tile.</p>
             </div>
           </div>
           <div class="auto-picks">
@@ -659,6 +660,9 @@
                     templates: values.length ? values : undefined,
                   })}
               />
+              <p class="hint text-muted">
+                Automatic face default for tiles from these templates.
+              </p>
             </div>
             <div class="field">
               <span class="label-mono">Roles</span>
@@ -669,6 +673,10 @@
                 onChange={(values) =>
                   updateUser({ roles: values.length ? values : undefined })}
               />
+              <p class="hint text-muted">
+                Fallback by the headline control's ioBroker role (exact, then
+                family).
+              </p>
             </div>
           </div>
         {/if}
@@ -758,6 +766,10 @@
             <summary class="label-mono">
               Base icons ({baseRows.length}) · device types and roles
             </summary>
+            <p class="hint text-muted">
+              Base catalog — picking is copy-on-pick. Automatic defaults live on
+              your entries.
+            </p>
             {#each baseRows as entry (entry.id)}
               {@render poolRow(entry, true)}
             {/each}
@@ -784,6 +796,7 @@
 
 {#if pickerTarget}
   <IconPicker
+    manage
     icon={entryById(pickerTarget.id, pickerTarget.builtin)?.[
       pickerTarget.field
     ]}
