@@ -26,7 +26,10 @@
     /** The current value, for highlighting and the URL prefill. */
     icon?: string;
     /** The picked value; "" clears the icon. */
-    onPick: (icon: string, meta?: { name?: string; group?: string }) => void;
+    onPick: (
+      icon: string,
+      meta?: { name?: string; group?: string; active?: string },
+    ) => void;
     onClose: () => void;
     /** The manager's add flow: also offers the lazy MDI source. */
     manage?: boolean;
@@ -234,9 +237,19 @@
                   class="row-btn pool-row"
                   class:current={entry.value === icon}
                   title={entry.name}
-                  onclick={() => onPick(entry.value)}
+                  onclick={() =>
+                    onPick(entry.value, {
+                      name: entry.name,
+                      group: entry.group,
+                      active: entry.activeValue,
+                    })}
                 >
                   <Icon value={entry.value} size={22} />
+                  {#if entry.activeValue}
+                    <span class="pool-twin" title="Active icon">
+                      <Icon value={entry.activeValue} size={22} />
+                    </span>
+                  {/if}
                   <span class="value">{entry.name}</span>
                   {#if entry.builtin}
                     <span class="pool-badge">built-in</span>
@@ -527,6 +540,11 @@
     flex: 1 1 auto;
     min-width: 0;
     white-space: normal;
+  }
+
+  .pool-twin {
+    display: flex;
+    opacity: 0.7;
   }
 
   .pool-badge {
