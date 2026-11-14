@@ -49,9 +49,13 @@ it("iconSrc resolves against the ioBroker base (A66)", () => {
   expect(iconSrc("energiefluss.png", undefined, b)).toBe(
     b + "/energiefluss.png",
   );
-  // A leading slash is broker-root-relative for a broker value, app-relative
-  // for a document value.
-  expect(iconSrc("/icons/a.png", undefined, b)).toBe("/icons/a.png");
+  // A leading slash is broker-root-relative, except for the app's own
+  // deployed document paths (/ihome/…). Without this, /iqontrol/… resolves
+  // against the Vite dev server's localhost instead of the broker.
+  expect(iconSrc("/icons/a.png", undefined, b)).toBe(b + "/icons/a.png");
+  expect(iconSrc("/iqontrol/gate.png", undefined, b)).toBe(
+    b + "/iqontrol/gate.png",
+  );
   expect(iconSrc("/icons/a.png", "a.0.b", b)).toBe(b + "/icons/a.png");
   // The deployed `/ihome/…` path works on the dev server, which serves the app
   // at `/` (vitest runs with `import.meta.env.DEV`).

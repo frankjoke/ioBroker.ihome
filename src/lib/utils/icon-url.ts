@@ -81,10 +81,14 @@ export function iconSrc(
   if (/^(https?:)?\/\//i.test(value)) return value;
   if (!isImageIcon(value)) return value;
   const root = base ?? iconBase();
-  // A leading slash is broker-root-relative for a broker value; a document
-  // value keeps meaning the app's own origin.
+  // A leading slash is broker-root-relative, except for the app's own
+  // deployed document paths (/ihome/…). Without this, /iqontrol/… would ride
+  // the Vite dev server's origin (localhost) instead of the broker.
   if (value.startsWith("/")) {
-    return owner ? root + value : documentIconPath(value);
+    if (value === "/ihome" || value.startsWith("/ihome/")) {
+      return documentIconPath(value);
+    }
+    return root + value;
   }
   if (value.startsWith("adapter/")) return `${root}/${value}`;
   const adapter = owner ? ownerOf(owner).adapter : "";
