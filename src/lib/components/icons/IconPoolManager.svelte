@@ -40,6 +40,8 @@
   let draft = $state<IconPool>({ version: 1, updatedAt: 0, icons: [] });
   let baseUpdatedAt = $state(0);
   let search = $state("");
+  /** The Base section's own open state; a row click must not re-close it. */
+  let baseOpen = $state(false);
   let openId = $state<string | null>(null);
   let pendingRemove = $state<PoolEntry | null>(null);
   let pickerOpen = $state(false);
@@ -94,6 +96,11 @@
       baseUpdatedAt = draft.updatedAt;
       loaded = true;
     });
+  });
+
+  $effect(() => {
+    // A search is a request to see the matches, not a latch on the section.
+    if (search.trim()) baseOpen = true;
   });
 
   $effect(() => {
@@ -539,7 +546,7 @@
     {:else}
       <div class="list">
         {#if baseRows.length > 0}
-          <details class="base-group" open={search.trim().length > 0}>
+          <details class="base-group" bind:open={baseOpen}>
             <summary class="label-mono">
               Base icons ({baseRows.length}) · device types and roles
             </summary>
