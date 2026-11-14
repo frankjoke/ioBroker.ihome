@@ -73,7 +73,7 @@ it("gives a control slot its role's glyph, like a raw state does", () => {
     device(),
     ctl("c1", "power", { role: "switch.light" }),
   );
-  expect(light.icon).toEqual({ glyph: "power_settings_new" });
+  expect(light.icon).toEqual({ glyph: "lightbulb" });
   // A role-less boolean still gets a face.
   expect(
     slotFromControl(device(), ctl("c2", "x", { role: "", type: "boolean" }))
