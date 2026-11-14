@@ -4,11 +4,14 @@
   import { writeControl } from "$lib/utils/control-write";
   import { backgroundCss } from "$lib/config/appearance";
   import {
+    presetForType,
     primaryControl,
     resolveControl,
     tileActionControl,
   } from "$lib/config/template-ops";
-  import { evalActive } from "$lib/config/tile-ops";
+  import { evalActive, withRolePair } from "$lib/config/tile-ops";
+  import { defaultPair } from "$lib/config/icon-pool";
+  import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
@@ -294,9 +297,38 @@
   );
   const accent = $derived(headline ?? { kind: "value" as const });
   const tileStyle = $derived(slotStyle(accent, controlFor(accent)));
+  // The automatic pair: the tile/device template first, then the headline
+  // control's exact ioBroker role, then its family. Auto defaults need the
+  // pool before the first render; the root layout starts its load.
+  const headlineControl = $derived(
+    parts.rows.find((row) => row.slot === headline)?.control,
+  );
+  // resolveTile rewrites each source to a `slot:N` pseudo key; the original
+  // placement's slot at the same index still names the device.
+  const rawTile = $derived(tile ?? placement?.tile);
+  const rawHeadlineSource = $derived(
+    rawTile?.slots?.[slots.indexOf(headline)]?.source,
+  );
+  const sourceDevice = $derived.by(() => {
+    const source = rawHeadlineSource;
+    if (!source || typeof source === "string" || source.kind !== "control") {
+      return undefined;
+    }
+    return $devicesEnrichedStore.find((entry) => entry.id === source.device);
+  });
+  const templateId = $derived(
+    workingTile?.template ??
+      sourceDevice?.template ??
+      presetForType(sourceDevice?.type ?? device.type).id,
+  );
+  const automaticPair = $derived(
+    defaultPair(getIconPool().icons, templateId, headlineControl?.role),
+  );
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
-  const look = $derived(stateLook(workingTile, active));
+  const look = $derived(
+    stateLook(withRolePair(workingTile, automaticPair), active),
+  );
   const accentColor = $derived(look.color ?? tileStyle.color);
   // A glow colour of its own turns the glow on, whatever the rules said (A71).
   const glowing = $derived(look.glow !== undefined || tileStyle.glow === true);

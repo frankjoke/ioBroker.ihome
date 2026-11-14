@@ -646,7 +646,10 @@
       applyTemplateError = `“${template.name}” fits no source on this tile.`;
       return;
     }
-    edit(() => materializedTileConfig(materialized));
+    edit(() => ({
+      ...materializedTileConfig(materialized),
+      template: template.id,
+    }));
     applyTemplateOpen = false;
   }
 

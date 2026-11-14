@@ -29,6 +29,7 @@ import {
   setSlotSource,
   setSlotTile,
   slotTileMode,
+  withRolePair,
   withPlacementDefaults,
 } from "./tile-ops";
 
@@ -428,6 +429,29 @@ it("leaves the look alone when the pool icon has no twin", () => {
   const next = applyPoolIcon(tile, "gate");
   expect(next.icon).toBe("gate");
   expect(next.look).toEqual({ active: { glyph: "on" } });
+});
+
+it("fills both look glyphs from an automatic role pair", () => {
+  const tile: TileConfig = {
+    look: { active: { color: "red" }, inactive: { glow: "x" } },
+  };
+  const next = withRolePair(tile, { value: "gate", activeValue: "gate_open" });
+  expect(next.look?.inactive).toEqual({ glow: "x", glyph: "gate" });
+  expect(next.look?.active).toEqual({ color: "red", glyph: "gate_open" });
+});
+
+it("uses the single icon for both states without a twin", () => {
+  const next = withRolePair({}, { value: "gate" });
+  expect(next.look).toEqual({
+    inactive: { glyph: "gate" },
+    active: { glyph: "gate" },
+  });
+});
+
+it("leaves an explicit tile icon and a missing pair alone", () => {
+  const tile: TileConfig = { icon: "own", look: { inactive: { glyph: "x" } } };
+  expect(withRolePair(tile, { value: "gate" })).toBe(tile);
+  expect(withRolePair(tile, undefined)).toBe(tile);
 });
 
 it("clears only the tile icon for an empty pick", () => {

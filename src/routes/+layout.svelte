@@ -63,6 +63,7 @@
     registerAliveState,
   } from "$lib/stores/connection.svelte";
   import { toast } from "$lib/stores/toasts.svelte";
+  import { initIconPool } from "$lib/stores/icon-pool.svelte";
 
   let { children } = $props();
 
@@ -106,6 +107,10 @@
     new URLSearchParams(location.search).get("socket") ||
     "";
   const hostPort = storage.hostPort || FALLBACK_BROKER;
+  // Automatic role/template icon defaults need the pool before the first tile
+  // renders; the store waits for the connection itself.
+  void initIconPool();
+
   const ioBroker = ioBrokerStart({
     namespace,
     explicit,

@@ -224,11 +224,13 @@ export function filterPoolIcons(
  * defaults.
  */
 export function defaultPair(
-  entries: PoolEntry[],
+  entries: PoolIcon[],
   templateId: string | undefined,
   role: string | undefined,
 ): PoolEntry | undefined {
-  const user = entries.filter((entry) => !entry.builtin);
+  // The picker hides a user value that repeats a base glyph; automatic
+  // defaults must not: the entry's template/role claim is independent.
+  const user = entries.filter((entry) => !(entry as PoolEntry).builtin);
   if (templateId) {
     const byTemplate = user.find((entry) =>
       entry.templates?.includes(templateId),

@@ -280,6 +280,25 @@ export function setLook(
   };
 }
 
+/** An automatic role/template pair fills both look glyphs. An explicit tile
+ *  icon wins; colours/glow/background/disabled stay. */
+export function withRolePair(
+  tile: TileConfig,
+  pair?: { value: string; activeValue?: string },
+): TileConfig {
+  const glyph = pair?.value?.trim();
+  if (!pair || !glyph || tile.icon) return tile;
+  const twin = pair.activeValue?.trim() || glyph;
+  return {
+    ...tile,
+    look: {
+      ...(tile.look ?? {}),
+      inactive: { ...(tile.look?.inactive ?? {}), glyph },
+      active: { ...(tile.look?.active ?? {}), glyph: twin },
+    },
+  };
+}
+
 /** A pool pick: an unpaired icon replaces the tile icon only. A pair also
  *  fills both look glyphs, preserving the look's colours/glow/background. */
 export function applyPoolIcon(
