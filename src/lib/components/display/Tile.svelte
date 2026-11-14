@@ -882,7 +882,7 @@
 
   .tile-name {
     font-size: var(--ui-name-size, var(--body-sm));
-    font-weight: 600;
+    font-weight: 700;
     overflow-wrap: anywhere;
     max-width: 100%;
   }
