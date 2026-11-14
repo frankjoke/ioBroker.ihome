@@ -143,6 +143,27 @@ const ROLE_GLYPHS: [RegExp, string][] = [
   [/pressure/i, "compress"],
 ];
 
+/** The same role defaults, labelled for the icon pool. */
+export const ROLE_GLYPH_DEFAULTS: { name: string; glyph: string }[] = [
+  { name: "Switch / plug", glyph: "power_settings_new" },
+  { name: "Button", glyph: "touch_app" },
+  { name: "Motion", glyph: "directions_walk" },
+  { name: "Door / window", glyph: "sensor_door" },
+  { name: "Light", glyph: "lightbulb" },
+  { name: "Temperature", glyph: "thermostat" },
+  { name: "Humidity", glyph: "water_drop" },
+  { name: "Battery", glyph: "battery_full" },
+  { name: "Power / energy", glyph: "bolt" },
+  { name: "Brightness", glyph: "brightness_6" },
+  { name: "Colour", glyph: "palette" },
+  { name: "Volume", glyph: "volume_up" },
+  { name: "Blind / shutter", glyph: "blinds" },
+  { name: "Lock", glyph: "lock" },
+  { name: "Air quality", glyph: "air" },
+  { name: "Illuminance", glyph: "light_mode" },
+  { name: "Pressure", glyph: "compress" },
+];
+
 /** The glyph a role suggests; a harmless fallback for a bare boolean. */
 export function glyphForRole(
   role: unknown,
