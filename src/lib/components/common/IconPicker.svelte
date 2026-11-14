@@ -280,41 +280,55 @@
           <ul class="list">
             {#each poolShown as entry (`${entry.builtin ? "b" : "u"}:${entry.id}`)}
               <li>
-                <button
-                  type="button"
-                  class="row-btn pool-row"
-                  class:current={entry.value === icon}
-                  title={entry.name}
-                  onclick={() =>
-                    onPick(entry.value, {
-                      name: entry.name,
-                      group: entry.group,
-                      active: entry.activeValue,
-                    })}
-                >
-                  <Icon value={entry.value} size={22} />
+                <div class="pool-row">
+                  <button
+                    type="button"
+                    class="row-btn pool-main"
+                    class:current={entry.value === icon}
+                    title={entry.name}
+                    onclick={() =>
+                      onPick(entry.value, {
+                        name: entry.name,
+                        group: entry.group,
+                        active: entry.activeValue,
+                      })}
+                  >
+                    <Icon value={entry.value} size={22} />
+                    <span class="value">{entry.name}</span>
+                    {#if entry.builtin}
+                      <span class="pool-badge">built-in</span>
+                    {/if}
+                    {#if entry.templates?.length || entry.roles?.length}
+                      <span
+                        class="pool-badge auto"
+                        title={`Automatic default for ${[
+                          ...(entry.templates ?? []),
+                          ...(entry.roles ?? []),
+                        ].join(", ")}`}>auto</span
+                      >
+                    {/if}
+                    {#if entry.group}
+                      <span class="meta text-muted">{entry.group}</span>
+                    {/if}
+                  </button>
                   {#if entry.activeValue}
-                    <span class="pool-twin" title="Active icon">
-                      <Icon value={entry.activeValue} size={22} />
-                    </span>
-                  {/if}
-                  <span class="value">{entry.name}</span>
-                  {#if entry.builtin}
-                    <span class="pool-badge">built-in</span>
-                  {/if}
-                  {#if entry.templates?.length || entry.roles?.length}
-                    <span
-                      class="pool-badge auto"
-                      title={`Automatic default for ${[
-                        ...(entry.templates ?? []),
-                        ...(entry.roles ?? []),
-                      ].join(", ")}`}>auto</span
+                    <button
+                      type="button"
+                      class="pool-twin-btn"
+                      class:current={entry.activeValue === icon}
+                      title={`Use the active icon of ${entry.name}`}
+                      aria-label={`Use the active icon of ${entry.name}`}
+                      onclick={() =>
+                        onPick(entry.activeValue!, {
+                          name: entry.name,
+                          group: entry.group,
+                        })}
                     >
+                      <Icon value={entry.activeValue} size={20} />
+                      <span class="pool-twin-label">active</span>
+                    </button>
                   {/if}
-                  {#if entry.group}
-                    <span class="meta text-muted">{entry.group}</span>
-                  {/if}
-                </button>
+                </div>
               </li>
             {/each}
           </ul>
@@ -607,15 +621,51 @@
     white-space: nowrap;
   }
 
-  .pool-row .value {
+  .pool-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .pool-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+  }
+
+  .pool-main .value {
     flex: 1 1 auto;
     min-width: 0;
     white-space: normal;
   }
 
-  .pool-twin {
-    display: flex;
-    opacity: 0.7;
+  .pool-twin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .pool-twin-btn:hover {
+    background-color: var(--surface-container);
+    color: var(--text-color);
+  }
+
+  .pool-twin-btn.current {
+    background-color: var(--primary-container);
+    color: var(--text-color);
+    border-color: var(--primary-color);
+  }
+
+  .pool-twin-label {
+    font-size: var(--label-mono-size);
   }
 
   .pool-badge.auto {
