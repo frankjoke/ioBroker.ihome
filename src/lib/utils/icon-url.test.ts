@@ -72,6 +72,21 @@ it("iconSrc resolves against the ioBroker base (A66)", () => {
   expect(iconSrc(html, "ihome.0", b)).toBe(html);
 });
 
+it("uses the dev web adapter origin for broker paths", () => {
+  vi.stubEnv("VITE_IOBROKER_ORIGIN", "http://192.168.178.9:8082/");
+  try {
+    expect(iconBase()).toBe("http://192.168.178.9:8082");
+    expect(iconSrc("/iqontrol/icons/door.png")).toBe(
+      "http://192.168.178.9:8082/iqontrol/icons/door.png",
+    );
+    expect(iconSrc("adapter/a/x.png")).toBe(
+      "http://192.168.178.9:8082/adapter/a/x.png",
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
 it("iconBase reads the footer host, else this origin (A66)", () => {
   setIconBrokerBase("");
   const g = globalThis as any;

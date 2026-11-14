@@ -62,6 +62,11 @@ export function setIconBrokerBase(url: string): void {
  *  app is served from `/adapter/ihome/…`, where root-relative already means the
  *  broker. */
 export function iconBase(): string {
+  // The dev server is not the broker: the operator pins the web adapter here
+  // (the socket can be on another port, usually 8081). Production is served by
+  // the web adapter, so its page origin stays authoritative.
+  const devWeb = String(import.meta.env.VITE_IOBROKER_ORIGIN ?? "").trim();
+  if (import.meta.env.DEV && devWeb) return devWeb.replace(/\/+$/, "");
   const g = globalThis as {
     localStorage?: { getItem(key: string): string | null };
     location?: { origin: string; protocol: string };
