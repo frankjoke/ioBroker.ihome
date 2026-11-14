@@ -97,12 +97,16 @@ export interface SectionAppearance {
  * A tile's own config. Absent → resolved from the device → its template →
  * the preset; on the first edit it is materialised (complete, not a patch).
  */
-/** Tile chart layout: the sparkline band can sit above the rows instead of
- *  behind the headline icon. */
+/** Tile chart layout: a band after the tile name, or the whole tile face. */
 export interface TileChartConfig {
+  /** Fill the tile's content area instead of a band after the name. */
+  full?: boolean;
+  /** Legacy name for `full`; read when `full` is absent. */
   separate?: boolean;
-  /** Separated band height in px; absent → 56. */
+  /** Band height in px; absent → 56. Ignored when `full` is set. */
   height?: number;
+  /** Fill each line with a 30% → 0% gradient. */
+  area?: boolean;
 }
 
 export interface TileConfig {

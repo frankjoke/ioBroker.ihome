@@ -841,7 +841,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: var(--body-sm);
+    font-size: var(--label-mono-size);
     white-space: nowrap;
   }
 

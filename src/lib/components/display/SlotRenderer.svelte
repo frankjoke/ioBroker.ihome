@@ -22,7 +22,6 @@
     emphasis,
     icon,
     stack = false,
-    anchor = false,
     single = false,
     face = false,
     home = "tile",
@@ -38,8 +37,6 @@
     icon?: { glyph: string; color?: string; disabled?: boolean; size?: number };
     /** The primary cluster at a 1-wide span: icon above the value (A53). */
     stack?: boolean;
-    /** The headline row: the tile measures its glyph for the chart band. */
-    anchor?: boolean;
     /** The tile has only this surface slot; its name would be redundant. */
     single?: boolean;
     /** Draw the headline icon alone, above the tile name and reading. */
@@ -135,7 +132,7 @@
 {/snippet}
 
 {#if face}
-  <div class="slot-face" data-chart-anchor>
+  <div class="slot-face">
     {@render slotIcon()}
   </div>
 {:else if show}
@@ -167,11 +164,7 @@
     <!-- The slot's icon and its reading, one cluster (A53): side by side when
          the line fits; the headline stacks at a 1-wide span so a 1×1 tile puts
          the icon above the value. -->
-    <div
-      class="slot-cluster"
-      class:stack
-      data-chart-anchor={anchor ? "" : undefined}
-    >
+    <div class="slot-cluster" class:stack>
       {@render slotIcon()}
       {@render content()}
       {#if showName && name}<span class="slot-name">{name}</span>{/if}
@@ -188,6 +181,8 @@
 
 <style>
   .slot-face {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;

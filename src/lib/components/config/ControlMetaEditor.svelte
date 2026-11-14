@@ -314,7 +314,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.85rem;
+    font-size: var(--label-mono-size);
   }
 
   .states {

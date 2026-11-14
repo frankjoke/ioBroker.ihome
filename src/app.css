@@ -281,6 +281,22 @@ button {
   color: var(--secondary-color);
 }
 
+/* A checkbox reads like every other field: its label first, the box after.
+   The input stays first in the DOM, so label-click and keyboard work. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row-reverse;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: var(--label-mono-size);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary-color);
+  cursor: pointer;
+}
+
 .mono {
   font-family: var(--font-mono);
   font-size: var(--label-mono-size);

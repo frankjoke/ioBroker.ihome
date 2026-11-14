@@ -406,7 +406,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: var(--body-sm);
+    font-size: var(--label-mono-size);
     cursor: pointer;
   }
 

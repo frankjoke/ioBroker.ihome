@@ -8,8 +8,11 @@
   } from "$lib/stores/history.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
-  let { series, wide = false }: { series: ChartSeries[]; wide?: boolean } =
-    $props();
+  let {
+    series,
+    wide = false,
+    area = false,
+  }: { series: ChartSeries[]; wide?: boolean; area?: boolean } = $props();
 
   // Fetch and feed every series (the store dedupes per state + spec), so the
   // tile chart and a row chart read one cache.
@@ -62,6 +65,26 @@
       }))
       .filter((l) => l.points);
   });
+
+  /** One gradient per colour; shared charts can reuse the same identical one. */
+  const areaColors = $derived([...new Set(drawn.map((l) => l.color))]);
+  const colorId = (color: string) =>
+    `area-${String(color)
+      .replace(/[^a-z0-9]/gi, "")
+      .toLowerCase()}`;
+
+  /** The line's points and the baseline, closed into a filled path. */
+  function areaPath(points: string): string {
+    const pairs = points
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((pair) => pair.split(",").map(Number));
+    if (!pairs.length) return "";
+    const first = pairs[0][0];
+    const last = pairs[pairs.length - 1][0];
+    return `M ${pairs.map(([x, y]) => `${x},${y}`).join(" L ")} L ${last},28 L ${first},28 Z`;
+  }
 </script>
 
 {#if drawn.length}
@@ -72,9 +95,26 @@
     preserveAspectRatio="none"
     aria-hidden="true"
   >
+    {#if area}
+      <defs>
+        {#each areaColors as color (color)}
+          <linearGradient id={colorId(color)} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style:stop-color={color} stop-opacity="0.3" />
+            <stop offset="1" style:stop-color={color} stop-opacity="0" />
+          </linearGradient>
+        {/each}
+      </defs>
+    {/if}
     <!-- Reversed: the first series is the tile's main line, so it paints last
          and stays visible on top of the others. -->
     {#each [...drawn].reverse() as l, i (i)}
+      {#if area}
+        <path
+          class="area"
+          d={areaPath(l.points)}
+          fill={`url(#${colorId(l.color)})`}
+        />
+      {/if}
       <polyline points={l.points} style:stroke={l.color} />
     {/each}
   </svg>
@@ -91,6 +131,10 @@
   .chart.wide {
     max-width: none;
     height: 100%;
+  }
+
+  .chart .area {
+    stroke: none;
   }
 
   .chart polyline {

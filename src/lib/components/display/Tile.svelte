@@ -323,12 +323,13 @@
   );
   /** A lone frame/html slot is the whole face: no name, no padding. */
   const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
-  /** Sparkline layout: a separate band instead of the icon overlay. */
+  /** Sparkline layout: a band after the name, or the whole tile face. */
   const chartConfig = $derived(workingTile?.chart);
-  const separatedChart = $derived(
-    chartConfig?.separate === true && chart.length > 0,
+  const chartFull = $derived(
+    chartConfig?.full ?? chartConfig?.separate === true,
   );
   const chartHeight = $derived(chartConfig?.height ?? 56);
+  const chartArea = $derived(chartConfig?.area === true);
 
   /** The icon a row shows: state Look → tile icon → the row's own icon →
    *  the device's face. The look/tile/device are tile-level and survive a
@@ -355,49 +356,11 @@
     return {
       ...icon,
       size: main ? 46 : 22,
-      disabled: icon.disabled === true || (main && chart.length > 0),
+      disabled: icon.disabled === true,
     };
   }
 
-  /** The band the chart occupies: the big glyph's box plus 2 px each way, so the
-   *  line sits on the icon rather than in a strip of its own. Measured, because
-   *  the name line and the rows above it move the glyph; falls back to the tile's
-   *  middle 70% when the headline shows no icon. */
-  // shortcut: re-measures only when the tile or the glyph resizes; a name that
-  // wraps without resizing the tile leaves the band a line off until then.
   let tileEl = $state<HTMLElement>();
-  let band = $state<{ top: number; height: number }>();
-
-  $effect(() => {
-    const el = tileEl;
-    if (!el || !chart.length || separatedChart) {
-      band = undefined;
-      return;
-    }
-    let watched: HTMLElement | null = null;
-    const measure = () => {
-      const glyph = el.querySelector<HTMLElement>(
-        "[data-chart-anchor] .slot-icon",
-      );
-      if (glyph && glyph !== watched) {
-        watched = glyph;
-        ro.observe(glyph);
-      }
-      if (!glyph) {
-        band = undefined;
-        return;
-      }
-      const t = el.getBoundingClientRect();
-      const g = glyph.getBoundingClientRect();
-      // `top` is measured from the padding box, so the tile's border comes off.
-      const border = parseFloat(getComputedStyle(el).borderTopWidth) || 0;
-      band = { top: g.top - t.top - border - 2, height: g.height + 4 };
-    };
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    measure();
-    return () => ro.disconnect();
-  });
 
   // The detail page's face (A54): the headline's icon follows its own
   // descriptor and homes. The header deliberately does not consult the row's
@@ -694,13 +657,9 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
-  {#if chart.length && !separatedChart}
-    <div
-      class="tile-bg"
-      style:--chart-top={band ? `${band.top}px` : undefined}
-      style:--chart-height={band ? `${band.height}px` : undefined}
-    >
-      <TileChart series={chart} />
+  {#if chartFull && chart.length}
+    <div class="tile-chart-full">
+      <TileChart series={chart} wide area={chartArea} />
     </div>
   {/if}
   {#if headlineRow && !surfaceOnly}
@@ -718,9 +677,9 @@
     {/if}
   {/if}
   {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
-  {#if separatedChart}
+  {#if !chartFull && chart.length}
     <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
-      <TileChart series={chart} wide />
+      <TileChart series={chart} wide area={chartArea} />
     </div>
   {/if}
   <div class="tile-body">
@@ -832,37 +791,50 @@
     padding-left: 0;
   }
 
-  /* The tile's chart (A61): the series of every value that charts here, drawn
-     over the content — the icon (blended out while a chart draws) and values
-     sit under it, so the line is never hidden. No pointer events; clipped to
-     the tile's rounded box; the badges (z 2) stay on top. The band follows the
-     headline glyph — its box plus 2 px each way — and falls back to the tile's
-     middle 70% when no glyph anchors it. */
-  .tile-bg {
+  /* Sparkline full: one layer across the tile's content area, behind the name,
+     icon and rows. The content is lifted above it below. */
+  .tile-chart-full {
     position: absolute;
-    left: 0;
-    right: 0;
-    top: var(--chart-top, 15%);
-    height: var(--chart-height, 70%);
+    top: calc(8px + var(--badge-inset-top, 0px));
+    bottom: calc(6px + var(--badge-inset-bottom, 0px));
+    left: 2px;
+    right: 2px;
+    z-index: 0;
     overflow: hidden;
     pointer-events: none;
     border-radius: inherit;
-    z-index: 1;
-    display: flex;
-    align-items: center;
   }
 
-  /* Stretch the chart across the band: the chart ships a fixed size for the
-     in-body case, and a scoped style cannot reach into the child. */
-  .tile-bg :global(.chart) {
+  .tile-chart-full :global(.chart) {
     width: 100%;
     max-width: none;
     height: 100%;
   }
 
-  /* A separated sparkline: its own band above the tile's name and rows, so
-     multiple lines never sit behind the icon. The 5% side inset is the 0.1
-     total breathing room from the tile edge. */
+  .tile.no-padding .tile-chart-full {
+    top: var(--badge-inset-top, 0px);
+    right: 0;
+    bottom: var(--badge-inset-bottom, 0px);
+    left: 0;
+  }
+
+  .tile.single-surface .tile-chart-full {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  /* The chart is a background: the face, name and rows paint over it. */
+  .tile-name,
+  .tile-body {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* The default sparkline: its own band after the name, so the face icon and
+     title stay together. The 5% side inset is the breathing room from the
+     tile edge. */
   .tile-chart {
     display: flex;
     align-items: stretch;

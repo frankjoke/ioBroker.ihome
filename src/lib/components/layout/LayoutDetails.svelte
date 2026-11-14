@@ -99,6 +99,7 @@
     SlotTile,
     StateLook,
     Template,
+    TileChartConfig,
     TileConfig,
   } from "$lib/types/display";
   import type { DeviceType, EnrichedDevice } from "$lib/types/device";
@@ -528,6 +529,9 @@
   ]);
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
+  const chartFull = $derived(
+    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  );
 
   /** The source a template materialises against: the tile's active source,
    *  else its first bound slot. */
@@ -733,9 +737,18 @@
     edit((t) => setLook(t, state, patch));
   }
 
-  /** The tile's sparkline layout (separate band / height). */
-  function patchChart(patch: { separate?: boolean; height?: number }): void {
-    edit((t) => ({ ...t, chart: { ...(t.chart ?? {}), ...patch } }));
+  /** The tile's sparkline layout (full / band height / area). */
+  function patchChart(patch: Partial<TileChartConfig>): void {
+    edit((t) => {
+      const chart = { ...(t.chart ?? {}), ...patch };
+      for (const [key, value] of Object.entries(chart)) {
+        if (value === undefined) delete chart[key as keyof TileChartConfig];
+      }
+      return {
+        ...t,
+        chart: Object.keys(chart).length ? chart : undefined,
+      };
+    });
   }
 
   // ------------------------------------------------------------------- slots
@@ -1394,17 +1407,23 @@
 
         {#if id === "look"}
           <div class="field">
-            <div class="row">
-              <label class="check">
+            <div class="row wrap">
+              <label
+                class="check"
+                title="Fill the whole tile face with the sparkline; off gives it a band after the name"
+              >
                 <input
                   type="checkbox"
-                  checked={tile?.tile?.chart?.separate === true}
+                  checked={chartFull}
                   onchange={(e) =>
-                    patchChart({ separate: e.currentTarget.checked })}
+                    patchChart({
+                      full: e.currentTarget.checked ? true : undefined,
+                      separate: undefined,
+                    })}
                 />
-                <span>Separate sparkline from icon</span>
+                <span>Sparkline full</span>
               </label>
-              {#if tile?.tile?.chart?.separate}
+              {#if !chartFull}
                 <label class="small">
                   <span class="label-mono">Chart height (px)</span>
                   <input
@@ -1425,8 +1444,17 @@
                   />
                 </label>
               {/if}
-            </div>
-            <div class="row">
+              <label class="check" title="Fill each line with a soft gradient">
+                <input
+                  type="checkbox"
+                  checked={tile?.tile?.chart?.area === true}
+                  onchange={(e) =>
+                    patchChart({
+                      area: e.currentTarget.checked ? true : undefined,
+                    })}
+                />
+                <span>Area</span>
+              </label>
               <label class="check" title="Draw the tile's border">
                 <input
                   type="checkbox"
@@ -1539,18 +1567,19 @@
                       />
                       <span>Dim</span>
                     </label>
-                  </div>
-                  <div
-                    class="look-bg"
-                    title="Tile Background"
-                    aria-label="Tile Background"
-                  >
-                    <span class="label-mono">BG</span>
-                    <div class="look-bg-body">
-                      <BackgroundEditor
-                        background={lk.background ?? tile?.tile?.background}
-                        onChange={(bg) => patchLook(state, { background: bg })}
-                      />
+                    <div
+                      class="look-bg"
+                      title="Tile Background"
+                      aria-label="Tile Background"
+                    >
+                      <span class="label-mono">BG</span>
+                      <div class="look-bg-body">
+                        <BackgroundEditor
+                          background={lk.background ?? tile?.tile?.background}
+                          onChange={(bg) =>
+                            patchLook(state, { background: bg })}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2883,6 +2912,10 @@
     min-width: 0;
   }
 
+  .row.wrap {
+    flex-wrap: wrap;
+  }
+
   /* Icon and value each get their own group: the value's sits right and is
      fenced off, so a home button clearly belongs to its own switch. */
   .slot-settings {
@@ -2946,7 +2979,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: var(--body-sm);
+    font-size: var(--label-mono-size);
   }
 
   .small {

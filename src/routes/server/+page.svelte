@@ -393,7 +393,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: var(--body-sm);
+    font-size: var(--label-mono-size);
     cursor: pointer;
   }
 

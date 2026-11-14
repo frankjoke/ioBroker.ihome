@@ -972,7 +972,7 @@
     align-items: center;
     gap: 0.25rem;
     min-height: 2rem;
-    font-size: var(--body-sm);
+    font-size: var(--label-mono-size);
   }
 
   .duration,
