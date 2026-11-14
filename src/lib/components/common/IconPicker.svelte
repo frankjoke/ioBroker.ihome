@@ -1,8 +1,11 @@
 <script lang="ts">
   import { SvelteMap } from "svelte/reactivity";
+  import { base } from "$app/paths";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import { initIconPool, getIconPool } from "$lib/stores/icon-pool.svelte";
+  import { filterPoolIcons, poolEntries } from "$lib/config/icon-pool";
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { iconTitle, isHtmlIcon } from "$lib/config/icon-html";
   import { brokerIconPath } from "$lib/config/icon-ops";
@@ -23,6 +26,7 @@
   } = $props();
 
   const TABS = [
+    { id: "pool", label: "Pool" },
     { id: "symbols", label: "Symbols" },
     { id: "document", label: "Document" },
     { id: "broker", label: "Broker" },
@@ -64,7 +68,7 @@
     },
   ] as const;
 
-  let tab = $state<(typeof TABS)[number]["id"]>("symbols");
+  let tab = $state<(typeof TABS)[number]["id"]>("pool");
   let search = $state("");
   // The picker is mounted fresh per open, so capturing the initial value is the
   // point; a later `icon` change never arrives while it is up.
@@ -77,6 +81,13 @@
       .filter((n) => !search.trim() || n.includes(search.trim().toLowerCase()))
       .slice(0, 120),
   );
+
+  const pool = $derived(poolEntries(getIconPool()));
+  const poolShown = $derived(filterPoolIcons(pool, search));
+
+  $effect(() => {
+    if (tab === "pool") void initIconPool();
+  });
 
   const documentIcons = $derived(
     collectDocumentIcons(getPageRegistry(), getTemplateRegistry()),
@@ -132,10 +143,45 @@
 
     {#if tab === "symbols"}
       <input type="search" placeholder="Search symbols…" bind:value={search} />
+    {:else if tab === "pool"}
+      <input type="search" placeholder="Search the pool…" bind:value={search} />
     {/if}
 
     <div class="results">
-      {#if tab === "symbols"}
+      {#if tab === "pool"}
+        {#if poolShown.length === 0}
+          <p class="empty text-muted">No icons match the search.</p>
+        {:else}
+          <ul class="list">
+            {#each poolShown as entry (entry.id)}
+              <li>
+                <button
+                  type="button"
+                  class="row-btn pool-row"
+                  class:current={entry.value === icon}
+                  title={entry.name}
+                  onclick={() => onPick(entry.value)}
+                >
+                  <Icon value={entry.value} size={22} />
+                  <span class="value">{entry.name}</span>
+                  {#if entry.builtin}
+                    <span class="pool-badge">built-in</span>
+                  {/if}
+                  {#if entry.group}
+                    <span class="meta text-muted">{entry.group}</span>
+                  {/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <a
+          class="btn btn-outline btn-sm manage-link"
+          href={`${base}/#/templates?type=icons`}
+          target="_blank"
+          rel="noopener">Manage icons</a
+        >
+      {:else if tab === "symbols"}
         {#if matches.length === 0}
           <p class="empty text-muted">No matching symbols.</p>
         {:else}
@@ -347,6 +393,25 @@
   .value {
     font-size: var(--body-sm);
     white-space: nowrap;
+  }
+
+  .pool-row .value {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .pool-badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0 0.3rem;
+  }
+
+  .manage-link {
+    margin-top: 0.5rem;
   }
 
   .meta {
