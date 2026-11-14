@@ -348,6 +348,13 @@
   const bodySlots = $derived(parts.body);
   /** The face icon sits above the name; its reading stays with the other rows. */
   const headlineRow = $derived(bodySlots.find((r) => r.slot === headline));
+  /** A detail-only headline still dresses the face; only its control is hidden. */
+  const faceRow = $derived(
+    headlineRow ?? parts.rows.find((row) => row.slot === headline),
+  );
+  const faceIcon = $derived(
+    faceRow ? bodyIcon(faceRow, headlineRow ? "tile" : "modal") : undefined,
+  );
   const orderedBody = $derived(
     headlineRow
       ? [headlineRow, ...bodySlots.filter((r) => r !== headlineRow)]
@@ -381,9 +388,9 @@
     };
   }
 
-  function bodyIcon(r: SlotRow) {
+  function bodyIcon(r: SlotRow, home: "tile" | "modal" = "tile") {
     const main = r.slot === headline;
-    const icon = rowGlyph(r, "tile");
+    const icon = rowGlyph(r, home);
     if (!icon) return undefined;
     return {
       ...icon,
@@ -699,16 +706,15 @@
       />
     </div>
   {/if}
-  {#if headlineRow && !surfaceOnly}
-    {@const faceIcon = bodyIcon(headlineRow)}
+  {#if faceRow && !surfaceOnly}
     {#if faceIcon}
       <SlotRenderer
-        slot={headlineRow.slot}
+        slot={faceRow.slot}
         {device}
-        control={headlineRow.control}
-        style={headlineRow.style}
+        control={faceRow.control}
+        style={faceRow.style}
         icon={faceIcon}
-        onPrimary={actionFor(headlineRow.control)}
+        onPrimary={headlineRow ? actionFor(faceRow.control) : undefined}
         face
       />
     {/if}
