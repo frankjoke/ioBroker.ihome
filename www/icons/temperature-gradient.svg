@@ -8,9 +8,9 @@
       x2="0"
       y2="22.75"
     >
-      <stop offset="0" stop-color="#ff8a80"/>
-      <stop offset="0.55" stop-color="#ffd6d6"/>
-      <stop offset="1" stop-color="#80d8ff"/>
+      <stop offset="0" stop-color="#E06060"/>
+      <stop offset="0.55" stop-color="#ffA0A0"/>
+      <stop offset="1" stop-color="#4040ff"/>
     </linearGradient>
   </defs>
   <rect
