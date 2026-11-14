@@ -149,6 +149,10 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### 0.3.5 (2026-11-14)
+
+Device and tile templates: create a complete device from a template with role-based auto-fill, or create only a tile from a state; save any tile as a reusable template from the Slots line and apply a template to the current tile. The tile editor resumes at the last edited tile, lists select the next item after a delete, and badges gain rule colours/backgrounds plus an offline-since badge gated by `isOnline()`. Colour-temperature states now render as sliders.
+
 ### 0.3.4 (2026-11-13)
 
 Cog menu instead of the configuration tab strip, plugin pages under Plugins (built-in Admin, iqontrol and custom links) embedded or in a new tab, frame-only embedded pages, fold-out User Interface/Server & Security forms, and the page name in the bar instead of a content title.

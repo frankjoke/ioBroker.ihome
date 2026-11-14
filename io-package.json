@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "news": {
+      "0.3.5": {
+        "en": "Device and tile templates: create a complete device from a template with role-based auto-fill, or create only a tile from a state; save any tile as a reusable template from the Slots line and apply a template to the current tile. The tile editor resumes at the last edited tile, lists select the next item after a delete, and badges gain rule colours/backgrounds plus an offline-since badge gated by isOnline(). Colour-temperature states now render as sliders.",
+        "de": "Geräte- und Kachelvorlagen: Ein vollständiges Gerät aus einer Vorlage mit rollenbasierter Auto-Füllung anlegen oder nur eine Kachel aus einem State erzeugen; jede Kachel über die Slots-Zeile als wiederverwendbare Vorlage speichern und eine Vorlage auf die aktuelle Kachel anwenden. Der Kachel-Editor öffnet die zuletzt bearbeitete Kachel, Listen wählen nach dem Löschen das nächste Element, und Badges erhalten Regel-Farben/Hintergründe sowie ein Offline-seit-Badge über isOnline(). Farbtemperatur-States werden jetzt als Schieberegler dargestellt."
+      },
       "0.3.4": {
         "en": "New cog menu instead of the configuration tabs: plugin pages (built-in Admin, iqontrol and custom links) open embedded or in a new tab, embedded pages are frame-only, and User Interface/Server & Security use fold-out lists with the page name in the bar.",
         "de": "Neues Zahnrad-Menü statt der Konfigurations-Tabs: Plugin-Seiten (eingebautes Admin, iqontrol und eigene Links) öffnen eingebettet oder in einem neuen Tab, eingebettete Seiten sind nur noch Frame, und Benutzeroberfläche/Server & Sicherheit nutzen aufklappbare Listen mit dem Seitennamen in der Leiste."
