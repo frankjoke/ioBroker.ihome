@@ -105,8 +105,9 @@
   };
   type MdiCategory = { id: string; name: Record<string, string> };
 
-  let mdiIcons = $state<MdiIcon[]>([]);
-  let mdiCategories = $state<MdiCategory[]>([]);
+  // Imported once and never edited: raw avoids deep-proxying ~5000 objects.
+  let mdiIcons = $state.raw<MdiIcon[]>([]);
+  let mdiCategories = $state.raw<MdiCategory[]>([]);
   let mdiLoading = $state(false);
   let mdiError = $state("");
   let mdiCategory = $state("");
@@ -200,7 +201,10 @@
           aria-selected={tab === t.id}
           class="option-tab"
           class:active={tab === t.id}
-          onclick={() => (tab = t.id)}>{t.label}</button
+          onclick={() => {
+            tab = t.id;
+            search = "";
+          }}>{t.label}</button
         >
       {/each}
     </div>
@@ -223,7 +227,7 @@
           <p class="empty text-muted">No icons match the search.</p>
         {:else}
           <ul class="list">
-            {#each poolShown as entry (entry.id)}
+            {#each poolShown as entry (`${entry.builtin ? "b" : "u"}:${entry.id}`)}
               <li>
                 <button
                   type="button"
@@ -245,12 +249,19 @@
             {/each}
           </ul>
         {/if}
-        <a
-          class="btn btn-outline btn-sm manage-link"
-          href={`${base}/#/templates?type=icons`}
-          target="_blank"
-          rel="noopener">Manage icons</a
-        >
+        {#if !manage && pool.every((entry) => entry.builtin)}
+          <p class="empty text-muted">
+            No added icons yet — expand the pool in Templates → Icons.
+          </p>
+        {/if}
+        {#if !manage}
+          <a
+            class="btn btn-outline btn-sm manage-link"
+            href={`${base}/#/templates?type=icons`}
+            target="_blank"
+            rel="noopener">Manage icons</a
+          >
+        {/if}
       {:else if tab === "symbols"}
         {#if matches.length === 0}
           <p class="empty text-muted">No matching symbols.</p>

@@ -3,10 +3,13 @@ import { DEVICE_TYPES } from "./features";
 import { ROLE_GLYPH_DEFAULTS } from "./icon-ops";
 import {
   BUILTIN_POOL,
+  POOL_CAP,
   filterPoolIcons,
   mdiIconValue,
   parseIconPool,
   poolEntries,
+  removePoolIcon,
+  upsertPoolIcon,
 } from "./icon-pool";
 
 it("survives an empty document and rejects a broken one", () => {
@@ -31,6 +34,60 @@ it("accepts valid icons, drops duplicates and caps", () => {
     ],
   });
   expect(parseIconPool(raw)?.icons.map((icon) => icon.id)).toEqual(["a"]);
+});
+
+it("caps the document at 500 icons", () => {
+  const icons = Array.from({ length: POOL_CAP + 1 }, (_, i) => ({
+    id: `i${i}`,
+    name: `Icon ${i}`,
+    value: `value-${i}`,
+  }));
+  const parsed = parseIconPool(JSON.stringify({ version: 1, icons }));
+  expect(parsed?.icons).toHaveLength(POOL_CAP);
+});
+
+it("rejects a future document instead of downgrading it", () => {
+  expect(parseIconPool(JSON.stringify({ version: 2, icons: [] }))).toBeNull();
+});
+
+it("trims entries and drops whitespace-only ones", () => {
+  const raw = JSON.stringify({
+    version: 1,
+    icons: [
+      { id: " a ", name: " Lamp ", value: " lightbulb ", group: " Light " },
+      { id: "   ", name: "Broken", value: "x" },
+    ],
+  });
+  expect(parseIconPool(raw)?.icons).toEqual([
+    { id: "a", name: "Lamp", value: "lightbulb", group: "Light" },
+  ]);
+});
+
+it("keeps an MDI SVG value through a parse round-trip", () => {
+  const value = mdiIconValue("M1 2");
+  const parsed = parseIconPool(
+    JSON.stringify({
+      version: 1,
+      icons: [{ id: "m", name: "MDI", value }],
+    }),
+  );
+  expect(parsed?.icons[0].value).toBe(value);
+});
+
+it("upserts and removes one icon by id", () => {
+  const pool = { version: 1 as const, updatedAt: 0, icons: [] };
+  const added = upsertPoolIcon(pool, { id: "a", name: "A", value: "x" });
+  expect(added.icons).toHaveLength(1);
+  const replaced = upsertPoolIcon(added, { id: "a", name: "B", value: "y" });
+  expect(replaced.icons).toEqual([{ id: "a", name: "B", value: "y" }]);
+  expect(replaced.updatedAt).toBeGreaterThan(0);
+  expect(removePoolIcon(replaced, "a").icons).toHaveLength(0);
+});
+
+it("exposes base entries without storing them", () => {
+  const document = { version: 1 as const, updatedAt: 0, icons: [] };
+  expect(poolEntries(document)).toHaveLength(BUILTIN_POOL.length);
+  expect(document.icons).toHaveLength(0);
 });
 
 it("has every device type and role default, deduped", () => {

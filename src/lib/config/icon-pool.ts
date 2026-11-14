@@ -23,7 +23,7 @@ export interface PoolEntry extends PoolIcon {
   builtin?: boolean;
 }
 
-const CAP = 500;
+export const POOL_CAP = 500;
 
 function emptyPool(): IconPool {
   return { version: 1, updatedAt: 0, icons: [] };
@@ -86,43 +86,40 @@ export function parseIconPool(raw: unknown): IconPool | null {
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
+  // A future document must not be silently downgraded on the next save.
+  if (record.version !== undefined && record.version !== 1) return null;
   if (!Array.isArray(record.icons)) return null;
   const ids = new Set<string>();
   const icons: PoolIcon[] = [];
   for (const item of record.icons) {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const entry = item as Record<string, unknown>;
-    const id = typeof entry.id === "string" ? entry.id : "";
-    const name = typeof entry.name === "string" ? entry.name : "";
-    const iconValue = typeof entry.value === "string" ? entry.value : "";
+    const id = typeof entry.id === "string" ? entry.id.trim() : "";
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    const iconValue = typeof entry.value === "string" ? entry.value.trim() : "";
     if (!id || !name || !iconValue || ids.has(id)) continue;
     ids.add(id);
     const keywords = Array.isArray(entry.keywords)
-      ? entry.keywords.filter(
-          (word): word is string => typeof word === "string",
-        )
+      ? entry.keywords
+          .filter((word): word is string => typeof word === "string")
+          .map((word) => word.trim())
+          .filter(Boolean)
       : undefined;
+    const group = typeof entry.group === "string" ? entry.group.trim() : "";
     icons.push({
       id,
       name,
       value: iconValue,
-      ...(typeof entry.group === "string" ? { group: entry.group } : {}),
+      ...(group ? { group } : {}),
       ...(keywords?.length ? { keywords } : {}),
     });
-    if (icons.length >= CAP) break;
+    if (icons.length >= POOL_CAP) break;
   }
   const updatedAt =
     typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
       ? record.updatedAt
       : 0;
   return { version: 1, updatedAt, icons };
-}
-
-/** A short reason the stored document cannot be edited, or null. */
-export function iconPoolProblem(raw: unknown): string | null {
-  if (raw === undefined || raw === null || raw === "") return null;
-  if (parseIconPool(raw)) return null;
-  return "The icon pool document is not a readable icon list.";
 }
 
 /** Base first, then user additions; a value already present is not repeated. */
