@@ -951,7 +951,7 @@
   }
 
   function labelWhereTitle(slot: Slot): string {
-    return `Name shows: ${WHERE_LABEL[labelWhereOf(slot)]} — click for ${
+    return `Label shows: ${WHERE_LABEL[labelWhereOf(slot)]} — click for ${
       WHERE_LABEL[nextLabelWhere(slot)]
     }`;
   }
@@ -2409,7 +2409,7 @@
                       {/if}
                     </span>
                     <span class="setting-group name-group">
-                      <span class="label-mono">Name</span>
+                      <span class="label-mono">Label</span>
                       <WhereButton
                         where={labelWhereOf(slot)}
                         title={labelWhereTitle(slot)}

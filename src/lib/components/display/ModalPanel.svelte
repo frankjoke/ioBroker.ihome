@@ -147,9 +147,23 @@
             />
           </div>
         {:else}
+          <!-- The row is one click target for its action: icon, label and a
+               non-interactive value all toggle/press. Buttons and inputs keep
+               their own handlers (the icon, the switch widget). -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="row"
             class:half={detailSpan(r.slot) === "half" && !r.spark}
+            class:actionable={!!r.onPrimary}
+            onclick={(event) => {
+              if (!r.onPrimary) return;
+              const target = event.target as HTMLElement;
+              if (target.closest("button, input, select, textarea, a, label")) {
+                return;
+              }
+              r.onPrimary();
+            }}
           >
             {#if r.icon}
               {#if r.onPrimary}
@@ -282,6 +296,10 @@
 
   .row-icon.action:focus-visible {
     box-shadow: 0 0 0 2px var(--primary-color);
+  }
+
+  .row.actionable {
+    cursor: pointer;
   }
 
   .frame-cap {
