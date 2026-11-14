@@ -149,6 +149,26 @@ it("renders a value slot promoted to a badge", () => {
   expect(badge.label).toBe("21.5 °C");
 });
 
+it("honours a promoted value slot's decimals in its badge", () => {
+  const badge = resolveBadges(
+    [
+      {
+        kind: "value",
+        source: { kind: "control", device: "d", control: "humidity" },
+        options: { decimals: 0 },
+      },
+    ],
+    {
+      controls: [
+        { id: "humidity", feature: "humidity", liveValue: 45.6, unit: "%" },
+      ],
+    } as any,
+    undefined,
+    NOW,
+  )[0];
+  expect(badge.label).toBe("46 %");
+});
+
 it("keeps an HTML icon on a promoted badge and can hide its label", () => {
   const badge = resolveBadges(
     [

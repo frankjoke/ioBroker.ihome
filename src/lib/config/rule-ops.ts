@@ -390,7 +390,9 @@ function controlBadge(
   const parts = splitReading(
     control.liveValue,
     unitFor(slot.unit, control.meta?.unit, control.unit),
-    undefined,
+    typeof slot.options?.decimals === "number"
+      ? slot.options.decimals
+      : undefined,
     normalizeStates(control.meta?.states ?? control.states),
     control.meta?.role ?? control.role,
   );
