@@ -215,6 +215,21 @@ export function stateLook(
   return tile.look?.[active ? "active" : "inactive"] ?? {};
 }
 
+/** The row whose control a tile-face tap runs: a switch/button shown on the
+ *  tile, the headline first. Slot icons do not matter — a control shown in the
+ *  tile stays operable from the face even when its icon is detail-only. */
+export function faceSwitchRow(
+  rows: SlotRow[],
+  headline?: SlotRow,
+): SlotRow | undefined {
+  const actionable = (row: SlotRow | undefined): boolean =>
+    !!row?.control &&
+    row.control.writable === true &&
+    (row.slot.kind === "switch" || row.slot.kind === "button");
+  if (headline && actionable(headline)) return headline;
+  return rows.find(actionable);
+}
+
 /** The glyph of the tile's face: the state's look, then the tile's own icon,
  *  then the headline slot's icon. The slot icon stays the row's own. */
 export function faceGlyph(

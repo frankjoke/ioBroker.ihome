@@ -3,6 +3,7 @@ import {
   CHART_PALETTE,
   hasHistory,
   faceGlyph,
+  faceSwitchRow,
   headerIcon,
   headlineSlot,
   labelShown,
@@ -14,6 +15,7 @@ import {
   tileParts,
   tileSeries,
   valueShown,
+  type SlotRow,
 } from "$lib/config/tile-parts";
 import type {
   EnrichedControl,
@@ -669,6 +671,24 @@ it("reads a tile's state look, the inactive one as its default (A71)", () => {
   expect(stateLook(undefined, true)).toEqual({});
   // The state without its own entry keeps the rules.
   expect(stateLook(on({ look: { active: look.active } }), false)).toEqual({});
+});
+
+it("finds the switch/button a face tap should run", () => {
+  const row = (kind: Slot["kind"], widget: string, writable = true) =>
+    ({ slot: { kind }, control: { widget, writable } }) as unknown as SlotRow;
+  const headline = row("value", "value");
+  const headSwitch = row("switch", "switch");
+  const shownSwitch = row("switch", "switch");
+  const button = row("button", "button");
+  expect(faceSwitchRow([headline, shownSwitch, button], headline)).toBe(
+    shownSwitch,
+  );
+  expect(faceSwitchRow([headline, shownSwitch], headSwitch)).toBe(headSwitch);
+  expect(faceSwitchRow([headline], headline)).toBeUndefined();
+  const hiddenIcon = row("switch", "switch");
+  hiddenIcon.slot.icon = { glyph: "power_settings_new", where: "modal" };
+  expect(faceSwitchRow([hiddenIcon], undefined)).toBe(hiddenIcon);
+  expect(faceSwitchRow([], undefined)).toBeUndefined();
 });
 
 it("hides the slot's value off, or moves it by its own home", () => {

@@ -16,6 +16,7 @@
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
     faceGlyph,
+    faceSwitchRow,
     headerIcon,
     tileHeadlineSlot,
     rowIcon,
@@ -355,6 +356,14 @@
   const faceIcon = $derived(
     faceRow ? bodyIcon(faceRow, headlineRow ? "tile" : "modal") : undefined,
   );
+  /** A switch/button shown on the tile drives the face even when its own slot
+   *  icon is hidden there. A detail-only slot stays out (the PIN case). */
+  const faceSwitch = $derived(faceSwitchRow(bodySlots, headlineRow));
+  const faceAction = $derived.by(() => {
+    if (!faceRow) return undefined;
+    const control = faceSwitch?.control ?? headlineRow?.control;
+    return control ? actionFor(control) : undefined;
+  });
   const orderedBody = $derived(
     headlineRow
       ? [headlineRow, ...bodySlots.filter((r) => r !== headlineRow)]
@@ -714,7 +723,7 @@
         control={faceRow.control}
         style={faceRow.style}
         icon={faceIcon}
-        onPrimary={headlineRow ? actionFor(faceRow.control) : undefined}
+        onPrimary={faceAction}
         face
       />
     {/if}
