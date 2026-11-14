@@ -467,6 +467,49 @@
     return byAnchor;
   });
 
+  /** Room a top/bottom badge row needs; it is absolute, so without it the
+   *  name and readings draw underneath. Measured because a row can wrap. */
+  let badgeHeights = $state({ top: 0, bottom: 0 });
+  $effect(() => {
+    // Re-query when the groups change; observe each row for wrapping.
+    void badgeGroups;
+    const el = tileEl;
+    if (!el) return;
+    const rows = [
+      ...el.querySelectorAll<HTMLElement>(".badges.by-top"),
+      ...el.querySelectorAll<HTMLElement>(".badges.by-bottom"),
+    ];
+    if (!rows.length) {
+      const current = untrack(() => badgeHeights);
+      if (current.top || current.bottom) badgeHeights = { top: 0, bottom: 0 };
+      return;
+    }
+    const measure = () => {
+      const height = (selector: string) =>
+        Array.from(el.querySelectorAll<HTMLElement>(selector)).reduce(
+          (max, row) => Math.max(max, row.getBoundingClientRect().height),
+          0,
+        );
+      const next = {
+        top: height(".badges.by-top"),
+        bottom: height(".badges.by-bottom"),
+      };
+      const current = untrack(() => badgeHeights);
+      if (next.top !== current.top || next.bottom !== current.bottom) {
+        badgeHeights = next;
+      }
+    };
+    const ro = new ResizeObserver(measure);
+    for (const row of rows) ro.observe(row);
+    measure();
+    return () => ro.disconnect();
+  });
+  // A row's height minus the 3px it hangs outside the border, plus a gap, minus
+  // the base padding on that side (8px top, 6px bottom).
+  const badgePadVars = $derived(
+    `--badge-inset-top: ${badgeHeights.top ? Math.max(0, badgeHeights.top - 9) : 0}px; --badge-inset-bottom: ${badgeHeights.bottom ? Math.max(0, badgeHeights.bottom - 7) : 0}px;`,
+  );
+
   /**
    * A slot's icon may be its action even when no device control exists: a tile
    * built from a raw state/variable has no device primary, but its switch or
@@ -638,7 +681,7 @@
   data-placement-id={anchor?.placementId}
   style="grid-column: {newLine
     ? '1'
-    : 'auto'} / span {columns}; grid-row: span {span.h}; {tileVars}"
+    : 'auto'} / span {columns}; grid-row: span {span.h}; {tileVars}; {badgePadVars}"
   class:interactive={hasModal || !!tileAction}
   bind:this={tileEl}
   role={tileAction ? "button" : undefined}
@@ -740,8 +783,10 @@
        baselines instead of floating to different heights. */
     justify-content: flex-start;
     gap: 0.2rem;
-    /* More air above and below the content, less at the sides. */
-    padding: 8px 2px 6px;
+    /* More air above and below the content, less at the sides; a top/bottom
+       badge row adds its band so it never draws over the content. */
+    padding: calc(8px + var(--badge-inset-top, 0px)) 2px
+      calc(6px + var(--badge-inset-bottom, 0px));
     min-width: 0;
     /* No overflow clipping: a badge is allowed to sit on the tile's own edge. */
     text-align: center;
@@ -779,8 +824,12 @@
     border-color: transparent;
   }
 
+  /* Removing the normal padding still leaves the badge band reserved. */
   .tile.no-padding {
-    padding: 0;
+    padding-top: var(--badge-inset-top, 0px);
+    padding-right: 0;
+    padding-bottom: var(--badge-inset-bottom, 0px);
+    padding-left: 0;
   }
 
   /* The tile's chart (A61): the series of every value that charts here, drawn
