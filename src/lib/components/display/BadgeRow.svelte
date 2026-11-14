@@ -48,11 +48,9 @@
     gap: 3px;
     max-width: 92%;
     pointer-events: none;
-    /* Hangs the badge out onto the border/glow instead of into the content.
-       Measured from the padding box; -8px puts the edge 7px past the 1px
-       border, on the glow ring. The grid gap is 6px, so two facing badges
-       still clear each other. */
-    --out: -8px;
+    /* Sit on the border, not the glow: 4px from the padding box is 3px past
+       the 1px border — half the 6px grid gap, so facing badges just meet. */
+    --out: -4px;
   }
 
   .bx-left {

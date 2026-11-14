@@ -406,6 +406,17 @@ export function primaryControl<
   );
 }
 
+/** The control a tap anywhere on a tile acts on, when it has no detail page:
+ *  its primary switch, else its first writable button. A level is not a tap
+ *  action (it needs a value). */
+export function tileActionControl<
+  T extends { widget?: string; writable?: boolean },
+>(controls: T[]): T | undefined {
+  const primary = primaryControl(controls);
+  if (primary?.widget === "switch" && primary.writable === true) return primary;
+  return controls.find((c) => c.writable === true && c.widget === "button");
+}
+
 /** Read a persisted user-template registry; null when there is nothing usable. */
 function isTemplateEntry(v: unknown): v is Template {
   if (!v || typeof v !== "object") return false;

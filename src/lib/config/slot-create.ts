@@ -268,6 +268,8 @@ export function materializeTemplateTile(
   look?: TileLook;
   size?: Size;
   background?: Background;
+  border?: boolean;
+  padding?: boolean;
   title?: string;
   icon?: string;
 } {
@@ -288,6 +290,8 @@ export function materializeTemplateTile(
     ...(template.active !== undefined ? { active } : {}),
     ...(template.look ? { look: template.look } : {}),
     ...(template.background ? { background: template.background } : {}),
+    ...(template.border === false ? { border: false } : {}),
+    ...(template.padding === false ? { padding: false } : {}),
   };
 }
 
@@ -306,6 +310,8 @@ export function materializeTemplateTileFromState(
   look?: TileLook;
   size?: Size;
   background?: Background;
+  border?: boolean;
+  padding?: boolean;
   title?: string;
   icon?: string;
 } {
@@ -389,6 +395,8 @@ export function materializeTemplateTileFromState(
     ...(template.look ? { look: template.look } : {}),
     ...(template.size ? { size: template.size } : {}),
     ...(template.background ? { background: template.background } : {}),
+    ...(template.border === false ? { border: false } : {}),
+    ...(template.padding === false ? { padding: false } : {}),
     ...(name ? { title: name } : {}),
     ...(glyph ? { icon: glyph } : {}),
   };
@@ -403,6 +411,8 @@ export function materializedTileConfig(
     slots: materialized.slots,
     ...(materialized.size ? { size: materialized.size } : {}),
     ...(materialized.background ? { background: materialized.background } : {}),
+    ...(materialized.border === false ? { border: false } : {}),
+    ...(materialized.padding === false ? { padding: false } : {}),
     ...(materialized.active ? { active: materialized.active } : {}),
     ...(materialized.look ? { look: materialized.look } : {}),
   };

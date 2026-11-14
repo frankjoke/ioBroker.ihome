@@ -71,11 +71,7 @@ Presence can lag a few minutes on Wi-Fi; a device that sleeps may look offline.`
             color: "var(--success-color)",
             glow: true,
           },
-          {
-            when: "!truthy(online)",
-            color: "var(--text-muted)",
-            disabled: true,
-          },
+          { when: "!truthy(online)", color: "var(--text-muted)" },
         ],
       },
       { kind: "badge", source: "ago", options: { of: "lastConnected" } },
