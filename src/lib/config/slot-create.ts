@@ -415,16 +415,12 @@ export function materializedTileConfig(
     ...(materialized.padding === false ? { padding: false } : {}),
     ...(materialized.active ? { active: materialized.active } : {}),
     ...(materialized.look ? { look: materialized.look } : {}),
+    // The face icon is a frozen copy of the template's default look, else the
+    // first slot/type glyph; the slot's own icon stays independent.
+    ...(materialized.look?.inactive?.glyph || materialized.icon
+      ? { icon: materialized.look?.inactive?.glyph ?? materialized.icon }
+      : {}),
   };
-  if (materialized.icon) {
-    tile.look = {
-      ...tile.look,
-      inactive: {
-        ...tile.look?.inactive,
-        glyph: tile.look?.inactive?.glyph ?? materialized.icon,
-      },
-    };
-  }
   return tile;
 }
 

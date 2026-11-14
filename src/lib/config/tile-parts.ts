@@ -199,15 +199,19 @@ export function tileHeadlineSlot(slots: Slot[]): Slot | undefined {
   return headlineSlot(body.length ? body : slots);
 }
 
-/** The look of the tile's current state (A71). A tile with no active condition
- *  never becomes active, so its one state is the inactive one — the pane edits
- *  those values as the tile's default look. */
+/** The look of the tile's current state (A71). With no active condition the
+ *  inactive look still styles the tile, but its glyph is not the face: the
+ *  tile's own icon is. A look glyph needs a state to switch between. */
 export function stateLook(
   tile: TileConfig | undefined,
   active: boolean,
 ): StateLook {
   if (!tile) return {};
-  if (!tile.active) return tile.look?.inactive ?? {};
+  if (!tile.active) {
+    const rest = { ...(tile.look?.inactive ?? {}) };
+    delete rest.glyph;
+    return rest;
+  }
   return tile.look?.[active ? "active" : "inactive"] ?? {};
 }
 

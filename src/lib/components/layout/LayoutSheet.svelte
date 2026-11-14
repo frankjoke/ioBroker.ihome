@@ -530,15 +530,14 @@
     }
     // The type's glyph is the tile's face even when the headline slot is a
     // value or another slot: the first slot offers it once (S11).
-    const seedIcon = seed.icon;
-    if (seedIcon) {
-      next = editTile(next, anchor, (t) => ({
-        ...t,
-        look: {
-          ...t.look,
-          inactive: { ...t.look?.inactive, glyph: seedIcon },
-        },
-      }));
+    // The main/face icon is a frozen copy: the template's default look when it
+    // has one, else the first slot/type glyph. The slot keeps its own icon, so
+    // editing either never changes the other.
+    const seedMainIcon = seed.look?.inactive?.glyph ?? seed.icon;
+    if (seedMainIcon) {
+      next = editTile(next, anchor, (t) =>
+        t.icon ? t : { ...t, icon: seedMainIcon },
+      );
     }
     next = editTile(next, anchor, (t) => applyTileSeed(t, seed));
     if (slots.length > 1) {

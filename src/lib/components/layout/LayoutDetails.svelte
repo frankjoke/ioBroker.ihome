@@ -1537,7 +1537,8 @@
               {/if}
             </div>
             <p class="note text-muted">
-              The base icon; a glyph in the state look below wins over it.
+              The tile's face. Without an active condition it is the main icon;
+              with one, the state look icons below win. Slot icons are separate.
             </p>
             <div class="look">
               {#each lookStates as state (state)}
@@ -1547,26 +1548,32 @@
                     <span class="look-name"
                       >{activeCond ? state : "default"}</span
                     >
-                    <button
-                      type="button"
-                      class="btn btn-sm glyph-pick"
-                      title={lk.glyph
-                        ? `Glyph: ${iconTitle(lk.glyph)} — click to change`
-                        : defaultGlyph
-                          ? `Default glyph: ${defaultGlyph} — click to change`
-                          : "Choose a glyph"}
-                      onclick={() => (lookIconFor = state)}
-                    >
-                      {#if lk.glyph}
-                        <Icon value={lk.glyph} size={16} />
-                      {:else if defaultGlyph}
-                        <span class="glyph-default"
-                          ><Icon value={defaultGlyph} size={16} /></span
-                        >
-                      {:else}
-                        icon…
-                      {/if}
-                    </button>
+                    {#if activeCond}
+                      <button
+                        type="button"
+                        class="btn btn-sm glyph-pick"
+                        title={lk.glyph
+                          ? `Glyph: ${iconTitle(lk.glyph)} — click to change`
+                          : defaultGlyph
+                            ? `Default glyph: ${defaultGlyph} — click to change`
+                            : "Choose a glyph"}
+                        onclick={() => (lookIconFor = state)}
+                      >
+                        {#if lk.glyph}
+                          <Icon value={lk.glyph} size={16} />
+                        {:else if defaultGlyph}
+                          <span class="glyph-default"
+                            ><Icon value={defaultGlyph} size={16} /></span
+                          >
+                        {:else}
+                          icon…
+                        {/if}
+                      </button>
+                    {:else}
+                      <span class="note text-muted"
+                        >State icons need an active condition.</span
+                      >
+                    {/if}
                     {@render lookColor(
                       "glow",
                       lk.glow,

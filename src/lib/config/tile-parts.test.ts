@@ -656,9 +656,16 @@ it("reads a tile's state look, the inactive one as its default (A71)", () => {
   });
   expect(stateLook(on(), true)).toEqual(look.active);
   expect(stateLook(on(), false)).toEqual(look.inactive);
-  // No condition → the tile is never active, so the inactive look is its own.
+  // No condition → the inactive look still styles the tile, but its glyph is
+  // not the face; the tile's own icon is.
   expect(stateLook({ slots: [], look }, true)).toEqual(look.inactive);
   expect(stateLook({ slots: [], look }, false)).toEqual(look.inactive);
+  const glyphOnly = {
+    inactive: { glyph: "door_locked", color: "#fff" },
+  };
+  expect(stateLook({ slots: [], look: glyphOnly }, true)).toEqual({
+    color: "#fff",
+  });
   expect(stateLook(undefined, true)).toEqual({});
   // The state without its own entry keeps the rules.
   expect(stateLook(on({ look: { active: look.active } }), false)).toEqual({});

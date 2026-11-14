@@ -41,6 +41,20 @@ it("carries the bare-face options into the tile", () => {
   ).toMatchObject({ slots: [], border: false, padding: false });
 });
 
+it("takes the face icon from the template's default look, else the seed", () => {
+  expect(
+    materializedTileConfig({
+      slots: [],
+      icon: "seed",
+      look: {
+        inactive: { glyph: "template_default" },
+        active: { glyph: "template_on" },
+      },
+    }).icon,
+  ).toBe("template_default");
+  expect(materializedTileConfig({ slots: [], icon: "seed" }).icon).toBe("seed");
+});
+
 it("copies label/min/max/step into the slot, not the unit", () => {
   const control = ctl("c1", "brightness", {
     label: "Brightness",
