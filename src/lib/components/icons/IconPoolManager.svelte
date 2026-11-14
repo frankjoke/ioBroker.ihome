@@ -346,15 +346,29 @@
       </button>
       {#if builtin}<span class="badge">built-in</span>{/if}
       {#if entry.group}<span class="badge">{entry.group}</span>{/if}
-      {#if !builtin}
+      {#if !builtin || openId === entry.id}
         <span class="item-actions">
-          <IconButton
-            icon="delete"
-            danger
-            label={`Delete ${entry.name}`}
-            disabled={!writable}
-            onclick={() => (pendingRemove = entry)}
-          />
+          {#if openId === entry.id}
+            <!-- One document: this row's Save writes the whole pool. -->
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              title="Save the whole icon pool"
+              disabled={!dirty || !writable || saving}
+              onclick={save}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          {/if}
+          {#if !builtin}
+            <IconButton
+              icon="delete"
+              danger
+              label={`Delete ${entry.name}`}
+              disabled={!writable}
+              onclick={() => (pendingRemove = entry)}
+            />
+          {/if}
         </span>
       {/if}
     </div>
@@ -482,8 +496,7 @@
         <Icon value="apps" size={18} />
         <span class="name">Icon pool</span>
         <span class="badge">{draft.icons.length} added</span>
-        <!-- UI-DESIGN §5 exception: the pool is one document, so Add/Save live
-             once in the header instead of on each open row. -->
+        <!-- Add stays on the document line; Save lives on the open row (§5). -->
         <span class="item-actions">
           <button
             type="button"
@@ -496,14 +509,6 @@
             }}
           >
             + Icon
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={!dirty || !writable || saving}
-            onclick={save}
-          >
-            {saving ? "Saving…" : "Save"}
           </button>
         </span>
       </div>
