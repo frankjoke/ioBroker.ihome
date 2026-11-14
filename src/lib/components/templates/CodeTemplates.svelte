@@ -3,6 +3,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { BUILTIN_FUNCTIONS } from "$lib/config/function-presets";
   import {
@@ -250,15 +251,21 @@
 
   function confirmDelete() {
     if (!pendingDelete) return;
+    const removed = pendingDelete;
+    const neighbor = nextAfterRemoval(
+      rows,
+      `${removed.kind}:${removed.id}`,
+      (entry) => `${entry.kind}:${entry.id}`,
+    );
     error = "";
-    if (pendingDelete.kind === "formula") {
+    if (removed.kind === "formula") {
       if (!isFormulasWritable()) {
         error =
           "Formula templates could not be loaded — the delete was not saved.";
         pendingDelete = null;
         return;
       }
-      deleteFormula(pendingDelete.id);
+      deleteFormula(removed.id);
       saveFormulas();
     } else {
       if (!isFunctionsWritable()) {
@@ -267,14 +274,12 @@
         pendingDelete = null;
         return;
       }
-      deleteFunction(pendingDelete.id);
+      deleteFunction(removed.id);
       saveFunctions();
     }
-    if (
-      selected?.id === pendingDelete.id &&
-      selected?.kind === pendingDelete.kind
-    ) {
-      closeNow();
+    if (selected?.id === removed.id && selected?.kind === removed.kind) {
+      if (neighbor) start(neighbor);
+      else closeNow();
     }
     pendingDelete = null;
   }

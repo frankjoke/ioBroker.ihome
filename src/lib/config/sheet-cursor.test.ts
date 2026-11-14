@@ -1,5 +1,9 @@
 import { it, expect } from "vitest";
-import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
+import {
+  restoreSelection,
+  sheetCursor,
+  tileLabel,
+} from "$lib/config/sheet-cursor";
 import type { Group, Page, PageRegistry, Placement } from "$lib/types/display";
 
 const placement = (id: string, device = "d1"): Placement => ({
@@ -126,4 +130,44 @@ it("labels a tile name · w×h, degrading to the title and then Tile", () => {
 it("labels a device-less placement and keeps a title over the fallback", () => {
   expect(tileLabel({ id: "t" })).toBe("Tile");
   expect(tileLabel({ id: "t", title: "Frame" })).toBe("Frame");
+});
+
+it("restores the deepest still-existing level of a stored selection", () => {
+  expect(
+    restoreSelection(twoPages(), {
+      kind: "tile",
+      pageId: "rooms",
+      sectionId: "bad",
+      placementId: "t2",
+    }),
+  ).toEqual({
+    kind: "tile",
+    pageId: "rooms",
+    sectionId: "bad",
+    placementId: "t2",
+  });
+  expect(
+    restoreSelection(twoPages(), {
+      kind: "tile",
+      pageId: "rooms",
+      sectionId: "bad",
+      placementId: "gone",
+    }),
+  ).toEqual({ kind: "section", pageId: "rooms", sectionId: "bad" });
+  expect(
+    restoreSelection(twoPages(), {
+      kind: "tile",
+      pageId: "rooms",
+      sectionId: "gone",
+      placementId: "t2",
+    }),
+  ).toEqual({ kind: "page", pageId: "rooms" });
+  expect(
+    restoreSelection(twoPages(), {
+      kind: "tile",
+      pageId: "gone",
+      sectionId: "bad",
+      placementId: "t2",
+    }),
+  ).toBeNull();
 });

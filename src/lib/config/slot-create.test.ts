@@ -1,5 +1,8 @@
 import { it, expect } from "vitest";
 import {
+  applyTileSeed,
+  materializeTemplateTile,
+  materializeTemplateTileFromState,
   preselectedControlIds,
   suggestedSlots,
   slotFromControl,
@@ -10,6 +13,7 @@ import {
 import { PRESETS } from "$lib/config/presets";
 import { labelShown } from "$lib/config/tile-parts";
 import type { Control, Device } from "$lib/types/device";
+import type { Slot, Template } from "$lib/types/display";
 
 const ctl = (
   id: string,
@@ -269,4 +273,275 @@ it("maps widgets to their slot kind", () => {
   expect(slotKindForWidget("enum")).toBe("enum");
   expect(slotKindForWidget("button")).toBe("button");
   expect(slotKindForWidget("value")).toBe("value");
+});
+
+const power = ctl("c-power", "power");
+const brightness = ctl("c-brightness", "brightness");
+const light = device({
+  id: "lamp",
+  name: "Lamp",
+  type: "Light",
+  template: "u",
+  controls: [power, brightness],
+});
+
+const template = {
+  ...PRESETS.Light,
+  id: "u",
+  name: "U",
+  builtin: false,
+  basedOn: "Light",
+  features: PRESETS.Light.features,
+  active: { source: "power", op: "truthy" },
+  look: { active: { glow: "red" } },
+} as Template;
+
+it("materialises feature slots and keeps raw state slots", () => {
+  const render = {
+    ...template,
+    features: [
+      ...PRESETS.Light.features,
+      {
+        feature: "missing",
+        label: "Missing",
+        widget: "value" as const,
+        roleHints: [],
+      },
+    ],
+    slots: [
+      { kind: "switch", source: "power" },
+      { kind: "value", source: { kind: "state", stateId: "hue.0.other" } },
+      { kind: "value", source: "missing" },
+      { kind: "value", source: "hue.0.raw" },
+    ],
+  } as Template;
+  const result = materializeTemplateTile(render, light, [render]);
+  expect(result.slots).toEqual([
+    expect.objectContaining({
+      kind: "switch",
+      source: { kind: "control", device: "lamp", control: "c-power" },
+    }),
+    expect.objectContaining({
+      source: { kind: "state", stateId: "hue.0.other" },
+    }),
+    expect.objectContaining({ source: "hue.0.raw" }),
+  ]);
+});
+
+it("rewrites the active feature and drops an unfilled one", () => {
+  const withBattery = {
+    ...template,
+    features: [
+      ...PRESETS.Light.features,
+      {
+        feature: "battery",
+        label: "Battery",
+        widget: "value" as const,
+        roleHints: ["value.battery"],
+      },
+    ],
+  } as Template;
+  expect(
+    materializeTemplateTile(
+      { ...template, active: { source: "power", op: "truthy" } },
+      light,
+      [template],
+    ).active,
+  ).toEqual({
+    source: { kind: "control", device: "lamp", control: "c-power" },
+    op: "truthy",
+  });
+  expect(
+    materializeTemplateTile(
+      { ...withBattery, active: { source: "battery", op: "lt", value: "20" } },
+      device({ ...light, controls: [power, brightness] }),
+      [withBattery],
+    ).active,
+  ).toBeUndefined();
+});
+
+it("tileSeed carries the template active and look", () => {
+  const slot: Slot = slotFromControl(light, power);
+  const seed = tileSeed([slot], [light], [template]);
+  expect(seed.active).toEqual(expect.objectContaining({ op: "truthy" }));
+  expect(seed.look).toEqual(
+    expect.objectContaining({ active: expect.any(Object) }),
+  );
+});
+
+it("fills active, look and background from the seed without overwriting", () => {
+  const seed = {
+    active: { source: "power", op: "truthy" as const },
+    look: { active: { glow: "red" } },
+    size: { w: 2 as const, h: 2 as const },
+    background: { kind: "solid" as const, value: "#000" },
+  };
+  expect(applyTileSeed({ slots: [] }, seed)).toMatchObject({
+    active: seed.active,
+    look: seed.look,
+    size: seed.size,
+    background: seed.background,
+  });
+  expect(
+    applyTileSeed(
+      {
+        slots: [],
+        active: { source: "x", op: "truthy" },
+        look: { inactive: { glyph: "x" } },
+      },
+      seed,
+    ).active,
+  ).toEqual({ source: "x", op: "truthy" });
+  expect(
+    applyTileSeed(
+      { slots: [], look: { inactive: { glyph: "x" } } },
+      { look: { inactive: { color: "red" } } },
+    ).look?.inactive,
+  ).toEqual({ color: "red", glyph: "x" });
+});
+
+it("binds a switch's ago badge to its main switch", () => {
+  const sw = device({
+    id: "plug",
+    name: "Plug",
+    type: "Switch",
+    controls: [
+      ctl("c-power", "power", { stateId: "shelly.1.plug.Relay0.Switch" }),
+      ctl("c-connected", "connected", {
+        stateId: "shelly.1.plug.available",
+      }),
+    ],
+  });
+  const result = materializeTemplateTile(PRESETS.Switch, sw, [PRESETS.Switch]);
+  const ago = result.slots.find((slot) => slot.source === "ago");
+  expect(ago?.options).toMatchObject({
+    of: "shelly.1.plug.Relay0.Switch",
+    from: "lc",
+  });
+  expect(
+    result.slots.some(
+      (slot) =>
+        slot.options?.derive === "ago" &&
+        typeof slot.source === "object" &&
+        slot.source.kind === "control",
+    ),
+  ).toBe(true);
+  const offline = result.slots.find(
+    (slot) => slot.options?.derive === "ago" && slot.rules?.length,
+  );
+  expect(offline?.rules).toEqual([
+    { when: "!isOnline(connected)", only: true, tone: "danger" },
+  ]);
+});
+
+it("drops a switch's availability badge when there is no connected control", () => {
+  const sw = device({
+    id: "plug2",
+    name: "Plug",
+    type: "Switch",
+    controls: [ctl("c-power", "power", { stateId: "x.Switch" })],
+  });
+  const result = materializeTemplateTile(PRESETS.Switch, sw, [PRESETS.Switch]);
+  expect(result.slots.some((slot) => slot.options?.derive === "ago")).toBe(
+    false,
+  );
+});
+
+it("builds a Light tile from a state without creating a device", () => {
+  const main = {
+    ref: "alias.0.Lamp.SET",
+    stateId: "alias.0.Lamp.SET",
+    object: {
+      type: "state",
+      common: { name: "Lamp", role: "switch.light", type: "boolean" },
+    },
+  };
+  const objects = new Map<string, any>([
+    ["alias.0.Lamp", { type: "channel", common: { name: "Lamp" } }],
+    ["alias.0.Lamp.SET", main.object],
+    [
+      "alias.0.Lamp.brightness",
+      {
+        type: "state",
+        common: {
+          name: "Brightness",
+          role: "level.dimmer",
+          type: "number",
+          min: 0,
+          max: 100,
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.colortemp",
+      {
+        type: "state",
+        common: {
+          name: "Color temperature",
+          role: "level.color.temperature",
+          type: "number",
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.available",
+      {
+        type: "state",
+        common: {
+          name: "Available",
+          role: "indicator.reachable",
+          type: "boolean",
+        },
+      },
+    ],
+  ]);
+  const result = materializeTemplateTileFromState(
+    PRESETS.Light,
+    main,
+    objects,
+    "power",
+  );
+  // The same slots the device tile has: power, dimmer, colour temperature,
+  // ago and availability ago; colour and battery have no state here.
+  expect(result.slots.map((slot) => slot.kind)).toEqual([
+    "switch",
+    "level",
+    "level",
+    "badge",
+    "badge",
+  ]);
+  expect(result.slots[0].source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.SET",
+  });
+  expect(result.slots[2].source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.colortemp",
+  });
+  // The same captions the device tile gets from its feature controls.
+  expect(result.slots.map((slot) => slot.label)).toEqual([
+    "Power",
+    "Brightness",
+    "Color Temp",
+    undefined,
+    "Connected",
+  ]);
+  const ago = result.slots.find((slot) => slot.source === "ago");
+  expect(ago?.options).toMatchObject({
+    of: "alias.0.Lamp.SET",
+    from: "lc",
+  });
+  const offline = result.slots.find((slot) => slot.options?.derive === "ago");
+  expect(offline?.source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.available",
+  });
+  expect(offline?.rules).toEqual([
+    { when: "!isOnline(connected)", only: true, tone: "danger" },
+  ]);
+  expect(result.title).toBe("Lamp");
+  expect(result.active).toMatchObject({
+    source: { kind: "state", stateId: "alias.0.Lamp.SET" },
+    op: "truthy",
+  });
 });

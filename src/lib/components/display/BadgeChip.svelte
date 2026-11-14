@@ -11,6 +11,7 @@
     label,
     tone,
     color,
+    background,
     title,
     value,
     labelHidden,
@@ -19,6 +20,8 @@
     label: string;
     tone?: string;
     color?: string;
+    /** An explicit chip background from a matching rule. */
+    background?: string;
     title?: string;
     /** The raw reading, for an HTML icon's `{{$value}}`. */
     value?: unknown;
@@ -41,7 +44,12 @@
   );
 </script>
 
-<span class="badge {tone}" style:color title={title ?? label}>
+<span
+  class="badge {tone}"
+  style:color
+  style:background-color={background}
+  title={title ?? label}
+>
   {#if icon}
     {#if isHtmlIcon(icon)}
       <Icon

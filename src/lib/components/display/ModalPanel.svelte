@@ -85,6 +85,7 @@
               label={b.label}
               tone={b.tone}
               color={b.color}
+              background={b.background}
               title={b.title}
             />
           {/each}

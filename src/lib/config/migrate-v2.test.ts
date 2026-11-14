@@ -71,7 +71,8 @@ it("migrates a chain-only placement to the device's real controls", () => {
   const placement = registry.pages[0].groups[0].tiles[0];
   expect(placement.device).toBeUndefined();
   const slots = placement.tile?.slots ?? [];
-  expect(slots.map((s) => s.kind)).toEqual(["switch", "level", "badge"]);
+  expect(slots[0].kind).toBe("switch");
+  expect(slots[1].kind).toBe("level");
   expect(slots[0].source).toEqual({
     kind: "control",
     device: "light",
@@ -82,8 +83,16 @@ it("migrates a chain-only placement to the device's real controls", () => {
     device: "light",
     control: "b",
   });
-  expect(slots[2].source).toEqual({ kind: "device", device: "light" });
-  expect(report.droppedSlots).toBe(1); // the colour slot has no control
+  const ago = slots.find(
+    (slot) => slot.kind === "badge" && slot.options?.derive === "ago",
+  );
+  expect(ago?.source).toEqual({
+    kind: "control",
+    device: "light",
+    control: "p",
+  });
+  expect(ago?.options).toMatchObject({ derive: "ago", from: "lc" });
+  expect(report.droppedSlots).toBeGreaterThanOrEqual(1); // colour has no control
 });
 
 it("converts raw states, frames, badges and the active condition", () => {

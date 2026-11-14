@@ -61,6 +61,25 @@
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
+  import SaveTemplateModal from "$lib/components/templates/SaveTemplateModal.svelte";
+  import ApplyTemplateModal from "$lib/components/templates/ApplyTemplateModal.svelte";
+  import {
+    collectTileTemplate,
+    inferTemplateType,
+  } from "$lib/config/tile-template";
+  import {
+    materializeTemplateTile,
+    materializeTemplateTileFromState,
+    materializedTileConfig,
+  } from "$lib/config/slot-create";
+  import { PRESETS } from "$lib/config/presets";
+  import { visualTemplateProblem } from "$lib/config/visual-templates";
+  import {
+    commitTemplates,
+    getTemplateRegistry,
+    isTemplatesWritable,
+  } from "$lib/stores/templates.svelte";
+  import { newId } from "$lib/utils/ids";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
@@ -78,9 +97,10 @@
     SlotSpark,
     SlotTile,
     StateLook,
+    Template,
     TileConfig,
   } from "$lib/types/display";
-  import type { EnrichedDevice } from "$lib/types/device";
+  import type { DeviceType, EnrichedDevice } from "$lib/types/device";
   import type { Snippet } from "svelte";
 
   let {
@@ -164,6 +184,12 @@
   let tileIconPicker = $state(false);
   /** The slot whose trash button was pressed; the modal decides. */
   let pendingSlotDelete = $state<number | null>(null);
+  /** Save/apply a template from the Slots line. */
+  let saveTemplateOpen = $state(false);
+  let saveTemplateError = $state("");
+  let saveTemplateNote = $state("");
+  let applyTemplateOpen = $state(false);
+  let applyTemplateError = $state("");
   const bp = $derived(breakpointFor(width));
   const def = $derived(
     BREAKPOINTS.find((b) => b.name === bp) ?? BREAKPOINTS[0],
@@ -495,6 +521,107 @@
     );
   }
 
+  const allTemplates = $derived([
+    ...Object.values(PRESETS),
+    ...(getTemplateRegistry().templates ?? []),
+  ]);
+  const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
+  const tileTemplateName = $derived(
+    `${tile?.title || device?.name || "Tile"} template`,
+  );
+
+  /** The source a template materialises against: the tile's active source,
+   *  else its first bound slot. */
+  function templateAnchor(config: TileConfig): SlotSource | undefined {
+    const active = config.active?.source;
+    if (active && typeof active === "object") return active;
+    for (const slot of config.slots ?? []) {
+      if (slot.source && typeof slot.source === "object") return slot.source;
+    }
+    return undefined;
+  }
+
+  function saveTileTemplate(name: string, type: DeviceType): void {
+    saveTemplateError = "";
+    const config = tile?.tile;
+    if (!config) return;
+    const result = collectTileTemplate(config, {
+      id: newId(),
+      name,
+      type,
+      look: sourceLook,
+    });
+    if (result.template.features.length === 0) {
+      saveTemplateError = "No slot in this tile maps to a known feature.";
+      return;
+    }
+    const templateRegistry = getTemplateRegistry();
+    const problem = visualTemplateProblem(
+      result.template,
+      (templateRegistry.templates ?? []).map((template) => template.id),
+    );
+    if (problem) {
+      saveTemplateError = problem;
+      return;
+    }
+    if (
+      !isTemplatesWritable() ||
+      !commitTemplates({
+        ...templateRegistry,
+        templates: [...(templateRegistry.templates ?? []), result.template],
+      })
+    ) {
+      saveTemplateError = "The template document could not be saved.";
+      return;
+    }
+    saveTemplateOpen = false;
+    saveTemplateNote = `Saved “${name}”${
+      result.omitted ? ` — ${result.omitted} slot(s) left out` : ""
+    }.`;
+  }
+
+  function applyTemplate(template: Template): void {
+    applyTemplateError = "";
+    const config = tile?.tile;
+    if (!config) return;
+    const anchor = templateAnchor(config);
+    if (!anchor) {
+      applyTemplateError =
+        "This tile has no state or device to anchor the template.";
+      return;
+    }
+    let materialized;
+    if (anchor.kind === "state") {
+      const resolved = resolveSlotSource(anchor, sourceLook);
+      if (!resolved?.stateId || !resolved.object) {
+        applyTemplateError = "The tile's source state is gone.";
+        return;
+      }
+      materialized = materializeTemplateTileFromState(
+        template,
+        {
+          ref: anchor.stateId,
+          stateId: resolved.stateId,
+          object: resolved.object,
+        },
+        sourceLook.objects,
+      );
+    } else {
+      const target = devices.find((entry) => entry.id === anchor.device);
+      if (!target) {
+        applyTemplateError = "The tile's device is gone.";
+        return;
+      }
+      materialized = materializeTemplateTile(template, target, allTemplates);
+    }
+    if (materialized.slots.length === 0) {
+      applyTemplateError = `“${template.name}” fits no source on this tile.`;
+      return;
+    }
+    edit(() => materializedTileConfig(materialized));
+    applyTemplateOpen = false;
+  }
+
   /** This tile's address, or null when the selection drifted (deleted tile). */
   function anchor(): PlacementAnchor | null {
     if (!page || !section || !tile) return null;
@@ -674,6 +801,22 @@
     const source = slot.source;
     if (!source) return true;
     if (typeof source === "string") {
+      // The derived ago/offline badges name their source in `options.of` (or
+      // fall back to the tile's own controls), not in the slot source.
+      if (source === "ago" || source === "offline") {
+        const of = typeof slot.options?.of === "string" ? slot.options.of : "";
+        if (!of) return (device?.controls ?? []).length === 0;
+        const id = stateIdFor(of, getVariables());
+        return (
+          !sourceLook.objects.get(id) &&
+          !sourceLook.states.get(id) &&
+          !devices.some((d) =>
+            (d.controls ?? []).some(
+              (c) => c.id === of || c.stateId === of || c.feature === of,
+            ),
+          )
+        );
+      }
       const id = stateIdFor(source, getVariables());
       return (
         !devices.some((d) =>
@@ -1403,6 +1546,33 @@
       <div class="row between">
         <span class="label-mono">Slots ({shownSlots.length})</span>
         <span class="row-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            title="Save this tile as a template"
+            aria-label="Save this tile as a template"
+            disabled={!tile?.tile?.slots?.length}
+            onclick={() => {
+              saveTemplateError = "";
+              saveTemplateNote = "";
+              saveTemplateOpen = true;
+            }}
+          >
+            <span class="material-symbols-outlined">save</span>
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
+            title="Apply a template to this tile"
+            aria-label="Apply a template to this tile"
+            disabled={!tile?.tile?.slots?.length}
+            onclick={() => {
+              applyTemplateError = "";
+              applyTemplateOpen = true;
+            }}
+          >
+            <span class="material-symbols-outlined">folder_open</span>
+          </button>
           <!-- The detail page's eye (A47) rides the slots line: it shows the page
                over the display and never asks for the PIN; it dims when nothing of
                this tile lives in the detail page. -->
@@ -1435,6 +1605,9 @@
           </button>
         </span>
       </div>
+      {#if saveTemplateNote}
+        <p class="note text-muted">{saveTemplateNote}</p>
+      {/if}
       <div class="slot-list">
         {#each shownSlots as slot, i (i)}
           <div
@@ -2389,6 +2562,20 @@
                                     }),
                                   )}
                               />
+                              <input
+                                type="color"
+                                class="color-input"
+                                aria-label="Rule background colour"
+                                value={isHexColor(rule.background)
+                                  ? rule.background
+                                  : "#000000"}
+                                oninput={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      background: e.currentTarget.value,
+                                    }),
+                                  )}
+                              />
                             </label>
                             <label class="small">
                               <span class="label-mono">tone</span>
@@ -2422,6 +2609,23 @@
     </div>
   {/if}
 
+  {#if saveTemplateOpen && tile?.tile}
+    <SaveTemplateModal
+      suggestedName={tileTemplateName}
+      suggestedType={tileTemplateType}
+      error={saveTemplateError}
+      onSave={saveTileTemplate}
+      onClose={() => (saveTemplateOpen = false)}
+    />
+  {/if}
+  {#if applyTemplateOpen && tile?.tile}
+    <ApplyTemplateModal
+      templates={allTemplates}
+      error={applyTemplateError}
+      onPick={applyTemplate}
+      onClose={() => (applyTemplateOpen = false)}
+    />
+  {/if}
   {#if iconPicker}
     <IconPicker
       icon={iconPicker === "page" ? page?.icon : section?.icon}

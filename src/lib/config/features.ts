@@ -22,6 +22,8 @@ export interface FeatureDef {
   roleHints: string[];
   /** A template may insist a device of its type supplies this feature. */
   required?: boolean;
+  /** The feature whose state is picked first when a template creates a device. */
+  primary?: boolean;
 }
 
 export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
@@ -30,7 +32,8 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "power",
       label: "Power",
       widget: "switch",
-      roleHints: ["switch", "power"],
+      roleHints: ["switch.light", "switch", "power"],
+      primary: true,
     },
   ],
   Button: [
@@ -39,6 +42,7 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       label: "Press",
       widget: "button",
       roleHints: ["button"],
+      primary: true,
     },
   ],
   Light: [
@@ -46,25 +50,26 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "power",
       label: "Power",
       widget: "switch",
-      roleHints: ["switch", "power"],
+      roleHints: ["switch.light", "switch", "power"],
+      primary: true,
     },
     {
       feature: "brightness",
       label: "Brightness",
       widget: "level",
-      roleHints: ["level", "dimmer", "brightness"],
+      roleHints: ["level.dimmer", "level.brightness", "dimmer", "brightness"],
     },
     {
       feature: "color",
       label: "Color",
       widget: "color",
-      roleHints: ["color", "hue", "rgb"],
+      roleHints: ["level.color.rgb", "level.color", "color", "hue", "rgb"],
     },
     {
       feature: "colorTemp",
       label: "Color Temp",
       widget: "level",
-      roleHints: ["colortemp", "color.temperature"],
+      roleHints: ["level.color.temperature", "colortemp", "color.temperature"],
     },
   ],
   Thermostat: [
@@ -72,13 +77,14 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "actual",
       label: "Actual",
       widget: "value",
-      roleHints: ["temperature", "value.temperature"],
+      roleHints: ["value.temperature", "temperature"],
     },
     {
       feature: "setpoint",
       label: "Setpoint",
       widget: "level",
-      roleHints: ["setpoint", "level.temperature"],
+      roleHints: ["level.temperature", "setpoint"],
+      primary: true,
     },
     {
       feature: "mode",
@@ -140,13 +146,14 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       feature: "temperature",
       label: "Temperature",
       widget: "value",
-      roleHints: ["temperature", "value.temperature"],
+      roleHints: ["value.temperature", "temperature"],
+      primary: true,
     },
     {
       feature: "humidity",
       label: "Humidity",
       widget: "value",
-      roleHints: ["humidity", "value.humidity"],
+      roleHints: ["value.humidity", "humidity"],
     },
   ],
   Motion: [
@@ -155,6 +162,7 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
       label: "Motion",
       widget: "switch",
       roleHints: ["motion"],
+      primary: true,
     },
   ],
   Meter: [
@@ -219,6 +227,42 @@ export const DEVICE_FEATURES: Record<DeviceType, FeatureDef[]> = {
     },
   ],
 };
+
+/** Features a template can add beyond its type baseline. */
+export const COMMON_FEATURES: readonly FeatureDef[] = [
+  {
+    feature: "battery",
+    label: "Battery",
+    widget: "value",
+    roleHints: ["value.battery", "indicator.lowbat", "battery"],
+  },
+  {
+    feature: "connected",
+    label: "Connected",
+    widget: "value",
+    roleHints: [
+      "indicator.connected",
+      "indicator.reachable",
+      "indicator.state",
+      "connected",
+    ],
+  },
+];
+
+/** The type's known features plus the common extras, deduplicated. */
+export function featureCatalog(type: DeviceType): FeatureDef[] {
+  const out: FeatureDef[] = [];
+  const seen = new Set<string>();
+  for (const feature of [
+    ...(DEVICE_FEATURES[type] ?? []),
+    ...COMMON_FEATURES,
+  ]) {
+    if (seen.has(feature.feature)) continue;
+    seen.add(feature.feature);
+    out.push(feature);
+  }
+  return out;
+}
 
 export function featureDef(
   deviceType: DeviceType,

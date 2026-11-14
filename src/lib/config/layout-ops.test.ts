@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   addPage,
   addSection,
+  appendPlacement,
   appendTile,
   deletePage,
   deletePlacement,
@@ -109,6 +110,24 @@ it("appends a tile with its first slot, at the given index", () => {
   const top = appendTile(regWithTiles(), "p", "g", slot, 0);
   expect(top.pages[0].groups[0].tiles?.[0].tile?.slots).toEqual([slot]);
   expect(top.pages[0].groups[0].tiles?.[1].id).toBe("g-t0");
+});
+
+it("appends a complete placement at the requested index", () => {
+  const placement = {
+    id: "p2",
+    title: "Lamp",
+    tile: {
+      slots: [
+        {
+          kind: "value" as const,
+          source: { kind: "state" as const, stateId: "x" },
+        },
+      ],
+    },
+  };
+  const next = appendPlacement(regWithTiles(), "p", "g", placement, 0);
+  expect(next.pages[0].groups[0].tiles?.[0]).toEqual(placement);
+  expect(next.pages[0].groups[0].tiles?.[1].id).toBe("g-t0");
 });
 
 it("moves a placement between sections", () => {

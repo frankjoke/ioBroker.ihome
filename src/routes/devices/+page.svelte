@@ -20,6 +20,7 @@
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import {
     roomList,
@@ -228,11 +229,22 @@
 
   function confirmDelete() {
     const d = pendingDelete;
-    // The pages keep their tiles: a slot whose device is gone shows
-    // unavailable, and returns when a device with the same id is added back.
-    if (d) commit(devices.filter((x) => x.id !== d.id));
     pendingDelete = null;
     pendingSlots = 0;
+    if (!d) return;
+    const neighbor = nextAfterRemoval(
+      sortedDevices,
+      d.id,
+      (device) => device.id,
+    );
+    const wasEditing = editing?.id === d.id;
+    // The pages keep their tiles: a slot whose device is gone shows
+    // unavailable, and returns when a device with the same id is added back.
+    commit(devices.filter((x) => x.id !== d.id));
+    if (wasEditing) {
+      if (neighbor) editDevice(neighbor);
+      else onCancel();
+    }
   }
 
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect

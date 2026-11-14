@@ -137,7 +137,11 @@ export function widgetForMeta(meta: ControlMeta, fallback?: Widget): Widget {
   const role = String(meta.role ?? "");
   const type = String(meta.type ?? "");
   if (/switch/i.test(role)) return "switch";
-  if (/color/i.test(role) || type === "color") return "color";
+  // A numeric colour role (level.color.temperature) is a slider; only a
+  // colour-typed state (or a non-numeric colour role such as rgb) is a picker.
+  if (type === "color" || (/color/i.test(role) && type !== "number")) {
+    return "color";
+  }
   if (/button|press/i.test(role)) return "button";
   if (
     type === "number" &&

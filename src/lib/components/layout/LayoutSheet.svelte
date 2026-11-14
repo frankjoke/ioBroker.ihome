@@ -8,10 +8,12 @@
   import MoveSectionModal from "$lib/components/layout/MoveSectionModal.svelte";
   import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import TemplateSuggestionModal from "$lib/components/templates/TemplateSuggestionModal.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
     addPage,
     addSection,
+    appendPlacement,
     appendTile,
     deletePage,
     deletePlacement,
@@ -32,8 +34,37 @@
     editTile,
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
-  import { tileSeed } from "$lib/config/slot-create";
-  import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
+  import { templateById } from "$lib/config/template-ops";
+  import {
+    applyTileSeed,
+    materializeTemplateTile,
+    materializeTemplateTileFromState,
+    materializedTileConfig,
+    slotFromControl,
+    slotFromState,
+    slotKindForWidget,
+    tileSeed,
+  } from "$lib/config/slot-create";
+  import { widgetForState } from "$lib/config/slot-source";
+  import {
+    resolveTemplateReference,
+    type TemplateReference,
+  } from "$lib/config/template-reference";
+  import {
+    suggestTemplatesForState,
+    type TemplateSuggestion,
+  } from "$lib/config/template-suggest";
+  import { PRESETS } from "$lib/config/presets";
+  import { getLogicDocument } from "$lib/stores/logics.svelte";
+  import { getVariables } from "$lib/stores/variables.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { newId } from "$lib/utils/ids";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
+  import {
+    sheetCursor,
+    restoreSelection,
+    tileLabel,
+  } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -43,7 +74,10 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
-  import type { PageRegistry, Slot } from "$lib/types/display";
+  import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
+  import type { PageRegistry, Placement, Slot } from "$lib/types/display";
+  import type { Device } from "$lib/types/device";
+  import type { Template } from "$lib/types/display";
 
   let {
     pageId = "",
@@ -60,6 +94,11 @@
   } = $props();
 
   let selection = $state<LayoutSelection | null>(sheet.selection);
+  /** Read before the save effect can overwrite it with the display's page. */
+  const rememberedSelection = readLastLayout();
+  /** While a remembered/requested target is being applied, the display page
+   *  must not pull the cursor back to the page it was on. */
+  let restoring = $state(!!(sheet.selection ?? rememberedSelection));
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** The '+' asks for a name first; nothing is created until it is submitted. */
   let pendingCreate = $state<
@@ -71,6 +110,14 @@
     | { kind: "newTile"; pageId: string; sectionId: string; at?: number }
     | null
   >(null);
+  let pendingTileState = $state<{
+    reference: TemplateReference;
+    suggestions: TemplateSuggestion[];
+    pageId: string;
+    sectionId: string;
+    at?: number;
+  } | null>(null);
+  let actionError = $state("");
 
   const registry = $derived(getPageRegistry());
   const devices = $derived($devicesEnrichedStore);
@@ -78,6 +125,10 @@
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
+  const allTemplates = $derived([
+    ...Object.values(PRESETS),
+    ...(getTemplateRegistry().templates ?? []),
+  ]);
 
   // ------------------------------------------------ the drill-down (spike B)
   // Page → section → the section's tiles. The selection leads: the selectors
@@ -111,15 +162,23 @@
   // A page change (here or in the app bar) moves the cursor with it — but only
   // when the selection is on another page, so a handoff that set both survives.
   $effect(() => {
+    if (restoring) return;
     if (selection?.pageId !== pageId) {
       selection = { kind: "page", pageId };
     }
   });
 
+  // The restored target is in place once the display has moved to its page.
+  $effect(() => {
+    if (restoring && selection?.pageId === pageId) restoring = false;
+  });
+
   // The eye/pencil toggle unmounts the sheet: remember the cursor so the
   // return lands on the tile that was being edited, not the page's first tile.
+  // The browser copy survives a reload.
   $effect(() => {
     sheet.selection = selection;
+    if (selection?.pageId) writeLastLayout(selection);
   });
 
   // A click in the display points the cursor at its tile (A48). The page moves
@@ -246,12 +305,24 @@
   }
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
-  // click): select it, so the drill-down opens on what was clicked.
+  // click): select it, so the drill-down opens on what was clicked. Otherwise
+  // resume the last edited node — even after a reload, and even on another page.
   onMount(() => {
     const requested = takeRequestedLayout();
     if (requested) {
       onPage(requested.pageId);
       selection = requested;
+    } else {
+      const remembered = sheet.selection ?? rememberedSelection;
+      const restored = remembered
+        ? restoreSelection(registry, remembered)
+        : null;
+      if (restored) {
+        if (restored.pageId !== pageId) onPage(restored.pageId);
+        selection = restored;
+      } else {
+        restoring = false;
+      }
     }
     const onResize = () => (previewBp = breakpointFor(window.innerWidth));
     onResize();
@@ -269,6 +340,122 @@
   function openNewTile(pageId: string, sectionId: string, at?: number): void {
     if (!pageId || !sectionId) return;
     pickerFor = { kind: "newTile", pageId, sectionId, at };
+  }
+
+  function createBlankTile(
+    pageId: string,
+    sectionId: string,
+    reference: TemplateReference,
+    at?: number,
+  ): void {
+    const kind = slotKindForWidget(widgetForState(reference.object));
+    addTileWith(
+      pageId,
+      sectionId,
+      [slotFromState(reference.ref, reference.object, kind)],
+      at,
+    );
+  }
+
+  function onTileStatePicked(id: string, object: any): void {
+    const target = pickerFor;
+    if (!target || target.kind !== "newTile") return;
+    if (!writable) {
+      actionError = "The page document is not editable — nothing was created.";
+      return;
+    }
+    const resolved = resolveTemplateReference(
+      id,
+      ioBroker.objects as Map<string, any>,
+      getVariables(),
+    );
+    pickerFor = null;
+    actionError = "";
+    if ("problem" in resolved) {
+      actionError = resolved.problem;
+      return;
+    }
+    const reference = resolved.reference;
+    const suggestions = suggestTemplatesForState(reference, allTemplates);
+    if (suggestions.length === 0) {
+      createBlankTile(target.pageId, target.sectionId, reference, target.at);
+      return;
+    }
+    pendingTileState = {
+      reference,
+      suggestions,
+      pageId: target.pageId,
+      sectionId: target.sectionId,
+      at: target.at,
+    };
+  }
+
+  function commitMaterializedTile(
+    pageId: string,
+    sectionId: string,
+    materialized: ReturnType<typeof materializeTemplateTile>,
+    at?: number,
+  ): void {
+    const tile = materializedTileConfig(materialized);
+    const placement: Placement = {
+      id: newId(),
+      ...(materialized.title ? { title: materialized.title } : {}),
+      tile,
+    };
+    if (
+      !commitLayout(appendPlacement(registry, pageId, sectionId, placement, at))
+    ) {
+      actionError = "The tile was created but the page could not be saved.";
+      return;
+    }
+    pickerFor = null;
+    selection = { kind: "tile", pageId, sectionId, placementId: placement.id };
+  }
+
+  function addMaterializedTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    device: Device,
+    at?: number,
+  ): void {
+    const materialized = materializeTemplateTile(
+      template,
+      device,
+      getTemplateRegistry().templates ?? [],
+    );
+    if (materialized.slots.length === 0) {
+      const primary = device.controls?.[0];
+      if (primary) materialized.slots = [slotFromControl(device, primary)];
+    }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
+  }
+
+  /** A tile picked for a state: no device is created, only the tile. */
+  function addStateTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    reference: TemplateReference,
+    anchorFeature: string | undefined,
+    at?: number,
+  ): void {
+    const materialized = materializeTemplateTileFromState(
+      template,
+      reference,
+      ioBroker.objects as Map<string, any>,
+      anchorFeature,
+    );
+    if (materialized.slots.length === 0) {
+      materialized.slots = [
+        slotFromState(
+          reference.ref,
+          reference.object,
+          slotKindForWidget(widgetForState(reference.object)),
+        ),
+      ];
+    }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
   function addSlotsTo(
@@ -300,6 +487,18 @@
     at?: number,
   ): void {
     if (!slots.length) return;
+    const source = slots[0]?.source;
+    const device =
+      source && typeof source === "object" && source.kind === "control"
+        ? devices.find((entry) => entry.id === source.device)
+        : undefined;
+    const template = device?.template
+      ? templateById(device.template, getTemplateRegistry().templates ?? [])
+      : undefined;
+    if (device && template) {
+      addMaterializedTile(pageId, sectionId, template, device, at);
+      return;
+    }
     const sectionIn = (reg: PageRegistry) =>
       reg.pages
         .find((p) => p.id === pageId)
@@ -341,6 +540,7 @@
         },
       }));
     }
+    next = editTile(next, anchor, (t) => applyTileSeed(t, seed));
     if (slots.length > 1) {
       next = editTile(next, { pageId, sectionId, placementId: added.id }, (t) =>
         slots
@@ -361,18 +561,67 @@
     pendingDelete = null;
     if (!target) return;
     if (target.kind === "page") {
-      commitLayout(deletePage(registry, target.pageId));
-    } else if (target.kind === "section") {
-      commitLayout(deleteSection(registry, target.pageId, target.sectionId));
-    } else if (target.kind === "tile") {
-      commitLayout(
-        deletePlacement(
-          registry,
-          target.pageId,
-          target.sectionId,
-          target.placementId,
-        ),
+      const neighbor = nextAfterRemoval(
+        registry.pages,
+        target.pageId,
+        (page) => page.id,
       );
+      if (!commitLayout(deletePage(registry, target.pageId))) return;
+      if (!neighbor) return;
+      onPage(neighbor.id);
+      selection = { kind: "page", pageId: neighbor.id };
+    } else if (target.kind === "section") {
+      const page = registry.pages.find((p) => p.id === target.pageId);
+      const neighbor = nextAfterRemoval(
+        page?.groups ?? [],
+        target.sectionId,
+        (group) => group.id,
+      );
+      if (
+        !commitLayout(deleteSection(registry, target.pageId, target.sectionId))
+      ) {
+        return;
+      }
+      selection = neighbor
+        ? {
+            kind: "section",
+            pageId: target.pageId,
+            sectionId: neighbor.id,
+          }
+        : { kind: "page", pageId: target.pageId };
+    } else if (target.kind === "tile") {
+      const section = registry.pages
+        .find((p) => p.id === target.pageId)
+        ?.groups.find((g) => g.id === target.sectionId);
+      const neighbor = nextAfterRemoval(
+        section?.tiles ?? [],
+        target.placementId,
+        (tile) => tile.id,
+      );
+      if (
+        !commitLayout(
+          deletePlacement(
+            registry,
+            target.pageId,
+            target.sectionId,
+            target.placementId,
+          ),
+        )
+      ) {
+        return;
+      }
+      selection = neighbor
+        ? {
+            kind: "tile",
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+            placementId: neighbor.id,
+          }
+        : {
+            kind: "section",
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+          };
     }
   }
 
@@ -397,6 +646,9 @@
 </script>
 
 <aside class="sheet" aria-label="Layout editor">
+  {#if actionError}
+    <p class="text-danger hint">{actionError}</p>
+  {/if}
   {#if saveFailed || !writable || registry.pages.length === 0}
     <header class="sheet-head">
       {#if saveFailed}
@@ -738,6 +990,10 @@
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
     showBadge={target.kind !== "newTile"}
+    logics={getLogicDocument().logics}
+    logicPick="state"
+    suggestTemplates={target.kind === "newTile"}
+    onStatePicked={onTileStatePicked}
     onSlots={(slots) => {
       // Snapshot before closing: `target` reads the reactive value, which
       // becomes null the moment `pickerFor` is cleared.
@@ -748,6 +1004,36 @@
       }
     }}
     onClose={() => (pickerFor = null)}
+  />
+{/if}
+
+{#if pendingTileState}
+  <TemplateSuggestionModal
+    state={pendingTileState.reference}
+    templates={allTemplates}
+    onPick={(template, feature) => {
+      const target = pendingTileState!;
+      addStateTile(
+        target.pageId,
+        target.sectionId,
+        template,
+        target.reference,
+        feature.feature,
+        target.at,
+      );
+      pendingTileState = null;
+    }}
+    onBlank={() => {
+      const target = pendingTileState!;
+      createBlankTile(
+        target.pageId,
+        target.sectionId,
+        target.reference,
+        target.at,
+      );
+      pendingTileState = null;
+    }}
+    onClose={() => (pendingTileState = null)}
   />
 {/if}
 

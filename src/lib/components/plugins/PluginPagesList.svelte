@@ -7,6 +7,7 @@
   import NameModal from "$lib/components/common/NameModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { newId } from "$lib/utils/ids";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
   import {
@@ -157,17 +158,22 @@
     if (!pendingDelete) return;
     const page = pendingDelete;
     pendingDelete = null;
+    const neighbor = nextAfterRemoval(pages, page.id, (entry) => entry.id);
+    const wasSelected = selectedId === page.id;
     const ok = commitPluginPages({
       ...getPluginPages(),
       pages: pages.filter((entry) => entry.id !== page.id),
     });
+    if (ok && wasSelected) {
+      if (neighbor) select(neighbor);
+      else {
+        selectedId = "";
+        draft = null;
+        saved = null;
+      }
+    }
     message = ok ? "Deleted." : "Not deleted — the page list is unreadable.";
     messageError = !ok;
-    if (ok && selectedId === page.id) {
-      selectedId = "";
-      draft = null;
-      saved = null;
-    }
   }
 
   function add(title: string) {

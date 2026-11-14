@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { isRegistryWritable } from "$lib/registry.svelte.js";
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
@@ -39,6 +41,7 @@
   import BundleEditor from "./BundleEditor.svelte";
   import BundleApplyModal from "./BundleApplyModal.svelte";
   import DeviceApplyModal from "./DeviceApplyModal.svelte";
+  import DeviceCreateModal from "./DeviceCreateModal.svelte";
   import LogicApplyModal from "./LogicApplyModal.svelte";
   import HelpSection from "./HelpSection.svelte";
   import { exportTemplate } from "$lib/template-export";
@@ -75,6 +78,7 @@
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
   let deviceApplyTemplate = $state<Template | null>(null);
+  let deviceCreateTemplate = $state<Template | null>(null);
   let logicApplyTemplate = $state<LogicTemplate | null>(null);
   let bundleApplyTemplate = $state<TemplateBundle | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
@@ -134,6 +138,7 @@
         ? isTemplateBundlesWritable()
         : isLogicsWritable(),
   );
+  const deviceWritable = $derived(isRegistryWritable());
   const blocked = $derived(
     selected?.kind === "logic" || selected?.kind === "api"
       ? logicBlocked()
@@ -167,6 +172,12 @@
   });
 
   function badge(entry: TemplateEntry): string {
+    if (entry.kind === "device") {
+      const definition = definitionFor(entry);
+      const type =
+        definition && "type" in definition ? String(definition.type) : "";
+      return type ? `Device · ${type}` : "Device";
+    }
     if (entry.kind === "api") return "Logic + Device (API)";
     if (entry.kind === "bundle") {
       return (
@@ -177,7 +188,7 @@
           .join(" + ") || "Bundle"
       );
     }
-    return entry.kind === "device" ? "Device" : "Logic";
+    return "Logic";
   }
 
   function typeIcon(entry: TemplateEntry): string {
@@ -228,6 +239,11 @@
   function openDeviceApply(entry: TemplateEntry) {
     const definition = definitionFor(entry);
     if (definition) deviceApplyTemplate = definition as Template;
+  }
+
+  function openDeviceCreate(entry: TemplateEntry) {
+    const definition = definitionFor(entry);
+    if (definition) deviceCreateTemplate = definition as Template;
   }
 
   function openLogicApply(entry: TemplateEntry) {
@@ -494,6 +510,11 @@
     const entry = pendingDelete;
     pendingDelete = null;
     if (entry.builtin) return;
+    const neighbor = nextAfterRemoval(
+      rows,
+      `${entry.kind}:${entry.id}`,
+      (item) => `${item.kind}:${item.id}`,
+    );
     if (entry.kind === "device") {
       if (
         !commitTemplates({
@@ -547,7 +568,8 @@
     }
     if (selected?.kind === entry.kind && selected?.id === entry.id) {
       bundleDraft = null;
-      closeNow();
+      if (neighbor) start(neighbor);
+      else closeNow();
     }
   }
 </script>
@@ -598,7 +620,22 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={editorDirty || !applyWritable || blocked}
+                    disabled={editorDirty ||
+                      !applyWritable ||
+                      blocked ||
+                      !deviceWritable}
+                    onclick={() => openDeviceCreate(entry)}
+                  >
+                    <span class="material-symbols-outlined">add</span>
+                    New device
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    disabled={editorDirty ||
+                      !applyWritable ||
+                      blocked ||
+                      !deviceWritable}
                     onclick={() => openDeviceApply(entry)}
                   >
                     <span class="material-symbols-outlined">play_arrow</span>
@@ -720,6 +757,13 @@
         askSwitch = false;
         pendingAction = null;
       }}
+    />
+  {/if}
+
+  {#if deviceCreateTemplate}
+    <DeviceCreateModal
+      template={deviceCreateTemplate}
+      onClose={() => (deviceCreateTemplate = null)}
     />
   {/if}
 

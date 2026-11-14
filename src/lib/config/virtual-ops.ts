@@ -32,6 +32,7 @@ const HELPER_NAMES = [
   "all",
   "get",
   "device",
+  "isOnline",
 ];
 
 /** Words that cannot be a function parameter name (incl. strict-mode extras). */

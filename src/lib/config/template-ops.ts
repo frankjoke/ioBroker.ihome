@@ -1,6 +1,13 @@
 import type { Device, DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
-import type { Size, Slot, Template } from "$lib/types/display";
+import type {
+  ActiveCondition,
+  Background,
+  Size,
+  Slot,
+  Template,
+  TileLook,
+} from "$lib/types/display";
 import type { TemplateRegistry } from "$lib/types/display";
 import { PRESETS } from "$lib/config/presets";
 import {
@@ -20,6 +27,21 @@ export interface ResolvedTemplate {
   size: Size;
   features: FeatureDef[];
   slots: Slot[];
+  active?: ActiveCondition;
+  look?: TileLook;
+  background?: Background;
+}
+
+/** A template's control schema: its own features, else the type preset's. */
+export function templateFeatures(template: Template): FeatureDef[] {
+  return template.features?.length
+    ? template.features
+    : presetForType(template.type).features;
+}
+
+/** The feature whose state is picked first; old templates use the first. */
+export function primaryFeature(features: FeatureDef[]): FeatureDef | undefined {
+  return features.find((feature) => feature.primary === true) ?? features[0];
 }
 
 /**
@@ -130,6 +152,9 @@ export function resolveTemplate(
       feedable(user?.slots, device),
       device.slots ?? [],
     ]),
+    active: user?.active ?? base.active,
+    look: user?.look ?? base.look,
+    background: user?.background ?? base.background,
   };
 }
 

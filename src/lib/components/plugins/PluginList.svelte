@@ -8,6 +8,7 @@
   import { downloadJson } from "$lib/utils/download";
   import { slugify } from "$lib/config/slug";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { adapterIcon } from "$lib/config/icon-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import type { PluginView } from "$adapter/plugin-admin";
@@ -97,10 +98,14 @@
     const plugin = pendingDelete;
     pendingDelete = null;
     rowError = "";
+    const neighbor = nextAfterRemoval(plugins, plugin.id, (item) => item.id);
+    const wasSelected = selectedId === plugin.id;
     try {
       await deletePlugin(plugin.id);
-      selectedId = "";
-      resetDraft();
+      if (wasSelected) {
+        selectedId = neighbor?.id ?? "";
+        resetDraft();
+      }
     } catch (failure) {
       rowError = failure instanceof Error ? failure.message : String(failure);
     }

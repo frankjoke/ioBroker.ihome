@@ -29,6 +29,26 @@ it("applies the last matching rule", () => {
   expect(style).toEqual({ color: "amber" });
 });
 
+it("reads online flags as booleans and integration strings", () => {
+  for (const value of [
+    true,
+    1,
+    "1",
+    "true",
+    "online",
+    "Connected",
+    "up",
+    "ok",
+  ]) {
+    const scope = ruleScope([{ feature: "connected", liveValue: value }], []);
+    expect(evalRule({ when: "isOnline(connected)" }, scope)).toBe(true);
+  }
+  for (const value of [false, 0, "0", "false", "offline", "disconnected", ""]) {
+    const scope = ruleScope([{ feature: "connected", liveValue: value }], []);
+    expect(evalRule({ when: "!isOnline(connected)" }, scope)).toBe(true);
+  }
+});
+
 it("does not match a broken expression and keeps the tile renderable", () => {
   const scope = ruleScope([{ feature: "power", liveValue: true }], []);
   expect(evalRule({ when: "power >" }, scope)).toBe(false); // Review Focus 3
@@ -178,6 +198,39 @@ it("derives ago and offline from the badge's own control", () => {
   expect(badges.map((b) => b.source)).toEqual(["ago", "offline"]);
   expect(badges[0].label).toBe("now");
   expect(badges[1].tone).toBe("danger");
+});
+
+it("dresses a derived ago badge with its rule's style", () => {
+  const badge = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: { kind: "control", device: "d", control: "online" },
+        options: { derive: "ago" },
+        rules: [
+          {
+            when: "!isOnline(online)",
+            only: true,
+            tone: "danger",
+            color: "#ff0000",
+            background: "#330000",
+            icon: "cloud_off",
+          },
+        ],
+      },
+    ],
+    {
+      controls: [{ id: "online", feature: "online", liveValue: false }],
+    } as any,
+    { at: () => NOW - 1000 },
+    NOW,
+  )[0];
+  expect(badge).toMatchObject({
+    tone: "danger",
+    color: "#ff0000",
+    background: "#330000",
+    icon: "cloud_off",
+  });
 });
 
 it("hides an offline badge while its state is online", () => {

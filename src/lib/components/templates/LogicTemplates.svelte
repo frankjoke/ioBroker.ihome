@@ -2,6 +2,7 @@
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
+  import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { BUILTIN_TEMPLATES } from "$logic/templates";
   import { logicTemplateProblem } from "$lib/config/logic-templates";
@@ -167,6 +168,7 @@
 
   function remove(): void {
     if (!selected || isBuiltin || !writable) return;
+    const neighbor = nextAfterRemoval(shown, selected.id, (item) => item.id);
     const next = (doc.templates ?? []).filter(
       (template) => template.id !== selected.id,
     );
@@ -178,7 +180,7 @@
       error = "Not saved — fix the logic errors in the document.";
       return;
     }
-    selectedId = BUILTIN_TEMPLATES[0].id;
+    selectedId = neighbor?.id ?? BUILTIN_TEMPLATES[0].id;
     pendingDelete = null;
   }
 </script>

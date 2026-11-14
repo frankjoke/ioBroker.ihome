@@ -1,6 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { Slot, Template } from "$lib/types/display";
-import { DEVICE_FEATURES } from "$lib/config/features";
+import { COMMON_FEATURES, DEVICE_FEATURES } from "$lib/config/features";
 
 /**
  * Frozen built-in templates — one per device type (spec §4.2). They are the
@@ -27,6 +27,15 @@ const agoSince = (of: string, from: "ts" | "lc" = "lc"): Slot => ({
   source: "ago",
   options: { of, from },
 });
+/** Age since the availability state changed; shown only while offline, red.
+ *  `isOnline` accepts booleans and the "online"/"offline" strings integrations
+ *  publish. */
+const offlineAgo: Slot = {
+  kind: "badge",
+  source: "connected",
+  options: { derive: "ago", from: "lc" },
+  rules: [{ when: "!isOnline(connected)", only: true, tone: "danger" }],
+};
 const offline = badge("offline");
 
 export const PRESETS: Record<DeviceType, Template> = {
@@ -41,7 +50,7 @@ The tile glows green while the device is on and the badge tells you when it was 
     builtin: true,
     type: "Switch",
     size: { w: 2, h: 2 },
-    features: DEVICE_FEATURES.Switch,
+    features: [...DEVICE_FEATURES.Switch, ...COMMON_FEATURES],
     slots: [
       // A switch glows green when it is on (a light glows amber): the accent is
       // the headline slot's resolved colour, so this rule colours both — the
@@ -49,6 +58,7 @@ The tile glows green while the device is on and the badge tells you when it was 
       {
         kind: "value",
         source: "power",
+        options: { valueWhere: "modal" },
         icon: { glyph: "power_settings_new" },
         rules: [
           { when: "truthy(power)", color: "var(--success-color)", glow: true },
@@ -62,8 +72,8 @@ The tile glows green while the device is on and the badge tells you when it was 
       // The watts, in the top-left reading corner — a switch's second question
       // after "is it on".
       { kind: "badge", options: { pick: "power" } },
-      ago,
-      offline,
+      agoSince("power"),
+      offlineAgo,
     ],
   },
   Button: {
@@ -93,13 +103,26 @@ The tile glows amber while the light is on; the slider and colour picker write b
     builtin: true,
     type: "Light",
     size: { w: 2, h: 2 },
-    features: DEVICE_FEATURES.Light,
+    features: [...DEVICE_FEATURES.Light, ...COMMON_FEATURES],
+    active: { source: "power", op: "truthy" },
+    look: {
+      active: {
+        color: "var(--warning-color)",
+        glow: "var(--warning-color)",
+        glyph: "lightbulb",
+      },
+      inactive: {
+        color: "var(--text-muted)",
+        glyph: "lightbulb_outline",
+      },
+    },
     slots: [
       // `truthy(...)`: power arrives as true, 1, "1" or "true" depending on the
       // adapter. Colours are theme tokens — "amber" is not a CSS colour.
       {
         kind: "value",
         source: "power",
+        options: { valueWhere: "modal" },
         icon: { glyph: "lightbulb" },
         rules: [
           {
@@ -118,8 +141,15 @@ The tile glows amber while the light is on; the slider and colour picker write b
       },
       { kind: "level", source: "brightness" },
       { kind: "color", source: "color" },
-      ago,
-      offline,
+      { kind: "level", source: "colorTemp" },
+      {
+        kind: "badge",
+        label: "Battery",
+        source: "battery",
+        rules: [{ when: "battery < 20", tone: "danger" }],
+      },
+      agoSince("power"),
+      offlineAgo,
     ],
   },
   Thermostat: {

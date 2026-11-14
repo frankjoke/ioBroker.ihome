@@ -52,6 +52,8 @@
     /** A new tile starts from values, not badges (the slot part adds those). */
     showBadge = true,
     single = false,
+    suggestTemplates = false,
+    onStatePicked,
     onSlots,
     onSource,
     onControls,
@@ -76,6 +78,9 @@
     showBadge?: boolean;
     /** control mode: picking replaces one state instead of adding. */
     single?: boolean;
+    /** New tile: hand a picked state back instead of creating a slot. */
+    suggestTemplates?: boolean;
+    onStatePicked?: (id: string, object: any) => void;
     onSlots?: (slots: Slot[]) => void;
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
@@ -374,8 +379,13 @@
   /** One click on a tree leaf: add a slot, set a source, add a control, or
    *  hand a state to the Variables page. */
   function pickRawState(id: string): void {
-    if (mode === "slot") pickState(id);
-    else if (mode === "source") onSource?.(stateSource(id));
+    if (mode === "slot") {
+      if (suggestTemplates) {
+        onStatePicked?.(id, objectForState(id));
+        return;
+      }
+      pickState(id);
+    } else if (mode === "source") onSource?.(stateSource(id));
     else if (mode === "state") onState?.(id);
     else togglePickedState(id);
   }
