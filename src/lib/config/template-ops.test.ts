@@ -218,7 +218,7 @@ it("gives the light its on/off icon rules and the thermometer its battery badge"
     PRESETS.Thermometer.slots
       .filter((s) => s.kind === "badge")
       .map((s) => s.source),
-  ).toEqual(["ago", "offline", "battery"]);
+  ).toEqual(["ago", "connected", "battery"]);
 });
 
 it("carries every preset's icon on the slot its source named (A55)", () => {

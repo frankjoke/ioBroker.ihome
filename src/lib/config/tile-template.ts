@@ -39,6 +39,23 @@ const TYPE_ORDER: DeviceType[] = [
   "Custom",
 ];
 
+/** How many distinct origins a tile reads: one per control/device source,
+ *  plus one group for raw states. Applying a template anchors on one of them. */
+export function tileSourceCount(tile: TileConfig | undefined): number {
+  const devices = new Set<string>();
+  let states = false;
+  const sources = [
+    tile?.active?.source,
+    ...(tile?.slots ?? []).map((slot) => slot.source),
+  ];
+  for (const source of sources) {
+    if (!source || typeof source === "string") continue;
+    if (source.kind === "state") states = true;
+    else devices.add(source.device);
+  }
+  return devices.size + (states ? 1 : 0);
+}
+
 /** The state id behind a slot's source, for re-linking an `ago` badge. */
 function sourceId(slot: Slot, look: SourceLook): string | undefined {
   if (!slot.source || typeof slot.source !== "object") return undefined;

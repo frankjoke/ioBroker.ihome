@@ -53,7 +53,12 @@ describe("templateEntries", () => {
       "bundle",
     ]);
     expect(entries[3].parts).toEqual(["device", "logic"]);
+    expect(entries[3].type).toBe("Custom");
     expect(entries.every((entry) => entry.builtin === false)).toBe(true);
+    // A bundle is findable by the device type it creates.
+    expect(
+      filterTemplateEntries(entries, "custom", "asc").map((entry) => entry.id),
+    ).toEqual(["b"]);
   });
 
   it("marks built-ins and filters/sorts", () => {

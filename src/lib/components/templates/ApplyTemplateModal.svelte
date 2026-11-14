@@ -4,12 +4,15 @@
   let {
     templates,
     error = "",
+    warning = "",
     onPick,
     onClose,
   }: {
     templates: Template[];
     /** Why the last apply attempt did not happen. */
     error?: string;
+    /** What the tile loses when it reads more than one source. */
+    warning?: string;
     onPick: (template: Template) => void;
     onClose: () => void;
   } = $props();
@@ -51,6 +54,9 @@
       Replaces this tile's slots, size and look with the template. Its state or
       device source stays the anchor.
     </p>
+    {#if warning}
+      <p class="hint text-warning">{warning}</p>
+    {/if}
     <label class="field">
       <span class="label-mono">Search</span>
       <input type="search" bind:value={search} placeholder="name or type…" />

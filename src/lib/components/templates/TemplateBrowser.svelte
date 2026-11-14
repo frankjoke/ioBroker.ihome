@@ -172,18 +172,18 @@
   });
 
   function badge(entry: TemplateEntry): string {
-    if (entry.kind === "device") {
-      const definition = definitionFor(entry);
-      const type =
-        definition && "type" in definition ? String(definition.type) : "";
-      return type ? `Device · ${type}` : "Device";
-    }
+    const deviceBadge = entry.type ? `Device · ${entry.type}` : "Device";
+    if (entry.kind === "device") return deviceBadge;
     if (entry.kind === "api") return "Logic + Device (API)";
     if (entry.kind === "bundle") {
       return (
         entry.parts
           .map((part) =>
-            part === "device" ? "Device" : part === "logic" ? "Logic" : "API",
+            part === "device"
+              ? deviceBadge
+              : part === "logic"
+                ? "Logic"
+                : "API",
           )
           .join(" + ") || "Bundle"
       );
