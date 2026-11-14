@@ -147,8 +147,10 @@ export interface ResolvedBadge {
   /** An explicit colour (rule colour, or the slot's named/hex colour) — wins
    *  over the tone class. */
   color?: string;
-  /** An explicit chip background from a matching rule. */
+  /** An explicit chip background (rule background or the slot's own). */
   background?: string;
+  /** The slot asks for a heavier chip label. */
+  bold?: boolean;
   /** The raw reading, for an HTML icon's `{{$value}}`. */
   value?: unknown;
   /** The chip shows its icon only; the reading stays in the title and the
@@ -410,7 +412,7 @@ function controlBadge(
     color:
       style.color ??
       (explicitTone ? undefined : badgeColor(slot.options?.color)),
-    background: style.background,
+    background: style.background ?? badgeColor(slot.options?.background),
   };
 }
 
@@ -508,6 +510,7 @@ export function resolveBadges(
       // The chip can show just its icon; the value stays in the title and the
       // detail page.
       if (slot.options?.badgeLabel === false) badge.labelHidden = true;
+      if (slot.options?.bold === true) badge.bold = true;
       out.push(badge);
     }
   }

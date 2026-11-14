@@ -12,6 +12,7 @@
     tone,
     color,
     background,
+    bold = false,
     title,
     value,
     labelHidden,
@@ -22,6 +23,8 @@
     color?: string;
     /** An explicit chip background from a matching rule. */
     background?: string;
+    /** A heavier label, for a chip that must read at a glance. */
+    bold?: boolean;
     title?: string;
     /** The raw reading, for an HTML icon's `{{$value}}`. */
     value?: unknown;
@@ -46,6 +49,7 @@
 
 <span
   class="badge {tone}"
+  class:bold
   style:color
   style:background-color={background}
   title={title ?? label}
@@ -69,7 +73,7 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    padding: 0 5px;
+    padding: 0 4px;
     border-radius: var(--border-radius-pill);
     background-color: var(--surface-container);
     font-size: 11px;
@@ -99,5 +103,9 @@
 
   .badge.more {
     color: var(--text-muted);
+  }
+
+  .badge.bold {
+    font-weight: 700;
   }
 </style>

@@ -2290,6 +2290,63 @@
                       />
                     {/if}
                   </div>
+                  <div class="row wrap">
+                    <label class="small">
+                      <span class="label-mono">bg</span>
+                      <select
+                        value={isHexColor(
+                          String(slot.options?.background ?? ""),
+                        )
+                          ? "custom"
+                          : String(slot.options?.background ?? "")}
+                        onchange={(e) => {
+                          const value = e.currentTarget.value;
+                          if (value === "custom") {
+                            if (
+                              !isHexColor(
+                                String(slot.options?.background ?? ""),
+                              )
+                            ) {
+                              patchOptions(i, { background: "#1e3a8a" });
+                            }
+                            return;
+                          }
+                          patchOptions(i, {
+                            background: value || undefined,
+                          });
+                        }}
+                      >
+                        <option value="">default</option>
+                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
+                          <option value={name}>{name}</option>
+                        {/each}
+                        <option value="custom">custom…</option>
+                      </select>
+                    </label>
+                    {#if isHexColor(String(slot.options?.background ?? ""))}
+                      <input
+                        type="color"
+                        class="color-input"
+                        aria-label="Badge background"
+                        value={String(slot.options?.background)}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            background: e.currentTarget.value,
+                          })}
+                      />
+                    {/if}
+                    <label class="check" title="Use a heavier badge label">
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.bold === true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            bold: e.currentTarget.checked ? true : undefined,
+                          })}
+                      />
+                      <span>Bold</span>
+                    </label>
+                  </div>
                 {/if}
                 {#if ICON_KINDS.includes(slot.kind)}
                   <div class="row slot-settings">

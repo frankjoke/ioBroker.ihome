@@ -19,6 +19,7 @@
         tone={b.tone}
         color={b.color}
         background={b.background}
+        bold={b.bold}
         title={b.title}
         value={b.value}
         labelHidden={b.labelHidden}

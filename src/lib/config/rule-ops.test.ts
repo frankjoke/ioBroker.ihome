@@ -155,7 +155,12 @@ it("honours a promoted value slot's decimals in its badge", () => {
       {
         kind: "value",
         source: { kind: "control", device: "d", control: "humidity" },
-        options: { decimals: 0 },
+        options: {
+          decimals: 0,
+          background: "#1e3a8a",
+          color: "#ffffff",
+          bold: true,
+        },
       },
     ],
     {
@@ -167,6 +172,9 @@ it("honours a promoted value slot's decimals in its badge", () => {
     NOW,
   )[0];
   expect(badge.label).toBe("46 %");
+  expect(badge.background).toBe("#1e3a8a");
+  expect(badge.color).toBe("#ffffff");
+  expect(badge.bold).toBe(true);
 });
 
 it("keeps an HTML icon on a promoted badge and can hide its label", () => {
