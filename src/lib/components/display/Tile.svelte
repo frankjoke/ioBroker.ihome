@@ -354,7 +354,7 @@
     if (!icon) return undefined;
     return {
       ...icon,
-      size: main ? 42 : 22,
+      size: main ? 46 : 22,
       disabled: icon.disabled === true || (main && chart.length > 0),
     };
   }
