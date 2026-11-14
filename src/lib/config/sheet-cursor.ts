@@ -65,6 +65,29 @@ export function sheetCursor(
 }
 
 /**
+ * The stored selection if it still exists, narrowed to the deepest surviving
+ * level: a deleted page → null, a deleted section → its page, a deleted tile →
+ * its section. The sheet opens on what is still there, never on a dangling id.
+ */
+export function restoreSelection(
+  registry: PageRegistry,
+  selection: LayoutSelection,
+): LayoutSelection | null {
+  const page = registry.pages.find((p) => p.id === selection.pageId);
+  if (!page) return null;
+  if (selection.kind === "page") return selection;
+  const section = (page.groups ?? []).find((g) => g.id === selection.sectionId);
+  if (!section) return { kind: "page", pageId: page.id };
+  if (selection.kind === "section") return selection;
+  const tile = (section.tiles ?? []).find(
+    (t) => t.id === selection.placementId,
+  );
+  return tile
+    ? selection
+    : { kind: "section", pageId: page.id, sectionId: section.id };
+}
+
+/**
  * A tile line's label (A44): what the placement is called, plus its size when it
  * has one — `name · w×h`. The name is the placement's own title, else the
  * device name the caller passes as a suggestion, else `Tile` — a tile has no

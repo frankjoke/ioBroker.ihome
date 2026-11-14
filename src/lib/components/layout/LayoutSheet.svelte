@@ -59,7 +59,11 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { newId } from "$lib/utils/ids";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
-  import { sheetCursor, tileLabel } from "$lib/config/sheet-cursor";
+  import {
+    sheetCursor,
+    restoreSelection,
+    tileLabel,
+  } from "$lib/config/sheet-cursor";
   import {
     commitLayout,
     getLayoutSaveFailed,
@@ -69,6 +73,7 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
+  import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
   import type {
     PageRegistry,
     Placement,
@@ -93,6 +98,11 @@
   } = $props();
 
   let selection = $state<LayoutSelection | null>(sheet.selection);
+  /** Read before the save effect can overwrite it with the display's page. */
+  const rememberedSelection = readLastLayout();
+  /** While a remembered/requested target is being applied, the display page
+   *  must not pull the cursor back to the page it was on. */
+  let restoring = $state(!!(sheet.selection ?? rememberedSelection));
   let pendingDelete = $state<LayoutSelection | null>(null);
   /** The '+' asks for a name first; nothing is created until it is submitted. */
   let pendingCreate = $state<
@@ -156,15 +166,23 @@
   // A page change (here or in the app bar) moves the cursor with it — but only
   // when the selection is on another page, so a handoff that set both survives.
   $effect(() => {
+    if (restoring) return;
     if (selection?.pageId !== pageId) {
       selection = { kind: "page", pageId };
     }
   });
 
+  // The restored target is in place once the display has moved to its page.
+  $effect(() => {
+    if (restoring && selection?.pageId === pageId) restoring = false;
+  });
+
   // The eye/pencil toggle unmounts the sheet: remember the cursor so the
   // return lands on the tile that was being edited, not the page's first tile.
+  // The browser copy survives a reload.
   $effect(() => {
     sheet.selection = selection;
+    if (selection?.pageId) writeLastLayout(selection);
   });
 
   // A click in the display points the cursor at its tile (A48). The page moves
@@ -291,12 +309,24 @@
   }
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
-  // click): select it, so the drill-down opens on what was clicked.
+  // click): select it, so the drill-down opens on what was clicked. Otherwise
+  // resume the last edited node — even after a reload, and even on another page.
   onMount(() => {
     const requested = takeRequestedLayout();
     if (requested) {
       onPage(requested.pageId);
       selection = requested;
+    } else {
+      const remembered = sheet.selection ?? rememberedSelection;
+      const restored = remembered
+        ? restoreSelection(registry, remembered)
+        : null;
+      if (restored) {
+        if (restored.pageId !== pageId) onPage(restored.pageId);
+        selection = restored;
+      } else {
+        restoring = false;
+      }
     }
     const onResize = () => (previewBp = breakpointFor(window.innerWidth));
     onResize();
