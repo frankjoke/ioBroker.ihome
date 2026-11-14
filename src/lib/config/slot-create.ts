@@ -394,6 +394,30 @@ export function materializeTemplateTileFromState(
   };
 }
 
+/** The tile config a materialised template produces (a new tile or an applied
+ *  template), so the two callers cannot drift. */
+export function materializedTileConfig(
+  materialized: ReturnType<typeof materializeTemplateTile>,
+): TileConfig {
+  const tile: TileConfig = {
+    slots: materialized.slots,
+    ...(materialized.size ? { size: materialized.size } : {}),
+    ...(materialized.background ? { background: materialized.background } : {}),
+    ...(materialized.active ? { active: materialized.active } : {}),
+    ...(materialized.look ? { look: materialized.look } : {}),
+  };
+  if (materialized.icon) {
+    tile.look = {
+      ...tile.look,
+      inactive: {
+        ...tile.look?.inactive,
+        glyph: tile.look?.inactive?.glyph ?? materialized.icon,
+      },
+    };
+  }
+  return tile;
+}
+
 export function tileSeed(
   slots: Slot[],
   devices: Device[],

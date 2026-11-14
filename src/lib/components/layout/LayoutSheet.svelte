@@ -39,6 +39,7 @@
     applyTileSeed,
     materializeTemplateTile,
     materializeTemplateTileFromState,
+    materializedTileConfig,
     slotFromControl,
     slotFromState,
     slotKindForWidget,
@@ -74,12 +75,7 @@
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
-  import type {
-    PageRegistry,
-    Placement,
-    Slot,
-    TileConfig,
-  } from "$lib/types/display";
+  import type { PageRegistry, Placement, Slot } from "$lib/types/display";
   import type { Device } from "$lib/types/device";
   import type { Template } from "$lib/types/display";
 
@@ -400,24 +396,7 @@
     materialized: ReturnType<typeof materializeTemplateTile>,
     at?: number,
   ): void {
-    const tile: TileConfig = {
-      slots: materialized.slots,
-      ...(materialized.size ? { size: materialized.size } : {}),
-      ...(materialized.background
-        ? { background: materialized.background }
-        : {}),
-      ...(materialized.active ? { active: materialized.active } : {}),
-      ...(materialized.look ? { look: materialized.look } : {}),
-    };
-    if (materialized.icon) {
-      tile.look = {
-        ...tile.look,
-        inactive: {
-          ...tile.look?.inactive,
-          glyph: tile.look?.inactive?.glyph ?? materialized.icon,
-        },
-      };
-    }
+    const tile = materializedTileConfig(materialized);
     const placement: Placement = {
       id: newId(),
       ...(materialized.title ? { title: materialized.title } : {}),

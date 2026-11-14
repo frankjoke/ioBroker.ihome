@@ -118,6 +118,18 @@ function matchFeature(feature: FeatureDef, object: any): Match {
   return null;
 }
 
+/** How well an object's role fits a feature: role 3, generic role 2, type 1. */
+export function featureMatchRank(feature: FeatureDef, object: any): number {
+  const match = matchFeature(feature, object);
+  return match === "role"
+    ? 3
+    : match === "generic"
+      ? 2
+      : match === "type"
+        ? 1
+        : 0;
+}
+
 /** The state ids an alias object points at (`common.alias.id`). */
 export function aliasBaseIds(object: any): string[] {
   const alias = object?.common?.alias;
