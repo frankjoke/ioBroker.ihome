@@ -896,7 +896,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
+    /* One pixel more than before: a slot icon must read as belonging to the
+       slot below it, not the previous row. */
+    gap: calc(0.15rem + 1px);
     min-width: 0;
     max-width: 100%;
     /* Grow into the tile's leftover height so a frame slot can fill it, and be

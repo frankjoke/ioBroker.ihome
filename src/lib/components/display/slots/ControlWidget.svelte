@@ -218,6 +218,11 @@
   .level input {
     flex: 1 1 6rem;
     min-width: 0;
+    /* The browser's native 8px vertical padding is the gap that made the
+       slider look detached from its icon. Pull the top in a little more than
+       the bottom so the thumb reads as part of its own slot row. */
+    margin: -2px 0 0;
+    padding: 0;
   }
 
   /* The reading sits over the track, out of the drag's way. */
