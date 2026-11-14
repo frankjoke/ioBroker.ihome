@@ -10,6 +10,10 @@ export interface PoolIcon {
   value: string;
   /** Active twin; absent means a single icon. */
   activeValue?: string;
+  /** Template ids this pair is the default for. */
+  templates?: string[];
+  /** Exact ioBroker roles and `family.*` patterns this pair defaults to. */
+  roles?: string[];
   keywords?: string[];
 }
 
@@ -86,6 +90,20 @@ export const BUILTIN_POOL: PoolEntry[] = baseEntries();
 
 const BASE_IDS = new Set(BUILTIN_POOL.map((entry) => entry.id));
 
+function parseStringList(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const value = item.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out.length ? out : undefined;
+}
+
 function parseOverrides(
   raw: unknown,
 ): Record<string, PoolOverride> | undefined {
@@ -149,11 +167,15 @@ export function parseIconPool(raw: unknown): IconPool | null {
     const group = typeof entry.group === "string" ? entry.group.trim() : "";
     const activeValue =
       typeof entry.activeValue === "string" ? entry.activeValue.trim() : "";
+    const templates = parseStringList(entry.templates);
+    const roles = parseStringList(entry.roles);
     icons.push({
       id,
       name,
       value: iconValue,
       ...(activeValue ? { activeValue } : {}),
+      ...(templates ? { templates } : {}),
+      ...(roles ? { roles } : {}),
       ...(group ? { group } : {}),
       ...(keywords?.length ? { keywords } : {}),
     });
@@ -194,6 +216,36 @@ export function filterPoolIcons(
       field.toLowerCase().includes(q),
     ),
   );
+}
+
+/**
+ * The automatic pair for a tile: its template first, then the headline's exact
+ * ioBroker role, then that role's `family.*` pattern. Base entries never claim
+ * defaults.
+ */
+export function defaultPair(
+  entries: PoolEntry[],
+  templateId: string | undefined,
+  role: string | undefined,
+): PoolEntry | undefined {
+  const user = entries.filter((entry) => !entry.builtin);
+  if (templateId) {
+    const byTemplate = user.find((entry) =>
+      entry.templates?.includes(templateId),
+    );
+    if (byTemplate) return byTemplate;
+  }
+  if (role) {
+    const exact = user.find((entry) => entry.roles?.includes(role));
+    if (exact) return exact;
+    const dot = role.indexOf(".");
+    if (dot > 0) {
+      const family = `${role.slice(0, dot)}.*`;
+      const byFamily = user.find((entry) => entry.roles?.includes(family));
+      if (byFamily) return byFamily;
+    }
+  }
+  return undefined;
 }
 
 /** Add or remove one keyword; case-insensitive, and an empty list is absent. */

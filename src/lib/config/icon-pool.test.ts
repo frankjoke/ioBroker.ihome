@@ -7,12 +7,14 @@ import {
   filterPoolIcons,
   mdiIconValue,
   clearBaseOverride,
+  defaultPair,
   parseIconPool,
   poolEntries,
   removePoolIcon,
   setBaseOverride,
   toggleKeyword,
   upsertPoolIcon,
+  type PoolEntry,
 } from "./icon-pool";
 
 it("survives an empty document and rejects a broken one", () => {
@@ -192,6 +194,45 @@ it("combines base and user, base wins a duplicate value", () => {
   });
   expect(entries.some((entry) => entry.builtin)).toBe(true);
   expect(entries.filter((entry) => entry.value === base.value)).toHaveLength(1);
+});
+
+it("parses templates and roles as trimmed deduped lists", () => {
+  const parsed = parseIconPool(
+    JSON.stringify({
+      version: 1,
+      icons: [
+        {
+          id: "g",
+          name: "Gate",
+          value: "gate",
+          templates: [" t1 ", "t1", ""],
+          roles: ["switch.active", " switch.active ", "sensor.window", ""],
+        },
+      ],
+    }),
+  );
+  expect(parsed?.icons[0].templates).toEqual(["t1"]);
+  expect(parsed?.icons[0].roles).toEqual(["switch.active", "sensor.window"]);
+});
+
+it("defaults by template first, then exact role, then family", () => {
+  const entries: PoolEntry[] = [
+    { id: "t", name: "Template pair", value: "a", templates: ["Door"] },
+    { id: "r", name: "Role pair", value: "b", roles: ["switch.active"] },
+    { id: "f", name: "Family pair", value: "c", roles: ["switch.*"] },
+    {
+      id: "base",
+      name: "Base",
+      value: "d",
+      builtin: true,
+      roles: ["state"],
+    },
+  ];
+  expect(defaultPair(entries, "Door", "switch.active")?.id).toBe("t");
+  expect(defaultPair(entries, "Other", "switch.active")?.id).toBe("r");
+  expect(defaultPair(entries, "Other", "switch.enable")?.id).toBe("f");
+  expect(defaultPair(entries, undefined, undefined)).toBeUndefined();
+  expect(defaultPair(entries, "Nope", "state")).toBeUndefined();
 });
 
 it("toggles a keyword case-insensitively and clears the last one", () => {
