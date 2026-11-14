@@ -61,9 +61,9 @@
   );
 
   /** The mono readout with the effective unit and states labels. */
-  function readout(): string {
+  function readout(value: unknown = control.liveValue): string {
     const parts = splitReading(
-      control.liveValue,
+      value,
       unitFor(undefined, control.meta?.unit, control.unit),
       undefined,
       normalizeStates(control.meta?.states ?? control.states),
@@ -74,6 +74,23 @@
   }
   /** The body's own homes; absent = both. `hideValue` turns it off entirely. */
   const showValue = $derived(valueShown(options, home));
+
+  /** The value under the thumb while a drag is in flight; `null` = live value. */
+  let dragValue = $state<number | null>(null);
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function settle(value: number): void {
+    write(value);
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => (dragValue = null), 1500);
+  }
+
+  $effect(() => {
+    if (dragValue !== null && Number(control.liveValue) === dragValue) {
+      clearTimeout(settleTimer);
+      dragValue = null;
+    }
+  });
   /** A read-only level is a reading, not a disabled slider. */
   const widget = $derived(
     widgetOverride ??
@@ -116,10 +133,12 @@
       disabled={!control.writable}
       onpointerdown={stop}
       onclick={stop}
-      onchange={(e) => write(Number(e.currentTarget.value))}
+      oninput={(e) => (dragValue = Number(e.currentTarget.value))}
+      onchange={(e) => settle(Number(e.currentTarget.value))}
+      onblur={() => (dragValue = null)}
     />
     {#if showValue}
-      <span class="mono">{readout()}</span>
+      <span class="level-value">{readout(dragValue ?? control.liveValue)}</span>
     {/if}
   </div>
 {:else if showValue && widget === "color"}
@@ -183,6 +202,7 @@
   }
 
   .level {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -200,8 +220,21 @@
     min-width: 0;
   }
 
-  .level .mono {
-    flex: 0 0 auto;
+  /* The reading sits over the track, out of the drag's way. */
+  .level-value {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: var(--body-sm);
+    font-weight: 400;
+    white-space: nowrap;
+    color: var(--text-color);
+    text-shadow:
+      0 0 3px var(--surface-color),
+      0 0 1px var(--surface-color);
   }
 
   .color {
