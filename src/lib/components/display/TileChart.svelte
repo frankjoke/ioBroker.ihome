@@ -1,5 +1,6 @@
 <script lang="ts">
   import { durationMs, seriesPoints } from "$lib/config/history-ops";
+  import { splitReading } from "$lib/config/format";
   import type { ChartSeries } from "$lib/config/tile-parts";
   import {
     ensureHistory,
@@ -43,7 +44,16 @@
         spec && s.control.stateId
           ? readHistory(s.control.stateId, spec)
           : undefined;
-      return { color: s.color, spec, points: entry?.series ?? [] };
+      return {
+        color: s.color,
+        spec,
+        points: entry?.series ?? [],
+        unit: s.control.meta?.unit ?? s.control.unit,
+        decimals:
+          typeof s.slot.options?.decimals === "number"
+            ? s.slot.options.decimals
+            : undefined,
+      };
     });
     let to = 0;
     let span = 0;
@@ -54,16 +64,44 @@
     const end = to || Date.now();
     const from = end - span;
     return loaded
-      .map((l) => ({
-        color: l.color,
-        points: seriesPoints(l.points, {
-          from,
-          to: end,
-          width: 120,
-          height: 28,
-        }),
-      }))
+      .map((l) => {
+        const values = l.points
+          .map((point) => point.val)
+          .filter(
+            (value): value is number =>
+              typeof value === "number" && Number.isFinite(value),
+          );
+        return {
+          color: l.color,
+          points: seriesPoints(l.points, {
+            from,
+            to: end,
+            width: 120,
+            height: 28,
+          }),
+          min: values.length ? Math.min(...values) : undefined,
+          max: values.length ? Math.max(...values) : undefined,
+          unit: l.unit,
+          decimals: l.decimals,
+        };
+      })
       .filter((l) => l.points);
+  });
+
+  /** The first line is the tile's main series; label that one only, because
+   *  several lines can carry different units. */
+  const range = $derived.by(() => {
+    const first = drawn[0];
+    if (!first || first.min === undefined || first.max === undefined) {
+      return undefined;
+    }
+    // One decimal keeps corner labels short; a slot's own precision wins.
+    const min = splitReading(first.min, first.unit, first.decimals ?? 1);
+    const max = splitReading(first.max, first.unit, first.decimals ?? 1);
+    return {
+      min: min.unit ? `${min.value} ${min.unit}` : min.value,
+      max: max.unit ? `${max.value} ${max.unit}` : max.value,
+    };
   });
 
   /** One gradient per colour; shared charts can reuse the same identical one. */
@@ -88,44 +126,81 @@
 </script>
 
 {#if drawn.length}
-  <svg
-    class="chart"
-    class:wide
-    viewBox="0 0 120 28"
-    preserveAspectRatio="none"
-    aria-hidden="true"
-  >
-    {#if area}
-      <defs>
-        {#each areaColors as color (color)}
-          <linearGradient id={colorId(color)} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style:stop-color={color} stop-opacity="0.3" />
-            <stop offset="1" style:stop-color={color} stop-opacity="0" />
-          </linearGradient>
-        {/each}
-      </defs>
-    {/if}
-    <!-- Reversed: the first series is the tile's main line, so it paints last
-         and stays visible on top of the others. -->
-    {#each [...drawn].reverse() as l, i (i)}
+  <div class="chart-wrap">
+    <svg
+      class="chart"
+      class:wide
+      viewBox="0 0 120 28"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
       {#if area}
-        <path
-          class="area"
-          d={areaPath(l.points)}
-          fill={`url(#${colorId(l.color)})`}
-        />
+        <defs>
+          {#each areaColors as color (color)}
+            <linearGradient id={colorId(color)} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" style:stop-color={color} stop-opacity="0.3" />
+              <stop offset="1" style:stop-color={color} stop-opacity="0" />
+            </linearGradient>
+          {/each}
+        </defs>
       {/if}
-      <polyline points={l.points} style:stroke={l.color} />
-    {/each}
-  </svg>
+      <!-- Reversed: the first series is the tile's main line, so it paints last
+         and stays visible on top of the others. -->
+      {#each [...drawn].reverse() as l, i (i)}
+        {#if area}
+          <path
+            class="area"
+            d={areaPath(l.points)}
+            fill={`url(#${colorId(l.color)})`}
+          />
+        {/if}
+        <polyline points={l.points} style:stroke={l.color} />
+      {/each}
+    </svg>
+    {#if wide && range}
+      <span class="chart-min">{range.min}</span>
+      <span class="chart-max">{range.max}</span>
+    {/if}
+  </div>
 {/if}
 
 <style>
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
   .chart {
     display: block;
     width: 100%;
     max-width: 140px;
     height: 28px;
+    margin-inline: auto;
+  }
+
+  /* The main line's range, quiet at the chart's corners. */
+  .chart-min,
+  .chart-max {
+    position: absolute;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--text-muted);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .chart-min {
+    left: 0;
+    bottom: 1px;
+  }
+
+  .chart-max {
+    right: 0;
+    top: 1px;
+    text-align: right;
   }
 
   .chart.wide {
