@@ -526,9 +526,7 @@
     ...(getTemplateRegistry().templates ?? []),
   ]);
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
-  const tileTemplateName = $derived(
-    `${tile?.title || device?.name || "Tile"} template`,
-  );
+  const tileTemplateName = $derived(`${tileTemplateType} template`);
 
   /** The source a template materialises against: the tile's active source,
    *  else its first bound slot. */

@@ -20,7 +20,14 @@
   let name = $state(suggestedName);
   // svelte-ignore state_referenced_locally
   let type = $state<DeviceType>(suggestedType);
+  // svelte-ignore state_referenced_locally
+  let nameTouched = $state(suggestedName !== `${suggestedType} template`);
   let localError = $state("");
+
+  // The default name follows the type (function), not the tile/room name.
+  $effect(() => {
+    if (!nameTouched) name = `${type} template`;
+  });
 
   function submit(e: SubmitEvent): void {
     e.preventDefault();
@@ -54,6 +61,7 @@
       <input
         type="text"
         bind:value={name}
+        oninput={() => (nameTouched = true)}
         autofocus
         autocomplete="off"
         maxlength="80"
