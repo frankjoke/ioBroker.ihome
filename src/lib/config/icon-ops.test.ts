@@ -201,6 +201,11 @@ it("ignores page and adapter logos on the state's path", () => {
 
 it("suggests a default glyph for a bare state's role", () => {
   expect(glyphForRole("switch")).toBe("power_settings_new");
+  expect(glyphForRole("switch.light")).toBe("lightbulb");
+  expect(glyphForRole("switch.lock")).toBe("lock");
+  expect(glyphForRole("sensor.window")).toBe("sensor_door");
+  expect(glyphForRole("sensor.motion")).toBe("directions_walk");
+  expect(glyphForRole("button.next")).toBe("touch_app");
   expect(glyphForRole("value.battery")).toBe("battery_full");
   expect(glyphForRole("value.temperature")).toBe("thermostat");
   expect(glyphForRole("button")).toBe("touch_app");

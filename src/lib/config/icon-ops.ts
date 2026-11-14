@@ -124,11 +124,14 @@ export function deviceObjectIcon(
 /** Default glyphs for the ioBroker roles, so a tile built from a bare state has
  *  a face instead of a blank slot. Ordered: the first match wins. */
 const ROLE_GLYPHS: [RegExp, string][] = [
-  [/switch|socket|plug|outlet/i, "power_settings_new"],
-  [/button|press/i, "touch_app"],
-  [/motion|presence/i, "directions_walk"],
-  [/door|window|contact/i, "sensor_door"],
+  // Specific families first: `switch.light` is a light, `switch.lock` a lock,
+  // not the generic switch glyph.
+  [/lock/i, "lock"],
   [/light|lamp/i, "lightbulb"],
+  [/door|window|contact/i, "sensor_door"],
+  [/motion|presence/i, "directions_walk"],
+  [/button|press/i, "touch_app"],
+  [/switch|socket|plug|outlet/i, "power_settings_new"],
   [/temperature/i, "thermostat"],
   [/humidity|moisture/i, "water_drop"],
   [/battery/i, "battery_full"],
@@ -137,7 +140,6 @@ const ROLE_GLYPHS: [RegExp, string][] = [
   [/color/i, "palette"],
   [/volume|audio/i, "volume_up"],
   [/position|blind|shutter/i, "blinds"],
-  [/lock/i, "lock"],
   [/co2|air|quality/i, "air"],
   [/illuminance|lux/i, "light_mode"],
   [/pressure/i, "compress"],
