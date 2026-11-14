@@ -4,6 +4,7 @@ import { templateKind } from "$lib/config/config-nav";
 it("maps template deep links to the two groups", () => {
   expect(templateKind("code")).toBe("code");
   expect(templateKind("templates")).toBe("templates");
+  expect(templateKind("icons")).toBe("icons");
   expect(templateKind("formula")).toBe("code");
   expect(templateKind("function")).toBe("code");
   expect(templateKind("device")).toBe("templates");

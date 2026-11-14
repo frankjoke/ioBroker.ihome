@@ -16,7 +16,7 @@
   } from "$lib/config/template-file";
   import { installTemplateFile } from "$lib/template-import";
 
-  type Group = "code" | "templates" | "help";
+  type Group = "code" | "templates" | "icons" | "help";
 
   const tabs: Array<{ id: Group; label: string; hint: string }> = [
     {
@@ -28,6 +28,11 @@
       id: "templates",
       label: "Templates",
       hint: "Device, logic, both or API templates.",
+    },
+    {
+      id: "icons",
+      label: "Icons",
+      hint: "Manage the saved icon pool.",
     },
     {
       id: "help",
@@ -171,7 +176,7 @@
           onchange={onTabChange}
         />
       </div>
-      {#if group !== "help"}
+      {#if group === "code" || group === "templates"}
         <div class="page-actions">
           {#if group === "code"}
             <button
@@ -188,7 +193,7 @@
             >
               + Function
             </button>
-          {:else}
+          {:else if group === "templates"}
             <button
               type="button"
               class="btn btn-primary btn-sm"
@@ -240,6 +245,14 @@
     <div class="card help-panel">
       <HelpSection help={TEMPLATES_GUIDE} static plain />
     </div>
+  {:else if group === "icons"}
+    {#await import("$lib/components/icons/IconPoolManager.svelte") then { default: IconPoolManager }}
+      <IconPoolManager bind:dirty />
+    {:catch error}
+      <p class="text-danger hint">
+        The icon manager could not be loaded: {error}
+      </p>
+    {/await}
   {:else}
     <div class="list-toolbar">
       <div class="list-filter">
