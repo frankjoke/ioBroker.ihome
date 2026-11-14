@@ -92,6 +92,7 @@ const DOCS = [
   "pageList",
   "deviceList",
   "templateList",
+  "iconPool",
   "formulaList",
   "variableList",
   "settings",
