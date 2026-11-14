@@ -446,7 +446,9 @@
       slot: r.slot,
       control: r.control,
       style: r.style,
-      icon: rowGlyph(r, "modal"),
+      // The slot's own icon, not the tile's main/look icon: the headline row is
+      // a line in the detail page, not the face.
+      icon: rowIcon(r, "modal", device.objectIcon),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
