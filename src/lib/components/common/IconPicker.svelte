@@ -5,7 +5,11 @@
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { initIconPool, getIconPool } from "$lib/stores/icon-pool.svelte";
-  import { filterPoolIcons, poolEntries } from "$lib/config/icon-pool";
+  import {
+    filterPoolIcons,
+    mdiIconValue,
+    poolEntries,
+  } from "$lib/config/icon-pool";
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { iconTitle, isHtmlIcon } from "$lib/config/icon-html";
   import { brokerIconPath } from "$lib/config/icon-ops";
@@ -17,12 +21,15 @@
     icon = undefined,
     onPick,
     onClose,
+    manage = false,
   }: {
     /** The current value, for highlighting and the URL prefill. */
     icon?: string;
     /** The picked value; "" clears the icon. */
-    onPick: (icon: string) => void;
+    onPick: (icon: string, meta?: { name?: string; group?: string }) => void;
     onClose: () => void;
+    /** The manager's add flow: also offers the lazy MDI source. */
+    manage?: boolean;
   } = $props();
 
   const TABS = [
@@ -31,6 +38,7 @@
     { id: "document", label: "Document" },
     { id: "broker", label: "Broker" },
     { id: "url", label: "URL / SVG / HTML" },
+    { id: "mdi", label: "MDI" },
   ] as const;
 
   /** Ready-made icon markup: the slot's reading, its resolved colour and its
@@ -89,6 +97,62 @@
     if (tab === "pool") void initIconPool();
   });
 
+  type MdiIcon = {
+    id: string;
+    p: string;
+    c: string;
+    n: Record<string, string>;
+  };
+  type MdiCategory = { id: string; name: Record<string, string> };
+
+  let mdiIcons = $state<MdiIcon[]>([]);
+  let mdiCategories = $state<MdiCategory[]>([]);
+  let mdiLoading = $state(false);
+  let mdiError = $state("");
+  let mdiCategory = $state("");
+  let mdiStarted = false;
+
+  const mdiCategoryName = (id: string) =>
+    mdiCategories.find((category) => category.id === id)?.name?.en ?? id;
+
+  const mdiShown = $derived.by(() => {
+    const q = search.trim().toLowerCase();
+    return mdiIcons
+      .filter((icon) => {
+        if (mdiCategory && icon.c !== mdiCategory) return false;
+        if (!q) return true;
+        return `${icon.id} ${icon.n?.en ?? ""} ${mdiCategoryName(icon.c)}`
+          .toLowerCase()
+          .includes(q);
+      })
+      .slice(0, 120);
+  });
+
+  async function loadMdi(): Promise<void> {
+    if (mdiStarted) return;
+    mdiStarted = true;
+    mdiLoading = true;
+    mdiError = "";
+    try {
+      const url = new URL("icon-library.js", document.baseURI).href;
+      const mod = (await import(/* @vite-ignore */ url)) as {
+        ICON_LIBRARY: MdiIcon[];
+        ICON_LIBRARY_CATEGORIES: MdiCategory[];
+      };
+      mdiIcons = mod.ICON_LIBRARY;
+      mdiCategories = mod.ICON_LIBRARY_CATEGORIES;
+    } catch (e) {
+      mdiStarted = false;
+      mdiError = e instanceof Error ? e.message : String(e);
+    } finally {
+      mdiLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (tab === "mdi" && manage) void loadMdi();
+  });
+
   const documentIcons = $derived(
     collectDocumentIcons(getPageRegistry(), getTemplateRegistry()),
   );
@@ -129,7 +193,7 @@
     </div>
 
     <div class="option-tabs" role="tablist">
-      {#each TABS as t (t.id)}
+      {#each TABS.filter((entry) => manage || entry.id !== "mdi") as t (t.id)}
         <button
           type="button"
           role="tab"
@@ -145,6 +209,12 @@
       <input type="search" placeholder="Search symbols…" bind:value={search} />
     {:else if tab === "pool"}
       <input type="search" placeholder="Search the pool…" bind:value={search} />
+    {:else if tab === "mdi"}
+      <input
+        type="search"
+        placeholder="Search MDI icons…"
+        bind:value={search}
+      />
     {/if}
 
     <div class="results">
@@ -243,6 +313,53 @@
               </li>
             {/each}
           </ul>
+        {/if}
+      {:else if tab === "mdi" && manage}
+        {#if mdiLoading}
+          <p class="empty text-muted">Loading MDI icons…</p>
+        {:else if mdiError}
+          <p class="empty text-danger">MDI icons failed to load: {mdiError}</p>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline"
+            onclick={() => {
+              mdiStarted = false;
+              void loadMdi();
+            }}>Retry</button
+          >
+        {:else}
+          <label class="mdi-category">
+            <span class="label-mono">Category</span>
+            <select bind:value={mdiCategory}>
+              <option value="">All categories</option>
+              {#each mdiCategories as category (category.id)}
+                <option value={category.id}
+                  >{category.name?.en ?? category.id}</option
+                >
+              {/each}
+            </select>
+          </label>
+          {#if mdiShown.length === 0}
+            <p class="empty text-muted">No matching MDI icons.</p>
+          {:else}
+            <div class="grid">
+              {#each mdiShown as entry (entry.id)}
+                <button
+                  type="button"
+                  class="cell"
+                  title={entry.n?.en ?? entry.id}
+                  aria-label={entry.n?.en ?? entry.id}
+                  onclick={() =>
+                    onPick(mdiIconValue(entry.p), {
+                      name: entry.n?.en ?? entry.id,
+                      group: mdiCategoryName(entry.c),
+                    })}
+                >
+                  <Icon value={mdiIconValue(entry.p)} size={22} />
+                </button>
+              {/each}
+            </div>
+          {/if}
         {/if}
       {:else}
         <div class="snippets">
@@ -421,6 +538,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.75rem;
+  }
+
+  .mdi-category {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
   }
 
   .snippets {
