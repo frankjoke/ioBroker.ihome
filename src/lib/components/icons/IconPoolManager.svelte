@@ -3,6 +3,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
+  import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import {
     POOL_CAP,
     clearBaseOverride,
@@ -10,13 +11,12 @@
     poolEntries,
     removePoolIcon,
     setBaseOverride,
-    toggleKeyword,
     upsertPoolIcon,
     type IconPool,
     type PoolEntry,
     type PoolIcon,
   } from "$lib/config/icon-pool";
-  import { ROLE_GLYPH_DEFAULTS } from "$lib/config/icon-ops";
+  import { PRESETS } from "$lib/config/presets";
   import {
     commitIconPool,
     getIconPool,
@@ -26,6 +26,12 @@
     isIconPoolWritable,
     reloadIconPool,
   } from "$lib/stores/icon-pool.svelte";
+  import {
+    getTemplateRegistry,
+    initTemplates,
+  } from "$lib/stores/templates.svelte.js";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
@@ -52,6 +58,8 @@
   let conflict = $state("");
   let savedHint = $state("");
   let saving = $state(false);
+  let keywordDraft = $state("");
+  let roleChoices = $state<{ value: string; label: string }[]>([]);
   let started = false;
 
   const loadKind = $derived(iconPoolLoadKind());
@@ -86,14 +94,93 @@
   );
   const openEntry = $derived(openBase ?? openUser);
 
+  const templateOptions = $derived.by(() => {
+    const seen = new SvelteSet<string>();
+    const options: { value: string; label: string }[] = [];
+    for (const template of getTemplateRegistry().templates ?? []) {
+      if (seen.has(template.id)) continue;
+      seen.add(template.id);
+      options.push({ value: template.id, label: template.name });
+    }
+    for (const template of Object.values(PRESETS)) {
+      if (seen.has(template.id)) continue;
+      seen.add(template.id);
+      options.push({ value: template.id, label: `${template.name} (preset)` });
+    }
+    return options;
+  });
+
+  const keywordChoices = $derived.by(() => {
+    if (!openUser) return [];
+    const current = new SvelteSet(
+      (openUser.keywords ?? []).map((word) => word.toLowerCase()),
+    );
+    const seen = new SvelteSet<string>();
+    const words: string[] = [];
+    for (const entry of [...baseEntries, ...draft.icons]) {
+      for (const word of entry.keywords ?? []) {
+        const lower = word.toLowerCase();
+        if (current.has(lower) || seen.has(lower)) continue;
+        seen.add(lower);
+        words.push(word);
+      }
+    }
+    return words.sort((a, b) => a.localeCompare(b));
+  });
+
   function clonePool(pool: IconPool): IconPool {
     return JSON.parse(JSON.stringify(pool)) as IconPool;
+  }
+
+  function buildRoleChoices(): void {
+    const counts = new SvelteMap<string, number>();
+    for (const object of ioBroker.objects.values()) {
+      const record = object as {
+        type?: string;
+        common?: { role?: string };
+      };
+      // Only state roles can be a tile headline; channels/folders are noise.
+      if (record.type !== "state") continue;
+      const role = record.common?.role;
+      if (typeof role === "string" && role.trim()) {
+        counts.set(role, (counts.get(role) ?? 0) + 1);
+      }
+    }
+    const families = new SvelteMap<string, number>();
+    for (const [role, count] of counts) {
+      const dot = role.indexOf(".");
+      if (dot > 0) {
+        const family = `${role.slice(0, dot)}.*`;
+        families.set(family, (families.get(family) ?? 0) + count);
+      }
+    }
+    roleChoices = [
+      ...[...counts]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([role, count]) => ({ value: role, label: `${role} · ${count}` })),
+      ...[...families]
+        .sort((a, b) => b[1] - a[1])
+        .map(([family, count]) => ({
+          value: family,
+          label: `${family} · ${count}`,
+        })),
+    ];
+  }
+
+  /** The object cache fills after the socket connects; retry until it has roles. */
+  async function fillRoleChoices(): Promise<void> {
+    for (let i = 0; i < 20; i++) {
+      buildRoleChoices();
+      if (roleChoices.length) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   $effect(() => {
     if (started) return;
     started = true;
-    void initIconPool().then(() => {
+    void Promise.allSettled([initIconPool(), initTemplates()]).then(() => {
+      void fillRoleChoices();
       draft = clonePool(getIconPool());
       baseUpdatedAt = draft.updatedAt;
       loaded = true;
@@ -131,23 +218,51 @@
     savedHint = "";
   }
 
-  function setKeywords(value: string): void {
-    const keywords = value
-      .split(",")
-      .map((word) => word.trim())
-      .filter(Boolean);
+  function addKeyword(): void {
+    const user = openUser;
+    const word = keywordDraft.trim();
+    if (!user || !writable || !word) return;
+    if (
+      (user.keywords ?? []).some(
+        (item) => item.toLowerCase() === word.toLowerCase(),
+      )
+    ) {
+      keywordDraft = "";
+      return;
+    }
+    updateUser({ keywords: [...(user.keywords ?? []), word] });
+    keywordDraft = "";
+  }
+
+  function removeKeyword(word: string): void {
+    const user = openUser;
+    if (!user || !writable) return;
+    const keywords = (user.keywords ?? []).filter((item) => item !== word);
     updateUser({ keywords: keywords.length ? keywords : undefined });
   }
 
-  function roleSelected(role: string): boolean {
-    return (openUser?.keywords ?? []).some(
-      (word) => word.toLowerCase() === role.toLowerCase(),
-    );
+  function templateName(id: string): string {
+    return templateOptions.find((option) => option.value === id)?.label ?? id;
   }
 
-  function toggleRole(role: string): void {
-    if (!openUser) return;
-    updateUser({ keywords: toggleKeyword(openUser.keywords, role) });
+  function claimConflict(): string | null {
+    const templates = new SvelteMap<string, string>();
+    const roles = new SvelteMap<string, string>();
+    for (const icon of draft.icons) {
+      for (const id of icon.templates ?? []) {
+        if (templates.has(id)) {
+          return `The template “${templateName(id)}” is assigned to both “${templates.get(id)}” and “${icon.name.trim() || "an icon"}”.`;
+        }
+        templates.set(id, icon.name.trim() || "an icon");
+      }
+      for (const key of icon.roles ?? []) {
+        if (roles.has(key)) {
+          return `The role “${key}” is assigned to both “${roles.get(key)}” and “${icon.name.trim() || "an icon"}”.`;
+        }
+        roles.set(key, icon.name.trim() || "an icon");
+      }
+    }
+    return null;
   }
 
   function defaultTaken(id: string, value: string): boolean {
@@ -288,6 +403,8 @@
           name: icon.name.trim(),
           value: icon.value.trim(),
           ...(activeValue ? { activeValue } : {}),
+          ...(icon.templates?.length ? { templates: icon.templates } : {}),
+          ...(icon.roles?.length ? { roles: icon.roles } : {}),
           ...(icon.group?.trim() ? { group: icon.group.trim() } : {}),
           ...(keywords.length ? { keywords } : {}),
         };
@@ -316,6 +433,11 @@
     }
     if (draft.icons.some((icon) => !icon.name.trim() || !icon.value.trim())) {
       hint = "Every icon needs a name and an icon.";
+      return;
+    }
+    const duplicate = claimConflict();
+    if (duplicate) {
+      hint = duplicate;
       return;
     }
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
@@ -359,6 +481,14 @@
       </button>
       {#if builtin}<span class="badge">built-in</span>{/if}
       {#if entry.group}<span class="badge">{entry.group}</span>{/if}
+      {#each entry.templates ?? [] as id (id)}
+        <span class="badge auto-badge" title="Template default"
+          >{templateName(id)}</span
+        >
+      {/each}
+      {#each entry.roles ?? [] as role (role)}
+        <span class="badge auto-badge" title="Role default">{role}</span>
+      {/each}
       {#if !builtin || openId === entry.id}
         <span class="item-actions">
           {#if openId === entry.id}
@@ -470,29 +600,76 @@
                   })}
               />
             </label>
-            <label class="field">
+            <div class="field keywords">
               <span class="label-mono">Keywords</span>
-              <input
-                type="text"
-                value={(openEntry.keywords ?? []).join(", ")}
-                placeholder="extra words"
-                disabled={!writable}
-                onchange={(e) => setKeywords(e.currentTarget.value)}
-              />
-            </label>
+              <div class="keyword-chips">
+                {#each openEntry.keywords ?? [] as word (word)}
+                  <span class="keyword-chip">
+                    {word}
+                    <button
+                      type="button"
+                      class="chip-x"
+                      aria-label={`Remove keyword ${word}`}
+                      disabled={!writable}
+                      onclick={() => removeKeyword(word)}
+                    >
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </span>
+                {/each}
+              </div>
+              <div class="keyword-add">
+                <input
+                  type="text"
+                  aria-label="Add a keyword"
+                  placeholder="add a keyword"
+                  list="icon-keyword-choices"
+                  bind:value={keywordDraft}
+                  disabled={!writable}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addKeyword();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  disabled={!writable || !keywordDraft.trim()}
+                  onclick={addKeyword}>Add</button
+                >
+              </div>
+              <datalist id="icon-keyword-choices">
+                {#each keywordChoices as word (word)}
+                  <option value={word}></option>
+                {/each}
+              </datalist>
+            </div>
           </div>
-          <div class="role-picks">
-            <span class="label-mono">Roles</span>
-            {#each ROLE_GLYPH_DEFAULTS as role (role.name)}
-              <button
-                type="button"
-                class="role-toggle"
-                class:on={roleSelected(role.name)}
-                aria-pressed={roleSelected(role.name)}
-                disabled={!writable}
-                onclick={() => toggleRole(role.name)}>{role.name}</button
-              >
-            {/each}
+          <div class="auto-picks">
+            <div class="field">
+              <span class="label-mono">Applies to templates</span>
+              <MultiSelect
+                options={templateOptions}
+                selected={openEntry.templates ?? []}
+                placeholder="No template default"
+                onChange={(values) =>
+                  updateUser({
+                    templates: values.length ? values : undefined,
+                  })}
+              />
+            </div>
+            <div class="field">
+              <span class="label-mono">Roles</span>
+              <MultiSelect
+                options={roleChoices}
+                selected={openEntry.roles ?? []}
+                placeholder="No role default"
+                onChange={(values) =>
+                  updateUser({ roles: values.length ? values : undefined })}
+              />
+            </div>
           </div>
         {/if}
       </div>
@@ -739,12 +916,13 @@
 
   .pool-fields {
     display: grid;
-    grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr) minmax(
-        12rem,
-        1.5fr
-      );
+    grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr);
     gap: 0.5rem;
     align-items: end;
+  }
+
+  .pool-fields .keywords {
+    grid-column: 1 / -1;
   }
 
   @media (max-width: 820px) {
@@ -765,36 +943,56 @@
     box-sizing: border-box;
   }
 
-  .role-picks {
+  .keyword-chips {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 0.35rem;
   }
 
-  .role-picks .label-mono {
-    margin-right: 0.15rem;
-  }
-
-  .role-toggle {
-    font: inherit;
-    font-size: var(--body-sm);
-    padding: 0.15rem 0.55rem;
+  .keyword-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.1rem 0.3rem 0.1rem 0.55rem;
     border: 1px solid var(--border-color);
     border-radius: 999px;
-    background: transparent;
+    font-size: var(--body-sm);
     color: var(--text-muted);
+  }
+
+  .chip-x {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
     cursor: pointer;
   }
 
-  .role-toggle.on {
-    background: var(--primary-container);
-    border-color: var(--primary-color);
-    color: var(--text-color);
+  .chip-x .material-symbols-outlined {
+    font-size: 15px;
   }
 
-  .role-toggle:disabled {
-    opacity: 0.5;
-    cursor: default;
+  .keyword-add {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  .keyword-add input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .auto-picks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 820px) {
+    .auto-picks {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
