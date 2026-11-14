@@ -83,13 +83,13 @@
       <p class="text-danger error">{error}</p>
     {/if}
     <div class="actions">
-      <button type="button" class="btn" onclick={onClose}>
+      <button type="button" class="btn btn-sm" onclick={onClose}>
         <span class="material-symbols-outlined" aria-hidden="true">close</span>
         Cancel
       </button>
       <button
         type="button"
-        class="btn btn-primary"
+        class="btn btn-sm btn-primary"
         disabled={!selected}
         onclick={() => selected && onPick(selected)}
       >
@@ -103,8 +103,51 @@
 </div>
 
 <style>
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    padding: 1rem;
+  }
+
+  /* A flex card: the list scrolls, the actions stay on screen. */
+  .modal-card {
+    display: flex;
+    flex-direction: column;
+    width: min(36rem, 100%);
+    max-height: 88vh;
+    overflow: hidden;
+    padding: 1rem;
+    gap: 0.6rem;
+  }
+
+  .modal-card h3 {
+    margin: 0;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .hint {
+    margin: 0;
+    font-size: var(--body-sm);
+  }
+
   .template-pick {
-    max-height: 45vh;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -117,7 +160,7 @@
     justify-content: space-between;
     gap: 8px;
     width: 100%;
-    padding: 8px 10px;
+    padding: 4px 8px;
     border: 0;
     border-radius: var(--border-radius);
     background: transparent;
@@ -142,5 +185,13 @@
     border: 1px solid var(--border-color);
     border-radius: 999px;
     padding: 0 0.4rem;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    padding-top: 0.5rem;
   }
 </style>
