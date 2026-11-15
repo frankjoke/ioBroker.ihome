@@ -120,7 +120,7 @@
                 <span class="row-icon" style:color={r.icon.color}>
                   <Icon
                     value={r.icon.glyph}
-                    size={18}
+                    size={22}
                     dim={r.icon.disabled}
                     data={{
                       $value: r.control?.liveValue,
@@ -182,7 +182,7 @@
                 >
                   <Icon
                     value={r.icon.glyph}
-                    size={18}
+                    size={22}
                     dim={r.icon.disabled}
                     data={{
                       $value: r.control?.liveValue,
@@ -194,7 +194,7 @@
                 <span class="row-icon" style:color={r.icon.color}>
                   <Icon
                     value={r.icon.glyph}
-                    size={18}
+                    size={22}
                     dim={r.icon.disabled}
                     data={{
                       $value: r.control?.liveValue,
@@ -308,7 +308,7 @@
   }
 
   .frame-label {
-    font-size: var(--body-sm);
+    font-size: var(--body-md);
     font-weight: 600;
   }
 
@@ -382,7 +382,7 @@
   }
 
   .row-label {
-    font-size: var(--body-sm);
+    font-size: var(--body-md);
     font-weight: 600;
     min-width: 6rem;
   }

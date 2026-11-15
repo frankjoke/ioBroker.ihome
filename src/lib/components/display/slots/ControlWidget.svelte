@@ -60,18 +60,6 @@
     levelRange((control.meta ?? common) as Record<string, unknown>, options),
   );
 
-  /** The mono readout with the effective unit and states labels. */
-  function readout(value: unknown = control.liveValue): string {
-    const parts = splitReading(
-      value,
-      unitFor(undefined, control.meta?.unit, control.unit),
-      undefined,
-      normalizeStates(control.meta?.states ?? control.states),
-      control.meta?.role ?? control.role,
-      time.now,
-    );
-    return parts.unit ? `${parts.value} ${parts.unit}` : parts.value;
-  }
   /** The body's own homes; absent = both. `hideValue` turns it off entirely. */
   const showValue = $derived(valueShown(options, home));
 
@@ -107,6 +95,22 @@
   }
 </script>
 
+<!-- The reading with its effective unit and states labels, split so the detail
+     page can bold the number without bolding the unit. -->
+{#snippet reading(value: unknown)}
+  {@const r = splitReading(
+    value,
+    unitFor(undefined, control.meta?.unit, control.unit),
+    undefined,
+    normalizeStates(control.meta?.states ?? control.states),
+    control.meta?.role ?? control.role,
+    time.now,
+  )}
+  <span class="num">{r.value}</span>{#if r.unit}<span class="unit"
+      >{r.unit}</span
+    >{/if}
+{/snippet}
+
 {#if !control.available && control.kind !== "virtual"}
   <span class="text-muted">unavailable</span>
 {:else if showValue && widget === "switch"}
@@ -139,8 +143,8 @@
         onblur={() => (dragValue = null)}
       />
       {#if showValue}
-        <span class="level-value"
-          >{readout(dragValue ?? control.liveValue)}</span
+        <span class="level-value" class:modal={home === "modal"}
+          >{@render reading(dragValue ?? control.liveValue)}</span
         >
       {/if}
     </div>
@@ -186,7 +190,9 @@
     {label || "Press"}
   </button>
 {:else if showValue}
-  <span class="mono">{readout()}</span>
+  <span class="mono" class:modal={home === "modal"}
+    >{@render reading(control.liveValue)}</span
+  >
 {/if}
 
 <style>
@@ -265,5 +271,18 @@
     font-family: var(--font-mono);
     font-size: var(--body-sm);
     white-space: nowrap;
+  }
+
+  /* The detail page is the enlargement of the tile: its numbers carry the row,
+     so they are bold there while the tile keeps its quiet readings. The unit
+     stays light either way. */
+  .level-value.modal .num,
+  .mono.modal .num {
+    font-weight: 700;
+  }
+
+  .unit {
+    font-weight: 400;
+    margin-left: 0.15em;
   }
 </style>

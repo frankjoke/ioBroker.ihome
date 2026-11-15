@@ -56,6 +56,7 @@
       type="button"
       class="value mono action"
       class:secondary={emphasis === "secondary"}
+      class:modal={home === "modal"}
       title="Toggle"
       onclick={(e) => {
         e.stopPropagation();
@@ -65,7 +66,10 @@
         >{/if}</button
     >
   {:else}
-    <span class="value mono" class:secondary={emphasis === "secondary"}
+    <span
+      class="value mono"
+      class:secondary={emphasis === "secondary"}
+      class:modal={home === "modal"}
       >{parts.value}{#if parts.unit}<span class="unit">{parts.unit}</span
         >{/if}</span
     >
@@ -103,6 +107,12 @@
 
   .value.secondary .unit {
     font-size: calc(var(--ui-secondary-size, 0.924rem) * 0.8);
+  }
+
+  /* The detail page is the enlarged tile: its number carries the row, so it is
+     bold there even when the tile keeps a secondary reading quiet. */
+  .value.modal {
+    font-weight: 700;
   }
 
   .value.action {
