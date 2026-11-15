@@ -63,9 +63,15 @@ async function readText(
   path: string,
 ): Promise<string | null> {
   try {
+    // The controller's promise resolves to `{ file, mimeType }`; the callback
+    // form hands out the bytes directly. Accept both.
     const raw = await host.readFileAsync(META_ADAPTER, path);
-    if (typeof raw === "string") return raw;
-    if (Buffer.isBuffer(raw)) return raw.toString("utf8");
+    const value =
+      raw != null && typeof raw === "object" && "file" in raw
+        ? (raw as { file: unknown }).file
+        : raw;
+    if (typeof value === "string") return value;
+    if (Buffer.isBuffer(value)) return value.toString("utf8");
     return null;
   } catch {
     return null;

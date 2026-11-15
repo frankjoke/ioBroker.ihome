@@ -154,6 +154,24 @@ it("reports a folder that cannot be listed", async () => {
   expect(logs[0]).toContain("not a meta object");
 });
 
+it("reads the controller's { file, mimeType } result", async () => {
+  const h: PluginFileHost = {
+    async readDirAsync() {
+      return [{ file: "clock", isDir: true }];
+    },
+    async readFileAsync(_adapter, path) {
+      return path.endsWith("plugin.json")
+        ? { file: MANIFEST, mimeType: "application/json" }
+        : {
+            file: Buffer.from("module.exports = {}"),
+            mimeType: "text/javascript",
+          };
+    },
+  };
+  const result = await readPluginFiles(h, "clock");
+  expect("files" in result && result.files.code).toBe("module.exports = {}");
+});
+
 it("rejects an unknown id", async () => {
   expect(await readPluginFiles(host({}), "../evil")).toEqual({
     problem: "Unknown plugin id: ../evil",
