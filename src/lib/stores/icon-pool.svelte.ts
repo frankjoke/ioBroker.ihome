@@ -69,7 +69,8 @@ async function writeMirror(pool: IconPool): Promise<void> {
       continue;
     }
     const back = await readLibraryFile();
-    if (back !== null && parseIconPool(back)) {
+    const parsed = back === null ? null : parseIconPool(back);
+    if (parsed && parsed.updatedAt === pool.updatedAt) {
       mirrorStale = false;
       return;
     }

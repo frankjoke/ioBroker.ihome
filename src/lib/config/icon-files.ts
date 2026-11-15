@@ -5,7 +5,7 @@
 
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { loadIo2Client } from "$lib/socket-client";
-import { iconSrc } from "$lib/utils/icon-url";
+import { iconBase, iconSrc } from "$lib/utils/icon-url";
 
 export const META_ADAPTER = "ihome.meta";
 export const ICON_DIR = "icons";
@@ -23,13 +23,45 @@ type FileSocket = {
 let fileSocket: FileSocket | null = null;
 let fileSocketPromise: Promise<FileSocket | null> | null = null;
 
+/** The dev server has no socket.io client; the broker does. Load it there. */
+async function loadBrokerClient(): Promise<{
+  connect: (url: string, options?: object) => FileSocket;
+} | null> {
+  const root = iconBase();
+  if (!root || typeof document === "undefined") return null;
+  return await new Promise((resolve) => {
+    try {
+      const frame = document.createElement("iframe");
+      frame.style.display = "none";
+      document.body.append(frame);
+      const doc = frame.contentDocument;
+      if (!doc) {
+        resolve(null);
+        return;
+      }
+      const script = doc.createElement("script");
+      script.src = new URL("/lib/js/socket.io.js", root).href;
+      script.onload = () =>
+        resolve(
+          (frame.contentWindow as { io?: { connect: () => FileSocket } } | null)
+            ?.io ?? null,
+        );
+      script.onerror = () => resolve(null);
+      doc.head.append(script);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 async function openFileSocket(): Promise<FileSocket | null> {
   fileSocketPromise ??= (async () => {
-    const client = (await loadIo2Client()) as {
-      connect: (url: string, options?: object) => FileSocket;
-    } | null;
+    const client =
+      ((await loadIo2Client()) as {
+        connect: (url: string, options?: object) => FileSocket;
+      } | null) ?? (await loadBrokerClient());
     if (!client) return null;
-    const origin = globalThis.location?.origin ?? "";
+    const origin = iconBase() || globalThis.location?.origin || "";
     const socket = client.connect(origin, {
       query: "key=nokey",
       reconnection: false,
@@ -231,8 +263,19 @@ export async function deleteIconFile(value: string): Promise<void> {
 
 /** Fetch the library document from the shared space; null when absent. */
 export async function readLibraryFile(): Promise<string | null> {
+  const url = new URL(iconSrc(`${META_PREFIX}library.json`));
+  // The dev server is a different origin: the web adapter sends no CORS
+  // headers, so a plain fetch is blocked there. Read over the socket instead.
+  if (url.origin !== globalThis.location?.origin) {
+    try {
+      const data = await fileCall("readFile", META_ADAPTER, LIBRARY_FILE);
+      return typeof data === "string" && data.length ? data : null;
+    } catch {
+      return null;
+    }
+  }
   try {
-    const response = await fetch(`${META_PREFIX}library.json?t=${Date.now()}`, {
+    const response = await fetch(`${url.href}?t=${Date.now()}`, {
       cache: "no-store",
     });
     if (response.status === 404) return null;
