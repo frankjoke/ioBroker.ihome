@@ -11,6 +11,7 @@
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { isHtmlIcon } from "$lib/config/icon-html";
+  import { writeIconFile } from "$lib/config/icon-files";
 
   /** The one editor picker: the library, narrowed by keywords. The main tile
    *  icon may pick an on/off pair; every other consumer sees the same grid. */
@@ -34,30 +35,26 @@
   let inUse = $state(false);
   let customOpen = $state(false);
   let uploadError = $state("");
+  // svelte-ignore state_referenced_locally
+  let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
-  /** A local image (svg/png/…), stored self-contained as a data URI. */
+  /** A local image (svg/png/…), stored in the shared space. */
   function onFile(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
     uploadError = "";
-    if (file.size > 2_000_000) {
-      uploadError = "The image is larger than 2 MB.";
+    if (file.size > 10_000_000) {
+      uploadError = "The image is larger than 10 MB.";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") onPick(reader.result);
-      else uploadError = "The image could not be read.";
-    };
-    reader.onerror = () => {
-      uploadError = "The image could not be read.";
-    };
-    reader.readAsDataURL(file);
+    void writeIconFile(file)
+      .then((value) => onPick(value))
+      .catch(() => {
+        uploadError = "The image could not be stored.";
+      });
   }
-  // svelte-ignore state_referenced_locally
-  let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
   $effect(() => {
     void initIconPool();

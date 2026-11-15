@@ -1,12 +1,15 @@
-// Persists the user's icon-pool additions. The device/role base pool lives in
-// code (`$lib/config/icon-pool`) and is never written here.
+// The icon library lives in the shared meta file space (`ihome.meta`), so every
+// iHome instance reads the same document and the same image files. The old
+// `ihome.0.config.iconPool` state is read once for migration and kept as a
+// best-effort mirror for older builds; it is no longer the truth.
+
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import {
   emptyIconPool,
   parseIconPool,
   type IconPool,
 } from "$lib/config/icon-library";
+import { readLibraryFile, writeLibraryFile } from "$lib/config/icon-files";
 
 export const ICON_POOL_ID = "ihome.0.config.iconPool";
 
@@ -15,9 +18,6 @@ export type IconPoolSave = "saved" | "conflict" | "failed";
 
 let iconPool = $state<IconPool>(emptyIconPool());
 let initPromise: Promise<void> | null = null;
-/** The updatedAt this tab last wrote; its own echo is not a remote change. */
-let lastSent: number | null = null;
-let subscribed = false;
 let saveFailed = $state(false);
 let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
   "pending",
@@ -41,43 +41,20 @@ export function iconPoolLoadKind():
   return loadKind;
 }
 
-async function ensureIconPoolObject(): Promise<void> {
-  const obj = await ioBroker.getObject(ICON_POOL_ID);
-  if (obj) return;
-  await ioBroker.emitAsync("setObject", ICON_POOL_ID, {
-    type: "state",
-    common: {
-      name: "iHome icon pool",
-      type: "string",
-      role: "text.json",
-      read: true,
-      write: true,
-    },
-    native: {},
-  });
-}
-
-function attachUpdates(st: { onUpdate?: unknown }): void {
-  subscribed = true;
-  st.onUpdate = (_cl: unknown, state: { val?: unknown }) => {
-    const parsed = parseIconPool(state?.val);
-    if (!parsed) {
-      if (state?.val != null && state.val !== "") loadKind = "unreadable";
-      return true;
-    }
-    if (lastSent !== null && parsed.updatedAt === lastSent) return true;
-    iconPool = parsed;
-    loadKind = "loaded";
-    saveFailed = false;
-    return true;
-  };
+/** The legacy state, read only when the shared file does not exist yet. */
+async function readLegacyState(): Promise<{ value?: unknown } | null> {
+  let state = await ioBroker.getState(ICON_POOL_ID, true).catch(() => null);
+  if (!state) {
+    await ioBroker.wait(300);
+    state = await ioBroker.getState(ICON_POOL_ID, true).catch(() => null);
+  }
+  return state;
 }
 
 /**
- * Write the whole document. Only the manager saves, and only on an explicit
- * Save, so there is no debounce; the promise settles with the write. The state
- * is re-read first: an absent document that another tab has since created must
- * not be overwritten by this tab's empty draft.
+ * Write the whole library. The file is re-read first: a save from another tab
+ * or instance since this one loaded is reported as a conflict rather than
+ * silently overwritten.
  */
 export async function commitIconPool(
   next: IconPool,
@@ -93,90 +70,95 @@ export async function commitIconPool(
     saveFailed = true;
     return "failed";
   }
-  let st;
-  try {
-    st = await ioBroker.getState(ICON_POOL_ID, true);
-  } catch (e) {
-    saveFailed = true;
-    console.error("re-read icon pool before save:", e);
-    return "failed";
-  }
-  if (!st && baseUpdatedAt !== 0) return "conflict";
-  const current = parseIconPool(st?.value);
-  if (st && !current) return "conflict";
-  if (current && current.updatedAt !== baseUpdatedAt) {
-    iconPool = current;
-    loadKind = "loaded";
-    attachUpdates(st!);
+  const currentText = await readLibraryFile();
+  if (currentText !== null) {
+    const current = parseIconPool(currentText);
+    if (!current) {
+      saveFailed = true;
+      loadKind = "unreadable";
+      return "conflict";
+    }
+    if (current.updatedAt !== baseUpdatedAt) {
+      iconPool = current;
+      loadKind = "loaded";
+      return "conflict";
+    }
+  } else if (baseUpdatedAt !== 0) {
+    // The file vanished under us; let the caller reload instead of guessing.
     return "conflict";
   }
-  iconPool = next;
-  lastSent = next.updatedAt;
-  saveFailed = false;
+
   try {
-    await ioBroker.setState(ICON_POOL_ID, JSON.stringify(next));
+    await writeLibraryFile(JSON.stringify(next));
   } catch (e) {
     saveFailed = true;
-    console.error("save icon pool:", e);
+    console.error("save icon library:", e);
     return "failed";
   }
-  if (!subscribed) {
-    // The first save created the state; subscribe to it from now on.
-    initPromise = null;
-    void initIconPool();
-  }
+  iconPool = next;
+  saveFailed = false;
+  // Mirror for older builds; a failure here does not fail the save.
+  void ioBroker
+    .setState(ICON_POOL_ID, JSON.stringify(next))
+    .catch(() => undefined);
   return "saved";
 }
 
-/** Re-read the document (the conflict banner's Reload action). */
+/** Re-read the shared document (the conflict banner's Reload action). */
 export function reloadIconPool(): Promise<void> {
   initPromise = null;
-  subscribed = false;
-  lastSent = null;
   return initIconPool();
 }
 
-/** Load the user pool; an absent document simply means "no additions yet". */
+/** Load the shared library; an absent file migrates from the legacy state. */
 export function initIconPool(): Promise<void> {
   if (!initPromise) {
-    // Without this the connection layer never reads the document, so another
-    // tab's save would be invisible and the conflict warning unreachable.
-    registerProgramStateId(ICON_POOL_ID);
     initPromise = (async () => {
       const until = Date.now() + 10_000;
       while (!ioBroker.connected && Date.now() < until) {
         await ioBroker.wait(200);
       }
+
+      const text = await readLibraryFile();
+      if (text !== null) {
+        const parsed = parseIconPool(text);
+        if (parsed) {
+          iconPool = parsed;
+          loadKind = "loaded";
+        } else {
+          loadKind = "unreadable";
+          console.error(
+            "the shared icon library is unreadable — leaving it untouched",
+          );
+        }
+        return;
+      }
+
+      // First run of the shared space: take the legacy state (or start empty)
+      // and seed the file so other instances see the same document.
+      let legacy: unknown = undefined;
       try {
-        await ensureIconPoolObject();
+        legacy = (await readLegacyState())?.value;
       } catch (e) {
-        console.error("initIconPool ensureIconPoolObject:", e);
+        console.error("initIconPool read legacy:", e);
       }
-      let st = await ioBroker.getState(ICON_POOL_ID, true);
-      if (!st) {
-        // A never-written state and a failed read both read as "not found";
-        // ask once more before treating the document as absent.
-        await ioBroker.wait(300);
-        st = await ioBroker.getState(ICON_POOL_ID, true);
-      }
-      if (!st) {
-        // The adapter creates the object but writes no value on a fresh
-        // install. That is an empty pool, not an unreadable one.
+      if (legacy === null || legacy === undefined || legacy === "") {
+        iconPool = emptyIconPool();
         loadKind = "absent";
         initPromise = null;
         return;
       }
-      attachUpdates(st);
-      const parsed = parseIconPool(st.value);
-      if (parsed) {
-        loadKind = "loaded";
-        iconPool = parsed;
-      } else if (st.value != null && st.value !== "") {
+      const parsed = parseIconPool(legacy);
+      if (!parsed) {
         loadKind = "unreadable";
-        console.error(
-          "iconPool is unreadable — leaving it untouched rather than overwriting it",
-        );
-      } else {
+        return;
+      }
+      iconPool = parsed;
+      loadKind = "loaded";
+      try {
+        await writeLibraryFile(JSON.stringify(parsed));
+      } catch (e) {
+        console.error("seed the shared icon library:", e);
         loadKind = "absent";
         initPromise = null;
       }

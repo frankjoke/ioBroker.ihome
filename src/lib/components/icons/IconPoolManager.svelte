@@ -29,6 +29,7 @@
   } from "$lib/stores/icon-pool.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
+  import { deleteIconFile, isMetaIconValue } from "$lib/config/icon-files";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
@@ -276,6 +277,16 @@
     savedHint = "";
   }
 
+  /** Still used by the document after `next` is written? */
+  function referencedIn(pool: IconPool, value: string): boolean {
+    return (
+      pool.library.some((icon) => icon.value === value) ||
+      Object.values(pool.twins).includes(value) ||
+      Object.values(pool.defaults.roles).includes(value) ||
+      Object.values(pool.defaults.templates).includes(value)
+    );
+  }
+
   async function save(): Promise<void> {
     if (saving) return;
     hint = "";
@@ -289,6 +300,7 @@
       hint = "Every icon needs an icon.";
       return;
     }
+    const previous = getIconPool();
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
     const snapshot = JSON.stringify([next.library, next.twins, next.defaults]);
     saving = true;
@@ -302,6 +314,13 @@
         snapshot
       ) {
         draft = clonePool(next);
+      }
+      // Files whose row is gone (and that nothing else references) leave the
+      // shared space with the save; a discarded draft never deletes files.
+      for (const icon of previous.library) {
+        if (isMetaIconValue(icon.value) && !referencedIn(next, icon.value)) {
+          void deleteIconFile(icon.value);
+        }
       }
       savedHint = "Saved.";
     } else if (result === "conflict") {
@@ -608,7 +627,11 @@
     onConfirm={() => remove(pendingRemove!)}
     onCancel={() => (pendingRemove = null)}
   >
-    <p>Only the library row is removed; tiles using the icon keep it.</p>
+    <p>
+      The row goes now. Its image file is removed from the shared space on Save
+      when no other icon, twin or default uses it. Tiles using the icon keep
+      their value.
+    </p>
   </ConfirmModal>
 {/if}
 

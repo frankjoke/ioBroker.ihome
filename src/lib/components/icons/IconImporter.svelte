@@ -14,6 +14,7 @@
     type SourceEntry,
   } from "$lib/config/icon-source";
   import { brokerIconPath } from "$lib/config/icon-ops";
+  import { copyIconFile, writeIconFile } from "$lib/config/icon-files";
 
   /** Pick one icon (single pick closes the browser) or many ("Add all"). The
    *  values are already in stored form; keywords/name are suggestions. */
@@ -317,74 +318,38 @@
     });
   }
 
-  const MIME: Record<string, string> = {
-    svg: "image/svg+xml",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    gif: "image/gif",
-    ico: "image/x-icon",
-  };
-
-  /** A self-contained copy, so an adapter update cannot break the icon. */
-  async function copyAsDataUri(value: string): Promise<string | null> {
-    const extension = value.split(".").pop()?.toLowerCase() ?? "";
-    const mime = MIME[extension];
-    if (!mime) return null;
-    try {
-      const response = await fetch(new URL(value, document.baseURI));
-      if (!response.ok) return null;
-      const blob = await response.blob();
-      return await new Promise<string | null>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () =>
-          resolve(
-            typeof reader.result === "string"
-              ? `data:${mime};base64,${reader.result.split(",")[1] ?? ""}`
-              : null,
-          );
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    } catch {
-      return null;
-    }
+  async function pickFile(entry: SourceEntry, close = true): Promise<void> {
+    const reference = importValue(basePath, entry.path);
+    const value =
+      (downloadCopy ? await copyIconFile(reference, entry.label) : null) ??
+      reference;
+    onPick(value, {
+      keywords: keywordsFromPath(basePath, entry.path),
+      name: entry.label,
+    });
+    if (close) onClose();
   }
 
-  /** A local image file, added with the same meta the sources provide. */
+  /** A local image file, stored in the shared space and added as its path. */
   function onUpload(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
     uploadError = "";
-    if (file.size > 2_000_000) {
-      uploadError = "The image is larger than 2 MB.";
+    if (file.size > 10_000_000) {
+      uploadError = "The image is larger than 10 MB.";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") return;
-      const name = file.name.replace(/\.[^.]+$/, "");
-      onPick(reader.result, { keywords: keywordWords(name), name });
-      onClose();
-    };
-    reader.onerror = () => {
-      uploadError = "The image could not be read.";
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function pickFile(entry: SourceEntry, close = true): Promise<void> {
-    const reference = importValue(basePath, entry.path);
-    const value =
-      (downloadCopy ? await copyAsDataUri(reference) : null) ?? reference;
-    onPick(value, {
-      keywords: keywordsFromPath(basePath, entry.path),
-      name: entry.label,
-    });
-    if (close) onClose();
+    void writeIconFile(file)
+      .then((value) => {
+        const name = file.name.replace(/\.[^.]+$/, "");
+        onPick(value, { keywords: keywordWords(name), name });
+        onClose();
+      })
+      .catch(() => {
+        uploadError = "The image could not be stored.";
+      });
   }
 
   async function addAll(): Promise<void> {
