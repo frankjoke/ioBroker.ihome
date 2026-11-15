@@ -10,6 +10,7 @@ import {
   removeLibraryIcon,
   roleChoicesFromObjects,
   seedLibrary,
+  setDefault,
   splitTwins,
   upsertLibraryIcon,
   type LibraryIcon,
@@ -198,4 +199,23 @@ it("builds role choices from state roles only", () => {
     { value: "switch.*", label: "switch.* · 2" },
     { value: "light.*", label: "light.* · 1" },
   ]);
+});
+
+it("sets, overwrites and clears a default", () => {
+  let pool = emptyIconPool();
+  pool = setDefault(pool, "roles", "light.*", {
+    value: "x",
+    activeValue: "y",
+  });
+  expect(pool.defaults.roles["light.*"]).toEqual({
+    value: "x",
+    activeValue: "y",
+  });
+  pool = setDefault(pool, "roles", "light.*", { value: "z" });
+  expect(pool.defaults.roles["light.*"]).toEqual({ value: "z" });
+  pool = setDefault(pool, "templates", "Door", { value: "t" });
+  expect(pool.defaults.templates.Door).toEqual({ value: "t" });
+  pool = setDefault(pool, "roles", "light.*", null);
+  expect(pool.defaults.roles["light.*"]).toBeUndefined();
+  expect(pool.updatedAt).toBeGreaterThan(0);
 });

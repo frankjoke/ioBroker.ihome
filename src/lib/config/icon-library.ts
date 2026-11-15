@@ -417,3 +417,26 @@ export function roleChoicesFromObjects(
       })),
   ];
 }
+
+/** Set or clear one default; an empty pair removes the key. */
+export function setDefault(
+  pool: IconPool,
+  kind: "roles" | "templates",
+  key: string,
+  pair: IconPair | null,
+): IconPool {
+  const trimmed = key.trim();
+  const value = pair?.value?.trim() ?? "";
+  if (!trimmed) return pool;
+  const defaults: IconPool["defaults"] = {
+    roles: { ...pool.defaults.roles },
+    templates: { ...pool.defaults.templates },
+  };
+  if (value) {
+    const activeValue = pair?.activeValue?.trim();
+    defaults[kind][trimmed] = activeValue ? { value, activeValue } : { value };
+  } else {
+    delete defaults[kind][trimmed];
+  }
+  return { ...pool, updatedAt: Date.now(), defaults };
+}

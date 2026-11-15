@@ -3,6 +3,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import IconImporter from "$lib/components/icons/IconImporter.svelte";
+  import IconDefaults from "$lib/components/icons/IconDefaults.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import {
     POOL_CAP,
@@ -11,7 +12,9 @@
     keywordWords,
     libraryKeywordCounts,
     removeLibraryIcon,
+    setDefault,
     upsertLibraryIcon,
+    type IconPair,
     type IconPool,
     type LibraryIcon,
   } from "$lib/config/icon-library";
@@ -36,10 +39,15 @@
 
   const TABS = [
     { id: "library", label: "Library", hint: "Your curated icons" },
+    {
+      id: "defaults",
+      label: "Defaults",
+      hint: "Icons for roles and templates",
+    },
   ] as const;
 
   let loaded = $state(false);
-  let tab = $state<"library">("library");
+  let tab = $state<"library" | "defaults">("library");
   let draft = $state<IconPool>(emptyIconPool());
   let baseUpdatedAt = $state(0);
   let search = $state("");
@@ -294,6 +302,16 @@
     }
   }
 
+  function setDefaultEntry(
+    kind: "roles" | "templates",
+    key: string,
+    pair: IconPair | null,
+  ): void {
+    if (!writable) return;
+    draft = setDefault(draft, kind, key, pair);
+    savedHint = "";
+  }
+
   function label(icon: LibraryIcon): string {
     return icon.name?.trim() || icon.value;
   }
@@ -483,30 +501,6 @@
       collapsible={false}
       showHint={false}
     />
-    <div class="item">
-      <div class="item-line title-line">
-        <Icon value="apps" size={18} />
-        <span class="name">Icon library</span>
-        <span class="badge">{draft.library.length} icons</span>
-        <!-- Add stays on the document line; Save lives on the open row (§5). -->
-        <span class="item-actions">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={!writable || saving}
-            onclick={() => {
-              hint = "";
-              savedHint = "";
-              added = 0;
-              skipped = 0;
-              importer = { mode: "add" };
-            }}
-          >
-            + Icon
-          </button>
-        </span>
-      </div>
-    </div>
 
     {#if loadKind === "unreadable"}
       <p class="text-danger hint">
@@ -527,27 +521,63 @@
       <p class="text-danger hint">Not saved — check the connection.</p>
     {/if}
 
-    <div class="list-toolbar">
-      <div class="list-filter">
-        <span class="label-mono filter-label">Filters</span>
-        <input
-          type="search"
-          placeholder="Search name, keywords or icon…"
-          bind:value={search}
-        />
+    {#if tab === "library"}
+      <div class="item">
+        <div class="item-line title-line">
+          <Icon value="apps" size={18} />
+          <span class="name">Icon library</span>
+          <span class="badge">{draft.library.length} icons</span>
+          <!-- Add stays on the document line; Save lives on the open row (§5). -->
+          <span class="item-actions">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={!writable || saving}
+              onclick={() => {
+                hint = "";
+                savedHint = "";
+                added = 0;
+                skipped = 0;
+                importer = { mode: "add" };
+              }}
+            >
+              + Icon
+            </button>
+          </span>
+        </div>
       </div>
-    </div>
 
-    {#if rows.length === 0}
-      <div class="card empty-state">
-        <p class="text-muted">No icons match the search.</p>
+      <div class="list-toolbar">
+        <div class="list-filter">
+          <span class="label-mono filter-label">Filters</span>
+          <input
+            type="search"
+            placeholder="Search name, keywords or icon…"
+            bind:value={search}
+          />
+        </div>
       </div>
+
+      {#if rows.length === 0}
+        <div class="card empty-state">
+          <p class="text-muted">No icons match the search.</p>
+        </div>
+      {:else}
+        <div class="list">
+          {#each rows as entry (entry.id)}
+            {@render libraryRow(entry)}
+          {/each}
+        </div>
+      {/if}
     {:else}
-      <div class="list">
-        {#each rows as entry (entry.id)}
-          {@render libraryRow(entry)}
-        {/each}
-      </div>
+      <IconDefaults
+        {draft}
+        {writable}
+        {dirty}
+        {saving}
+        onSet={setDefaultEntry}
+        onSave={save}
+      />
     {/if}
   </div>
 {/if}
