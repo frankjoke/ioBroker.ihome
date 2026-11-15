@@ -1,19 +1,18 @@
 import { it, expect, vi } from "vitest";
 
 const h = vi.hoisted(() => {
-  const file = { text: null as string | null, writes: [] as string[] };
   const state = { value: null as unknown };
+  const file = { text: null as string | null };
   const setState = vi.fn(async (_id: string, value: unknown) => {
     state.value = value;
   });
   return {
-    file,
     state,
+    file,
     setState,
     readLibraryFile: vi.fn(async () => file.text),
     writeLibraryFile: vi.fn(async (json: string) => {
       file.text = json;
-      file.writes.push(json);
     }),
   };
 });
@@ -43,58 +42,53 @@ const doc = (updatedAt: number, id = "a", value = "x") =>
     defaults: { roles: {}, templates: {} },
   });
 
-/** A fresh module per scenario: absent, loaded and unreadable differ at init. */
-async function load(fileText: string | null, legacy: unknown = null) {
+async function load(stateValue: string | null, fileText: string | null) {
+  h.state.value = stateValue;
   h.file.text = fileText;
-  h.file.writes.length = 0;
-  h.state.value = legacy;
   h.setState.mockClear();
-  h.readLibraryFile.mockClear();
   h.writeLibraryFile.mockClear();
+  h.readLibraryFile.mockClear();
   vi.resetModules();
   const store = await import("./icon-pool.svelte");
   await store.initIconPool();
   return store;
 }
 
-it("loads the shared library file", async () => {
-  const store = await load(doc(1));
+it("loads from the state and keeps the mirror in step", async () => {
+  const store = await load(doc(5), null);
   expect(store.iconPoolLoadKind()).toBe("loaded");
-  expect(store.getIconPool().library).toHaveLength(1);
-  expect(h.writeLibraryFile).not.toHaveBeenCalled();
-});
-
-it("migrates the legacy state into the shared file on first run", async () => {
-  const store = await load(null, doc(4, "legacy", "y"));
-  expect(store.iconPoolLoadKind()).toBe("loaded");
-  expect(store.getIconPool().library[0].id).toBe("legacy");
+  expect(store.getIconPool().library[0].id).toBe("a");
   expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
-  expect(h.file.text).toContain("legacy");
 });
 
-it("keeps an unreadable shared file untouched when there is no mirror", async () => {
-  const store = await load("{not json", null);
-  expect(store.iconPoolLoadKind()).toBe("unreadable");
-  expect(store.isIconPoolWritable()).toBe(false);
-  expect(h.writeLibraryFile).not.toHaveBeenCalled();
+it("joins an existing shared file when the state is empty", async () => {
+  const store = await load(null, doc(7, "joined", "y"));
+  expect(store.iconPoolLoadKind()).toBe("loaded");
+  expect(store.getIconPool().library[0].id).toBe("joined");
+  expect(h.setState).toHaveBeenCalled();
 });
 
-it("repairs an unreadable shared file from a valid mirror", async () => {
-  const store = await load("{not json", doc(9, "mirror", "m"));
+it("prefers the newer of state and file", async () => {
+  const store = await load(doc(3, "state"), doc(9, "file"));
+  expect(store.getIconPool().library[0].id).toBe("file");
+  expect(h.setState).toHaveBeenCalled();
+});
+
+it("recovers from a corrupt state using a valid mirror", async () => {
+  const store = await load("{not json", doc(4, "mirror", "m"));
   expect(store.iconPoolLoadKind()).toBe("loaded");
   expect(store.getIconPool().library[0].id).toBe("mirror");
-  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
+  expect(h.setState).toHaveBeenCalled();
 });
 
-it("starts empty and writable when neither file nor state exists", async () => {
+it("starts empty when neither side exists", async () => {
   const store = await load(null, null);
   expect(store.iconPoolLoadKind()).toBe("absent");
   expect(store.isIconPoolWritable()).toBe(true);
-  expect(h.writeLibraryFile).not.toHaveBeenCalled();
 });
 
-it("writes the file and mirrors the state on save", async () => {
-  const store = await load(doc(1));
+it("saves the state first and refreshes the mirror", async () => {
+  const store = await load(doc(1), doc(1));
   const next = {
     version: 3 as const,
     updatedAt: 10,
@@ -103,17 +97,31 @@ it("writes the file and mirrors the state on save", async () => {
     defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 1)).toBe("saved");
-  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
   expect(h.setState).toHaveBeenCalledWith(
     store.ICON_POOL_ID,
     JSON.stringify(next),
   );
-  expect(store.getIconPool().updatedAt).toBe(10);
+  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
+  expect(store.iconPoolMirrorStale()).toBe(false);
 });
 
-it("refuses to overwrite a save made since load", async () => {
-  const store = await load(doc(1));
-  h.file.text = doc(2, "remote", "z");
+it("a broken mirror does not fail the save", async () => {
+  const store = await load(doc(1), doc(1));
+  h.writeLibraryFile.mockRejectedValueOnce(new Error("broken"));
+  const next = {
+    version: 3 as const,
+    updatedAt: 11,
+    library: [],
+    twins: {},
+    defaults: { roles: {}, templates: {} },
+  };
+  expect(await store.commitIconPool(next, 1)).toBe("saved");
+  expect(store.iconPoolMirrorStale()).toBe(true);
+});
+
+it("refuses to overwrite a state changed since load", async () => {
+  const store = await load(doc(1), doc(1));
+  h.state.value = doc(2, "remote", "z");
   const result = await store.commitIconPool(
     {
       version: 3 as const,
@@ -125,6 +133,5 @@ it("refuses to overwrite a save made since load", async () => {
     1,
   );
   expect(result).toBe("conflict");
-  expect(h.writeLibraryFile).not.toHaveBeenCalled();
   expect(store.getIconPool().library[0].id).toBe("remote");
 });

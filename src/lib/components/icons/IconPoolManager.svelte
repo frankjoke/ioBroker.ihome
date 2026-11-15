@@ -22,6 +22,7 @@
     commitIconPool,
     getIconPool,
     iconPoolLoadKind,
+    iconPoolMirrorStale,
     iconPoolSaveFailed,
     initIconPool,
     isIconPoolWritable,
@@ -66,6 +67,7 @@
   const loadKind = $derived(iconPoolLoadKind());
   const writable = $derived(isIconPoolWritable());
   const saveFailed = $derived(iconPoolSaveFailed());
+  const mirrorStale = $derived(iconPoolMirrorStale());
 
   // The draft, not the filtered list: an entry being edited must stay visible
   // even while its name stops matching the search.
@@ -392,6 +394,12 @@
     {#if savedHint}<p class="text-success hint">{savedHint}</p>{/if}
     {#if saveFailed}
       <p class="text-danger hint">Not saved — check the connection.</p>
+    {/if}
+    {#if mirrorStale}
+      <p class="text-warning hint">
+        The library is saved, but its shared copy
+        (ihome.meta/icons/library.json) could not be updated.
+      </p>
     {/if}
 
     {#if tab === "library"}
