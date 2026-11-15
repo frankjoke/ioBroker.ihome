@@ -12,6 +12,7 @@ import {
   TEMPLATE_KINDS,
   parseTemplateFile,
   serializeTemplateFile,
+  templateFile,
   type TemplateFile,
   type TemplateKind,
 } from "$lib/config/template-file";
@@ -114,4 +115,19 @@ export async function listTemplates(
       a.id.localeCompare(b.id)
     );
   });
+}
+
+/** Write every definition of one kind and remove the files that are gone. */
+export async function syncKind(
+  kind: TemplateKind,
+  definitions: { id: string }[],
+  previousIds: Iterable<string>,
+): Promise<void> {
+  const ids = new Set(definitions.map((definition) => definition.id));
+  for (const definition of definitions) {
+    await writeTemplate(kind, definition.id, templateFile(kind, definition));
+  }
+  for (const id of previousIds) {
+    if (!ids.has(id)) await deleteTemplate(kind, id);
+  }
 }

@@ -61,7 +61,7 @@ async function ensureFormulaObject() {
     await ioBroker.emitAsync("setObject", FORMULA_LIST_ID, {
       type: "state",
       common: {
-        name: "AiHome formula templates",
+        name: "iHome formula templates",
         type: "json",
         role: "json",
         read: true,

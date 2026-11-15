@@ -1,12 +1,13 @@
-// Persists the *user* templates to their own ioBroker state. Built-in presets
-// live in code (`$lib/config/presets`) and are never stored; a user template is
-// a copy (`basedOn`) that this document owns. Same registry pattern and the same
-// no-module-global-client rule as `pages.svelte.ts`.
+// User templates live as one file per template in the shared space
+// (`ihome.meta/templates/device/<id>.json`). The folder is the truth; the old
+// `templateList` state is read once for migration and then left untouched.
+// Built-in presets stay in code and are never stored.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  parseTemplateRegistry,
   migrateTemplateRegistry,
+  parseTemplateRegistry,
 } from "$lib/config/template-ops";
+import { listTemplates, syncKind } from "$lib/config/template-files";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { stateIdFor } from "$lib/config/variables";
@@ -14,6 +15,7 @@ import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { getSettings } from "$lib/stores/settings.svelte";
 import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { TemplateRegistry } from "$lib/types/display";
+import type { Template } from "$lib/types/display";
 
 export const TEMPLATE_LIST_ID = "ihome.0.config.templateList";
 
@@ -24,6 +26,8 @@ const emptyRegistry: TemplateRegistry = {
 };
 
 let templateRegistry = $state<TemplateRegistry>(emptyRegistry);
+/** Ids present in the folder at the last load/save; deleting removes the rest. */
+let knownIds: Record<string, true> = {};
 
 export function getTemplateRegistry(): TemplateRegistry {
   return templateRegistry;
@@ -39,76 +43,55 @@ export function setTemplateRegistry(reg: TemplateRegistry): void {
 
 let initPromise: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let lastSent: string | null = null;
 let saveFailed = $state(false);
-/** How the stored document last loaded. `absent` is a valid empty state (the
- *  first save creates it); only `pending` and `unreadable` block writes. */
 let templatesLoadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
   "pending",
 );
 
-/**
- * True while the last document write failed, so the pane can say "not saved"
- * instead of pretending the change landed.
- */
+/** True while the last file write failed, so the pane can say "not saved". */
 export function getTemplateSaveFailed(): boolean {
   return saveFailed;
 }
 
-/** May templates be written? False until the document has been read, and false
- *  for an unreadable one — a failed read must not be replaced by "no templates". */
+/** May templates be written? False until loaded; a corrupt legacy document
+ *  without files still blocks writes so it is never replaced by "none". */
 export function isTemplatesWritable(): boolean {
   return templatesLoadKind === "loaded" || templatesLoadKind === "absent";
 }
 
-async function ensureTemplatesObject() {
-  const obj = await ioBroker.getObject(TEMPLATE_LIST_ID);
-  if (!obj) {
-    await ioBroker.emitAsync("setObject", TEMPLATE_LIST_ID, {
-      type: "state",
-      common: {
-        name: "AiHome user templates",
-        type: "string",
-        role: "text.json",
-        read: true,
-        write: true,
-      },
-      native: {},
-    });
-  }
+function registryOf(templates: Template[]): TemplateRegistry {
+  return { version: 1, updatedAt: Date.now(), templates };
 }
 
+/** Every write goes to the folder: one file per template, stale files removed. */
 export function saveTemplates(): void {
   if (saveTimer) clearTimeout(saveTimer);
-  const snapshot = JSON.stringify(getTemplateRegistry());
+  const templates = getTemplateRegistry().templates ?? [];
   saveTimer = setTimeout(() => {
-    // A disconnected socket resolves `emitAsync` without sending anything, so a
-    // write would look successful while the broker never saw it (review I1).
     if (!ioBroker.connected) {
       saveFailed = true;
       return;
     }
-    lastSent = snapshot;
-    ioBroker
-      .setState(TEMPLATE_LIST_ID, snapshot)
-      .then(() => {
+    void (async () => {
+      try {
+        await syncKind("device", templates, Object.keys(knownIds));
+        knownIds = Object.fromEntries(
+          templates.map((template) => [template.id, true]),
+        );
         saveFailed = false;
-      })
-      .catch((e) => {
+      } catch (e) {
         saveFailed = true;
         console.error("save templates:", e);
-      });
+      }
+    })();
   }, 250);
 }
 
-/**
- * The pane's only write path: replace the registry and persist it. Refuses while
- * the document is pending or unreadable, so a failed read is never overwritten.
- */
+/** The pane's only write path: replace the registry and persist it. */
 export function commitTemplates(next: TemplateRegistry): boolean {
   if (!isTemplatesWritable()) {
     console.error(
-      "templateList is not readable (no successful load) — the change was not saved",
+      "templates are not readable (no successful load) — the change was not saved",
     );
     return false;
   }
@@ -120,8 +103,7 @@ export function commitTemplates(next: TemplateRegistry): boolean {
 /**
  * The template document, plus every raw state and rule id its templates name:
  * a device that has no slots of its own renders the chain's, so the chain's
- * sources and rules must be in the used set too (the device store scans the
- * device's own slots only).
+ * sources and rules must be in the used set too.
  */
 function registerTemplateStateIds(): void {
   registerProgramStateId(TEMPLATE_LIST_ID);
@@ -130,9 +112,6 @@ function registerTemplateStateIds(): void {
     for (const slot of template?.slots ?? []) {
       const source = slot?.source;
       if (typeof source === "string" && source) {
-        // A feature name (no dot) is not a state; a state id is. No object-cache
-        // check: at load the cache can still be empty, and a skipped id is never
-        // read (the slot then shows "—").
         const id = stateIdFor(source, variables);
         if (id.includes(".")) registerProgramStateId(id);
       }
@@ -145,7 +124,7 @@ function registerTemplateStateIds(): void {
   }
 }
 
-/** Load the user templates; an absent document simply means "none yet". */
+/** Load the templates from the folder; migrate the old state once. */
 export function initTemplates(): Promise<void> {
   registerTemplateStateIds();
   if (!initPromise) {
@@ -154,49 +133,59 @@ export function initTemplates(): Promise<void> {
       while (!ioBroker.connected && Date.now() < until) {
         await ioBroker.wait(200);
       }
-      try {
-        await ensureTemplatesObject();
-      } catch (e) {
-        console.error("initTemplates ensureTemplatesObject:", e);
-      }
-      const st = await ioBroker.getState(TEMPLATE_LIST_ID, true);
-      if (!st) {
-        templatesLoadKind = "absent";
+      if (!ioBroker.connected) {
         initPromise = null;
         return;
       }
-      st.onUpdate = (_cl, state) => {
-        const parsed = parseTemplateRegistry(state?.val);
-        if (!parsed) return true;
-        const migrated = migrateTemplateRegistry(
-          parsed,
-          getSettings().sizeUnit === SIZE_UNIT,
+
+      const files = await listTemplates("device");
+      const readable = files.filter(
+        (row): row is { id: string; file: NonNullable<typeof row.file> } =>
+          !!row.file,
+      );
+      if (files.length) {
+        templatesLoadKind = "loaded";
+        knownIds = Object.fromEntries(readable.map((row) => [row.id, true]));
+        setTemplateRegistry(
+          registryOf(readable.map((row) => row.file.definition as Template)),
         );
-        const asString = JSON.stringify(migrated.registry);
-        if (lastSent !== null && lastSent === asString) return true;
-        setTemplateRegistry(migrated.registry);
-        if (migrated.changed) saveTemplates();
-        return true;
-      };
-      const parsed = parseTemplateRegistry(st.value);
-      // Templates are only ever absent (never seeded), so nothing is written
-      // here: an unreadable document must not be replaced by an empty one.
+        return;
+      }
+
+      // No files yet: migrate the legacy document once (never written again).
+      let state: { value?: unknown } | null = null;
+      try {
+        state = await ioBroker.getState(TEMPLATE_LIST_ID, true);
+      } catch (e) {
+        console.error("initTemplates legacy:", e);
+      }
+      const parsed = parseTemplateRegistry(state?.value);
       if (parsed) {
         const migrated = migrateTemplateRegistry(
           parsed,
           getSettings().sizeUnit === SIZE_UNIT,
         );
-        templatesLoadKind = "loaded";
         setTemplateRegistry(migrated.registry);
-        if (migrated.changed) saveTemplates();
-      } else if (st.value != null && st.value !== "") {
+        templatesLoadKind = "loaded";
+        try {
+          await syncKind("device", migrated.registry.templates, []);
+          knownIds = Object.fromEntries(
+            migrated.registry.templates.map((template) => [template.id, true]),
+          );
+        } catch (e) {
+          saveFailed = true;
+          console.error("migrate templates:", e);
+        }
+        return;
+      }
+      if (state && state.value != null && state.value !== "") {
         templatesLoadKind = "unreadable";
         console.error(
-          "templateList is unreadable — leaving it untouched rather than overwriting it",
+          "the legacy template document is unreadable and no template files exist — leaving both untouched",
         );
-      } else {
-        templatesLoadKind = "absent";
+        return;
       }
+      templatesLoadKind = "absent";
     })().catch((e) => {
       console.error("initTemplates:", e);
       initPromise = null;
