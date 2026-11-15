@@ -61,11 +61,25 @@
   let mdiIcons = $state.raw<MdiIcon[]>([]);
   let mdiCategories = $state.raw<MdiCategory[]>([]);
   let mdiCategory = $state("");
+  let mdiTouched = $state(false);
   let mdiState = $state<"idle" | "loading" | "ready" | "error">("idle");
   let mdiError = $state("");
 
   // ioBroker objects
   let objectAdapter = $state("");
+  let objectTouched = $state(false);
+
+  $effect(() => {
+    if (mdiTouched || mdiCategory) return;
+    if (mdiState === "ready" && mdiCategoryCounts.length) {
+      mdiCategory = mdiCategoryCounts[0].id;
+    }
+  });
+
+  $effect(() => {
+    if (objectTouched || objectAdapter) return;
+    if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
+  });
 
   const library = $derived(getIconPool().library);
   const libraryShown = $derived.by(() => {
@@ -135,17 +149,16 @@
 
   const objectShown = $derived.by(() => {
     const query = search.trim().toLowerCase();
-    if (query) {
-      return objectIcons.filter(
-        (entry) =>
-          entry.id.toLowerCase().includes(query) ||
-          entry.adapter.toLowerCase().includes(query),
-      );
-    }
-    return objectAdapter
+    const base = objectAdapter
       ? (objectAdapters.find((entry) => entry.name === objectAdapter)?.list ??
-          [])
-      : [];
+        [])
+      : objectIcons;
+    if (!query) return base;
+    return base.filter(
+      (entry) =>
+        entry.id.toLowerCase().includes(query) ||
+        entry.adapter.toLowerCase().includes(query),
+    );
   });
 
   const iconEntries = $derived(entries.filter((e) => e.kind === "icon"));
@@ -353,25 +366,33 @@
               />
             </div>
           {/if}
-          {#if resource === "objects" && !search.trim() && objectAdapter}
-            <button
-              type="button"
-              class="btn btn-sm btn-outline"
-              onclick={() => (objectAdapter = "")}>All adapters</button
+          {#if resource === "objects"}
+            <select
+              aria-label="ioBroker adapter"
+              bind:value={objectAdapter}
+              onchange={() => (objectTouched = true)}
             >
+              {#each objectAdapters as adapter (adapter.name)}
+                <option value={adapter.name}
+                  >{adapter.name} ({adapter.list.length})</option
+                >
+              {/each}
+              <option value="">-- all --</option>
+            </select>
           {/if}
           {#if resource === "mdi"}
             <select
               aria-label="MDI category"
               bind:value={mdiCategory}
               disabled={mdiState !== "ready"}
+              onchange={() => (mdiTouched = true)}
             >
-              <option value="">All categories</option>
               {#each mdiCategoryCounts as category (category.id)}
                 <option value={category.id}
                   >{mdiName(category.id)} ({category.count})</option
                 >
               {/each}
+              <option value="">-- all --</option>
             </select>
           {/if}
         </div>
@@ -416,28 +437,10 @@
               </div>
             {/if}
           {:else if resource === "objects"}
-            {#if !search.trim() && !objectAdapter}
-              {#if objectAdapters.length === 0}
-                <p class="empty text-muted">
-                  No broker objects carry a common.icon.
-                </p>
-              {:else}
-                <ul class="folders">
-                  {#each objectAdapters as adapter (adapter.name)}
-                    <li>
-                      <button
-                        type="button"
-                        class="folder"
-                        onclick={() => (objectAdapter = adapter.name)}
-                      >
-                        <span class="material-symbols-outlined">folder</span>
-                        <span class="folder-name">{adapter.name}</span>
-                        <span class="count">{adapter.list.length}</span>
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
+            {#if objectAdapters.length === 0}
+              <p class="empty text-muted">
+                No broker objects carry a common.icon.
+              </p>
             {:else if objectShown.length === 0}
               <p class="empty text-muted">No icons match the search.</p>
             {:else}
@@ -671,11 +674,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .count {
-    font-size: var(--body-sm);
-    color: var(--text-muted);
   }
 
   .grid {
