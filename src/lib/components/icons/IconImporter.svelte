@@ -118,6 +118,7 @@
         path: "icons-addictive-flavour-png/",
         label: "icons-addictive-flavour-png",
       },
+      { path: "iqontrol/images/", label: "iqontrol/images" },
     ];
     for (const id of metaSpaces) {
       roots.push({ path: `${id}/`, label: id });

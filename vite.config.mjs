@@ -1,11 +1,26 @@
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import adapter from "@sveltejs/adapter-static";
 
 // The SvelteKit config lives here rather than in svelte.config.js: this package
 // is CommonJS (main.js), so Node cannot import an ESM svelte.config.js.
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Dev only: the broker's browsable icon roots are cross-origin, so the
+  // listings are proxied through the dev server (the app fetches them
+  // relatively). Production is served by the web adapter itself.
+  const env = loadEnv(mode, process.cwd(), "");
+  const broker = String(env.VITE_IOBROKER_ORIGIN ?? "").replace(/\/+$/, "");
+  const proxy = broker
+    ? Object.fromEntries(
+        ["/icons-freepic", "/icons-addictive-flavour-png", "/iqontrol"].map(
+          (root) => [root, { target: broker, changeOrigin: true }],
+        ),
+      )
+    : {};
+
+  return {
   plugins: [
     sveltekit({
       preprocess: vitePreprocess(),
@@ -41,6 +56,7 @@ export default defineConfig({
     }),
   ],
   server: {
+    proxy,
     headers: {
       "Access-Control-Allow-Origin": "*",
     },
@@ -61,4 +77,5 @@ export default defineConfig({
       requireAssertions: true,
     },
   },
+  };
 });
