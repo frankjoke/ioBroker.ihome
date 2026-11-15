@@ -16,6 +16,7 @@ export interface CreateDeviceInput {
   name: string;
   room?: string;
   icon?: string;
+  activeIcon?: string;
   fills: DeviceTemplateFill[];
   newId: () => string;
   newControlId: () => string;
@@ -70,6 +71,7 @@ export function planDeviceCreate(
       type: input.template.type,
       ...(input.room ? { room: input.room } : {}),
       ...(input.icon ? { icon: input.icon } : {}),
+      ...(input.activeIcon ? { activeIcon: input.activeIcon } : {}),
       template: input.template.id,
       controls,
     },

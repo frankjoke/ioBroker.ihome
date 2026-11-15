@@ -76,6 +76,7 @@
   let section = $state(init?.section ?? "");
   let panel = $state(init?.panel ?? "");
   let icon = $state(init?.icon ?? "");
+  let activeIcon = $state(init?.activeIcon ?? "");
   let iconPicker = $state(false);
   let controls = $state<Control[]>(init?.controls ?? []);
   // auto-open the picker for a brand-new (empty) device
@@ -290,6 +291,7 @@
         section: section || undefined,
         panel: panel || undefined,
         icon: icon || undefined,
+        activeIcon: activeIcon || undefined,
         functions: device?.functions,
         favorites: device?.favorites,
         tags: device?.tags,
@@ -355,9 +357,19 @@
           {#if icon}<Icon value={icon} size={20} />{/if}
           <span>{icon ? "Change icon" : "Choose icon"}</span>
         </button>
+        {#if activeIcon}
+          <span class="twin" title="On twin"
+            ><Icon value={activeIcon} size={20} /></span
+          >
+        {/if}
         {#if icon}
-          <button type="button" class="btn" onclick={() => (icon = "")}
-            >Clear</button
+          <button
+            type="button"
+            class="btn"
+            onclick={() => {
+              icon = "";
+              activeIcon = "";
+            }}>Clear</button
           >
         {/if}
       </div>
@@ -488,8 +500,10 @@
 {#if iconPicker}
   <IconPicker
     {icon}
-    onPick={(value) => {
+    twins
+    onPick={(value, meta) => {
       icon = value;
+      activeIcon = meta?.active ?? "";
       iconPicker = false;
     }}
     onClose={() => (iconPicker = false)}

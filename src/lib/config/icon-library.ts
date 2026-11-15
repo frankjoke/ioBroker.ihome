@@ -1,6 +1,6 @@
-// The icon library document (version 2): a curated, keyword-tagged collection
-// plus the role/template defaults map. It replaces the mixed v1 pool; a v1
-// document is migrated on read and written back as v2 on the next save.
+// The icon library document. Version 3 splits the two jobs cleanly: the
+// library lists single icons, and a pairing is one relation between two values.
+// Every reader that cares about on/off reads `twins`; nothing else does.
 
 import { DEVICE_TYPES } from "$lib/config/features";
 import { ROLE_GLYPH_DEFAULTS, presetGlyph } from "$lib/config/icon-ops";
@@ -11,27 +11,29 @@ export interface LibraryIcon {
   /** Optional; the editor picker never shows it, the manager falls back to the value. */
   name?: string;
   value: string;
-  /** The other half of an on/off twin. */
-  activeValue?: string;
   /** Single lowercase words; many per icon. */
   keywords: string[];
 }
 
-/** A default is a value pair, never a reference to a library row. */
+/** A resolved pair: the icon plus its active twin, looked up in `twins`. */
 export interface IconPair {
   value: string;
   activeValue?: string;
 }
 
+export type DefaultKind = "roles" | "templates";
+
 export interface IconPool {
-  version: 2;
+  version: 3;
   updatedAt: number;
   library: LibraryIcon[];
+  /** off value → on value; one pairing per value, global. */
+  twins: Record<string, string>;
   defaults: {
-    /** Exact role (`switch.active`) or family pattern (`light.*`). */
-    roles: Record<string, IconPair>;
-    /** Template id. */
-    templates: Record<string, IconPair>;
+    /** Exact role (`switch.active`) or family pattern (`light.*`) → value. */
+    roles: Record<string, string>;
+    /** Template id → value. */
+    templates: Record<string, string>;
   };
 }
 
@@ -91,9 +93,10 @@ export function seedLibrary(): LibraryIcon[] {
 
 export function emptyIconPool(): IconPool {
   return {
-    version: 2,
+    version: 3,
     updatedAt: 0,
     library: seedLibrary(),
+    twins: {},
     defaults: { roles: {}, templates: {} },
   };
 }
@@ -102,28 +105,9 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function parsePair(raw: unknown): IconPair | undefined {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const record = raw as Record<string, unknown>;
-  const value = text(record.value);
-  if (!value) return undefined;
-  const activeValue = text(record.activeValue);
-  return activeValue ? { value, activeValue } : { value };
-}
-
-function parseDefaults(raw: unknown): IconPool["defaults"] {
-  const defaults: IconPool["defaults"] = { roles: {}, templates: {} };
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
-  const record = raw as Record<string, unknown>;
-  for (const kind of ["roles", "templates"] as const) {
-    const map = record[kind];
-    if (!map || typeof map !== "object" || Array.isArray(map)) continue;
-    for (const [key, pair] of Object.entries(map as Record<string, unknown>)) {
-      const parsed = parsePair(pair);
-      if (key.trim() && parsed) defaults[kind][key.trim()] = parsed;
-    }
-  }
-  return defaults;
+function parseKeywords(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.flatMap((word) => keywordWords(String(word))))];
 }
 
 function parseLibraryIcon(raw: unknown): LibraryIcon | undefined {
@@ -133,20 +117,11 @@ function parseLibraryIcon(raw: unknown): LibraryIcon | undefined {
   const value = text(record.value);
   if (!id || !value) return undefined;
   const name = text(record.name);
-  const activeValue = text(record.activeValue);
-  const keywords = Array.isArray(record.keywords)
-    ? [
-        ...new Set(
-          record.keywords.flatMap((word) => keywordWords(String(word))),
-        ),
-      ]
-    : [];
   return {
     id,
     ...(name ? { name } : {}),
     value,
-    ...(activeValue ? { activeValue } : {}),
-    keywords,
+    keywords: parseKeywords(record.keywords),
   };
 }
 
@@ -166,7 +141,34 @@ function parseLibrary(raw: unknown): LibraryIcon[] | null {
   return library;
 }
 
-function parseV2(record: Record<string, unknown>): IconPool | null {
+function parseTwins(raw: unknown): Record<string, string> {
+  const twins: Record<string, string> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return twins;
+  for (const [off, on] of Object.entries(raw as Record<string, unknown>)) {
+    const key = off.trim();
+    const value = text(on);
+    if (key && value && key !== value) twins[key] = value;
+  }
+  return twins;
+}
+
+function parseDefaults(raw: unknown): IconPool["defaults"] {
+  const defaults: IconPool["defaults"] = { roles: {}, templates: {} };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+  const record = raw as Record<string, unknown>;
+  for (const kind of ["roles", "templates"] as const) {
+    const map = record[kind];
+    if (!map || typeof map !== "object" || Array.isArray(map)) continue;
+    for (const [key, value] of Object.entries(map as Record<string, unknown>)) {
+      const trimmed = key.trim();
+      const icon = text(value);
+      if (trimmed && icon) defaults[kind][trimmed] = icon;
+    }
+  }
+  return defaults;
+}
+
+function parseV3(record: Record<string, unknown>): IconPool | null {
   const library = parseLibrary(record.library);
   if (!library) return null;
   const updatedAt =
@@ -174,23 +176,122 @@ function parseV2(record: Record<string, unknown>): IconPool | null {
       ? record.updatedAt
       : 0;
   return {
-    version: 2,
+    version: 3,
     updatedAt,
     library,
+    twins: parseTwins(record.twins),
     defaults: parseDefaults(record.defaults),
   };
 }
 
-/** v1: `icons[]` carried value, group, keywords, roles and templates together;
- *  `overrides` patched the code-defined base entries. */
-function migrateV1(record: Record<string, unknown>): IconPool | null {
+/** v2 rows carried `activeValue` next to `value`; defaults carried pairs. */
+interface LibraryIconV2 extends LibraryIcon {
+  activeValue?: string;
+}
+
+function libraryV2(raw: unknown): LibraryIconV2[] {
+  if (!Array.isArray(raw)) return [];
+  const rows: LibraryIconV2[] = [];
+  for (const item of raw) {
+    const icon = parseLibraryIcon(item);
+    if (!icon) continue;
+    const active = text((item as Record<string, unknown>).activeValue);
+    rows.push({ ...icon, ...(active ? { activeValue: active } : {}) });
+  }
+  return rows;
+}
+
+function defaultsV2(raw: unknown): {
+  roles: Record<string, IconPair>;
+  templates: Record<string, IconPair>;
+} {
+  const defaults: {
+    roles: Record<string, IconPair>;
+    templates: Record<string, IconPair>;
+  } = { roles: {}, templates: {} };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return defaults;
+  const record = raw as Record<string, unknown>;
+  for (const kind of ["roles", "templates"] as const) {
+    const map = record[kind];
+    if (!map || typeof map !== "object" || Array.isArray(map)) continue;
+    for (const [key, pair] of Object.entries(map as Record<string, unknown>)) {
+      if (!pair || typeof pair !== "object" || Array.isArray(pair)) continue;
+      const value = text((pair as Record<string, unknown>).value);
+      const activeValue = text((pair as Record<string, unknown>).activeValue);
+      if (key.trim() && value) {
+        defaults[kind][key.trim()] = activeValue
+          ? { value, activeValue }
+          : { value };
+      }
+    }
+  }
+  return defaults;
+}
+
+/** Build v3 from v2-shaped material: split pairs into rows + `twins`. */
+function buildV3(
+  rows: LibraryIconV2[],
+  defaults: {
+    roles: Record<string, IconPair>;
+    templates: Record<string, IconPair>;
+  },
+  updatedAt: number,
+): IconPool {
+  const library: LibraryIcon[] = [];
+  const ids = new Set<string>();
+  const values = new Set<string>();
+  const twins: Record<string, string> = {};
+
+  const addRow = (row: LibraryIcon): void => {
+    if (!row.value || ids.has(row.id) || values.has(row.value)) return;
+    if (library.length >= POOL_CAP) return;
+    ids.add(row.id);
+    values.add(row.value);
+    library.push(row);
+  };
+  const addTwin = (off: string, on: string): void => {
+    if (!off || !on || off === on) return;
+    twins[off] = on;
+    // Both halves are icons in the library; list the on-half when the pair
+    // introduces it.
+    if (!values.has(on)) {
+      addRow({
+        id: `twin:${slug(on)}`,
+        value: on,
+        keywords: keywordWords(on),
+      });
+    }
+  };
+
+  for (const row of rows) {
+    const { activeValue, ...icon } = row;
+    addRow(icon);
+    if (activeValue) addTwin(icon.value, activeValue);
+  }
+
+  const outDefaults: IconPool["defaults"] = { roles: {}, templates: {} };
+  for (const kind of ["roles", "templates"] as const) {
+    for (const [key, pair] of Object.entries(defaults[kind])) {
+      outDefaults[kind][key] = pair.value;
+      if (pair.activeValue) addTwin(pair.value, pair.activeValue);
+    }
+  }
+
+  return { version: 3, updatedAt, library, twins, defaults: outDefaults };
+}
+
+/** v1: user icons carried group, keywords, roles, templates and activeValue. */
+function migrateV1(
+  record: Record<string, unknown>,
+  updatedAt: number,
+): IconPool | null {
   const rawIcons = record.icons;
   // A v1 document without an icons array is malformed; it must stay
   // unreadable rather than be replaced by the seed and overwritten.
   if (!Array.isArray(rawIcons)) return null;
   const roles = new Map<string, IconPair>();
   const templates = new Map<string, IconPair>();
-  const userRows: LibraryIcon[] = [];
+  const userRows: LibraryIconV2[] = [];
   for (const item of rawIcons) {
     const icon = parseLibraryIcon(item);
     if (!icon) continue;
@@ -199,11 +300,16 @@ function migrateV1(record: Record<string, unknown>): IconPool | null {
     const keywords = [
       ...new Set([...(group ? keywordWords(group) : []), ...icon.keywords]),
     ];
-    userRows.push({ ...icon, keywords });
-    const pair: IconPair = icon.activeValue
-      ? { value: icon.value, activeValue: icon.activeValue }
+    const activeValue = text(source.activeValue);
+    userRows.push({
+      ...icon,
+      keywords,
+      ...(activeValue ? { activeValue } : {}),
+    });
+    const pair: IconPair = activeValue
+      ? { value: icon.value, activeValue }
       : { value: icon.value };
-    // First claim wins: the two maps are only written when the key is free.
+    // First claim wins: the maps are only written when the key is free.
     for (const key of stringList(source.roles)) {
       if (!roles.has(key)) roles.set(key, pair);
     }
@@ -212,57 +318,58 @@ function migrateV1(record: Record<string, unknown>): IconPool | null {
     }
   }
 
-  const seeds = seedLibrary();
   const overrides =
     record.overrides &&
     typeof record.overrides === "object" &&
     !Array.isArray(record.overrides)
       ? (record.overrides as Record<string, unknown>)
       : {};
-  const patched = seeds.map((seed) => {
+  const seeds = seedLibrary().map((seed) => {
     const patch = overrides[seed.id];
-    return patch && typeof patch === "object" && !Array.isArray(patch)
-      ? parseOverride(seed, patch as Record<string, unknown>)
-      : seed;
+    if (!patch || typeof patch !== "object" || Array.isArray(patch))
+      return seed;
+    const value = text((patch as Record<string, unknown>).value);
+    const activeValue = text((patch as Record<string, unknown>).activeValue);
+    return {
+      ...seed,
+      ...(value ? { value } : {}),
+      ...(activeValue ? { activeValue } : {}),
+    };
   });
 
   const ids = new Set<string>();
   const values = new Set<string>();
-  const library: LibraryIcon[] = [];
-  for (const icon of [...userRows, ...patched]) {
-    if (ids.has(icon.id) || values.has(icon.value)) continue;
-    ids.add(icon.id);
-    values.add(icon.value);
-    library.push(icon);
-    if (library.length >= POOL_CAP) break;
+  const rows: LibraryIconV2[] = [];
+  for (const row of [...userRows, ...seeds]) {
+    if (ids.has(row.id) || values.has(row.value)) continue;
+    ids.add(row.id);
+    values.add(row.value);
+    rows.push(row);
+    if (rows.length >= POOL_CAP) break;
   }
 
+  return buildV3(
+    rows,
+    {
+      roles: Object.fromEntries(roles),
+      templates: Object.fromEntries(templates),
+    },
+    updatedAt,
+  );
+}
+
+/** v2: library rows may carry `activeValue`, defaults carry pairs. */
+function upgradeV2(record: Record<string, unknown>): IconPool | null {
+  if (!Array.isArray(record.library)) return null;
   const updatedAt =
     typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
       ? record.updatedAt
       : 0;
-  return {
-    version: 2,
+  return buildV3(
+    libraryV2(record.library),
+    defaultsV2(record.defaults),
     updatedAt,
-    library,
-    defaults: {
-      roles: Object.fromEntries(roles),
-      templates: Object.fromEntries(templates),
-    },
-  };
-}
-
-function parseOverride(
-  seed: LibraryIcon,
-  patch: Record<string, unknown>,
-): LibraryIcon {
-  const value = text(patch.value);
-  const activeValue = text(patch.activeValue);
-  return {
-    ...seed,
-    ...(value ? { value } : {}),
-    ...(activeValue ? { activeValue } : {}),
-  };
+  );
 }
 
 function stringList(raw: unknown): string[] {
@@ -292,14 +399,14 @@ export function parseIconPool(raw: unknown): IconPool | null {
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  if (record.version === 2) return parseV2(record);
-  if (record.version === 1) return migrateV1(record);
+  const updatedAt =
+    typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
+      ? record.updatedAt
+      : 0;
+  if (record.version === 3) return parseV3(record);
+  if (record.version === 2) return upgradeV2(record);
+  if (record.version === 1) return migrateV1(record, updatedAt);
   return null;
-}
-
-/** An MDI path as an inline icon that follows the resolved icon colour. */
-export function mdiIconValue(path: string): string {
-  return `<svg viewBox="0 0 24 24" fill="{{$color}}"><path d="${path}"/></svg>`;
 }
 
 /** Keywords of the library with their use count, most used first. */
@@ -347,14 +454,15 @@ export function filterLibraryNames(
   );
 }
 
-/** Icons with an active twin first; the rest are singles. */
-export function splitTwins(entries: LibraryIcon[]): {
-  twins: LibraryIcon[];
-  singles: LibraryIcon[];
-} {
+/** Paired icons first for the twin-aware picker; a pair is shown once. */
+export function splitTwins(
+  entries: LibraryIcon[],
+  twins: Record<string, string>,
+): { pairs: LibraryIcon[]; singles: LibraryIcon[] } {
+  const paired = new Set([...Object.keys(twins), ...Object.values(twins)]);
   return {
-    twins: entries.filter((icon) => !!icon.activeValue),
-    singles: entries.filter((icon) => !icon.activeValue),
+    pairs: entries.filter((icon) => !!twins[icon.value]),
+    singles: entries.filter((icon) => !paired.has(icon.value)),
   };
 }
 
@@ -364,19 +472,22 @@ export function defaultPair(
   templateId: string | undefined,
   role: string | undefined,
 ): IconPair | undefined {
-  if (templateId) {
-    const pair = effectiveDefault(pool, "templates", templateId);
-    if (pair) return pair;
-  }
-  return role ? effectiveDefault(pool, "roles", role) : undefined;
+  const value =
+    (templateId
+      ? effectiveDefault(pool, "templates", templateId)
+      : undefined) ??
+    (role ? effectiveDefault(pool, "roles", role) : undefined);
+  if (!value) return undefined;
+  const twin = pool.twins[value];
+  return twin ? { value, activeValue: twin } : { value };
 }
 
-/** The pair a key resolves to: the exact key, then (roles) its `family.*`. */
+/** The value a key resolves to: the exact key, then (roles) its `family.*`. */
 export function effectiveDefault(
   pool: IconPool,
-  kind: "roles" | "templates",
+  kind: DefaultKind,
   key: string,
-): IconPair | undefined {
+): string | undefined {
   const exact = pool.defaults[kind][key];
   if (exact) return exact;
   if (kind === "roles") {
@@ -395,16 +506,73 @@ export function upsertLibraryIcon(pool: IconPool, icon: LibraryIcon): IconPool {
   return { ...pool, updatedAt: Date.now(), library };
 }
 
+/** Removing an icon also removes any pairing that names it. */
 export function removeLibraryIcon(pool: IconPool, id: string): IconPool {
+  const removed = pool.library.find((entry) => entry.id === id);
+  const twins = { ...pool.twins };
+  if (removed) {
+    delete twins[removed.value];
+    for (const [off, on] of Object.entries(twins)) {
+      if (on === removed.value) delete twins[off];
+    }
+  }
   return {
     ...pool,
     updatedAt: Date.now(),
     library: pool.library.filter((entry) => entry.id !== id),
+    twins,
   };
+}
+
+/** Pair one icon with its active twin; the twin becomes a library row too. */
+export function setTwin(
+  pool: IconPool,
+  value: string,
+  twin: string | null,
+): IconPool {
+  const off = value.trim();
+  if (!off) return pool;
+  const twins = { ...pool.twins };
+  if (!twin || !twin.trim() || twin.trim() === off) {
+    delete twins[off];
+    return { ...pool, updatedAt: Date.now(), twins };
+  }
+  const on = twin.trim();
+  twins[off] = on;
+  const library = pool.library.some((icon) => icon.value === on)
+    ? pool.library
+    : [
+        ...pool.library,
+        {
+          id: `twin:${slug(on)}`,
+          value: on,
+          keywords: keywordWords(on),
+        },
+      ];
+  return { ...pool, updatedAt: Date.now(), library, twins };
 }
 
 export function hasIconValue(library: LibraryIcon[], value: string): boolean {
   return library.some((icon) => icon.value === value);
+}
+
+/** Set or clear one default; an empty value removes the key. */
+export function setDefault(
+  pool: IconPool,
+  kind: DefaultKind,
+  key: string,
+  value: string | null,
+): IconPool {
+  const trimmed = key.trim();
+  const icon = value?.trim() ?? "";
+  if (!trimmed) return pool;
+  const defaults: IconPool["defaults"] = {
+    roles: { ...pool.defaults.roles },
+    templates: { ...pool.defaults.templates },
+  };
+  if (icon) defaults[kind][trimmed] = icon;
+  else delete defaults[kind][trimmed];
+  return { ...pool, updatedAt: Date.now(), defaults };
 }
 
 /** Exact state roles and their `family.*` patterns, with use counts. */
@@ -445,25 +613,7 @@ export function roleChoicesFromObjects(
   ];
 }
 
-/** Set or clear one default; an empty pair removes the key. */
-export function setDefault(
-  pool: IconPool,
-  kind: "roles" | "templates",
-  key: string,
-  pair: IconPair | null,
-): IconPool {
-  const trimmed = key.trim();
-  const value = pair?.value?.trim() ?? "";
-  if (!trimmed) return pool;
-  const defaults: IconPool["defaults"] = {
-    roles: { ...pool.defaults.roles },
-    templates: { ...pool.defaults.templates },
-  };
-  if (value) {
-    const activeValue = pair?.activeValue?.trim();
-    defaults[kind][trimmed] = activeValue ? { value, activeValue } : { value };
-  } else {
-    delete defaults[kind][trimmed];
-  }
-  return { ...pool, updatedAt: Date.now(), defaults };
+/** An MDI path as an inline icon that follows the resolved icon colour. */
+export function mdiIconValue(path: string): string {
+  return `<svg viewBox="0 0 24 24" fill="{{$color}}"><path d="${path}"/></svg>`;
 }

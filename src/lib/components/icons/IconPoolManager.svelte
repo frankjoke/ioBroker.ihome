@@ -13,8 +13,8 @@
     libraryKeywordCounts,
     removeLibraryIcon,
     setDefault,
+    setTwin,
     upsertLibraryIcon,
-    type IconPair,
     type IconPool,
     type LibraryIcon,
   } from "$lib/config/icon-library";
@@ -34,8 +34,7 @@
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
   type Importer =
-    | { mode: "add" }
-    | { mode: "field"; id: string; field: "value" | "activeValue" };
+    { mode: "add" } | { mode: "field"; id: string; field: "value" | "twin" };
 
   const TABS = [
     { id: "library", label: "Library", hint: "Your curated icons" },
@@ -105,8 +104,12 @@
     dirty =
       loaded &&
       (saveFailed ||
-        JSON.stringify([draft.library, draft.defaults]) !==
-          JSON.stringify([getIconPool().library, getIconPool().defaults]));
+        JSON.stringify([draft.library, draft.twins, draft.defaults]) !==
+          JSON.stringify([
+            getIconPool().library,
+            getIconPool().twins,
+            getIconPool().defaults,
+          ]));
   });
 
   function updateIcon(patch: Partial<LibraryIcon>): void {
@@ -141,7 +144,7 @@
 
   function importIcon(
     value: string,
-    meta: { activeValue?: string; keywords: string[]; name: string },
+    meta: { keywords: string[]; name: string },
   ): void {
     const target = importer;
     if (!target || !writable) return;
@@ -160,7 +163,6 @@
         id: newId(),
         ...(name ? { name } : {}),
         value,
-        ...(meta.activeValue ? { activeValue: meta.activeValue } : {}),
         keywords: [
           ...new Set([
             ...(meta.keywords ?? []),
@@ -176,11 +178,8 @@
     }
     const icon = draft.library.find((entry) => entry.id === target.id);
     if (!icon) return;
-    if (target.field === "activeValue") {
-      draft = upsertLibraryIcon(draft, {
-        ...icon,
-        activeValue: meta.activeValue ?? value,
-      });
+    if (target.field === "twin") {
+      draft = setTwin(draft, icon.value, value);
       savedHint = "";
       return;
     }
@@ -191,11 +190,7 @@
       hint = "Another library icon already uses that icon.";
       return;
     }
-    draft = upsertLibraryIcon(draft, {
-      ...icon,
-      value: glyph,
-      ...(meta.activeValue ? { activeValue: meta.activeValue } : {}),
-    });
+    draft = upsertLibraryIcon(draft, { ...icon, value: glyph });
     savedHint = "";
   }
 
@@ -208,15 +203,11 @@
     skipped = 0;
   }
 
-  function setActive(id: string, value: string): void {
+  function setTwinValue(id: string, value: string): void {
     if (!writable) return;
     const icon = draft.library.find((entry) => entry.id === id);
     if (!icon) return;
-    const activeValue = value.trim() || undefined;
-    draft = upsertLibraryIcon(draft, {
-      ...icon,
-      ...(activeValue ? { activeValue } : { activeValue: undefined }),
-    });
+    draft = setTwin(draft, icon.value, value);
     savedHint = "";
   }
 
@@ -240,19 +231,18 @@
 
   function cleanDraft(): IconPool {
     return {
-      version: 2,
+      version: 3,
       updatedAt: draft.updatedAt,
+      twins: draft.twins,
       library: draft.library.map((icon) => {
         const keywords = [
           ...new Set(icon.keywords.flatMap((word) => keywordWords(word))),
         ];
         const name = icon.name?.trim();
-        const activeValue = icon.activeValue?.trim();
         return {
           id: icon.id,
           ...(name ? { name } : {}),
           value: icon.value.trim(),
-          ...(activeValue ? { activeValue } : {}),
           keywords,
         };
       }),
@@ -283,14 +273,17 @@
       return;
     }
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
-    const snapshot = JSON.stringify([next.library, next.defaults]);
+    const snapshot = JSON.stringify([next.library, next.twins, next.defaults]);
     saving = true;
     const result = await commitIconPool(next, baseUpdatedAt);
     saving = false;
     if (result === "saved") {
       baseUpdatedAt = next.updatedAt;
       // Keep edits made while the write was in flight.
-      if (JSON.stringify([draft.library, draft.defaults]) === snapshot) {
+      if (
+        JSON.stringify([draft.library, draft.twins, draft.defaults]) ===
+        snapshot
+      ) {
         draft = clonePool(next);
       }
       savedHint = "Saved.";
@@ -305,10 +298,10 @@
   function setDefaultEntry(
     kind: "roles" | "templates",
     key: string,
-    pair: IconPair | null,
+    value: string | null,
   ): void {
     if (!writable) return;
-    draft = setDefault(draft, kind, key, pair);
+    draft = setDefault(draft, kind, key, value);
     savedHint = "";
   }
 
@@ -323,9 +316,9 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
       <Icon value={entry.value} size={18} />
-      {#if entry.activeValue}
-        <span class="row-twin" title="Active icon">
-          <Icon value={entry.activeValue} size={18} />
+      {#if draft.twins[entry.value]}
+        <span class="row-twin" title="Twin icon">
+          <Icon value={draft.twins[entry.value]} size={18} />
         </span>
       {/if}
       <button
@@ -379,33 +372,33 @@
             </button>
           </div>
           <div class="icon-slot">
-            <span class="label-mono">Active</span>
+            <span class="label-mono">Twin (on)</span>
             <div class="active-line">
               <button
                 type="button"
                 class="btn btn-sm glyph-pick"
-                title={`Set the active icon of ${label(entry)}`}
-                aria-label={`Set the active icon of ${label(entry)}`}
+                title={`Set the on-twin of ${label(entry)}`}
+                aria-label={`Set the on-twin of ${label(entry)}`}
                 disabled={!writable}
                 onclick={() =>
                   (importer = {
                     mode: "field",
                     id: entry.id,
-                    field: "activeValue",
+                    field: "twin",
                   })}
               >
-                {#if openIcon.activeValue}
-                  <Icon value={openIcon.activeValue} size={18} />
+                {#if draft.twins[openIcon.value]}
+                  <Icon value={draft.twins[openIcon.value]} size={18} />
                 {:else}
                   <span class="material-symbols-outlined">add</span>
                 {/if}
               </button>
-              {#if openIcon.activeValue}
+              {#if draft.twins[openIcon.value]}
                 <IconButton
                   icon="close"
-                  label={`Clear the active icon of ${label(entry)}`}
+                  label={`Clear the twin of ${label(entry)}`}
                   disabled={!writable}
-                  onclick={() => setActive(entry.id, "")}
+                  onclick={() => setTwinValue(entry.id, "")}
                 />
               {/if}
             </div>

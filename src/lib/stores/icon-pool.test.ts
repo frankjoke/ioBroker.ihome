@@ -42,9 +42,10 @@ vi.mock("$lib/stores/devices.svelte", () => ({
 
 const doc = (updatedAt: number, id = "a", value = "x") =>
   JSON.stringify({
-    version: 2,
+    version: 3,
     updatedAt,
     library: [{ id, name: id.toUpperCase(), value, keywords: [] }],
+    twins: {},
     defaults: { roles: {}, templates: {} },
   });
 
@@ -83,9 +84,10 @@ it("keeps a malformed document unreadable and unwritable", async () => {
 it("ignores its own echo and accepts a remote change", async () => {
   const store = await load(doc(1));
   const next = {
-    version: 2 as const,
+    version: 3 as const,
     updatedAt: 10,
     library: [{ id: "b", name: "B", value: "y", keywords: [] }],
+    twins: {},
     defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 1)).toBe("saved");
@@ -104,9 +106,10 @@ it("refuses to overwrite a remote save made since load", async () => {
   h.state.raw = doc(2, "remote", "z");
   const result = await store.commitIconPool(
     {
-      version: 2 as const,
+      version: 3 as const,
       updatedAt: 3,
       library: [],
+      twins: {},
       defaults: { roles: {}, templates: {} },
     },
     1,
@@ -119,9 +122,10 @@ it("refuses to overwrite a remote save made since load", async () => {
 it("creates the first document and subscribes to it", async () => {
   const store = await load(null);
   const next = {
-    version: 2 as const,
+    version: 3 as const,
     updatedAt: 5,
     library: [{ id: "a", name: "A", value: "x", keywords: [] }],
+    twins: {},
     defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 0)).toBe("saved");

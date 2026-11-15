@@ -21,10 +21,7 @@
     onPick,
     onClose,
   }: {
-    onPick: (
-      value: string,
-      meta: { activeValue?: string; keywords: string[]; name: string },
-    ) => void;
+    onPick: (value: string, meta: { keywords: string[]; name: string }) => void;
     onClose: () => void;
   } = $props();
 
@@ -238,7 +235,6 @@
 
   function pickLibrary(icon: LibraryIcon, close = true): void {
     onPick(icon.value, {
-      ...(icon.activeValue ? { activeValue: icon.activeValue } : {}),
       keywords: icon.keywords,
       name: icon.name ?? icon.value,
     });
@@ -382,17 +378,11 @@
                   <button
                     type="button"
                     class="cell"
-                    class:pair={!!icon.activeValue}
-                    title={`${icon.name ?? icon.value}${icon.activeValue ? " (pair)" : ""}`}
-                    aria-label={`${icon.name ?? icon.value}${icon.activeValue ? " (pair)" : ""}`}
+                    title={icon.name ?? icon.value}
+                    aria-label={icon.name ?? icon.value}
                     onclick={() => pickLibrary(icon)}
                   >
                     <Icon value={icon.value} size={22} />
-                    {#if icon.activeValue}
-                      <span class="pair-twin">
-                        <Icon value={icon.activeValue} size={14} />
-                      </span>
-                    {/if}
                   </button>
                 {/each}
               </div>
@@ -718,20 +708,6 @@
   .cell:hover {
     background-color: var(--surface-container);
     color: var(--text-color);
-  }
-
-  .cell.pair {
-    position: relative;
-    width: 48px;
-  }
-
-  .pair-twin {
-    position: absolute;
-    right: 1px;
-    bottom: 1px;
-    display: inline-flex;
-    color: var(--text-muted);
-    opacity: 0.85;
   }
 
   .source-foot {

@@ -18,12 +18,15 @@
     icon = undefined,
     onPick,
     onClose,
+    twins = false,
   }: {
     /** The current value, for marking and the custom prefill. */
     icon?: string;
-    /** The picked value; "" clears the icon. `active` comes with a twin. */
+    /** The picked value; "" clears the icon. `active` comes with a pair. */
     onPick: (value: string, meta?: { active?: string }) => void;
     onClose: () => void;
+    /** Twin-aware consumers group the `twins` map into an On/Off block. */
+    twins?: boolean;
   } = $props();
 
   let search = $state("");
@@ -48,7 +51,15 @@
     const list = filterLibrary(library, selected, search);
     return inUse ? list.filter((entry) => inUseValues.has(entry.value)) : list;
   });
-  const { twins, singles } = $derived(splitTwins(shown));
+  const split = $derived(
+    twins
+      ? splitTwins(shown, getIconPool().twins)
+      : { pairs: [] as typeof shown, singles: shown },
+  );
+  const pairs = $derived(split.pairs);
+  const singles = $derived(split.singles);
+  const twinOf = (value: string): string | undefined =>
+    getIconPool().twins[value];
 
   function toggleKeyword(word: string): void {
     selected = selected.includes(word)
@@ -107,7 +118,7 @@
         >None — clear the icon</button
       >
 
-      {#if icon && !shown.some((entry) => entry.value === icon || entry.activeValue === icon)}
+      {#if icon && !shown.some((entry) => entry.value === icon || twinOf(entry.value) === icon)}
         <p class="label-mono group-title">Current</p>
         <div class="grid">
           <button
@@ -122,22 +133,25 @@
         </div>
       {/if}
 
-      {#if twins.length > 0}
+      {#if pairs.length > 0}
         <p class="label-mono group-title">On / Off pairs</p>
         <div class="grid">
-          {#each twins as entry (entry.id)}
+          {#each pairs as entry (entry.id)}
+            {@const twin = twinOf(entry.value)}
             <button
               type="button"
               class="pair"
-              class:current={entry.value === icon || entry.activeValue === icon}
+              class:current={entry.value === icon || twin === icon}
               title={`${entry.name ?? entry.value} (pair)`}
               aria-label={`${entry.name ?? entry.value} (pair)`}
-              onclick={() => onPick(entry.value, { active: entry.activeValue })}
+              onclick={() => onPick(entry.value, { active: twin })}
             >
               <Icon value={entry.value} size={22} />
-              <span class="pair-twin">
-                <Icon value={entry.activeValue} size={16} />
-              </span>
+              {#if twin}
+                <span class="pair-twin">
+                  <Icon value={twin} size={16} />
+                </span>
+              {/if}
             </button>
           {/each}
         </div>
@@ -161,7 +175,7 @@
         </div>
       {/if}
 
-      {#if twins.length === 0 && singles.length === 0}
+      {#if pairs.length === 0 && singles.length === 0}
         <p class="empty text-muted">
           No icons match. Add some in
           <a href={`${base}/#/templates?type=icons`} target="_blank"

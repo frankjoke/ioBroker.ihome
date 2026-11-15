@@ -2928,6 +2928,7 @@
   {#if tileIconPicker}
     <IconPicker
       icon={tile?.tile?.icon}
+      twins
       onPick={(value, meta) => {
         tileIconPicker = false;
         edit((t) => applyPoolIcon(t, value, meta?.active));

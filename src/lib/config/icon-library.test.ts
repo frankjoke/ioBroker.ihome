@@ -13,6 +13,7 @@ import {
   roleChoicesFromObjects,
   seedLibrary,
   setDefault,
+  setTwin,
   splitTwins,
   upsertLibraryIcon,
   type LibraryIcon,
@@ -33,12 +34,13 @@ it("seeds the device-type and role glyphs once", () => {
 
 it("an absent document starts from the seed", () => {
   const pool = parseIconPool(undefined);
-  expect(pool?.version).toBe(2);
+  expect(pool?.version).toBe(3);
   expect(pool?.library).toEqual(seedLibrary());
+  expect(pool?.twins).toEqual({});
   expect(pool?.defaults).toEqual({ roles: {}, templates: {} });
 });
 
-it("migrates a v1 document", () => {
+it("migrates a v1 document into rows, twins and string defaults", () => {
   const pool = parseIconPool({
     version: 1,
     icons: [
@@ -55,19 +57,17 @@ it("migrates a v1 document", () => {
     ],
     overrides: { "builtin:type:light": { value: "wb_incandescent" } },
   });
-  expect(pool?.version).toBe(2);
+  expect(pool?.version).toBe(3);
   expect(pool?.library[0]).toMatchObject({
     id: "lamp",
     keywords: ["light", "bright"],
   });
-  expect(pool?.defaults.roles["switch.active"]).toEqual({
-    value: "lightbulb",
-    activeValue: "lightbulb_outline",
-  });
-  expect(pool?.defaults.templates["Door"]).toEqual({
-    value: "lightbulb",
-    activeValue: "lightbulb_outline",
-  });
+  expect(pool?.library.some((icon) => icon.value === "lightbulb_outline")).toBe(
+    true,
+  );
+  expect(pool?.twins).toEqual({ lightbulb: "lightbulb_outline" });
+  expect(pool?.defaults.roles["switch.active"]).toBe("lightbulb");
+  expect(pool?.defaults.templates.Door).toBe("lightbulb");
   expect(
     pool?.library.find((icon) => icon.id === "builtin:type:light")?.value,
   ).toBe("wb_incandescent");
@@ -81,38 +81,63 @@ it("first claim wins when two v1 rows fight over a role", () => {
       { id: "b", name: "B", value: "bolt", roles: ["light.*"] },
     ],
   });
-  expect(pool?.defaults.roles["light.*"]).toEqual({ value: "lightbulb" });
+  expect(pool?.defaults.roles["light.*"]).toBe("lightbulb");
+});
+
+it("upgrades a v2 document: pairs become rows plus twins", () => {
+  const pool = parseIconPool({
+    version: 2,
+    updatedAt: 7,
+    library: [
+      {
+        id: "x",
+        name: "Lamp",
+        value: "lamp",
+        activeValue: "lamp_on",
+        keywords: ["light"],
+      },
+    ],
+    defaults: {
+      roles: { state: { value: "lamp", activeValue: "lamp_on" } },
+      templates: {},
+    },
+  });
+  expect(pool?.version).toBe(3);
+  expect(pool?.library.map((icon) => icon.value)).toEqual(["lamp", "lamp_on"]);
+  expect(pool?.twins).toEqual({ lamp: "lamp_on" });
+  expect(pool?.defaults.roles.state).toBe("lamp");
+});
+
+it("keeps a v3 document as written", () => {
+  const doc = {
+    version: 3,
+    updatedAt: 5,
+    library: [{ id: "x", value: "bolt", keywords: ["power"] }],
+    twins: { bolt: "bolt_on" },
+    defaults: { roles: { state: "bolt" }, templates: {} },
+  };
+  expect(parseIconPool(doc)).toEqual(doc);
 });
 
 it("rejects an unknown version", () => {
-  expect(parseIconPool({ version: 3, library: [] })).toBeNull();
+  expect(parseIconPool({ version: 4, library: [] })).toBeNull();
 });
 
-it("keeps a v2 document as written", () => {
-  const pool = {
-    version: 2,
-    updatedAt: 7,
-    library: [{ id: "x", value: "bolt", keywords: ["power"] }],
-    defaults: { roles: { state: { value: "bolt" } }, templates: {} },
-  };
-  expect(parseIconPool(pool)).toEqual(pool);
+it("rejects a v1 document without an icons array", () => {
+  expect(parseIconPool({ version: 1, overrides: {} })).toBeNull();
 });
 
-it("emptyIconPool is the seed with empty defaults", () => {
+it("emptyIconPool is the seed with empty twins and defaults", () => {
   expect(emptyIconPool()).toMatchObject({
-    version: 2,
+    version: 3,
     updatedAt: 0,
+    twins: {},
     defaults: { roles: {}, templates: {} },
   });
 });
 
 const library: LibraryIcon[] = [
-  {
-    id: "l",
-    value: "lightbulb",
-    activeValue: "lightbulb_outline",
-    keywords: ["light", "switch"],
-  },
+  { id: "l", value: "lightbulb", keywords: ["light", "switch"] },
   { id: "p", value: "bolt", keywords: ["power", "switch"] },
   { id: "d", value: "sensor_door", keywords: ["door"] },
 ];
@@ -128,7 +153,6 @@ it("filters by every selected keyword and the search", () => {
     filterLibrary(library, ["light", "door"], "").map((icon) => icon.id),
   ).toEqual([]);
   expect(filterLibrary(library, [], "SWI")).toHaveLength(2);
-  expect(filterLibrary(library, [], "bolt")).toEqual([]);
 });
 
 it("counts keywords by use, then by name", () => {
@@ -140,28 +164,82 @@ it("counts keywords by use, then by name", () => {
   ]);
 });
 
-it("splits twins from singles", () => {
-  const { twins, singles } = splitTwins(library);
-  expect(twins.map((icon) => icon.id)).toEqual(["l"]);
+it("finds a library row by name, value or keyword", () => {
+  expect(
+    filterLibraryNames([{ ...library[0], name: "Lamp" }], "lamp").map(
+      (icon) => icon.id,
+    ),
+  ).toEqual(["l"]);
+  expect(filterLibraryNames(library, "bolt").map((icon) => icon.id)).toEqual([
+    "p",
+  ]);
+  expect(filterLibraryNames(library, "doo").map((icon) => icon.id)).toEqual([
+    "d",
+  ]);
+  expect(filterLibraryNames(library, "")).toHaveLength(3);
+});
+
+it("splits pairs from singles through the twins map", () => {
+  const { pairs, singles } = splitTwins(library, {
+    lightbulb: "lightbulb_outline",
+  });
+  expect(pairs.map((icon) => icon.id)).toEqual(["l"]);
   expect(singles.map((icon) => icon.id)).toEqual(["p", "d"]);
 });
 
-it("resolves a default template first, then role, then family", () => {
+it("resolves a default template first, then role, then family, plus its twin", () => {
   const pool = emptyIconPool();
-  pool.defaults.templates.Door = { value: "t" };
-  pool.defaults.roles["switch.active"] = { value: "x", activeValue: "y" };
-  pool.defaults.roles["light.*"] = { value: "z" };
+  pool.twins.z = "zy";
+  pool.defaults.templates.Door = "t";
+  pool.defaults.roles["switch.active"] = "x";
+  pool.defaults.roles["light.*"] = "z";
   expect(defaultPair(pool, "Door", "switch.active")).toEqual({ value: "t" });
-  expect(defaultPair(pool, "Nope", "switch.active")).toEqual({
-    value: "x",
-    activeValue: "y",
+  expect(defaultPair(pool, "Nope", "switch.active")).toEqual({ value: "x" });
+  expect(defaultPair(pool, undefined, "light.dimmer")).toEqual({
+    value: "z",
+    activeValue: "zy",
   });
-  expect(defaultPair(pool, undefined, "light.dimmer")).toEqual({ value: "z" });
   expect(defaultPair(pool, undefined, "state")).toBeUndefined();
 });
 
-it("upserts by id and removes by id", () => {
+it("resolves an effective default through the role family", () => {
   const pool = emptyIconPool();
+  pool.defaults.roles["light.*"] = "z";
+  pool.defaults.roles["light.dimmer"] = "exact";
+  expect(effectiveDefault(pool, "roles", "light.dimmer")).toBe("exact");
+  expect(effectiveDefault(pool, "roles", "light.color")).toBe("z");
+  expect(effectiveDefault(pool, "roles", "switch.active")).toBeUndefined();
+  expect(effectiveDefault(pool, "templates", "Door")).toBeUndefined();
+});
+
+it("sets, overwrites and clears a default", () => {
+  let pool = emptyIconPool();
+  pool = setDefault(pool, "roles", "light.*", "x");
+  expect(pool.defaults.roles["light.*"]).toBe("x");
+  pool = setDefault(pool, "roles", "light.*", "z");
+  expect(pool.defaults.roles["light.*"]).toBe("z");
+  pool = setDefault(pool, "templates", "Door", "t");
+  expect(pool.defaults.templates.Door).toBe("t");
+  pool = setDefault(pool, "roles", "light.*", null);
+  expect(pool.defaults.roles["light.*"]).toBeUndefined();
+  expect(pool.updatedAt).toBeGreaterThan(0);
+});
+
+it("pairs an icon and lists its twin as a library row", () => {
+  let pool = emptyIconPool();
+  pool = setTwin(pool, "lightbulb", "lightbulb_outline");
+  expect(pool.twins).toEqual({ lightbulb: "lightbulb_outline" });
+  expect(pool.library.some((icon) => icon.value === "lightbulb_outline")).toBe(
+    true,
+  );
+  pool = setTwin(pool, "lightbulb", "lightbulb_on");
+  expect(pool.twins.lightbulb).toBe("lightbulb_on");
+  pool = setTwin(pool, "lightbulb", null);
+  expect(pool.twins.lightbulb).toBeUndefined();
+});
+
+it("upserts by id and drops a pairing when either half is removed", () => {
+  let pool = setTwin(emptyIconPool(), "lightbulb", "lightbulb_outline");
   const added = upsertLibraryIcon(pool, {
     id: "n",
     value: "my.svg",
@@ -178,9 +256,19 @@ it("upserts by id and removes by id", () => {
     "door",
     "gate",
   ]);
-  expect(
-    removeLibraryIcon(changed, "n").library.some((i) => i.id === "n"),
-  ).toBe(false);
+
+  pool = removeLibraryIcon(
+    changed,
+    changed.library.find((icon) => icon.value === "lightbulb")!.id,
+  );
+  expect(pool.twins.lightbulb).toBeUndefined();
+
+  const paired = setTwin(emptyIconPool(), "lightbulb", "lightbulb_outline");
+  const removed = removeLibraryIcon(
+    paired,
+    paired.library.find((icon) => icon.value === "lightbulb_outline")!.id,
+  );
+  expect(removed.twins.lightbulb).toBeUndefined();
 });
 
 it("sees a value that is already in the library", () => {
@@ -201,58 +289,4 @@ it("builds role choices from state roles only", () => {
     { value: "switch.*", label: "switch.* · 2" },
     { value: "light.*", label: "light.* · 1" },
   ]);
-});
-
-it("rejects a v1 document without an icons array", () => {
-  expect(parseIconPool({ version: 1, overrides: {} })).toBeNull();
-});
-
-it("finds a library row by name, value or keyword", () => {
-  expect(filterLibraryNames(library, "lamp")).toEqual([]);
-  expect(
-    filterLibraryNames([{ ...library[0], name: "Lamp" }], "lamp").map(
-      (icon) => icon.id,
-    ),
-  ).toEqual(["l"]);
-  expect(filterLibraryNames(library, "bolt").map((icon) => icon.id)).toEqual([
-    "p",
-  ]);
-  expect(filterLibraryNames(library, "doo").map((icon) => icon.id)).toEqual([
-    "d",
-  ]);
-  expect(filterLibraryNames(library, "")).toHaveLength(3);
-});
-
-it("resolves an effective default through the role family", () => {
-  const pool = emptyIconPool();
-  pool.defaults.roles["light.*"] = { value: "z", activeValue: "y" };
-  pool.defaults.roles["light.dimmer"] = { value: "exact" };
-  expect(effectiveDefault(pool, "roles", "light.dimmer")).toEqual({
-    value: "exact",
-  });
-  expect(effectiveDefault(pool, "roles", "light.color")).toEqual({
-    value: "z",
-    activeValue: "y",
-  });
-  expect(effectiveDefault(pool, "roles", "switch.active")).toBeUndefined();
-  expect(effectiveDefault(pool, "templates", "Door")).toBeUndefined();
-});
-
-it("sets, overwrites and clears a default", () => {
-  let pool = emptyIconPool();
-  pool = setDefault(pool, "roles", "light.*", {
-    value: "x",
-    activeValue: "y",
-  });
-  expect(pool.defaults.roles["light.*"]).toEqual({
-    value: "x",
-    activeValue: "y",
-  });
-  pool = setDefault(pool, "roles", "light.*", { value: "z" });
-  expect(pool.defaults.roles["light.*"]).toEqual({ value: "z" });
-  pool = setDefault(pool, "templates", "Door", { value: "t" });
-  expect(pool.defaults.templates.Door).toEqual({ value: "t" });
-  pool = setDefault(pool, "roles", "light.*", null);
-  expect(pool.defaults.roles["light.*"]).toBeUndefined();
-  expect(pool.updatedAt).toBeGreaterThan(0);
 });

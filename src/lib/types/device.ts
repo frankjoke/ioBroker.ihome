@@ -151,6 +151,8 @@ export interface Device {
   // deprecated: superseded by page groups (spec §4.1.5) — kept so old registries still parse
   panel?: string;
   icon?: string;
+  /** The on-half of the device's icon pair; the tile inherits it. */
+  activeIcon?: string;
   title?: string;
   functions?: string[];
   favorites?: string[];
@@ -219,4 +221,6 @@ export interface EnrichedDevice extends Device {
    *  name or a path, exactly as stored — else the icon its ioBroker objects
    *  carry, already resolved to a URL. Absent when neither knows one. */
   objectIcon?: string;
+  /** The device face's on-twin, when the device document defines one. */
+  objectActiveIcon?: string;
 }

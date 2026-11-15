@@ -5,7 +5,6 @@
   import {
     effectiveDefault,
     roleChoicesFromObjects,
-    type IconPair,
     type IconPool,
   } from "$lib/config/icon-library";
   import { glyphForRole, presetGlyph } from "$lib/config/icon-ops";
@@ -31,7 +30,7 @@
     onSet: (
       kind: "roles" | "templates",
       key: string,
-      pair: IconPair | null,
+      value: string | null,
     ) => void;
     onSave: () => void;
   } = $props();
@@ -85,30 +84,23 @@
     kind: "roles" | "templates",
     key: string,
     fallback?: string,
-  ): { value?: string; active?: string; own: boolean; family: boolean } {
+  ): { value?: string; twin?: string; own: boolean; family: boolean } {
     const exact = draft.defaults[kind][key];
-    const pair = effectiveDefault(draft, kind, key);
-    if (pair) {
+    const value = effectiveDefault(draft, kind, key);
+    if (value) {
       return {
-        value: pair.value,
-        active: pair.activeValue,
+        value,
+        twin: draft.twins[value],
         own: !!exact,
         family: !exact,
       };
     }
-    return { value: fallback, own: false, family: false };
+    return { value: fallback, twin: undefined, own: false, family: false };
   }
 
-  function setFromImporter(
-    value: string,
-    meta: { activeValue?: string; keywords: string[]; name: string },
-  ): void {
+  function setFromImporter(value: string): void {
     if (!target) return;
-    onSet(
-      target.kind,
-      target.key,
-      meta.activeValue ? { value, activeValue: meta.activeValue } : { value },
-    );
+    onSet(target.kind, target.key, value);
     target = null;
   }
 </script>
@@ -162,8 +154,8 @@
             {#if roleCount(row.label)}
               <span class="badge">{roleCount(row.label)}</span>
             {/if}
-            {#if icon.active && icon.active !== icon.value}
-              <Icon value={icon.active} size={16} />
+            {#if icon.twin}
+              <Icon value={icon.twin} size={16} />
             {/if}
             {#if !icon.own && !icon.family && icon.value}
               <span class="badge">code default</span>
@@ -213,8 +205,8 @@
               <span class="material-symbols-outlined muted">help</span>
             {/if}
             <span class="name">{row.name}</span>
-            {#if icon.active && icon.active !== icon.value}
-              <Icon value={icon.active} size={16} />
+            {#if icon.twin}
+              <Icon value={icon.twin} size={16} />
             {/if}
             {#if !icon.own && icon.value}
               <span class="badge">code default</span>
