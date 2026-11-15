@@ -81,10 +81,12 @@
      (600), so the number owns the tile. A notch smaller than it used to be
      (0.95 → 0.90rem). */
   .value {
-    font-family: var(--font-mono);
+    font-family: var(--ui-font-value, var(--font-family));
     font-size: var(--ui-value-size, 0.99rem);
     font-weight: 800;
     line-height: 1.15;
+    /* Sans digits: tabular figures keep the columns aligned without mono. */
+    font-variant-numeric: tabular-nums;
     max-width: 100%;
     /* Wrap rather than truncate: on a narrow tile the unit drops to the next
        line ("49.23" / "%"), and the row grows to fit. A clipped number is a

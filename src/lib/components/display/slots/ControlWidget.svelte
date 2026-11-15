@@ -242,9 +242,10 @@
     top: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    font-family: var(--font-mono);
+    font-family: var(--ui-font-value, var(--font-family));
     font-size: var(--body-sm);
     font-weight: 400;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
     color: var(--text-color);
     text-shadow:
@@ -268,8 +269,9 @@
   }
 
   .mono {
-    font-family: var(--font-mono);
+    font-family: var(--ui-font-value, var(--font-family));
     font-size: var(--body-sm);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 

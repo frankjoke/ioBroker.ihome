@@ -191,7 +191,7 @@
   .chart-min,
   .chart-max {
     position: absolute;
-    font-family: var(--font-mono);
+    font-family: var(--ui-font-value, var(--font-family));
     font-size: 10px;
     font-weight: 400;
     line-height: 1;

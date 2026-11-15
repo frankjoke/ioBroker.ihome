@@ -13,13 +13,32 @@ it("effectiveUi returns the shipped defaults for an empty document", () => {
     secondary: 0.924,
     tileScale: 1,
     reloadMinutes: 0,
+    textFont: "inter",
+    valueFont: "inter",
   });
   expect(UI_DEFAULTS).toEqual({
     primary: 0.99,
     secondary: 0.924,
     tileScale: 1,
     reloadMinutes: 0,
+    textFont: "inter",
+    valueFont: "inter",
   });
+});
+
+it("accepts only known font ids", () => {
+  const chosen = effectiveUi({
+    "ui.textFont": "plex",
+    "ui.valueFont": "mono",
+  });
+  expect(chosen.textFont).toBe("plex");
+  expect(chosen.valueFont).toBe("mono");
+  const junk = effectiveUi({
+    "ui.textFont": "comic-sans",
+    "ui.valueFont": 7,
+  });
+  expect(junk.textFont).toBe("inter");
+  expect(junk.valueFont).toBe("inter");
 });
 
 it("effectiveUi accepts only hex colours", () => {
@@ -63,6 +82,8 @@ it("uiCss emits colours only when set and always the sizes", () => {
   expect(plain).toContain("--ui-value-size: 0.99rem");
   expect(plain).toContain("--ui-name-size: 0.825rem"); // 0.99 × 12 / 14.4
   expect(plain).toContain("--ui-secondary-size: 0.924rem");
+  expect(plain).toContain('--ui-font-text: "Inter"');
+  expect(plain).toContain('--ui-font-value: "Inter"');
 
   const custom = uiCss(
     effectiveUi({

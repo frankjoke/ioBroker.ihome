@@ -3043,7 +3043,7 @@
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
-    font-family: var(--font-mono);
+    font-family: var(--font-code);
     font-size: 0.75rem;
     line-height: 1.35;
     resize: vertical;
@@ -3240,7 +3240,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-code);
     font-size: var(--body-sm);
     font-weight: 400;
   }

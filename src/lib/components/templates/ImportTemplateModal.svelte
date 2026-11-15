@@ -123,7 +123,7 @@
   textarea {
     width: 100%;
     box-sizing: border-box;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
 

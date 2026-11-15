@@ -141,7 +141,7 @@
     padding: 0 3px;
     border-radius: 3px;
     background: var(--surface-container-high);
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
   }
 
   .help-body :global(pre) {

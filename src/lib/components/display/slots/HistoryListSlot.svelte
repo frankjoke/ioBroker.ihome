@@ -81,7 +81,7 @@
   }
 
   .mono {
-    font-family: var(--font-mono);
+    font-family: var(--ui-font-value, var(--font-family));
     white-space: nowrap;
   }
 </style>

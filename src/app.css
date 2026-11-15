@@ -90,9 +90,11 @@
 
   /* type scale */
   --font-family:
-    "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  /* Code only: the logic editor, HTML/JSON fields and rule expressions. Every
+     other surface reads in the UI face. */
+  --font-code:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --label-mono-size: 11px;
   --body-sm: 12px;
@@ -272,7 +274,7 @@ button {
 
 /* Monospaced label style (Stitch `label` role) */
 .label-mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-size: var(--label-mono-size);
   font-weight: 500;
   line-height: 1;
@@ -288,7 +290,7 @@ button {
   align-items: center;
   flex-direction: row-reverse;
   gap: 0.4rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-size: var(--label-mono-size);
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -298,9 +300,10 @@ button {
 }
 
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-size: var(--label-mono-size);
   letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ *
@@ -809,7 +812,7 @@ label {
 
 .table thead th {
   background-color: var(--surface-container-low);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-size: var(--label-mono-size);
   font-weight: 500;
   letter-spacing: 0.06em;

@@ -155,7 +155,7 @@
 
   .json {
     width: 100%;
-    font-family: var(--font-mono);
+    font-family: var(--font-code);
     font-size: var(--body-sm);
     resize: vertical;
   }

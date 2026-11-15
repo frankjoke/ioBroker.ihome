@@ -12,7 +12,47 @@ export const UI_DEFAULTS = {
   secondary: 0.924,
   tileScale: 1,
   reloadMinutes: 0,
+  textFont: "inter" as FontId,
+  valueFont: "inter" as FontId,
 };
+
+/** The faces a tile may wear. The text face dresses names, labels and badges;
+ *  the value face dresses the readings. Both are display-only: the config
+ *  pages always use `--font-family`, so a choice can never reshape an editor. */
+export const FONTS = [
+  {
+    id: "inter",
+    label: "Inter",
+    stack: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "jakarta",
+    label: "Plus Jakarta Sans",
+    stack:
+      '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "plex",
+    label: "IBM Plex Sans",
+    stack:
+      '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "grotesk",
+    label: "Space Grotesk",
+    stack:
+      '"Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "mono",
+    label: "JetBrains Mono",
+    stack: '"JetBrains Mono", ui-monospace, monospace',
+  },
+] as const;
+
+export type FontId = (typeof FONTS)[number]["id"];
+
+const FONT_IDS = new Set<string>(FONTS.map((f) => f.id));
 
 export const UI_LIMITS = {
   primary: { min: 0.7, max: 1.6, step: 0.02 },
@@ -30,6 +70,16 @@ export interface UiDefaults {
   tileScale: number;
   /** Whole minutes between automatic reloads; 0 is off. */
   reloadMinutes: number;
+  /** The tile's text face (names, labels, badges). */
+  textFont: FontId;
+  /** The tile's reading face (values, units). */
+  valueFont: FontId;
+}
+
+function font(value: unknown, fallback: FontId): FontId {
+  return typeof value === "string" && FONT_IDS.has(value)
+    ? (value as FontId)
+    : fallback;
 }
 
 function colour(value: unknown): string | undefined {
@@ -73,6 +123,8 @@ export function effectiveUi(settings: Settings): UiDefaults {
         UI_DEFAULTS.reloadMinutes,
       ),
     ),
+    textFont: font(settings["ui.textFont"], UI_DEFAULTS.textFont),
+    valueFont: font(settings["ui.valueFont"], UI_DEFAULTS.valueFont),
   };
 }
 
@@ -91,7 +143,13 @@ export function uiCss(ui: UiDefaults): string {
   // The tile name keeps its current ratio to the main reading (12 px / 14.4 px).
   parts.push(`--ui-name-size: ${rem((ui.primary * 12) / 14.4)};`);
   parts.push(`--ui-secondary-size: ${rem(ui.secondary)};`);
+  parts.push(`--ui-font-text: ${stack(ui.textFont)};`);
+  parts.push(`--ui-font-value: ${stack(ui.valueFont)};`);
   return parts.join(" ");
+}
+
+function stack(id: FontId): string {
+  return FONTS.find((f) => f.id === id)!.stack;
 }
 
 /** The 1×1 module at a scale, rounded to 0.1 px so the emitted CSS stays short. */

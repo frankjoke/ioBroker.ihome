@@ -882,7 +882,7 @@
   }
 
   .var-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
     color: var(--text-muted);
     overflow: hidden;
@@ -916,7 +916,7 @@
 
   .field input {
     width: 100%;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
 
@@ -953,7 +953,7 @@
   }
 
   .prefix {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
     color: var(--text-muted);
     white-space: nowrap;

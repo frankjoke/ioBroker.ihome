@@ -797,6 +797,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* The tile's text face is the user's choice; editors keep the UI face. */
+    font-family: var(--ui-font-text, var(--font-family));
     /* Top-aligned, not centred: side-by-side tiles in a row then share their
        baselines instead of floating to different heights. */
     justify-content: flex-start;

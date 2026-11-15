@@ -317,6 +317,6 @@
   }
 
   .mono {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
   }
 </style>

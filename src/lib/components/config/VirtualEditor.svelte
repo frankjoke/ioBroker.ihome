@@ -318,7 +318,7 @@
     max-width: 8rem;
   }
   textarea.mono {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     resize: vertical;
   }
   .cols {
@@ -345,7 +345,7 @@
     color: var(--primary);
   }
   code {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
   .row {

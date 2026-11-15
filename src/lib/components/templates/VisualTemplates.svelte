@@ -509,7 +509,7 @@
   .json {
     width: 100%;
     box-sizing: border-box;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 0.8rem;
     line-height: 1.4;
     tab-size: 2;

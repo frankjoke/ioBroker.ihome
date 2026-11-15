@@ -381,7 +381,7 @@
 
   .field input {
     width: 100%;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
 

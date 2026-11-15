@@ -570,7 +570,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-code);
     font-size: var(--body-sm);
     color: var(--text-muted);
   }

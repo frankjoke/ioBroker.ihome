@@ -316,7 +316,7 @@
     width: 100%;
     margin: 0;
     border: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-code);
     font-size: 0.85rem;
     line-height: 1.4;
     padding: 0.35rem 0.5rem;

@@ -246,6 +246,7 @@
     border-radius: var(--border-radius-md, 12px);
     background-color: var(--surface-container-lowest);
     color: var(--text-color);
+    font-family: var(--ui-font-text, var(--font-family));
     overflow: hidden;
   }
 

@@ -111,7 +111,7 @@
   }
 
   .theme-option-label {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.06em;

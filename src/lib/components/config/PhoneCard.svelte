@@ -422,7 +422,7 @@
 
   .home-value {
     display: block;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
 
@@ -434,7 +434,7 @@
 
   .radius input {
     width: 5.5rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
   }
 

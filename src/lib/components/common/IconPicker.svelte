@@ -727,7 +727,7 @@
     min-width: 0;
     min-height: 5rem;
     padding: 0.35rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: var(--body-sm);
     resize: vertical;
   }

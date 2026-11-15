@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BREAKPOINTS } from "$lib/config/size-ops";
   import {
+    FONTS,
     UI_DEFAULTS,
     UI_LIMITS,
     effectiveUi,
@@ -252,6 +253,34 @@
       {#if openSection === "text"}
         <div class="item-editor ui-body">
           <div class="ui-row">
+            <span class="label-mono row-label">Text font</span>
+            <select
+              aria-label="Text font"
+              value={ui.textFont}
+              onchange={(e) => set("ui.textFont", e.currentTarget.value)}
+            >
+              {#each FONTS as f (f.id)}
+                <option value={f.id}>{f.label}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="ui-row">
+            <span class="label-mono row-label">Readings font</span>
+            <select
+              aria-label="Readings font"
+              value={ui.valueFont}
+              onchange={(e) => set("ui.valueFont", e.currentTarget.value)}
+            >
+              {#each FONTS as f (f.id)}
+                <option value={f.id}>{f.label}</option>
+              {/each}
+            </select>
+          </div>
+          <p class="hint text-muted">
+            Both apply to the tiles and their detail page — also in the preview.
+            The configuration pages keep the UI face.
+          </p>
+          <div class="ui-row">
             <span class="label-mono row-label">Primary text</span>
             <input
               type="range"
@@ -301,14 +330,13 @@
               style:font-size={`${(primary * 12) / 14.4}rem`}
               >Kitchen light</span
             >
-            <span class="sample-value mono" style:font-size={`${primary}rem`}
+            <span class="sample-value" style:font-size={`${primary}rem`}
               >21.5<span style:font-size={`${primary * 0.8}rem`}>
                 °C</span
               ></span
             >
-            <span
-              class="sample-secondary mono"
-              style:font-size={`${secondary}rem`}>44.8 %</span
+            <span class="sample-secondary" style:font-size={`${secondary}rem`}
+              >44.8 %</span
             >
           </div>
         </div>
@@ -459,6 +487,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md, 12px);
     background-color: var(--surface-container-lowest);
+    font-family: var(--ui-font-text);
   }
 
   .sample-name {
@@ -466,7 +495,14 @@
   }
 
   .sample-value {
+    font-family: var(--ui-font-value);
     font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sample-secondary {
+    font-family: var(--ui-font-value);
+    font-variant-numeric: tabular-nums;
   }
 
   .sizes {

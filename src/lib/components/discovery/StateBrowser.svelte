@@ -332,7 +332,7 @@
 
   .logic-ref {
     margin-left: auto;
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 0.7rem;
     color: var(--text-muted);
   }

@@ -198,7 +198,7 @@
   }
 
   .leaf-id {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 0.7rem;
     color: var(--text-muted);
     overflow: hidden;
@@ -207,7 +207,7 @@
   }
 
   .leaf-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 0.75rem;
     color: var(--text-muted);
     white-space: nowrap;
