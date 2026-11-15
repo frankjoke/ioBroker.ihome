@@ -73,12 +73,9 @@ export async function commitIconPool(
   const currentText = await readLibraryFile();
   if (currentText !== null) {
     const current = parseIconPool(currentText);
-    if (!current) {
-      saveFailed = true;
-      loadKind = "unreadable";
-      return "conflict";
-    }
-    if (current.updatedAt !== baseUpdatedAt) {
+    // A corrupt file must not block saves forever: the draft being saved is a
+    // whole valid document, so the write repairs it.
+    if (current && current.updatedAt !== baseUpdatedAt) {
       iconPool = current;
       loadKind = "loaded";
       return "conflict";
@@ -125,12 +122,25 @@ export function initIconPool(): Promise<void> {
         if (parsed) {
           iconPool = parsed;
           loadKind = "loaded";
-        } else {
-          loadKind = "unreadable";
-          console.error(
-            "the shared icon library is unreadable — leaving it untouched",
-          );
+          return;
         }
+        console.error("the shared icon library is unreadable — trying the mirror");
+        // Repair from the legacy mirror when it holds a valid document.
+        try {
+          const legacyText = (await readLegacyState())?.value;
+          if (legacyText !== null && legacyText !== undefined && legacyText !== "") {
+            const repaired = parseIconPool(legacyText);
+            if (repaired) {
+              await writeLibraryFile(JSON.stringify(repaired));
+              iconPool = repaired;
+              loadKind = "loaded";
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("initIconPool repair:", e);
+        }
+        loadKind = "unreadable";
         return;
       }
 

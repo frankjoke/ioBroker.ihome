@@ -72,11 +72,18 @@ it("migrates the legacy state into the shared file on first run", async () => {
   expect(h.file.text).toContain("legacy");
 });
 
-it("keeps an unreadable shared file untouched", async () => {
-  const store = await load("{not json");
+it("keeps an unreadable shared file untouched when there is no mirror", async () => {
+  const store = await load("{not json", null);
   expect(store.iconPoolLoadKind()).toBe("unreadable");
   expect(store.isIconPoolWritable()).toBe(false);
   expect(h.writeLibraryFile).not.toHaveBeenCalled();
+});
+
+it("repairs an unreadable shared file from a valid mirror", async () => {
+  const store = await load("{not json", doc(9, "mirror", "m"));
+  expect(store.iconPoolLoadKind()).toBe("loaded");
+  expect(store.getIconPool().library[0].id).toBe("mirror");
+  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
 });
 
 it("starts empty and writable when neither file nor state exists", async () => {
