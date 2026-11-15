@@ -214,6 +214,9 @@
   function closeImporter(): void {
     if (importer?.mode === "add" && (added || skipped)) {
       savedHint = `${added} added${skipped ? `, ${skipped} skipped` : ""}.`;
+      // An import writes its files at once; the rows land here, so an import
+      // never leaves orphan files behind waiting for a second save.
+      if (added) void save();
     }
     importer = null;
     added = 0;
@@ -228,12 +231,14 @@
     savedHint = "";
   }
 
+  /** A confirmed delete is committed at once: no second "save" step. */
   function remove(entry: LibraryIcon): void {
     if (!writable) return;
     draft = removeLibraryIcon(draft, entry.id);
     pendingRemove = null;
     openId = null;
     savedHint = "";
+    void save();
   }
 
   function onLineClick(event: MouseEvent, entry: LibraryIcon): void {
@@ -640,9 +645,9 @@
     onCancel={() => (pendingRemove = null)}
   >
     <p>
-      The row goes now. Its image file is removed from the shared space on Save
-      when no other icon, twin or default uses it. Tiles using the icon keep
-      their value.
+      The row is deleted and saved immediately; its image file is removed when
+      no other icon, twin or default uses it. Tiles using the icon keep their
+      value.
     </p>
   </ConfirmModal>
 {/if}
