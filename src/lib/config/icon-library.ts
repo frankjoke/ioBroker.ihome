@@ -183,11 +183,14 @@ function parseV2(record: Record<string, unknown>): IconPool | null {
 
 /** v1: `icons[]` carried value, group, keywords, roles and templates together;
  *  `overrides` patched the code-defined base entries. */
-function migrateV1(record: Record<string, unknown>): IconPool {
+function migrateV1(record: Record<string, unknown>): IconPool | null {
+  const rawIcons = record.icons;
+  // A v1 document without an icons array is malformed; it must stay
+  // unreadable rather than be replaced by the seed and overwritten.
+  if (!Array.isArray(rawIcons)) return null;
   const roles = new Map<string, IconPair>();
   const templates = new Map<string, IconPair>();
   const userRows: LibraryIcon[] = [];
-  const rawIcons = Array.isArray(record.icons) ? record.icons : [];
   for (const item of rawIcons) {
     const icon = parseLibraryIcon(item);
     if (!icon) continue;
@@ -329,6 +332,21 @@ export function filterLibrary(
   );
 }
 
+/** Manager search: name, value and keywords (the picker shows no names). */
+export function filterLibraryNames(
+  library: LibraryIcon[],
+  search: string,
+): LibraryIcon[] {
+  const query = search.trim().toLowerCase();
+  if (!query) return library;
+  return library.filter(
+    (icon) =>
+      (icon.name ?? "").toLowerCase().includes(query) ||
+      icon.value.toLowerCase().includes(query) ||
+      icon.keywords.some((word) => word.includes(query)),
+  );
+}
+
 /** Icons with an active twin first; the rest are singles. */
 export function splitTwins(entries: LibraryIcon[]): {
   twins: LibraryIcon[];
@@ -346,15 +364,24 @@ export function defaultPair(
   templateId: string | undefined,
   role: string | undefined,
 ): IconPair | undefined {
-  const { roles, templates } = pool.defaults;
-  if (templateId && templates[templateId]) return templates[templateId];
-  if (role) {
-    if (roles[role]) return roles[role];
-    const dot = role.indexOf(".");
-    if (dot > 0) {
-      const family = `${role.slice(0, dot)}.*`;
-      if (roles[family]) return roles[family];
-    }
+  if (templateId) {
+    const pair = effectiveDefault(pool, "templates", templateId);
+    if (pair) return pair;
+  }
+  return role ? effectiveDefault(pool, "roles", role) : undefined;
+}
+
+/** The pair a key resolves to: the exact key, then (roles) its `family.*`. */
+export function effectiveDefault(
+  pool: IconPool,
+  kind: "roles" | "templates",
+  key: string,
+): IconPair | undefined {
+  const exact = pool.defaults[kind][key];
+  if (exact) return exact;
+  if (kind === "roles") {
+    const dot = key.indexOf(".");
+    if (dot > 0) return pool.defaults.roles[`${key.slice(0, dot)}.*`];
   }
   return undefined;
 }

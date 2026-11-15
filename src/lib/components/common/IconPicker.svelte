@@ -103,6 +103,25 @@
     </div>
 
     <div class="results">
+      <button type="button" class="none" onclick={() => onPick("")}
+        >None — clear the icon</button
+      >
+
+      {#if icon && !shown.some((entry) => entry.value === icon || entry.activeValue === icon)}
+        <p class="label-mono group-title">Current</p>
+        <div class="grid">
+          <button
+            type="button"
+            class="cell current"
+            title={icon}
+            aria-label="Current icon"
+            onclick={() => onPick(icon ?? "")}
+          >
+            <Icon value={icon} size={22} />
+          </button>
+        </div>
+      {/if}
+
       {#if twins.length > 0}
         <p class="label-mono group-title">On / Off pairs</p>
         <div class="grid">
@@ -254,6 +273,25 @@
 
   .group-title {
     margin: 0.25rem 0 0.2rem;
+  }
+
+  .none {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--body-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .none:hover {
+    color: var(--text-color);
+    background-color: var(--surface-container);
   }
 
   .grid {

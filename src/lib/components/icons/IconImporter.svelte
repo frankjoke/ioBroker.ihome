@@ -13,6 +13,7 @@
     parseListing,
     type SourceEntry,
   } from "$lib/config/icon-source";
+  import { brokerIconPath } from "$lib/config/icon-ops";
 
   /** Pick one icon (single pick closes the browser) or many ("Add all"). The
    *  values are already in stored form; keywords/name are suggestions. */
@@ -158,6 +159,9 @@
         entry.label.toLowerCase().includes(search.trim().toLowerCase()),
     ),
   );
+  const adapterIconCount = $derived(
+    visibleEntries.filter((entry) => entry.kind === "icon").length,
+  );
   const visibleIcons = $derived(
     visibleEntries.filter((entry) => entry.kind === "icon").slice(0, limit),
   );
@@ -168,7 +172,7 @@
         ? mdiShown.length
         : resource === "objects"
           ? objectShown.length
-          : visibleIcons.length,
+          : adapterIconCount,
   );
 
   function normalizeBase(): string {
@@ -241,7 +245,7 @@
     if (close) onClose();
   }
 
-  function pickMdi(icon: MdiIcon): void {
+  function pickMdi(icon: MdiIcon, close = true): void {
     const name = icon.n?.en ?? icon.id;
     onPick(mdiIconValue(icon.p), {
       keywords: [
@@ -249,23 +253,23 @@
       ],
       name,
     });
-    onClose();
+    if (close) onClose();
   }
 
   function pickObject(entry: { id: string; value: string }): void {
-    onPick(entry.value, {
+    onPick(brokerIconPath(entry.value, entry.id), {
       keywords: keywordWords(entry.id),
       name: entry.id.split(".").pop() ?? entry.id,
     });
   }
 
-  function pickFile(entry: SourceEntry): void {
+  function pickFile(entry: SourceEntry, close = true): void {
     const value = importValue(basePath, entry.path);
     onPick(value, {
       keywords: keywordsFromPath(basePath, entry.path),
       name: entry.label,
     });
-    onClose();
+    if (close) onClose();
   }
 
   function addAll(): void {
@@ -275,7 +279,7 @@
       return;
     }
     if (resource === "mdi") {
-      for (const icon of mdiShown.slice(0, limit)) pickMdi(icon);
+      for (const icon of mdiShown.slice(0, limit)) pickMdi(icon, false);
       onClose();
       return;
     }
@@ -284,7 +288,7 @@
       onClose();
       return;
     }
-    for (const entry of visibleIcons) pickFile(entry);
+    for (const entry of visibleIcons) pickFile(entry, false);
     onClose();
   }
 

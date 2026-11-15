@@ -3,6 +3,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import IconImporter from "$lib/components/icons/IconImporter.svelte";
   import {
+    effectiveDefault,
     roleChoicesFromObjects,
     type IconPair,
     type IconPool,
@@ -84,12 +85,18 @@
     kind: "roles" | "templates",
     key: string,
     fallback?: string,
-  ): { value?: string; active?: string; own: boolean } {
-    const pair = draft.defaults[kind][key];
+  ): { value?: string; active?: string; own: boolean; family: boolean } {
+    const exact = draft.defaults[kind][key];
+    const pair = effectiveDefault(draft, kind, key);
     if (pair) {
-      return { value: pair.value, active: pair.activeValue, own: true };
+      return {
+        value: pair.value,
+        active: pair.activeValue,
+        own: !!exact,
+        family: !exact,
+      };
     }
-    return { value: fallback, own: false };
+    return { value: fallback, own: false, family: false };
   }
 
   function setFromImporter(
@@ -158,8 +165,11 @@
             {#if icon.active && icon.active !== icon.value}
               <Icon value={icon.active} size={16} />
             {/if}
-            {#if !icon.own && icon.value}
+            {#if !icon.own && !icon.family && icon.value}
               <span class="badge">code default</span>
+            {/if}
+            {#if icon.family}
+              <span class="badge">family default</span>
             {/if}
             <span class="item-actions">
               {#if icon.own}

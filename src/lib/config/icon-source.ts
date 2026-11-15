@@ -67,7 +67,8 @@ export function keywordsFromPath(basePath: string, path: string): string[] {
   return [...new Set(rest.flatMap((segment) => keywordWords(segment)))];
 }
 
-/** The stored form: `adapter/<adapter>/<path>` (what `Icon` resolves). */
+/** The stored form `Icon` resolves: a site-absolute path for the web adapter's
+ *  media root (`/icons-freepic/…`); an `adapter/` value is kept as written. */
 export function importValue(_basePath: string, path: string): string {
   let value = String(path ?? "").trim();
   if (/^https?:/i.test(value)) {
@@ -77,6 +78,6 @@ export function importValue(_basePath: string, path: string): string {
       return value;
     }
   }
-  value = value.replace(/^\/+/, "");
-  return value.startsWith("adapter/") ? value : `adapter/${value}`;
+  if (/^(\/|adapter\/)/.test(value)) return value;
+  return `/${value}`;
 }

@@ -8,7 +8,7 @@
   import {
     POOL_CAP,
     emptyIconPool,
-    filterLibrary,
+    filterLibraryNames,
     keywordWords,
     libraryKeywordCounts,
     removeLibraryIcon,
@@ -70,7 +70,7 @@
   // The draft, not the filtered list: an entry being edited must stay visible
   // even while its name stops matching the search.
   const rows = $derived.by<LibraryIcon[]>(() => {
-    const filtered = filterLibrary(draft.library, [], search);
+    const filtered = filterLibraryNames(draft.library, search);
     if (!openId || filtered.some((entry) => entry.id === openId)) {
       return filtered;
     }

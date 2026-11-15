@@ -1,8 +1,10 @@
 import { it, expect } from "vitest";
 import {
   defaultPair,
+  effectiveDefault,
   emptyIconPool,
   filterLibrary,
+  filterLibraryNames,
   hasIconValue,
   keywordWords,
   libraryKeywordCounts,
@@ -199,6 +201,41 @@ it("builds role choices from state roles only", () => {
     { value: "switch.*", label: "switch.* · 2" },
     { value: "light.*", label: "light.* · 1" },
   ]);
+});
+
+it("rejects a v1 document without an icons array", () => {
+  expect(parseIconPool({ version: 1, overrides: {} })).toBeNull();
+});
+
+it("finds a library row by name, value or keyword", () => {
+  expect(filterLibraryNames(library, "lamp")).toEqual([]);
+  expect(
+    filterLibraryNames([{ ...library[0], name: "Lamp" }], "lamp").map(
+      (icon) => icon.id,
+    ),
+  ).toEqual(["l"]);
+  expect(filterLibraryNames(library, "bolt").map((icon) => icon.id)).toEqual([
+    "p",
+  ]);
+  expect(filterLibraryNames(library, "doo").map((icon) => icon.id)).toEqual([
+    "d",
+  ]);
+  expect(filterLibraryNames(library, "")).toHaveLength(3);
+});
+
+it("resolves an effective default through the role family", () => {
+  const pool = emptyIconPool();
+  pool.defaults.roles["light.*"] = { value: "z", activeValue: "y" };
+  pool.defaults.roles["light.dimmer"] = { value: "exact" };
+  expect(effectiveDefault(pool, "roles", "light.dimmer")).toEqual({
+    value: "exact",
+  });
+  expect(effectiveDefault(pool, "roles", "light.color")).toEqual({
+    value: "z",
+    activeValue: "y",
+  });
+  expect(effectiveDefault(pool, "roles", "switch.active")).toBeUndefined();
+  expect(effectiveDefault(pool, "templates", "Door")).toBeUndefined();
 });
 
 it("sets, overwrites and clears a default", () => {

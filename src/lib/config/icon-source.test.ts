@@ -73,16 +73,16 @@ it("takes keywords from the folders below the base", () => {
 it("builds the stored adapter path", () => {
   expect(
     importValue("icons-freepic/", "icons-freepic/gadgets/alarm-clock-set.svg"),
-  ).toBe("adapter/icons-freepic/gadgets/alarm-clock-set.svg");
+  ).toBe("/icons-freepic/gadgets/alarm-clock-set.svg");
   expect(importValue("icons-freepic/", "/icons-freepic/x.svg")).toBe(
-    "adapter/icons-freepic/x.svg",
+    "/icons-freepic/x.svg",
   );
   expect(
     importValue(
       "icons-freepic/",
       "http://host:8082/icons-freepic/gadgets/x.svg",
     ),
-  ).toBe("adapter/icons-freepic/gadgets/x.svg");
+  ).toBe("/icons-freepic/gadgets/x.svg");
   expect(importValue("icons-freepic/", "adapter/icons-freepic/x.svg")).toBe(
     "adapter/icons-freepic/x.svg",
   );
