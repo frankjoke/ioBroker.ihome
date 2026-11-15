@@ -1202,7 +1202,10 @@ class IHome extends utils.Adapter {
   private async mergePluginFiles(
     list: AdapterPlugin[],
   ): Promise<AdapterPlugin[]> {
-    const ids = await listPluginFolders(this as unknown as PluginFileHost);
+    const ids = await listPluginFolders(
+      this as unknown as PluginFileHost,
+      (message) => this.log.warn(message),
+    );
     if (!ids.length) return list;
     const next = [...list];
     for (const id of ids) {
@@ -2184,13 +2187,18 @@ class IHome extends utils.Adapter {
       this.pluginConfig = mergePluginSettings(native, doc);
       this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
     }
-    await this.savePluginSettings();
 
     // User plugin content lives as folders in `ihome.meta`; the config only
     // holds the runtime flags. Move any code still in config out once, then
     // merge what the files say.
     await this.migratePluginCodeToFiles();
     this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
+    if (!updateFailed) {
+      // File-backed plugins belong in the settings document too, or the next
+      // start would lose their enabled flag.
+      this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+    }
+    await this.savePluginSettings();
 
     this.pluginHost = createPluginHost(
       this.pluginConfig,

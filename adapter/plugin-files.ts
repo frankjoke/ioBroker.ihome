@@ -75,19 +75,26 @@ async function readText(
 /** The plugin ids present as folders in the shared space. */
 export async function listPluginFolders(
   host: PluginFileHost,
+  log?: (message: string) => void,
 ): Promise<string[]> {
   let rows: { file: string; isDir?: boolean }[] | undefined;
   try {
     rows = await host.readDirAsync(META_ADAPTER, PLUGIN_DIR);
-  } catch {
+  } catch (error) {
+    log?.(`plugins: cannot list ${PLUGIN_DIR}: ${String(error)}`);
     return [];
   }
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .filter((row) => row.isDir === true)
-    .map((row) => row.file)
-    .filter((id): id is string => !!validPluginId(id))
-    .sort();
+  if (!Array.isArray(rows)) {
+    log?.(`plugins: ${PLUGIN_DIR} is not a folder`);
+    return [];
+  }
+  return (
+    rows
+      // Some controllers omit `isDir`; only a plain file is ruled out.
+      .filter((row) => row.isDir !== false && validPluginId(row.file))
+      .map((row) => row.file)
+      .sort()
+  );
 }
 
 /** Read one plugin folder; a broken manifest is reported, not guessed. */

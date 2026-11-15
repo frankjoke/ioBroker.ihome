@@ -126,6 +126,34 @@ it("merges the file content with the runtime flags", async () => {
   expect(mergePlugin(files).enabled).toBe(false);
 });
 
+it("lists folders even when the controller omits isDir", async () => {
+  const h: PluginFileHost = {
+    async readDirAsync() {
+      return [{ file: "clock" }, { file: "index.js", isDir: false }];
+    },
+    async readFileAsync() {
+      return "";
+    },
+  };
+  expect(await listPluginFolders(h)).toEqual(["clock"]);
+});
+
+it("reports a folder that cannot be listed", async () => {
+  const logs: string[] = [];
+  const h: PluginFileHost = {
+    async readDirAsync() {
+      throw new Error("not a meta object");
+    },
+    async readFileAsync() {
+      return "";
+    },
+  };
+  expect(await listPluginFolders(h, (message) => logs.push(message))).toEqual(
+    [],
+  );
+  expect(logs[0]).toContain("not a meta object");
+});
+
 it("rejects an unknown id", async () => {
   expect(await readPluginFiles(host({}), "../evil")).toEqual({
     problem: "Unknown plugin id: ../evil",
