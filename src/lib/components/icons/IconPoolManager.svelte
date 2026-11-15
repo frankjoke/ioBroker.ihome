@@ -310,166 +310,6 @@
   }
 </script>
 
-{#snippet libraryRow(entry: LibraryIcon)}
-  <div class="item" class:open={openId === entry.id}>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
-      <Icon value={entry.value} size={18} />
-      {#if draft.twins[entry.value]}
-        <span class="row-twin" title="Twin icon">
-          <Icon value={draft.twins[entry.value]} size={18} />
-        </span>
-      {/if}
-      <button
-        type="button"
-        class="name"
-        aria-expanded={openId === entry.id}
-        onclick={() => (openId = openId === entry.id ? null : entry.id)}
-      >
-        {label(entry)}
-      </button>
-      {#each entry.keywords.slice(0, 4) as word (word)}
-        <span class="badge">{word}</span>
-      {/each}
-      <span class="item-actions">
-        {#if openId === entry.id}
-          <!-- One document: this row's Save writes the whole library. -->
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            title="Save the whole icon library"
-            disabled={!dirty || !writable || saving}
-            onclick={save}
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-        {/if}
-        <IconButton
-          icon="delete"
-          danger
-          label={`Delete ${label(entry)}`}
-          disabled={!writable}
-          onclick={() => (pendingRemove = entry)}
-        />
-      </span>
-    </div>
-    {#if openId === entry.id && openIcon}
-      <div class="item-editor pool-editor">
-        <div class="icon-pair">
-          <div class="icon-slot">
-            <span class="label-mono">Default</span>
-            <button
-              type="button"
-              class="btn btn-sm glyph-pick"
-              title={`Change the default icon of ${label(entry)}`}
-              aria-label={`Change the default icon of ${label(entry)}`}
-              disabled={!writable}
-              onclick={() =>
-                (importer = { mode: "field", id: entry.id, field: "value" })}
-            >
-              <Icon value={openIcon.value} size={18} />
-            </button>
-          </div>
-          <div class="icon-slot">
-            <span class="label-mono">Twin (on)</span>
-            <div class="active-line">
-              <button
-                type="button"
-                class="btn btn-sm glyph-pick"
-                title={`Set the on-twin of ${label(entry)}`}
-                aria-label={`Set the on-twin of ${label(entry)}`}
-                disabled={!writable}
-                onclick={() =>
-                  (importer = {
-                    mode: "field",
-                    id: entry.id,
-                    field: "twin",
-                  })}
-              >
-                {#if draft.twins[openIcon.value]}
-                  <Icon value={draft.twins[openIcon.value]} size={18} />
-                {:else}
-                  <span class="material-symbols-outlined">add</span>
-                {/if}
-              </button>
-              {#if draft.twins[openIcon.value]}
-                <IconButton
-                  icon="close"
-                  label={`Clear the twin of ${label(entry)}`}
-                  disabled={!writable}
-                  onclick={() => setTwinValue(entry.id, "")}
-                />
-              {/if}
-            </div>
-          </div>
-        </div>
-        <div class="pool-fields">
-          <label class="field">
-            <span class="label-mono">Name</span>
-            <input
-              type="text"
-              placeholder="optional"
-              value={openIcon.name ?? ""}
-              disabled={!writable}
-              oninput={(e) => updateIcon({ name: e.currentTarget.value })}
-            />
-          </label>
-          <div class="field keywords">
-            <span class="label-mono">Keywords</span>
-            <div class="keyword-chips">
-              {#each openIcon.keywords as word (word)}
-                <span class="keyword-chip">
-                  {word}
-                  <button
-                    type="button"
-                    class="chip-x"
-                    aria-label={`Remove keyword ${word}`}
-                    disabled={!writable}
-                    onclick={() => removeKeyword(word)}
-                  >
-                    <span class="material-symbols-outlined">close</span>
-                  </button>
-                </span>
-              {/each}
-            </div>
-            <div class="keyword-add">
-              <input
-                type="text"
-                aria-label="Add a keyword"
-                placeholder="add a keyword"
-                list="icon-keyword-choices"
-                bind:value={keywordDraft}
-                disabled={!writable}
-                onkeydown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addKeyword();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                class="btn btn-outline btn-sm"
-                disabled={!writable || !keywordDraft.trim()}
-                onclick={addKeyword}>Add</button
-              >
-            </div>
-            <datalist id="icon-keyword-choices">
-              {#each keywordChoices as word (word)}
-                <option value={word}></option>
-              {/each}
-            </datalist>
-            <p class="hint text-muted">
-              Search only — an icon may carry several keywords.
-            </p>
-          </div>
-        </div>
-      </div>
-    {/if}
-  </div>
-{/snippet}
-
 {#if !loaded}
   <div class="card empty-state">
     <p class="text-muted">
@@ -520,7 +360,7 @@
           <Icon value="apps" size={18} />
           <span class="name">Icon library</span>
           <span class="badge">{draft.library.length} icons</span>
-          <!-- Add stays on the document line; Save lives on the open row (§5). -->
+          <!-- Add stays on the document line; Save lives on the open editor (§5). -->
           <span class="item-actions">
             <button
               type="button"
@@ -540,6 +380,132 @@
         </div>
       </div>
 
+      {#if openIcon}
+        <div class="item open">
+          <div class="item-editor pool-editor">
+            <div class="editor-row">
+              <div class="icon-slot">
+                <span class="label-mono">Default</span>
+                <button
+                  type="button"
+                  class="btn btn-sm glyph-pick"
+                  title={`Change the default icon of ${label(openIcon)}`}
+                  aria-label={`Change the default icon of ${label(openIcon)}`}
+                  disabled={!writable}
+                  onclick={() =>
+                    (importer = {
+                      mode: "field",
+                      id: openIcon.id,
+                      field: "value",
+                    })}
+                >
+                  <Icon value={openIcon.value} size={18} />
+                </button>
+              </div>
+              <div class="icon-slot">
+                <span class="label-mono">Twin (on)</span>
+                <div class="active-line">
+                  <button
+                    type="button"
+                    class="btn btn-sm glyph-pick"
+                    title={`Set the on-twin of ${label(openIcon)}`}
+                    aria-label={`Set the on-twin of ${label(openIcon)}`}
+                    disabled={!writable}
+                    onclick={() =>
+                      (importer = {
+                        mode: "field",
+                        id: openIcon.id,
+                        field: "twin",
+                      })}
+                  >
+                    {#if draft.twins[openIcon.value]}
+                      <Icon value={draft.twins[openIcon.value]} size={18} />
+                    {:else}
+                      <span class="material-symbols-outlined">add</span>
+                    {/if}
+                  </button>
+                  {#if draft.twins[openIcon.value]}
+                    <IconButton
+                      icon="close"
+                      label={`Clear the twin of ${label(openIcon)}`}
+                      disabled={!writable}
+                      onclick={() => setTwinValue(openIcon!.id, "")}
+                    />
+                  {/if}
+                </div>
+              </div>
+              <label class="field name-field">
+                <span class="label-mono">Name</span>
+                <input
+                  type="text"
+                  placeholder="optional"
+                  value={openIcon.name ?? ""}
+                  disabled={!writable}
+                  oninput={(e) => updateIcon({ name: e.currentTarget.value })}
+                />
+              </label>
+              <span class="item-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  title="Save the whole icon library"
+                  disabled={!dirty || !writable || saving}
+                  onclick={save}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </span>
+            </div>
+            <div class="field keywords">
+              <span class="label-mono">Keywords</span>
+              <div class="keyword-chips">
+                {#each openIcon.keywords as word (word)}
+                  <span class="keyword-chip">
+                    {word}
+                    <button
+                      type="button"
+                      class="chip-x"
+                      aria-label={`Remove keyword ${word}`}
+                      disabled={!writable}
+                      onclick={() => removeKeyword(word)}
+                    >
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </span>
+                {/each}
+              </div>
+              <div class="keyword-add">
+                <input
+                  type="text"
+                  aria-label="Add a keyword"
+                  placeholder="add a keyword"
+                  list="icon-keyword-choices"
+                  bind:value={keywordDraft}
+                  disabled={!writable}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addKeyword();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  disabled={!writable || !keywordDraft.trim()}
+                  onclick={addKeyword}>Add</button
+                >
+              </div>
+              <datalist id="icon-keyword-choices">
+                {#each keywordChoices as word (word)}
+                  <option value={word}></option>
+                {/each}
+              </datalist>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       <div class="list-toolbar">
         <div class="list-filter">
           <span class="label-mono filter-label">Filters</span>
@@ -556,9 +522,31 @@
           <p class="text-muted">No icons match the search.</p>
         </div>
       {:else}
-        <div class="list">
+        <div class="tiles">
           {#each rows as entry (entry.id)}
-            {@render libraryRow(entry)}
+            {@const twin = draft.twins[entry.value]}
+            <div class="tile" class:current={openId === entry.id}>
+              <button
+                type="button"
+                class="tile-main"
+                title={`${label(entry)}${twin ? " (pair)" : ""}`}
+                aria-label={`${label(entry)}${twin ? " (pair)" : ""}`}
+                aria-pressed={openId === entry.id}
+                onclick={() => (openId = openId === entry.id ? null : entry.id)}
+              >
+                <Icon value={entry.value} size={24} />
+                {#if twin}
+                  <span class="tile-twin"><Icon value={twin} size={16} /></span>
+                {/if}
+              </button>
+              <IconButton
+                icon="delete"
+                danger
+                label={`Delete ${label(entry)}`}
+                disabled={!writable}
+                onclick={() => (pendingRemove = entry)}
+              />
+            </div>
           {/each}
         </div>
       {/if}
@@ -609,12 +597,6 @@
     cursor: default;
   }
 
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
   .list-toolbar {
     display: flex;
     flex-direction: column;
@@ -641,22 +623,82 @@
     text-align: center;
   }
 
-  .row-twin {
-    display: flex;
-    opacity: 0.7;
-  }
-
   .pool-editor {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
 
-  .icon-pair {
+  .editor-row {
     display: flex;
     align-items: flex-end;
     gap: 0.75rem;
     flex-wrap: wrap;
+  }
+
+  .name-field {
+    flex: 1 1 12rem;
+  }
+
+  .tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .tile {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    background: var(--surface-container-lowest);
+  }
+
+  .tile.current {
+    border-color: var(--primary-color);
+  }
+
+  .tile-main {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+  }
+
+  .tile-main:hover {
+    background-color: var(--surface-container);
+  }
+
+  .tile-twin {
+    position: absolute;
+    left: 1px;
+    bottom: 1px;
+    display: inline-flex;
+    color: var(--text-muted);
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  .tile :global(.icon-btn) {
+    width: 28px;
+    height: 28px;
+    opacity: 0.55;
+  }
+
+  .tile :global(.icon-btn .material-symbols-outlined) {
+    font-size: 17px;
+  }
+
+  .tile:hover :global(.icon-btn),
+  .tile :global(.icon-btn):focus-visible {
+    opacity: 1;
   }
 
   .icon-slot {
@@ -685,23 +727,6 @@
 
   .conflict-line .hint {
     flex: 1 1 auto;
-  }
-
-  .pool-fields {
-    display: grid;
-    grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr);
-    gap: 0.5rem;
-    align-items: end;
-  }
-
-  .pool-fields .keywords {
-    grid-column: 1 / -1;
-  }
-
-  @media (max-width: 820px) {
-    .pool-fields {
-      grid-template-columns: 1fr;
-    }
   }
 
   .field {
