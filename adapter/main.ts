@@ -1385,7 +1385,7 @@ class IHome extends utils.Adapter {
       }
       this.pluginConfig = active;
       this.pluginSettings = {
-        ...pluginSettingsDoc(active),
+        ...pluginSettingsDoc(active, this.pluginSettings.settings),
         staged,
         removals: this.pluginSettings.removals,
       };
@@ -1508,7 +1508,7 @@ class IHome extends utils.Adapter {
         : [...this.pluginConfig, merged];
       await host.restart(merged);
       this.pluginSettings = {
-        ...pluginSettingsDoc(this.pluginConfig),
+        ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
         staged: this.pluginSettings.staged.filter(
           (entry) => entry.id !== merged.id,
         ),
@@ -1533,7 +1533,7 @@ class IHome extends utils.Adapter {
         (entry) => entry.id !== command.id,
       );
       this.pluginSettings = {
-        ...pluginSettingsDoc(this.pluginConfig),
+        ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
         staged: this.pluginSettings.staged.filter(
           (entry) => entry.id !== command.id,
         ),
@@ -2268,7 +2268,7 @@ class IHome extends utils.Adapter {
     } else {
       doc = { ...doc, staged: [], removals: [] };
       this.pluginConfig = mergePluginSettings(native, doc);
-      this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+      this.pluginSettings = pluginSettingsDoc(this.pluginConfig, doc.settings);
     }
 
     // User plugin content lives as folders in `ihome.meta`; the config only
@@ -2279,7 +2279,10 @@ class IHome extends utils.Adapter {
     if (!updateFailed) {
       // File-backed plugins belong in the settings document too, or the next
       // start would lose their enabled flag.
-      this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+      this.pluginSettings = pluginSettingsDoc(
+        this.pluginConfig,
+        this.pluginSettings.settings,
+      );
     }
     await this.savePluginSettings();
 
