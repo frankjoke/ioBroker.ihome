@@ -47,6 +47,12 @@ import {
 } from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
+  listPluginFolders,
+  mergePlugin,
+  readPluginFiles,
+  type PluginFileHost,
+} from "./plugin-files";
+import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
   parsePluginMessage,
@@ -1145,6 +1151,34 @@ class IHome extends utils.Adapter {
     });
   }
 
+  /** File-backed user plugins override what the config still carries. */
+  private async mergePluginFiles(
+    list: AdapterPlugin[],
+  ): Promise<AdapterPlugin[]> {
+    const ids = await listPluginFolders(this as unknown as PluginFileHost);
+    if (!ids.length) return list;
+    const next = [...list];
+    for (const id of ids) {
+      const read = await readPluginFiles(this as unknown as PluginFileHost, id);
+      if ("problem" in read) {
+        this.log.warn(`plugin ${id}: ${read.problem}`);
+        continue;
+      }
+      const runtime = next.find((entry) => entry.id === id);
+      const settings = this.pluginSettings.settings[id];
+      const merged = mergePlugin(read.files, {
+        enabled: runtime?.enabled ?? settings?.enabled,
+        debug: runtime?.debug ?? settings?.debug,
+        timeoutMs: runtime?.timeoutMs ?? settings?.timeoutMs,
+        settings: runtime?.settings ?? settings?.settings,
+      });
+      const index = next.findIndex((entry) => entry.id === id);
+      if (index >= 0) next[index] = merged;
+      else next.push(merged);
+    }
+    return next;
+  }
+
   private pluginViews(): PluginView[] {
     const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
     const views = this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
@@ -2104,6 +2138,10 @@ class IHome extends utils.Adapter {
       this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
     }
     await this.savePluginSettings();
+
+    // User plugin content lives as folders in `ihome.meta`; the config only
+    // holds the runtime flags. Read the files once and merge them in.
+    this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
 
     this.pluginHost = createPluginHost(
       this.pluginConfig,
