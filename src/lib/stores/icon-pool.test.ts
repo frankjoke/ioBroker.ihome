@@ -2,7 +2,7 @@ import { it, expect, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const state = { value: null as unknown };
-  const file = { text: null as string | null };
+  const file = { text: null as string | null, failWrites: false };
   const setState = vi.fn(async (_id: string, value: unknown) => {
     state.value = value;
   });
@@ -12,6 +12,7 @@ const h = vi.hoisted(() => {
     setState,
     readLibraryFile: vi.fn(async () => file.text),
     writeLibraryFile: vi.fn(async (json: string) => {
+      if (file.failWrites) throw new Error("broken");
       file.text = json;
     }),
   };
@@ -45,6 +46,7 @@ const doc = (updatedAt: number, id = "a", value = "x") =>
 async function load(stateValue: string | null, fileText: string | null) {
   h.state.value = stateValue;
   h.file.text = fileText;
+  h.file.failWrites = false;
   h.setState.mockClear();
   h.writeLibraryFile.mockClear();
   h.readLibraryFile.mockClear();
@@ -107,7 +109,7 @@ it("saves the state first and refreshes the mirror", async () => {
 
 it("a broken mirror does not fail the save", async () => {
   const store = await load(doc(1), doc(1));
-  h.writeLibraryFile.mockRejectedValueOnce(new Error("broken"));
+  h.file.failWrites = true;
   const next = {
     version: 3 as const,
     updatedAt: 11,

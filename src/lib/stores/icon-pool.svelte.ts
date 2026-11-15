@@ -56,15 +56,28 @@ async function readState(): Promise<{ value?: unknown } | null> {
   return state;
 }
 
+/** Write the mirror and prove it by reading it back over HTTP. A write that
+ *  "succeeds" but leaves something that does not parse is retried once, then
+ *  reported; the state is already saved and stays authoritative. */
 async function writeMirror(pool: IconPool): Promise<void> {
-  try {
-    await writeLibraryFile(JSON.stringify(pool));
-    mirrorStale = false;
-  } catch (error) {
-    // The library is saved either way; the mirror is a convenience copy.
-    mirrorStale = true;
-    console.warn("icon library mirror not updated:", error);
+  const text = JSON.stringify(pool);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await writeLibraryFile(text);
+    } catch (error) {
+      console.warn("icon library mirror write failed:", error);
+      continue;
+    }
+    const back = await readLibraryFile();
+    if (back !== null && parseIconPool(back)) {
+      mirrorStale = false;
+      return;
+    }
   }
+  mirrorStale = true;
+  console.warn(
+    "icon library mirror did not verify; the state is authoritative",
+  );
 }
 
 /**
