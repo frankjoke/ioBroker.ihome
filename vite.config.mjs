@@ -1,64 +1,81 @@
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import adapter from "@sveltejs/adapter-static";
 
 // The SvelteKit config lives here rather than in svelte.config.js: this package
 // is CommonJS (main.js), so Node cannot import an ESM svelte.config.js.
-export default defineConfig({
-  plugins: [
-    sveltekit({
-      preprocess: vitePreprocess(),
-      adapter: adapter({
-        pages: "www",
-        assets: "www",
-        fallback: "index.html",
-        precompress: false,
-        strict: true,
+export default defineConfig(({ mode }) => {
+  // Dev only: the broker's browsable icon roots are cross-origin, so the
+  // listings are proxied through the dev server (the app fetches them
+  // relatively). Production is served by the web adapter itself.
+  const env = loadEnv(mode, process.cwd(), "");
+  const broker = String(env.VITE_IOBROKER_ORIGIN ?? "").replace(/\/+$/, "");
+  const proxy = broker
+    ? Object.fromEntries(
+        ["/icons-freepic", "/icons-addictive-flavour-png", "/iqontrol"].map(
+          (root) => [root, { target: broker, changeOrigin: true }],
+        ),
+      )
+    : {};
+
+  return {
+    plugins: [
+      sveltekit({
+        preprocess: vitePreprocess(),
+        adapter: adapter({
+          pages: "www",
+          assets: "www",
+          fallback: "index.html",
+          precompress: false,
+          strict: true,
+        }),
+        paths: {
+          base: process.env.NODE_ENV === "production" ? "/ihome" : "",
+        },
+        router: {
+          type: "hash",
+        },
+        // The logic engine is shared with the adapter (adapter/logic), so the SPA
+        // imports exactly the code the adapter runs.
+        alias: {
+          $logic: "adapter/logic",
+          $adapter: "adapter",
+        },
+        serviceWorker: {
+          // registered in +layout.svelte, with updateViaCache: "none"
+          register: false,
+        },
+        version: {
+          pollInterval: 0,
+        },
+        output: {
+          bundleStrategy: "inline",
+        },
       }),
-      paths: {
-        base: process.env.NODE_ENV === "production" ? "/ihome" : "",
+    ],
+    server: {
+      proxy,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
       },
-      router: {
-        type: "hash",
+      // The project lives under OneDrive, whose file events get swallowed: Vite
+      // missed edits and kept serving the previous module until the dev server
+      // was restarted. Polling is the documented remedy for sync/network folders
+      // (it costs a little CPU in exchange for never being stale).
+      watch: {
+        usePolling: true,
+        interval: 300,
+        awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
       },
-      // The logic engine is shared with the adapter (adapter/logic), so the SPA
-      // imports exactly the code the adapter runs.
-      alias: {
-        $logic: "adapter/logic",
-        $adapter: "adapter",
-      },
-      serviceWorker: {
-        // registered in +layout.svelte, with updateViaCache: "none"
-        register: false,
-      },
-      version: {
-        pollInterval: 0,
-      },
-      output: {
-        bundleStrategy: "inline",
-      },
-    }),
-  ],
-  server: {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
     },
-    // The project lives under OneDrive, whose file events get swallowed: Vite
-    // missed edits and kept serving the previous module until the dev server
-    // was restarted. Polling is the documented remedy for sync/network folders
-    // (it costs a little CPU in exchange for never being stale).
-    watch: {
-      usePolling: true,
-      interval: 300,
-      awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+    test: {
+      environment: "node",
+      include: ["src/**/*.{test,spec}.{js,ts}", "adapter/**/*.test.ts"],
+      expect: {
+        requireAssertions: true,
+      },
     },
-  },
-  test: {
-    environment: "node",
-    include: ["src/**/*.{test,spec}.{js,ts}", "adapter/**/*.test.ts"],
-    expect: {
-      requireAssertions: true,
-    },
-  },
+  };
 });

@@ -1,124 +1,139 @@
 import { it, expect, vi } from "vitest";
 
 const h = vi.hoisted(() => {
-  const state = {
-    raw: null as unknown,
-    onUpdate: null as
-      null | ((client: unknown, state: { val: unknown }) => boolean),
-  };
-  const register = vi.fn();
+  const state = { value: null as unknown };
+  const file = { text: null as string | null, failWrites: false };
   const setState = vi.fn(async (_id: string, value: unknown) => {
-    state.raw = value;
+    state.value = value;
   });
-  const getState = vi.fn(async () => {
-    if (state.raw === null) return null;
-    return {
-      value: state.raw,
-      set onUpdate(fn: typeof state.onUpdate) {
-        state.onUpdate = fn;
-      },
-      get onUpdate() {
-        return state.onUpdate;
-      },
-    };
-  });
-  return { state, register, setState, getState };
+  return {
+    state,
+    file,
+    setState,
+    readLibraryFile: vi.fn(async () => file.text),
+    writeLibraryFile: vi.fn(async (json: string) => {
+      if (file.failWrites) throw new Error("broken");
+      file.text = json;
+    }),
+  };
 });
+
+vi.mock("$lib/config/icon-files", () => ({
+  readLibraryFile: h.readLibraryFile,
+  writeLibraryFile: h.writeLibraryFile,
+}));
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
     connected: true,
-    getState: h.getState,
+    getState: vi.fn(async () =>
+      h.state.value === null ? null : { value: h.state.value },
+    ),
     setState: h.setState,
-    getObject: vi.fn(async () => ({})),
-    emitAsync: vi.fn(async () => ({})),
     wait: vi.fn(async () => {}),
   },
 }));
 
-vi.mock("$lib/stores/devices.svelte", () => ({
-  registerProgramStateId: h.register,
-}));
-
 const doc = (updatedAt: number, id = "a", value = "x") =>
   JSON.stringify({
-    version: 1,
+    version: 3,
     updatedAt,
-    icons: [{ id, name: id.toUpperCase(), value }],
+    library: [{ id, name: id.toUpperCase(), value, keywords: [] }],
+    twins: {},
+    defaults: { roles: {}, templates: {} },
   });
 
-/** A fresh module per scenario: absent, loaded and unreadable differ at init. */
-async function load(raw: unknown) {
-  h.state.raw = raw;
-  h.state.onUpdate = null;
-  h.register.mockClear();
+async function load(stateValue: string | null, fileText: string | null) {
+  h.state.value = stateValue;
+  h.file.text = fileText;
+  h.file.failWrites = false;
   h.setState.mockClear();
+  h.writeLibraryFile.mockClear();
+  h.readLibraryFile.mockClear();
   vi.resetModules();
   const store = await import("./icon-pool.svelte");
   await store.initIconPool();
   return store;
 }
 
-it("registers the document and loads it", async () => {
-  const store = await load(doc(1));
-  expect(h.register).toHaveBeenCalledWith(store.ICON_POOL_ID);
+it("loads from the state and keeps the mirror in step", async () => {
+  const store = await load(doc(5), null);
   expect(store.iconPoolLoadKind()).toBe("loaded");
-  expect(store.getIconPool().icons).toHaveLength(1);
+  expect(store.getIconPool().library[0].id).toBe("a");
+  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
 });
 
-it("treats an adapter-created empty document as absent and writable", async () => {
-  // The object exists (getObject truthy) but no value was ever written.
-  const store = await load(null);
+it("joins an existing shared file when the state is empty", async () => {
+  const store = await load(null, doc(7, "joined", "y"));
+  expect(store.iconPoolLoadKind()).toBe("loaded");
+  expect(store.getIconPool().library[0].id).toBe("joined");
+  expect(h.setState).toHaveBeenCalled();
+});
+
+it("prefers the newer of state and file", async () => {
+  const store = await load(doc(3, "state"), doc(9, "file"));
+  expect(store.getIconPool().library[0].id).toBe("file");
+  expect(h.setState).toHaveBeenCalled();
+});
+
+it("recovers from a corrupt state using a valid mirror", async () => {
+  const store = await load("{not json", doc(4, "mirror", "m"));
+  expect(store.iconPoolLoadKind()).toBe("loaded");
+  expect(store.getIconPool().library[0].id).toBe("mirror");
+  expect(h.setState).toHaveBeenCalled();
+});
+
+it("starts empty when neither side exists", async () => {
+  const store = await load(null, null);
   expect(store.iconPoolLoadKind()).toBe("absent");
   expect(store.isIconPoolWritable()).toBe(true);
 });
 
-it("keeps a malformed document unreadable and unwritable", async () => {
-  const store = await load("{not json");
-  expect(store.iconPoolLoadKind()).toBe("unreadable");
-  expect(store.isIconPoolWritable()).toBe(false);
-});
-
-it("ignores its own echo and accepts a remote change", async () => {
-  const store = await load(doc(1));
+it("saves the state first and refreshes the mirror", async () => {
+  const store = await load(doc(1), doc(1));
   const next = {
-    version: 1 as const,
+    version: 3 as const,
     updatedAt: 10,
-    icons: [{ id: "b", name: "B", value: "y" }],
+    library: [{ id: "b", value: "z", keywords: [] }],
+    twins: {},
+    defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 1)).toBe("saved");
-  h.state.onUpdate?.(null, {
-    val: JSON.stringify({ ...next, icons: [] }),
-  });
-  expect(store.getIconPool().icons).toHaveLength(1);
-  h.state.onUpdate?.(null, {
-    val: JSON.stringify({ ...next, updatedAt: 11, icons: [] }),
-  });
-  expect(store.getIconPool().icons).toHaveLength(0);
+  expect(h.setState).toHaveBeenCalledWith(
+    store.ICON_POOL_ID,
+    JSON.stringify(next),
+  );
+  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
+  expect(store.iconPoolMirrorStale()).toBe(false);
 });
 
-it("refuses to overwrite a remote save made since load", async () => {
-  const store = await load(doc(1));
-  h.state.raw = doc(2, "remote", "z");
+it("a broken mirror does not fail the save", async () => {
+  const store = await load(doc(1), doc(1));
+  h.file.failWrites = true;
+  const next = {
+    version: 3 as const,
+    updatedAt: 11,
+    library: [],
+    twins: {},
+    defaults: { roles: {}, templates: {} },
+  };
+  expect(await store.commitIconPool(next, 1)).toBe("saved");
+  expect(store.iconPoolMirrorStale()).toBe(true);
+});
+
+it("refuses to overwrite a state changed since load", async () => {
+  const store = await load(doc(1), doc(1));
+  h.state.value = doc(2, "remote", "z");
   const result = await store.commitIconPool(
-    { version: 1, updatedAt: 3, icons: [] },
+    {
+      version: 3 as const,
+      updatedAt: 3,
+      library: [],
+      twins: {},
+      defaults: { roles: {}, templates: {} },
+    },
     1,
   );
   expect(result).toBe("conflict");
-  expect(h.setState).not.toHaveBeenCalled();
-  expect(store.getIconPool().icons[0].id).toBe("remote");
-});
-
-it("creates the first document and subscribes to it", async () => {
-  const store = await load(null);
-  const next = {
-    version: 1 as const,
-    updatedAt: 5,
-    icons: [{ id: "a", name: "A", value: "x" }],
-  };
-  expect(await store.commitIconPool(next, 0)).toBe("saved");
-  await store.initIconPool();
-  expect(store.iconPoolLoadKind()).toBe("loaded");
-  h.state.onUpdate?.(null, { val: doc(6, "b", "y") });
-  expect(store.getIconPool().icons[0].id).toBe("b");
+  expect(store.getIconPool().library[0].id).toBe("remote");
 });

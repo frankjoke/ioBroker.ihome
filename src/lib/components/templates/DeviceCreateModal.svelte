@@ -54,6 +54,7 @@
   let name = $state("");
   let room = $state("");
   let icon = $state("");
+  let activeIcon = $state("");
   let error = $state("");
   let picking = $state(false);
   let pickingFor = $state<string | null>(null);
@@ -196,6 +197,7 @@
       name,
       room,
       icon,
+      activeIcon: activeIcon || undefined,
       fills: chosen.map((fill) => ({
         feature: fill.feature.feature,
         ref: fill.ref,
@@ -401,8 +403,10 @@
 {#if iconPicker}
   <IconPicker
     {icon}
-    onPick={(value) => {
+    twins
+    onPick={(value, meta) => {
       icon = value;
+      activeIcon = meta?.active ?? "";
       iconPicker = false;
     }}
     onClose={() => (iconPicker = false)}

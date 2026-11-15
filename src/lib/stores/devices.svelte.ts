@@ -271,11 +271,15 @@ function _devicesEnriched(): EnrichedDevice[] {
         )
       : undefined;
     const objectIcon = deviceFaceIcon(device.icon, iconHit, device.type);
+    const objectActiveIcon = device.activeIcon
+      ? deviceFaceIcon(device.activeIcon, iconHit, device.type)
+      : undefined;
     return {
       ...device,
       controls,
       displayRoom: deviceDisplayRoom,
       objectIcon,
+      ...(objectActiveIcon ? { objectActiveIcon } : {}),
     };
   });
   return result as EnrichedDevice[];

@@ -161,6 +161,162 @@
   "protectedNative": [
     "vapidPrivateKey"
   ],
-  "objects": [],
-  "instanceObjects": []
+  "objects": [
+    {
+      "_id": "ihome.meta",
+      "type": "meta",
+      "common": {
+        "name": "Images and user files for iHome",
+        "type": "meta.user",
+        "expert": true
+      },
+      "native": {}
+    }
+  ],
+  "instanceObjects": [
+    {
+      "_id": "config.pageList",
+      "type": "state",
+      "common": {
+        "name": "iHome pages",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.pageListV1",
+      "type": "state",
+      "common": {
+        "name": "iHome pages backup (previous save)",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.deviceList",
+      "type": "state",
+      "common": {
+        "name": "iHome devices",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.templateList",
+      "type": "state",
+      "common": {
+        "name": "iHome device templates",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.templateBundleList",
+      "type": "state",
+      "common": {
+        "name": "iHome template bundles",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.variableList",
+      "type": "state",
+      "common": {
+        "name": "iHome variables and constants",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.formulaList",
+      "type": "state",
+      "common": {
+        "name": "iHome formula templates",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.functionList",
+      "type": "state",
+      "common": {
+        "name": "iHome code templates",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.logicList",
+      "type": "state",
+      "common": {
+        "name": "iHome logic",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.iconPool",
+      "type": "state",
+      "common": {
+        "name": "iHome icon library",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.pluginPages",
+      "type": "state",
+      "common": {
+        "name": "iHome plugin pages",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
+      "_id": "config.settings",
+      "type": "state",
+      "common": {
+        "name": "iHome settings",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    }
+  ]
 }

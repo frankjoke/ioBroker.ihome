@@ -10,7 +10,7 @@
     tileActionControl,
   } from "$lib/config/template-ops";
   import { evalActive, withRolePair } from "$lib/config/tile-ops";
-  import { defaultPair } from "$lib/config/icon-pool";
+  import { defaultPair } from "$lib/config/icon-library";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
@@ -322,9 +322,20 @@
       sourceDevice?.template ??
       presetForType(sourceDevice?.type ?? device.type).id,
   );
-  const automaticPair = $derived(
-    defaultPair(getIconPool().icons, templateId, headlineControl?.role),
+  const poolPair = $derived(
+    defaultPair(getIconPool(), templateId, headlineControl?.role),
   );
+  // The device's own pair dresses a tile that carries no icon and no look of
+  // its own; a pool default still wins (it is a deliberate assignment).
+  const devicePair = $derived(
+    device.objectActiveIcon &&
+      device.objectIcon &&
+      !workingTile?.look?.inactive?.glyph &&
+      !workingTile?.look?.active?.glyph
+      ? { value: device.objectIcon, activeValue: device.objectActiveIcon }
+      : undefined,
+  );
+  const automaticPair = $derived(poolPair ?? devicePair);
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
   const look = $derived(
