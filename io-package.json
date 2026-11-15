@@ -161,7 +161,18 @@
   "protectedNative": [
     "vapidPrivateKey"
   ],
-  "objects": [],
+  "objects": [
+    {
+      "_id": "ihome.meta",
+      "type": "meta",
+      "common": {
+        "name": "Images and user files for iHome",
+        "type": "meta.user",
+        "expert": true
+      },
+      "native": {}
+    }
+  ],
   "instanceObjects": [
     {
       "_id": "config.pageList",
