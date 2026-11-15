@@ -60,6 +60,7 @@
   let savedHint = $state("");
   let saving = $state(false);
   let keywordDraft = $state("");
+  let keywordOpen = $state(false);
   let started = false;
 
   const loadKind = $derived(iconPoolLoadKind());
@@ -119,16 +120,32 @@
     savedHint = "";
   }
 
-  function addKeyword(): void {
+  function addKeywordWords(...values: string[]): void {
     const icon = openIcon;
     if (!icon || !writable) return;
-    const words = keywordWords(keywordDraft).filter(
-      (word) => !icon.keywords.includes(word),
-    );
-    keywordDraft = "";
+    const words = [
+      ...new Set(
+        values
+          .flatMap((value) => keywordWords(value))
+          .filter((word) => !icon.keywords.includes(word)),
+      ),
+    ];
     if (!words.length) return;
     updateIcon({ keywords: [...icon.keywords, ...words] });
   }
+
+  function addKeyword(): void {
+    if (!writable) return;
+    addKeywordWords(keywordDraft);
+    keywordDraft = "";
+  }
+
+  const keywordSuggestions = $derived.by(() => {
+    const query = keywordDraft.trim().toLowerCase();
+    return keywordChoices
+      .filter((word) => !query || word.toLowerCase().includes(query))
+      .slice(0, 8);
+  });
 
   function removeKeyword(word: string): void {
     const icon = openIcon;
@@ -476,20 +493,41 @@
                 {/each}
               </div>
               <div class="keyword-add">
-                <input
-                  type="text"
-                  aria-label="Add a keyword"
-                  placeholder="add a keyword"
-                  list="icon-keyword-choices"
-                  bind:value={keywordDraft}
-                  disabled={!writable}
-                  onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addKeyword();
-                    }
-                  }}
-                />
+                <div class="keyword-input">
+                  <input
+                    type="text"
+                    aria-label="Add a keyword"
+                    placeholder="add a keyword"
+                    bind:value={keywordDraft}
+                    disabled={!writable}
+                    onfocus={() => (keywordOpen = true)}
+                    onblur={() => (keywordOpen = false)}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addKeyword();
+                      }
+                      if (e.key === "Escape") keywordOpen = false;
+                    }}
+                  />
+                  {#if keywordOpen && keywordSuggestions.length}
+                    <div class="suggest">
+                      {#each keywordSuggestions as word (word)}
+                        <button
+                          type="button"
+                          class="suggest-row"
+                          onmousedown={(event) => {
+                            event.preventDefault();
+                            addKeywordWords(word);
+                            keywordOpen = false;
+                          }}
+                        >
+                          {word}
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
                 <button
                   type="button"
                   class="btn btn-outline btn-sm"
@@ -497,11 +535,6 @@
                   onclick={addKeyword}>Add</button
                 >
               </div>
-              <datalist id="icon-keyword-choices">
-                {#each keywordChoices as word (word)}
-                  <option value={word}></option>
-                {/each}
-              </datalist>
             </div>
           </div>
         </div>
@@ -778,8 +811,44 @@
     margin-top: 0.25rem;
   }
 
-  .keyword-add input {
+  .keyword-input {
+    position: relative;
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .keyword-input input {
+    width: 100%;
+  }
+
+  /* The browser's datalist cannot be styled; this menu can. */
+  .suggest {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    background: var(--surface-color);
+    box-shadow: var(--shadow-normal);
+  }
+
+  .suggest-row {
+    padding: 0.3rem 0.5rem;
+    border: 0;
+    border-radius: var(--border-radius-sm, 4px);
+    background: transparent;
+    color: var(--text-color);
+    font-size: var(--body-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .suggest-row:hover {
+    background-color: var(--surface-container);
   }
 </style>
