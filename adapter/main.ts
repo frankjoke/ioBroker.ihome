@@ -1480,6 +1480,89 @@ class IHome extends utils.Adapter {
       );
     }
 
+    if (command.action === "reload" || command.action === "install") {
+      const current = this.pluginConfig.find(
+        (entry) => entry.id === command.id,
+      );
+      if (current?.builtin) {
+        return pluginError(`plugin ${command.id} is built-in and has no files`);
+      }
+      const read = await readPluginFiles(
+        this as unknown as PluginFileHost,
+        command.id,
+      );
+      if ("problem" in read) return pluginError(read.problem);
+      const saved = this.pluginSettings.settings[command.id];
+      const merged = mergePlugin(read.files, {
+        enabled: current?.enabled ?? saved?.enabled ?? false,
+        debug: current?.debug ?? saved?.debug,
+        timeoutMs: current?.timeoutMs ?? saved?.timeoutMs,
+        settings: current?.settings ?? saved?.settings,
+      });
+      // A newly installed plugin waits, disabled, until the user enables it.
+      if (command.action === "install" && !current) merged.enabled = false;
+      this.pluginConfig = current
+        ? this.pluginConfig.map((entry) =>
+            entry.id === merged.id ? merged : entry,
+          )
+        : [...this.pluginConfig, merged];
+      await host.restart(merged);
+      this.pluginSettings = {
+        ...pluginSettingsDoc(this.pluginConfig),
+        staged: this.pluginSettings.staged.filter(
+          (entry) => entry.id !== merged.id,
+        ),
+        removals: this.pluginSettings.removals.filter((id) => id !== merged.id),
+      };
+      await this.savePluginSettings();
+      return pluginReply({ plugins: this.pluginViews(), restartRequired: [] });
+    }
+
+    if (command.action === "remove") {
+      const old = this.pluginConfig.find((entry) => entry.id === command.id);
+      if (!old) return pluginError(`unknown plugin: ${command.id}`);
+      if (old.builtin) {
+        return pluginError(
+          `plugin ${command.id} is built-in and cannot be removed`,
+        );
+      }
+      await host.setEnabled({ ...old, enabled: false });
+      // Runtime flags stay in the document so a re-install keeps them.
+      const keep = this.pluginSettings.settings[command.id];
+      this.pluginConfig = this.pluginConfig.filter(
+        (entry) => entry.id !== command.id,
+      );
+      this.pluginSettings = {
+        ...pluginSettingsDoc(this.pluginConfig),
+        staged: this.pluginSettings.staged.filter(
+          (entry) => entry.id !== command.id,
+        ),
+        removals: this.pluginSettings.removals.filter(
+          (id) => id !== command.id,
+        ),
+      };
+      if (keep) {
+        this.pluginSettings.settings[command.id] = {
+          ...keep,
+          enabled: false,
+        };
+      }
+      await this.savePluginSettings();
+      try {
+        await this.updateConfig({
+          plugins: removeNativePlugin(
+            pluginConfigWithBuiltins(
+              (this.config as { plugins?: unknown }).plugins,
+            ),
+            command.id,
+          ),
+        });
+      } catch (error) {
+        this.log.warn(`cannot store the plugin list: ${String(error)}`);
+      }
+      return pluginReply({ plugins: this.pluginViews() });
+    }
+
     const stagedPlugin = this.pluginSettings.staged.find(
       (entry) => entry.id === command.id,
     );

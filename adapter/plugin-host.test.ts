@@ -465,6 +465,48 @@ describe("createPluginHost", () => {
     expect(host.status("u")).toBe("running");
   });
 
+  it("restarts a plugin with new code and keeps it running", async () => {
+    const host = createPluginHost(
+      [
+        plugin(
+          "u",
+          `module.exports = () => ({ async call() { return "old"; } });`,
+        ),
+      ],
+      fakeApi,
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(await host.call("u", null)).toEqual({ ok: true, result: "old" });
+    const next = `module.exports = () => ({ async call() { return "new"; } });`;
+    expect(await host.restart(plugin("u", next))).toEqual({
+      ok: true,
+      result: undefined,
+    });
+    expect(host.status("u")).toBe("running");
+    expect(host.canHotEnable("u", next)).toBe(true);
+    expect(await host.call("u", null)).toEqual({ ok: true, result: "new" });
+  });
+
+  it("restart stops a plugin that is disabled and reports broken code", async () => {
+    const host = createPluginHost(
+      [plugin("u", `module.exports = () => ({ async call() { return 1; } });`)],
+      fakeApi,
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(
+      await host.restart(plugin("u", undefined, 5000, { enabled: false })),
+    ).toEqual({ ok: true, result: undefined });
+    expect(host.status("u")).toBe("disabled");
+    expect(await host.restart(plugin("u", "not a factory"))).toMatchObject({
+      ok: false,
+    });
+    expect(host.status("u")).toBe("failed");
+  });
+
   it("returns an error and marks restart-required when reload fails", async () => {
     const host = createPluginHost(
       [

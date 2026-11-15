@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { importPlugin } from "$lib/stores/plugins.svelte";
+  import {
+    importPlugin,
+    installPlugin,
+    savePlugin,
+  } from "$lib/stores/plugins.svelte";
+  import { writePluginFiles } from "$lib/config/plugin-storage";
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { NUT_EXAMPLE } from "$lib/config/plugin-examples";
 
@@ -41,7 +46,23 @@
     error = "";
     busy = true;
     try {
-      await importPlugin(plugin);
+      if (!plugin.builtin) {
+        // The folder is the truth: write it first, then let the adapter add
+        // the disabled runtime entry and read the files back.
+        await writePluginFiles(plugin);
+        await installPlugin(plugin.id);
+        if (plugin.settings || plugin.timeoutMs !== undefined) {
+          await savePlugin({
+            id: plugin.id,
+            ...(plugin.timeoutMs !== undefined
+              ? { timeoutMs: plugin.timeoutMs }
+              : {}),
+            ...(plugin.settings ? { settings: plugin.settings } : {}),
+          });
+        }
+      } else {
+        await importPlugin(plugin);
+      }
       onImported();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -59,8 +80,8 @@
         Choose a built-in plugin settings file. Its settings are applied
         immediately; the built-in code stays untouched.
       {:else}
-        Choose an iHome plugin file. The plugin stays switched off until you
-        restart iHome in Admin and enable it here.
+        Choose an iHome plugin file. The plugin is added switched off; enable it
+        here when you are ready.
       {/if}
     </p>
 
@@ -102,8 +123,8 @@
 
     {#if !plugin?.builtin}
       <p class="warning-banner">
-        The imported plugin stays switched off. Restart iHome in Admin, then
-        enable it here.
+        The imported plugin is added switched off. Enable it here when you are
+        ready; the code is written to the iHome file space.
       </p>
     {/if}
 

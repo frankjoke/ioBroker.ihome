@@ -1,7 +1,13 @@
 <script lang="ts">
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
-  import { savePlugin } from "$lib/stores/plugins.svelte";
+  import { reloadPlugin, savePlugin } from "$lib/stores/plugins.svelte";
+  import { savePluginManifest } from "$lib/config/plugin-storage";
+  import {
+    META_ADAPTER,
+    readMetaText,
+    verifiedWrite,
+  } from "$lib/config/meta-files";
   import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 
   let {
@@ -32,6 +38,24 @@
   });
   let busy = $state(false);
   let error = $state("");
+  // The code file is read when the editor opens; null means not loaded yet.
+  let code = $state("");
+  let initialCode = $state<string | null>(null);
+
+  $effect(() => {
+    if (plugin.builtin) return;
+    let live = true;
+    void readMetaText(META_ADAPTER, `plugins/${plugin.id}/index.js`).then(
+      (text) => {
+        if (!live) return;
+        code = text ?? "";
+        initialCode = code;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  });
 
   // One snapshot for the dirty check; the form never updates it.
   const initial = (() => ({
@@ -46,7 +70,8 @@
       timeoutMs !== initial.timeoutMs ||
       help !== initial.help ||
       usage !== initial.usage ||
-      JSON.stringify(settings) !== initial.settings,
+      JSON.stringify(settings) !== initial.settings ||
+      (initialCode !== null && code !== initialCode),
   );
   $effect(() => {
     dirty = changed;
@@ -67,19 +92,52 @@
   export async function save(): Promise<void> {
     error = "";
     if (busy || !valid || !changed) return;
+    const nextName = name.trim();
+    if (!plugin.builtin && !nextName) {
+      error = "A plugin needs a name.";
+      return;
+    }
     busy = true;
+    const manifestChanged =
+      !plugin.builtin &&
+      (nextName !== initial.name ||
+        help.trim() !== initial.help ||
+        usage.trim() !== initial.usage);
+    const codeChanged =
+      !plugin.builtin && initialCode !== null && code !== initialCode;
+    if (codeChanged && !code.trim()) {
+      error = "A plugin needs code.";
+      return;
+    }
     const patch: PluginPatch = {
       id: plugin.id,
       timeoutMs,
       settings,
     };
     if (!plugin.builtin) {
-      patch.name = name.trim();
+      patch.name = nextName;
       patch.help = help.trim();
       patch.usage = usage.trim();
     }
     try {
+      // The manifest file is the truth for name/help/usage; writing it first
+      // means a failed write leaves the runtime entry untouched.
+      if (manifestChanged) {
+        await savePluginManifest(plugin.id, {
+          name: nextName,
+          help: help.trim(),
+          usage: usage.trim(),
+        });
+      }
+      if (codeChanged) {
+        await verifiedWrite(
+          META_ADAPTER,
+          `plugins/${plugin.id}/index.js`,
+          code,
+        );
+      }
       await savePlugin(patch);
+      if (manifestChanged || codeChanged) await reloadPlugin(plugin.id);
       onSaved();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -159,9 +217,19 @@
         <textarea rows="4" bind:value={usage}></textarea>
       </label>
     </div>
+    <label class="field">
+      <span class="label-mono">Code (JavaScript)</span>
+      <textarea
+        class="mono plugin-code"
+        rows="12"
+        spellcheck="false"
+        bind:value={code}
+      ></textarea>
+    </label>
     <p class="hint text-muted">
-      Plugin file: {plugin.codeLength} bytes (imported). Export to change it outside
-      iHome.
+      Stored in <span class="mono">plugins/{plugin.id}/index.js</span>; Save
+      writes the file and restarts this plugin. {plugin.codeLength} bytes on disk
+      now.
     </p>
   {:else}
     <p class="hint text-muted">
@@ -198,6 +266,13 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .plugin-code {
+    min-height: 12rem;
+    font-size: var(--body-sm);
+    line-height: 1.45;
+    tab-size: 2;
   }
 
   .call-examples {

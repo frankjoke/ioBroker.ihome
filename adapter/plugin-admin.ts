@@ -56,7 +56,10 @@ export type PluginsCommand =
   | { action: "save"; patches: PluginPatch[] }
   | { action: "import"; plugin: ImportedPlugin }
   | { action: "export"; id: string }
-  | { action: "delete"; id: string };
+  | { action: "delete"; id: string }
+  | { action: "reload"; id: string }
+  | { action: "install"; id: string }
+  | { action: "remove"; id: string };
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -272,7 +275,13 @@ export function parsePluginsCommand(
       },
     };
   }
-  if (action === "export" || action === "delete") {
+  if (
+    action === "export" ||
+    action === "delete" ||
+    action === "reload" ||
+    action === "install" ||
+    action === "remove"
+  ) {
     if (typeof value.id !== "string" || !value.id.trim()) {
       return { problem: `${action} needs a plugin id` };
     }

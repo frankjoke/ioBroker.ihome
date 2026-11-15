@@ -208,6 +208,15 @@ describe("parsePluginsCommand", () => {
     expect(parsePluginsCommand({ action: "delete", id: "u" })).toEqual({
       command: { action: "delete", id: "u" },
     });
+    expect(parsePluginsCommand({ action: "reload", id: "u" })).toEqual({
+      command: { action: "reload", id: "u" },
+    });
+    expect(parsePluginsCommand({ action: "install", id: "u" })).toEqual({
+      command: { action: "install", id: "u" },
+    });
+    expect(parsePluginsCommand({ action: "remove", id: "u" })).toEqual({
+      command: { action: "remove", id: "u" },
+    });
   });
 
   it("rejects invalid commands", () => {

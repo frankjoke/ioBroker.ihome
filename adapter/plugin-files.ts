@@ -190,7 +190,12 @@ export function mergePlugin(
 }
 
 /** The portable half of a config plugin: what belongs in `plugin.json`. */
-export function pluginManifestOf(plugin: AdapterPlugin): PluginManifest {
+export function pluginManifestOf(
+  plugin: Pick<
+    AdapterPlugin,
+    "id" | "name" | "help" | "usage" | "settingsSchema" | "bundle"
+  >,
+): PluginManifest {
   return {
     id: plugin.id,
     name: plugin.name,

@@ -5,6 +5,7 @@
   import PluginPagesList from "$lib/components/plugins/PluginPagesList.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import {
     applyPluginBundle,
@@ -146,22 +147,18 @@
       </div>
       {#if view === "plugins"}
         <div class="page-actions">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
+          <IconButton
+            icon="upload"
+            label="Import plugin"
             disabled={busy || !ioBroker.connected}
             onclick={() => (importOpen = true)}
-          >
-            <span class="material-symbols-outlined">upload</span> Import
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
+          />
+          <IconButton
+            icon="refresh"
+            label="Refresh plugins"
             disabled={busy || !ioBroker.connected}
             onclick={refresh}
-          >
-            <span class="material-symbols-outlined">refresh</span> Refresh
-          </button>
+          />
         </div>
       {:else if view === "pages"}
         <div class="page-actions">
@@ -263,6 +260,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
     flex-wrap: wrap;
   }
 
