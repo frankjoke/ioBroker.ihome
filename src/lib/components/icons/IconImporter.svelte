@@ -52,6 +52,8 @@
 
   // Adapter folders
   let basePath = $state("icons-freepic/");
+  /** Copy the picked file instead of referencing the adapter path. */
+  let downloadCopy = $state(false);
   let folder = $state("/icons-freepic/");
   let entries = $state<SourceEntry[]>([]);
   let loading = $state(false);
@@ -314,8 +316,45 @@
     });
   }
 
-  function pickFile(entry: SourceEntry, close = true): void {
-    const value = importValue(basePath, entry.path);
+  const MIME: Record<string, string> = {
+    svg: "image/svg+xml",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    gif: "image/gif",
+    ico: "image/x-icon",
+  };
+
+  /** A self-contained copy, so an adapter update cannot break the icon. */
+  async function copyAsDataUri(value: string): Promise<string | null> {
+    const extension = value.split(".").pop()?.toLowerCase() ?? "";
+    const mime = MIME[extension];
+    if (!mime) return null;
+    try {
+      const response = await fetch(new URL(value, document.baseURI));
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve(
+            typeof reader.result === "string"
+              ? `data:${mime};base64,${reader.result.split(",")[1] ?? ""}`
+              : null,
+          );
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function pickFile(entry: SourceEntry, close = true): Promise<void> {
+    const reference = importValue(basePath, entry.path);
+    const value =
+      (downloadCopy ? await copyAsDataUri(reference) : null) ?? reference;
     onPick(value, {
       keywords: keywordsFromPath(basePath, entry.path),
       name: entry.label,
@@ -323,7 +362,7 @@
     if (close) onClose();
   }
 
-  function addAll(): void {
+  async function addAll(): Promise<void> {
     if (resource === "library") {
       for (const icon of libraryShown) pickLibrary(icon, false);
       onClose();
@@ -339,7 +378,7 @@
       onClose();
       return;
     }
-    for (const entry of visibleIcons) pickFile(entry, false);
+    for (const entry of visibleIcons) await pickFile(entry, false);
     onClose();
   }
 
@@ -423,6 +462,10 @@
                 onchange={() => void loadFolder(normalizeBase())}
               />
             </div>
+            <label class="check copy-check">
+              <input type="checkbox" bind:checked={downloadCopy} />
+              <span>Save a copy (survives adapter updates)</span>
+            </label>
           {/if}
           {#if resource === "objects"}
             <select
@@ -551,7 +594,7 @@
                     class="cell"
                     title={entry.label}
                     aria-label={entry.label}
-                    onclick={() => pickFile(entry)}
+                    onclick={() => void pickFile(entry)}
                   >
                     <Icon value={importValue(basePath, entry.path)} size={22} />
                   </button>
@@ -573,7 +616,7 @@
             <button
               type="button"
               class="btn btn-outline btn-sm"
-              onclick={addAll}
+              onclick={() => void addAll()}
             >
               Add all shown
             </button>
