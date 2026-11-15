@@ -21,61 +21,61 @@ export default defineConfig(({ mode }) => {
     : {};
 
   return {
-  plugins: [
-    sveltekit({
-      preprocess: vitePreprocess(),
-      adapter: adapter({
-        pages: "www",
-        assets: "www",
-        fallback: "index.html",
-        precompress: false,
-        strict: true,
+    plugins: [
+      sveltekit({
+        preprocess: vitePreprocess(),
+        adapter: adapter({
+          pages: "www",
+          assets: "www",
+          fallback: "index.html",
+          precompress: false,
+          strict: true,
+        }),
+        paths: {
+          base: process.env.NODE_ENV === "production" ? "/ihome" : "",
+        },
+        router: {
+          type: "hash",
+        },
+        // The logic engine is shared with the adapter (adapter/logic), so the SPA
+        // imports exactly the code the adapter runs.
+        alias: {
+          $logic: "adapter/logic",
+          $adapter: "adapter",
+        },
+        serviceWorker: {
+          // registered in +layout.svelte, with updateViaCache: "none"
+          register: false,
+        },
+        version: {
+          pollInterval: 0,
+        },
+        output: {
+          bundleStrategy: "inline",
+        },
       }),
-      paths: {
-        base: process.env.NODE_ENV === "production" ? "/ihome" : "",
+    ],
+    server: {
+      proxy,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
       },
-      router: {
-        type: "hash",
+      // The project lives under OneDrive, whose file events get swallowed: Vite
+      // missed edits and kept serving the previous module until the dev server
+      // was restarted. Polling is the documented remedy for sync/network folders
+      // (it costs a little CPU in exchange for never being stale).
+      watch: {
+        usePolling: true,
+        interval: 300,
+        awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
       },
-      // The logic engine is shared with the adapter (adapter/logic), so the SPA
-      // imports exactly the code the adapter runs.
-      alias: {
-        $logic: "adapter/logic",
-        $adapter: "adapter",
-      },
-      serviceWorker: {
-        // registered in +layout.svelte, with updateViaCache: "none"
-        register: false,
-      },
-      version: {
-        pollInterval: 0,
-      },
-      output: {
-        bundleStrategy: "inline",
-      },
-    }),
-  ],
-  server: {
-    proxy,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
     },
-    // The project lives under OneDrive, whose file events get swallowed: Vite
-    // missed edits and kept serving the previous module until the dev server
-    // was restarted. Polling is the documented remedy for sync/network folders
-    // (it costs a little CPU in exchange for never being stale).
-    watch: {
-      usePolling: true,
-      interval: 300,
-      awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+    test: {
+      environment: "node",
+      include: ["src/**/*.{test,spec}.{js,ts}", "adapter/**/*.test.ts"],
+      expect: {
+        requireAssertions: true,
+      },
     },
-  },
-  test: {
-    environment: "node",
-    include: ["src/**/*.{test,spec}.{js,ts}", "adapter/**/*.test.ts"],
-    expect: {
-      requireAssertions: true,
-    },
-  },
   };
 });

@@ -28,12 +28,13 @@ async function loadBrokerClient(): Promise<{
   connect: (url: string, options?: object) => FileSocket;
 } | null> {
   const root = iconBase();
-  if (!root || typeof document === "undefined") return null;
+  const browserDoc = globalThis.document;
+  if (!root || !browserDoc) return null;
   return await new Promise((resolve) => {
     try {
-      const frame = document.createElement("iframe");
+      const frame = browserDoc.createElement("iframe");
       frame.style.display = "none";
-      document.body.append(frame);
+      browserDoc.body.append(frame);
       const doc = frame.contentDocument;
       if (!doc) {
         resolve(null);
@@ -101,7 +102,7 @@ async function fileCall(event: string, ...args: unknown[]): Promise<unknown> {
         else resolve(data);
       });
     });
-  } catch (error) {
+  } catch {
     // Fall back to the app socket; a broken dedicated socket must not block.
     fileSocket = null;
     fileSocketPromise = null;
