@@ -41,7 +41,7 @@
     {
       id: "defaults",
       label: "Defaults",
-      hint: "Icons for roles and templates",
+      hint: "Icons and images for roles and templates",
     },
   ] as const;
 
@@ -314,7 +314,7 @@
   <div class="card empty-state">
     <p class="text-muted">
       {loadKind === "unreadable"
-        ? "The icon pool document is unreadable. Fix or remove ihome.0.config.iconPool before editing."
+        ? "The icon library document is unreadable. Fix or remove ihome.0.config.iconPool before editing."
         : "Loading icon library…"}
     </p>
   </div>
@@ -337,7 +337,8 @@
 
     {#if loadKind === "unreadable"}
       <p class="text-danger hint">
-        The icon pool document is unreadable. Its content is never overwritten.
+        The icon library document is unreadable. Its content is never
+        overwritten.
       </p>
     {/if}
     {#if hint}<p class="text-danger hint">{hint}</p>{/if}
@@ -358,7 +359,7 @@
       <div class="item">
         <div class="item-line title-line">
           <Icon value="apps" size={18} />
-          <span class="name">Icon library</span>
+          <span class="name">Icon & image library</span>
           <span class="badge">{draft.library.length} icons</span>
           <!-- Add stays on the document line; Save lives on the open editor (§5). -->
           <span class="item-actions">
@@ -374,7 +375,7 @@
                 importer = { mode: "add" };
               }}
             >
-              + Icon
+              + Icon / Image
             </button>
           </span>
         </div>

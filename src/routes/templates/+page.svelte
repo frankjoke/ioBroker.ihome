@@ -31,8 +31,8 @@
     },
     {
       id: "icons",
-      label: "Icons",
-      hint: "Manage the saved icon pool.",
+      label: "Icons & Images",
+      hint: "Manage the saved icons and images.",
     },
     {
       id: "help",

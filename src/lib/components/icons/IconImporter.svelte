@@ -422,7 +422,7 @@
 <div class="modal" role="dialog" aria-modal="true" aria-label="Add icons">
   <div class="modal-content importer">
     <div class="modal-head">
-      <h3>Add icons</h3>
+      <h3>Add icons / images</h3>
       <button
         type="button"
         class="icon-btn"

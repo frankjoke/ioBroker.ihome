@@ -202,7 +202,7 @@
         <p class="empty text-muted">
           No icons match. Add some in
           <a href={`${base}/#/templates?type=icons`} target="_blank"
-            >Templates → Icons</a
+            >Templates → Icons &amp; Images</a
           >.
         </p>
       {/if}
