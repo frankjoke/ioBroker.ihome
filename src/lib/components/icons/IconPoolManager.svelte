@@ -412,15 +412,17 @@
             >
               + Icon / Image
             </button>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              title="Save the whole icon library"
-              disabled={!dirty || !writable || saving}
-              onclick={save}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            {#if !openIcon}
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                title="Save the whole icon library"
+                disabled={!dirty || !writable || saving}
+                onclick={save}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            {/if}
           </span>
         </div>
       </div>
@@ -489,6 +491,19 @@
                   oninput={(e) => updateIcon({ name: e.currentTarget.value })}
                 />
               </label>
+              {#if dirty}
+                <span class="item-actions">
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    title="Save the whole icon library"
+                    disabled={!writable || saving}
+                    onclick={save}
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                </span>
+              {/if}
             </div>
             <div class="field keywords">
               <span class="label-mono">Keywords</span>
