@@ -53,8 +53,9 @@
 
   // Adapter folders
   let basePath = $state("icons-freepic/");
-  /** Copy the picked file instead of referencing the adapter path. */
-  let downloadCopy = $state(false);
+  /** Copy the picked file instead of referencing the adapter path. Default on:
+   *  a reference dies with the next update of the source adapter. */
+  let downloadCopy = $state(true);
   let uploadError = $state("");
   let folder = $state("/icons-freepic/");
   let entries = $state<SourceEntry[]>([]);
