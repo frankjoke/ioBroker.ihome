@@ -1,0 +1,89 @@
+import { it, expect } from "vitest";
+import {
+  importValue,
+  keywordsFromPath,
+  parseListing,
+} from "$lib/config/icon-source";
+
+const LISTING = `<a href="./gadgets/">gadgets</a>
+<a href="../">..</a>
+<a href="./alarm-clock-set.svg">alarm-clock-set.svg</a>
+<a href="./notes.txt">notes.txt</a>
+<a href="https://example.org/icons/remote.png">remote</a>`;
+
+it("parses a web-adapter directory listing", () => {
+  expect(parseListing(LISTING, "http://host:8082/icons-freepic/")).toEqual([
+    {
+      path: "/icons-freepic/gadgets/",
+      label: "gadgets",
+      kind: "folder",
+    },
+    {
+      path: "/icons-freepic/alarm-clock-set.svg",
+      label: "alarm-clock-set",
+      kind: "icon",
+    },
+  ]);
+});
+
+it("parses a picker page that only links images", () => {
+  const html = `<table><tr>
+    <td><img src="battery/battery_10percent.png" width="64"></td>
+    <td><img src="battery/battery_20percent.png" width="64"></td>
+  </tr></table>`;
+  expect(
+    parseListing(html, "http://host:8082/icons-addictive-flavour-png/"),
+  ).toEqual([
+    {
+      path: "/icons-addictive-flavour-png/battery/battery_10percent.png",
+      label: "battery_10percent",
+      kind: "icon",
+    },
+    {
+      path: "/icons-addictive-flavour-png/battery/battery_20percent.png",
+      label: "battery_20percent",
+      kind: "icon",
+    },
+  ]);
+});
+
+it("dedupes repeated links and keeps single quotes", () => {
+  const html = `<img src='a.svg'><a href="a.svg">a</a>`;
+  expect(parseListing(html, "http://host/base/")).toEqual([
+    { path: "/base/a.svg", label: "a", kind: "icon" },
+  ]);
+});
+
+it("takes keywords from the folders below the base", () => {
+  expect(
+    keywordsFromPath(
+      "icons-freepic/",
+      "icons-freepic/gadgets/alarm-clock-set.svg",
+    ),
+  ).toEqual(["gadgets"]);
+  expect(
+    keywordsFromPath(
+      "/icons-addictive-flavour-png/",
+      "/icons-addictive-flavour-png/battery/battery_10percent.png",
+    ),
+  ).toEqual(["battery"]);
+  expect(keywordsFromPath("icons-freepic/", "icons-freepic/x.svg")).toEqual([]);
+});
+
+it("builds the stored adapter path", () => {
+  expect(
+    importValue("icons-freepic/", "icons-freepic/gadgets/alarm-clock-set.svg"),
+  ).toBe("adapter/icons-freepic/gadgets/alarm-clock-set.svg");
+  expect(importValue("icons-freepic/", "/icons-freepic/x.svg")).toBe(
+    "adapter/icons-freepic/x.svg",
+  );
+  expect(
+    importValue(
+      "icons-freepic/",
+      "http://host:8082/icons-freepic/gadgets/x.svg",
+    ),
+  ).toBe("adapter/icons-freepic/gadgets/x.svg");
+  expect(importValue("icons-freepic/", "adapter/icons-freepic/x.svg")).toBe(
+    "adapter/icons-freepic/x.svg",
+  );
+});

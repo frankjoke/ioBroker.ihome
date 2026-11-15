@@ -2,7 +2,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import IconPicker from "$lib/components/common/IconPicker.svelte";
+  import IconImporter from "$lib/components/icons/IconImporter.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import {
     POOL_CAP,
@@ -30,7 +30,9 @@
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
-  type PickerTarget = { id: string; field: "value" | "activeValue" };
+  type Importer =
+    | { mode: "add" }
+    | { mode: "field"; id: string; field: "value" | "activeValue" };
 
   const TABS = [
     { id: "library", label: "Library", hint: "Your curated icons" },
@@ -43,8 +45,9 @@
   let search = $state("");
   let openId = $state<string | null>(null);
   let pendingRemove = $state<LibraryIcon | null>(null);
-  let pickerOpen = $state(false);
-  let pickerTarget = $state<PickerTarget | null>(null);
+  let importer = $state<Importer | null>(null);
+  let added = $state(0);
+  let skipped = $state(0);
   let hint = $state("");
   let conflict = $state("");
   let savedHint = $state("");
@@ -128,34 +131,73 @@
     );
   }
 
-  function applyPick(
+  function importIcon(
     value: string,
-    meta?: { name?: string; active?: string },
+    meta: { activeValue?: string; keywords: string[]; name: string },
   ): void {
-    const target = pickerTarget;
+    const target = importer;
     if (!target || !writable) return;
-    pickerTarget = null;
     hint = "";
-    savedHint = "";
+    if (target.mode === "add") {
+      if (draft.library.some((entry) => entry.value === value)) {
+        skipped += 1;
+        return;
+      }
+      if (draft.library.length >= POOL_CAP) {
+        skipped += 1;
+        return;
+      }
+      const name = meta.name?.trim() || undefined;
+      const icon: LibraryIcon = {
+        id: newId(),
+        ...(name ? { name } : {}),
+        value,
+        ...(meta.activeValue ? { activeValue: meta.activeValue } : {}),
+        keywords: [
+          ...new Set([
+            ...(meta.keywords ?? []),
+            ...keywordWords(meta.name ?? ""),
+          ]),
+        ],
+      };
+      draft = upsertLibraryIcon(draft, icon);
+      openId = icon.id;
+      added += 1;
+      savedHint = "";
+      return;
+    }
+    const icon = draft.library.find((entry) => entry.id === target.id);
+    if (!icon) return;
     if (target.field === "activeValue") {
-      setActive(target.id, (meta?.active ?? value).trim());
+      draft = upsertLibraryIcon(draft, {
+        ...icon,
+        activeValue: meta.activeValue ?? value,
+      });
+      savedHint = "";
       return;
     }
     const glyph = value.trim();
     // A default icon cannot be empty; Clear in the picker is a no-op here.
     if (!glyph) return;
-    const icon = draft.library.find((entry) => entry.id === target.id);
-    if (!icon) return;
     if (defaultTaken(target.id, glyph)) {
       hint = "Another library icon already uses that icon.";
       return;
     }
-    const active = (meta?.active ?? "").trim();
     draft = upsertLibraryIcon(draft, {
       ...icon,
       value: glyph,
-      ...(active ? { activeValue: active } : {}),
+      ...(meta.activeValue ? { activeValue: meta.activeValue } : {}),
     });
+    savedHint = "";
+  }
+
+  function closeImporter(): void {
+    if (importer?.mode === "add" && (added || skipped)) {
+      savedHint = `${added} added${skipped ? `, ${skipped} skipped` : ""}.`;
+    }
+    importer = null;
+    added = 0;
+    skipped = 0;
   }
 
   function setActive(id: string, value: string): void {
@@ -167,39 +209,6 @@
       ...icon,
       ...(activeValue ? { activeValue } : { activeValue: undefined }),
     });
-    savedHint = "";
-  }
-
-  function addIcon(
-    value: string,
-    meta?: { name?: string; group?: string; active?: string },
-  ): void {
-    // The picker's Clear returns ""; it is not an icon to add.
-    if (!writable || !value.trim()) return;
-    if (draft.library.some((entry) => entry.value === value)) {
-      pickerOpen = false;
-      hint = "That icon is already in the library.";
-      return;
-    }
-    if (draft.library.length >= POOL_CAP) {
-      hint = `The library is full (${POOL_CAP} icons).`;
-      return;
-    }
-    pickerOpen = false;
-    const name = meta?.name?.trim() || undefined;
-    const icon: LibraryIcon = {
-      id: newId(),
-      ...(name ? { name } : {}),
-      value,
-      ...(meta?.active?.trim() ? { activeValue: meta.active.trim() } : {}),
-      keywords: keywordWords(
-        [meta?.name, meta?.group].filter(Boolean).join(" ") || value,
-      ),
-    };
-    draft = upsertLibraryIcon(draft, icon);
-    openId = icon.id;
-    search = "";
-    hint = "";
     savedHint = "";
   }
 
@@ -345,7 +354,8 @@
               title={`Change the default icon of ${label(entry)}`}
               aria-label={`Change the default icon of ${label(entry)}`}
               disabled={!writable}
-              onclick={() => (pickerTarget = { id: entry.id, field: "value" })}
+              onclick={() =>
+                (importer = { mode: "field", id: entry.id, field: "value" })}
             >
               <Icon value={openIcon.value} size={18} />
             </button>
@@ -360,7 +370,11 @@
                 aria-label={`Set the active icon of ${label(entry)}`}
                 disabled={!writable}
                 onclick={() =>
-                  (pickerTarget = { id: entry.id, field: "activeValue" })}
+                  (importer = {
+                    mode: "field",
+                    id: entry.id,
+                    field: "activeValue",
+                  })}
               >
                 {#if openIcon.activeValue}
                   <Icon value={openIcon.activeValue} size={18} />
@@ -483,7 +497,9 @@
             onclick={() => {
               hint = "";
               savedHint = "";
-              pickerOpen = true;
+              added = 0;
+              skipped = 0;
+              importer = { mode: "add" };
             }}
           >
             + Icon
@@ -536,19 +552,8 @@
   </div>
 {/if}
 
-{#if pickerOpen}
-  <IconPicker manage onPick={addIcon} onClose={() => (pickerOpen = false)} />
-{/if}
-
-{#if pickerTarget}
-  <IconPicker
-    manage
-    icon={draft.library.find((entry) => entry.id === pickerTarget?.id)?.[
-      pickerTarget.field
-    ]}
-    onPick={applyPick}
-    onClose={() => (pickerTarget = null)}
-  />
+{#if importer}
+  <IconImporter onPick={importIcon} onClose={closeImporter} />
 {/if}
 
 {#if pendingRemove}
