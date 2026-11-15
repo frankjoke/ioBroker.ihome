@@ -242,7 +242,13 @@ export async function copyIconFile(
     if (!response.ok) return null;
     const blob = await response.blob();
     const bytes = await blob.arrayBuffer();
-    const fileName = await iconFileName(name, bytes);
+    // The label carries no extension; the URL does. Without it the file would
+    // be served as octet-stream and named `x.<whole-name>`.
+    const extension = extensionOf(new URL(iconSrc(url)).pathname);
+    const fileName = await iconFileName(
+      extension ? `${name}.${extension}` : name,
+      bytes,
+    );
     await writeFile(`${ICON_DIR}/${fileName}`, { bytes });
     return `${META_PREFIX}${fileName}`;
   } catch {
