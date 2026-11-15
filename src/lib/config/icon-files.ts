@@ -172,7 +172,23 @@ export async function readLibraryFile(): Promise<string | null> {
 }
 
 export async function writeLibraryFile(json: string): Promise<void> {
-  await ioBroker.emitAsync("writeFile", META_ADAPTER, LIBRARY_FILE, json);
+  const text = typeof json === "string" ? json : JSON.stringify(json);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await ioBroker.emitAsync("writeFile", META_ADAPTER, LIBRARY_FILE, text);
+    // The socket can lose a large text payload now and then; verify the
+    // stored bytes and write once more rather than persist a broken document.
+    try {
+      const back = await ioBroker.emitAsync(
+        "readFile",
+        META_ADAPTER,
+        LIBRARY_FILE,
+      );
+      if (back === text) return;
+    } catch {
+      // A failed check is not a proven failure; retry the write.
+    }
+  }
+  throw new Error("the icon library file did not verify after writing");
 }
 
 export function mimeOf(name: string): string | undefined {
