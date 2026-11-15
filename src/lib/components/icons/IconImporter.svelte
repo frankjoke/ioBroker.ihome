@@ -81,6 +81,46 @@
     if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
   });
 
+  // The object cache carries states and devices, not `meta` objects; the
+  // spaces are fetched once through the meta object view instead.
+  let metaSpaces = $state<string[]>([]);
+  let metaStarted = false;
+
+  async function loadMetaSpaces(): Promise<void> {
+    if (metaStarted) return;
+    metaStarted = true;
+    try {
+      const result = (await ioBroker.emitAsync(
+        "getObjectView",
+        "system",
+        "meta",
+        { startkey: "", endkey: "\u9999" },
+      )) as { rows?: { id?: string; value?: unknown }[] };
+      const rows = Array.isArray(result?.rows) ? result.rows : [];
+      metaSpaces = rows
+        .map((row) => row.id ?? "")
+        .filter((id) => /\.meta$/.test(id))
+        .sort();
+    } catch {
+      metaStarted = false;
+    }
+  }
+
+  /** Adapter file roots: the icon packs plus every `*.meta` user-file space. */
+  const sourceChoices = $derived.by(() => {
+    const roots: { path: string; label: string }[] = [
+      { path: "icons-freepic/", label: "icons-freepic" },
+      {
+        path: "icons-addictive-flavour-png/",
+        label: "icons-addictive-flavour-png",
+      },
+    ];
+    for (const id of metaSpaces) {
+      roots.push({ path: `${id}/`, label: id });
+    }
+    return roots;
+  });
+
   const library = $derived(getIconPool().library);
   const libraryShown = $derived.by(() => {
     const query = search.trim().toLowerCase();
@@ -242,6 +282,7 @@
     error = "";
     limit = 200;
     if (resourceId === "adapter") {
+      void loadMetaSpaces();
       void loadFolder(normalizeBase());
     }
     if (resourceId === "mdi") void loadMdi();
@@ -355,6 +396,23 @@
                 onclick={crumbUp}>..</button
               >
               <code class="path">{folder}</code>
+            </div>
+            <div class="base-line">
+              <span class="label-mono">Known source</span>
+              <select
+                aria-label="Known icon sources"
+                onchange={(e) => {
+                  basePath = e.currentTarget.value;
+                  void loadFolder(normalizeBase());
+                }}
+              >
+                {#each sourceChoices as source (source.path)}
+                  <option
+                    value={source.path}
+                    selected={basePath === source.path}>{source.label}</option
+                  >
+                {/each}
+              </select>
             </div>
             <div class="base-line">
               <span class="label-mono">Source</span>
