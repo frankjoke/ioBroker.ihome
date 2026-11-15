@@ -149,6 +149,10 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### 0.3.6 (2026-11-15)
+
+Icon library v2 (Templates → Icons & Images): a keyword-tagged library of icons and images with on/off twin pairs, role and template defaults, one picker for every editor, an importer for MDI, broker objects and adapter folders (icon packs, iqontrol/images, meta spaces), local image uploads stored as files in the shared `ihome.meta` space with a library mirror, and copy-on-import so icons survive adapter updates.
+
 ### 0.3.5 (2026-11-14)
 
 Device and tile templates: create a complete device from a template with role-based auto-fill, or create only a tile from a state; save any tile as a reusable template from the Slots line and apply a template to the current tile. The tile editor resumes at the last edited tile, lists select the next item after a delete, and badges gain rule colours/backgrounds plus an offline-since badge gated by `isOnline()`. Colour-temperature states now render as sliders.

@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "news": {
+  "0.3.6": {
+    "en": "Icon library v2: a keyword-tagged library of icons and images with on/off twin pairs and role/template defaults, one picker for every editor, an importer for MDI, broker objects and adapter folders (icon packs, iqontrol/images, meta spaces), local image uploads stored as files in the shared ihome.meta space, and a library mirror kept in that space; imported copies survive adapter updates.",
+    "de": "Icon-Bibliothek v2: eine schlagwortbasierte Sammlung von Icons und Bildern mit Ein/Aus-Paaren und Rollen-/Vorlagen-Standards, ein Picker für alle Editoren, ein Importeur für MDI, Broker-Objekte und Adapter-Ordner (Icon-Packs, iqontrol/images, Meta-Bereiche), lokale Bild-Uploads als Dateien im gemeinsamen ihome.meta-Bereich und eine Bibliotheksspiegelung dort; importierte Kopien überleben Adapter-Updates."
+  },
       "0.3.5": {
         "en": "Device and tile templates: create a complete device from a template with role-based auto-fill, or create only a tile from a state; save any tile as a reusable template from the Slots line and apply a template to the current tile. The tile editor resumes at the last edited tile, lists select the next item after a delete, and badges gain rule colours/backgrounds plus an offline-since badge gated by isOnline(). Colour-temperature states now render as sliders.",
         "de": "Geräte- und Kachelvorlagen: Ein vollständiges Gerät aus einer Vorlage mit rollenbasierter Auto-Füllung anlegen oder nur eine Kachel aus einem State erzeugen; jede Kachel über die Slots-Zeile als wiederverwendbare Vorlage speichern und eine Vorlage auf die aktuelle Kachel anwenden. Der Kachel-Editor öffnet die zuletzt bearbeitete Kachel, Listen wählen nach dem Löschen das nächste Element, und Badges erhalten Regel-Farben/Hintergründe sowie ein Offline-seit-Badge über isOnline(). Farbtemperatur-States werden jetzt als Schieberegler dargestellt."
