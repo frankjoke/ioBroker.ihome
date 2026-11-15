@@ -5,6 +5,7 @@
 
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { loadIo2Client } from "$lib/socket-client";
+import { iconSrc } from "$lib/utils/icon-url";
 
 export const META_ADAPTER = "ihome.meta";
 export const ICON_DIR = "icons";
