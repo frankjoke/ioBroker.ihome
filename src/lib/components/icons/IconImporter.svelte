@@ -54,6 +54,7 @@
   let basePath = $state("icons-freepic/");
   /** Copy the picked file instead of referencing the adapter path. */
   let downloadCopy = $state(false);
+  let uploadError = $state("");
   let folder = $state("/icons-freepic/");
   let entries = $state<SourceEntry[]>([]);
   let loading = $state(false);
@@ -351,6 +352,30 @@
     }
   }
 
+  /** A local image file, added with the same meta the sources provide. */
+  function onUpload(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    uploadError = "";
+    if (file.size > 2_000_000) {
+      uploadError = "The image is larger than 2 MB.";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      const name = file.name.replace(/\.[^.]+$/, "");
+      onPick(reader.result, { keywords: keywordWords(name), name });
+      onClose();
+    };
+    reader.onerror = () => {
+      uploadError = "The image could not be read.";
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function pickFile(entry: SourceEntry, close = true): Promise<void> {
     const reference = importValue(basePath, entry.path);
     const value =
@@ -604,6 +629,16 @@
           {/if}
         </div>
 
+        <div class="upload-line">
+          <label class="upload">
+            <input type="file" accept="image/*,.svg" onchange={onUpload} />
+            <span class="btn btn-outline btn-sm">Upload image…</span>
+          </label>
+          {#if uploadError}
+            <span class="text-danger hint">{uploadError}</span>
+          {/if}
+        </div>
+
         <div class="source-foot">
           <span class="text-muted hint">
             {#if resource === "adapter"}
@@ -811,5 +846,19 @@
   .hint {
     flex: 1 1 auto;
     font-size: var(--body-sm);
+  }
+
+  .upload-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .upload input {
+    display: none;
+  }
+
+  .upload {
+    cursor: pointer;
   }
 </style>

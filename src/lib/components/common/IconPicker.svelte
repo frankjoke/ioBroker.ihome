@@ -33,6 +33,29 @@
   let selected = $state<string[]>([]);
   let inUse = $state(false);
   let customOpen = $state(false);
+  let uploadError = $state("");
+
+  /** A local image (svg/png/…), stored self-contained as a data URI. */
+  function onFile(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    uploadError = "";
+    if (file.size > 2_000_000) {
+      uploadError = "The image is larger than 2 MB.";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") onPick(reader.result);
+      else uploadError = "The image could not be read.";
+    };
+    reader.onerror = () => {
+      uploadError = "The image could not be read.";
+    };
+    reader.readAsDataURL(file);
+  }
   // svelte-ignore state_referenced_locally
   let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
@@ -206,6 +229,15 @@
             onclick={() => onPick(url.trim())}>Use</button
           >
         </div>
+        <div class="custom">
+          <label class="upload">
+            <input type="file" accept="image/*,.svg" onchange={onFile} />
+            <span class="btn btn-outline btn-sm">Upload image…</span>
+          </label>
+        </div>
+        {#if uploadError}
+          <p class="text-danger upload-error">{uploadError}</p>
+        {/if}
       {/if}
     </div>
   </div>
@@ -371,8 +403,21 @@
     gap: 0.4rem;
   }
 
-  .custom input {
+  .custom input[type="text"] {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .upload input {
+    display: none;
+  }
+
+  .upload {
+    cursor: pointer;
+  }
+
+  .upload-error {
+    margin: 0;
+    font-size: var(--body-sm);
   }
 </style>
