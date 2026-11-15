@@ -30,7 +30,6 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
   import { deleteIconFile, isMetaIconValue } from "$lib/config/icon-files";
-  import { nextAfterRemoval } from "$lib/utils/list-selection";
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
@@ -231,10 +230,9 @@
 
   function remove(entry: LibraryIcon): void {
     if (!writable) return;
-    const next = nextAfterRemoval(draft.library, entry.id, (icon) => icon.id);
     draft = removeLibraryIcon(draft, entry.id);
     pendingRemove = null;
-    openId = next?.id ?? null;
+    openId = null;
     savedHint = "";
   }
 
@@ -397,11 +395,12 @@
           <Icon value="apps" size={18} />
           <span class="name">Icon & image library</span>
           <span class="badge">{draft.library.length} icons</span>
-          <!-- Add stays on the document line; Save lives on the open editor (§5). -->
+          <!-- One document: Save rides the library line, so a delete can be
+               saved without opening (or leaving) another icon. -->
           <span class="item-actions">
             <button
               type="button"
-              class="btn btn-primary btn-sm"
+              class="btn btn-outline btn-sm"
               disabled={!writable || saving}
               onclick={() => {
                 hint = "";
@@ -412,6 +411,15 @@
               }}
             >
               + Icon / Image
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              title="Save the whole icon library"
+              disabled={!dirty || !writable || saving}
+              onclick={save}
+            >
+              {saving ? "Saving…" : "Save"}
             </button>
           </span>
         </div>
@@ -481,17 +489,6 @@
                   oninput={(e) => updateIcon({ name: e.currentTarget.value })}
                 />
               </label>
-              <span class="item-actions">
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  title="Save the whole icon library"
-                  disabled={!dirty || !writable || saving}
-                  onclick={save}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </span>
             </div>
             <div class="field keywords">
               <span class="label-mono">Keywords</span>
