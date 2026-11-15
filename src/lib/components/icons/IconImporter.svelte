@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import {
@@ -282,6 +283,11 @@
     }
   }
 
+  function activate(resourceId: Resource | null): void {
+    if (!resourceId) return;
+    select(resourceId);
+  }
+
   function select(resourceId: Resource): void {
     resource = resourceId;
     search = "";
@@ -400,21 +406,16 @@
       </button>
     </div>
 
-    <div class="importer-body">
-      <nav class="resources" aria-label="Icon sources">
-        {#each RESOURCES as entry (entry.id)}
-          <button
-            type="button"
-            class="resource"
-            class:active={resource === entry.id}
-            title={entry.hint}
-            onclick={() => select(entry.id)}
-          >
-            {entry.label}
-          </button>
-        {/each}
-      </nav>
+    <OptionTabs
+      bind:value={resource}
+      label="Icon sources"
+      tabs={RESOURCES}
+      collapsible={false}
+      showHint={false}
+      onchange={activate}
+    />
 
+    <div class="importer-body">
       <section class="source">
         <div class="source-head">
           <input type="search" placeholder="Search…" bind:value={search} />
@@ -674,37 +675,10 @@
   }
 
   .importer-body {
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 0.75rem;
-    min-height: 0;
-  }
-
-  @media (max-width: 640px) {
-    .importer-body {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .resources {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .resource {
-    text-align: left;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .resource.active {
-    color: var(--primary-color);
-    border-color: var(--primary-color);
+    gap: 0.75rem;
+    min-height: 0;
   }
 
   .source {
