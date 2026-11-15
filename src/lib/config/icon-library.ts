@@ -298,3 +298,122 @@ export function parseIconPool(raw: unknown): IconPool | null {
 export function mdiIconValue(path: string): string {
   return `<svg viewBox="0 0 24 24" fill="{{$color}}"><path d="${path}"/></svg>`;
 }
+
+/** Keywords of the library with their use count, most used first. */
+export function libraryKeywordCounts(
+  library: LibraryIcon[],
+): { keyword: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const icon of library) {
+    for (const word of icon.keywords) {
+      counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+  }
+  return [...counts]
+    .map(([keyword, count]) => ({ keyword, count }))
+    .sort((a, b) => b.count - a.count || a.keyword.localeCompare(b.keyword));
+}
+
+/** Every selected keyword must be present (AND); search reads keywords only. */
+export function filterLibrary(
+  library: LibraryIcon[],
+  keywords: string[],
+  search: string,
+): LibraryIcon[] {
+  const selected = keywords.map((word) => word.toLowerCase());
+  const query = search.trim().toLowerCase();
+  return library.filter(
+    (icon) =>
+      selected.every((word) => icon.keywords.includes(word)) &&
+      (!query || icon.keywords.some((word) => word.includes(query))),
+  );
+}
+
+/** Icons with an active twin first; the rest are singles. */
+export function splitTwins(entries: LibraryIcon[]): {
+  twins: LibraryIcon[];
+  singles: LibraryIcon[];
+} {
+  return {
+    twins: entries.filter((icon) => !!icon.activeValue),
+    singles: entries.filter((icon) => !icon.activeValue),
+  };
+}
+
+/** Template first, then the exact role, then its `family.*` pattern. */
+export function defaultPair(
+  pool: IconPool,
+  templateId: string | undefined,
+  role: string | undefined,
+): IconPair | undefined {
+  const { roles, templates } = pool.defaults;
+  if (templateId && templates[templateId]) return templates[templateId];
+  if (role) {
+    if (roles[role]) return roles[role];
+    const dot = role.indexOf(".");
+    if (dot > 0) {
+      const family = `${role.slice(0, dot)}.*`;
+      if (roles[family]) return roles[family];
+    }
+  }
+  return undefined;
+}
+
+export function upsertLibraryIcon(pool: IconPool, icon: LibraryIcon): IconPool {
+  const exists = pool.library.some((entry) => entry.id === icon.id);
+  if (!exists && pool.library.length >= POOL_CAP) return pool;
+  const library = exists
+    ? pool.library.map((entry) => (entry.id === icon.id ? icon : entry))
+    : [...pool.library, icon];
+  return { ...pool, updatedAt: Date.now(), library };
+}
+
+export function removeLibraryIcon(pool: IconPool, id: string): IconPool {
+  return {
+    ...pool,
+    updatedAt: Date.now(),
+    library: pool.library.filter((entry) => entry.id !== id),
+  };
+}
+
+export function hasIconValue(library: LibraryIcon[], value: string): boolean {
+  return library.some((icon) => icon.value === value);
+}
+
+/** Exact state roles and their `family.*` patterns, with use counts. */
+export function roleChoicesFromObjects(
+  objects: Iterable<[string, unknown]>,
+): { value: string; label: string }[] {
+  const counts = new Map<string, number>();
+  for (const [, object] of objects) {
+    const record = object as {
+      type?: string;
+      common?: { role?: string };
+    } | null;
+    // Only state roles can be a tile headline; channels/folders are noise.
+    if (record?.type !== "state") continue;
+    const role = record.common?.role;
+    if (typeof role === "string" && role.trim()) {
+      counts.set(role, (counts.get(role) ?? 0) + 1);
+    }
+  }
+  const families = new Map<string, number>();
+  for (const [role, count] of counts) {
+    const dot = role.indexOf(".");
+    if (dot > 0) {
+      const family = `${role.slice(0, dot)}.*`;
+      families.set(family, (families.get(family) ?? 0) + count);
+    }
+  }
+  return [
+    ...[...counts]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([role, count]) => ({ value: role, label: `${role} · ${count}` })),
+    ...[...families]
+      .sort((a, b) => b[1] - a[1])
+      .map(([family, count]) => ({
+        value: family,
+        label: `${family} · ${count}`,
+      })),
+  ];
+}

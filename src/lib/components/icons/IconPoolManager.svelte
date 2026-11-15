@@ -3,20 +3,18 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
-  import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import {
     POOL_CAP,
-    clearBaseOverride,
-    filterPoolIcons,
-    poolEntries,
-    removePoolIcon,
-    setBaseOverride,
-    upsertPoolIcon,
+    emptyIconPool,
+    filterLibrary,
+    keywordWords,
+    libraryKeywordCounts,
+    removeLibraryIcon,
+    upsertLibraryIcon,
     type IconPool,
-    type PoolEntry,
-    type PoolIcon,
-  } from "$lib/config/icon-pool";
-  import { PRESETS } from "$lib/config/presets";
+    type LibraryIcon,
+  } from "$lib/config/icon-library";
   import {
     commitIconPool,
     getIconPool,
@@ -26,32 +24,25 @@
     isIconPoolWritable,
     reloadIconPool,
   } from "$lib/stores/icon-pool.svelte";
-  import {
-    getTemplateRegistry,
-    initTemplates,
-  } from "$lib/stores/templates.svelte.js";
-  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { newId } from "$lib/utils/ids";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
 
   let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
 
-  type PickerTarget = {
-    id: string;
-    builtin: boolean;
-    field: "value" | "activeValue";
-  };
+  type PickerTarget = { id: string; field: "value" | "activeValue" };
+
+  const TABS = [
+    { id: "library", label: "Library", hint: "Your curated icons" },
+  ] as const;
 
   let loaded = $state(false);
-  let draft = $state<IconPool>({ version: 1, updatedAt: 0, icons: [] });
+  let tab = $state<"library">("library");
+  let draft = $state<IconPool>(emptyIconPool());
   let baseUpdatedAt = $state(0);
   let search = $state("");
-  /** The Base section's own open state; a row click must not re-close it. */
-  let baseOpen = $state(false);
   let openId = $state<string | null>(null);
-  let pendingRemove = $state<PoolEntry | null>(null);
+  let pendingRemove = $state<LibraryIcon | null>(null);
   let pickerOpen = $state(false);
   let pickerTarget = $state<PickerTarget | null>(null);
   let hint = $state("");
@@ -59,128 +50,40 @@
   let savedHint = $state("");
   let saving = $state(false);
   let keywordDraft = $state("");
-  let roleChoices = $state<{ value: string; label: string }[]>([]);
   let started = false;
 
   const loadKind = $derived(iconPoolLoadKind());
   const writable = $derived(isIconPoolWritable());
   const saveFailed = $derived(iconPoolSaveFailed());
-  const baseEntries = $derived(
-    poolEntries({
-      version: 1,
-      updatedAt: 0,
-      icons: [],
-      overrides: draft.overrides,
-    }),
-  );
-  // The draft, not `poolEntries`: an entry being edited must stay visible even
-  // while its name is empty or stops matching the search.
-  const rows = $derived.by<PoolEntry[]>(() => {
-    const all: PoolEntry[] = [...baseEntries, ...draft.icons];
-    const filtered = filterPoolIcons(all, search);
+
+  // The draft, not the filtered list: an entry being edited must stay visible
+  // even while its name stops matching the search.
+  const rows = $derived.by<LibraryIcon[]>(() => {
+    const filtered = filterLibrary(draft.library, [], search);
     if (!openId || filtered.some((entry) => entry.id === openId)) {
       return filtered;
     }
-    const open = all.find((entry) => entry.id === openId);
+    const open = draft.library.find((entry) => entry.id === openId);
     return open ? [...filtered, open] : filtered;
   });
-  const baseRows = $derived(rows.filter((entry) => entry.builtin));
-  const userRows = $derived(rows.filter((entry) => !entry.builtin));
-  const openBase = $derived(
-    openId ? baseEntries.find((entry) => entry.id === openId) : undefined,
+  const openIcon = $derived(
+    openId ? draft.library.find((icon) => icon.id === openId) : undefined,
   );
-  const openUser = $derived(
-    openId ? draft.icons.find((icon) => icon.id === openId) : undefined,
-  );
-  const openEntry = $derived(openBase ?? openUser);
-
-  const templateOptions = $derived.by(() => {
-    const seen = new SvelteSet<string>();
-    const options: { value: string; label: string }[] = [];
-    for (const template of getTemplateRegistry().templates ?? []) {
-      if (seen.has(template.id)) continue;
-      seen.add(template.id);
-      options.push({ value: template.id, label: template.name });
-    }
-    for (const template of Object.values(PRESETS)) {
-      if (seen.has(template.id)) continue;
-      seen.add(template.id);
-      options.push({ value: template.id, label: `${template.name} (preset)` });
-    }
-    return options;
-  });
-
   const keywordChoices = $derived.by(() => {
-    if (!openUser) return [];
-    const current = new SvelteSet(
-      (openUser.keywords ?? []).map((word) => word.toLowerCase()),
-    );
-    const seen = new SvelteSet<string>();
-    const words: string[] = [];
-    for (const entry of [...baseEntries, ...draft.icons]) {
-      for (const word of entry.keywords ?? []) {
-        const lower = word.toLowerCase();
-        if (current.has(lower) || seen.has(lower)) continue;
-        seen.add(lower);
-        words.push(word);
-      }
-    }
-    return words.sort((a, b) => a.localeCompare(b));
+    const current = new Set(openIcon?.keywords ?? []);
+    return libraryKeywordCounts(draft.library)
+      .map((entry) => entry.keyword)
+      .filter((word) => !current.has(word));
   });
 
   function clonePool(pool: IconPool): IconPool {
     return JSON.parse(JSON.stringify(pool)) as IconPool;
   }
 
-  function buildRoleChoices(): void {
-    const counts = new SvelteMap<string, number>();
-    for (const object of ioBroker.objects.values()) {
-      const record = object as {
-        type?: string;
-        common?: { role?: string };
-      };
-      // Only state roles can be a tile headline; channels/folders are noise.
-      if (record.type !== "state") continue;
-      const role = record.common?.role;
-      if (typeof role === "string" && role.trim()) {
-        counts.set(role, (counts.get(role) ?? 0) + 1);
-      }
-    }
-    const families = new SvelteMap<string, number>();
-    for (const [role, count] of counts) {
-      const dot = role.indexOf(".");
-      if (dot > 0) {
-        const family = `${role.slice(0, dot)}.*`;
-        families.set(family, (families.get(family) ?? 0) + count);
-      }
-    }
-    roleChoices = [
-      ...[...counts]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([role, count]) => ({ value: role, label: `${role} · ${count}` })),
-      ...[...families]
-        .sort((a, b) => b[1] - a[1])
-        .map(([family, count]) => ({
-          value: family,
-          label: `${family} · ${count}`,
-        })),
-    ];
-  }
-
-  /** The object cache fills after the socket connects; retry until it has roles. */
-  async function fillRoleChoices(): Promise<void> {
-    for (let i = 0; i < 20; i++) {
-      buildRoleChoices();
-      if (roleChoices.length) return;
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-
   $effect(() => {
     if (started) return;
     started = true;
-    void Promise.allSettled([initIconPool(), initTemplates()]).then(() => {
-      void fillRoleChoices();
+    void initIconPool().then(() => {
       draft = clonePool(getIconPool());
       baseUpdatedAt = draft.updatedAt;
       loaded = true;
@@ -188,198 +91,128 @@
   });
 
   $effect(() => {
-    // A search is a request to see the matches, not a latch on the section.
-    if (search.trim()) baseOpen = true;
-  });
-
-  $effect(() => {
     dirty =
       loaded &&
       (saveFailed ||
-        JSON.stringify([draft.icons, draft.overrides ?? {}]) !==
-          JSON.stringify([getIconPool().icons, getIconPool().overrides ?? {}]));
+        JSON.stringify([draft.library, draft.defaults]) !==
+          JSON.stringify([getIconPool().library, getIconPool().defaults]));
   });
 
-  function entryById(id: string, builtin: boolean): PoolEntry | undefined {
-    return builtin
-      ? baseEntries.find((entry) => entry.id === id)
-      : draft.icons.find((icon) => icon.id === id);
-  }
-
-  function updateUser(patch: Partial<PoolIcon>): void {
-    const user = openUser;
-    if (!user || !writable) return;
-    draft = {
-      ...draft,
-      icons: draft.icons.map((icon) =>
-        icon.id === user.id ? { ...icon, ...patch } : icon,
-      ),
-    };
+  function updateIcon(patch: Partial<LibraryIcon>): void {
+    const icon = openIcon;
+    if (!icon || !writable) return;
+    draft = upsertLibraryIcon(draft, { ...icon, ...patch });
     savedHint = "";
   }
 
   function addKeyword(): void {
-    const user = openUser;
-    const word = keywordDraft.trim();
-    if (!user || !writable || !word) return;
-    if (
-      (user.keywords ?? []).some(
-        (item) => item.toLowerCase() === word.toLowerCase(),
-      )
-    ) {
-      keywordDraft = "";
-      return;
-    }
-    updateUser({ keywords: [...(user.keywords ?? []), word] });
+    const icon = openIcon;
+    if (!icon || !writable) return;
+    const words = keywordWords(keywordDraft).filter(
+      (word) => !icon.keywords.includes(word),
+    );
     keywordDraft = "";
+    if (!words.length) return;
+    updateIcon({ keywords: [...icon.keywords, ...words] });
   }
 
   function removeKeyword(word: string): void {
-    const user = openUser;
-    if (!user || !writable) return;
-    const keywords = (user.keywords ?? []).filter((item) => item !== word);
-    updateUser({ keywords: keywords.length ? keywords : undefined });
-  }
-
-  function templateName(id: string): string {
-    return templateOptions.find((option) => option.value === id)?.label ?? id;
-  }
-
-  function claimConflict(): string | null {
-    const templates = new SvelteMap<string, string>();
-    const roles = new SvelteMap<string, string>();
-    for (const icon of draft.icons) {
-      for (const id of icon.templates ?? []) {
-        if (templates.has(id)) {
-          return `The template “${templateName(id)}” is assigned to both “${templates.get(id)}” and “${icon.name.trim() || "an icon"}”.`;
-        }
-        templates.set(id, icon.name.trim() || "an icon");
-      }
-      for (const key of icon.roles ?? []) {
-        if (roles.has(key)) {
-          return `The role “${key}” is assigned to both “${roles.get(key)}” and “${icon.name.trim() || "an icon"}”.`;
-        }
-        roles.set(key, icon.name.trim() || "an icon");
-      }
-    }
-    return null;
+    const icon = openIcon;
+    if (!icon || !writable) return;
+    updateIcon({ keywords: icon.keywords.filter((item) => item !== word) });
   }
 
   function defaultTaken(id: string, value: string): boolean {
-    return [...baseEntries, ...draft.icons].some(
+    return draft.library.some(
       (entry) => entry.id !== id && entry.value === value,
     );
   }
 
   function applyPick(
     value: string,
-    meta?: { name?: string; group?: string; active?: string },
+    meta?: { name?: string; active?: string },
   ): void {
     const target = pickerTarget;
     if (!target || !writable) return;
     pickerTarget = null;
     hint = "";
     savedHint = "";
-    const active = (meta?.active ?? "").trim();
     if (target.field === "activeValue") {
-      setActiveValue(target, (meta?.active ?? value).trim());
+      setActive(target.id, (meta?.active ?? value).trim());
       return;
     }
     const glyph = value.trim();
     // A default icon cannot be empty; Clear in the picker is a no-op here.
     if (!glyph) return;
+    const icon = draft.library.find((entry) => entry.id === target.id);
+    if (!icon) return;
     if (defaultTaken(target.id, glyph)) {
-      hint = "Another pool icon already uses that icon.";
+      hint = "Another library icon already uses that icon.";
       return;
     }
-    if (target.builtin) {
-      draft = setBaseOverride(draft, target.id, {
-        value: glyph,
-        ...(active ? { activeValue: active } : {}),
-      });
-    } else {
-      draft = {
-        ...draft,
-        icons: draft.icons.map((icon) =>
-          icon.id === target.id
-            ? {
-                ...icon,
-                value: glyph,
-                ...(active ? { activeValue: active } : {}),
-              }
-            : icon,
-        ),
-      };
-    }
+    const active = (meta?.active ?? "").trim();
+    draft = upsertLibraryIcon(draft, {
+      ...icon,
+      value: glyph,
+      ...(active ? { activeValue: active } : {}),
+    });
   }
 
-  function setActiveValue(target: PickerTarget, value: string): void {
+  function setActive(id: string, value: string): void {
     if (!writable) return;
+    const icon = draft.library.find((entry) => entry.id === id);
+    if (!icon) return;
     const activeValue = value.trim() || undefined;
-    if (target.builtin) {
-      draft = setBaseOverride(draft, target.id, { activeValue });
-    } else {
-      draft = {
-        ...draft,
-        icons: draft.icons.map((icon) =>
-          icon.id === target.id ? { ...icon, activeValue } : icon,
-        ),
-      };
-    }
-    savedHint = "";
-  }
-
-  function resetBase(entry: PoolEntry): void {
-    if (!writable) return;
-    if (!draft.overrides?.[entry.id]) {
-      hint = "This base icon already uses its default.";
-      return;
-    }
-    draft = clearBaseOverride(draft, entry.id);
+    draft = upsertLibraryIcon(draft, {
+      ...icon,
+      ...(activeValue ? { activeValue } : { activeValue: undefined }),
+    });
     savedHint = "";
   }
 
   function addIcon(
     value: string,
-    meta?: { name?: string; group?: string },
+    meta?: { name?: string; group?: string; active?: string },
   ): void {
     // The picker's Clear returns ""; it is not an icon to add.
     if (!writable || !value.trim()) return;
-    if (
-      [...baseEntries, ...draft.icons].some((entry) => entry.value === value)
-    ) {
+    if (draft.library.some((entry) => entry.value === value)) {
       pickerOpen = false;
-      hint = "That icon is already in the pool.";
+      hint = "That icon is already in the library.";
       return;
     }
-    if (draft.icons.length >= POOL_CAP) {
-      hint = `The pool is full (${POOL_CAP} icons).`;
+    if (draft.library.length >= POOL_CAP) {
+      hint = `The library is full (${POOL_CAP} icons).`;
       return;
     }
     pickerOpen = false;
-    const icon: PoolIcon = {
+    const name = meta?.name?.trim() || undefined;
+    const icon: LibraryIcon = {
       id: newId(),
-      name: meta?.name?.trim() || "Icon",
+      ...(name ? { name } : {}),
       value,
-      ...(meta?.group?.trim() ? { group: meta.group.trim() } : {}),
+      ...(meta?.active?.trim() ? { activeValue: meta.active.trim() } : {}),
+      keywords: keywordWords(
+        [meta?.name, meta?.group].filter(Boolean).join(" ") || value,
+      ),
     };
-    draft = upsertPoolIcon(draft, icon);
+    draft = upsertLibraryIcon(draft, icon);
     openId = icon.id;
     search = "";
     hint = "";
     savedHint = "";
   }
 
-  function remove(entry: PoolEntry): void {
+  function remove(entry: LibraryIcon): void {
     if (!writable) return;
-    const next = nextAfterRemoval(draft.icons, entry.id, (icon) => icon.id);
-    draft = removePoolIcon(draft, entry.id);
+    const next = nextAfterRemoval(draft.library, entry.id, (icon) => icon.id);
+    draft = removeLibraryIcon(draft, entry.id);
     pendingRemove = null;
     openId = next?.id ?? null;
     savedHint = "";
   }
 
-  function onLineClick(event: MouseEvent, entry: PoolEntry): void {
+  function onLineClick(event: MouseEvent, entry: LibraryIcon): void {
     const target = event.target as HTMLElement;
     if (
       target.closest(".item-actions, button, input, select, textarea, a, label")
@@ -389,27 +222,24 @@
   }
 
   function cleanDraft(): IconPool {
-    const overrides = draft.overrides;
     return {
-      version: 1,
+      version: 2,
       updatedAt: draft.updatedAt,
-      icons: draft.icons.map((icon) => {
-        const keywords = (icon.keywords ?? [])
-          .map((word) => word.trim())
-          .filter(Boolean);
+      library: draft.library.map((icon) => {
+        const keywords = [
+          ...new Set(icon.keywords.flatMap((word) => keywordWords(word))),
+        ];
+        const name = icon.name?.trim();
         const activeValue = icon.activeValue?.trim();
         return {
           id: icon.id,
-          name: icon.name.trim(),
+          ...(name ? { name } : {}),
           value: icon.value.trim(),
           ...(activeValue ? { activeValue } : {}),
-          ...(icon.templates?.length ? { templates: icon.templates } : {}),
-          ...(icon.roles?.length ? { roles: icon.roles } : {}),
-          ...(icon.group?.trim() ? { group: icon.group.trim() } : {}),
-          ...(keywords.length ? { keywords } : {}),
+          keywords,
         };
       }),
-      ...(overrides && Object.keys(overrides).length ? { overrides } : {}),
+      defaults: draft.defaults,
     };
   }
 
@@ -428,39 +258,39 @@
     savedHint = "";
     conflict = "";
     if (!writable) {
-      hint = "The icon pool is not writable.";
+      hint = "The icon library is not writable.";
       return;
     }
-    if (draft.icons.some((icon) => !icon.name.trim() || !icon.value.trim())) {
-      hint = "Every icon needs a name and an icon.";
-      return;
-    }
-    const duplicate = claimConflict();
-    if (duplicate) {
-      hint = duplicate;
+    if (draft.library.some((icon) => !icon.value.trim())) {
+      hint = "Every icon needs an icon.";
       return;
     }
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
-    const snapshot = JSON.stringify([next.icons, next.overrides ?? {}]);
+    const snapshot = JSON.stringify([next.library, next.defaults]);
     saving = true;
     const result = await commitIconPool(next, baseUpdatedAt);
     saving = false;
     if (result === "saved") {
       baseUpdatedAt = next.updatedAt;
       // Keep edits made while the write was in flight.
-      if (JSON.stringify([draft.icons, draft.overrides ?? {}]) === snapshot) {
+      if (JSON.stringify([draft.library, draft.defaults]) === snapshot) {
         draft = clonePool(next);
       }
       savedHint = "Saved.";
     } else if (result === "conflict") {
-      conflict = "The icon pool changed in another tab. Reload before saving.";
+      conflict =
+        "The icon library changed in another tab. Reload before saving.";
     } else {
-      hint = "The icon pool could not be saved.";
+      hint = "The icon library could not be saved.";
     }
+  }
+
+  function label(icon: LibraryIcon): string {
+    return icon.name?.trim() || icon.value;
   }
 </script>
 
-{#snippet poolRow(entry: PoolEntry, builtin: boolean)}
+{#snippet libraryRow(entry: LibraryIcon)}
   <div class="item" class:open={openId === entry.id}>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -477,45 +307,34 @@
         aria-expanded={openId === entry.id}
         onclick={() => (openId = openId === entry.id ? null : entry.id)}
       >
-        {entry.name}
+        {label(entry)}
       </button>
-      {#if builtin}<span class="badge">built-in</span>{/if}
-      {#if entry.group}<span class="badge">{entry.group}</span>{/if}
-      {#each entry.templates ?? [] as id (id)}
-        <span class="badge auto-badge" title="Template default"
-          >{templateName(id)}</span
-        >
+      {#each entry.keywords.slice(0, 4) as word (word)}
+        <span class="badge">{word}</span>
       {/each}
-      {#each entry.roles ?? [] as role (role)}
-        <span class="badge auto-badge" title="Role default">{role}</span>
-      {/each}
-      {#if !builtin || openId === entry.id}
-        <span class="item-actions">
-          {#if openId === entry.id}
-            <!-- One document: this row's Save writes the whole pool. -->
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              title="Save the whole icon pool"
-              disabled={!dirty || !writable || saving}
-              onclick={save}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          {/if}
-          {#if !builtin}
-            <IconButton
-              icon="delete"
-              danger
-              label={`Delete ${entry.name}`}
-              disabled={!writable}
-              onclick={() => (pendingRemove = entry)}
-            />
-          {/if}
-        </span>
-      {/if}
+      <span class="item-actions">
+        {#if openId === entry.id}
+          <!-- One document: this row's Save writes the whole library. -->
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            title="Save the whole icon library"
+            disabled={!dirty || !writable || saving}
+            onclick={save}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        {/if}
+        <IconButton
+          icon="delete"
+          danger
+          label={`Delete ${label(entry)}`}
+          disabled={!writable}
+          onclick={() => (pendingRemove = entry)}
+        />
+      </span>
     </div>
-    {#if openId === entry.id && openEntry}
+    {#if openId === entry.id && openIcon}
       <div class="item-editor pool-editor">
         <div class="icon-pair">
           <div class="icon-slot">
@@ -523,13 +342,12 @@
             <button
               type="button"
               class="btn btn-sm glyph-pick"
-              title={`Change the default icon of ${entry.name}`}
-              aria-label={`Change the default icon of ${entry.name}`}
+              title={`Change the default icon of ${label(entry)}`}
+              aria-label={`Change the default icon of ${label(entry)}`}
               disabled={!writable}
-              onclick={() =>
-                (pickerTarget = { id: entry.id, builtin, field: "value" })}
+              onclick={() => (pickerTarget = { id: entry.id, field: "value" })}
             >
-              <Icon value={openEntry.value} size={18} />
+              <Icon value={openIcon.value} size={18} />
             </button>
           </div>
           <div class="icon-slot">
@@ -538,148 +356,90 @@
               <button
                 type="button"
                 class="btn btn-sm glyph-pick"
-                title={`Set the active icon of ${entry.name}`}
-                aria-label={`Set the active icon of ${entry.name}`}
+                title={`Set the active icon of ${label(entry)}`}
+                aria-label={`Set the active icon of ${label(entry)}`}
                 disabled={!writable}
                 onclick={() =>
-                  (pickerTarget = {
-                    id: entry.id,
-                    builtin,
-                    field: "activeValue",
-                  })}
+                  (pickerTarget = { id: entry.id, field: "activeValue" })}
               >
-                {#if openEntry.activeValue}
-                  <Icon value={openEntry.activeValue} size={18} />
+                {#if openIcon.activeValue}
+                  <Icon value={openIcon.activeValue} size={18} />
                 {:else}
                   <span class="material-symbols-outlined">add</span>
                 {/if}
               </button>
-              {#if openEntry.activeValue}
+              {#if openIcon.activeValue}
                 <IconButton
                   icon="close"
-                  label={`Clear the active icon of ${entry.name}`}
+                  label={`Clear the active icon of ${label(entry)}`}
                   disabled={!writable}
-                  onclick={() =>
-                    setActiveValue(
-                      { id: entry.id, builtin, field: "activeValue" },
-                      "",
-                    )}
+                  onclick={() => setActive(entry.id, "")}
                 />
               {/if}
             </div>
           </div>
-          {#if builtin}
-            <button
-              type="button"
-              class="btn btn-outline btn-sm reset-btn"
-              disabled={!writable}
-              onclick={() => resetBase(entry)}>Reset</button
-            >
-          {/if}
         </div>
-        {#if !builtin}
-          <div class="pool-fields">
-            <label class="field">
-              <span class="label-mono">Name</span>
+        <div class="pool-fields">
+          <label class="field">
+            <span class="label-mono">Name</span>
+            <input
+              type="text"
+              placeholder="optional"
+              value={openIcon.name ?? ""}
+              disabled={!writable}
+              oninput={(e) => updateIcon({ name: e.currentTarget.value })}
+            />
+          </label>
+          <div class="field keywords">
+            <span class="label-mono">Keywords</span>
+            <div class="keyword-chips">
+              {#each openIcon.keywords as word (word)}
+                <span class="keyword-chip">
+                  {word}
+                  <button
+                    type="button"
+                    class="chip-x"
+                    aria-label={`Remove keyword ${word}`}
+                    disabled={!writable}
+                    onclick={() => removeKeyword(word)}
+                  >
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </span>
+              {/each}
+            </div>
+            <div class="keyword-add">
               <input
                 type="text"
-                value={openEntry.name}
+                aria-label="Add a keyword"
+                placeholder="add a keyword"
+                list="icon-keyword-choices"
+                bind:value={keywordDraft}
                 disabled={!writable}
-                oninput={(e) => updateUser({ name: e.currentTarget.value })}
+                onkeydown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addKeyword();
+                  }
+                }}
               />
-            </label>
-            <label class="field">
-              <span class="label-mono">Group</span>
-              <input
-                type="text"
-                value={openEntry.group ?? ""}
-                disabled={!writable}
-                onchange={(e) =>
-                  updateUser({
-                    group: e.currentTarget.value.trim() || undefined,
-                  })}
-              />
-            </label>
-            <div class="field keywords">
-              <span class="label-mono">Keywords</span>
-              <div class="keyword-chips">
-                {#each openEntry.keywords ?? [] as word (word)}
-                  <span class="keyword-chip">
-                    {word}
-                    <button
-                      type="button"
-                      class="chip-x"
-                      aria-label={`Remove keyword ${word}`}
-                      disabled={!writable}
-                      onclick={() => removeKeyword(word)}
-                    >
-                      <span class="material-symbols-outlined">close</span>
-                    </button>
-                  </span>
-                {/each}
-              </div>
-              <div class="keyword-add">
-                <input
-                  type="text"
-                  aria-label="Add a keyword"
-                  placeholder="add a keyword"
-                  list="icon-keyword-choices"
-                  bind:value={keywordDraft}
-                  disabled={!writable}
-                  onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addKeyword();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  class="btn btn-outline btn-sm"
-                  disabled={!writable || !keywordDraft.trim()}
-                  onclick={addKeyword}>Add</button
-                >
-              </div>
-              <datalist id="icon-keyword-choices">
-                {#each keywordChoices as word (word)}
-                  <option value={word}></option>
-                {/each}
-              </datalist>
-              <p class="hint text-muted">Search only — never changes a tile.</p>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                disabled={!writable || !keywordDraft.trim()}
+                onclick={addKeyword}>Add</button
+              >
             </div>
+            <datalist id="icon-keyword-choices">
+              {#each keywordChoices as word (word)}
+                <option value={word}></option>
+              {/each}
+            </datalist>
+            <p class="hint text-muted">
+              Search only — an icon may carry several keywords.
+            </p>
           </div>
-          <div class="auto-picks">
-            <div class="field">
-              <span class="label-mono">Applies to templates</span>
-              <MultiSelect
-                options={templateOptions}
-                selected={openEntry.templates ?? []}
-                placeholder="No template default"
-                onChange={(values) =>
-                  updateUser({
-                    templates: values.length ? values : undefined,
-                  })}
-              />
-              <p class="hint text-muted">
-                Automatic face default for tiles from these templates.
-              </p>
-            </div>
-            <div class="field">
-              <span class="label-mono">Roles</span>
-              <MultiSelect
-                options={roleChoices}
-                selected={openEntry.roles ?? []}
-                placeholder="No role default"
-                onChange={(values) =>
-                  updateUser({ roles: values.length ? values : undefined })}
-              />
-              <p class="hint text-muted">
-                Fallback by the headline control's ioBroker role (exact, then
-                family).
-              </p>
-            </div>
-          </div>
-        {/if}
+        </div>
       </div>
     {/if}
   </div>
@@ -690,23 +450,30 @@
     <p class="text-muted">
       {loadKind === "unreadable"
         ? "The icon pool document is unreadable. Fix or remove ihome.0.config.iconPool before editing."
-        : "Loading icon pool…"}
+        : "Loading icon library…"}
     </p>
   </div>
 {:else if loadKind === "pending"}
   <div class="card empty-state">
-    <p class="text-muted">The icon pool could not be loaded.</p>
+    <p class="text-muted">The icon library could not be loaded.</p>
     <button type="button" class="btn btn-outline btn-sm" onclick={reload}>
       Retry
     </button>
   </div>
 {:else}
   <div class="icon-pool-page">
+    <OptionTabs
+      bind:value={tab}
+      label="Icon manager"
+      tabs={TABS}
+      collapsible={false}
+      showHint={false}
+    />
     <div class="item">
       <div class="item-line title-line">
         <Icon value="apps" size={18} />
-        <span class="name">Icon pool</span>
-        <span class="badge">{draft.icons.length} added</span>
+        <span class="name">Icon library</span>
+        <span class="badge">{draft.library.length} icons</span>
         <!-- Add stays on the document line; Save lives on the open row (§5). -->
         <span class="item-actions">
           <button
@@ -749,42 +516,21 @@
         <span class="label-mono filter-label">Filters</span>
         <input
           type="search"
-          placeholder="Search name, group or keywords…"
+          placeholder="Search name, keywords or icon…"
           bind:value={search}
         />
       </div>
     </div>
 
-    {#if userRows.length === 0 && baseRows.length === 0}
+    {#if rows.length === 0}
       <div class="card empty-state">
         <p class="text-muted">No icons match the search.</p>
       </div>
     {:else}
       <div class="list">
-        {#if baseRows.length > 0}
-          <details class="base-group" bind:open={baseOpen}>
-            <summary class="label-mono">
-              Base icons ({baseRows.length}) · device types and roles
-            </summary>
-            <p class="hint text-muted">
-              Base catalog — picking is copy-on-pick. Automatic defaults live on
-              your entries.
-            </p>
-            {#each baseRows as entry (entry.id)}
-              {@render poolRow(entry, true)}
-            {/each}
-          </details>
-        {/if}
-
-        {#each userRows as entry (entry.id)}
-          {@render poolRow(entry, false)}
+        {#each rows as entry (entry.id)}
+          {@render libraryRow(entry)}
         {/each}
-        {#if draft.icons.length === 0}
-          <p class="hint text-muted">
-            No added icons yet — the base icons are always available. Use
-            <strong>+ Icon</strong> to expand the pool.
-          </p>
-        {/if}
       </div>
     {/if}
   </div>
@@ -797,7 +543,7 @@
 {#if pickerTarget}
   <IconPicker
     manage
-    icon={entryById(pickerTarget.id, pickerTarget.builtin)?.[
+    icon={draft.library.find((entry) => entry.id === pickerTarget?.id)?.[
       pickerTarget.field
     ]}
     onPick={applyPick}
@@ -807,12 +553,12 @@
 
 {#if pendingRemove}
   <ConfirmModal
-    title={deleteTitle("icon", pendingRemove.name)}
+    title={deleteTitle("icon", label(pendingRemove))}
     confirmLabel="Delete"
     onConfirm={() => remove(pendingRemove!)}
     onCancel={() => (pendingRemove = null)}
   >
-    <p>Only the pool entry is removed; tiles using the icon keep it.</p>
+    <p>Only the library row is removed; tiles using the icon keep it.</p>
   </ConfirmModal>
 {/if}
 
@@ -867,16 +613,6 @@
     text-align: center;
   }
 
-  .base-group {
-    margin-bottom: 0.25rem;
-  }
-
-  .base-group summary {
-    cursor: pointer;
-    padding: 0.35rem 0.5rem;
-    color: var(--secondary-color);
-  }
-
   .row-twin {
     display: flex;
     opacity: 0.7;
@@ -921,10 +657,6 @@
 
   .conflict-line .hint {
     flex: 1 1 auto;
-  }
-
-  .reset-btn {
-    margin-bottom: 2px;
   }
 
   .pool-fields {
@@ -995,17 +727,5 @@
   .keyword-add input {
     flex: 1 1 auto;
     min-width: 0;
-  }
-
-  .auto-picks {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  @media (max-width: 820px) {
-    .auto-picks {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

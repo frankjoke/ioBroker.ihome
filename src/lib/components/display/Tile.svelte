@@ -10,7 +10,7 @@
     tileActionControl,
   } from "$lib/config/template-ops";
   import { evalActive, withRolePair } from "$lib/config/tile-ops";
-  import { defaultPair } from "$lib/config/icon-pool";
+  import { defaultPair } from "$lib/config/icon-library";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
@@ -323,7 +323,7 @@
       presetForType(sourceDevice?.type ?? device.type).id,
   );
   const automaticPair = $derived(
-    defaultPair(getIconPool().icons, templateId, headlineControl?.role),
+    defaultPair(getIconPool(), templateId, headlineControl?.role),
   );
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.

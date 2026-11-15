@@ -2,16 +2,18 @@
 // code (`$lib/config/icon-pool`) and is never written here.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
-import { parseIconPool, type IconPool } from "$lib/config/icon-pool";
+import {
+  emptyIconPool,
+  parseIconPool,
+  type IconPool,
+} from "$lib/config/icon-library";
 
 export const ICON_POOL_ID = "ihome.0.config.iconPool";
 
 /** The result of a save attempt, so the manager can word the outcome. */
 export type IconPoolSave = "saved" | "conflict" | "failed";
 
-const emptyIconPool: IconPool = { version: 1, updatedAt: 0, icons: [] };
-
-let iconPool = $state<IconPool>(emptyIconPool);
+let iconPool = $state<IconPool>(emptyIconPool());
 let initPromise: Promise<void> | null = null;
 /** The updatedAt this tab last wrote; its own echo is not a remote change. */
 let lastSent: number | null = null;

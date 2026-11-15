@@ -42,9 +42,10 @@ vi.mock("$lib/stores/devices.svelte", () => ({
 
 const doc = (updatedAt: number, id = "a", value = "x") =>
   JSON.stringify({
-    version: 1,
+    version: 2,
     updatedAt,
-    icons: [{ id, name: id.toUpperCase(), value }],
+    library: [{ id, name: id.toUpperCase(), value, keywords: [] }],
+    defaults: { roles: {}, templates: {} },
   });
 
 /** A fresh module per scenario: absent, loaded and unreadable differ at init. */
@@ -63,7 +64,7 @@ it("registers the document and loads it", async () => {
   const store = await load(doc(1));
   expect(h.register).toHaveBeenCalledWith(store.ICON_POOL_ID);
   expect(store.iconPoolLoadKind()).toBe("loaded");
-  expect(store.getIconPool().icons).toHaveLength(1);
+  expect(store.getIconPool().library).toHaveLength(1);
 });
 
 it("treats an adapter-created empty document as absent and writable", async () => {
@@ -82,43 +83,50 @@ it("keeps a malformed document unreadable and unwritable", async () => {
 it("ignores its own echo and accepts a remote change", async () => {
   const store = await load(doc(1));
   const next = {
-    version: 1 as const,
+    version: 2 as const,
     updatedAt: 10,
-    icons: [{ id: "b", name: "B", value: "y" }],
+    library: [{ id: "b", name: "B", value: "y", keywords: [] }],
+    defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 1)).toBe("saved");
   h.state.onUpdate?.(null, {
-    val: JSON.stringify({ ...next, icons: [] }),
+    val: JSON.stringify({ ...next, library: [] }),
   });
-  expect(store.getIconPool().icons).toHaveLength(1);
+  expect(store.getIconPool().library).toHaveLength(1);
   h.state.onUpdate?.(null, {
-    val: JSON.stringify({ ...next, updatedAt: 11, icons: [] }),
+    val: JSON.stringify({ ...next, updatedAt: 11, library: [] }),
   });
-  expect(store.getIconPool().icons).toHaveLength(0);
+  expect(store.getIconPool().library).toHaveLength(0);
 });
 
 it("refuses to overwrite a remote save made since load", async () => {
   const store = await load(doc(1));
   h.state.raw = doc(2, "remote", "z");
   const result = await store.commitIconPool(
-    { version: 1, updatedAt: 3, icons: [] },
+    {
+      version: 2 as const,
+      updatedAt: 3,
+      library: [],
+      defaults: { roles: {}, templates: {} },
+    },
     1,
   );
   expect(result).toBe("conflict");
   expect(h.setState).not.toHaveBeenCalled();
-  expect(store.getIconPool().icons[0].id).toBe("remote");
+  expect(store.getIconPool().library[0].id).toBe("remote");
 });
 
 it("creates the first document and subscribes to it", async () => {
   const store = await load(null);
   const next = {
-    version: 1 as const,
+    version: 2 as const,
     updatedAt: 5,
-    icons: [{ id: "a", name: "A", value: "x" }],
+    library: [{ id: "a", name: "A", value: "x", keywords: [] }],
+    defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 0)).toBe("saved");
   await store.initIconPool();
   expect(store.iconPoolLoadKind()).toBe("loaded");
   h.state.onUpdate?.(null, { val: doc(6, "b", "y") });
-  expect(store.getIconPool().icons[0].id).toBe("b");
+  expect(store.getIconPool().library[0].id).toBe("b");
 });

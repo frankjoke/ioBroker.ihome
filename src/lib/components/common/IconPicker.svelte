@@ -5,11 +5,7 @@
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { initIconPool, getIconPool } from "$lib/stores/icon-pool.svelte";
-  import {
-    filterPoolIcons,
-    mdiIconValue,
-    poolEntries,
-  } from "$lib/config/icon-pool";
+  import { filterLibrary, mdiIconValue } from "$lib/config/icon-library";
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { iconTitle, isHtmlIcon } from "$lib/config/icon-html";
   import { brokerIconPath } from "$lib/config/icon-ops";
@@ -137,8 +133,8 @@
     if (tab === "symbols" && manage) void loadSymbols();
   });
 
-  const pool = $derived(poolEntries(getIconPool()));
-  const poolShown = $derived(filterPoolIcons(pool, search));
+  const pool = $derived(getIconPool().library);
+  const poolShown = $derived(filterLibrary(pool, [], search));
 
   $effect(() => {
     if (tab === "pool") void initIconPool();
@@ -284,37 +280,26 @@
           <p class="empty text-muted">No icons match the search.</p>
         {:else}
           <ul class="list">
-            {#each poolShown as entry (`${entry.builtin ? "b" : "u"}:${entry.id}`)}
+            {#each poolShown as entry (entry.id)}
               <li>
                 <div class="pool-row">
                   <button
                     type="button"
                     class="row-btn pool-main"
                     class:current={entry.value === icon}
-                    title={entry.name}
+                    title={entry.name ?? entry.value}
                     onclick={() =>
                       onPick(entry.value, {
                         name: entry.name,
-                        group: entry.group,
                         active: entry.activeValue,
                       })}
                   >
                     <Icon value={entry.value} size={22} />
-                    <span class="value">{entry.name}</span>
-                    {#if entry.builtin}
-                      <span class="pool-badge">built-in</span>
-                    {/if}
-                    {#if entry.templates?.length || entry.roles?.length}
-                      <span
-                        class="pool-badge auto"
-                        title={`Automatic default for ${[
-                          ...(entry.templates ?? []),
-                          ...(entry.roles ?? []),
-                        ].join(", ")}`}>auto</span
+                    <span class="value">{entry.name ?? entry.value}</span>
+                    {#if entry.keywords.length}
+                      <span class="meta text-muted"
+                        >{entry.keywords.slice(0, 3).join(" · ")}</span
                       >
-                    {/if}
-                    {#if entry.group}
-                      <span class="meta text-muted">{entry.group}</span>
                     {/if}
                   </button>
                   {#if entry.activeValue}
@@ -322,13 +307,10 @@
                       type="button"
                       class="pool-twin-btn"
                       class:current={entry.activeValue === icon}
-                      title={`Use the active icon of ${entry.name}`}
-                      aria-label={`Use the active icon of ${entry.name}`}
+                      title={`Use the active icon of ${entry.name ?? entry.value}`}
+                      aria-label={`Use the active icon of ${entry.name ?? entry.value}`}
                       onclick={() =>
-                        onPick(entry.activeValue!, {
-                          name: entry.name,
-                          group: entry.group,
-                        })}
+                        onPick(entry.activeValue!, { name: entry.name })}
                     >
                       <Icon value={entry.activeValue} size={20} />
                       <span class="pool-twin-label">active</span>
@@ -339,9 +321,9 @@
             {/each}
           </ul>
         {/if}
-        {#if !manage && pool.every((entry) => entry.builtin)}
+        {#if pool.length === 0}
           <p class="empty text-muted">
-            No added icons yet — expand the pool in Templates → Icons.
+            No icons in the library yet — add them in Templates → Icons.
           </p>
         {/if}
         {#if !manage}
@@ -672,20 +654,6 @@
 
   .pool-twin-label {
     font-size: var(--label-mono-size);
-  }
-
-  .pool-badge.auto {
-    color: var(--primary-color);
-    border-color: var(--primary-color);
-  }
-
-  .pool-badge {
-    flex: 0 0 auto;
-    font-size: var(--label-mono-size);
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    padding: 0 0.3rem;
   }
 
   .manage-link {
