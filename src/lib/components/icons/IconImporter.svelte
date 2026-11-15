@@ -417,15 +417,6 @@
         <div class="source-head">
           <input type="search" placeholder="Search…" bind:value={search} />
           {#if resource === "adapter"}
-            <div class="path-line">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline"
-                title="Parent folder"
-                onclick={crumbUp}>..</button
-              >
-              <code class="path">{folder}</code>
-            </div>
             <div class="base-line">
               <span class="label-mono">Known source</span>
               <select
@@ -487,6 +478,18 @@
             </select>
           {/if}
         </div>
+
+        {#if resource === "adapter"}
+          <div class="path-line">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline"
+              title="Parent folder"
+              onclick={crumbUp}>..</button
+            >
+            <code class="path">{folder}</code>
+          </div>
+        {/if}
 
         <div class="results">
           {#if resource === "library"}
