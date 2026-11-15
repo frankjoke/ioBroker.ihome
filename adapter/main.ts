@@ -49,7 +49,9 @@ import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
   listPluginFolders,
   mergePlugin,
+  pluginManifestOf,
   readPluginFiles,
+  runtimeOnly,
   type PluginFileHost,
 } from "./plugin-files";
 import {
@@ -1151,6 +1153,51 @@ class IHome extends utils.Adapter {
     });
   }
 
+  /** Move user plugin code out of the config into `ihome.meta/plugins/<id>/`.
+   *  Existing files win; a failed write keeps the code in config. */
+  private async migratePluginCodeToFiles(): Promise<void> {
+    let changed = false;
+    const next: AdapterPlugin[] = [];
+    for (const plugin of this.pluginConfig) {
+      if (plugin.builtin || !plugin.code) {
+        next.push(plugin);
+        continue;
+      }
+      try {
+        const dir = `plugins/${plugin.id}`;
+        if (!(await this.fileExistsAsync("ihome.meta", `${dir}/plugin.json`))) {
+          await this.writeFileAsync(
+            "ihome.meta",
+            `${dir}/plugin.json`,
+            JSON.stringify(pluginManifestOf(plugin), null, 2),
+          );
+        }
+        if (!(await this.fileExistsAsync("ihome.meta", `${dir}/index.js`))) {
+          await this.writeFileAsync(
+            "ihome.meta",
+            `${dir}/index.js`,
+            plugin.code,
+          );
+        }
+        next.push(runtimeOnly(plugin));
+        changed = true;
+        this.log.info(`plugin ${plugin.id}: code moved to ihome.meta`);
+      } catch (error) {
+        this.log.warn(
+          `plugin ${plugin.id}: cannot move code to files: ${String(error)}`,
+        );
+        next.push(plugin);
+      }
+    }
+    if (!changed) return;
+    this.pluginConfig = next;
+    try {
+      await this.updateConfig({ plugins: next });
+    } catch (error) {
+      this.log.warn(`cannot store the plugin list: ${String(error)}`);
+    }
+  }
+
   /** File-backed user plugins override what the config still carries. */
   private async mergePluginFiles(
     list: AdapterPlugin[],
@@ -2140,7 +2187,9 @@ class IHome extends utils.Adapter {
     await this.savePluginSettings();
 
     // User plugin content lives as folders in `ihome.meta`; the config only
-    // holds the runtime flags. Read the files once and merge them in.
+    // holds the runtime flags. Move any code still in config out once, then
+    // merge what the files say.
+    await this.migratePluginCodeToFiles();
     this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
 
     this.pluginHost = createPluginHost(

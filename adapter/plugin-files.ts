@@ -175,3 +175,27 @@ export function mergePlugin(
     code,
   };
 }
+
+/** The portable half of a config plugin: what belongs in `plugin.json`. */
+export function pluginManifestOf(plugin: AdapterPlugin): PluginManifest {
+  return {
+    id: plugin.id,
+    name: plugin.name,
+    ...(plugin.help ? { help: plugin.help } : {}),
+    ...(plugin.usage ? { usage: plugin.usage } : {}),
+    ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
+    ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+  };
+}
+
+/** The runtime half kept in config: no code, schema, help or bundle. */
+export function runtimeOnly(plugin: AdapterPlugin): AdapterPlugin {
+  return {
+    id: plugin.id,
+    name: plugin.name,
+    enabled: plugin.enabled,
+    ...(plugin.builtin ? { builtin: true } : {}),
+    timeoutMs: plugin.timeoutMs,
+    debug: plugin.debug,
+  };
+}

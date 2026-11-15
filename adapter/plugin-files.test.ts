@@ -2,7 +2,9 @@ import { it, expect, vi } from "vitest";
 import {
   listPluginFolders,
   mergePlugin,
+  pluginManifestOf,
   readPluginFiles,
+  runtimeOnly,
   type PluginFileHost,
 } from "./plugin-files";
 
@@ -131,3 +133,33 @@ it("rejects an unknown id", async () => {
 });
 
 vi.restoreAllMocks();
+
+it("splits a config plugin into manifest and runtime", () => {
+  const plugin = {
+    id: "clock",
+    name: "Clock",
+    enabled: true,
+    builtin: false,
+    timeoutMs: 5000,
+    debug: false,
+    help: "h",
+    usage: "u",
+    settingsSchema: [{ name: "tz", label: "Zone", type: "string" as const }],
+    settings: { tz: "UTC" },
+    code: "code",
+  };
+  expect(pluginManifestOf(plugin)).toEqual({
+    id: "clock",
+    name: "Clock",
+    help: "h",
+    usage: "u",
+    settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
+  });
+  expect(runtimeOnly(plugin)).toEqual({
+    id: "clock",
+    name: "Clock",
+    enabled: true,
+    timeoutMs: 5000,
+    debug: false,
+  });
+});
