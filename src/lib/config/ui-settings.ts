@@ -32,10 +32,28 @@ export const FONTS = [
       '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   },
   {
+    id: "intertight",
+    label: "Inter Tight · denser",
+    stack:
+      '"Inter Tight", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
     id: "plex",
     label: "IBM Plex Sans",
     stack:
       '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "plexcond",
+    label: "IBM Plex Sans Condensed · denser",
+    stack:
+      '"IBM Plex Sans Condensed", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: "robotocond",
+    label: "Roboto Condensed · denser",
+    stack:
+      '"Roboto Condensed", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   },
   {
     id: "grotesk",
