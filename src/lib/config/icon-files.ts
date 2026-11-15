@@ -4,11 +4,82 @@
 // the web adapter's file commands over the open socket.
 
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { loadIo2Client } from "$lib/socket-client";
 
 export const META_ADAPTER = "ihome.meta";
 export const ICON_DIR = "icons";
 export const LIBRARY_FILE = "icons/library.json";
 export const META_PREFIX = "/ihome.meta/icons/";
+
+type FileSocket = {
+  emit: (event: string, ...args: unknown[]) => void;
+  on: (event: string, handler: (...args: unknown[]) => void) => void;
+  disconnect: () => void;
+};
+
+/** A dedicated connection for file commands: the app's shared socket has been
+ *  seen to turn a large text payload into binary, this one is proven clean. */
+let fileSocket: FileSocket | null = null;
+let fileSocketPromise: Promise<FileSocket | null> | null = null;
+
+async function openFileSocket(): Promise<FileSocket | null> {
+  fileSocketPromise ??= (async () => {
+    const client = (await loadIo2Client()) as {
+      connect: (url: string, options?: object) => FileSocket;
+    } | null;
+    if (!client) return null;
+    const origin = globalThis.location?.origin ?? "";
+    const socket = client.connect(origin, {
+      query: "key=nokey",
+      reconnection: false,
+    });
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("file socket timeout")),
+        5000,
+      );
+      socket.on("connect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      socket.on("connect_error", (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
+    return socket;
+  })().catch(() => null);
+  fileSocket = await fileSocketPromise;
+  return fileSocket;
+}
+
+async function fileCall(event: string, ...args: unknown[]): Promise<unknown> {
+  const socket = await openFileSocket();
+  if (!socket) return await ioBroker.emitAsync(event, ...args);
+  try {
+    return await new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`file call timeout: ${event}`)),
+        15000,
+      );
+      socket.emit(event, ...args, (error: unknown, data: unknown) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve(data);
+      });
+    });
+  } catch (error) {
+    // Fall back to the app socket; a broken dedicated socket must not block.
+    fileSocket = null;
+    fileSocketPromise = null;
+    try {
+      socket.disconnect();
+    } catch {
+      // already gone
+    }
+    return await ioBroker.emitAsync(event, ...args);
+  }
+}
 
 const TEXT_EXT = /^(svg|html?|txt|json)$/i;
 const MIME: Record<string, string> = {
@@ -104,10 +175,10 @@ async function writeFile(
   content: { text?: string; bytes?: ArrayBuffer },
 ): Promise<void> {
   if (content.text !== undefined) {
-    await ioBroker.emitAsync("writeFile", META_ADAPTER, path, content.text);
+    await fileCall("writeFile", META_ADAPTER, path, content.text);
     return;
   }
-  await ioBroker.emitAsync(
+  await fileCall(
     "writeFile64",
     META_ADAPTER,
     path,
@@ -151,7 +222,7 @@ export async function deleteIconFile(value: string): Promise<void> {
   const path = metaPathFor(value);
   if (!path) return;
   try {
-    await ioBroker.emitAsync("deleteFile", META_ADAPTER, path);
+    await fileCall("deleteFile", META_ADAPTER, path);
   } catch {
     // The row is gone either way; a leftover file is recoverable.
   }
@@ -174,15 +245,11 @@ export async function readLibraryFile(): Promise<string | null> {
 export async function writeLibraryFile(json: string): Promise<void> {
   const text = typeof json === "string" ? json : JSON.stringify(json);
   for (let attempt = 0; attempt < 2; attempt++) {
-    await ioBroker.emitAsync("writeFile", META_ADAPTER, LIBRARY_FILE, text);
+    await fileCall("writeFile", META_ADAPTER, LIBRARY_FILE, text);
     // The socket can lose a large text payload now and then; verify the
     // stored bytes and write once more rather than persist a broken document.
     try {
-      const back = await ioBroker.emitAsync(
-        "readFile",
-        META_ADAPTER,
-        LIBRARY_FILE,
-      );
+      const back = await fileCall("readFile", META_ADAPTER, LIBRARY_FILE);
       if (back === text) return;
     } catch {
       // A failed check is not a proven failure; retry the write.
