@@ -1,119 +1,21 @@
-// The shared image space. Content lives as files under `ihome.meta` so the
-// library document stays small and every instance reads the same files; the
-// library JSON itself also lives here. Reads use HTTP (cacheable), writes use
-// the web adapter's file commands over the open socket.
+// The shared image space: icons/uploads live as files under `ihome.meta`, the
+// icon library mirrors its document there. The file IO itself is `meta-files`;
+// this module only knows icon naming and the library paths.
 
-import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { loadIo2Client } from "$lib/socket-client";
-import { iconBase, iconSrc } from "$lib/utils/icon-url";
+import {
+  META_ADAPTER,
+  deleteMetaFile,
+  readMetaText,
+  writeMetaBinary,
+  writeMetaText,
+} from "$lib/config/meta-files";
+import { iconSrc } from "$lib/utils/icon-url";
 
-export const META_ADAPTER = "ihome.meta";
+export { META_ADAPTER };
+
 export const ICON_DIR = "icons";
 export const LIBRARY_FILE = "icons/library.json";
 export const META_PREFIX = "/ihome.meta/icons/";
-
-type FileSocket = {
-  emit: (event: string, ...args: unknown[]) => void;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  disconnect: () => void;
-};
-
-/** A dedicated connection for file commands: the app's shared socket has been
- *  seen to turn a large text payload into binary, this one is proven clean. */
-let fileSocket: FileSocket | null = null;
-let fileSocketPromise: Promise<FileSocket | null> | null = null;
-
-/** The dev server has no socket.io client; the broker does. Load it there. */
-async function loadBrokerClient(): Promise<{
-  connect: (url: string, options?: object) => FileSocket;
-} | null> {
-  const root = iconBase();
-  const browserDoc = globalThis.document;
-  if (!root || !browserDoc) return null;
-  return await new Promise((resolve) => {
-    try {
-      const frame = browserDoc.createElement("iframe");
-      frame.style.display = "none";
-      browserDoc.body.append(frame);
-      const doc = frame.contentDocument;
-      if (!doc) {
-        resolve(null);
-        return;
-      }
-      const script = doc.createElement("script");
-      script.src = new URL("/lib/js/socket.io.js", root).href;
-      script.onload = () =>
-        resolve(
-          (frame.contentWindow as { io?: { connect: () => FileSocket } } | null)
-            ?.io ?? null,
-        );
-      script.onerror = () => resolve(null);
-      doc.head.append(script);
-    } catch {
-      resolve(null);
-    }
-  });
-}
-
-async function openFileSocket(): Promise<FileSocket | null> {
-  fileSocketPromise ??= (async () => {
-    const client =
-      ((await loadIo2Client()) as {
-        connect: (url: string, options?: object) => FileSocket;
-      } | null) ?? (await loadBrokerClient());
-    if (!client) return null;
-    const origin = iconBase() || globalThis.location?.origin || "";
-    const socket = client.connect(origin, {
-      query: "key=nokey",
-      reconnection: false,
-    });
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("file socket timeout")),
-        5000,
-      );
-      socket.on("connect", () => {
-        clearTimeout(timer);
-        resolve();
-      });
-      socket.on("connect_error", (error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-    });
-    return socket;
-  })().catch(() => null);
-  fileSocket = await fileSocketPromise;
-  return fileSocket;
-}
-
-async function fileCall(event: string, ...args: unknown[]): Promise<unknown> {
-  const socket = await openFileSocket();
-  if (!socket) return await ioBroker.emitAsync(event, ...args);
-  try {
-    return await new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`file call timeout: ${event}`)),
-        15000,
-      );
-      socket.emit(event, ...args, (error: unknown, data: unknown) => {
-        clearTimeout(timer);
-        if (error) reject(error);
-        else resolve(data);
-      });
-    });
-  } catch {
-    // Fall back to the app socket; a broken dedicated socket must not block.
-    fileSocket = null;
-    fileSocketPromise = null;
-    try {
-      socket.disconnect();
-    } catch {
-      // already gone
-    }
-    return await ioBroker.emitAsync(event, ...args);
-  }
-}
 
 const TEXT_EXT = /^(svg|html?|txt|json)$/i;
 const MIME: Record<string, string> = {
@@ -184,15 +86,6 @@ export async function iconFileName(
   return `${hash}-${slug(name) || "icon"}.${extension}`;
 }
 
-function base64Of(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(binary);
-}
-
 /** Read the file bytes or text, depending on its type. */
 async function readContent(
   file: File,
@@ -204,22 +97,6 @@ async function readContent(
   return { name: file.name, bytes: await file.arrayBuffer() };
 }
 
-async function writeFile(
-  path: string,
-  content: { text?: string; bytes?: ArrayBuffer },
-): Promise<void> {
-  if (content.text !== undefined) {
-    await fileCall("writeFile", META_ADAPTER, path, content.text);
-    return;
-  }
-  await fileCall(
-    "writeFile64",
-    META_ADAPTER,
-    path,
-    base64Of(content.bytes ?? new ArrayBuffer(0)),
-  );
-}
-
 /** Store one local file; returns its `/ihome.meta/icons/…` value. */
 export async function writeIconFile(
   file: File,
@@ -227,7 +104,12 @@ export async function writeIconFile(
 ): Promise<string> {
   const content = await readContent(file);
   const fileName = await iconFileName(name, content.text ?? content.bytes!);
-  await writeFile(`${ICON_DIR}/${fileName}`, content);
+  const path = `${ICON_DIR}/${fileName}`;
+  if (content.text !== undefined) {
+    await writeMetaText(META_ADAPTER, path, content.text);
+  } else {
+    await writeMetaBinary(META_ADAPTER, path, content.bytes!);
+  }
   return `${META_PREFIX}${fileName}`;
 }
 
@@ -237,9 +119,7 @@ export async function copyIconFile(
   name: string,
 ): Promise<string | null> {
   try {
-    const response = await fetch(
-      new URL(url, globalThis.document?.baseURI ?? url),
-    );
+    const response = await fetch(iconSrc(url));
     if (!response.ok) return null;
     const blob = await response.blob();
     const bytes = await blob.arrayBuffer();
@@ -250,7 +130,7 @@ export async function copyIconFile(
       extension ? `${name}.${extension}` : name,
       bytes,
     );
-    await writeFile(`${ICON_DIR}/${fileName}`, { bytes });
+    await writeMetaBinary(META_ADAPTER, `${ICON_DIR}/${fileName}`, bytes);
     return `${META_PREFIX}${fileName}`;
   } catch {
     return null;
@@ -262,40 +142,20 @@ export async function deleteIconFile(value: string): Promise<void> {
   const path = metaPathFor(value);
   if (!path) return;
   try {
-    await fileCall("deleteFile", META_ADAPTER, path);
+    await deleteMetaFile(META_ADAPTER, path);
   } catch {
     // The row is gone either way; a leftover file is recoverable.
   }
 }
 
 /** Fetch the library document from the shared space; null when absent. */
-export async function readLibraryFile(): Promise<string | null> {
-  const url = new URL(iconSrc(`${META_PREFIX}library.json`));
-  // The dev server is a different origin: the web adapter sends no CORS
-  // headers, so a plain fetch is blocked there. Read over the socket instead.
-  if (url.origin !== globalThis.location?.origin) {
-    try {
-      const data = await fileCall("readFile", META_ADAPTER, LIBRARY_FILE);
-      return typeof data === "string" && data.length ? data : null;
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const response = await fetch(`${url.href}?t=${Date.now()}`, {
-      cache: "no-store",
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`${response.status}`);
-    return await response.text();
-  } catch {
-    return null;
-  }
+export function readLibraryFile(): Promise<string | null> {
+  return readMetaText(META_ADAPTER, LIBRARY_FILE);
 }
 
-export async function writeLibraryFile(json: string): Promise<void> {
+export function writeLibraryFile(json: string): Promise<void> {
   const text = typeof json === "string" ? json : JSON.stringify(json);
-  await fileCall("writeFile", META_ADAPTER, LIBRARY_FILE, text);
+  return writeMetaText(META_ADAPTER, LIBRARY_FILE, text);
 }
 
 export function mimeOf(name: string): string | undefined {
