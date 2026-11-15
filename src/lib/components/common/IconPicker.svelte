@@ -38,18 +38,24 @@
   const TABS = [
     { id: "pool", label: "Pool" },
     { id: "symbols", label: "Symbols" },
-    { id: "document", label: "Document" },
+    { id: "document", label: "Used in UI" },
     { id: "broker", label: "Broker" },
     { id: "url", label: "URL / SVG / HTML" },
     { id: "mdi", label: "MDI" },
   ] as const;
 
-  /** Consumers see the curated pool and a one-off URL; only the manager
-   *  browses the source libraries. */
+  /** Consumers see the curated pool, the icons already used in pages/templates
+   *  (a local walk, no source scan), and a one-off URL. Only the manager browses
+   *  the source libraries. */
   const visibleTabs = $derived(
     manage
       ? TABS
-      : TABS.filter((entry) => entry.id === "pool" || entry.id === "url"),
+      : TABS.filter(
+          (entry) =>
+            entry.id === "pool" ||
+            entry.id === "document" ||
+            entry.id === "url",
+        ),
   );
 
   /** Ready-made icon markup: the slot's reading, its resolved colour and its
@@ -382,7 +388,7 @@
       {:else if tab === "document"}
         {#if documentIcons.length === 0}
           <p class="empty text-muted">
-            No icons in the layout or the templates yet.
+            No icons are used in the pages or templates yet.
           </p>
         {:else}
           <div class="grid">
