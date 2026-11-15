@@ -122,14 +122,15 @@
 
   const mdiShown = $derived.by(() => {
     const query = search.trim().toLowerCase();
-    const list = query
-      ? mdiIcons.filter((icon) =>
-          `${icon.id} ${icon.n?.en ?? ""} ${mdiName(icon.c)}`
-            .toLowerCase()
-            .includes(query),
-        )
-      : mdiIcons.filter((icon) => icon.c === mdiCategory);
-    return list;
+    const base = mdiCategory
+      ? mdiIcons.filter((icon) => icon.c === mdiCategory)
+      : mdiIcons;
+    if (!query) return base;
+    return base.filter((icon) =>
+      `${icon.id} ${icon.n?.en ?? ""} ${mdiName(icon.c)}`
+        .toLowerCase()
+        .includes(query),
+    );
   });
 
   const objectShown = $derived.by(() => {
@@ -359,12 +360,19 @@
               onclick={() => (objectAdapter = "")}>All adapters</button
             >
           {/if}
-          {#if resource === "mdi" && !search.trim() && mdiCategory}
-            <button
-              type="button"
-              class="btn btn-sm btn-outline"
-              onclick={() => (mdiCategory = "")}>All categories</button
+          {#if resource === "mdi"}
+            <select
+              aria-label="MDI category"
+              bind:value={mdiCategory}
+              disabled={mdiState !== "ready"}
             >
+              <option value="">All categories</option>
+              {#each mdiCategoryCounts as category (category.id)}
+                <option value={category.id}
+                  >{mdiName(category.id)} ({category.count})</option
+                >
+              {/each}
+            </select>
           {/if}
         </div>
 
@@ -392,22 +400,6 @@
               <p class="empty text-muted">Loading MDI icons…</p>
             {:else if mdiState === "error"}
               <p class="empty text-danger">{mdiError}</p>
-            {:else if !search.trim() && !mdiCategory}
-              <ul class="folders">
-                {#each mdiCategoryCounts as category (category.id)}
-                  <li>
-                    <button
-                      type="button"
-                      class="folder"
-                      onclick={() => (mdiCategory = category.id)}
-                    >
-                      <span class="material-symbols-outlined">folder</span>
-                      <span class="folder-name">{mdiName(category.id)}</span>
-                      <span class="count">{category.count}</span>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
             {:else}
               <div class="grid">
                 {#each mdiShown.slice(0, limit) as icon (icon.id)}
