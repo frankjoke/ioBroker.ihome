@@ -576,6 +576,15 @@
     backdrop-filter: blur(8px);
   }
 
+  /* Phones (portrait and landscape) are short on height: the bar scrolls
+     away with the page instead of eating a fixed slice of every screen.
+     Tablets keep it sticky. */
+  @media (max-width: 640px), (max-height: 500px) {
+    .bar {
+      position: static;
+    }
+  }
+
   /* View mode: the page tabs sit on a stronger light gray so the menu is
      easier to pick out from the page below. */
   .bar.view {
