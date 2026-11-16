@@ -1,8 +1,13 @@
 import { it, expect } from "vitest";
 import {
+  BUILTIN_DEFAULTS,
+  BUILTIN_ICONS,
+  BUILTIN_SEED_VERSION,
+  BUILTIN_TWINS,
   defaultPair,
   effectiveDefault,
   emptyIconPool,
+  ensureBuiltinDefaults,
   filterLibrary,
   filterLibraryNames,
   hasIconValue,
@@ -301,4 +306,53 @@ it("finds a twin in both directions", () => {
   expect(offTwin(twins, "bulb-off")).toBeUndefined();
   expect(onTwin({}, "x")).toBeUndefined();
   expect(offTwin({}, "x")).toBeUndefined();
+});
+
+it("seeds the built-in defaults additively and once", () => {
+  const pool = parseIconPool(
+    JSON.stringify({
+      version: 3,
+      updatedAt: 1,
+      library: [
+        {
+          id: "mine",
+          value: "/ihome/icons/builtin/light-off.svg",
+          keywords: [],
+        },
+      ],
+      twins: {},
+      defaults: { roles: { "switch.light": "/my/light.svg" }, templates: {} },
+    }),
+  )!;
+  const once = ensureBuiltinDefaults(pool);
+  expect(once.builtin).toBe(BUILTIN_SEED_VERSION);
+  expect(once.library.find((i) => i.id === "mine")).toBeTruthy();
+  expect(once.library.filter((i) => i.value === "/ihome/icons/builtin/light-off.svg")).toHaveLength(1);
+  expect(once.defaults.roles["switch.light"]).toBe("/my/light.svg");
+  expect(once.defaults.roles["sensor.motion"]).toBe(
+    BUILTIN_DEFAULTS.roles["sensor.motion"],
+  );
+  expect(once.twins["/ihome/icons/builtin/switch-off.svg"]).toBe(
+    "/ihome/icons/builtin/switch-on.svg",
+  );
+  expect(ensureBuiltinDefaults(once)).toBe(once);
+});
+
+it("keeps every built-in reference inside the built-in rows", () => {
+  const values = new Set(BUILTIN_ICONS.map((icon) => icon.value));
+  for (const [off, on] of Object.entries(BUILTIN_TWINS)) {
+    expect(values.has(off)).toBe(true);
+    expect(values.has(on)).toBe(true);
+  }
+  for (const value of [
+    ...Object.values(BUILTIN_DEFAULTS.roles),
+    ...Object.values(BUILTIN_DEFAULTS.templates),
+  ]) {
+    expect(values.has(value)).toBe(true);
+  }
+  expect(BUILTIN_SEED_VERSION).toBe(1);
+  expect(
+    parseIconPool(JSON.stringify({ version: 3, library: [], builtin: 1 }))
+      ?.builtin,
+  ).toBe(1);
 });

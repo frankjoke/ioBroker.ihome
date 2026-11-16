@@ -35,6 +35,8 @@ export interface IconPool {
     /** Template id → value. */
     templates: Record<string, string>;
   };
+  /** Built-in seed already applied (see `ensureBuiltinDefaults`). */
+  builtin?: number;
 }
 
 export const POOL_CAP = 500;
@@ -98,6 +100,90 @@ export function emptyIconPool(): IconPool {
     library: seedLibrary(),
     twins: {},
     defaults: { roles: {}, templates: {} },
+  };
+}
+
+// ------------------------------------------------------------ built-in seed
+
+export const BUILTIN_SEED_VERSION = 1;
+
+const builtinIcon = (file: string): string => `/ihome/icons/builtin/${file}`;
+
+/** Shipped icons, added to the library once; they also dress roles/templates. */
+export const BUILTIN_ICONS: { value: string; name: string; keywords: string[] }[] =
+  [
+    { value: builtinIcon("light-off.svg"), name: "Light off", keywords: ["light", "lamp", "off"] },
+    { value: builtinIcon("light-on.svg"), name: "Light on", keywords: ["light", "lamp", "on"] },
+    { value: builtinIcon("switch-off.svg"), name: "Switch off", keywords: ["switch", "plug", "off"] },
+    { value: builtinIcon("switch-on.svg"), name: "Switch on", keywords: ["switch", "plug", "on"] },
+    { value: builtinIcon("ac-off.svg"), name: "Air condition off", keywords: ["ac", "air", "climate", "off"] },
+    { value: builtinIcon("ac-on.svg"), name: "Air condition on", keywords: ["ac", "air", "climate", "on"] },
+    { value: builtinIcon("motion-off.svg"), name: "Motion off", keywords: ["motion", "presence", "off"] },
+    { value: builtinIcon("motion-on.svg"), name: "Motion on", keywords: ["motion", "presence", "on"] },
+    { value: builtinIcon("alarm-off.svg"), name: "Alarm off", keywords: ["alarm", "fire", "flood", "off"] },
+    { value: builtinIcon("alarm-on.svg"), name: "Alarm on", keywords: ["alarm", "fire", "flood", "on"] },
+    { value: builtinIcon("temperature.svg"), name: "Temperature", keywords: ["temperature", "climate"] },
+    { value: builtinIcon("humidity.svg"), name: "Humidity", keywords: ["humidity", "water"] },
+    { value: builtinIcon("power.svg"), name: "Power", keywords: ["power", "energy"] },
+    { value: builtinIcon("battery.svg"), name: "Battery", keywords: ["battery", "charge"] },
+    { value: builtinIcon("button.svg"), name: "Button", keywords: ["button", "press"] },
+  ];
+
+export const BUILTIN_TWINS: Record<string, string> = {
+  [builtinIcon("light-off.svg")]: builtinIcon("light-on.svg"),
+  [builtinIcon("switch-off.svg")]: builtinIcon("switch-on.svg"),
+  [builtinIcon("ac-off.svg")]: builtinIcon("ac-on.svg"),
+  [builtinIcon("motion-off.svg")]: builtinIcon("motion-on.svg"),
+  [builtinIcon("alarm-off.svg")]: builtinIcon("alarm-on.svg"),
+};
+
+export const BUILTIN_DEFAULTS: {
+  roles: Record<string, string>;
+  templates: Record<string, string>;
+} = {
+  roles: {
+    "switch.light": builtinIcon("light-off.svg"),
+    switch: builtinIcon("switch-off.svg"),
+    "switch.power": builtinIcon("ac-off.svg"),
+    "sensor.motion": builtinIcon("motion-off.svg"),
+    "sensor.alarm": builtinIcon("alarm-off.svg"),
+    "sensor.alarm.fire": builtinIcon("alarm-off.svg"),
+    "sensor.alarm.flood": builtinIcon("alarm-off.svg"),
+    "sensor.alarm.co": builtinIcon("alarm-off.svg"),
+    "value.temperature": builtinIcon("temperature.svg"),
+    "level.temperature": builtinIcon("temperature.svg"),
+    "value.humidity": builtinIcon("humidity.svg"),
+    "level.humidity": builtinIcon("humidity.svg"),
+    "value.power": builtinIcon("power.svg"),
+    "value.battery": builtinIcon("battery.svg"),
+    button: builtinIcon("button.svg"),
+  },
+  templates: { AC: builtinIcon("ac-off.svg") },
+};
+
+/** Add the shipped rows, pairs and defaults once; anything the user set wins. */
+export function ensureBuiltinDefaults(pool: IconPool): IconPool {
+  if (pool.builtin === BUILTIN_SEED_VERSION) return pool;
+  const library = [...pool.library];
+  for (const icon of BUILTIN_ICONS) {
+    if (!library.some((entry) => entry.value === icon.value)) {
+      library.push({ id: `builtin:icon:${slug(icon.value)}`, ...icon });
+    }
+  }
+  const twins = { ...pool.twins };
+  for (const [off, on] of Object.entries(BUILTIN_TWINS)) {
+    if (twins[off] || Object.values(twins).includes(on)) continue;
+    twins[off] = on;
+  }
+  return {
+    ...pool,
+    builtin: BUILTIN_SEED_VERSION,
+    library,
+    twins,
+    defaults: {
+      roles: { ...BUILTIN_DEFAULTS.roles, ...pool.defaults.roles },
+      templates: { ...BUILTIN_DEFAULTS.templates, ...pool.defaults.templates },
+    },
   };
 }
 
@@ -181,6 +267,7 @@ function parseV3(record: Record<string, unknown>): IconPool | null {
     library,
     twins: parseTwins(record.twins),
     defaults: parseDefaults(record.defaults),
+    ...(typeof record.builtin === "number" ? { builtin: record.builtin } : {}),
   };
 }
 
