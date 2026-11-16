@@ -17,6 +17,7 @@ import {
   type TimeSource,
 } from "$lib/config/rule-ops";
 import type { PoolEntry } from "$lib/config/virtual-ops";
+import { offTwin, onTwin } from "$lib/config/icon-library";
 
 /** One slot of a tile, resolved: what it shows and how it looks right now. */
 export interface SlotRow {
@@ -254,13 +255,31 @@ export function headerIcon(
   return deviceIcon ? { glyph: deviceIcon } : undefined;
 }
 
+/** The row's own state when it is unambiguously binary, else undefined. */
+export function binaryOn(control: SlotControl): boolean | undefined {
+  const value = control.liveValue;
+  if (typeof value === "boolean") return value;
+  const meta = control.meta;
+  if (
+    typeof value === "number" &&
+    (value === 0 || value === 1) &&
+    meta?.min === 0 &&
+    meta?.max === 1
+  ) {
+    return value === 1;
+  }
+  return undefined;
+}
+
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
  *  there — the last matching rule's glyph beats the descriptor's, and a glyph the
- *  template gave gives way to the device's own icon (A67). */
+ *  template gave gives way to the device's own icon (A67). A binary state with a
+ *  twin in the library draws the half its value asks for. */
 export function rowIcon(
   row: SlotRow,
   home: "tile" | "modal",
   deviceIcon?: string,
+  twins?: Record<string, string>,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
   const icon = row.slot.icon;
   if (!icon || icon.enabled === false) return undefined;
@@ -269,9 +288,15 @@ export function rowIcon(
   const glyph =
     row.style.icon ??
     (row.iconIsTemplate ? (deviceIcon ?? icon.glyph) : icon.glyph);
-  return glyph
-    ? { glyph, color: row.style.color, disabled: row.style.disabled }
-    : undefined;
+  if (!glyph) return undefined;
+  const on = twins && row.control ? binaryOn(row.control) : undefined;
+  const shown =
+    on === true
+      ? (onTwin(twins!, glyph) ?? glyph)
+      : on === false
+        ? (offTwin(twins!, glyph) ?? glyph)
+        : glyph;
+  return { glyph: shown, color: row.style.color, disabled: row.style.disabled };
 }
 
 /** Does the slot's reading/control draw in `home`? `hideValue` turns the body

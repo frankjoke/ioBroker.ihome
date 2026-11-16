@@ -6,6 +6,7 @@ import {
   widgetForMeta,
   effectiveRoom,
   effectiveFunctions,
+  rawStateControl,
   unitFor,
 } from "$lib/config/state-meta";
 import type { Control } from "$lib/types/device";
@@ -150,4 +151,18 @@ it("infers a widget from the effective shape, then the fallback", () => {
   expect(widgetForMeta({ type: "boolean", write: true })).toBe("switch");
   expect(widgetForMeta({ type: "boolean" })).toBe("value");
   expect(widgetForMeta({})).toBe("value");
+});
+
+it("builds a raw state's pseudo-control from its object", () => {
+  const raw = rawStateControl(
+    "mqtt.0.meter.on",
+    { common: { name: "On", type: "number", role: "switch", min: 0, max: 1 } },
+    1,
+  );
+  expect(raw.stateId).toBe("mqtt.0.meter.on");
+  expect(raw.label).toBe("On");
+  expect(raw.meta?.min).toBe(0);
+  expect(raw.meta?.max).toBe(1);
+  expect(raw.liveValue).toBe(1);
+  expect(raw.writable).toBe(false);
 });

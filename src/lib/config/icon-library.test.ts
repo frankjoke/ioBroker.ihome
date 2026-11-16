@@ -8,6 +8,8 @@ import {
   hasIconValue,
   keywordWords,
   libraryKeywordCounts,
+  offTwin,
+  onTwin,
   parseIconPool,
   removeLibraryIcon,
   roleChoicesFromObjects,
@@ -289,4 +291,14 @@ it("builds role choices from state roles only", () => {
     { value: "switch.*", label: "switch.* · 2" },
     { value: "light.*", label: "light.* · 1" },
   ]);
+});
+
+it("finds a twin in both directions", () => {
+  const twins = { "bulb-off": "bulb-on" };
+  expect(onTwin(twins, "bulb-off")).toBe("bulb-on");
+  expect(onTwin(twins, "bulb-on")).toBeUndefined();
+  expect(offTwin(twins, "bulb-on")).toBe("bulb-off");
+  expect(offTwin(twins, "bulb-off")).toBeUndefined();
+  expect(onTwin({}, "x")).toBeUndefined();
+  expect(offTwin({}, "x")).toBeUndefined();
 });

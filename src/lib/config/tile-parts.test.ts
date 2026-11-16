@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import {
   CHART_PALETTE,
+  binaryOn,
   hasHistory,
   faceGlyph,
   faceSwitchRow,
@@ -757,4 +758,38 @@ it("treats a lone frame or html slot as a full surface", () => {
   expect(singleSurface([{ kind: "value" }])).toBe(false);
   expect(singleSurface([{ kind: "frame" }, { kind: "value" }])).toBe(false);
   expect(singleSurface([])).toBe(false);
+});
+
+it("reads a control's binary state", () => {
+  const state = (liveValue: unknown, meta?: Record<string, unknown>) =>
+    binaryOn({ liveValue, meta } as SlotControl);
+  expect(state(true)).toBe(true);
+  expect(state(false)).toBe(false);
+  expect(state(1, { type: "number", min: 0, max: 1 })).toBe(true);
+  expect(state(0, { type: "number", min: 0, max: 1 })).toBe(false);
+  expect(state(1)).toBeUndefined();
+  expect(state("1")).toBeUndefined();
+  expect(state(2, { type: "number", min: 0, max: 1 })).toBeUndefined();
+  expect(state(undefined)).toBeUndefined();
+});
+
+it("switches a row icon with its twin from the row's own state", () => {
+  const twins = { "bulb-off": "bulb-on" };
+  const row = (liveValue: unknown, glyph = "bulb-off"): SlotRow => ({
+    slot: { kind: "value", source: "s", icon: { glyph } },
+    control: { liveValue, meta: { type: "boolean" } },
+    style: {},
+  });
+  expect(rowIcon(row(true), "tile", undefined, twins)?.glyph).toBe("bulb-on");
+  expect(rowIcon(row(false), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+  // the on half is drawn when that is what the document picked
+  expect(rowIcon(row(true, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
+    "bulb-on",
+  );
+  expect(rowIcon(row(false, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
+    "bulb-off",
+  );
+  // no twin or no twins map: unchanged
+  expect(rowIcon(row(true), "tile", undefined)?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(1), "tile", undefined, twins)?.glyph).toBe("bulb-off");
 });
