@@ -297,7 +297,7 @@
     overflow: hidden;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
   }
 
   .editor:focus-within {
@@ -307,7 +307,7 @@
   }
 
   .editor.invalid {
-    border-color: var(--danger-color, #b00020);
+    border-color: var(--danger-color);
   }
 
   .code,

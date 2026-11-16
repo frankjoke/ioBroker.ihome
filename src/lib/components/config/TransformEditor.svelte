@@ -260,7 +260,7 @@
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-container-low, #fafafa);
+    background: var(--surface-container-low);
   }
 
   .field {
@@ -312,7 +312,7 @@
   }
 
   .err {
-    color: var(--danger-color, #c0392b);
+    color: var(--danger-color);
     font-size: var(--body-sm);
   }
 

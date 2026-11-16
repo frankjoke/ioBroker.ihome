@@ -51,6 +51,6 @@
     width: 100%;
     min-height: 0;
     border: 0;
-    background-color: var(--surface-color, #fff);
+    background-color: var(--surface-color);
   }
 </style>

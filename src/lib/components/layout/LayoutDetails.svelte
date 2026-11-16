@@ -3298,11 +3298,11 @@
   }
 
   .dot.true {
-    background: var(--success-color, #2e7d32);
+    background: var(--success-color);
   }
 
   .dot.error {
-    background: var(--danger-color, #c0392b);
+    background: var(--danger-color);
   }
 
   /* The active look (A71): glyph, colours and background per state. */

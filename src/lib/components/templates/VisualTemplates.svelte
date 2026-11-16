@@ -461,7 +461,7 @@
     padding: 0.4rem 0.55rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     color: var(--text-color);
     cursor: pointer;
     text-align: left;

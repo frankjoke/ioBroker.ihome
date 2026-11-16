@@ -836,7 +836,7 @@
   }
 
   .error {
-    color: var(--danger-color, #c0392b);
+    color: var(--danger-color);
     margin: 0;
   }
 

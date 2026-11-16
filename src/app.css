@@ -61,7 +61,7 @@
   --on-secondary: #ffffff;
   --secondary-container: #c9e6ff;
   --on-secondary-container: #00344e;
-  --tertiary: #00885d;
+  --tertiary: #007a54;
   --on-tertiary: #ffffff;
 
   /* status */
@@ -179,6 +179,19 @@ html.dark {
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Respect the OS "reduce motion" setting: the final state stays, the movement
+   goes. (Tiles are already static by design.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html {

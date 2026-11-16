@@ -240,11 +240,11 @@
   }
 
   .severity.warn {
-    color: var(--warning-color, #b26a00);
+    color: var(--warning-color);
   }
 
   .severity.error {
-    color: var(--danger-color, #c62828);
+    color: var(--danger-color);
   }
 
   .message {

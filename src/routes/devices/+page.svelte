@@ -162,8 +162,14 @@
     showForm = true;
     // The editor sits under the device; bring it into view so a device far
     // down the list does not look un-edited at the top of the page.
+    const reduce = globalThis.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     void tick().then(() =>
-      inlineForm?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+      inlineForm?.scrollIntoView({
+        block: "nearest",
+        behavior: reduce ? "auto" : "smooth",
+      }),
     );
   }
 

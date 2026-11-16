@@ -145,7 +145,7 @@
     padding: 0.25rem 0.35rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     min-height: 2.1rem;
     cursor: text;
   }
@@ -199,7 +199,7 @@
     list-style: none;
     max-height: 16rem;
     overflow: auto;
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
     box-shadow: var(--shadow-normal, 0 4px 12px rgba(0, 0, 0, 0.15));

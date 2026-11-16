@@ -273,7 +273,7 @@
     padding: 1rem;
   }
   .modal-content {
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     color: var(--text-color);
     border-radius: var(--border-radius-lg, 8px);
     width: min(640px, 100%);
@@ -307,7 +307,7 @@
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
-    background: var(--surface-container-low, #fafafa);
+    background: var(--surface-container-low);
   }
   .field {
     display: flex;
@@ -359,7 +359,7 @@
     gap: 2px;
   }
   .err {
-    color: var(--danger-color, #c0392b);
+    color: var(--danger-color);
     font-size: var(--body-sm);
   }
   .actions {

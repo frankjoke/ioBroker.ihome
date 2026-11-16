@@ -98,7 +98,7 @@
   }
 
   .badge.danger {
-    color: var(--danger-color, #c0392b);
+    color: var(--danger-color);
   }
 
   .badge.more {

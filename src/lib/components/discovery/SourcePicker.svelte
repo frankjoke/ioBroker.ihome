@@ -960,7 +960,7 @@
   }
 
   .modal-content {
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     color: var(--text-color);
     border-radius: var(--border-radius-lg, 8px);
     width: min(720px, 100%);
@@ -1164,7 +1164,7 @@
 
   .device-source {
     border: 1px solid var(--border-color);
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
     color: var(--text-color);
     border-radius: 999px;
     padding: 0.25rem 0.65rem;
@@ -1172,7 +1172,7 @@
   }
 
   .device-source:hover {
-    border-color: var(--accent-color, #1976d2);
+    border-color: var(--primary-color);
   }
 
   .actions {

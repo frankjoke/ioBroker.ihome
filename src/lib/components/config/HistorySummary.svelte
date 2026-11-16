@@ -118,7 +118,7 @@
   }
 
   .err {
-    color: var(--danger-color, #c0392b);
+    color: var(--danger-color);
   }
 
   /* Compact exception to the 34px icon button: this row is dense (UI-DESIGN §6). */

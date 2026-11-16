@@ -61,7 +61,13 @@
 
   $effect(() => {
     if (selectedId && inlineForm) {
-      inlineForm.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const reduce = globalThis.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      inlineForm.scrollIntoView({
+        block: "nearest",
+        behavior: reduce ? "auto" : "smooth",
+      });
     }
   });
 
