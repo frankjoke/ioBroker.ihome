@@ -149,7 +149,7 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.4.0 (2026-11-16)
 
 File-backed templates and plugins. User templates (device/tile and bundle) now live as one JSON file per template in the shared `ihome.meta` space (`templates/<kind>/<id>.json`) and user plugins as one folder each (`plugins/<id>/plugin.json` + `index.js`); the folders are the source of truth and the old state documents stay as a read-only backup. Runtime plugin flags (enabled, debug, timeout, settings) stay in the adapter config. The Plugins page edits a plugin's manifest and code in place, imports by writing the folder, and reloads, installs or removes a plugin without an adapter restart. Every file write is verified by reading it back and a failed write restores the previous file; a broken file is reported and never overwritten. Import and refresh are icon buttons in the Plugins header.
 
