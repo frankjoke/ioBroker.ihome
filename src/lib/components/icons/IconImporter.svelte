@@ -179,9 +179,7 @@
 
   /** Adapter file roots: every installed icon adapter plus every `*.meta`
    *  user-file space. */
-  const sourceChoices = $derived(
-    iconSourceChoices(iconAdapters, metaSpaces),
-  );
+  const sourceChoices = $derived(iconSourceChoices(iconAdapters, metaSpaces));
 
   const library = $derived(getIconPool().library);
   const libraryShown = $derived.by(() => {

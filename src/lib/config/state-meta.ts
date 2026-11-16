@@ -1,4 +1,9 @@
-import type { Control, ControlMeta, SlotControl, Widget } from "$lib/types/device";
+import type {
+  Control,
+  ControlMeta,
+  SlotControl,
+  Widget,
+} from "$lib/types/device";
 import { localizeName } from "$lib/config/format";
 import { enumsOfState } from "$lib/config/rooms";
 

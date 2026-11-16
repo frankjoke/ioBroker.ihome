@@ -117,7 +117,9 @@ it("builds entries from a file-API directory listing", () => {
     { path: "/icons-smarthome/bulb.svg", label: "bulb", kind: "icon" },
   ]);
   expect(
-    sourceEntriesFromDir("/iqontrol/images/", [{ file: "battery.png", isDir: false }]),
+    sourceEntriesFromDir("/iqontrol/images/", [
+      { file: "battery.png", isDir: false },
+    ]),
   ).toEqual([
     { path: "/iqontrol/images/battery.png", label: "battery", kind: "icon" },
   ]);

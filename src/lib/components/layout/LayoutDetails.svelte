@@ -530,7 +530,8 @@
   ]);
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
-  const chartFull = $derived(    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  const chartFull = $derived(
+    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
   );
   /** The tile actually draws a sparkline: a slot has one enabled and its
    *  reading carries history. */
@@ -1427,77 +1428,82 @@
           <div class="field">
             <div class="row wrap">
               {#if hasSparkline}
-              <label
-                class="check"
-                title="Fill the whole tile face with the sparkline; off gives it a band after the name"
-              >
-                <input
-                  type="checkbox"
-                  checked={chartFull}
-                  onchange={(e) =>
-                    patchChart({
-                      full: e.currentTarget.checked ? true : undefined,
-                      separate: undefined,
-                    })}
-                />
-                <span>Sparkline full</span>
-              </label>
-              {#if !chartFull}
+                <label
+                  class="check"
+                  title="Fill the whole tile face with the sparkline; off gives it a band after the name"
+                >
+                  <input
+                    type="checkbox"
+                    checked={chartFull}
+                    onchange={(e) =>
+                      patchChart({
+                        full: e.currentTarget.checked ? true : undefined,
+                        separate: undefined,
+                      })}
+                  />
+                  <span>Sparkline full</span>
+                </label>
+                {#if !chartFull}
+                  <label class="small">
+                    <span class="label-mono">Chart height (px)</span>
+                    <input
+                      type="number"
+                      class="num-input"
+                      min="8"
+                      max="200"
+                      step="1"
+                      value={String(tile.tile.chart?.height ?? 56)}
+                      oninput={(e) => {
+                        const value = Math.trunc(Number(e.currentTarget.value));
+                        if (Number.isFinite(value)) {
+                          patchChart({
+                            height: Math.min(200, Math.max(8, value)),
+                          });
+                        }
+                      }}
+                    />
+                  </label>
+                {/if}
                 <label class="small">
-                  <span class="label-mono">Chart height (px)</span>
+                  <span class="label-mono">Chart decimals</span>
                   <input
                     type="number"
                     class="num-input"
-                    min="8"
-                    max="200"
+                    min="0"
+                    max="4"
                     step="1"
-                    value={String(tile.tile.chart?.height ?? 56)}
+                    placeholder="auto"
+                    value={tile?.tile?.chart?.decimals === undefined
+                      ? ""
+                      : String(tile.tile.chart.decimals)}
                     oninput={(e) => {
-                      const value = Math.trunc(Number(e.currentTarget.value));
-                      if (Number.isFinite(value)) {
+                      const raw = e.currentTarget.value.trim();
+                      const value =
+                        raw === "" ? undefined : Math.trunc(Number(raw));
+                      if (value === undefined)
+                        patchChart({ decimals: undefined });
+                      else if (Number.isFinite(value)) {
                         patchChart({
-                          height: Math.min(200, Math.max(8, value)),
+                          decimals: Math.min(4, Math.max(0, value)),
                         });
                       }
                     }}
                   />
                 </label>
-              {/if}
-              <label class="small">
-                <span class="label-mono">Chart decimals</span>
-                <input
-                  type="number"
-                  class="num-input"
-                  min="0"
-                  max="4"
-                  step="1"
-                  placeholder="auto"
-                  value={tile?.tile?.chart?.decimals === undefined
-                    ? ""
-                    : String(tile.tile.chart.decimals)}
-                  oninput={(e) => {
-                    const raw = e.currentTarget.value.trim();
-                    const value =
-                      raw === "" ? undefined : Math.trunc(Number(raw));
-                    if (value === undefined)
-                      patchChart({ decimals: undefined });
-                    else if (Number.isFinite(value)) {
-                      patchChart({ decimals: Math.min(4, Math.max(0, value)) });
-                    }
-                  }}
-                />
-              </label>
-              <label class="check" title="Fill each line with a soft gradient">
-                <input
-                  type="checkbox"
-                  checked={tile?.tile?.chart?.area === true}
-                  onchange={(e) =>
-                    patchChart({
-                      area: e.currentTarget.checked ? true : undefined,
-                    })}
-                />
-                <span>Area</span>
-              </label>
+                <label
+                  class="check"
+                  title="Fill each line with a soft gradient"
+                >
+                  <input
+                    type="checkbox"
+                    checked={tile?.tile?.chart?.area === true}
+                    onchange={(e) =>
+                      patchChart({
+                        area: e.currentTarget.checked ? true : undefined,
+                      })}
+                  />
+                  <span>Area</span>
+                </label>
               {/if}
               <label class="check" title="Draw the tile's border">
                 <input
