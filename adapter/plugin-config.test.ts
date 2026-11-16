@@ -60,6 +60,25 @@ describe("plugin settings document", () => {
     expect(doc.removals).toEqual([]);
   });
 
+  it("keeps the settings of a removed plugin for a re-install", () => {
+    const doc = pluginSettingsDoc([plugin("a")], {
+      a: { enabled: false, timeoutMs: 2000, debug: false },
+      gone: {
+        enabled: false,
+        timeoutMs: 7000,
+        debug: true,
+        settings: { ups: "piups" },
+      },
+    });
+    expect(doc.settings.gone).toEqual({
+      enabled: false,
+      timeoutMs: 7000,
+      debug: true,
+      settings: { ups: "piups" },
+    });
+    expect(doc.settings.a.enabled).toBe(true);
+  });
+
   it("merges state over native while keeping code and builtin metadata", () => {
     const native = [
       plugin("u", { code: "user-code" }),

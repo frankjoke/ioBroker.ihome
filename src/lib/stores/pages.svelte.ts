@@ -162,7 +162,7 @@ async function ensurePagesObject() {
     await ioBroker.emitAsync("setObject", PAGE_LIST_ID, {
       type: "state",
       common: {
-        name: "AiHome display pages",
+        name: "iHome display pages",
         type: "string",
         role: "text.json",
         read: true,

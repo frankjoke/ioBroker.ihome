@@ -47,6 +47,15 @@ import {
 } from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
+  ensurePluginFiles,
+  listPluginFolders,
+  mergePlugin,
+  readPluginFiles,
+  runtimeOnly,
+  type PluginFileHost,
+  type PluginWriteHost,
+} from "./plugin-files";
+import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
   parsePluginMessage,
@@ -243,6 +252,8 @@ class IHome extends utils.Adapter {
   private pluginHost?: PluginHost;
   /** The plugin list as the adapter currently knows it. */
   private pluginConfig: AdapterPlugin[] = [];
+  /** Why a file-backed plugin cannot be used, per id. */
+  private readonly pluginProblems = new Map<string, string>();
   /** Page-managed plugin settings, staged imports and removals. */
   private pluginSettings: PluginSettingsDocument = {
     version: 1,
@@ -1145,9 +1156,91 @@ class IHome extends utils.Adapter {
     });
   }
 
+  /** Move user plugin code out of the config into `ihome.meta/plugins/<id>/`.
+   *  Existing files win; a failed write keeps the code in config. */
+  private async migratePluginCodeToFiles(): Promise<void> {
+    let changed = false;
+    const next: AdapterPlugin[] = [];
+    for (const plugin of this.pluginConfig) {
+      if (plugin.builtin || !plugin.code) {
+        next.push(plugin);
+        continue;
+      }
+      try {
+        const ensured = await ensurePluginFiles(
+          this as unknown as PluginWriteHost,
+          plugin,
+        );
+        if ("problem" in ensured) {
+          this.log.warn(
+            `plugin ${plugin.id}: cannot move code to files: ${ensured.problem}`,
+          );
+          next.push(plugin);
+          continue;
+        }
+        next.push(runtimeOnly(plugin));
+        changed = true;
+        this.log.info(`plugin ${plugin.id}: code moved to ihome.meta`);
+      } catch (error) {
+        this.log.warn(
+          `plugin ${plugin.id}: cannot move code to files: ${String(error)}`,
+        );
+        next.push(plugin);
+      }
+    }
+    if (!changed) return;
+    this.pluginConfig = next;
+    try {
+      await this.updateConfig({ plugins: next });
+    } catch (error) {
+      this.log.warn(`cannot store the plugin list: ${String(error)}`);
+    }
+  }
+
+  /** File-backed user plugins override what the config still carries. */
+  private async mergePluginFiles(
+    list: AdapterPlugin[],
+  ): Promise<AdapterPlugin[]> {
+    const ids = await listPluginFolders(
+      this as unknown as PluginFileHost,
+      (message) => this.log.warn(message),
+    );
+    if (!ids.length) return list;
+    const next = [...list];
+    for (const id of ids) {
+      if (BUILTIN_PLUGINS.some((builtin) => builtin.id === id)) {
+        this.log.warn(`plugin ${id}: built-in ids cannot come from files`);
+        continue;
+      }
+      const read = await readPluginFiles(this as unknown as PluginFileHost, id);
+      if ("problem" in read) {
+        this.pluginProblems.set(id, read.problem);
+        this.log.warn(`plugin ${id}: ${read.problem}`);
+        continue;
+      }
+      this.pluginProblems.delete(id);
+      const runtime = next.find((entry) => entry.id === id);
+      const settings = this.pluginSettings.settings[id];
+      const merged = mergePlugin(read.files, {
+        enabled: runtime?.enabled ?? settings?.enabled,
+        debug: runtime?.debug ?? settings?.debug,
+        timeoutMs: runtime?.timeoutMs ?? settings?.timeoutMs,
+        settings: runtime?.settings ?? settings?.settings,
+      });
+      const index = next.findIndex((entry) => entry.id === id);
+      if (index >= 0) next[index] = merged;
+      else next.push(merged);
+    }
+    return next;
+  }
+
   private pluginViews(): PluginView[] {
     const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
-    const views = this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
+    const views = this.pluginConfig.map((plugin) => {
+      const view = this.pluginViewOf(plugin);
+      const problem = this.pluginProblems.get(plugin.id);
+      return problem ? { ...view, problem } : view;
+    });
     for (const imported of this.pluginSettings.staged) {
       if (activeIds.has(imported.id)) continue;
       views.push(
@@ -1301,7 +1394,7 @@ class IHome extends utils.Adapter {
       }
       this.pluginConfig = active;
       this.pluginSettings = {
-        ...pluginSettingsDoc(active),
+        ...pluginSettingsDoc(active, this.pluginSettings.settings),
         staged,
         removals: this.pluginSettings.removals,
       };
@@ -1394,6 +1487,89 @@ class IHome extends utils.Adapter {
           code: plugin.code ?? "",
         }),
       );
+    }
+
+    if (command.action === "reload" || command.action === "install") {
+      const current = this.pluginConfig.find(
+        (entry) => entry.id === command.id,
+      );
+      if (current?.builtin) {
+        return pluginError(`plugin ${command.id} is built-in and has no files`);
+      }
+      const read = await readPluginFiles(
+        this as unknown as PluginFileHost,
+        command.id,
+      );
+      if ("problem" in read) return pluginError(read.problem);
+      const saved = this.pluginSettings.settings[command.id];
+      const merged = mergePlugin(read.files, {
+        enabled: current?.enabled ?? saved?.enabled ?? false,
+        debug: current?.debug ?? saved?.debug,
+        timeoutMs: current?.timeoutMs ?? saved?.timeoutMs,
+        settings: current?.settings ?? saved?.settings,
+      });
+      // A newly installed plugin waits, disabled, until the user enables it.
+      if (command.action === "install" && !current) merged.enabled = false;
+      this.pluginConfig = current
+        ? this.pluginConfig.map((entry) =>
+            entry.id === merged.id ? merged : entry,
+          )
+        : [...this.pluginConfig, merged];
+      await host.restart(merged);
+      this.pluginSettings = {
+        ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
+        staged: this.pluginSettings.staged.filter(
+          (entry) => entry.id !== merged.id,
+        ),
+        removals: this.pluginSettings.removals.filter((id) => id !== merged.id),
+      };
+      await this.savePluginSettings();
+      return pluginReply({ plugins: this.pluginViews(), restartRequired: [] });
+    }
+
+    if (command.action === "remove") {
+      const old = this.pluginConfig.find((entry) => entry.id === command.id);
+      if (!old) return pluginError(`unknown plugin: ${command.id}`);
+      if (old.builtin) {
+        return pluginError(
+          `plugin ${command.id} is built-in and cannot be removed`,
+        );
+      }
+      await host.setEnabled({ ...old, enabled: false });
+      // Runtime flags stay in the document so a re-install keeps them.
+      const keep = this.pluginSettings.settings[command.id];
+      this.pluginConfig = this.pluginConfig.filter(
+        (entry) => entry.id !== command.id,
+      );
+      this.pluginSettings = {
+        ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
+        staged: this.pluginSettings.staged.filter(
+          (entry) => entry.id !== command.id,
+        ),
+        removals: this.pluginSettings.removals.filter(
+          (id) => id !== command.id,
+        ),
+      };
+      if (keep) {
+        this.pluginSettings.settings[command.id] = {
+          ...keep,
+          enabled: false,
+        };
+      }
+      await this.savePluginSettings();
+      try {
+        await this.updateConfig({
+          plugins: removeNativePlugin(
+            pluginConfigWithBuiltins(
+              (this.config as { plugins?: unknown }).plugins,
+            ),
+            command.id,
+          ),
+        });
+      } catch (error) {
+        this.log.warn(`cannot store the plugin list: ${String(error)}`);
+      }
+      return pluginReply({ plugins: this.pluginViews() });
     }
 
     const stagedPlugin = this.pluginSettings.staged.find(
@@ -2101,7 +2277,21 @@ class IHome extends utils.Adapter {
     } else {
       doc = { ...doc, staged: [], removals: [] };
       this.pluginConfig = mergePluginSettings(native, doc);
-      this.pluginSettings = pluginSettingsDoc(this.pluginConfig);
+      this.pluginSettings = pluginSettingsDoc(this.pluginConfig, doc.settings);
+    }
+
+    // User plugin content lives as folders in `ihome.meta`; the config only
+    // holds the runtime flags. Move any code still in config out once, then
+    // merge what the files say.
+    await this.migratePluginCodeToFiles();
+    this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
+    if (!updateFailed) {
+      // File-backed plugins belong in the settings document too, or the next
+      // start would lose their enabled flag.
+      this.pluginSettings = pluginSettingsDoc(
+        this.pluginConfig,
+        this.pluginSettings.settings,
+      );
     }
     await this.savePluginSettings();
 

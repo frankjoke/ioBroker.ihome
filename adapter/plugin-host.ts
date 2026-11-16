@@ -30,6 +30,8 @@ export interface PluginHost {
   status(id: string): PluginStatus;
   canHotEnable(id: string, code?: string): boolean;
   setEnabled(entry: AdapterPlugin): Promise<PluginReply>;
+  /** Swap the entry (code included) and restart the plugin. */
+  restart(entry: AdapterPlugin): Promise<PluginReply>;
   hasReload(id: string): boolean;
   updateSettings(
     id: string,
@@ -234,6 +236,36 @@ export function createPluginHost(
         failed.delete(id);
         disabled.delete(id);
         settingsRestart.delete(id);
+        return pluginReply(undefined);
+      } catch (error) {
+        failed.add(id);
+        disabled.delete(id);
+        log("warn", `plugin ${id}: ${errorText(error)}`);
+        return pluginError(error);
+      }
+    },
+
+    async restart(entry) {
+      const id = entry.id;
+      const record = records.get(id);
+      if (record) {
+        try {
+          await withTimeout(Promise.resolve(record.stop?.()), 1000, "stop ");
+        } catch (error) {
+          log("warn", `plugin ${id}: ${errorText(error)}`);
+        }
+        records.delete(id);
+      }
+      failed.delete(id);
+      settingsRestart.delete(id);
+      snapshot.set(id, entry.code);
+      if (!entry.enabled) {
+        disabled.add(id);
+        return pluginReply(undefined);
+      }
+      try {
+        records.set(id, await startPlugin(entry));
+        disabled.delete(id);
         return pluginReply(undefined);
       } catch (error) {
         failed.add(id);

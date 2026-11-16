@@ -49,6 +49,8 @@ export interface PluginView {
   staged: boolean;
   /** A user plugin waiting to be removed at the next start. */
   removalPending: boolean;
+  /** Why the plugin cannot be used (a broken file, a failed start). */
+  problem?: string;
 }
 
 export type PluginsCommand =
@@ -56,7 +58,10 @@ export type PluginsCommand =
   | { action: "save"; patches: PluginPatch[] }
   | { action: "import"; plugin: ImportedPlugin }
   | { action: "export"; id: string }
-  | { action: "delete"; id: string };
+  | { action: "delete"; id: string }
+  | { action: "reload"; id: string }
+  | { action: "install"; id: string }
+  | { action: "remove"; id: string };
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -185,6 +190,8 @@ export function pluginView(
     restartRequired: boolean;
     staged?: boolean;
     removalPending?: boolean;
+    /** Why the plugin cannot be used (a broken file, a failed start). */
+    problem?: string;
   },
 ): PluginView {
   return {
@@ -199,6 +206,7 @@ export function pluginView(
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+    ...(opts.problem ? { problem: opts.problem } : {}),
     status: opts.status,
     hotSettings: opts.hotSettings,
     hasCode: typeof plugin.code === "string",
@@ -272,7 +280,13 @@ export function parsePluginsCommand(
       },
     };
   }
-  if (action === "export" || action === "delete") {
+  if (
+    action === "export" ||
+    action === "delete" ||
+    action === "reload" ||
+    action === "install" ||
+    action === "remove"
+  ) {
     if (typeof value.id !== "string" || !value.id.trim()) {
       return { problem: `${action} needs a plugin id` };
     }

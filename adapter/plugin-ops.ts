@@ -542,8 +542,14 @@ function validEntry(
   // A builtin id is reserved for the shipped implementation.
   if (builtin) return null;
 
-  if (typeof value.code !== "string" || value.code.trim() === "") return null;
-  if (value.code.length > MAX_PLUGIN_CODE) return null;
+  // Code may live in `ihome.meta/plugins/<id>/index.js`; the config entry
+  // then carries only the runtime flags.
+  let code: string | undefined;
+  if (value.code !== undefined) {
+    if (typeof value.code !== "string" || value.code.trim() === "") return null;
+    if (value.code.length > MAX_PLUGIN_CODE) return null;
+    code = value.code;
+  }
   const help = textOf(value.help, MAX_PLUGIN_HELP);
   const usage = textOf(value.usage, MAX_PLUGIN_USAGE);
   const settingsSchema = pluginSettingsSchema(value.settingsSchema);
@@ -562,7 +568,7 @@ function validEntry(
     ...(settings ? { settings } : {}),
     ...(settingsSchema ? { settingsSchema } : {}),
     ...(bundle ? { bundle } : {}),
-    code: value.code,
+    ...(code ? { code } : {}),
   };
 }
 

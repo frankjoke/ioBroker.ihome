@@ -1,8 +1,7 @@
 // @ts-nocheck
-// Persists the combined template library to its own ioBroker state. Same
-// registry pattern as functions: create if missing, load once, echo guard,
-// debounced writes. Writes are refused until the document has been read, so a
-// failed read is never replaced by "no bundles".
+// Combined templates (bundles) live as one file per bundle in the shared space
+// (`ihome.meta/templates/bundle/<id>.json`). The folder is the truth; the old
+// `templateBundleList` state is read once for migration and then left untouched.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   TEMPLATE_BUNDLE_LIST_ID,
@@ -13,10 +12,16 @@ import {
   setTemplateBundlesLoadKind,
 } from "$lib/stores/template-bundles.svelte.ts";
 import { migrateTemplateBundleLibrary } from "$lib/config/template-bundles";
+import { listTemplates, syncKind } from "$lib/config/template-files";
 
 let initPromise = null;
 let saveTimer = null;
-let lastSent = null;
+/** Ids present in the folder at the last load/save; deleting removes the rest. */
+let knownIds = {};
+
+function libraryOf(bundles) {
+  return { version: 1, updatedAt: Date.now(), bundles };
+}
 
 /** Read a stored value into a library, or report why it cannot be used. */
 function readTemplateBundleLibrary(raw) {
@@ -37,44 +42,26 @@ function readTemplateBundleLibrary(raw) {
   return { kind: "loaded", library: migrateTemplateBundleLibrary(value) };
 }
 
-async function ensureTemplateBundlesObject() {
-  const obj = await ioBroker.getObject(TEMPLATE_BUNDLE_LIST_ID);
-  if (!obj) {
-    await ioBroker.emitAsync("setObject", TEMPLATE_BUNDLE_LIST_ID, {
-      type: "state",
-      common: {
-        name: "AiHome combined templates",
-        type: "json",
-        role: "json",
-        read: true,
-        write: true,
-      },
-      native: {},
-    });
-  }
-}
-
 export function saveTemplateBundles() {
   clearTimeout(saveTimer);
-  const snapshot = JSON.stringify(getTemplateBundleLibrary());
+  const bundles = getTemplateBundleLibrary().bundles ?? [];
   saveTimer = setTimeout(() => {
-    if (!isTemplateBundlesWritable()) {
+    if (!isTemplateBundlesWritable() || !ioBroker.connected) {
       setTemplateBundleSaveFailed(true);
       return;
     }
-    // A disconnected socket resolves without sending; never report success.
-    if (!ioBroker.connected) {
-      setTemplateBundleSaveFailed(true);
-      return;
-    }
-    lastSent = snapshot;
-    ioBroker
-      .setState(TEMPLATE_BUNDLE_LIST_ID, snapshot)
-      .then(() => setTemplateBundleSaveFailed(false))
-      .catch((e) => {
+    void (async () => {
+      try {
+        await syncKind("bundle", bundles, Object.keys(knownIds));
+        knownIds = Object.fromEntries(
+          bundles.map((bundle) => [bundle.id, true]),
+        );
+        setTemplateBundleSaveFailed(false);
+      } catch (e) {
         setTemplateBundleSaveFailed(true);
         console.error("save template bundles:", e);
-      });
+      }
+    })();
   }, 250);
 }
 
@@ -85,38 +72,48 @@ export function initTemplateBundles() {
       while (!ioBroker.connected && Date.now() < until) {
         await ioBroker.wait(200);
       }
-      try {
-        await ensureTemplateBundlesObject();
-      } catch (e) {
-        console.error("initTemplateBundles ensureTemplateBundlesObject:", e);
-      }
-      const st = await ioBroker.getState(TEMPLATE_BUNDLE_LIST_ID, true);
-      if (!st) {
-        setTemplateBundlesLoadKind("absent");
+      if (!ioBroker.connected) {
         initPromise = null;
         return;
       }
-      st.onUpdate = (_cl, state) => {
-        const raw = state?.val;
-        const asString = typeof raw === "string" ? raw : JSON.stringify(raw);
-        if (lastSent !== null && lastSent === asString) return true;
-        const read = readTemplateBundleLibrary(raw);
-        if (read.kind === "unreadable") {
-          setTemplateBundlesLoadKind("unreadable");
-          return true;
-        }
-        setTemplateBundleLibrary(read.library);
-        setTemplateBundlesLoadKind(read.kind);
-        return true;
-      };
-      const read = readTemplateBundleLibrary(st.value);
-      setTemplateBundlesLoadKind(read.kind);
-      if (read.library) {
-        setTemplateBundleLibrary(read.library);
-      } else {
-        console.error(
-          "templateBundleList is unreadable — leaving it untouched rather than overwriting it",
+
+      const files = await listTemplates("bundle");
+      const readable = files.filter((row) => !!row.file);
+      if (files.length) {
+        setTemplateBundlesLoadKind("loaded");
+        knownIds = Object.fromEntries(readable.map((row) => [row.id, true]));
+        setTemplateBundleLibrary(
+          libraryOf(readable.map((row) => row.file.definition)),
         );
+        return;
+      }
+
+      // No files yet: migrate the legacy document once (never written again).
+      let state = null;
+      try {
+        state = await ioBroker.getState(TEMPLATE_BUNDLE_LIST_ID, true);
+      } catch (e) {
+        console.error("initTemplateBundles legacy:", e);
+      }
+      const read = readTemplateBundleLibrary(state?.value);
+      setTemplateBundlesLoadKind(read.kind);
+      if (!read.library) {
+        console.error(
+          "the legacy bundle document is unreadable and no bundle files exist — leaving both untouched",
+        );
+        return;
+      }
+      setTemplateBundleLibrary(read.library);
+      if (read.kind === "loaded") {
+        try {
+          await syncKind("bundle", read.library.bundles ?? [], []);
+          knownIds = Object.fromEntries(
+            (read.library.bundles ?? []).map((bundle) => [bundle.id, true]),
+          );
+        } catch (e) {
+          setTemplateBundleSaveFailed(true);
+          console.error("migrate template bundles:", e);
+        }
       }
     })().catch((e) => {
       console.error("initTemplateBundles:", e);

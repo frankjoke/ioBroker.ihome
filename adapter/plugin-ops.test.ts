@@ -195,6 +195,23 @@ describe("validAdapterPlugins", () => {
     ).toEqual([]);
   });
 
+  it("keeps a user entry whose code lives in the shared space", () => {
+    expect(
+      validAdapterPlugins([
+        { id: "nut.ups", name: "NUT UPS", enabled: true, timeoutMs: 5000 },
+      ]),
+    ).toEqual([
+      {
+        id: "nut.ups",
+        name: "NUT UPS",
+        enabled: true,
+        builtin: false,
+        timeoutMs: 5000,
+        debug: false,
+      },
+    ]);
+  });
+
   it("keeps the first duplicate and clamps the timeout", () => {
     expect(
       validAdapterPlugins([

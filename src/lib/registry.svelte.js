@@ -56,7 +56,7 @@ async function ensureRegistryObject() {
     await ioBroker.emitAsync("setObject", DEVICE_LIST_ID, {
       type: "state",
       common: {
-        name: "AiHome device list",
+        name: "iHome device list",
         type: "json",
         role: "json",
         read: true,

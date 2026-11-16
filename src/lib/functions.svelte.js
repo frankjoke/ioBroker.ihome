@@ -43,7 +43,7 @@ async function ensureFunctionObject() {
     await ioBroker.emitAsync("setObject", FUNCTION_LIST_ID, {
       type: "state",
       common: {
-        name: "AiHome function templates",
+        name: "iHome function templates",
         type: "json",
         role: "json",
         read: true,

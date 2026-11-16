@@ -167,6 +167,23 @@ describe("pluginView", () => {
     expect(view).not.toHaveProperty("code");
   });
 
+  it("carries the reason a plugin cannot be used", () => {
+    const view = pluginView(userPlugin("u", true, "x"), {
+      status: "failed",
+      hotSettings: false,
+      restartRequired: false,
+      problem: "plugins/u/plugin.json is missing.",
+    });
+    expect(view.problem).toBe("plugins/u/plugin.json is missing.");
+    expect(
+      pluginView(userPlugin("u", true, "x"), {
+        status: "running",
+        hotSettings: false,
+        restartRequired: false,
+      }).problem,
+    ).toBeUndefined();
+  });
+
   it("exposes a bundled device template", () => {
     const bundle = {
       version: 1 as const,
@@ -207,6 +224,15 @@ describe("parsePluginsCommand", () => {
     });
     expect(parsePluginsCommand({ action: "delete", id: "u" })).toEqual({
       command: { action: "delete", id: "u" },
+    });
+    expect(parsePluginsCommand({ action: "reload", id: "u" })).toEqual({
+      command: { action: "reload", id: "u" },
+    });
+    expect(parsePluginsCommand({ action: "install", id: "u" })).toEqual({
+      command: { action: "install", id: "u" },
+    });
+    expect(parsePluginsCommand({ action: "remove", id: "u" })).toEqual({
+      command: { action: "remove", id: "u" },
     });
   });
 

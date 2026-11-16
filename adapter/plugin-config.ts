@@ -51,11 +51,18 @@ function timeout(value: unknown): number {
   );
 }
 
-/** The settings document seeded from the merged plugin list. */
+/** The settings document seeded from the merged plugin list. Entries for ids
+ *  that are not in the list are kept: they belong to removed plugins and make
+ *  a re-install keep its timeout, debug flag and values. */
 export function pluginSettingsDoc(
   plugins: AdapterPlugin[],
+  previous: Record<string, PluginSettingsEntry> = {},
 ): PluginSettingsDocument {
+  const active = new Set(plugins.map((plugin) => plugin.id));
   const settings: Record<string, PluginSettingsEntry> = {};
+  for (const [id, entry] of Object.entries(previous)) {
+    if (!active.has(id)) settings[id] = entry;
+  }
   for (const plugin of plugins) {
     settings[plugin.id] = {
       enabled: plugin.enabled,

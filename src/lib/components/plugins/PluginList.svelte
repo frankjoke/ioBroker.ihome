@@ -3,7 +3,8 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import { deletePlugin, exportPlugin } from "$lib/stores/plugins.svelte";
+  import { exportPlugin, removePlugin } from "$lib/stores/plugins.svelte";
+  import { removePluginFolder } from "$lib/config/plugin-storage";
   import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
   import { downloadJson } from "$lib/utils/download";
   import { slugify } from "$lib/config/slug";
@@ -101,7 +102,8 @@
     const neighbor = nextAfterRemoval(plugins, plugin.id, (item) => item.id);
     const wasSelected = selectedId === plugin.id;
     try {
-      await deletePlugin(plugin.id);
+      await removePlugin(plugin.id);
+      await removePluginFolder(plugin.id);
       if (wasSelected) {
         selectedId = neighbor?.id ?? "";
         resetDraft();
@@ -210,6 +212,9 @@
             Restart iHome in Admin to apply. <a href="#/admin">Open Admin</a>.
           </p>
         {/if}
+        {#if plugin.problem}
+          <p class="row-error text-danger hint">{plugin.problem}</p>
+        {/if}
       </div>
       {#if open}
         <div class="item-editor">
@@ -237,7 +242,7 @@
     onCancel={() => (pendingDelete = null)}
   >
     <p class="text-muted">
-      The plugin and its settings are removed after a restart in Admin.
+      The plugin and its code are removed now. Exported copies are unaffected.
     </p>
   </ConfirmModal>
 {/if}

@@ -69,6 +69,24 @@ export async function deletePlugin(id: string): Promise<void> {
   plugins = result.plugins;
 }
 
+/** Re-read the plugin folder and restart it, no adapter restart. */
+export async function reloadPlugin(id: string): Promise<void> {
+  const result = await command<PluginsResult>("reload", { id });
+  plugins = result.plugins;
+}
+
+/** The folder was written by the page; add or refresh its runtime entry. */
+export async function installPlugin(id: string): Promise<void> {
+  const result = await command<PluginsResult>("install", { id });
+  plugins = result.plugins;
+}
+
+/** Drop the runtime entry; the caller removes the folder. */
+export async function removePlugin(id: string): Promise<void> {
+  const result = await command<PluginsResult>("remove", { id });
+  plugins = result.plugins;
+}
+
 export async function exportPlugin(id: string): Promise<ImportedPlugin> {
   const file = await command<PluginFile>("export", { id });
   return file.plugin;

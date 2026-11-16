@@ -48,7 +48,7 @@ async function ensureVariableObject() {
     await ioBroker.emitAsync("setObject", VARIABLE_LIST_ID, {
       type: "state",
       common: {
-        name: "AiHome global variables",
+        name: "iHome global variables",
         type: "json",
         role: "json",
         read: true,
