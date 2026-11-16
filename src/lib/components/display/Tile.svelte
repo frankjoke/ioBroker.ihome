@@ -318,19 +318,21 @@
   const poolPair = $derived(
     defaultPair(getIconPool(), templateId, headlineControl?.role),
   );
-  // The device's own pair dresses a tile that carries no icon and no look of
-  // its own. A pool default wins over an icon only derived from the objects —
-  // the device document's icon is a deliberate choice and wins over both.
-  const ownPair = $derived(
-    device.objectIcon &&
+  /** The headline control's own device: its explicit icon is a deliberate
+   *  choice and beats a pool default; an icon only derived from its objects
+   *  loses to one. */
+  const deviceOwnIcon = $derived(sourceDevice?.icon);
+  const deviceFaceIcon = $derived(sourceDevice?.objectIcon);
+  const devicePair = $derived(
+    deviceOwnIcon &&
       !workingTile?.look?.inactive?.glyph &&
       !workingTile?.look?.active?.glyph
-      ? device.objectActiveIcon
-        ? { value: device.objectIcon, activeValue: device.objectActiveIcon }
-        : { value: device.objectIcon }
+      ? sourceDevice?.activeIcon
+        ? { value: deviceOwnIcon, activeValue: sourceDevice.activeIcon }
+        : { value: deviceOwnIcon }
       : undefined,
   );
-  const automaticPair = $derived(device.icon ? ownPair : (poolPair ?? ownPair));
+  const automaticPair = $derived(devicePair ?? poolPair);
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
   const look = $derived(
@@ -339,7 +341,7 @@
   /** A pool default dresses the face without an active condition too; with one,
    *  the look pair already carries it. A device's own icon wins over it. */
   const poolFaceGlyph = $derived(!workingTile?.active ? poolPair?.value : undefined);
-  const faceDefault = $derived(device.icon ? undefined : poolFaceGlyph);
+  const faceDefault = $derived(deviceOwnIcon ? undefined : poolFaceGlyph);
   /** The role default for a row whose slot carries no icon; a rule icon and a
    *  slot icon still win inside `rowIcon`. */
   function roleDefault(control?: SlotControl): string | undefined {
@@ -405,7 +407,7 @@
     const icon = rowIcon(
       r,
       home,
-      device.objectIcon,
+      deviceFaceIcon,
       main ? undefined : getIconPool().twins,
       main ? undefined : roleDefault(r.control),
     );
@@ -414,7 +416,7 @@
       main ? workingTile?.icon : undefined,
       icon?.glyph,
       main ? faceDefault : undefined,
-      main ? device.objectIcon : undefined,
+      main ? deviceFaceIcon : undefined,
     );
     if (!glyph) return undefined;
     return {
@@ -450,7 +452,7 @@
             style: slotStyle(headline, controlFor(headline)),
           },
           "modal",
-          device.objectIcon,
+          deviceFaceIcon,
         )
       : undefined;
     // A54/A72: tile icon, state look, headline icon, pool default, device face
@@ -458,7 +460,7 @@
     return (
       headerIcon(workingTile?.icon, look, own) ??
       (faceDefault ? { glyph: faceDefault } : undefined) ??
-      (device.objectIcon ? { glyph: device.objectIcon } : undefined)
+      (deviceFaceIcon ? { glyph: deviceFaceIcon } : undefined)
     );
   });
 
@@ -484,7 +486,7 @@
       icon: rowIcon(
         r,
         "modal",
-        device.objectIcon,
+        deviceFaceIcon,
         getIconPool().twins,
         roleDefault(r.control),
       ),
