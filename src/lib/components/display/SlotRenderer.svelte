@@ -253,8 +253,4 @@
     cursor: pointer;
     border-radius: var(--border-radius-pill);
   }
-
-  .slot-icon.action:focus-visible {
-    box-shadow: 0 0 0 2px var(--primary-color);
-  }
 </style>

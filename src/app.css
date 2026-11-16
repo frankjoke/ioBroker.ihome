@@ -778,6 +778,13 @@ textarea:focus {
     color-mix(in srgb, var(--primary-color) 35%, transparent);
 }
 
+/* Keyboard focus: one visible ring on every control. `:focus-visible` keeps it
+   out of mouse/touch use; the offset keeps the ring off the control's own edge. */
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
 input[type="checkbox"] {
   accent-color: var(--primary-color);
   width: 1rem;
