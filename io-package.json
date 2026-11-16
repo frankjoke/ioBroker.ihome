@@ -107,7 +107,7 @@
     "connectionType": "local",
     "dataSource": "push",
     "messagebox": true,
-    "type": "general",
+    "type": "visualization",
     "compact": false,
     "logTransporter": true,
     "singleton": true,
