@@ -183,6 +183,16 @@ html.dark {
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Anything scrolled into view (focus, scrollIntoView) stops below the sticky
+     app bar instead of underneath it. */
+  scroll-padding-top: 56px;
+}
+
+/* Phones: the bar scrolls with the page, so there is nothing to avoid. */
+@media (max-width: 640px), (max-height: 500px) {
+  html {
+    scroll-padding-top: 0;
+  }
 }
 
 body {

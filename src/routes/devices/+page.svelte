@@ -550,7 +550,6 @@
     gap: 0.25rem;
   }
 
-  /* Leave room for the sticky app bar when the editor scrolls into view. */
   .device-updated {
     display: inline-flex;
     align-items: center;
