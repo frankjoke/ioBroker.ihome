@@ -301,6 +301,7 @@
       title="Output state"
       logics={otherLogics}
       logicPick="state"
+      currentState={output.scope === "state" ? (output.ref ?? "") : ""}
       onState={(id) => {
         setRef(id);
         picking = false;

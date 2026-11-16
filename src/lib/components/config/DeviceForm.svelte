@@ -488,6 +488,9 @@
     activeDeviceId={device?.id ?? ""}
     {devices}
     single={replaceIndex !== null}
+    currentState={replaceIndex !== null
+      ? stateIdFor(controls[replaceIndex]?.stateId ?? "", getVariables())
+      : ""}
     onControls={(picked) =>
       replaceIndex !== null ? replaceState(picked[0]) : addStates(picked)}
     onClose={() => {

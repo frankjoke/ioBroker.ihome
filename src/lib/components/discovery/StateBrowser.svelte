@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, tick } from "svelte";
   import {
     collectStates,
     applyFilters,
@@ -6,11 +7,17 @@
     buildVariableNode,
     collectVisibleLeaves,
     adapterOf,
+    firstState,
   } from "$lib/config/state-tree";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { fetchPickerValues } from "$lib/picker-values.svelte.js";
-  import { pickerFilters, pickerExpanded } from "$lib/picker-state.svelte.js";
+  import {
+    pickerFilters,
+    pickerExpanded,
+    rememberPickedState,
+    takePickedState,
+  } from "$lib/picker-state.svelte.js";
   import { SvelteSet } from "svelte/reactivity";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
@@ -27,6 +34,7 @@
     selection = new SvelteSet<string>(),
     onToggle = () => {},
     onPick = undefined,
+    currentState = "",
     logics = [],
     logicPick = undefined,
   }: {
@@ -38,6 +46,8 @@
     onToggle?: (id: string) => void;
     /** When set, a state is picked with one click instead of ticked. */
     onPick?: (id: string) => void;
+    /** The state this item already uses: the tree opens at it. */
+    currentState?: string;
     /** The document's logics, for the Logic tab. */
     logics?: LogicDef[];
     /** What a logic selection means: an event trigger or its output state. */
@@ -50,6 +60,8 @@
   pickerFilters.search = "";
 
   let tab = $state<Tab>("states");
+  /** The states results box, so a searched/picked line can be scrolled to. */
+  let resultsEl = $state<HTMLElement>();
 
   const allStates = $derived(collectStates(objects));
   const adapters = $derived(
@@ -114,6 +126,75 @@
     if (onPick) onPick(id);
     else onToggle(id);
   }
+
+  /** A one-click tree pick: remember its folder for the next open. A variable
+   *  leaf stores the real state so the next open lands in the broker tree. */
+  function pickFromTree(id: string) {
+    const variable = getVariables().find(
+      (v) => v.kind === "state" && v.name === id,
+    );
+    rememberPickedState(variable?.stateId ? String(variable.stateId) : id);
+    pick(id);
+  }
+
+  /** Alias link: reveal the original state whatever filters were set. */
+  function goToAlias(base: string) {
+    pickerFilters.adapter = "";
+    pickerFilters.room = [];
+    pickerFilters.functions = [];
+    tab = "states";
+    pickerFilters.search = base;
+  }
+
+  /** Branch ids of a state id, adapter first down to its parent folder. */
+  function parentIds(id: string): string[] {
+    const parts = id.split(".");
+    const out: string[] = [];
+    for (let n = 2; n < parts.length; n++)
+      out.push(parts.slice(0, n).join("."));
+    return out;
+  }
+
+  async function scrollTo(selector: string): Promise<boolean> {
+    await tick();
+    const el = resultsEl?.querySelector(selector);
+    el?.scrollIntoView({ block: "center" });
+    return !!el;
+  }
+
+  // The item's own state wins over the last pick: expand its folder chain and
+  // bring its line into view, clearing remembered filters only if they hide it.
+  // Otherwise the next pick opens at the last picked state's line.
+  onMount(async () => {
+    let focus = currentState;
+    if (focus) {
+      // A variable or logic ref is not a broker state: leave the tree alone.
+      if (!allStates.some((s) => s.id === focus)) return;
+      if (!filtered.some((s) => s.id === focus)) {
+        pickerFilters.adapter = "";
+        pickerFilters.room = [];
+        pickerFilters.functions = [];
+      }
+    } else {
+      focus = takePickedState();
+    }
+    if (!focus) return;
+    const parents = parentIds(focus);
+    for (const id of parents) pickerExpanded.add(id);
+    const found = await scrollTo(`[data-node="state:${focus}"]`);
+    const parent = parents[parents.length - 1];
+    if (!found && parent) await scrollTo(`[data-branch="${parent}"]`);
+  });
+
+  // A search unfolds the chain to its first match and scrolls that line in.
+  $effect(() => {
+    if (tab !== "states") return;
+    if (!(pickerFilters.search ?? "").trim()) return;
+    const found = firstState(tree);
+    if (!found) return;
+    for (const id of found.branches) pickerExpanded.add(id);
+    void scrollTo(`[data-node="state:${found.leaf}"]`);
+  });
 
   // Fetch values for exactly the visible (expanded) leaves, debounced so typing
   // in the search box does not fire a burst of requests.
@@ -184,11 +265,19 @@
     />
   </div>
 
-  <div class="results">
+  <div class="results" bind:this={resultsEl}>
     {#if filtered.length === 0}
       <p class="empty text-muted">No matching states.</p>
     {:else}
-      <StateTree nodes={tree} {selection} {onToggle} {onPick} {enums} />
+      <StateTree
+        nodes={tree}
+        {selection}
+        {onToggle}
+        onPick={onPick ? pickFromTree : undefined}
+        {enums}
+        {objects}
+        onAlias={goToAlias}
+      />
     {/if}
   </div>
 {:else if tab === "variables"}
@@ -207,8 +296,10 @@
         nodes={variableNode.children ?? []}
         {selection}
         {onToggle}
-        {onPick}
+        onPick={onPick ? pickFromTree : undefined}
         {enums}
+        {objects}
+        onAlias={goToAlias}
       />
     {/if}
   </div>

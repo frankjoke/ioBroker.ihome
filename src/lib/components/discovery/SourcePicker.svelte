@@ -49,6 +49,8 @@
     deviceType = "Custom",
     /** Preselect the device this picker was opened for, so its controls show. */
     activeDeviceId = "",
+    /** The state this item already uses: the tree opens at it. */
+    currentState = "",
     /** A new tile starts from values, not badges (the slot part adds those). */
     showBadge = true,
     single = false,
@@ -73,6 +75,8 @@
     deviceType?: DeviceType;
     /** The device the picker opened for (tile/slot/control). */
     activeDeviceId?: string;
+    /** The state this item already uses: the tree opens at it. */
+    currentState?: string;
     /** Show the Badge tab. A new tile starts from values; an added slot may be
      *  a badge. */
     showBadge?: boolean;
@@ -116,7 +120,11 @@
     TABS[mode].filter((entry) => showBadge || entry.id !== "badge"),
   );
 
-  let tab = $state<Tab>(untrack(() => (mode === "state" ? "state" : "device")));
+  // An item that already has a state opens where that state lives; a picker
+  // that adds a new source still starts on the device list.
+  let tab = $state<Tab>(
+    untrack(() => (mode === "state" || currentState ? "state" : "device")),
+  );
   let search = $state("");
   /** The device the picker opened for, else the first device the tile uses. */
   function initialDeviceId(): string {
@@ -603,6 +611,7 @@
           enums={ioBroker.enums}
           selection={pickedStates}
           onToggle={togglePickedState}
+          {currentState}
           {logics}
           {logicPick}
         />
@@ -613,6 +622,7 @@
           {rooms}
           enums={ioBroker.enums}
           onPick={pickRawState}
+          {currentState}
           {logics}
           {logicPick}
         />

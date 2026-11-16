@@ -816,6 +816,13 @@
       : "Choose a state…";
   }
 
+  /** The broker state behind a source, for the picker's opening position. */
+  function sourceStateId(source: SlotSource | string | undefined): string {
+    if (!source) return "";
+    if (typeof source === "string") return stateIdFor(source, getVariables());
+    return resolveSlotSource(source, sourceLook)?.stateId ?? "";
+  }
+
   /** The text a frame's URL really comes from: its state while that holds a
    *  string, else the fixed URL. */
   function framePreviewText(slot: Slot): string {
@@ -2832,6 +2839,7 @@
       {devices}
       slots={shownSlots}
       activeDeviceId={sourceDevice(activeCond?.source)}
+      currentState={sourceStateId(activeCond?.source)}
       onSource={setActiveSource}
       onClose={() => (activePicker = false)}
     />
@@ -2844,6 +2852,7 @@
       {devices}
       slots={shownSlots}
       activeDeviceId={sourceDevice(shownSlots[sourcePickerFor]?.source)}
+      currentState={sourceStateId(shownSlots[sourcePickerFor]?.source)}
       onSource={(source) => {
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;
@@ -2858,6 +2867,9 @@
     <SourcePicker
       mode="state"
       title="Choose an HTML state"
+      currentState={htmlSourceFor === null
+        ? ""
+        : sourceStateId(shownSlots[htmlSourceFor]?.source)}
       onState={(id) => {
         const slotIndex = htmlSourceFor;
         htmlSourceFor = null;
@@ -2874,6 +2886,9 @@
     <SourcePicker
       mode="state"
       title="Choose a frame state"
+      currentState={frameSourceFor === null
+        ? ""
+        : sourceStateId(shownSlots[frameSourceFor]?.source)}
       onState={(id) => {
         const slotIndex = frameSourceFor;
         frameSourceFor = null;

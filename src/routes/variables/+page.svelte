@@ -772,6 +772,7 @@
     <SourcePicker
       mode="state"
       title="Choose a state"
+      currentState={editing?.stateId ?? ""}
       onState={(id) => pickState(id)}
       onClose={() => (picking = false)}
     />

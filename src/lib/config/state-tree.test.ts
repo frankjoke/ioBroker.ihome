@@ -8,6 +8,7 @@ import {
   ancestorObjects,
   parentName,
   nodeKey,
+  firstState,
 } from "$lib/config/state-tree";
 
 it("gives a state and a folder with the same path distinct keys", () => {
@@ -131,6 +132,14 @@ it("filters by room using the injected resolver", () => {
 it("collects ancestor objects walking up the id", () => {
   const anc = ancestorObjects(objects, "hue.0.lamp.on");
   expect(anc.map((o: any) => o._id)).toContain("hue.0.lamp");
+});
+it("finds the first state leaf and the branches leading to it", () => {
+  const tree = buildStateTree(collectStates(objects));
+  expect(firstState(tree)).toEqual({
+    leaf: "hue.0.lamp.bri",
+    branches: ["hue.0", "hue.0.lamp"],
+  });
+  expect(firstState([])).toBeNull();
 });
 it("collects leaves only under expanded branches, up to the limit", () => {
   const tree = buildStateTree(collectStates(objects));

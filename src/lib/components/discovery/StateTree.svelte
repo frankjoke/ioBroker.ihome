@@ -7,6 +7,8 @@
   import { formatAge, formatValue } from "$lib/config/format";
   import { pickerExpanded } from "$lib/picker-state.svelte.js";
   import { enumsOfState, enumLabel } from "$lib/config/rooms";
+  import { aliasBaseIds } from "$lib/config/template-suggest";
+  import IconButton from "$lib/components/common/IconButton.svelte";
 
   let {
     nodes,
@@ -14,6 +16,8 @@
     onToggle,
     onPick,
     enums = undefined,
+    objects = undefined,
+    onAlias = undefined,
   }: {
     nodes: StateNode[];
     selection: Set<string>;
@@ -22,7 +26,16 @@
     onPick?: (id: string) => void;
     /** The enum cache, so a leaf's tooltip says which room/function it is in. */
     enums?: any;
+    /** The object cache, to link an alias only when its original exists. */
+    objects?: Map<string, any>;
+    /** Jump to the state an alias points at. */
+    onAlias?: (id: string) => void;
   } = $props();
+
+  /** The first alias source that exists in the broker, or "". */
+  function aliasTarget(node: StateNode): string {
+    return aliasBaseIds(node.obj).find((id) => objects?.has(id)) ?? "";
+  }
 
   function toggleExpand(id: string) {
     if (pickerExpanded.has(id)) pickerExpanded.delete(id);
@@ -75,6 +88,7 @@
           class="leaf"
           class:selected={selection.has(node.id)}
           title={leafTitle(node)}
+          data-node={nodeKey(node)}
         >
           {#if onPick}
             <button
@@ -94,9 +108,20 @@
               {@render leafBody(node)}
             </label>
           {/if}
+          {#if onAlias}
+            {@const base = aliasTarget(node)}
+            {#if base}
+              <IconButton
+                icon="arrow_outward"
+                label={`Go to original state ${base}`}
+                title={`Original: ${base}`}
+                onclick={() => onAlias(base)}
+              />
+            {/if}
+          {/if}
         </li>
       {:else}
-        <li class="branch">
+        <li class="branch" data-branch={node.id}>
           <button
             type="button"
             class="branch-btn"
@@ -154,10 +179,18 @@
     color: var(--text-muted);
   }
 
+  .leaf {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
   .leaf label,
   .leaf-pick {
     display: flex;
     align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
     gap: 0.5rem;
     padding: 0.25rem 0.5rem;
     border-radius: var(--border-radius-sm, 4px);

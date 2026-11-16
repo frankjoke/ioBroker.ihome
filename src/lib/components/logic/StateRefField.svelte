@@ -49,6 +49,7 @@
     title={label}
     {logics}
     logicPick="state"
+    currentState={value}
     onState={(id) => {
       onchange(id);
       picking = false;

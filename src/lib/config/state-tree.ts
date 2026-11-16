@@ -198,6 +198,21 @@ export function nodeKey(node: StateNode): string {
   return `${node.kind}:${node.id}`;
 }
 
+/** The first state leaf in depth-first order, with the branch ids leading to
+ *  it (shallow to deep), or null when the tree has no state. */
+export function firstState(
+  nodes: StateNode[],
+): { leaf: string; branches: string[] } | null {
+  for (const node of nodes) {
+    if (node.kind === "state") return { leaf: node.id, branches: [] };
+    if (!node.children) continue;
+    const below = firstState(node.children);
+    if (below)
+      return { leaf: below.leaf, branches: [node.id, ...below.branches] };
+  }
+  return null;
+}
+
 /** State leaves currently visible (under expanded branches), capped at `limit`.
  *  The id is the state to fetch: a variable leaf's selected id is its bare
  *  name, but its value lives in the real state named by `obj._id`. */
