@@ -6,6 +6,7 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   emptyIconPool,
+  ensureBuiltinDefaults,
   parseIconPool,
   type IconPool,
 } from "$lib/config/icon-library";
@@ -158,23 +159,31 @@ export function initIconPool(): Promise<void> {
         const useState =
           !!stateDoc && (!fileDoc || stateDoc.updatedAt >= fileDoc.updatedAt);
         const chosen = (useState ? stateDoc : fileDoc)!;
-        iconPool = chosen;
+        const seeded = ensureBuiltinDefaults(chosen);
+        iconPool = seeded;
         loadKind = "loaded";
-        // Keep both sides in step without letting either override the choice.
-        if (!stateDoc || stateDoc.updatedAt < chosen.updatedAt) {
+        // The seed is a one-time document change: write both sides when it
+        // applied, else only the side that is behind (as before).
+        const dirty = seeded !== chosen;
+        if (dirty || !stateDoc || stateDoc.updatedAt < seeded.updatedAt) {
           void ioBroker
-            .setState(ICON_POOL_ID, JSON.stringify(chosen))
+            .setState(ICON_POOL_ID, JSON.stringify(seeded))
             .catch(() => undefined);
         }
-        if (!fileDoc || fileDoc.updatedAt < chosen.updatedAt) {
-          void writeMirror(chosen);
+        if (dirty || !fileDoc || fileDoc.updatedAt < seeded.updatedAt) {
+          void writeMirror(seeded);
         }
         return;
       }
 
       if (stateEmpty && fileText === null) {
-        iconPool = emptyIconPool();
+        const seeded = ensureBuiltinDefaults(emptyIconPool());
+        iconPool = seeded;
         loadKind = "absent";
+        void ioBroker
+          .setState(ICON_POOL_ID, JSON.stringify(seeded))
+          .catch(() => undefined);
+        void writeMirror(seeded);
         initPromise = null;
         return;
       }

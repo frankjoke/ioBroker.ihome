@@ -14,11 +14,14 @@
     type LibraryIcon,
   } from "$lib/config/icon-library";
   import {
+    iconSourceChoices,
     importValue,
     keywordsFromPath,
     parseListing,
+    sourceEntriesFromDir,
     type SourceEntry,
   } from "$lib/config/icon-source";
+  import { listMetaDir } from "$lib/config/meta-files";
   import { brokerIconPath } from "$lib/config/icon-ops";
   import { copyIconFile, writeIconFile } from "$lib/config/icon-files";
 
@@ -86,6 +89,7 @@
 
   onMount(() => {
     if (resource === "adapter") {
+      void loadIconAdapters();
       void loadMetaSpaces();
       void loadFolder(startFolder());
     } else if (resource === "mdi") {
@@ -117,10 +121,41 @@
     if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
   });
 
-  // The object cache carries states and devices, not `meta` objects; the
-  // spaces are fetched once through the meta object view instead.
+  // Adapter and meta objects are not in the state cache; both are fetched once
+  // through the object view instead.
   let metaSpaces = $state<string[]>([]);
   let metaStarted = false;
+  let iconAdapters = $state<string[]>([]);
+  let adaptersStarted = false;
+
+  async function loadIconAdapters(): Promise<void> {
+    if (adaptersStarted) return;
+    adaptersStarted = true;
+    try {
+      const result = (await ioBroker.emitAsync(
+        "getObjectView",
+        "system",
+        "adapter",
+        { startkey: "", endkey: "香" },
+      )) as { rows?: { id?: string }[] };
+      const rows = Array.isArray(result?.rows) ? result.rows : [];
+      // The view can carry instance rows (`iqontrol.0`): the source is the
+      // adapter, so the instance suffix is dropped.
+      iconAdapters = [
+        ...new Set(
+          rows
+            .map((row) =>
+              (row.id ?? "")
+                .replace(/^system\.adapter\./, "")
+                .replace(/\.\d+$/, ""),
+            )
+            .filter(Boolean),
+        ),
+      ];
+    } catch {
+      adaptersStarted = false;
+    }
+  }
 
   async function loadMetaSpaces(): Promise<void> {
     if (metaStarted) return;
@@ -142,21 +177,11 @@
     }
   }
 
-  /** Adapter file roots: the icon packs plus every `*.meta` user-file space. */
-  const sourceChoices = $derived.by(() => {
-    const roots: { path: string; label: string }[] = [
-      { path: "icons-freepic/", label: "icons-freepic" },
-      {
-        path: "icons-addictive-flavour-png/",
-        label: "icons-addictive-flavour-png",
-      },
-      { path: "iqontrol/images/", label: "iqontrol/images" },
-    ];
-    for (const id of metaSpaces) {
-      roots.push({ path: `${id}/`, label: id });
-    }
-    return roots;
-  });
+  /** Adapter file roots: every installed icon adapter plus every `*.meta`
+   *  user-file space. */
+  const sourceChoices = $derived(
+    iconSourceChoices(iconAdapters, metaSpaces),
+  );
 
   const library = $derived(getIconPool().library);
   const libraryShown = $derived.by(() => {
@@ -267,16 +292,41 @@
     return `/${basePath.trim().replace(/^\/+/, "").replace(/\/*$/, "")}/`;
   }
 
+  /** The folder through the file API: `/icons-x/sub/` is namespace `icons-x`,
+   *  folder `sub`. Null when the namespace is not a readable file tree. */
+  async function fileEntries(pathname: string): Promise<SourceEntry[] | null> {
+    const [adapter, ...rest] = String(pathname ?? "")
+      .replace(/^\/+|\/+$/g, "")
+      .split("/");
+    if (!adapter) return null;
+    try {
+      const rows = await listMetaDir(adapter, rest.join("/"));
+      return sourceEntriesFromDir(
+        pathname,
+        rows.map((row) => ({ file: row.name, isDir: row.isDir })),
+      );
+    } catch {
+      return null;
+    }
+  }
+
   async function loadFolder(pathname: string): Promise<void> {
     loading = true;
     error = "";
     try {
-      const url = new URL(pathname, document.baseURI);
-      const response = await fetch(url, { headers: { Accept: "text/html" } });
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}`);
+      const listed = await fileEntries(pathname);
+      if (listed) {
+        entries = listed;
+      } else {
+        // A namespace the file API cannot read (or a picker page): the web
+        // adapter's own HTML listing still works.
+        const url = new URL(pathname, document.baseURI);
+        const response = await fetch(url, { headers: { Accept: "text/html" } });
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}`);
+        }
+        entries = parseListing(await response.text(), url.href);
       }
-      entries = parseListing(await response.text(), url.href);
       folder = pathname;
       limit = 200;
       search = "";
@@ -324,6 +374,7 @@
     error = "";
     limit = 200;
     if (resourceId === "adapter") {
+      void loadIconAdapters();
       void loadMetaSpaces();
       void loadFolder(startFolder());
     }
@@ -459,10 +510,16 @@
                   void loadFolder(normalizeBase());
                 }}
               >
+                {#if !sourceChoices.some((s) => s.path === normalizeBase())}
+                  <option value={basePath} selected
+                    >Custom: {basePath.trim() || "—"}</option
+                  >
+                {/if}
                 {#each sourceChoices as source (source.path)}
                   <option
                     value={source.path}
-                    selected={basePath === source.path}>{source.label}</option
+                    selected={normalizeBase() === source.path}
+                    >{source.label}</option
                   >
                 {/each}
               </select>

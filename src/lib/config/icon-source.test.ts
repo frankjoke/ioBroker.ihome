@@ -1,8 +1,10 @@
 import { it, expect } from "vitest";
 import {
+  iconSourceChoices,
   importValue,
   keywordsFromPath,
   parseListing,
+  sourceEntriesFromDir,
 } from "$lib/config/icon-source";
 
 const LISTING = `<a href="./gadgets/">gadgets</a>
@@ -86,4 +88,37 @@ it("builds the stored adapter path", () => {
   expect(importValue("icons-freepic/", "adapter/icons-freepic/x.svg")).toBe(
     "adapter/icons-freepic/x.svg",
   );
+});
+
+it("offers every installed icon adapter as a root source", () => {
+  const choices = iconSourceChoices(
+    ["icons-freepic", "icons-smarthome", "hue", "icons8", "iqontrol"],
+    ["ihome.meta", "iqontrol.meta"],
+  );
+  expect(choices.map((c) => c.path)).toEqual([
+    "/icons-freepic/",
+    "/icons-smarthome/",
+    "/icons8/",
+    "/ihome.meta/",
+    "/iqontrol/",
+  ]);
+});
+
+it("builds entries from a file-API directory listing", () => {
+  const entries = sourceEntriesFromDir("/icons-smarthome/", [
+    { file: "bulb.svg", isDir: false },
+    { file: "readme.txt", isDir: false },
+    { file: "rooms", isDir: true },
+    { file: "alarm.svg", isDir: false },
+  ]);
+  expect(entries).toEqual([
+    { path: "/icons-smarthome/rooms/", label: "rooms", kind: "folder" },
+    { path: "/icons-smarthome/alarm.svg", label: "alarm", kind: "icon" },
+    { path: "/icons-smarthome/bulb.svg", label: "bulb", kind: "icon" },
+  ]);
+  expect(
+    sourceEntriesFromDir("/iqontrol/images/", [{ file: "battery.png", isDir: false }]),
+  ).toEqual([
+    { path: "/iqontrol/images/battery.png", label: "battery", kind: "icon" },
+  ]);
 });

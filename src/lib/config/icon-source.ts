@@ -13,6 +13,36 @@ export interface SourceEntry {
 
 const ICON_EXT = /\.(svg|png|jpe?g|webp|gif|ico)$/i;
 
+export interface IconSourceChoice {
+  path: string;
+  label: string;
+}
+
+/** The roots the adapter browser offers: every installed adapter with "icon" in
+ *  its name (web serves it at `/<adapter>/`), the iqontrol image folder and
+ *  every `*.meta` file space. */
+export function iconSourceChoices(
+  adapterNames: Iterable<string>,
+  metaSpaces: Iterable<string>,
+): IconSourceChoice[] {
+  const choices = new Map<string, IconSourceChoice>();
+  const adapters = [...adapterNames];
+  for (const name of adapters) {
+    if (!name || !/icon/i.test(name)) continue;
+    choices.set(`/${name}/`, { path: `/${name}/`, label: name });
+  }
+  // iqontrol's www carries both `images/` and `userimages/`, so its root is the
+  // one entry; the separate meta space would only duplicate the latter.
+  if (adapters.includes("iqontrol")) {
+    choices.set("/iqontrol/", { path: "/iqontrol/", label: "iqontrol" });
+  }
+  for (const id of metaSpaces) {
+    if (!id || id === "iqontrol.meta") continue;
+    choices.set(`/${id}/`, { path: `/${id}/`, label: id });
+  }
+  return [...choices.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export function parseListing(html: string, baseHref: string): SourceEntry[] {
   const base = new URL(baseHref);
   const seen = new Set<string>();
@@ -47,6 +77,40 @@ export function parseListing(html: string, baseHref: string): SourceEntry[] {
     entries.push({ path: pathname, label, kind: folder ? "folder" : "icon" });
   }
   return entries;
+}
+
+export interface DirRow {
+  file?: string;
+  isDir?: boolean;
+}
+
+/** Entries from the file API's `readDir`, so adapter folders need no HTML
+ *  listing fetch: `/<namespace>/<folder>/` maps to `namespace` + `folder`. */
+export function sourceEntriesFromDir(
+  pathname: string,
+  rows: DirRow[],
+): SourceEntry[] {
+  const base = String(pathname ?? "").replace(/^\/+|\/+$/g, "");
+  const entries = new Map<string, SourceEntry>();
+  for (const row of rows) {
+    const name = String(row?.file ?? "").trim();
+    if (!name) continue;
+    const isDir = row.isDir === true;
+    if (!isDir && !ICON_EXT.test(name)) continue;
+    const path = `/${base}/${name}${isDir ? "/" : ""}`;
+    entries.set(path, {
+      path,
+      label: isDir ? name : name.replace(ICON_EXT, ""),
+      kind: isDir ? "folder" : "icon",
+    });
+  }
+  return [...entries.values()].sort((a, b) =>
+    a.kind === b.kind
+      ? a.label.localeCompare(b.label)
+      : a.kind === "folder"
+        ? -1
+        : 1,
+  );
 }
 
 function pathSegments(value: string): string[] {

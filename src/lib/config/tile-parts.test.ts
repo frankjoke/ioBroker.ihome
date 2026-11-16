@@ -3,6 +3,7 @@ import {
   CHART_PALETTE,
   binaryOn,
   hasHistory,
+  faceDefaultGlyph,
   faceGlyph,
   faceSwitchRow,
   headerIcon,
@@ -792,4 +793,60 @@ it("switches a row icon with its twin from the row's own state", () => {
   // no twin or no twins map: unchanged
   expect(rowIcon(row(true), "tile", undefined)?.glyph).toBe("bulb-off");
   expect(rowIcon(row(1), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+});
+
+it("falls back to a role icon for a bare row, but not for a disabled one", () => {
+  const bare: SlotRow = { slot: { kind: "value", source: "s" }, style: {} };
+  expect(rowIcon(bare, "tile", undefined, undefined, "water_drop")?.glyph).toBe(
+    "water_drop",
+  );
+  const on: SlotRow = {
+    ...bare,
+    control: { liveValue: true, meta: { type: "boolean" } },
+  };
+  expect(rowIcon(on, "tile", undefined, { a: "b" }, "a")?.glyph).toBe("b");
+  const disabled: SlotRow = {
+    slot: { kind: "value", source: "s", icon: { glyph: "x", enabled: false } },
+    style: {},
+  };
+  expect(
+    rowIcon(disabled, "tile", undefined, undefined, "water_drop"),
+  ).toBeUndefined();
+});
+
+it("orders the face: look, tile, slot, default, device", () => {
+  expect(faceGlyph({}, undefined, undefined, "thermostat", "object.png")).toBe(
+    "thermostat",
+  );
+  expect(faceGlyph({}, undefined, undefined, undefined, "object.png")).toBe(
+    "object.png",
+  );
+  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def", "obj")).toBe(
+    "look",
+  );
+});
+
+it("suppresses the face default for an active, disabled or device-owned face", () => {
+  const headline: Slot = { kind: "value", source: "s" };
+  expect(
+    faceDefaultGlyph({ hasActive: false, headline, poolValue: "def" }),
+  ).toBe("def");
+  expect(
+    faceDefaultGlyph({ hasActive: true, headline, poolValue: "def" }),
+  ).toBeUndefined();
+  expect(
+    faceDefaultGlyph({
+      hasActive: false,
+      headline: { ...headline, icon: { enabled: false } },
+      poolValue: "def",
+    }),
+  ).toBeUndefined();
+  expect(
+    faceDefaultGlyph({
+      hasActive: false,
+      headline,
+      deviceOwnIcon: "own",
+      poolValue: "def",
+    }),
+  ).toBeUndefined();
 });

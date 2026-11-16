@@ -38,6 +38,7 @@ const doc = (updatedAt: number, id = "a", value = "x") =>
   JSON.stringify({
     version: 3,
     updatedAt,
+    builtin: 1,
     library: [{ id, name: id.toUpperCase(), value, keywords: [] }],
     twins: {},
     defaults: { roles: {}, templates: {} },
@@ -136,4 +137,27 @@ it("refuses to overwrite a state changed since load", async () => {
   );
   expect(result).toBe("conflict");
   expect(store.getIconPool().library[0].id).toBe("remote");
+});
+
+it("seeds the built-in defaults once and writes them to both sides", async () => {
+  const unseeded = JSON.stringify({
+    version: 3,
+    updatedAt: 5,
+    library: [{ id: "a", name: "A", value: "x", keywords: [] }],
+    twins: {},
+    defaults: { roles: {}, templates: {} },
+  });
+  const store = await load(unseeded, null);
+  const pool = store.getIconPool();
+  expect(pool.builtin).toBe(1);
+  expect(pool.defaults.roles["sensor.motion"]).toContain("motion-off.svg");
+  expect(h.setState).toHaveBeenCalled();
+  expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);
+
+  // A second load of the seeded document writes nothing.
+  const seededText = h.state.value as string;
+  const again = await load(seededText, h.file.text);
+  expect(again.getIconPool().builtin).toBe(1);
+  expect(h.setState).not.toHaveBeenCalled();
+  expect(h.writeLibraryFile).not.toHaveBeenCalled();
 });
