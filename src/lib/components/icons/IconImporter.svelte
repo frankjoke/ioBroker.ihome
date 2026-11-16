@@ -139,9 +139,19 @@
         { startkey: "", endkey: "香" },
       )) as { rows?: { id?: string }[] };
       const rows = Array.isArray(result?.rows) ? result.rows : [];
-      iconAdapters = rows
-        .map((row) => (row.id ?? "").replace(/^system\.adapter\./, ""))
-        .filter((name) => name && /icon/i.test(name));
+      // The view can carry instance rows (`iqontrol.0`): the source is the
+      // adapter, so the instance suffix is dropped.
+      iconAdapters = [
+        ...new Set(
+          rows
+            .map((row) =>
+              (row.id ?? "")
+                .replace(/^system\.adapter\./, "")
+                .replace(/\.\d+$/, ""),
+            )
+            .filter(Boolean),
+        ),
+      ];
     } catch {
       adaptersStarted = false;
     }
