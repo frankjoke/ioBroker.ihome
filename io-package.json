@@ -102,7 +102,7 @@
     "extIcon": "https://raw.githubusercontent.com/frankjoke/ioBroker.ihome/main/admin/ihome.png",
     "readme": "https://github.com/frankjoke/ioBroker.ihome/blob/main/README.md",
     "loglevel": "info",
-    "tier": 3,
+    "tier": 1,
     "mode": "daemon",
     "connectionType": "local",
     "dataSource": "push",
