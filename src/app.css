@@ -44,7 +44,7 @@
   --on-inverse-surface: #f7f8fc;
 
   /* outlines */
-  --border-color: #e3e5ee;
+  --border-color: #d3d6e4;
   --outline: #74778c;
   --outline-variant: #c4c6d6;
 
@@ -132,7 +132,7 @@ html.dark {
   --on-surface-variant: #c7c4d7;
   --on-inverse-surface: #1c2028;
 
-  --border-color: #31353e;
+  --border-color: #3d4250;
   --outline: #908fa0;
   --outline-variant: #464554;
 
