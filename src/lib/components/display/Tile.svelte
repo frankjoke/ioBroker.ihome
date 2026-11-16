@@ -16,6 +16,7 @@
   import { rawStateControl } from "$lib/config/state-meta";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
+    faceDefaultGlyph,
     faceGlyph,
     faceSwitchRow,
     headerIcon,
@@ -332,16 +333,35 @@
         : { value: deviceOwnIcon }
       : undefined,
   );
-  const automaticPair = $derived(devicePair ?? poolPair);
+  // A device's own icon is a deliberate choice: it wins over the pool pair.
+  // Otherwise the pool pair is the tile's face, with the device pair as fallback.
+  const automaticPair = $derived(
+    deviceOwnIcon ? devicePair : (poolPair ?? devicePair),
+  );
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
   const look = $derived(
     stateLook(withRolePair(workingTile, automaticPair), active),
   );
+  /** An icon frozen from a template/preset is not a user choice; a pool default
+   *  may dress the face, the frozen glyph stays as the fallback. */
+  const tileIcon = $derived(
+    workingTile?.iconAuto ? undefined : workingTile?.icon,
+  );
+  const autoTileIcon = $derived(
+    workingTile?.iconAuto ? workingTile?.icon : undefined,
+  );
   /** A pool default dresses the face without an active condition too; with one,
-   *  the look pair already carries it. A device's own icon wins over it. */
-  const poolFaceGlyph = $derived(!workingTile?.active ? poolPair?.value : undefined);
-  const faceDefault = $derived(deviceOwnIcon ? undefined : poolFaceGlyph);
+   *  the look pair already carries it. A device's own icon and a disabled
+   *  headline icon suppress it. */
+  const faceDefault = $derived(
+    faceDefaultGlyph({
+      hasActive: !!workingTile?.active,
+      headline,
+      deviceOwnIcon,
+      poolValue: poolPair?.value,
+    }),
+  );
   /** The role default for a row whose slot carries no icon; a rule icon and a
    *  slot icon still win inside `rowIcon`. */
   function roleDefault(control?: SlotControl): string | undefined {
@@ -413,9 +433,9 @@
     );
     const glyph = faceGlyph(
       lk,
-      main ? workingTile?.icon : undefined,
+      main ? tileIcon : undefined,
       icon?.glyph,
-      main ? faceDefault : undefined,
+      main ? (faceDefault ?? autoTileIcon) : undefined,
       main ? deviceFaceIcon : undefined,
     );
     if (!glyph) return undefined;
@@ -458,8 +478,10 @@
     // A54/A72: tile icon, state look, headline icon, pool default, device face
     // — the device's own icon beats the default only by making it absent.
     return (
-      headerIcon(workingTile?.icon, look, own) ??
-      (faceDefault ? { glyph: faceDefault } : undefined) ??
+      headerIcon(tileIcon, look, own) ??
+      ((faceDefault ?? autoTileIcon)
+        ? { glyph: faceDefault ?? autoTileIcon }
+        : undefined) ??
       (deviceFaceIcon ? { glyph: deviceFaceIcon } : undefined)
     );
   });

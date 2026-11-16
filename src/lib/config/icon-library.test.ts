@@ -13,6 +13,7 @@ import {
   hasIconValue,
   keywordWords,
   libraryKeywordCounts,
+  normalizeIconPool,
   offTwin,
   onTwin,
   parseIconPool,
@@ -327,7 +328,11 @@ it("seeds the built-in defaults additively and once", () => {
   const once = ensureBuiltinDefaults(pool);
   expect(once.builtin).toBe(BUILTIN_SEED_VERSION);
   expect(once.library.find((i) => i.id === "mine")).toBeTruthy();
-  expect(once.library.filter((i) => i.value === "/ihome/icons/builtin/light-off.svg")).toHaveLength(1);
+  expect(
+    once.library.filter(
+      (i) => i.value === "/ihome/icons/builtin/light-off.svg",
+    ),
+  ).toHaveLength(1);
   expect(once.defaults.roles["switch.light"]).toBe("/my/light.svg");
   expect(once.defaults.roles["sensor.motion"]).toBe(
     BUILTIN_DEFAULTS.roles["sensor.motion"],
@@ -355,4 +360,11 @@ it("keeps every built-in reference inside the built-in rows", () => {
     parseIconPool(JSON.stringify({ version: 3, library: [], builtin: 1 }))
       ?.builtin,
   ).toBe(1);
+});
+
+it("keeps the builtin marker on a normalized save", () => {
+  const pool = ensureBuiltinDefaults(emptyIconPool());
+  const saved = normalizeIconPool(pool);
+  expect(saved.builtin).toBe(BUILTIN_SEED_VERSION);
+  expect(ensureBuiltinDefaults(saved)).toBe(saved);
 });

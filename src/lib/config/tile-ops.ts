@@ -287,14 +287,20 @@ export function withRolePair(
   pair?: { value: string; activeValue?: string },
 ): TileConfig {
   const glyph = pair?.value?.trim();
-  if (!pair || !glyph || tile.icon) return tile;
+  if (!pair || !glyph || (tile.icon && !tile.iconAuto)) return tile;
   const twin = pair.activeValue?.trim() || glyph;
   return {
     ...tile,
     look: {
       ...(tile.look ?? {}),
-      inactive: { ...(tile.look?.inactive ?? {}), glyph },
-      active: { ...(tile.look?.active ?? {}), glyph: twin },
+      inactive: {
+        ...(tile.look?.inactive ?? {}),
+        glyph: tile.look?.inactive?.glyph ?? glyph,
+      },
+      active: {
+        ...(tile.look?.active ?? {}),
+        glyph: tile.look?.active?.glyph ?? twin,
+      },
     },
   };
 }
@@ -309,6 +315,7 @@ export function applyPoolIcon(
   const glyph = value.trim();
   const twin = active?.trim();
   let next: TileConfig = { ...tile, icon: glyph || undefined };
+  delete next.iconAuto;
   if (glyph && twin) {
     next = setLook(next, "inactive", { glyph });
     next = setLook(next, "active", { glyph: twin });

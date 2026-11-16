@@ -416,9 +416,13 @@ export function materializedTileConfig(
     ...(materialized.active ? { active: materialized.active } : {}),
     ...(materialized.look ? { look: materialized.look } : {}),
     // The face icon is a frozen copy of the template's default look, else the
-    // first slot/type glyph; the slot's own icon stays independent.
+    // first slot/type glyph; `iconAuto` lets a pool default dress the face and
+    // keeps this glyph as the fallback. The slot's own icon stays independent.
     ...(materialized.look?.inactive?.glyph || materialized.icon
-      ? { icon: materialized.look?.inactive?.glyph ?? materialized.icon }
+      ? {
+          icon: materialized.look?.inactive?.glyph ?? materialized.icon,
+          iconAuto: true,
+        }
       : {}),
   };
   return tile;

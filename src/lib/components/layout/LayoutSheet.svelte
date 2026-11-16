@@ -536,7 +536,7 @@
     const seedMainIcon = seed.look?.inactive?.glyph ?? seed.icon;
     if (seedMainIcon) {
       next = editTile(next, anchor, (t) =>
-        t.icon ? t : { ...t, icon: seedMainIcon },
+        t.icon ? t : { ...t, icon: seedMainIcon, iconAuto: true },
       );
     }
     next = editTile(next, anchor, (t) => applyTileSeed(t, seed));

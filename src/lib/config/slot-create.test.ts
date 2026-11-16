@@ -594,3 +594,9 @@ it("builds a Light tile from a state without creating a device", () => {
     op: "truthy",
   });
 });
+
+it("marks the frozen template icon as automatic", () => {
+  const tile = materializedTileConfig({ slots: [], icon: "ac_unit" });
+  expect(tile.icon).toBe("ac_unit");
+  expect(tile.iconAuto).toBe(true);
+});

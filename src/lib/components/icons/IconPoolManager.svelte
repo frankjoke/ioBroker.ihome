@@ -11,6 +11,7 @@
     filterLibraryNames,
     keywordWords,
     libraryKeywordCounts,
+    normalizeIconPool,
     removeLibraryIcon,
     setDefault,
     setTwin,
@@ -253,24 +254,7 @@
   }
 
   function cleanDraft(): IconPool {
-    return {
-      version: 3,
-      updatedAt: draft.updatedAt,
-      twins: draft.twins,
-      library: draft.library.map((icon) => {
-        const keywords = [
-          ...new Set(icon.keywords.flatMap((word) => keywordWords(word))),
-        ];
-        const name = icon.name?.trim();
-        return {
-          id: icon.id,
-          ...(name ? { name } : {}),
-          value: icon.value.trim(),
-          keywords,
-        };
-      }),
-      defaults: draft.defaults,
-    };
+    return normalizeIconPool(draft);
   }
 
   async function reload(): Promise<void> {

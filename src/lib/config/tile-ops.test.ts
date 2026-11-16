@@ -460,3 +460,18 @@ it("clears only the tile icon for an empty pick", () => {
   expect(next.icon).toBeUndefined();
   expect(next.look).toEqual({ inactive: { glyph: "x" } });
 });
+
+it("keeps look glyphs the user already set", () => {
+  const tile: TileConfig = { look: { inactive: { glyph: "mine" } } };
+  const next = withRolePair(tile, { value: "gate", activeValue: "gate_open" });
+  expect(next.look?.inactive?.glyph).toBe("mine");
+  expect(next.look?.active?.glyph).toBe("gate_open");
+});
+
+it("lets a user pick replace an automatic tile icon", () => {
+  const auto: TileConfig = { icon: "ac_unit", iconAuto: true };
+  expect(withRolePair(auto, { value: "gate" }).icon).toBe("ac_unit");
+  const picked = applyPoolIcon(auto, "mine");
+  expect(picked.icon).toBe("mine");
+  expect(picked.iconAuto).toBeUndefined();
+});

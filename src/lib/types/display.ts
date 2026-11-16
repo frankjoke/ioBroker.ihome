@@ -131,6 +131,9 @@ export interface TileConfig {
    *  name on its detail page. Independent of every slot's icon; a state look
    *  glyph still overrides it. */
   icon?: string;
+  /** `icon` was copied from a template/preset, not picked by the user: a pool
+   *  default may dress the face instead, and the icon stays as its fallback. */
+  iconAuto?: boolean;
   /** The tile's own PIN (digits, 4-6): every open of its detail page asks for
    *  it. Absent, empty or malformed → the page opens freely, and a tile with no
    *  detail page ignores it entirely (`tileNeedsPin`). Not part of a template. */

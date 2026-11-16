@@ -3,6 +3,7 @@ import {
   CHART_PALETTE,
   binaryOn,
   hasHistory,
+  faceDefaultGlyph,
   faceGlyph,
   faceSwitchRow,
   headerIcon,
@@ -808,7 +809,9 @@ it("falls back to a role icon for a bare row, but not for a disabled one", () =>
     slot: { kind: "value", source: "s", icon: { glyph: "x", enabled: false } },
     style: {},
   };
-  expect(rowIcon(disabled, "tile", undefined, undefined, "water_drop")).toBeUndefined();
+  expect(
+    rowIcon(disabled, "tile", undefined, undefined, "water_drop"),
+  ).toBeUndefined();
 });
 
 it("orders the face: look, tile, slot, default, device", () => {
@@ -818,5 +821,32 @@ it("orders the face: look, tile, slot, default, device", () => {
   expect(faceGlyph({}, undefined, undefined, undefined, "object.png")).toBe(
     "object.png",
   );
-  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def", "obj")).toBe("look");
+  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def", "obj")).toBe(
+    "look",
+  );
+});
+
+it("suppresses the face default for an active, disabled or device-owned face", () => {
+  const headline: Slot = { kind: "value", source: "s" };
+  expect(
+    faceDefaultGlyph({ hasActive: false, headline, poolValue: "def" }),
+  ).toBe("def");
+  expect(
+    faceDefaultGlyph({ hasActive: true, headline, poolValue: "def" }),
+  ).toBeUndefined();
+  expect(
+    faceDefaultGlyph({
+      hasActive: false,
+      headline: { ...headline, icon: { enabled: false } },
+      poolValue: "def",
+    }),
+  ).toBeUndefined();
+  expect(
+    faceDefaultGlyph({
+      hasActive: false,
+      headline,
+      deviceOwnIcon: "own",
+      poolValue: "def",
+    }),
+  ).toBeUndefined();
 });

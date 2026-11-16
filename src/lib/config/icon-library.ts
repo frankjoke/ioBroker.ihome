@@ -110,24 +110,87 @@ export const BUILTIN_SEED_VERSION = 1;
 const builtinIcon = (file: string): string => `/ihome/icons/builtin/${file}`;
 
 /** Shipped icons, added to the library once; they also dress roles/templates. */
-export const BUILTIN_ICONS: { value: string; name: string; keywords: string[] }[] =
-  [
-    { value: builtinIcon("light-off.svg"), name: "Light off", keywords: ["light", "lamp", "off"] },
-    { value: builtinIcon("light-on.svg"), name: "Light on", keywords: ["light", "lamp", "on"] },
-    { value: builtinIcon("switch-off.svg"), name: "Switch off", keywords: ["switch", "plug", "off"] },
-    { value: builtinIcon("switch-on.svg"), name: "Switch on", keywords: ["switch", "plug", "on"] },
-    { value: builtinIcon("ac-off.svg"), name: "Air condition off", keywords: ["ac", "air", "climate", "off"] },
-    { value: builtinIcon("ac-on.svg"), name: "Air condition on", keywords: ["ac", "air", "climate", "on"] },
-    { value: builtinIcon("motion-off.svg"), name: "Motion off", keywords: ["motion", "presence", "off"] },
-    { value: builtinIcon("motion-on.svg"), name: "Motion on", keywords: ["motion", "presence", "on"] },
-    { value: builtinIcon("alarm-off.svg"), name: "Alarm off", keywords: ["alarm", "fire", "flood", "off"] },
-    { value: builtinIcon("alarm-on.svg"), name: "Alarm on", keywords: ["alarm", "fire", "flood", "on"] },
-    { value: builtinIcon("temperature.svg"), name: "Temperature", keywords: ["temperature", "climate"] },
-    { value: builtinIcon("humidity.svg"), name: "Humidity", keywords: ["humidity", "water"] },
-    { value: builtinIcon("power.svg"), name: "Power", keywords: ["power", "energy"] },
-    { value: builtinIcon("battery.svg"), name: "Battery", keywords: ["battery", "charge"] },
-    { value: builtinIcon("button.svg"), name: "Button", keywords: ["button", "press"] },
-  ];
+export const BUILTIN_ICONS: {
+  value: string;
+  name: string;
+  keywords: string[];
+}[] = [
+  {
+    value: builtinIcon("light-off.svg"),
+    name: "Light off",
+    keywords: ["light", "lamp", "off"],
+  },
+  {
+    value: builtinIcon("light-on.svg"),
+    name: "Light on",
+    keywords: ["light", "lamp", "on"],
+  },
+  {
+    value: builtinIcon("switch-off.svg"),
+    name: "Switch off",
+    keywords: ["switch", "plug", "off"],
+  },
+  {
+    value: builtinIcon("switch-on.svg"),
+    name: "Switch on",
+    keywords: ["switch", "plug", "on"],
+  },
+  {
+    value: builtinIcon("ac-off.svg"),
+    name: "Air condition off",
+    keywords: ["ac", "air", "climate", "off"],
+  },
+  {
+    value: builtinIcon("ac-on.svg"),
+    name: "Air condition on",
+    keywords: ["ac", "air", "climate", "on"],
+  },
+  {
+    value: builtinIcon("motion-off.svg"),
+    name: "Motion off",
+    keywords: ["motion", "presence", "off"],
+  },
+  {
+    value: builtinIcon("motion-on.svg"),
+    name: "Motion on",
+    keywords: ["motion", "presence", "on"],
+  },
+  {
+    value: builtinIcon("alarm-off.svg"),
+    name: "Alarm off",
+    keywords: ["alarm", "fire", "flood", "off"],
+  },
+  {
+    value: builtinIcon("alarm-on.svg"),
+    name: "Alarm on",
+    keywords: ["alarm", "fire", "flood", "on"],
+  },
+  {
+    value: builtinIcon("temperature.svg"),
+    name: "Temperature",
+    keywords: ["temperature", "climate"],
+  },
+  {
+    value: builtinIcon("humidity.svg"),
+    name: "Humidity",
+    keywords: ["humidity", "water"],
+  },
+  {
+    value: builtinIcon("power.svg"),
+    name: "Power",
+    keywords: ["power", "energy"],
+  },
+  {
+    value: builtinIcon("battery.svg"),
+    name: "Battery",
+    keywords: ["battery", "charge"],
+  },
+  {
+    value: builtinIcon("button.svg"),
+    name: "Button",
+    keywords: ["button", "press"],
+  },
+];
 
 export const BUILTIN_TWINS: Record<string, string> = {
   [builtinIcon("light-off.svg")]: builtinIcon("light-on.svg"),
@@ -160,6 +223,30 @@ export const BUILTIN_DEFAULTS: {
   },
   templates: { AC: builtinIcon("ac-off.svg") },
 };
+
+/** The pool as it is written: keywords normalized, everything else kept —
+ *  including the built-in marker, or the next load would seed again. */
+export function normalizeIconPool(pool: IconPool): IconPool {
+  return {
+    version: 3,
+    updatedAt: pool.updatedAt,
+    ...(typeof pool.builtin === "number" ? { builtin: pool.builtin } : {}),
+    twins: pool.twins,
+    library: pool.library.map((icon) => {
+      const keywords = [
+        ...new Set(icon.keywords.flatMap((word) => keywordWords(word))),
+      ];
+      const name = icon.name?.trim();
+      return {
+        id: icon.id,
+        ...(name ? { name } : {}),
+        value: icon.value.trim(),
+        keywords,
+      };
+    }),
+    defaults: pool.defaults,
+  };
+}
 
 /** Add the shipped rows, pairs and defaults once; anything the user set wins. */
 export function ensureBuiltinDefaults(pool: IconPool): IconPool {

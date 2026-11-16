@@ -257,6 +257,20 @@ export function headerIcon(
   return deviceIcon ? { glyph: deviceIcon } : undefined;
 }
 
+/** The pool default a face may wear: not while the tile has an active condition
+ *  (the look pair carries it), not over a device's own icon, and not when the
+ *  headline slot's icon was explicitly turned off. */
+export function faceDefaultGlyph(args: {
+  hasActive: boolean;
+  headline?: Slot;
+  deviceOwnIcon?: string;
+  poolValue?: string;
+}): string | undefined {
+  if (args.hasActive || args.deviceOwnIcon) return undefined;
+  if (args.headline?.icon?.enabled === false) return undefined;
+  return args.poolValue;
+}
+
 /** The row's own state when it is unambiguously binary, else undefined. */
 export function binaryOn(control: SlotControl): boolean | undefined {
   const value = control.liveValue;
