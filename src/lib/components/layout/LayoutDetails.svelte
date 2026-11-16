@@ -530,8 +530,15 @@
   ]);
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
-  const chartFull = $derived(
-    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  const chartFull = $derived(    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  );
+  /** The tile actually draws a sparkline: a slot has one enabled and its
+   *  reading carries history. */
+  const hasSparkline = $derived(
+    shownSlots.some(
+      (slot, index) =>
+        !!slot.spark && slot.spark.enabled !== false && sparkReady(index),
+    ),
   );
 
   /** The source a template materialises against: the tile's active source,
@@ -1419,6 +1426,7 @@
         {#if id === "look"}
           <div class="field">
             <div class="row wrap">
+              {#if hasSparkline}
               <label
                 class="check"
                 title="Fill the whole tile face with the sparkline; off gives it a band after the name"
@@ -1490,6 +1498,7 @@
                 />
                 <span>Area</span>
               </label>
+              {/if}
               <label class="check" title="Draw the tile's border">
                 <input
                   type="checkbox"
