@@ -396,7 +396,13 @@
   function rowGlyph(r: SlotRow, home: "tile" | "modal") {
     const main = r.slot === headline;
     const lk = main ? look : {};
-    const icon = rowIcon(r, home, device.objectIcon);
+    // The face keeps the look pair; a body row's icon follows its own state.
+    const icon = rowIcon(
+      r,
+      home,
+      device.objectIcon,
+      main ? undefined : getIconPool().twins,
+    );
     const glyph =
       faceGlyph(lk, main ? workingTile?.icon : undefined, icon?.glyph) ??
       (main ? device.objectIcon : undefined);
@@ -459,7 +465,7 @@
       style: r.style,
       // The slot's own icon, not the tile's main/look icon: the headline row is
       // a line in the detail page, not the face.
-      icon: rowIcon(r, "modal", device.objectIcon),
+      icon: rowIcon(r, "modal", device.objectIcon, getIconPool().twins),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.

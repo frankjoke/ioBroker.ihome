@@ -2921,6 +2921,7 @@
   {#if iconPickerFor !== null}
     <IconPicker
       icon={shownSlots[iconPickerFor]?.icon?.glyph}
+      twins
       onPick={(value) => {
         const target = iconPickerFor;
         iconPickerFor = null;
