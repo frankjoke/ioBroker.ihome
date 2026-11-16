@@ -1,4 +1,4 @@
-import type { Control, ControlMeta, Widget } from "$lib/types/device";
+import type { Control, ControlMeta, SlotControl, Widget } from "$lib/types/device";
 import { localizeName } from "$lib/config/format";
 import { enumsOfState } from "$lib/config/rooms";
 
@@ -85,6 +85,30 @@ export function effectiveCommon(
     write: flag(merged.write),
   };
   return meta;
+}
+
+/** A raw state id as a read-only pseudo-control (A21): the object supplies the
+ *  metadata a row's icon and rules read, so a legacy string source behaves like
+ *  a resolved one. */
+export function rawStateControl(
+  id: string,
+  object?: { common?: Record<string, any> },
+  value?: unknown,
+): SlotControl {
+  return {
+    id,
+    stateId: id,
+    label: object?.common?.name ?? id,
+    unit: object?.common?.unit,
+    role: object?.common?.role,
+    type: object?.common?.type,
+    meta: effectiveCommon(
+      { id: "", feature: "", writable: false } as Control,
+      object,
+    ),
+    liveValue: value,
+    writable: false,
+  };
 }
 
 /** The unit to show: an empty effective unit (hideUnit, or an explicitly empty

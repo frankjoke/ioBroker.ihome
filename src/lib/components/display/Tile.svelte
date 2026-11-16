@@ -13,6 +13,7 @@
   import { defaultPair } from "$lib/config/icon-library";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import { resolveTile } from "$lib/config/tile-resolve";
+  import { rawStateControl } from "$lib/config/state-meta";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import {
     faceGlyph,
@@ -209,15 +210,7 @@
     const obj = (ioBroker.objects as Map<string, any>)?.get?.(id);
     if (!obj) return undefined;
     const state = (ioBroker.states as Map<string, any>)?.get?.(id);
-    return {
-      id,
-      stateId: id,
-      label: obj.common?.name ?? id,
-      unit: obj.common?.unit,
-      role: obj.common?.role,
-      liveValue: state?.val,
-      writable: false,
-    };
+    return rawStateControl(id, obj, state?.val);
   }
 
   /**
