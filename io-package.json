@@ -104,6 +104,8 @@
     "loglevel": "info",
     "tier": 3,
     "mode": "daemon",
+    "connectionType": "local",
+    "dataSource": "push",
     "messagebox": true,
     "type": "general",
     "compact": false,
