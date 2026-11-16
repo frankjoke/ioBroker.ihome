@@ -1,8 +1,13 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import { onMount } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
+  import {
+    readIconSourcePrefs,
+    writeIconSourcePrefs,
+  } from "$lib/stores/icon-source-prefs";
   import {
     keywordWords,
     mdiIconValue,
@@ -48,20 +53,45 @@
   };
   type MdiCategory = { id: string; name?: Record<string, string> };
 
-  let resource = $state<Resource>("library");
+  /** The last folder/resource this browser browsed, so reopening the importer
+   *  resumes curation instead of the first adapter. */
+  const saved = readIconSourcePrefs();
+
+  let resource = $state<Resource>(saved.resource);
   let search = $state("");
   let limit = $state(200);
 
   // Adapter folders
-  let basePath = $state("icons-freepic/");
+  let basePath = $state(saved.basePath);
   /** Copy the picked file instead of referencing the adapter path. Default on:
    *  a reference dies with the next update of the source adapter. */
-  let downloadCopy = $state(true);
+  let downloadCopy = $state(saved.downloadCopy);
   let uploadError = $state("");
-  let folder = $state("/icons-freepic/");
+  let folder = $state(saved.folder);
   let entries = $state<SourceEntry[]>([]);
   let loading = $state(false);
   let error = $state("");
+
+  /** Reopening resumes the last source. A stored folder from another base
+   *  falls back to that base's root, so the tree always matches the Source
+   *  field. */
+  function startFolder(): string {
+    const base = normalizeBase();
+    return folder.startsWith(base) ? folder : base;
+  }
+
+  $effect(() => {
+    writeIconSourcePrefs({ resource, basePath, folder, downloadCopy });
+  });
+
+  onMount(() => {
+    if (resource === "adapter") {
+      void loadMetaSpaces();
+      void loadFolder(startFolder());
+    } else if (resource === "mdi") {
+      void loadMdi();
+    }
+  });
 
   // MDI
   let mdiIcons = $state.raw<MdiIcon[]>([]);
@@ -295,7 +325,7 @@
     limit = 200;
     if (resourceId === "adapter") {
       void loadMetaSpaces();
-      void loadFolder(normalizeBase());
+      void loadFolder(startFolder());
     }
     if (resourceId === "mdi") void loadMdi();
   }
