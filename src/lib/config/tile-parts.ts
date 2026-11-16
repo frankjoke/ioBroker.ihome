@@ -237,8 +237,10 @@ export function faceGlyph(
   look: StateLook,
   tileIcon?: string,
   slotGlyph?: string,
+  defaultGlyph?: string,
+  deviceIcon?: string,
 ): string | undefined {
-  return look.glyph ?? tileIcon ?? slotGlyph;
+  return look.glyph ?? tileIcon ?? slotGlyph ?? defaultGlyph ?? deviceIcon;
 }
 
 /** The icon before the tile name (detail header): the state's look, then the
@@ -280,23 +282,30 @@ export function rowIcon(
   home: "tile" | "modal",
   deviceIcon?: string,
   twins?: Record<string, string>,
+  fallback?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
   const icon = row.slot.icon;
-  if (!icon || icon.enabled === false) return undefined;
-  const where = icon.where ?? "both";
-  if (where !== "both" && where !== home) return undefined;
-  const glyph =
+  if (icon?.enabled === false) return undefined;
+  if (icon) {
+    const where = icon.where ?? "both";
+    if (where !== "both" && where !== home) return undefined;
+  }
+  const picked =
     row.style.icon ??
-    (row.iconIsTemplate ? (deviceIcon ?? icon.glyph) : icon.glyph);
-  if (!glyph) return undefined;
+    (icon
+      ? row.iconIsTemplate
+        ? (deviceIcon ?? icon.glyph)
+        : icon.glyph
+      : fallback);
+  if (!picked) return undefined;
   const on = twins && row.control ? binaryOn(row.control) : undefined;
-  const shown =
+  const glyph =
     on === true
-      ? (onTwin(twins!, glyph) ?? glyph)
+      ? (onTwin(twins!, picked) ?? picked)
       : on === false
-        ? (offTwin(twins!, glyph) ?? glyph)
-        : glyph;
-  return { glyph: shown, color: row.style.color, disabled: row.style.disabled };
+        ? (offTwin(twins!, picked) ?? picked)
+        : picked;
+  return { glyph, color: row.style.color, disabled: row.style.disabled };
 }
 
 /** Does the slot's reading/control draw in `home`? `hideValue` turns the body

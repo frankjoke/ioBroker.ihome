@@ -10,7 +10,7 @@
     tileActionControl,
   } from "$lib/config/template-ops";
   import { evalActive, withRolePair } from "$lib/config/tile-ops";
-  import { defaultPair } from "$lib/config/icon-library";
+  import { defaultPair, effectiveDefault } from "$lib/config/icon-library";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { rawStateControl } from "$lib/config/state-meta";
@@ -319,21 +319,33 @@
     defaultPair(getIconPool(), templateId, headlineControl?.role),
   );
   // The device's own pair dresses a tile that carries no icon and no look of
-  // its own; a pool default still wins (it is a deliberate assignment).
-  const devicePair = $derived(
-    device.objectActiveIcon &&
-      device.objectIcon &&
+  // its own. A pool default wins over an icon only derived from the objects —
+  // the device document's icon is a deliberate choice and wins over both.
+  const ownPair = $derived(
+    device.objectIcon &&
       !workingTile?.look?.inactive?.glyph &&
       !workingTile?.look?.active?.glyph
-      ? { value: device.objectIcon, activeValue: device.objectActiveIcon }
+      ? device.objectActiveIcon
+        ? { value: device.objectIcon, activeValue: device.objectActiveIcon }
+        : { value: device.objectIcon }
       : undefined,
   );
-  const automaticPair = $derived(poolPair ?? devicePair);
+  const automaticPair = $derived(device.icon ? ownPair : (poolPair ?? ownPair));
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
   const look = $derived(
     stateLook(withRolePair(workingTile, automaticPair), active),
   );
+  /** A pool default dresses the face without an active condition too; with one,
+   *  the look pair already carries it. A device's own icon wins over it. */
+  const poolFaceGlyph = $derived(!workingTile?.active ? poolPair?.value : undefined);
+  const faceDefault = $derived(device.icon ? undefined : poolFaceGlyph);
+  /** The role default for a row whose slot carries no icon; a rule icon and a
+   *  slot icon still win inside `rowIcon`. */
+  function roleDefault(control?: SlotControl): string | undefined {
+    const role = control?.role ?? control?.meta?.role;
+    return role ? effectiveDefault(getIconPool(), "roles", role) : undefined;
+  }
   const accentColor = $derived(look.color ?? tileStyle.color);
   // A glow colour of its own turns the glow on, whatever the rules said (A71).
   const glowing = $derived(look.glow !== undefined || tileStyle.glow === true);
@@ -395,10 +407,15 @@
       home,
       device.objectIcon,
       main ? undefined : getIconPool().twins,
+      main ? undefined : roleDefault(r.control),
     );
-    const glyph =
-      faceGlyph(lk, main ? workingTile?.icon : undefined, icon?.glyph) ??
-      (main ? device.objectIcon : undefined);
+    const glyph = faceGlyph(
+      lk,
+      main ? workingTile?.icon : undefined,
+      icon?.glyph,
+      main ? faceDefault : undefined,
+      main ? device.objectIcon : undefined,
+    );
     if (!glyph) return undefined;
     return {
       glyph,
@@ -436,7 +453,13 @@
           device.objectIcon,
         )
       : undefined;
-    return headerIcon(workingTile?.icon, look, own, device.objectIcon);
+    // A54/A72: tile icon, state look, headline icon, pool default, device face
+    // — the device's own icon beats the default only by making it absent.
+    return (
+      headerIcon(workingTile?.icon, look, own) ??
+      (faceDefault ? { glyph: faceDefault } : undefined) ??
+      (device.objectIcon ? { glyph: device.objectIcon } : undefined)
+    );
   });
 
   // What the sheet's Detail Page checkbox asks about (A47): the tile's own
@@ -458,7 +481,13 @@
       style: r.style,
       // The slot's own icon, not the tile's main/look icon: the headline row is
       // a line in the detail page, not the face.
-      icon: rowIcon(r, "modal", device.objectIcon, getIconPool().twins),
+      icon: rowIcon(
+        r,
+        "modal",
+        device.objectIcon,
+        getIconPool().twins,
+        roleDefault(r.control),
+      ),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
