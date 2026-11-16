@@ -9,6 +9,8 @@ import {
   MAX_PLUGIN_CODE,
   MAX_PLUGIN_HELP,
   MAX_PLUGIN_USAGE,
+  pluginBundleOf,
+  pluginSettingsSchema,
   validPluginId,
   type AdapterPlugin,
   type PluginBundle,
@@ -43,6 +45,10 @@ export interface PluginFileHost {
     path: string,
   ): Promise<{ file: string; isDir?: boolean }[] | undefined>;
   readFileAsync(adapter: string, path: string): Promise<unknown>;
+}
+
+export interface PluginWriteHost extends PluginFileHost {
+  writeFileAsync(adapter: string, path: string, text: string): Promise<void>;
 }
 
 const META_ADAPTER = "ihome.meta";
@@ -142,6 +148,23 @@ export async function readPluginFiles(
     return { problem: `plugins/${pluginId}/index.js is too large.` };
   }
 
+  const settingsSchema =
+    raw.settingsSchema === undefined
+      ? undefined
+      : pluginSettingsSchema(raw.settingsSchema);
+  if (raw.settingsSchema !== undefined && !settingsSchema) {
+    return {
+      problem: `plugins/${pluginId}/plugin.json has an invalid settings schema.`,
+    };
+  }
+  const bundle =
+    raw.bundle === undefined ? undefined : pluginBundleOf(raw.bundle);
+  if (raw.bundle !== undefined && !bundle) {
+    return {
+      problem: `plugins/${pluginId}/plugin.json has an invalid device bundle.`,
+    };
+  }
+
   const manifest: PluginManifest = {
     id: pluginId,
     name,
@@ -151,12 +174,8 @@ export async function readPluginFiles(
     ...(text(raw.usage, MAX_PLUGIN_USAGE)
       ? { usage: text(raw.usage, MAX_PLUGIN_USAGE) }
       : {}),
-    ...(Array.isArray(raw.settingsSchema)
-      ? { settingsSchema: raw.settingsSchema as PluginSettingDef[] }
-      : {}),
-    ...(record(raw.bundle)
-      ? { bundle: raw.bundle as unknown as PluginBundle }
-      : {}),
+    ...(settingsSchema ? { settingsSchema } : {}),
+    ...(bundle ? { bundle } : {}),
   };
   return { files: { manifest, code } };
 }
@@ -187,6 +206,33 @@ export function mergePlugin(
     ...(manifest.bundle ? { bundle: manifest.bundle } : {}),
     code,
   };
+}
+
+/** Make a config plugin's folder usable. Existing good files win; a broken
+ *  folder is rewritten from the config code before that code is stripped. */
+export async function ensurePluginFiles(
+  host: PluginWriteHost,
+  plugin: AdapterPlugin,
+): Promise<{ ok: true } | { problem: string }> {
+  const existing = await readPluginFiles(host, plugin.id);
+  if (!("problem" in existing)) return { ok: true };
+  if (!plugin.code?.trim()) return { problem: existing.problem };
+  try {
+    await host.writeFileAsync(
+      META_ADAPTER,
+      `${PLUGIN_DIR}/${plugin.id}/plugin.json`,
+      JSON.stringify(pluginManifestOf(plugin), null, 2),
+    );
+    await host.writeFileAsync(
+      META_ADAPTER,
+      `${PLUGIN_DIR}/${plugin.id}/index.js`,
+      plugin.code,
+    );
+  } catch (error) {
+    return { problem: String(error) };
+  }
+  const back = await readPluginFiles(host, plugin.id);
+  return "problem" in back ? { problem: back.problem } : { ok: true };
 }
 
 /** The portable half of a config plugin: what belongs in `plugin.json`. */

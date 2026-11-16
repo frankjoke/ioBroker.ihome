@@ -186,21 +186,19 @@ export async function readMetaText(
   }
 }
 
-/** One directory of the space; empty when it does not exist. */
+/** One directory of the space; an unreadable folder is an error, not "empty". */
 export async function listMetaDir(
   adapter: string,
   path: string,
 ): Promise<{ name: string; isDir: boolean }[]> {
-  try {
-    const rows = (await metaCall("readDir", adapter, path)) as
-      { file?: string; isDir?: boolean }[] | undefined;
-    if (!Array.isArray(rows)) return [];
-    return rows
-      .filter((row) => typeof row.file === "string" && row.file)
-      .map((row) => ({ name: row.file as string, isDir: row.isDir === true }));
-  } catch {
-    return [];
+  const rows = (await metaCall("readDir", adapter, path)) as
+    { file?: string; isDir?: boolean }[] | undefined;
+  if (!Array.isArray(rows)) {
+    throw new Error(`not a folder: ${adapter}/${path}`);
   }
+  return rows
+    .filter((row) => typeof row.file === "string" && row.file)
+    .map((row) => ({ name: row.file as string, isDir: row.isDir === true }));
 }
 
 export async function deleteMetaFile(
@@ -210,16 +208,26 @@ export async function deleteMetaFile(
   await metaCall("deleteFile", adapter, path);
 }
 
-/** Write text and prove it by reading it back; one retry, then an error. */
+/** Write text and prove it by reading it back; one retry, then an error.
+ *  A failed write puts the previous text back, so a corrupted write never
+ *  becomes the only copy of a file. */
 export async function verifiedWrite(
   adapter: string,
   path: string,
   text: string,
 ): Promise<void> {
+  const previous = await readMetaText(adapter, path);
   for (let attempt = 0; attempt < 2; attempt++) {
     await writeMetaText(adapter, path, text);
     const back = await readMetaText(adapter, path);
     if (back === text) return;
+  }
+  if (previous !== null) {
+    try {
+      await writeMetaText(adapter, path, previous);
+    } catch {
+      // Best effort: the error below is what the caller acts on.
+    }
   }
   throw new Error(`the file did not verify after writing: ${adapter}/${path}`);
 }

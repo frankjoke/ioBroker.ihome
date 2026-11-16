@@ -212,6 +212,9 @@
             Restart iHome in Admin to apply. <a href="#/admin">Open Admin</a>.
           </p>
         {/if}
+        {#if plugin.problem}
+          <p class="row-error text-danger hint">{plugin.problem}</p>
+        {/if}
       </div>
       {#if open}
         <div class="item-editor">

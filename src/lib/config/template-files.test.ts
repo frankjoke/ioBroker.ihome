@@ -106,6 +106,33 @@ it("lists every readable file and marks a corrupt one", async () => {
   expect(rows.find((row) => row.id === "a")?.file?.kind).toBe("device");
 });
 
+it("ignores a file filed under the wrong kind", async () => {
+  // A valid device template dropped into the logic folder.
+  files({ "ihome.meta/templates/logic/mix.json": validText });
+  const rows = await listTemplates("logic");
+  expect(rows.map((row) => row.id)).toEqual(["mix"]);
+  expect(rows[0].file).toBeNull();
+  expect(await readTemplate("logic", "mix")).toBeNull();
+});
+
+it("takes the template id from the file name, not the definition", async () => {
+  const original = templateFile("device", PRESETS.Light);
+  const copied = serializeTemplateFile({
+    ...original,
+    definition: { ...(original.definition as object), id: "other" },
+  });
+  files({ "ihome.meta/templates/device/file-id.json": copied });
+  const read = await readTemplate("device", "file-id");
+  expect((read?.definition as { id?: string } | undefined)?.id).toBe("file-id");
+});
+
+it("refuses to write a file name that is not a valid id", async () => {
+  files({});
+  await expect(
+    writeTemplate("device", "my lamp", templateFile("device", PRESETS.Light)),
+  ).rejects.toThrow(/invalid template id/);
+});
+
 it("reads a valid file and returns null for junk", async () => {
   files({
     "ihome.meta/templates/device/a.json": validText,

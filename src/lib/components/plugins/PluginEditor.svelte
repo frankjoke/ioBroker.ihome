@@ -41,9 +41,12 @@
   // The code file is read when the editor opens; null means not loaded yet.
   let code = $state("");
   let initialCode = $state<string | null>(null);
+  // The code is read once per plugin; a list refresh must not replace a draft.
+  let readFor = "";
 
   $effect(() => {
-    if (plugin.builtin) return;
+    if (plugin.builtin || readFor === plugin.id) return;
+    readFor = plugin.id;
     let live = true;
     void readMetaText(META_ADAPTER, `plugins/${plugin.id}/index.js`).then(
       (text) => {

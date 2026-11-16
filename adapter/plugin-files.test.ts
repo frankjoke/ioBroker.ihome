@@ -1,11 +1,13 @@
 import { it, expect, vi } from "vitest";
 import {
+  ensurePluginFiles,
   listPluginFolders,
   mergePlugin,
   pluginManifestOf,
   readPluginFiles,
   runtimeOnly,
   type PluginFileHost,
+  type PluginWriteHost,
 } from "./plugin-files";
 
 const MANIFEST = JSON.stringify({
@@ -154,6 +156,38 @@ it("reports a folder that cannot be listed", async () => {
   expect(logs[0]).toContain("not a meta object");
 });
 
+it("rejects an invalid settings schema or bundle", async () => {
+  const base = {
+    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
+  };
+  expect(
+    await readPluginFiles(
+      host({
+        ...base,
+        "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
+          id: "clock",
+          name: "Clock",
+          settingsSchema: [null],
+        }),
+      }),
+      "clock",
+    ),
+  ).toMatchObject({ problem: expect.stringMatching(/settings schema/) });
+  expect(
+    await readPluginFiles(
+      host({
+        ...base,
+        "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
+          id: "clock",
+          name: "Clock",
+          bundle: { device: {} },
+        }),
+      }),
+      "clock",
+    ),
+  ).toMatchObject({ problem: expect.stringMatching(/bundle/) });
+});
+
 it("reads the controller's { file, mimeType } result", async () => {
   const h: PluginFileHost = {
     async readDirAsync() {
@@ -170,6 +204,59 @@ it("reads the controller's { file, mimeType } result", async () => {
   };
   const result = await readPluginFiles(h, "clock");
   expect("files" in result && result.files.code).toBe("module.exports = {}");
+});
+
+it("keeps usable files and repairs a broken folder from the config code", async () => {
+  const store: Record<string, string> = {
+    "ihome.meta/plugins/clock/plugin.json": MANIFEST,
+    "ihome.meta/plugins/clock/index.js": "  ",
+  };
+  const h: PluginWriteHost = {
+    async readDirAsync() {
+      return [{ file: "clock", isDir: true }];
+    },
+    async readFileAsync(_adapter, path) {
+      const key = `ihome.meta/${path}`;
+      if (!(key in store)) throw new Error("Not exists");
+      return store[key];
+    },
+    async writeFileAsync(_adapter, path, text) {
+      store[`ihome.meta/${path}`] = text;
+    },
+  };
+  const plugin = {
+    id: "clock",
+    name: "Clock",
+    enabled: true,
+    timeoutMs: 5000,
+    debug: false,
+    code: "module.exports = () => ({ call() {} });",
+  };
+  expect(await ensurePluginFiles(h, plugin)).toEqual({ ok: true });
+  expect(store["ihome.meta/plugins/clock/index.js"]).toBe(plugin.code);
+});
+
+it("reports a folder it cannot repair", async () => {
+  const h: PluginWriteHost = {
+    async readDirAsync() {
+      return [];
+    },
+    async readFileAsync() {
+      throw new Error("Not exists");
+    },
+    async writeFileAsync() {
+      // The controller keeps dropping the file.
+    },
+  };
+  const result = await ensurePluginFiles(h, {
+    id: "clock",
+    name: "Clock",
+    enabled: true,
+    timeoutMs: 5000,
+    debug: false,
+    code: "module.exports = () => ({ call() {} });",
+  });
+  expect(result).toMatchObject({ problem: expect.stringMatching(/missing/) });
 });
 
 it("rejects an unknown id", async () => {

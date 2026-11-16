@@ -99,9 +99,30 @@ it("loads templates from the folder", async () => {
     }),
   );
   expect(mod.isTemplatesWritable()).toBe(true);
+  // The file name is the id, whatever the definition carried.
   expect(mod.getTemplateRegistry().templates.map((t) => t.id)).toEqual([
-    "Light",
+    "light",
   ]);
+});
+
+it("does not fall back to the legacy document when the folder cannot be read", async () => {
+  h.legacy = JSON.stringify({
+    version: 1,
+    updatedAt: 1,
+    templates: [PRESETS.Light],
+  });
+  vi.resetModules();
+  const meta = await import("$lib/config/meta-files");
+  meta.setMetaTransport({
+    async call(event) {
+      if (event === "readDir") throw new Error("denied");
+      return undefined;
+    },
+  });
+  const mod = await import("./templates.svelte");
+  await mod.initTemplates();
+  expect(mod.isTemplatesWritable()).toBe(false);
+  expect(mod.getTemplateRegistry().templates).toEqual([]);
 });
 
 it("migrates the legacy state into files once", async () => {

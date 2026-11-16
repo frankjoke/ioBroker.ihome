@@ -66,7 +66,13 @@ export async function readTemplate(
   }
   const parsed = parseTemplateFile(raw);
   if ("problem" in parsed) return null;
-  return parsed.file;
+  // The folder decides the kind and the id; a copy that kept a foreign kind or
+  // another definition id cannot be listed or applied under it.
+  if (parsed.file.kind !== kind) return null;
+  return {
+    ...parsed.file,
+    definition: { ...(parsed.file.definition as object), id },
+  };
 }
 
 export async function writeTemplate(
@@ -74,6 +80,9 @@ export async function writeTemplate(
   id: string,
   file: TemplateFile,
 ): Promise<void> {
+  if (validTemplateId(id) !== id) {
+    throw new Error(`invalid template id: ${id}`);
+  }
   await verifiedWrite(
     ADAPTER,
     templateMetaPath(kind, id),

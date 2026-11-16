@@ -49,6 +49,8 @@ export interface PluginView {
   staged: boolean;
   /** A user plugin waiting to be removed at the next start. */
   removalPending: boolean;
+  /** Why the plugin cannot be used (a broken file, a failed start). */
+  problem?: string;
 }
 
 export type PluginsCommand =
@@ -188,6 +190,8 @@ export function pluginView(
     restartRequired: boolean;
     staged?: boolean;
     removalPending?: boolean;
+    /** Why the plugin cannot be used (a broken file, a failed start). */
+    problem?: string;
   },
 ): PluginView {
   return {
@@ -202,6 +206,7 @@ export function pluginView(
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+    ...(opts.problem ? { problem: opts.problem } : {}),
     status: opts.status,
     hotSettings: opts.hotSettings,
     hasCode: typeof plugin.code === "string",

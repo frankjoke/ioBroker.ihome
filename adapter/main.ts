@@ -47,12 +47,13 @@ import {
 } from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
+  ensurePluginFiles,
   listPluginFolders,
   mergePlugin,
-  pluginManifestOf,
   readPluginFiles,
   runtimeOnly,
   type PluginFileHost,
+  type PluginWriteHost,
 } from "./plugin-files";
 import {
   BUILTIN_PLUGINS,
@@ -251,6 +252,8 @@ class IHome extends utils.Adapter {
   private pluginHost?: PluginHost;
   /** The plugin list as the adapter currently knows it. */
   private pluginConfig: AdapterPlugin[] = [];
+  /** Why a file-backed plugin cannot be used, per id. */
+  private readonly pluginProblems = new Map<string, string>();
   /** Page-managed plugin settings, staged imports and removals. */
   private pluginSettings: PluginSettingsDocument = {
     version: 1,
@@ -1164,20 +1167,16 @@ class IHome extends utils.Adapter {
         continue;
       }
       try {
-        const dir = `plugins/${plugin.id}`;
-        if (!(await this.fileExistsAsync("ihome.meta", `${dir}/plugin.json`))) {
-          await this.writeFileAsync(
-            "ihome.meta",
-            `${dir}/plugin.json`,
-            JSON.stringify(pluginManifestOf(plugin), null, 2),
+        const ensured = await ensurePluginFiles(
+          this as unknown as PluginWriteHost,
+          plugin,
+        );
+        if ("problem" in ensured) {
+          this.log.warn(
+            `plugin ${plugin.id}: cannot move code to files: ${ensured.problem}`,
           );
-        }
-        if (!(await this.fileExistsAsync("ihome.meta", `${dir}/index.js`))) {
-          await this.writeFileAsync(
-            "ihome.meta",
-            `${dir}/index.js`,
-            plugin.code,
-          );
+          next.push(plugin);
+          continue;
         }
         next.push(runtimeOnly(plugin));
         changed = true;
@@ -1209,11 +1208,17 @@ class IHome extends utils.Adapter {
     if (!ids.length) return list;
     const next = [...list];
     for (const id of ids) {
+      if (BUILTIN_PLUGINS.some((builtin) => builtin.id === id)) {
+        this.log.warn(`plugin ${id}: built-in ids cannot come from files`);
+        continue;
+      }
       const read = await readPluginFiles(this as unknown as PluginFileHost, id);
       if ("problem" in read) {
+        this.pluginProblems.set(id, read.problem);
         this.log.warn(`plugin ${id}: ${read.problem}`);
         continue;
       }
+      this.pluginProblems.delete(id);
       const runtime = next.find((entry) => entry.id === id);
       const settings = this.pluginSettings.settings[id];
       const merged = mergePlugin(read.files, {
@@ -1231,7 +1236,11 @@ class IHome extends utils.Adapter {
 
   private pluginViews(): PluginView[] {
     const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
-    const views = this.pluginConfig.map((plugin) => this.pluginViewOf(plugin));
+    const views = this.pluginConfig.map((plugin) => {
+      const view = this.pluginViewOf(plugin);
+      const problem = this.pluginProblems.get(plugin.id);
+      return problem ? { ...view, problem } : view;
+    });
     for (const imported of this.pluginSettings.staged) {
       if (activeIds.has(imported.id)) continue;
       views.push(

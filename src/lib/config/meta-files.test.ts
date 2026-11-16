@@ -53,11 +53,11 @@ it("lists a directory through readDir", async () => {
   setMetaTransport(null);
 });
 
-it("returns an empty list when readDir fails", async () => {
+it("reports a folder it cannot read instead of pretending it is empty", async () => {
   transport(() => {
     throw new Error("denied");
   });
-  expect(await listMetaDir("ihome.meta", "plugins")).toEqual([]);
+  await expect(listMetaDir("ihome.meta", "plugins")).rejects.toThrow("denied");
   setMetaTransport(null);
 });
 
@@ -88,13 +88,41 @@ it("verifiedWrite retries a corrupt read-back once, then succeeds", async () => 
     }
     if (event === "readFile") {
       reads += 1;
-      return reads === 1 ? "garbage" : "payload";
+      // 1: the previous text, 2: the corrupt read-back, 3: the retry.
+      if (reads === 2) return "garbage";
+      return reads === 1 ? "old" : "payload";
     }
     return undefined;
   });
   await verifiedWrite("ihome.meta", "a.json", "payload");
   expect(writes).toEqual(["payload", "payload"]);
   setMetaTransport(null);
+});
+
+it("restores the previous text when the write never verifies", async () => {
+  const files: Record<string, string> = { "a.json": "old" };
+  let writes = 0;
+  transport((event, args) => {
+    if (event === "writeFile") {
+      writes += 1;
+      const path = String(args[1]);
+      // The two attempts land corrupted; the restore write lands fine.
+      files[path] = writes <= 2 ? "garbage" : String(args[2]);
+      return undefined;
+    }
+    if (event === "readFile") {
+      const path = String(args[1]);
+      if (!(path in files)) throw new Error("Not exists");
+      return files[path];
+    }
+    return undefined;
+  });
+  await expect(verifiedWrite("ihome.meta", "a.json", "new")).rejects.toThrow(
+    /did not verify/,
+  );
+  expect(files["a.json"]).toBe("old");
+  setMetaTransport(null);
+  vi.restoreAllMocks();
 });
 
 it("verifiedWrite throws when the read-back never matches", async () => {
@@ -110,7 +138,8 @@ it("verifiedWrite throws when the read-back never matches", async () => {
   await expect(
     verifiedWrite("ihome.meta", "a.json", "payload"),
   ).rejects.toThrow(/did not verify/);
-  expect(writes).toHaveLength(2);
+  // Two attempts plus the best-effort restore of the previous text.
+  expect(writes).toHaveLength(3);
   setMetaTransport(null);
   vi.restoreAllMocks();
 });
