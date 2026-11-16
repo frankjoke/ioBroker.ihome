@@ -454,6 +454,22 @@ export function filterLibraryNames(
   );
 }
 
+/** The on half of a twin, when `value` is its off half. */
+export function onTwin(
+  twins: Record<string, string>,
+  value: string,
+): string | undefined {
+  return twins[value];
+}
+
+/** The off half of a twin, when `value` is its on half. */
+export function offTwin(
+  twins: Record<string, string>,
+  value: string,
+): string | undefined {
+  return Object.keys(twins).find((off) => twins[off] === value);
+}
+
 /** Paired icons first for the twin-aware picker; a pair is shown once. */
 export function splitTwins(
   entries: LibraryIcon[],
