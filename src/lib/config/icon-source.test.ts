@@ -4,6 +4,7 @@ import {
   importValue,
   keywordsFromPath,
   parseListing,
+  sourceEntriesFromDir,
 } from "$lib/config/icon-source";
 
 const LISTING = `<a href="./gadgets/">gadgets</a>
@@ -100,5 +101,24 @@ it("offers every installed icon adapter as a root source", () => {
     "/icons8/",
     "/ihome.meta/",
     "/iqontrol/images/",
+  ]);
+});
+
+it("builds entries from a file-API directory listing", () => {
+  const entries = sourceEntriesFromDir("/icons-smarthome/", [
+    { file: "bulb.svg", isDir: false },
+    { file: "readme.txt", isDir: false },
+    { file: "rooms", isDir: true },
+    { file: "alarm.svg", isDir: false },
+  ]);
+  expect(entries).toEqual([
+    { path: "/icons-smarthome/rooms/", label: "rooms", kind: "folder" },
+    { path: "/icons-smarthome/alarm.svg", label: "alarm", kind: "icon" },
+    { path: "/icons-smarthome/bulb.svg", label: "bulb", kind: "icon" },
+  ]);
+  expect(
+    sourceEntriesFromDir("/iqontrol/images/", [{ file: "battery.png", isDir: false }]),
+  ).toEqual([
+    { path: "/iqontrol/images/battery.png", label: "battery", kind: "icon" },
   ]);
 });

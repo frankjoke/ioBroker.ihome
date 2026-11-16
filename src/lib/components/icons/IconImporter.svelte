@@ -18,8 +18,10 @@
     importValue,
     keywordsFromPath,
     parseListing,
+    sourceEntriesFromDir,
     type SourceEntry,
   } from "$lib/config/icon-source";
+  import { listMetaDir } from "$lib/config/meta-files";
   import { brokerIconPath } from "$lib/config/icon-ops";
   import { copyIconFile, writeIconFile } from "$lib/config/icon-files";
 
@@ -280,16 +282,41 @@
     return `/${basePath.trim().replace(/^\/+/, "").replace(/\/*$/, "")}/`;
   }
 
+  /** The folder through the file API: `/icons-x/sub/` is namespace `icons-x`,
+   *  folder `sub`. Null when the namespace is not a readable file tree. */
+  async function fileEntries(pathname: string): Promise<SourceEntry[] | null> {
+    const [adapter, ...rest] = String(pathname ?? "")
+      .replace(/^\/+|\/+$/g, "")
+      .split("/");
+    if (!adapter) return null;
+    try {
+      const rows = await listMetaDir(adapter, rest.join("/"));
+      return sourceEntriesFromDir(
+        pathname,
+        rows.map((row) => ({ file: row.name, isDir: row.isDir })),
+      );
+    } catch {
+      return null;
+    }
+  }
+
   async function loadFolder(pathname: string): Promise<void> {
     loading = true;
     error = "";
     try {
-      const url = new URL(pathname, document.baseURI);
-      const response = await fetch(url, { headers: { Accept: "text/html" } });
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}`);
+      const listed = await fileEntries(pathname);
+      if (listed) {
+        entries = listed;
+      } else {
+        // A namespace the file API cannot read (or a picker page): the web
+        // adapter's own HTML listing still works.
+        const url = new URL(pathname, document.baseURI);
+        const response = await fetch(url, { headers: { Accept: "text/html" } });
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}`);
+        }
+        entries = parseListing(await response.text(), url.href);
       }
-      entries = parseListing(await response.text(), url.href);
       folder = pathname;
       limit = 200;
       search = "";

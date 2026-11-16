@@ -77,6 +77,40 @@ export function parseListing(html: string, baseHref: string): SourceEntry[] {
   return entries;
 }
 
+export interface DirRow {
+  file?: string;
+  isDir?: boolean;
+}
+
+/** Entries from the file API's `readDir`, so adapter folders need no HTML
+ *  listing fetch: `/<namespace>/<folder>/` maps to `namespace` + `folder`. */
+export function sourceEntriesFromDir(
+  pathname: string,
+  rows: DirRow[],
+): SourceEntry[] {
+  const base = String(pathname ?? "").replace(/^\/+|\/+$/g, "");
+  const entries = new Map<string, SourceEntry>();
+  for (const row of rows) {
+    const name = String(row?.file ?? "").trim();
+    if (!name) continue;
+    const isDir = row.isDir === true;
+    if (!isDir && !ICON_EXT.test(name)) continue;
+    const path = `/${base}/${name}${isDir ? "/" : ""}`;
+    entries.set(path, {
+      path,
+      label: isDir ? name : name.replace(ICON_EXT, ""),
+      kind: isDir ? "folder" : "icon",
+    });
+  }
+  return [...entries.values()].sort((a, b) =>
+    a.kind === b.kind
+      ? a.label.localeCompare(b.label)
+      : a.kind === "folder"
+        ? -1
+        : 1,
+  );
+}
+
 function pathSegments(value: string): string[] {
   return String(value ?? "")
     .replace(/^https?:\/\/[^/]+/i, "")
