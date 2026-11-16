@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import {
+  iconSourceChoices,
   importValue,
   keywordsFromPath,
   parseListing,
@@ -86,4 +87,18 @@ it("builds the stored adapter path", () => {
   expect(importValue("icons-freepic/", "adapter/icons-freepic/x.svg")).toBe(
     "adapter/icons-freepic/x.svg",
   );
+});
+
+it("offers every installed icon adapter as a root source", () => {
+  const choices = iconSourceChoices(
+    ["icons-freepic", "icons-smarthome", "hue", "icons8", "trash"],
+    ["ihome.meta"],
+  );
+  expect(choices.map((c) => c.path)).toEqual([
+    "/icons-freepic/",
+    "/icons-smarthome/",
+    "/icons8/",
+    "/ihome.meta/",
+    "/iqontrol/images/",
+  ]);
 });

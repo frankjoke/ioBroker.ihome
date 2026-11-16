@@ -14,6 +14,7 @@
     type LibraryIcon,
   } from "$lib/config/icon-library";
   import {
+    iconSourceChoices,
     importValue,
     keywordsFromPath,
     parseListing,
@@ -86,6 +87,7 @@
 
   onMount(() => {
     if (resource === "adapter") {
+      void loadIconAdapters();
       void loadMetaSpaces();
       void loadFolder(startFolder());
     } else if (resource === "mdi") {
@@ -117,10 +119,31 @@
     if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
   });
 
-  // The object cache carries states and devices, not `meta` objects; the
-  // spaces are fetched once through the meta object view instead.
+  // Adapter and meta objects are not in the state cache; both are fetched once
+  // through the object view instead.
   let metaSpaces = $state<string[]>([]);
   let metaStarted = false;
+  let iconAdapters = $state<string[]>([]);
+  let adaptersStarted = false;
+
+  async function loadIconAdapters(): Promise<void> {
+    if (adaptersStarted) return;
+    adaptersStarted = true;
+    try {
+      const result = (await ioBroker.emitAsync(
+        "getObjectView",
+        "system",
+        "adapter",
+        { startkey: "", endkey: "香" },
+      )) as { rows?: { id?: string }[] };
+      const rows = Array.isArray(result?.rows) ? result.rows : [];
+      iconAdapters = rows
+        .map((row) => (row.id ?? "").replace(/^system\.adapter\./, ""))
+        .filter((name) => name && /icon/i.test(name));
+    } catch {
+      adaptersStarted = false;
+    }
+  }
 
   async function loadMetaSpaces(): Promise<void> {
     if (metaStarted) return;
@@ -142,21 +165,11 @@
     }
   }
 
-  /** Adapter file roots: the icon packs plus every `*.meta` user-file space. */
-  const sourceChoices = $derived.by(() => {
-    const roots: { path: string; label: string }[] = [
-      { path: "icons-freepic/", label: "icons-freepic" },
-      {
-        path: "icons-addictive-flavour-png/",
-        label: "icons-addictive-flavour-png",
-      },
-      { path: "iqontrol/images/", label: "iqontrol/images" },
-    ];
-    for (const id of metaSpaces) {
-      roots.push({ path: `${id}/`, label: id });
-    }
-    return roots;
-  });
+  /** Adapter file roots: every installed icon adapter plus every `*.meta`
+   *  user-file space. */
+  const sourceChoices = $derived(
+    iconSourceChoices(iconAdapters, metaSpaces),
+  );
 
   const library = $derived(getIconPool().library);
   const libraryShown = $derived.by(() => {
@@ -324,6 +337,7 @@
     error = "";
     limit = 200;
     if (resourceId === "adapter") {
+      void loadIconAdapters();
       void loadMetaSpaces();
       void loadFolder(startFolder());
     }
@@ -459,10 +473,16 @@
                   void loadFolder(normalizeBase());
                 }}
               >
+                {#if !sourceChoices.some((s) => s.path === normalizeBase())}
+                  <option value={basePath} selected
+                    >Custom: {basePath.trim() || "—"}</option
+                  >
+                {/if}
                 {#each sourceChoices as source (source.path)}
                   <option
                     value={source.path}
-                    selected={basePath === source.path}>{source.label}</option
+                    selected={normalizeBase() === source.path}
+                    >{source.label}</option
                   >
                 {/each}
               </select>

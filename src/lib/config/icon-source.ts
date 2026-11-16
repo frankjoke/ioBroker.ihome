@@ -13,6 +13,34 @@ export interface SourceEntry {
 
 const ICON_EXT = /\.(svg|png|jpe?g|webp|gif|ico)$/i;
 
+export interface IconSourceChoice {
+  path: string;
+  label: string;
+}
+
+/** The roots the adapter browser offers: every installed adapter with "icon" in
+ *  its name (web serves it at `/<adapter>/`), the iqontrol image folder and
+ *  every `*.meta` file space. */
+export function iconSourceChoices(
+  adapterNames: Iterable<string>,
+  metaSpaces: Iterable<string>,
+): IconSourceChoice[] {
+  const choices = new Map<string, IconSourceChoice>();
+  for (const name of adapterNames) {
+    if (!name || !/icon/i.test(name)) continue;
+    choices.set(`/${name}/`, { path: `/${name}/`, label: name });
+  }
+  choices.set("/iqontrol/images/", {
+    path: "/iqontrol/images/",
+    label: "iqontrol/images",
+  });
+  for (const id of metaSpaces) {
+    if (!id) continue;
+    choices.set(`/${id}/`, { path: `/${id}/`, label: id });
+  }
+  return [...choices.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export function parseListing(html: string, baseHref: string): SourceEntry[] {
   const base = new URL(baseHref);
   const seen = new Set<string>();
