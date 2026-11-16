@@ -873,7 +873,7 @@
     min-width: 0;
     /* No overflow clipping: a badge is allowed to sit on the tile's own edge. */
     text-align: center;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--tile-border-color, var(--border-color));
     border-radius: var(--border-radius-md, 12px);
     /* A User Interface default (ui-settings.ts); an explicit tile background is
        inline and wins. */

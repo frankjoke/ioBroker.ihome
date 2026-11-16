@@ -45,6 +45,9 @@
 
   /* outlines */
   --border-color: #d3d6e4;
+  /* The tile edge may be bolder than a divider: a tile is a control and can
+     switch its border off per tile ("Border" in the Look tab). */
+  --tile-border-color: #8f94a6;
   --outline: #74778c;
   --outline-variant: #c4c6d6;
 
@@ -133,6 +136,7 @@ html.dark {
   --on-inverse-surface: #1c2028;
 
   --border-color: #3d4250;
+  --tile-border-color: #5a6070;
   --outline: #908fa0;
   --outline-variant: #464554;
 
