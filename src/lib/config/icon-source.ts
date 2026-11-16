@@ -26,16 +26,18 @@ export function iconSourceChoices(
   metaSpaces: Iterable<string>,
 ): IconSourceChoice[] {
   const choices = new Map<string, IconSourceChoice>();
-  for (const name of adapterNames) {
+  const adapters = [...adapterNames];
+  for (const name of adapters) {
     if (!name || !/icon/i.test(name)) continue;
     choices.set(`/${name}/`, { path: `/${name}/`, label: name });
   }
-  choices.set("/iqontrol/images/", {
-    path: "/iqontrol/images/",
-    label: "iqontrol/images",
-  });
+  // iqontrol's www carries both `images/` and `userimages/`, so its root is the
+  // one entry; the separate meta space would only duplicate the latter.
+  if (adapters.includes("iqontrol")) {
+    choices.set("/iqontrol/", { path: "/iqontrol/", label: "iqontrol" });
+  }
   for (const id of metaSpaces) {
-    if (!id) continue;
+    if (!id || id === "iqontrol.meta") continue;
     choices.set(`/${id}/`, { path: `/${id}/`, label: id });
   }
   return [...choices.values()].sort((a, b) => a.label.localeCompare(b.label));

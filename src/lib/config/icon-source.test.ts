@@ -92,15 +92,15 @@ it("builds the stored adapter path", () => {
 
 it("offers every installed icon adapter as a root source", () => {
   const choices = iconSourceChoices(
-    ["icons-freepic", "icons-smarthome", "hue", "icons8", "trash"],
-    ["ihome.meta"],
+    ["icons-freepic", "icons-smarthome", "hue", "icons8", "iqontrol"],
+    ["ihome.meta", "iqontrol.meta"],
   );
   expect(choices.map((c) => c.path)).toEqual([
     "/icons-freepic/",
     "/icons-smarthome/",
     "/icons8/",
     "/ihome.meta/",
-    "/iqontrol/images/",
+    "/iqontrol/",
   ]);
 });
 
