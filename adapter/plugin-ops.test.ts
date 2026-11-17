@@ -171,7 +171,7 @@ describe("validAdapterPlugins", () => {
         name: builtin.name,
         enabled: true,
         builtin: true,
-        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
         debug: false,
         code: undefined,
       })),
@@ -334,6 +334,18 @@ describe("seedBuiltinPlugins", () => {
         settingsSchema: BUILTIN_PLUGINS[2].settingsSchema,
         code: undefined,
       },
+      {
+        id: "external-access",
+        name: BUILTIN_PLUGINS[3].name,
+        enabled: true,
+        builtin: true,
+        timeoutMs: 20_000,
+        debug: false,
+        help: BUILTIN_PLUGINS[3].help,
+        usage: BUILTIN_PLUGINS[3].usage,
+        settingsSchema: BUILTIN_PLUGINS[3].settingsSchema,
+        code: undefined,
+      },
     ]);
   });
 });
@@ -368,5 +380,27 @@ describe("plugin replies", () => {
       error: "nope",
     });
     expect(pluginError("plain")).toEqual({ ok: false, error: "plain" });
+  });
+});
+
+describe("external-access built-in", () => {
+  it("is defined with its four settings", () => {
+    const def = BUILTIN_PLUGINS.find((entry) => entry.id === "external-access");
+    expect(def?.name).toBeTruthy();
+    expect(def?.settingsSchema?.map((setting) => setting.name)).toEqual([
+      "dir",
+      "caddyConfig",
+      "reloadCommand",
+      "publicUrl",
+    ]);
+    expect(def?.usage).toContain("basic_auth");
+  });
+});
+
+describe("external-access timeout", () => {
+  it("gets a longer call budget than the default", () => {
+    const seeded = seedBuiltinPlugins([]);
+    const entry = seeded.find((plugin) => plugin.id === "external-access");
+    expect(entry?.timeoutMs).toBe(20_000);
   });
 });

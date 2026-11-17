@@ -15,11 +15,23 @@
   import { appBaseUrl } from "$lib/config/frame-url";
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
+  import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
+  import { isLocalSession } from "$lib/config/locality";
+  import { browser } from "$app/environment";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
   /** The fieldset is editable after an unlock, or when the PIN is skipped. */
   const locked = $derived(!isUnlocked() && storage.pinDisabled !== true);
+  /** External management only exists on the LAN: the card is not rendered
+   *  when this page is opened through the public https host. */
+  const localSession = $derived(
+    browser &&
+      isLocalSession({
+        protocol: location.protocol,
+        host: location.host,
+      }),
+  );
 
   /** One collapsible item per form; the line keeps what fits, the editor the rest. */
   let openSection = $state("");
@@ -256,6 +268,30 @@
           </div>
         {/if}
       </div>
+
+      {#if localSession}
+        <div class="item" class:open={openSection === "external"}>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(e) => onLineClick(e, "external")}>
+            <Icon value="shield_lock" size={18} />
+            <button
+              type="button"
+              class="name"
+              aria-expanded={openSection === "external"}
+              onclick={() => toggle("external")}>External access</button
+            >
+            <span class="item-actions"
+              ><span class="badge badge-secondary">Caddy</span></span
+            >
+          </div>
+          {#if openSection === "external"}
+            <div class="item-editor">
+              <ExternalAccessCard />
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <div class="item" class:open={openSection === "about"}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->

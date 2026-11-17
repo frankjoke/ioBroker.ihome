@@ -67,6 +67,7 @@ import {
   type PluginReply,
 } from "./plugin-ops";
 import { createHttpPlugins } from "./plugins/http-in";
+import { createExternalAccessPlugins } from "./plugins/external-access";
 import { createNetworkPlugins } from "./plugins/network";
 import {
   locationText,
@@ -2339,7 +2340,11 @@ class IHome extends utils.Adapter {
             error: (message) => this.log.error(message),
           },
         }),
-      { ...createNetworkPlugins(), ...createHttpPlugins() },
+      {
+        ...createNetworkPlugins(),
+        ...createHttpPlugins(),
+        ...createExternalAccessPlugins(),
+      },
       (level, message) => this.log[level](message),
     );
     await this.pluginHost.start();
