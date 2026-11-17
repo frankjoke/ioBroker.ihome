@@ -126,8 +126,11 @@
       id: name,
       name,
       kind: "function",
+      // Most actions react to several inputs and decide per $input; start
+      // there, with Expression one tab away for a single formula.
+      mode: "statements",
       output: { scope: "memory", name },
-      expr: { code: "0" },
+      expr: { code: "noop()" },
     };
     if (commit([...doc.logics, logic])) select(logic);
   }
