@@ -1724,9 +1724,7 @@
               />
               <span>Secured</span>
             </label>
-            <p class="note text-muted">
-              Hidden outside the local network; only visible and editable here.
-            </p>
+            <p class="note text-muted">Secured tile, not visible externally.</p>
           </div>
         {/if}
       {/snippet}
