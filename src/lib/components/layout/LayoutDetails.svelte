@@ -1708,23 +1708,27 @@
 
         {#if id === "security"}
           <div class="field">
-            <label
-              class="check"
-              class:check-danger={tile?.tile?.secured === true}
-              title="Hidden from every list and from the display when iHome is opened through external access (https)."
-            >
-              <input
-                type="checkbox"
-                checked={tile?.tile?.secured === true}
-                onchange={(e) =>
-                  edit((t) => ({
-                    ...t,
-                    secured: e.currentTarget.checked ? true : undefined,
-                  }))}
-              />
-              <span>Secured</span>
-            </label>
-            <p class="note text-muted">Secured tile, not visible externally.</p>
+            <div class="row wrap">
+              <p class="note text-muted">
+                Secured tile, not visible externally.
+              </p>
+              <label
+                class="check"
+                class:check-danger={tile?.tile?.secured === true}
+                title="Hidden from every list and from the display when iHome is opened through external access (https)."
+              >
+                <input
+                  type="checkbox"
+                  checked={tile?.tile?.secured === true}
+                  onchange={(e) =>
+                    edit((t) => ({
+                      ...t,
+                      secured: e.currentTarget.checked ? true : undefined,
+                    }))}
+                />
+                <span>Secured</span>
+              </label>
+            </div>
           </div>
         {/if}
       {/snippet}
