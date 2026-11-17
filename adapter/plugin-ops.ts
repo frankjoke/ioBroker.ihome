@@ -256,7 +256,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "**Install Caddy**",
       "",
       "- Linux: https://caddyserver.com/docs/install#debian-ubuntu-raspbian (apt repo), then `systemctl enable --now caddy`.",
-      "- Windows: `winget install CaddyServer.Caddy` or `choco install caddy`; run `caddy run --config C:\caddy\Caddyfile` as a service.",
+      "- Windows: `winget install CaddyServer.Caddy` or `choco install caddy`; run `caddy run --config C:/caddy/Caddyfile` as a service.",
       "- macOS: `brew install caddy`; `brew services start caddy`.",
       "",
       "**Verify**",

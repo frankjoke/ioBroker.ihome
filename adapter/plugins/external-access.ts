@@ -140,7 +140,7 @@ async function readUsers(dir: string): Promise<ExternalUser[]> {
   try {
     raw = await readFile(join(dir, USERS_FILE), "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((error as { code?: string }).code === "ENOENT") return [];
     throw error;
   }
   const parsed = parseUsers(raw);
@@ -270,10 +270,14 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       const user = request.user;
       const password = request.password;
       if (!validateUsername(user)) {
-        throw new Error("The user name is not valid (letters, digits, . _ -, max 32).");
+        throw new Error(
+          "The user name is not valid (letters, digits, . _ -, max 32).",
+        );
       }
       if (!validatePassword(password)) {
-        throw new Error(`The password must be at least ${MIN_PASSWORD} characters.`);
+        throw new Error(
+          `The password must be at least ${MIN_PASSWORD} characters.`,
+        );
       }
       const users = await readUsers(dir);
       if (users.some((entry) => entry.user === user)) {
