@@ -182,6 +182,7 @@
     />
     {#if inputEntries.length > 0}
       <div class="badges">
+        <span class="label-mono">Insert</span>
         {#each inputEntries as [name, input] (name)}
           <button
             type="button"

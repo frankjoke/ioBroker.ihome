@@ -358,7 +358,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         add(
           id,
           "inputs",
-          "function logic has no event input; it runs once at start",
+          "function logic has no event input — it runs once at start; make an input an event (or give it a timer) to repeat",
           "warn",
         );
       }
