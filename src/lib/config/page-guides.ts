@@ -83,8 +83,8 @@ output works inside the adapter only.
 
 - Add a **Logic** and give it states, events and actions.
 - Add an **Action** for a computed value or a reusable function.
-- **Variable** inputs are read whenever the action runs; **Event** inputs run
-  it, on every new value or timer. A variable never triggers on its own.
+- **Variable** inputs name one source; **Event** inputs may list several
+  sources and timers. Every input runs the logic on each new value.
 - Start from a built-in logic with **From template**.
 - Open a row to edit it; Save sits on its line.
 - Show the adapter log, and filter by room or function.

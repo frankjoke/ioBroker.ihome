@@ -738,6 +738,25 @@ it("runs a function body with this, early returns and noop", () => {
   ]);
 });
 
+it("runs a function when a variable input changes", () => {
+  const { h, engine } = engineWith(
+    doc({
+      init: { run: false },
+      inputs: {
+        temp: {
+          from: { type: "state", ref: "0_userdata.0.T" },
+          kind: "variable",
+        },
+      },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+      expr: code('get("temp") * 2'),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 7);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 14, ack: false }]);
+});
+
 it("noop writes nothing", () => {
   const { h, engine } = engineWith(doc({ expr: code("noop()") }));
   engine.start();

@@ -270,14 +270,9 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         if (every === null || every <= 0) {
           add(id, `inputs.${name}.from.every`, "invalid duration");
         }
-        if ((input.kind ?? "variable") === "variable") {
-          add(id, `inputs.${name}.from.type`, "a variable cannot be a timer");
-        }
       } else if (source.type === "state" || source.type === "memory") {
         const hasTimers =
-          input.kind === "event" &&
-          Array.isArray(input.timers) &&
-          input.timers.length > 0;
+          Array.isArray(input.timers) && input.timers.length > 0;
         if (typeof source.ref !== "string" || (!source.ref && !hasTimers)) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
         }
@@ -293,7 +288,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
             );
           }
         }
-        if (source.type === "state" && input.kind === "event") {
+        if (source.type === "state") {
           const refs = [source.ref, ...(source.refs ?? [])];
           for (const ref of refs) {
             if (typeof ref !== "string" || !ref.startsWith("$logic.")) {
@@ -351,14 +346,11 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       } else {
         checkExpr(fn.expr, (path, message) => add(id, path, message), "expr");
       }
-      const hasEvent = Object.values(inputs).some(
-        (input) => input?.kind === "event" || input?.from?.type === "timer",
-      );
-      if (!hasEvent) {
+      if (Object.keys(inputs).length === 0) {
         add(
           id,
           "inputs",
-          "function logic has no event input — it runs once at start; make an input an event (or give it a timer) to repeat",
+          "function logic has no input — it runs once at start",
           "warn",
         );
       }
@@ -626,10 +618,6 @@ function checkRow(
     }
   } else if (typeof input !== "string" || !inputNames.has(input)) {
     add(id, `${path}.on`, `unknown input ${String(input)}`);
-  } else {
-    const isEvent =
-      inputs[input]?.kind === "event" || inputs[input]?.from?.type === "timer";
-    if (!isEvent) add(id, `${path}.on`, `input ${input} is not an event`);
   }
   if (row?.is) {
     if (!isRecord(row.is) || !row.is.op) {

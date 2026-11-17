@@ -1400,7 +1400,6 @@ export function createEngine(
     for (const rt of runtimes) {
       for (const input of rt.inputs.values()) {
         if (
-          input.input.kind !== "event" ||
           input.input.from.type !== "memory" ||
           input.input.from.ref !== name
         ) {
@@ -1462,7 +1461,6 @@ export function createEngine(
       }
       // A local event input may name the logic output among its states.
       for (const source of rt.inputs.values()) {
-        if (source.input.kind !== "event") continue;
         if (source.input.from.type !== "state") continue;
         const refs = [source.input.from.ref, ...(source.input.from.refs ?? [])];
         if (!refs.includes(input)) continue;
@@ -1617,7 +1615,6 @@ export function createEngine(
         const self = writer === rt.def.id;
         for (const input of rt.inputs.values()) {
           if (!input.stateIds.includes(change.id)) continue;
-          if ((input.input.kind ?? "variable") !== "event") continue;
           const previous = input.lastById.get(change.id);
           const hasPrevious = input.lastById.has(change.id);
           input.lastById.set(change.id, change.val);
