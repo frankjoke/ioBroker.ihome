@@ -138,6 +138,9 @@ export interface TileConfig {
    *  it. Absent, empty or malformed → the page opens freely, and a tile with no
    *  detail page ignores it entirely (`tileNeedsPin`). Not part of a template. */
   pin?: string;
+  /** Hidden from every list and from the display outside the local network.
+   *  A visibility layer, not an authorisation boundary. */
+  secured?: boolean;
   slots?: Slot[];
 }
 
@@ -319,6 +322,8 @@ export interface Template {
   help?: string;
   builtin?: boolean;
   basedOn?: string; // preset id this was copied from
+  /** Hidden outside the local network; absent = not secured. */
+  secured?: boolean;
   type: DeviceType;
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */

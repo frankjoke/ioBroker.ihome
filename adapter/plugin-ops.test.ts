@@ -77,6 +77,17 @@ describe("validAdapterPlugins", () => {
     expect(plugin.settingsSchema?.[0].type).toBe("number");
   });
 
+  it("keeps the secured flag and ignores a non-boolean one", () => {
+    const [secured] = validAdapterPlugins([
+      { id: "my.plugin", name: "My", code: "x", secured: true },
+    ]);
+    expect(secured.secured).toBe(true);
+    const [loose] = validAdapterPlugins([
+      { id: "my.plugin", name: "My", code: "x", secured: "yes" },
+    ]);
+    expect(loose.secured).toBeUndefined();
+  });
+
   it("drops nested settings values instead of the plugin", () => {
     const [plugin] = validAdapterPlugins([
       {

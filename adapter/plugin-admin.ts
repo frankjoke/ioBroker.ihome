@@ -19,6 +19,7 @@ export interface PluginPatch {
   enabled?: boolean;
   timeoutMs?: number;
   debug?: boolean;
+  secured?: boolean;
   help?: string;
   usage?: string;
   settings?: Record<string, unknown>;
@@ -34,6 +35,8 @@ export interface PluginView {
   builtin: boolean;
   timeoutMs: number;
   debug: boolean;
+  /** Hidden from the Plugins list outside the local network. */
+  secured?: boolean;
   help?: string;
   usage?: string;
   settings?: Record<string, unknown>;
@@ -154,6 +157,12 @@ export function applyPluginPatches(
         fail(`plugin ${patch.id} debug must be true or false`);
       } else next.debug = patch.debug;
     }
+    if (patch.secured !== undefined) {
+      if (typeof patch.secured !== "boolean") {
+        fail(`plugin ${patch.id} secured must be true or false`);
+      } else if (patch.secured) next.secured = true;
+      else delete next.secured;
+    }
     if (patch.timeoutMs !== undefined) {
       if (
         typeof patch.timeoutMs !== "number" ||
@@ -201,6 +210,7 @@ export function pluginView(
     builtin: plugin.builtin === true,
     timeoutMs: plugin.timeoutMs,
     debug: plugin.debug,
+    ...(plugin.secured ? { secured: true } : {}),
     ...(plugin.help ? { help: plugin.help } : {}),
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
@@ -234,6 +244,8 @@ function parsePatch(value: unknown): PluginPatch | null {
   }
   const debug = value.debug;
   if (debug !== undefined && typeof debug !== "boolean") return null;
+  const secured = value.secured;
+  if (secured !== undefined && typeof secured !== "boolean") return null;
   const help = value.help;
   if (help !== undefined && typeof help !== "string") return null;
   const usage = value.usage;
@@ -245,6 +257,7 @@ function parsePatch(value: unknown): PluginPatch | null {
   if (typeof enabled === "boolean") patch.enabled = enabled;
   if (typeof timeoutMs === "number") patch.timeoutMs = timeoutMs;
   if (typeof debug === "boolean") patch.debug = debug;
+  if (typeof secured === "boolean") patch.secured = secured;
   if (typeof help === "string") patch.help = help;
   if (typeof usage === "string") patch.usage = usage;
   if (record(settings)) patch.settings = settings;

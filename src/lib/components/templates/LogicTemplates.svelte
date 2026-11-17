@@ -4,6 +4,8 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import { BUILTIN_TEMPLATES } from "$logic/templates";
   import { logicTemplateProblem } from "$lib/config/logic-templates";
   import {
@@ -25,6 +27,7 @@
   const writable = $derived(isLogicsWritable());
   const blocked = $derived(logicBlocked());
   const saveFailed = $derived(logicSaveFailed());
+  const local = isLocalUi();
   const builtinIds = new Set(BUILTIN_TEMPLATES.map((template) => template.id));
   const allTemplates = $derived([
     ...BUILTIN_TEMPLATES,
@@ -53,6 +56,13 @@
   );
   const isBuiltin = $derived(!!selected && builtinIds.has(selected.id));
   const isDirty = $derived(!!selected && json !== loadedJson);
+  const draft = $derived.by(() => {
+    try {
+      return JSON.parse(json) as LogicTemplate;
+    } catch {
+      return null;
+    }
+  });
 
   $effect(() => {
     if (!selected) return;
@@ -89,17 +99,20 @@
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();
-    const list = q
-      ? allTemplates.filter(
-          (template) =>
-            String(template.name ?? "")
-              .toLowerCase()
-              .includes(q) ||
-            String(template.description ?? "")
-              .toLowerCase()
-              .includes(q),
-        )
-      : [...allTemplates];
+    const list = withoutSecured(
+      q
+        ? allTemplates.filter(
+            (template) =>
+              String(template.name ?? "")
+                .toLowerCase()
+                .includes(q) ||
+              String(template.description ?? "")
+                .toLowerCase()
+                .includes(q),
+          )
+        : allTemplates,
+      local,
+    );
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort(
       (a, b) => dir * String(a.name ?? "").localeCompare(String(b.name ?? "")),
@@ -123,6 +136,16 @@
       return;
     }
     selectedId = copy.id;
+  }
+
+  /** The secured flag is part of the JSON draft, so Save stays the one write. */
+  function setSecured(secured: boolean): void {
+    if (!draft) return;
+    json = JSON.stringify(
+      { ...draft, secured: secured ? true : undefined },
+      null,
+      2,
+    );
   }
 
   export function save(): void {
@@ -318,6 +341,21 @@
         bind:value={json}
         aria-label="Logic template JSON"
       ></textarea>
+      {#if local && !isBuiltin}
+        <label
+          class="check"
+          class:check-danger={draft?.secured === true}
+          title="Hidden from every list when iHome is opened through external access (https)."
+        >
+          <input
+            type="checkbox"
+            checked={draft?.secured === true}
+            disabled={!writable || blocked}
+            onchange={(event) => setSecured(event.currentTarget.checked)}
+          />
+          <span>Secured</span>
+        </label>
+      {/if}
       {#if error}
         <p class="text-danger hint">{error}</p>
       {/if}

@@ -42,6 +42,8 @@ export interface TemplateBundle {
   description?: string;
   /** Long-form Markdown help shown in the browser and apply dialog. */
   help?: string;
+  /** Hidden outside the local network; absent = not secured. */
+  secured?: boolean;
   params?: TemplateParameter[];
   /** Shared state/item definitions. */
   items?: TemplateItem[];

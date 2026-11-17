@@ -14,6 +14,8 @@
     findPluginDevice,
   } from "$lib/config/plugin-bundle";
   import { PLUGIN_GUIDE } from "$lib/config/plugin-guide";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import {
     getPlugins,
     loadPlugins,
@@ -51,7 +53,7 @@
   let importOpen = $state(false);
   let pendingBundle = $state<PluginView | null>(null);
   let bundleError = $state("");
-  const plugins = $derived(getPlugins());
+  const plugins = $derived(withoutSecured(getPlugins(), isLocalUi()));
   const loading = $derived(pluginsLoading());
   const error = $derived(pluginsError());
 

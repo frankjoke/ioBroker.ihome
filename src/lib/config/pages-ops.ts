@@ -119,8 +119,14 @@ export function resolveByMember<T extends FilterableDevice>(
  * tiles), and a device with nothing to show is skipped unless the section asks
  * for empties.
  */
-export function resolveSection(group: Group): ResolvedTile[] {
-  return (group.tiles ?? []).map((placement) => ({ placement }));
+export function resolveSection(
+  group: Group,
+  /** The display's filter: a secured tile is dropped outside the LAN. */
+  include?: (placement: Placement) => boolean,
+): ResolvedTile[] {
+  return (group.tiles ?? [])
+    .filter((placement) => include?.(placement) ?? true)
+    .map((placement) => ({ placement }));
 }
 
 /**
@@ -129,9 +135,12 @@ export function resolveSection(group: Group): ResolvedTile[] {
  * one section — nothing is claimed — and an empty section stays visible when
  * it has a title or asks for empties.
  */
-export function resolvePage(page: Page): ResolvedGroup[] {
+export function resolvePage(
+  page: Page,
+  include?: (placement: Placement) => boolean,
+): ResolvedGroup[] {
   return (page.groups ?? [])
-    .map((group) => ({ group, tiles: resolveSection(group) }))
+    .map((group) => ({ group, tiles: resolveSection(group, include) }))
     .filter(
       (r) =>
         r.tiles.length > 0 ||

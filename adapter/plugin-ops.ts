@@ -7,6 +7,9 @@ export interface AdapterPlugin {
   timeoutMs: number;
   /** Gates `api.log.debug`; info/warn/error always pass. */
   debug: boolean;
+  /** Hidden from the Plugins list outside the local network. A visibility
+   *  layer, not an authorisation boundary. */
+  secured?: boolean;
   /** Long-form Markdown help. */
   help?: string;
   /** Markdown usage/payload examples. */
@@ -609,6 +612,7 @@ function validEntry(
       builtin: true,
       timeoutMs: timeoutOf(value.timeoutMs),
       debug: value.debug === true,
+      ...(value.secured === true ? { secured: true } : {}),
       ...(builtin.help ? { help: builtin.help } : {}),
       ...(builtin.usage ? { usage: builtin.usage } : {}),
       ...(builtin.settingsSchema
@@ -642,6 +646,7 @@ function validEntry(
     builtin: false,
     timeoutMs: timeoutOf(value.timeoutMs),
     debug: value.debug === true,
+    ...(value.secured === true ? { secured: true } : {}),
     ...(help ? { help } : {}),
     ...(usage ? { usage } : {}),
     ...(settings ? { settings } : {}),

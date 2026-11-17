@@ -19,3 +19,15 @@ export function isLocalSession(args: {
       .toLowerCase() === "http:"
   );
 }
+
+/** This page's session: the rule every local-only control uses (external
+ *  access is https, the LAN is plain http). False during SSR/tests. */
+export function isLocalUi(
+  where?: { protocol: string; host: string } | null,
+): boolean {
+  const page =
+    where !== undefined
+      ? where
+      : (globalThis.location as { protocol: string; host: string } | undefined);
+  return !!page && isLocalSession(page);
+}

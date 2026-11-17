@@ -64,6 +64,7 @@ export function migrateTemplateBundleLibrary(
             typeof entry.description === "string"
               ? entry.description
               : undefined,
+          ...(entry.secured === true ? { secured: true } : {}),
           params: Array.isArray(entry.params) ? entry.params : undefined,
           items: Array.isArray(entry.items) ? entry.items : undefined,
           device:
