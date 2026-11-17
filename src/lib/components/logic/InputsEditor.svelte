@@ -231,7 +231,13 @@
             {name}
           </button>
         {/if}
-        <span class="badge badge-secondary">{input.kind}</span>
+        <span
+          class="badge badge-secondary"
+          title={input.kind === "event"
+            ? "Runs the logic on every change"
+            : "Read when the logic runs; does not trigger it"}
+          >{input.kind}</span
+        >
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
         {#if sourceReading(input)}
           <span class="input-reading mono">{sourceReading(input)}</span>
