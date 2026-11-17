@@ -2340,7 +2340,11 @@ class IHome extends utils.Adapter {
             error: (message) => this.log.error(message),
           },
         }),
-      { ...createNetworkPlugins(), ...createHttpPlugins(), ...createExternalAccessPlugins() },
+      {
+        ...createNetworkPlugins(),
+        ...createHttpPlugins(),
+        ...createExternalAccessPlugins(),
+      },
       (level, message) => this.log[level](message),
     );
     await this.pluginHost.start();

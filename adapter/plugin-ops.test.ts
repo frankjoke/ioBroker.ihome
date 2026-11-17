@@ -171,7 +171,7 @@ describe("validAdapterPlugins", () => {
         name: builtin.name,
         enabled: true,
         builtin: true,
-        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
         debug: false,
         code: undefined,
       })),
@@ -339,7 +339,7 @@ describe("seedBuiltinPlugins", () => {
         name: BUILTIN_PLUGINS[3].name,
         enabled: true,
         builtin: true,
-        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+        timeoutMs: 20_000,
         debug: false,
         help: BUILTIN_PLUGINS[3].help,
         usage: BUILTIN_PLUGINS[3].usage,
@@ -394,5 +394,13 @@ describe("external-access built-in", () => {
       "publicUrl",
     ]);
     expect(def?.usage).toContain("basic_auth");
+  });
+});
+
+describe("external-access timeout", () => {
+  it("gets a longer call budget than the default", () => {
+    const seeded = seedBuiltinPlugins([]);
+    const entry = seeded.find((plugin) => plugin.id === "external-access");
+    expect(entry?.timeoutMs).toBe(20_000);
   });
 });

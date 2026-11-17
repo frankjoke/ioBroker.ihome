@@ -123,14 +123,37 @@ function reloadCommand(api: PluginApi): string {
   return own || `caddy reload --config ${quote(caddyConfig(api))}`;
 }
 
-/** The previous file stays in place until the temp file is renamed over it. */
+/** Write through a temp file; on any failure the previous bytes are restored. */
 async function atomicWrite(path: string, content: string): Promise<void> {
   const temp = `${path}.${process.pid}.tmp`;
-  await writeFile(temp, content, "utf8");
-  await rename(temp, path);
-  const back = await readFile(path, "utf8");
-  if (back !== content) {
-    throw new Error(`write verification failed: ${path}`);
+  let previous: string | null = null;
+  try {
+    previous = await readFile(path, "utf8");
+  } catch {
+    previous = null;
+  }
+  try {
+    await writeFile(temp, content, "utf8");
+    await rename(temp, path);
+    const back = await readFile(path, "utf8");
+    if (back !== content) {
+      throw new Error(`write verification failed: ${path}`);
+    }
+  } catch (error) {
+    await rm(temp, { force: true }).catch(() => undefined);
+    if (previous !== null) {
+      await writeFile(path, previous, "utf8").catch(() => undefined);
+    }
+    throw error;
+  }
+}
+
+async function usersFileExists(dir: string): Promise<boolean> {
+  try {
+    await readFile(join(dir, USERS_FILE), "utf8");
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -170,7 +193,10 @@ function run(command: string, cwd: string): Promise<RunResult> {
       command,
       { cwd, timeout: 15_000, windowsHide: true },
       (error, stdout, stderr) => {
-        const output = `${stdout ?? ""}${stderr ?? ""}`.trim();
+        const output = [stdout ?? "", stderr ?? "", error?.message ?? ""]
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .join("\n");
         resolve({
           ok: !error,
           command,
@@ -183,7 +209,25 @@ function run(command: string, cwd: string): Promise<RunResult> {
 }
 
 async function status(api: PluginApi): Promise<unknown> {
-  const dir = folder(api);
+  const dir = text(api.settings.dir);
+  if (!dir) {
+    return {
+      folder: { path: "", writable: false },
+      users: {
+        count: 0,
+        enabled: 0,
+        problem:
+          "Set the data folder in the plugin settings (Advanced → Plugins → External access).",
+      },
+      snippet: { path: "", exists: false, current: false, users: 0 },
+      caddy: {
+        config: caddyConfig(api),
+        validateCommand: validateCommand(api),
+        reloadCommand: reloadCommand(api),
+      },
+      publicUrl: {},
+    };
+  }
   let writable = true;
   try {
     await mkdir(dir, { recursive: true });
@@ -220,7 +264,13 @@ async function status(api: PluginApi): Promise<unknown> {
         method: "HEAD",
         signal: controller.signal,
       });
-      publicUrl = { url, status: response.status, ok: response.ok };
+      const protectedSite = response.status === 401 || response.status === 403;
+      publicUrl = {
+        url,
+        status: response.status,
+        ok: response.ok || protectedSite,
+        ...(protectedSite ? { protected: true } : {}),
+      };
     } catch (error) {
       publicUrl = {
         url,
@@ -294,7 +344,10 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       const users = await readUsers(dir);
       const entry = users.find((item) => item.user === user);
       if (!entry) throw new Error(`Unknown user: ${String(user)}`);
-      entry.enabled = request.enabled !== false;
+      if (typeof request.enabled !== "boolean") {
+        throw new Error("enabled must be true or false.");
+      }
+      entry.enabled = request.enabled;
       await writeUsers(dir, users);
       return { users: publicUsers(users) };
     }
@@ -309,7 +362,8 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       return { users: publicUsers(next) };
     }
     case "snippet.write": {
-      const users = await readUsers(dir);
+      const exists = await usersFileExists(dir);
+      const users = exists ? await readUsers(dir) : [];
       const content = caddySnippet(users);
       const path = join(dir, SNIPPET_FILE);
       let previous = "";
@@ -317,6 +371,11 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
         previous = await readFile(path, "utf8");
       } catch {
         previous = "";
+      }
+      if (!exists && previous.trim()) {
+        throw new Error(
+          `${USERS_FILE} is missing — refusing to empty the live Caddy snippet.`,
+        );
       }
       if (previous !== content) await atomicWrite(path, content);
       return {
@@ -328,10 +387,19 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
     case "caddy.validate":
       return run(validateCommand(api), dir);
     case "caddy.reload": {
+      const expected = caddySnippet(await readUsers(dir));
+      let current = "";
       try {
-        await readFile(join(dir, SNIPPET_FILE), "utf8");
+        current = await readFile(join(dir, SNIPPET_FILE), "utf8");
       } catch {
+        current = "";
+      }
+      if (!current)
         throw new Error("Write the snippet before reloading Caddy.");
+      if (current !== expected) {
+        throw new Error(
+          "The snippet is stale — press Write snippet before reloading Caddy.",
+        );
       }
       return run(reloadCommand(api), dir);
     }

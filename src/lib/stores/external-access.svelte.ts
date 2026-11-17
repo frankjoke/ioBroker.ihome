@@ -17,7 +17,6 @@ let users = $state<ExternalUserView[]>([]);
 let status = $state<Record<string, unknown> | null>(null);
 let snippet = $state<Record<string, unknown> | null>(null);
 let problem = $state("");
-let busy = $state(false);
 
 export function getExternalUsers(): ExternalUserView[] {
   return users;
@@ -33,10 +32,6 @@ export function getExternalSnippet(): Record<string, unknown> | null {
 
 export function getExternalProblem(): string {
   return problem;
-}
-
-export function externalAccessBusy(): boolean {
-  return busy;
 }
 
 function failed(error: unknown): never {
@@ -75,15 +70,17 @@ function applyUsers(reply: unknown): void {
 
 /** Status first, then the list; a failure leaves the previous data alone. */
 export async function loadExternalAccess(): Promise<void> {
-  busy = true;
   try {
-    status = (await call("status")) as Record<string, unknown>;
+    await refreshStatus();
     applyUsers(await call("users.list"));
   } catch {
     /* problem already set */
-  } finally {
-    busy = false;
   }
+}
+
+/** Re-read the status after a change, so the snippet badge never lies. */
+async function refreshStatus(): Promise<void> {
+  status = (await call("status")) as Record<string, unknown>;
 }
 
 export async function addExternalUser(
@@ -105,10 +102,12 @@ export async function setExternalUserEnabled(
   enabled: boolean,
 ): Promise<void> {
   applyUsers(await call("users.setEnabled", { user, enabled }));
+  await refreshStatus();
 }
 
 export async function removeExternalUser(user: string): Promise<void> {
   applyUsers(await call("users.remove", { user }));
+  await refreshStatus();
 }
 
 export async function writeExternalSnippet(): Promise<void> {

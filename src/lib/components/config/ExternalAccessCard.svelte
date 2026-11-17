@@ -4,7 +4,6 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import {
     addExternalUser,
-    externalAccessBusy,
     getExternalProblem,
     getExternalSnippet,
     getExternalStatus,
@@ -17,6 +16,7 @@
     writeExternalSnippet,
   } from "$lib/stores/external-access.svelte";
   import { onMount } from "svelte";
+  import { base } from "$app/paths";
 
   let name = $state("");
   let password = $state("");
@@ -65,9 +65,19 @@
     outputs = "";
     try {
       const reply = (await action()) as
-        | { ok?: boolean; command?: string; output?: string; code?: unknown }
+        | {
+            ok?: boolean;
+            changed?: boolean;
+            command?: string;
+            output?: string;
+            code?: unknown;
+          }
         | undefined;
-      if (reply && "ok" in reply) {
+      if (reply && "changed" in reply) {
+        outputs = reply.changed
+          ? "Snippet written."
+          : "Snippet is already current.";
+      } else if (reply && "ok" in reply) {
         outputs =
           `${reply.ok ? "ok" : `failed (${String(reply.code ?? "")})`}\n$ ${reply.command ?? ""}\n${reply.output ?? ""}`.trim();
       }
@@ -192,7 +202,11 @@
       </label>
       <label class="field">
         <span class="label-mono">Password</span>
-        <input type="text" bind:value={password} autocomplete="new-password" />
+        <input
+          type="password"
+          bind:value={password}
+          autocomplete="new-password"
+        />
       </label>
       <label class="field">
         <span class="label-mono">Note</span>
@@ -211,7 +225,10 @@
         <button
           type="button"
           class="btn btn-outline btn-sm"
-          onclick={() => (addOpen = false)}>Cancel</button
+          onclick={() => {
+            addOpen = false;
+            password = "";
+          }}>Cancel</button
         >
       </div>
     </div>
@@ -254,13 +271,17 @@
 
   {#if outputs}<pre class="output">{outputs}</pre>{/if}
   {#if problem}<p class="text-danger hint">{problem}</p>{/if}
-  {#if snippet?.path}
+  {#if snippet?.path ?? snippetState.path}
     <p class="hint text-muted">
-      Caddyfile import: <code>{`basic_auth { import ${snippet.path} }`}</code>
+      Caddyfile import:
+      <code
+        >{`basic_auth { import ${snippet?.path ?? snippetState.path} }`}</code
+      >
     </p>
   {/if}
   <p class="hint text-muted">
-    Setup guide: <a href="/#/plugins">Advanced → Plugins → External access</a>.
+    Setup guide:
+    <a href="{base}/#/plugins">Advanced → Plugins → External access</a>.
   </p>
 </section>
 

@@ -57,6 +57,8 @@ export interface PluginSettingDef {
 export interface BuiltinPluginDef {
   id: string;
   name: string;
+  /** Default call timeout for this built-in (ms); falls back to the global. */
+  timeoutMs?: number;
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
@@ -231,6 +233,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "external-access",
     name: "External access (Caddy)",
+    timeoutMs: 20_000,
     help: "Manages the logins for iHome's external access: users are stored as bcrypt hashes and the plugin writes the user lines your Caddyfile imports. It never edits the Caddyfile and only reloads Caddy when you press the button.",
     usage: [
       "**What it does**",
@@ -694,7 +697,7 @@ export function seedBuiltinPlugins(
       name: builtin.name,
       enabled: true,
       builtin: true,
-      timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+      timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
       debug: false,
       ...(builtin.help ? { help: builtin.help } : {}),
       ...(builtin.usage ? { usage: builtin.usage } : {}),
@@ -729,7 +732,7 @@ export function pluginConfigWithBuiltins(
       name: builtin.name,
       enabled: true,
       builtin: true,
-      timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
+      timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
       debug: false,
       code: undefined,
     }));

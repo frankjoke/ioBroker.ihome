@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PluginApi } from "../plugin-api";
@@ -99,8 +99,16 @@ it("refuses to overwrite a corrupt users file", async () => {
 
 it("excludes a disabled user from the snippet after writing it", async () => {
   const mod = plugin();
-  await mod.call!({ action: "users.add", user: "alice", password: "long-enough" });
-  await mod.call!({ action: "users.add", user: "bob", password: "long-enough" });
+  await mod.call!({
+    action: "users.add",
+    user: "alice",
+    password: "long-enough",
+  });
+  await mod.call!({
+    action: "users.add",
+    user: "bob",
+    password: "long-enough",
+  });
   await mod.call!({ action: "users.setEnabled", user: "bob", enabled: false });
   await mod.call!({ action: "snippet.write" });
   const snippet = await readFile(join(dir, "caddy-users.conf"), "utf8");
@@ -110,7 +118,11 @@ it("excludes a disabled user from the snippet after writing it", async () => {
 
 it("reports a stale snippet in the status", async () => {
   const mod = plugin();
-  await mod.call!({ action: "users.add", user: "alice", password: "long-enough" });
+  await mod.call!({
+    action: "users.add",
+    user: "alice",
+    password: "long-enough",
+  });
   const before = (await mod.call!({ action: "status" })) as {
     snippet: { current: boolean };
   };
@@ -120,4 +132,49 @@ it("reports a stale snippet in the status", async () => {
     snippet: { current: boolean };
   };
   expect(after.snippet.current).toBe(true);
+});
+
+it("refuses to reload a stale snippet", async () => {
+  const mod = plugin();
+  await mod.call!({
+    action: "users.add",
+    user: "alice",
+    password: "long-enough",
+  });
+  await mod.call!({ action: "snippet.write" });
+  await mod.call!({
+    action: "users.setEnabled",
+    user: "alice",
+    enabled: false,
+  });
+  await expect(mod.call!({ action: "caddy.reload" })).rejects.toThrow(/stale/);
+});
+
+it("refuses to empty a live snippet when users.json is gone", async () => {
+  const mod = plugin();
+  await mod.call!({
+    action: "users.add",
+    user: "alice",
+    password: "long-enough",
+  });
+  await mod.call!({ action: "snippet.write" });
+  await rm(join(dir, "users.json"));
+  await expect(mod.call!({ action: "snippet.write" })).rejects.toThrow(
+    /missing/,
+  );
+  expect(await readFile(join(dir, "caddy-users.conf"), "utf8")).toContain(
+    "alice",
+  );
+});
+
+it("requires a real boolean for the enabled flag", async () => {
+  const mod = plugin();
+  await mod.call!({
+    action: "users.add",
+    user: "alice",
+    password: "long-enough",
+  });
+  await expect(
+    mod.call!({ action: "users.setEnabled", user: "alice", enabled: "false" }),
+  ).rejects.toThrow(/true or false/);
 });

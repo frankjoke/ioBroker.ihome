@@ -3,13 +3,9 @@ import { beforeEach, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => {
   const replies: Record<string, unknown> = {};
   const send = vi.fn(
-    async (
-      _ns: string,
-      _cmd: string,
-      payload: unknown,
-    ): Promise<unknown> => {
-    const action = (payload as { payload?: { action?: string } } | undefined)
-      ?.payload?.action;
+    async (_ns: string, _cmd: string, payload: unknown): Promise<unknown> => {
+      const action = (payload as { payload?: { action?: string } } | undefined)
+        ?.payload?.action;
       return {
         ok: true,
         result: replies[action ?? ""] ?? { users: [] },
@@ -81,4 +77,16 @@ it("surfaces a plugin error as the problem text", async () => {
   const s = await store();
   await expect(s.validateExternalCaddy()).rejects.toThrow("caddy missing");
   expect(s.getExternalProblem()).toBe("caddy missing");
+});
+
+it("refreshes the status after a toggle or removal", async () => {
+  h.replies["users.remove"] = { users: [] };
+  h.replies["status"] = { snippet: { current: false } };
+  const s = await store();
+  await s.removeExternalUser("alice");
+  expect(h.send).toHaveBeenLastCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "status" },
+  });
+  expect(s.getExternalStatus()).toMatchObject({ snippet: { current: false } });
 });
