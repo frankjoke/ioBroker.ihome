@@ -27,6 +27,9 @@
     where = "",
     logics = [],
     selfId = "",
+    /** The row whose fields are open; the parent binds it to close it when the
+     *  code field takes focus. */
+    editing = $bindable(null),
   }: {
     inputs: Record<string, Input>;
     onchange: (inputs: Record<string, Input>) => void;
@@ -38,10 +41,9 @@
     logics?: LogicDef[];
     /** The logic being edited, excluded from its own event sources. */
     selfId?: string;
+    editing?: string | null;
   } = $props();
 
-  /** The row whose fields are open; one at a time. */
-  let editing = $state<string | null>(null);
   /** Deleting an input always asks first. */
   let pendingDelete = $state<string | null>(null);
   /** The add-variable dialog: name and source in one step. */

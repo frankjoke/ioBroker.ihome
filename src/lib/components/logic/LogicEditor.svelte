@@ -37,6 +37,8 @@
   const output = $derived<Output>(
     draft.output ?? { scope: "memory", name: draft.id },
   );
+  /** The open inputs row; focusing the result closes it. */
+  let inputRow = $state<string | null>(null);
   const RESULT_PLACEHOLDER = 'get("temp") > 20 ? "On" : "Off"';
   const STATEMENT_RESULT_PLACEHOLDER =
     "if ($value > 20) return true;\nreturn this.NOOP";
@@ -221,6 +223,7 @@
       where={draft.name}
       {logics}
       selfId={draft.id}
+      bind:editing={inputRow}
     />
   </div>
 
@@ -269,6 +272,7 @@
         allowNoop
         {logics}
         inputs={draft.inputs}
+        onfocus={() => (inputRow = null)}
         onchange={(code) => patch({ expr: { code } })}
       />
       {#if dirty}

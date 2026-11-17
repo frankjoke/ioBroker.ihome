@@ -24,6 +24,7 @@
     stateNames = [],
     logics = [],
     inputs = {},
+    onfocus,
   }: {
     code: string;
     onchange: (code: string) => void;
@@ -43,6 +44,8 @@
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
+    /** The field took focus (the caller may close another editor). */
+    onfocus?: () => void;
   } = $props();
 
   const STATEMENT_PLACEHOLDER =
@@ -209,6 +212,7 @@
       value={code}
       aria-label={label}
       aria-invalid={problem ? "true" : undefined}
+      onfocus={() => onfocus?.()}
       aria-describedby={[problem ? errorId : "", hint ? hintId : ""]
         .filter(Boolean)
         .join(" ") || undefined}
