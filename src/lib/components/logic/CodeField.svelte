@@ -167,7 +167,9 @@
         class="btn btn-sm btn-outline"
         title="Leave the output unchanged"
         onmousedown={rememberSelection}
-        onclick={() => insertText("noop()")}>No update</button
+        onclick={() =>
+          insertText(mode === "statements" ? "return noop()" : "noop()")}
+        >No update</button
       >
     {/if}
     <SnippetSelect
