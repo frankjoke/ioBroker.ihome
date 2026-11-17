@@ -8,6 +8,8 @@
   } from "$lib/config/template-bundles";
   import { insertAtCaret } from "$lib/components/logic/code-field";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import SnippetInput from "$lib/components/templates/SnippetInput.svelte";
   import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
   import {
@@ -55,14 +57,19 @@
 
   const writable = $derived(isTemplateBundlesWritable());
   const saveFailed = $derived(templateBundleSaveFailed());
-  const deviceChoices = $derived([
-    ...Object.values(PRESETS),
-    ...(getTemplateRegistry().templates ?? []),
-  ]);
-  const logicChoices = $derived([
-    ...BUILTIN_TEMPLATES,
-    ...(getLogicDocument().templates ?? []),
-  ]);
+  const local = isLocalUi();
+  const deviceChoices = $derived(
+    withoutSecured(
+      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      local,
+    ),
+  );
+  const logicChoices = $derived(
+    withoutSecured(
+      [...BUILTIN_TEMPLATES, ...(getLogicDocument().templates ?? [])],
+      local,
+    ),
+  );
   const bundleIds = $derived(getTemplateBundles().map((entry) => entry.id));
   const logicIds = $derived(getLogicDocument().logics.map((logic) => logic.id));
   const problem = $derived(
@@ -233,6 +240,24 @@
       placeholder="What it does, what to configure first, and links to docs."
     ></textarea></label
   >
+
+  {#if local && !builtin}
+    <label
+      class="check"
+      class:check-danger={draft.secured === true}
+      title="Hidden from every list when iHome is opened through external access (https)."
+    >
+      <input
+        type="checkbox"
+        checked={draft.secured === true}
+        disabled={!writable}
+        onchange={(event) => {
+          draft.secured = event.currentTarget.checked ? true : undefined;
+        }}
+      />
+      <span>Secured</span>
+    </label>
+  {/if}
 
   {#if !writable}
     <p class="text-danger hint">

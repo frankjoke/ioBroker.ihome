@@ -815,6 +815,13 @@ input[type="checkbox"] {
   padding: 0;
 }
 
+/* A checked box that warns: the secured flag. Reads red in both themes. */
+.check-danger,
+.check-danger input {
+  color: var(--danger-color);
+  accent-color: var(--danger-color);
+}
+
 label {
   font-size: var(--body-sm);
   font-weight: 500;

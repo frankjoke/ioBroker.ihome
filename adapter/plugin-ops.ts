@@ -7,6 +7,9 @@ export interface AdapterPlugin {
   timeoutMs: number;
   /** Gates `api.log.debug`; info/warn/error always pass. */
   debug: boolean;
+  /** Hidden from the Plugins list outside the local network. A visibility
+   *  layer, not an authorisation boundary. */
+  secured?: boolean;
   /** Long-form Markdown help. */
   help?: string;
   /** Markdown usage/payload examples. */
@@ -59,6 +62,9 @@ export interface BuiltinPluginDef {
   name: string;
   /** Default call timeout for this built-in (ms); falls back to the global. */
   timeoutMs?: number;
+  /** Seeded hidden from the UI outside the local network. An explicit
+   *  `secured: false` from the Plugins page overrides it. */
+  secured?: boolean;
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
@@ -234,6 +240,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
     id: "external-access",
     name: "External access (Caddy)",
     timeoutMs: 20_000,
+    secured: true,
     help: "Manages the logins for iHome's external access: users are stored as bcrypt hashes and the plugin writes the user lines your Caddyfile imports. It never edits the Caddyfile and only reloads Caddy when you press the button.",
     usage: [
       "**What it does**",
@@ -609,6 +616,7 @@ function validEntry(
       builtin: true,
       timeoutMs: timeoutOf(value.timeoutMs),
       debug: value.debug === true,
+      ...(typeof value.secured === "boolean" ? { secured: value.secured } : {}),
       ...(builtin.help ? { help: builtin.help } : {}),
       ...(builtin.usage ? { usage: builtin.usage } : {}),
       ...(builtin.settingsSchema
@@ -642,6 +650,7 @@ function validEntry(
     builtin: false,
     timeoutMs: timeoutOf(value.timeoutMs),
     debug: value.debug === true,
+    ...(typeof value.secured === "boolean" ? { secured: value.secured } : {}),
     ...(help ? { help } : {}),
     ...(usage ? { usage } : {}),
     ...(settings ? { settings } : {}),
@@ -704,6 +713,7 @@ export function seedBuiltinPlugins(
       debug: false,
       ...(builtin.help ? { help: builtin.help } : {}),
       ...(builtin.usage ? { usage: builtin.usage } : {}),
+      ...(builtin.secured ? { secured: true } : {}),
       ...(builtin.settingsSchema
         ? { settingsSchema: builtin.settingsSchema }
         : {}),
@@ -723,6 +733,14 @@ export function pluginConfigWithBuiltins(
   builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
 ): unknown[] {
   const current = Array.isArray(raw) ? raw : [];
+  // A built-in's secured default applies once; an explicit false from the
+  // Plugins page stays in the raw entry and is never overwritten.
+  const upgraded = current.map((value) => {
+    if (!record(value)) return value;
+    const def = builtins.find((builtin) => builtin.id === value.id);
+    if (!def?.secured || value.secured !== undefined) return value;
+    return { ...value, secured: true };
+  });
   const validBuiltinIds = new Set(
     validAdapterPlugins(raw, builtins)
       .filter((plugin) => plugin.builtin)
@@ -737,9 +755,10 @@ export function pluginConfigWithBuiltins(
       builtin: true,
       timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
       debug: false,
+      ...(builtin.secured ? { secured: true } : {}),
       code: undefined,
     }));
-  return [...current, ...missing];
+  return [...upgraded, ...missing];
 }
 
 /** The `plugin` message payload, or the reason it cannot be used. */

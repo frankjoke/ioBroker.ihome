@@ -16,8 +16,7 @@
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
-  import { isLocalSession } from "$lib/config/locality";
-  import { browser } from "$app/environment";
+  import { isLocalUi } from "$lib/config/locality";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
@@ -25,13 +24,7 @@
   const locked = $derived(!isUnlocked() && storage.pinDisabled !== true);
   /** External management only exists on the LAN: the card is not rendered
    *  when this page is opened through the public https host. */
-  const localSession = $derived(
-    browser &&
-      isLocalSession({
-        protocol: location.protocol,
-        host: location.host,
-      }),
-  );
+  const localSession = $derived(isLocalUi());
 
   /** One collapsible item per form; the line keeps what fits, the editor the rest. */
   let openSection = $state("");

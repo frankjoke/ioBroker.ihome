@@ -10,6 +10,8 @@
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { newId } from "$lib/utils/ids";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import {
     BUILTIN_PAGES,
     adminPageHref,
@@ -45,8 +47,11 @@
   };
 
   const builtins: BuiltinRow[] = $derived(
-    BUILTIN_PAGES.map((page): BuiltinRow =>
-      page.id === "admin" ? { ...page, icon: adminIcon } : page,
+    withoutSecured(
+      BUILTIN_PAGES.map((page): BuiltinRow =>
+        page.id === "admin" ? { ...page, icon: adminIcon } : page,
+      ),
+      isLocalUi(),
     ),
   );
 

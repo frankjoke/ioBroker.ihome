@@ -7,6 +7,8 @@
   import TemplateControlsEditor from "./TemplateControlsEditor.svelte";
   import { PRESETS } from "$lib/config/presets";
   import { parseTemplateRegistry } from "$lib/config/template-ops";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import { visualTemplateProblem } from "$lib/config/visual-templates";
   import {
     commitTemplates,
@@ -25,6 +27,7 @@
   const registry = $derived(getTemplateRegistry());
   const writable = $derived(isTemplatesWritable());
   const saveFailed = $derived(getTemplateSaveFailed());
+  const local = isLocalUi();
   const presets = Object.values(PRESETS);
   const presetIds = new Set(presets.map((template) => template.id));
   const allTemplates = $derived([...presets, ...(registry.templates ?? [])]);
@@ -58,6 +61,16 @@
   function setFeatures(features: Template["features"]): void {
     if (!draft) return;
     json = JSON.stringify({ ...draft, features }, null, 2);
+  }
+
+  /** The secured flag is part of the JSON draft, so Save stays the one write. */
+  function setSecured(secured: boolean): void {
+    if (!draft) return;
+    json = JSON.stringify(
+      { ...draft, secured: secured ? true : undefined },
+      null,
+      2,
+    );
   }
 
   $effect(() => {
@@ -95,17 +108,20 @@
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();
-    const list = q
-      ? allTemplates.filter(
-          (template) =>
-            String(template.name ?? "")
-              .toLowerCase()
-              .includes(q) ||
-            String(template.type ?? "")
-              .toLowerCase()
-              .includes(q),
-        )
-      : [...allTemplates];
+    const list = withoutSecured(
+      q
+        ? allTemplates.filter(
+            (template) =>
+              String(template.name ?? "")
+                .toLowerCase()
+                .includes(q) ||
+              String(template.type ?? "")
+                .toLowerCase()
+                .includes(q),
+          )
+        : allTemplates,
+      local,
+    );
     const dir = sortDir === "asc" ? 1 : -1;
     return list.sort(
       (a, b) => dir * String(a.name ?? "").localeCompare(String(b.name ?? "")),
@@ -330,6 +346,21 @@
         />
       {:else if json.trim()}
         <p class="hint text-muted">Fix the JSON to edit controls.</p>
+      {/if}
+      {#if local && !isBuiltin}
+        <label
+          class="check"
+          class:check-danger={draft?.secured === true}
+          title="Hidden from every list when iHome is opened through external access (https)."
+        >
+          <input
+            type="checkbox"
+            checked={draft?.secured === true}
+            disabled={!writable}
+            onchange={(event) => setSecured(event.currentTarget.checked)}
+          />
+          <span>Secured</span>
+        </label>
       {/if}
       <textarea
         class="json"

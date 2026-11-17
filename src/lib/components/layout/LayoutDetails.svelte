@@ -10,6 +10,8 @@
   } from "$lib/config/layout-ops";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { resolveSection } from "$lib/config/pages-ops";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import {
     BREAKPOINTS,
     SIZE_MAX_H,
@@ -157,6 +159,15 @@
     },
   ] as const;
 
+  /** Local-only tab: a secured tile is hidden everywhere outside the LAN. */
+  const SECURITY_TAB = {
+    id: "security",
+    label: "Security",
+    hint: "Hide this tile from the UI outside the local network.",
+  } as const;
+  const local = isLocalUi();
+  const tileTabs = local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS;
+
   let width = $state(1400);
   onMount(() => {
     const onResize = () => (width = window.innerWidth);
@@ -171,7 +182,9 @@
   /** Slot UI: which row is expanded, which rule is open, pickers. */
   let expandedSlot = $state<number | null>(null);
   /** The tile editor's option tab: one group open at a time, none by default. */
-  let tileTab = $state<"size" | "view" | "look" | "pin" | null>(null);
+  let tileTab = $state<"size" | "view" | "look" | "pin" | "security" | null>(
+    null,
+  );
   /** The open rule, by slot and rule index. */
   let openRule = $state<{ slot: number; rule: number } | null>(null);
   let sourcePickerFor = $state<number | null>(null);
@@ -524,10 +537,12 @@
     );
   }
 
-  const allTemplates = $derived([
-    ...Object.values(PRESETS),
-    ...(getTemplateRegistry().templates ?? []),
-  ]);
+  const allTemplates = $derived(
+    withoutSecured(
+      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      local,
+    ),
+  );
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
   const chartFull = $derived(
@@ -1323,7 +1338,7 @@
         </label>
       </div>
     </div>
-    <OptionTabs bind:value={tileTab} label="Tile options" tabs={TILE_TABS}>
+    <OptionTabs bind:value={tileTab} label="Tile options" tabs={tileTabs}>
       {#snippet children(id)}
         {#if id === "size"}
           <div class="field">
@@ -1688,6 +1703,30 @@
             {#if pinInvalid}
               <p class="note text-muted">4-6 digits, numbers only.</p>
             {/if}
+          </div>
+        {/if}
+
+        {#if id === "security"}
+          <div class="field">
+            <label
+              class="check"
+              class:check-danger={tile?.tile?.secured === true}
+              title="Hidden from every list and from the display when iHome is opened through external access (https)."
+            >
+              <input
+                type="checkbox"
+                checked={tile?.tile?.secured === true}
+                onchange={(e) =>
+                  edit((t) => ({
+                    ...t,
+                    secured: e.currentTarget.checked ? true : undefined,
+                  }))}
+              />
+              <span>Secured</span>
+            </label>
+            <p class="note text-muted">
+              Hidden outside the local network; only visible and editable here.
+            </p>
           </div>
         {/if}
       {/snippet}

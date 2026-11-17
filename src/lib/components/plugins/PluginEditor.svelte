@@ -3,6 +3,7 @@
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
   import { reloadPlugin, savePlugin } from "$lib/stores/plugins.svelte";
   import { savePluginManifest } from "$lib/config/plugin-storage";
+  import { isLocalUi } from "$lib/config/locality";
   import {
     META_ADAPTER,
     readMetaText,
@@ -32,6 +33,9 @@
   let help = $state(plugin.help ?? "");
   // svelte-ignore state_referenced_locally
   let usage = $state(plugin.usage ?? "");
+  // svelte-ignore state_referenced_locally
+  let secured = $state(plugin.secured === true);
+  const local = isLocalUi();
   // svelte-ignore state_referenced_locally
   let settings = $state<Record<string, unknown>>({
     ...defaults(plugin.settingsSchema, plugin.settings),
@@ -66,6 +70,7 @@
     timeoutMs,
     help,
     usage,
+    secured,
     settings: JSON.stringify(settings),
   }))();
   const changed = $derived(
@@ -73,6 +78,7 @@
       timeoutMs !== initial.timeoutMs ||
       help !== initial.help ||
       usage !== initial.usage ||
+      secured !== initial.secured ||
       JSON.stringify(settings) !== initial.settings ||
       (initialCode !== null && code !== initialCode),
   );
@@ -116,6 +122,7 @@
       id: plugin.id,
       timeoutMs,
       settings,
+      secured,
     };
     if (!plugin.builtin) {
       patch.name = nextName;
@@ -187,6 +194,16 @@
         timeout option.</span
       >
     </label>
+    {#if local}
+      <label
+        class="check"
+        class:check-danger={secured}
+        title="Hidden from the Plugins list when iHome is opened through external access (https)."
+      >
+        <input type="checkbox" bind:checked={secured} />
+        <span>Secured</span>
+      </label>
+    {/if}
   </div>
 
   {#if plugin.settingsSchema?.length || Object.keys(settings).length > 0}

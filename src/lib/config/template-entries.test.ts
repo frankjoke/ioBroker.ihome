@@ -101,4 +101,27 @@ describe("templateEntries", () => {
       ).toEqual([id]);
     }
   });
+
+  it("carries the secured flag only from user definitions", () => {
+    const entries = templateEntries({
+      presets: [device],
+      visual: [{ ...device, secured: true }],
+      logicBuiltins: [logic],
+      logicUser: [{ ...logic, secured: true }],
+      apiBuiltins: [api],
+      apiUser: [{ ...api, secured: true }],
+      bundleBuiltins: [bundle],
+      bundleUser: [{ ...bundle, secured: true }],
+    });
+    expect(entries.map((entry) => entry.secured === true)).toEqual([
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
+  });
 });

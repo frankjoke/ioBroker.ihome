@@ -77,6 +77,17 @@ describe("validAdapterPlugins", () => {
     expect(plugin.settingsSchema?.[0].type).toBe("number");
   });
 
+  it("keeps the secured flag and ignores a non-boolean one", () => {
+    const [secured] = validAdapterPlugins([
+      { id: "my.plugin", name: "My", code: "x", secured: true },
+    ]);
+    expect(secured.secured).toBe(true);
+    const [loose] = validAdapterPlugins([
+      { id: "my.plugin", name: "My", code: "x", secured: "yes" },
+    ]);
+    expect(loose.secured).toBeUndefined();
+  });
+
   it("drops nested settings values instead of the plugin", () => {
     const [plugin] = validAdapterPlugins([
       {
@@ -173,6 +184,7 @@ describe("validAdapterPlugins", () => {
         builtin: true,
         timeoutMs: builtin.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
         debug: false,
+        ...(builtin.secured ? { secured: true } : {}),
         code: undefined,
       })),
     );
@@ -341,12 +353,27 @@ describe("seedBuiltinPlugins", () => {
         builtin: true,
         timeoutMs: 20_000,
         debug: false,
+        secured: true,
         help: BUILTIN_PLUGINS[3].help,
         usage: BUILTIN_PLUGINS[3].usage,
         settingsSchema: BUILTIN_PLUGINS[3].settingsSchema,
         code: undefined,
       },
     ]);
+  });
+
+  it("seeds external-access as secured and keeps an explicit opt-out", () => {
+    const seeded = seedBuiltinPlugins([]);
+    expect(
+      seeded.find((plugin) => plugin.id === "external-access")?.secured,
+    ).toBe(true);
+
+    const upgraded = pluginConfigWithBuiltins([{ id: "external-access" }]);
+    expect(upgraded[0]).toMatchObject({ secured: true });
+    const optedOut = pluginConfigWithBuiltins([
+      { id: "external-access", secured: false },
+    ]);
+    expect(optedOut[0]).toMatchObject({ secured: false });
   });
 });
 

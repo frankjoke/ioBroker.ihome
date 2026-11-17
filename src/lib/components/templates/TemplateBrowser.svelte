@@ -6,6 +6,8 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
   import { BUILTIN_DEVICE_TEMPLATES } from "$lib/config/device-templates";
@@ -66,6 +68,7 @@
     onFocusApplied?: () => void;
   } = $props();
   let lastFocus = "";
+  const local = isLocalUi();
 
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);
@@ -86,30 +89,35 @@
   const registry = $derived(getTemplateRegistry());
   const doc = $derived(getLogicDocument());
   const bundles = $derived(getTemplateBundles());
-  const entries = $derived([
-    ...templateEntries({
-      presets: Object.values(PRESETS),
-      visual: registry.templates ?? [],
-      logicBuiltins: BUILTIN_TEMPLATES,
-      logicUser: doc.templates ?? [],
-      apiBuiltins: BUILTIN_DEVICE_TEMPLATES,
-      apiUser: doc.deviceTemplates ?? [],
-      bundleBuiltins: BUILTIN_BUNDLES,
-      bundleUser: bundles,
-    }),
-    ...(bundleDraft
-      ? [
-          {
-            id: bundleDraft.id,
-            name: bundleDraft.name || "New template",
-            kind: "bundle" as const,
-            parts: bundleParts(bundleDraft),
-            builtin: false,
-            search: (bundleDraft.name || "New template").toLowerCase(),
-          },
-        ]
-      : []),
-  ]);
+  const entries = $derived(
+    withoutSecured(
+      [
+        ...templateEntries({
+          presets: Object.values(PRESETS),
+          visual: registry.templates ?? [],
+          logicBuiltins: BUILTIN_TEMPLATES,
+          logicUser: doc.templates ?? [],
+          apiBuiltins: BUILTIN_DEVICE_TEMPLATES,
+          apiUser: doc.deviceTemplates ?? [],
+          bundleBuiltins: BUILTIN_BUNDLES,
+          bundleUser: bundles,
+        }),
+        ...(bundleDraft
+          ? [
+              {
+                id: bundleDraft.id,
+                name: bundleDraft.name || "New template",
+                kind: "bundle" as const,
+                parts: bundleParts(bundleDraft),
+                builtin: false,
+                search: (bundleDraft.name || "New template").toLowerCase(),
+              },
+            ]
+          : []),
+      ],
+      local,
+    ),
+  );
   const shown = $derived(filterTemplateEntries(entries, search, sortDir));
   const rows = $derived.by(() => {
     if (!selected) return shown;

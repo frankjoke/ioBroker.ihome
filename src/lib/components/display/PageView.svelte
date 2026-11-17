@@ -10,10 +10,13 @@
   } from "$lib/config/size-ops";
   import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
   import { getSettings } from "$lib/stores/settings.svelte";
+  import { isLocalUi } from "$lib/config/locality";
   import GroupSection from "./GroupSection.svelte";
   import type { Page } from "$lib/types/display";
 
   let { page }: { page: Page } = $props();
+
+  const local = isLocalUi();
 
   // The breakpoint follows the *container*, not the window: the display is the
   // whole window on the wall, but the layout sheet renders it beside/in front of
@@ -26,7 +29,9 @@
   );
 
   // A section renders its placements, in order — not the filter it came from (A8).
-  const groups = $derived(resolvePage(page));
+  const groups = $derived(
+    resolvePage(page, (placement) => local || placement.tile?.secured !== true),
+  );
 
   const ui = $derived(effectiveUi(getSettings()));
   /** The 1×1 module at the installation's scale (ui-settings.ts). */

@@ -72,6 +72,8 @@
     isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
@@ -125,10 +127,16 @@
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
-  const allTemplates = $derived([
-    ...Object.values(PRESETS),
-    ...(getTemplateRegistry().templates ?? []),
-  ]);
+  const local = isLocalUi();
+  /** A secured tile is local-only, in the sheet as on the display. */
+  const visibleTile = (placement: Placement) =>
+    local || placement.tile?.secured !== true;
+  const allTemplates = $derived(
+    withoutSecured(
+      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      local,
+    ),
+  );
 
   // ------------------------------------------------ the drill-down (spike B)
   // Page → section → the section's tiles. The selection leads: the selectors
@@ -140,7 +148,9 @@
 
   // The cursor itself is a pure module (A45): page → section → tile, each with
   // its fallback, and its page is the display's (the `pageId` prop).
-  const cursor = $derived(sheetCursor(registry, selection, pageId));
+  const cursor = $derived(
+    sheetCursor(registry, selection, pageId, visibleTile),
+  );
   const page = $derived(cursor.page);
   const pageIndex = $derived(registry.pages.findIndex((p) => p.id === pageId));
   const section = $derived(cursor.section);
@@ -315,7 +325,7 @@
     } else {
       const remembered = sheet.selection ?? rememberedSelection;
       const restored = remembered
-        ? restoreSelection(registry, remembered)
+        ? restoreSelection(registry, remembered, visibleTile)
         : null;
       if (restored) {
         if (restored.pageId !== pageId) onPage(restored.pageId);
@@ -985,7 +995,7 @@
   <SourcePicker
     mode="slot"
     {devices}
-    templates={getTemplateRegistry().templates ?? []}
+    templates={withoutSecured(getTemplateRegistry().templates ?? [], local)}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
     showBadge={target.kind !== "newTile"}

@@ -13,6 +13,8 @@ export interface TemplateEntry {
   search: string;
   /** The device type a device or bundle template creates. */
   type?: string;
+  /** Hidden outside the local network; absent = not secured. */
+  secured?: boolean;
 }
 
 function entry(
@@ -23,6 +25,7 @@ function entry(
   builtin: boolean,
   detail: string,
   type?: string,
+  secured?: boolean,
 ): TemplateEntry {
   return {
     id,
@@ -32,6 +35,7 @@ function entry(
     builtin,
     search: `${name} ${type ?? ""} ${detail}`.toLowerCase(),
     ...(type ? { type } : {}),
+    ...(secured ? { secured: true } : {}),
   };
 }
 
@@ -74,6 +78,7 @@ export function templateEntries(input: {
         false,
         `${template.type} ${template.help ?? ""}`,
         template.type,
+        template.secured === true,
       ),
     ),
     ...input.logicBuiltins.map((template) =>
@@ -94,6 +99,8 @@ export function templateEntries(input: {
         ["logic"],
         false,
         `${template.description ?? ""} ${template.help ?? ""}`,
+        undefined,
+        template.secured === true,
       ),
     ),
     ...input.apiBuiltins.map((template) =>
@@ -114,6 +121,8 @@ export function templateEntries(input: {
         ["logic", "api"],
         false,
         `${template.description ?? ""} ${template.help ?? ""}`,
+        undefined,
+        template.secured === true,
       ),
     ),
     ...input.bundleBuiltins.map((bundle) =>
@@ -136,6 +145,7 @@ export function templateEntries(input: {
         false,
         `${bundle.description ?? ""} ${bundle.help ?? ""}`,
         bundle.device?.type,
+        bundle.secured === true,
       ),
     ),
   ];

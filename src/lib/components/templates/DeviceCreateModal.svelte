@@ -21,6 +21,8 @@
   import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { newId } from "$lib/utils/ids";
   import type { SlotSource } from "$lib/types/display";
@@ -44,7 +46,9 @@
   const objects = $derived(ioBroker.objects as Map<string, any>);
   const devices = $derived(getCanonicalRegistry().devices ?? []);
   const variables = $derived(getVariables());
-  const templates = $derived(getTemplateRegistry().templates ?? []);
+  const templates = $derived(
+    withoutSecured(getTemplateRegistry().templates ?? [], isLocalUi()),
+  );
   const logics = $derived(getLogicDocument().logics);
   const deviceWritable = $derived(isRegistryWritable());
 

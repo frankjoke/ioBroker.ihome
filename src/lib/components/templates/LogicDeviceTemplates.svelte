@@ -4,6 +4,8 @@
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import {
     BUILTIN_DEVICE_TEMPLATES,
     evaluateDeviceTemplate,
@@ -47,11 +49,14 @@
 
   const doc = $derived(getLogicDocument());
   const builtinIds = new Set(BUILTIN_DEVICE_TEMPLATES.map((entry) => entry.id));
+  const local = isLocalUi();
   let selectedId = $state(BUILTIN_DEVICE_TEMPLATES[0].id);
-  const allTemplates = $derived([
-    ...BUILTIN_DEVICE_TEMPLATES,
-    ...(doc.deviceTemplates ?? []),
-  ]);
+  const allTemplates = $derived(
+    withoutSecured(
+      [...BUILTIN_DEVICE_TEMPLATES, ...(doc.deviceTemplates ?? [])],
+      local,
+    ),
+  );
   const selected = $derived(
     allTemplates.find((entry) => entry.id === selectedId) ??
       BUILTIN_DEVICE_TEMPLATES[0],
@@ -61,6 +66,7 @@
   let name = $state("");
   let description = $state("");
   let help = $state("");
+  let secured = $state(false);
   let source = $state("");
   let error = $state("");
   let deleting = $state(false);
@@ -105,6 +111,7 @@
       (name !== selected.name ||
         description !== (selected.description ?? "") ||
         help !== (selected.help ?? "") ||
+        secured !== (selected.secured === true) ||
         source !== selected.source),
   );
   $effect(() => {
@@ -132,6 +139,7 @@
     name = selected.name;
     description = selected.description ?? "";
     help = selected.help ?? "";
+    secured = selected.secured === true;
     source = selected.source;
     error = "";
     deleting = false;
@@ -307,6 +315,7 @@
       name: `${selected.name} copy`,
       description: selected.description,
       help: selected.help,
+      ...(selected.secured ? { secured: true } : {}),
       source: selected.source,
     };
     if (
@@ -340,6 +349,7 @@
       name: name.trim() || selected.id,
       description: description.trim() || undefined,
       help: help.trim() || undefined,
+      ...(secured ? { secured: true } : {}),
       source,
     };
     const next = [
@@ -407,6 +417,17 @@
         aria-label="Template description"
       />
     </label>
+
+    {#if local && !isBuiltin}
+      <label
+        class="check"
+        class:check-danger={secured}
+        title="Hidden from every list when iHome is opened through external access (https)."
+      >
+        <input type="checkbox" bind:checked={secured} />
+        <span>Secured</span>
+      </label>
+    {/if}
 
     <label class="field">
       <span class="label-mono">Help (Markdown)</span>
@@ -602,7 +623,7 @@
             </optgroup>
             {#if (doc.deviceTemplates ?? []).length > 0}
               <optgroup label="My templates">
-                {#each doc.deviceTemplates ?? [] as entry (entry.id)}
+                {#each withoutSecured(doc.deviceTemplates ?? [], local) as entry (entry.id)}
                   <option value={entry.id}>{entry.name}</option>
                 {/each}
               </optgroup>

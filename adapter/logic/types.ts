@@ -231,6 +231,8 @@ export interface LogicTemplate {
   description?: string;
   /** Long-form Markdown help shown in the browser and apply dialog. */
   help?: string;
+  /** Hidden outside the local network; absent = not secured. */
+  secured?: boolean;
   params: TemplateParam[];
   /** String fields may contain {{param}} placeholders. */
   logic: LogicDef;
@@ -299,6 +301,8 @@ export interface DeviceTemplate {
   description?: string;
   /** Long-form Markdown help shown in the browser and apply dialog. */
   help?: string;
+  /** Hidden outside the local network; absent = not secured. */
+  secured?: boolean;
   source: string;
 }
 

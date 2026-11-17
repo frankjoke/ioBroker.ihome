@@ -198,6 +198,43 @@ describe("pluginView", () => {
     });
     expect(view.bundle).toEqual(bundle);
   });
+
+  it("carries the secured flag", () => {
+    const view = pluginView(userPlugin("u", true, "x", { secured: true }), {
+      status: "running",
+      hotSettings: false,
+      restartRequired: false,
+    });
+    expect(view.secured).toBe(true);
+  });
+});
+
+describe("secured patches", () => {
+  it("sets and clears the flag", () => {
+    const current = [userPlugin("u", true, "code")];
+    const set = applyPluginPatches(
+      current,
+      [{ id: "u", secured: true }],
+      BUILTIN_PLUGINS,
+    );
+    expect(set.problems).toEqual([]);
+    expect(set.plugins[0].secured).toBe(true);
+    const cleared = applyPluginPatches(
+      set.plugins,
+      [{ id: "u", secured: false }],
+      BUILTIN_PLUGINS,
+    );
+    expect(cleared.plugins[0].secured).toBe(false);
+  });
+
+  it("rejects a non-boolean flag", () => {
+    const result = applyPluginPatches(
+      [userPlugin("u", true, "code")],
+      [{ id: "u", secured: "yes" as unknown as boolean }],
+      BUILTIN_PLUGINS,
+    );
+    expect(result.problems).not.toEqual([]);
+  });
 });
 
 describe("parsePluginsCommand", () => {

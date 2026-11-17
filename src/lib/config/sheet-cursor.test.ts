@@ -171,3 +171,29 @@ it("restores the deepest still-existing level of a stored selection", () => {
     }),
   ).toBeNull();
 });
+
+it("never lands on a secured tile outside the LAN", () => {
+  const secured: Placement = { id: "secret", tile: { secured: true } };
+  const registry = reg([
+    {
+      id: "p",
+      title: "P",
+      groups: [section("g", [placement("open"), secured])],
+    },
+  ]);
+  const include = (tile: Placement) => tile.tile?.secured !== true;
+  const cursor = sheetCursor(
+    registry,
+    { kind: "tile", pageId: "p", sectionId: "g", placementId: "secret" },
+    "p",
+    include,
+  );
+  expect(cursor.tileId).toBe("open");
+  expect(
+    restoreSelection(
+      registry,
+      { kind: "tile", pageId: "p", sectionId: "g", placementId: "secret" },
+      include,
+    ),
+  ).toEqual({ kind: "section", pageId: "p", sectionId: "g" });
+});

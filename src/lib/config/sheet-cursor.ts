@@ -26,6 +26,8 @@ export function sheetCursor(
   /** The display's page (A45): the cursor's page is the display's page, so this
    *  wins when it is given and the selection's page is only the fallback. */
   pageId?: string,
+  /** Which placements this session may see (a secured tile is local-only). */
+  include?: (placement: Placement) => boolean,
 ): SheetCursor {
   // The page: the display's, else the selection's, else the first. A page the
   // document no longer has (deleted, or a stale handoff) falls back rather than
@@ -42,7 +44,9 @@ export function sheetCursor(
     page?.groups.find((g) => g.id === wantedSection) ?? page?.groups[0];
   const sectionId = section?.id ?? "";
 
-  const tiles = section?.tiles ?? [];
+  const tiles = (section?.tiles ?? []).filter(
+    (placement) => include?.(placement) ?? true,
+  );
   // A tile that was deleted (or a stale handoff) falls back to the section's
   // first, like every other step — the sheet never points at a tile that is not
   // there (A45).
@@ -72,6 +76,8 @@ export function sheetCursor(
 export function restoreSelection(
   registry: PageRegistry,
   selection: LayoutSelection,
+  /** A secured tile is not a valid landing place outside the LAN. */
+  include?: (placement: Placement) => boolean,
 ): LayoutSelection | null {
   const page = registry.pages.find((p) => p.id === selection.pageId);
   if (!page) return null;
@@ -79,9 +85,9 @@ export function restoreSelection(
   const section = (page.groups ?? []).find((g) => g.id === selection.sectionId);
   if (!section) return { kind: "page", pageId: page.id };
   if (selection.kind === "section") return selection;
-  const tile = (section.tiles ?? []).find(
-    (t) => t.id === selection.placementId,
-  );
+  const tile = (section.tiles ?? [])
+    .filter((t) => include?.(t) ?? true)
+    .find((t) => t.id === selection.placementId);
   return tile
     ? selection
     : { kind: "section", pageId: page.id, sectionId: section.id };
