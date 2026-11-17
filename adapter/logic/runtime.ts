@@ -298,7 +298,16 @@ export function createLogicRuntime(
     let name = stateNames.get(stateKey);
     if (!name) {
       name = `__state_${hiddenCount++}`;
-      defineHidden(name, runInContext("({})", context));
+      const object = runInContext("({})", context) as Record<string, unknown>;
+      // The "no update" constant belongs to the state object, like the
+      // helpers a block keeps there; the global NOOP is the same value.
+      Object.defineProperty(object, "NOOP", {
+        value: NOOP,
+        writable: false,
+        configurable: false,
+        enumerable: false,
+      });
+      defineHidden(name, object);
       stateNames.set(stateKey, name);
     }
     return name;
@@ -412,6 +421,8 @@ export function createLogicRuntime(
     );
   });
   define("noop", () => NOOP);
+  /** The form to write: a constant, not a call. `noop()` stays for stored code. */
+  define("NOOP", NOOP);
   define("NOACTION", NOACTION);
 
   const run = (script: Script, depth: number, object?: unknown): unknown => {

@@ -106,6 +106,11 @@ it("noop() is a sentinel", () => {
   expect(isNoop(runtime.runExpr({ code: "noop()" }, 0))).toBe(true);
 });
 
+it("NOOP is the constant form of the same sentinel", () => {
+  const { runtime } = runtimeFor("NOOP");
+  expect(isNoop(runtime.runExpr({ code: "NOOP" }, 0))).toBe(true);
+});
+
 it("compile errors name the path", () => {
   expect(() => runtimeFor("1 +")).toThrow(/expr: expression failed to compile/);
 });

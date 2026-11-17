@@ -38,7 +38,8 @@
     draft.output ?? { scope: "memory", name: draft.id },
   );
   const RESULT_PLACEHOLDER = 'get("temp") > 20 ? "On" : "Off"';
-  const STATEMENT_RESULT_PLACEHOLDER = "if ($value > 20) return true;\nnoop()";
+  const STATEMENT_RESULT_PLACEHOLDER =
+    "if ($value > 20) return true;\nreturn this.NOOP";
   const RESULT_TABS = [
     {
       id: "expression" as const,
@@ -48,7 +49,7 @@
     {
       id: "statements" as const,
       label: "Statements",
-      hint: "A function body: return the output, noop() writes nothing",
+      hint: "A function body: return the output, this.NOOP writes nothing",
     },
   ];
   const stateNames = $derived(

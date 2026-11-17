@@ -125,7 +125,7 @@ export interface Ref {
   ref: string;
 }
 
-/** A bare JavaScript expression; "no update" is the runtime value of noop(). */
+/** A bare JavaScript expression; "no update" is the runtime value of this.NOOP. */
 export type Expr = { code: string };
 
 export interface OnRow {
@@ -197,8 +197,8 @@ export interface FunctionLogic extends LogicBase {
   kind: "function";
   /** Default "expression": `expr.code` is one expression and its value is the
    *  output. "statements": `expr.code` is a function body; `this` lives as long
-   *  as the logic runs and `return value` is the output (no return or `noop()`
-   *  writes nothing). */
+   *  as the logic runs and `return value` is the output (no return or
+   *  `this.NOOP` writes nothing). */
   mode?: "expression" | "statements";
   expr: Expr;
 }

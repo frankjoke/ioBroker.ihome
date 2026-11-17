@@ -168,7 +168,7 @@
         title="Leave the output unchanged"
         onmousedown={rememberSelection}
         onclick={() =>
-          insertText(mode === "statements" ? "return noop()" : "noop()")}
+          insertText(mode === "statements" ? "return this.NOOP" : "this.NOOP")}
         >No update</button
       >
     {/if}

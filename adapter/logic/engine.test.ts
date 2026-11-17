@@ -721,7 +721,7 @@ it("runs a function body with this, early returns and noop", () => {
       init: { run: false },
       output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
       expr: code(
-        "this.count = (this.count ?? 0) + 1;\nif ($value > 10) return $value * this.count;\nnoop()",
+        "this.count = (this.count ?? 0) + 1;\nif ($value > 10) return $value * this.count;\nreturn this.NOOP",
       ),
     }),
   );
