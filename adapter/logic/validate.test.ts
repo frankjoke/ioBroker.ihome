@@ -97,6 +97,26 @@ it("rejects an expression without code, empty code or broken code", () => {
   expect(errors({ code: "1 +" })[0]).toMatch(/^expression failed to compile:/);
 });
 
+it("runs a function result as statements when the mode says so", () => {
+  const make = (mode: unknown, code: string): LogicDocument =>
+    ({
+      version: 3,
+      logics: [{ id: "x", name: "X", kind: "function", mode, expr: { code } }],
+    }) as never;
+  const errors = (mode: unknown, code: string) =>
+    validateLogicDocument(make(mode, code)).filter(
+      (issue) => issue.severity === "error",
+    );
+  // A body is not an expression, nor the other way round.
+  expect(errors(undefined, "return 1")).not.toHaveLength(0);
+  expect(errors("statements", "return 1")).toHaveLength(0);
+  expect(errors("statements", "1 +")).not.toHaveLength(0);
+  expect(errors("expression", "const x = 1; return x")).not.toHaveLength(0);
+  expect(errors("blocks", "return 1").map((issue) => issue.message)).toContain(
+    "mode must be expression or statements",
+  );
+});
+
 it("requires a ref and a known type on every state output", () => {
   const bad: LogicDocument = {
     version: 3,

@@ -332,8 +332,22 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
 
     if (logic.kind === "function") {
       const fn = logic as FunctionLogic;
+      if (
+        fn.mode !== undefined &&
+        fn.mode !== "expression" &&
+        fn.mode !== "statements"
+      ) {
+        add(id, "mode", "mode must be expression or statements");
+      }
       if (!("expr" in fn) || fn.expr == null) {
         add(id, "expr", "function logic without an expression");
+      } else if (fn.mode === "statements") {
+        if (!isRecord(fn.expr) || typeof fn.expr.code !== "string") {
+          add(id, "expr", "expression has no code");
+        } else {
+          const message = checkStatementCode(fn.expr.code);
+          if (message) add(id, "expr", message);
+        }
       } else {
         checkExpr(fn.expr, (path, message) => add(id, path, message), "expr");
       }

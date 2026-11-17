@@ -6,6 +6,7 @@
   import OutputEditor from "./OutputEditor.svelte";
   import CodeField from "./CodeField.svelte";
   import MachineEditor from "./MachineEditor.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
@@ -37,6 +38,19 @@
     draft.output ?? { scope: "memory", name: draft.id },
   );
   const RESULT_PLACEHOLDER = 'get("temp") > 20 ? "On" : "Off"';
+  const STATEMENT_RESULT_PLACEHOLDER = "if ($value > 20) return true;\nnoop()";
+  const RESULT_TABS = [
+    {
+      id: "expression" as const,
+      label: "Expression",
+      hint: "One expression; its value becomes the output",
+    },
+    {
+      id: "statements" as const,
+      label: "Statements",
+      hint: "A function body: return the output, noop() writes nothing",
+    },
+  ];
   const stateNames = $derived(
     draft.kind === "machine" ? Object.keys(draft.states) : [],
   );
@@ -210,9 +224,10 @@
   </div>
 
   {#if draft.kind === "function"}
+    {@const resultMode = draft.mode ?? "expression"}
     <div class="block">
       <div class="test-head">
-        <span class="label-mono">Result expression</span>
+        <span class="label-mono">Result</span>
         <button
           type="button"
           class="btn btn-sm btn-outline"
@@ -230,11 +245,26 @@
           {testing ? "Testing…" : "Test"}
         </button>
       </div>
+      <OptionTabs
+        label="Result code"
+        collapsible={false}
+        tabs={RESULT_TABS}
+        value={resultMode}
+        onchange={(next) =>
+          patch({ mode: next === "statements" ? "statements" : undefined })}
+      />
       <CodeField
         code={draft.expr.code}
-        label="Result expression"
-        placeholder={RESULT_PLACEHOLDER}
-        hint="fetchJson(url, (data, error) => …)"
+        label={resultMode === "statements"
+          ? "Result statements"
+          : "Result expression"}
+        placeholder={resultMode === "statements"
+          ? STATEMENT_RESULT_PLACEHOLDER
+          : RESULT_PLACEHOLDER}
+        hint={resultMode === "statements"
+          ? "this, $value, $previous, $input and $from are available"
+          : "fetchJson(url, (data, error) => …)"}
+        mode={resultMode}
         allowNoop
         {logics}
         inputs={draft.inputs}

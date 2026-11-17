@@ -195,6 +195,11 @@ export interface LogicBase {
 
 export interface FunctionLogic extends LogicBase {
   kind: "function";
+  /** Default "expression": `expr.code` is one expression and its value is the
+   *  output. "statements": `expr.code` is a function body; `this` lives as long
+   *  as the logic runs and `return value` is the output (no return or `noop()`
+   *  writes nothing). */
+  mode?: "expression" | "statements";
   expr: Expr;
 }
 

@@ -704,14 +704,38 @@ it("exposes $value and $previous to logic code", () => {
     doc({
       init: { run: false },
       output: { scope: "memory" },
-      expr: code('`${get("$previous")}|${get("$value")}`'),
+      expr: code('`${get("$previous")}|${get("$value")}|${get("$input")}`'),
     }),
   );
   engine.start();
   h.change("0_userdata.0.T", 6);
-  expect(engine.memoryValue("calc")).toBe("3|6");
+  expect(engine.memoryValue("calc")).toBe("3|6|temp");
   h.change("0_userdata.0.T", 8);
-  expect(engine.memoryValue("calc")).toBe("6|8");
+  expect(engine.memoryValue("calc")).toBe("6|8|temp");
+});
+
+it("runs a function body with this, early returns and noop", () => {
+  const { h, engine } = engineWith(
+    doc({
+      mode: "statements",
+      init: { run: false },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+      expr: code(
+        "this.count = (this.count ?? 0) + 1;\nif ($value > 10) return $value * this.count;\nnoop()",
+      ),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 5);
+  expect(h.writes.filter((write) => write.id === "0_userdata.0.OUT")).toEqual(
+    [],
+  );
+  h.change("0_userdata.0.T", 11);
+  h.change("0_userdata.0.T", 12);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.OUT", value: 22, ack: false },
+    { id: "0_userdata.0.OUT", value: 36, ack: false },
+  ]);
 });
 
 it("noop writes nothing", () => {

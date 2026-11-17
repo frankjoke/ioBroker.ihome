@@ -161,7 +161,7 @@
         {/each}
       </select>
     {/if}
-    {#if allowNoop && mode === "expression"}
+    {#if allowNoop}
       <button
         type="button"
         class="btn btn-sm btn-outline"

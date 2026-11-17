@@ -489,7 +489,9 @@ export function createEngine(
                     ? currentJob?.hasPrevious
                       ? currentJob.previous
                       : undefined
-                    : currentMeta.ts;
+                    : ref === "$input"
+                      ? currentJob?.input
+                      : currentMeta.ts;
     return {
       value,
       ack: currentMeta.ack ?? true,
@@ -509,6 +511,7 @@ export function createEngine(
       ref === "$ack" ||
       ref === "$value" ||
       ref === "$previous" ||
+      ref === "$input" ||
       ref === "$ts"
     ) {
       return pseudoInfo(rt, ref);
@@ -1022,13 +1025,21 @@ export function createEngine(
     const def = rt.def as FunctionLogic;
     let value: unknown;
     try {
-      value = runExpr(rt, def.expr, depth);
+      value =
+        def.mode === "statements"
+          ? rt.vm!.runStatements(def.expr, depth)
+          : runExpr(rt, def.expr, depth);
     } catch (error) {
       const message = errorText(error);
       warn(def.id, `expression failed: ${message}`);
       return { ok: false, error: message };
     }
-    if (isNoop(value)) return { ok: true, value: undefined };
+    // A body without a return says nothing; the expression form keeps its own
+    // rule (`noop()` only), so an expression that evaluates to undefined still
+    // writes, as it always did.
+    if (isNoop(value) || (value === undefined && def.mode === "statements")) {
+      return { ok: true, value: undefined };
+    }
     if (value && typeof (value as { then?: unknown }).then === "function") {
       // Consume a rejection: an unhandled one would terminate the adapter.
       void Promise.resolve(value).catch(() => {});
