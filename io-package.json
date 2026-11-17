@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "news": {
+      "0.4.1": {
+        "en": "External access management in Server & Security (Caddy logins with hashed passwords, a generated import snippet, explicit validate/reload), icon twins that follow binary states, built-in role/template defaults, every installed icon adapter as an icon source, and UI polish (stronger tile edges, one keyboard focus ring, scroll padding, reduced-motion support).",
+        "de": "Externer-Zugriff-Verwaltung unter Server & Sicherheit (Caddy-Logins mit gehashten Passwörtern, generierte Import-Datei, ausdrückliches Prüfen/Neuladen), Icon-Zwillingspaare für binäre Zustände, integrierte Rollen-/Vorlagen-Standardicons, alle installierten Icon-Adapter als Icon-Quelle und UI-Feinschliff (kräftigere Kachelränder, ein Tastatur-Fokusring, Scroll-Abstand, Unterstützung für reduzierte Bewegung)."
+      },
       "0.4.0": {
         "en": "File-backed templates and plugins: user templates and plugins are now stored as files in the shared ihome.meta space, while runtime flags stay in the adapter config. The Plugins page edits, imports, reloads and removes a plugin without an adapter restart; every write is verified and a broken file is reported, never overwritten.",
         "de": "Dateibasierte Vorlagen und Plugins: Benutzervorlagen und Plugins liegen jetzt als Dateien im gemeinsamen ihome.meta-Bereich, Laufzeit-Flags bleiben in der Adapterkonfiguration. Die Plugins-Seite bearbeitet, importiert, lädt neu und entfernt ein Plugin ohne Adapter-Neustart; jeder Schreibvorgang wird geprüft, eine defekte Datei wird gemeldet und nie überschrieben.",
