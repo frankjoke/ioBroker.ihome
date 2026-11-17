@@ -29,6 +29,8 @@
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { pluginPageHref } from "$lib/config/plugin-pages";
   import { BUILTIN_PAGES, adminPageHref } from "$lib/config/builtin-pages";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
   import {
     getPluginPages,
     initPluginPages,
@@ -50,6 +52,8 @@
    */
   const routeId = $derived(route.route?.id ?? "/");
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
+  /** The ioBroker Admin tabs are local-only. */
+  const builtinPages = $derived(withoutSecured(BUILTIN_PAGES, isLocalUi()));
 
   /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
   const adminTab = $derived.by(() => {
@@ -455,7 +459,7 @@
             <span>Plugins</span>
           </a>
           {#if adminPage}
-            {#each BUILTIN_PAGES as entry (entry.id)}
+            {#each builtinPages as entry (entry.id)}
               {@const active = routeId === "/admin" && adminTab === entry.tab}
               <a
                 class="menu-item sub"

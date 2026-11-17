@@ -160,8 +160,7 @@ export function applyPluginPatches(
     if (patch.secured !== undefined) {
       if (typeof patch.secured !== "boolean") {
         fail(`plugin ${patch.id} secured must be true or false`);
-      } else if (patch.secured) next.secured = true;
-      else delete next.secured;
+      } else next.secured = patch.secured;
     }
     if (patch.timeoutMs !== undefined) {
       if (

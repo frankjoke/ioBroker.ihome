@@ -224,7 +224,7 @@ describe("secured patches", () => {
       [{ id: "u", secured: false }],
       BUILTIN_PLUGINS,
     );
-    expect(cleared.plugins[0]).not.toHaveProperty("secured");
+    expect(cleared.plugins[0].secured).toBe(false);
   });
 
   it("rejects a non-boolean flag", () => {

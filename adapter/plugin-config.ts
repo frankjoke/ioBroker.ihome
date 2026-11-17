@@ -16,6 +16,8 @@ export interface PluginSettingsEntry {
   enabled: boolean;
   timeoutMs: number;
   debug: boolean;
+  /** Absent = no explicit choice (a built-in default may apply). */
+  secured?: boolean;
   help?: string;
   usage?: string;
   settings?: Record<string, unknown>;
@@ -68,6 +70,7 @@ export function pluginSettingsDoc(
       enabled: plugin.enabled,
       timeoutMs: plugin.timeoutMs,
       debug: plugin.debug,
+      ...(plugin.secured !== undefined ? { secured: plugin.secured } : {}),
       ...(plugin.help ? { help: plugin.help } : {}),
       ...(plugin.usage ? { usage: plugin.usage } : {}),
       ...(plugin.settings ? { settings: plugin.settings } : {}),
@@ -94,6 +97,7 @@ export function mergePluginSettings(
       timeoutMs: entry.timeoutMs,
       debug: entry.debug,
     };
+    if (entry.secured !== undefined) next.secured = entry.secured;
     if (!builtin) {
       if (entry.help) next.help = entry.help;
       else delete next.help;
@@ -130,6 +134,7 @@ export function normalizeSettingsDoc(
         timeoutMs: timeout(raw.timeoutMs),
         debug: raw.debug === true,
       };
+      if (typeof raw.secured === "boolean") entry.secured = raw.secured;
       const help = text(raw.help, MAX_PLUGIN_HELP);
       const usage = text(raw.usage, MAX_PLUGIN_USAGE);
       const values = pluginSettings(raw.settings);

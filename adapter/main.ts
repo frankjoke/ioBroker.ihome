@@ -2197,10 +2197,14 @@ class IHome extends utils.Adapter {
     );
 
     const rawPlugins = (this.config as { plugins?: unknown }).plugins;
-    const nativePlugins = seedBuiltinPlugins(rawPlugins, undefined, (message) =>
-      this.log.warn(message),
-    );
     const persistedPlugins = pluginConfigWithBuiltins(rawPlugins);
+    // Parse the upgraded list, so a new built-in default (e.g. external-access
+    // secured) is in effect on this start, not the next one.
+    const nativePlugins = seedBuiltinPlugins(
+      persistedPlugins,
+      undefined,
+      (message) => this.log.warn(message),
+    );
     if (JSON.stringify(persistedPlugins) !== JSON.stringify(rawPlugins)) {
       try {
         await this.updateConfig({ plugins: persistedPlugins });

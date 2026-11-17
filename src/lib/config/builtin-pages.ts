@@ -8,6 +8,8 @@ export interface BuiltinPage {
   meta: string;
   glyph: string;
   svg?: string;
+  /** The ioBroker Admin tabs are hidden outside the local network. */
+  secured?: boolean;
 }
 
 /** Admin's own Categories icon: a house for rooms and a bulb for functions,
@@ -21,6 +23,7 @@ export const BUILTIN_PAGES: readonly BuiltinPage[] = [
     tab: "overview",
     meta: "/admin",
     glyph: "settings_applications",
+    secured: true,
   },
   {
     id: "objects",
@@ -28,6 +31,7 @@ export const BUILTIN_PAGES: readonly BuiltinPage[] = [
     tab: "objects",
     meta: "/admin/#tab-objects",
     glyph: "account_tree",
+    secured: true,
   },
   {
     id: "enums",
@@ -36,6 +40,7 @@ export const BUILTIN_PAGES: readonly BuiltinPage[] = [
     meta: "/admin/#tab-enums",
     glyph: "category",
     svg: ENUMS_ICON,
+    secured: true,
   },
 ];
 

@@ -129,6 +129,49 @@ describe("plugin settings document", () => {
     });
   });
 
+  it("persists the secured flag and lets an explicit false win", () => {
+    const doc = pluginSettingsDoc([
+      plugin("a", { secured: true }),
+      plugin("b", { secured: false }),
+      plugin("c"),
+    ]);
+    expect(doc.settings.a.secured).toBe(true);
+    expect(doc.settings.b.secured).toBe(false);
+    expect(doc.settings.c).not.toHaveProperty("secured");
+
+    const native = [plugin("a", { secured: true }), plugin("b")];
+    const merged = mergePluginSettings(native, doc);
+    expect(merged[0].secured).toBe(true);
+    expect(merged[1].secured).toBe(false);
+    // No explicit choice keeps the native default.
+    expect(
+      mergePluginSettings(native, {
+        version: 1,
+        settings: {
+          a: { enabled: true, timeoutMs: 1000, debug: false },
+        },
+        staged: [],
+        removals: [],
+      })[0].secured,
+    ).toBe(true);
+  });
+
+  it("reads the secured flag from a stored settings document", () => {
+    const doc = normalizeSettingsDoc(
+      JSON.stringify({
+        version: 1,
+        settings: {
+          a: { enabled: true, secured: true },
+          b: { enabled: true, secured: "yes" },
+        },
+        staged: [],
+        removals: [],
+      }),
+    );
+    expect(doc?.settings.a.secured).toBe(true);
+    expect(doc?.settings.b).not.toHaveProperty("secured");
+  });
+
   it("normalizes JSON and drops invalid settings entries", () => {
     const doc = normalizeSettingsDoc(
       JSON.stringify({
