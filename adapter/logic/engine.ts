@@ -375,6 +375,8 @@ export function createEngine(
     Array<{ value: unknown; logicId: string }>
   >();
   let currentMeta: EventMeta = { from: "", self: false };
+  /** The job whose code is running, for `$value` and `$previous`. */
+  let currentJob: Job | undefined;
   let running = false;
   let started = false;
   let chainSeen = new Set<string>();
@@ -481,7 +483,13 @@ export function createEngine(
               ? currentMeta.self
               : ref === "$ack"
                 ? currentMeta.ack
-                : currentMeta.ts;
+                : ref === "$value"
+                  ? currentJob?.value
+                  : ref === "$previous"
+                    ? currentJob?.hasPrevious
+                      ? currentJob.previous
+                      : undefined
+                    : currentMeta.ts;
     return {
       value,
       ack: currentMeta.ack ?? true,
@@ -499,6 +507,8 @@ export function createEngine(
       ref === "$from" ||
       ref === "$self" ||
       ref === "$ack" ||
+      ref === "$value" ||
+      ref === "$previous" ||
       ref === "$ts"
     ) {
       return pseudoInfo(rt, ref);
@@ -628,13 +638,16 @@ export function createEngine(
     }
     if (job.task) {
       const previousMeta = currentMeta;
+      const previousJob = currentJob;
       currentMeta = job.meta;
+      currentJob = job;
       try {
         job.task.run(job.task.data, job.task.error);
       } catch (error) {
         warn(logId(job.rt), `task failed: ${errorText(error)}`);
       } finally {
         currentMeta = previousMeta;
+        currentJob = previousJob;
         job.task.done?.();
       }
       return;
@@ -650,11 +663,13 @@ export function createEngine(
     }
     chainSeen.add(key);
     const previousMeta = currentMeta;
+    const previousJob = currentJob;
     const previousStarting = job.rt.starting;
     if (job.input === "$start") {
       job.rt.starting = typeof job.value === "number" ? job.value : deps.now();
     }
     currentMeta = job.meta;
+    currentJob = job;
     try {
       if (job.rt.def.kind === "function") {
         const input = job.rt.inputs.get(job.input)?.input;
@@ -682,6 +697,7 @@ export function createEngine(
       }
     } finally {
       currentMeta = previousMeta;
+      currentJob = previousJob;
       job.rt.starting = previousStarting;
     }
   }

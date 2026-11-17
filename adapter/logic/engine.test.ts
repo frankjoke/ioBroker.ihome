@@ -699,6 +699,21 @@ it("exposes $from and $self to rows", () => {
   expect(engine.memoryValue("meta")).toBe("B");
 });
 
+it("exposes $value and $previous to logic code", () => {
+  const { h, engine } = engineWith(
+    doc({
+      init: { run: false },
+      output: { scope: "memory" },
+      expr: code('`${get("$previous")}|${get("$value")}`'),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 6);
+  expect(engine.memoryValue("calc")).toBe("3|6");
+  h.change("0_userdata.0.T", 8);
+  expect(engine.memoryValue("calc")).toBe("6|8");
+});
+
 it("noop writes nothing", () => {
   const { h, engine } = engineWith(doc({ expr: code("noop()") }));
   engine.start();
