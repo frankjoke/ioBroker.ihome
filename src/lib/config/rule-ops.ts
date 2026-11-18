@@ -13,8 +13,6 @@ import {
 import { formatAge, splitReading } from "$lib/config/format";
 import { normalizeStates, unitFor } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
-import { isHtmlIcon } from "$lib/config/icon-html";
-import { isImageIcon } from "$lib/utils/icon-url";
 import type { ControlMeta } from "$lib/types/device";
 
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
@@ -400,11 +398,9 @@ function controlBadge(
     normalizeStates(control.meta?.states ?? control.states),
     control.meta?.role ?? control.role,
   );
-  // A promoted value keeps its symbol or HTML as the chip's face; an image
-  // icon cannot draw in a badge.
+  // A promoted value keeps its symbol, image or HTML as the chip's face.
   const glyph = slot.icon?.glyph;
-  const ownGlyph =
-    glyph && (isHtmlIcon(glyph) || !isImageIcon(glyph)) ? glyph : undefined;
+  const ownGlyph = glyph || undefined;
   return {
     source: object?.key ?? String(slot.source),
     icon: style.icon ?? ownGlyph ?? "info",

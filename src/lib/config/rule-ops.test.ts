@@ -744,3 +744,19 @@ it("stateIdsInExpression ignores anything that is not a get(...) id", () => {
   expect(stateIdsInExpression('forget("a.b")')).toEqual([]); // not the helper
   expect(stateIdsInExpression("get('')")).toEqual([]); // empty id
 });
+
+it("keeps an image glyph on a badge", () => {
+  const badges = resolveBadges(
+    [
+      {
+        kind: "badge",
+        source: "battery",
+        icon: { glyph: "/ihome/icons/foo.png" },
+      },
+    ],
+    { controls: [{ available: true, feature: "battery", liveValue: 80 }] },
+    undefined,
+    NOW,
+  );
+  expect(badges[0]?.icon).toBe("/ihome/icons/foo.png");
+});
