@@ -113,6 +113,7 @@
                 kind: "bundle" as const,
                 parts: bundleParts(bundleDraft),
                 builtin: false,
+                description: bundleDraft.description ?? "",
                 search: (bundleDraft.name || "New template").toLowerCase(),
               },
             ]
@@ -182,7 +183,7 @@
     dirty = editorDirty;
   });
 
-  function badge(entry: TemplateEntry): string {
+  function typeLabel(entry: TemplateEntry): string {
     const deviceBadge = entry.type ? `Device · ${entry.type}` : "Device";
     if (entry.kind === "device") return deviceBadge;
     if (entry.kind === "api") return "Logic + Device (API)";
@@ -347,6 +348,7 @@
       kind: "device",
       parts: ["device"],
       builtin: false,
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -382,6 +384,7 @@
       kind: "logic",
       parts: ["logic"],
       builtin: false,
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -421,6 +424,7 @@
       kind: "api",
       parts: ["logic", "api"],
       builtin: false,
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -452,6 +456,7 @@
       kind: "bundle",
       parts: bundleParts(copy),
       builtin: false,
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -500,6 +505,7 @@
       kind: "bundle",
       parts: ["device", "logic"],
       builtin: false,
+      description: draft.description ?? "",
       search: "new template",
     });
   }
@@ -607,11 +613,18 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
-            <Icon value={typeIcon(entry)} size={18} />
-            <button type="button" class="name" onclick={() => open(entry)}>
+            <span class="type" title={typeLabel(entry)}>
+              <Icon value={typeIcon(entry)} size={18} />
+            </span>
+            <button
+              type="button"
+              class="name"
+              title={typeLabel(entry)}
+              onclick={() => open(entry)}
+            >
               {entry.name}
             </button>
-            <span class="badge">{badge(entry)}</span>
+            <span class="detail">{entry.description || typeLabel(entry)}</span>
             <span class="item-actions">
               {#if isOpen(entry)}
                 <IconButton
@@ -836,11 +849,25 @@
   }
 
   .name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .type {
+    display: inline-flex;
+  }
+
+  .detail {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 
   .badge {

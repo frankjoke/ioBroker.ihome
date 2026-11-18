@@ -318,6 +318,8 @@ export interface Slot {
 export interface Template {
   id: string;
   name: string;
+  /** Short one-line description for the template list. */
+  description?: string;
   /** Long-form Markdown help shown in the browser and apply dialog. */
   help?: string;
   builtin?: boolean;

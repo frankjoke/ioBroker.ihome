@@ -10,6 +10,8 @@ export interface TemplateEntry {
   kind: "device" | "logic" | "api" | "bundle";
   parts: TemplatePart[];
   builtin: boolean;
+  /** The short description; empty when the template has none. */
+  description: string;
   search: string;
   /** The device type a device or bundle template creates. */
   type?: string;
@@ -21,6 +23,7 @@ function entry(
   kind: TemplateEntry["kind"],
   id: string,
   name: string,
+  description: string,
   parts: TemplatePart[],
   builtin: boolean,
   detail: string,
@@ -33,7 +36,8 @@ function entry(
     kind,
     parts,
     builtin,
-    search: `${name} ${type ?? ""} ${detail}`.toLowerCase(),
+    description,
+    search: `${name} ${type ?? ""} ${description} ${detail}`.toLowerCase(),
     ...(type ? { type } : {}),
     ...(secured ? { secured: true } : {}),
   };
@@ -63,6 +67,7 @@ export function templateEntries(input: {
         "device",
         template.id,
         template.name,
+        template.description ?? "",
         ["device"],
         true,
         `${template.type} ${template.help ?? ""}`,
@@ -74,6 +79,7 @@ export function templateEntries(input: {
         "device",
         template.id,
         template.name,
+        template.description ?? "",
         ["device"],
         false,
         `${template.type} ${template.help ?? ""}`,
@@ -86,6 +92,7 @@ export function templateEntries(input: {
         "logic",
         template.id,
         template.name,
+        template.description ?? "",
         ["logic"],
         true,
         `${template.description ?? ""} ${template.help ?? ""}`,
@@ -96,6 +103,7 @@ export function templateEntries(input: {
         "logic",
         template.id,
         template.name,
+        template.description ?? "",
         ["logic"],
         false,
         `${template.description ?? ""} ${template.help ?? ""}`,
@@ -108,6 +116,7 @@ export function templateEntries(input: {
         "api",
         template.id,
         template.name,
+        template.description ?? "",
         ["logic", "api"],
         true,
         `${template.description ?? ""} ${template.help ?? ""}`,
@@ -118,6 +127,7 @@ export function templateEntries(input: {
         "api",
         template.id,
         template.name,
+        template.description ?? "",
         ["logic", "api"],
         false,
         `${template.description ?? ""} ${template.help ?? ""}`,
@@ -130,6 +140,7 @@ export function templateEntries(input: {
         "bundle",
         bundle.id,
         bundle.name,
+        bundle.description ?? "",
         bundleParts(bundle),
         true,
         `${bundle.description ?? ""} ${bundle.help ?? ""}`,
@@ -141,6 +152,7 @@ export function templateEntries(input: {
         "bundle",
         bundle.id,
         bundle.name,
+        bundle.description ?? "",
         bundleParts(bundle),
         false,
         `${bundle.description ?? ""} ${bundle.help ?? ""}`,
