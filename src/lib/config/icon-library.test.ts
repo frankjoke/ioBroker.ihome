@@ -18,6 +18,8 @@ import {
   onTwin,
   pairChoices,
   parseIconPool,
+  POOL_CAP,
+  addLibraryValue,
   removeLibraryIcon,
   roleChoicesFromObjects,
   seedLibrary,
@@ -430,4 +432,28 @@ it("offers pair halves separately only for single fields", () => {
     { value: "bulb_off", active: "bulb_on" },
   ]);
   expect(pairChoices("solo", undefined, true)).toEqual([{ value: "solo" }]);
+});
+
+it("adds a browsed icon once and respects the cap", () => {
+  const first = addLibraryValue(emptyIconPool(), "mdi:bulb", {
+    name: "Bulb",
+    keywords: ["light", "light"],
+  });
+  expect(first.added).toBe(true);
+  const row = first.pool.library.find((icon) => icon.value === "mdi:bulb");
+  expect(row?.name).toBe("Bulb");
+  expect(row?.keywords).toEqual(["light", "bulb"]);
+  const again = addLibraryValue(first.pool, "mdi:bulb");
+  expect(again.added).toBe(false);
+  expect(again.pool.library.length).toBe(first.pool.library.length);
+
+  const full = {
+    ...emptyIconPool(),
+    library: Array.from({ length: POOL_CAP }, (_, i) => ({
+      id: String(i),
+      value: `v${i}`,
+      keywords: [],
+    })),
+  };
+  expect(addLibraryValue(full, "beyond").added).toBe(false);
 });

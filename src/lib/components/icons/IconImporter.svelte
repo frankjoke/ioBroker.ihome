@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import {
@@ -30,9 +30,20 @@
   let {
     onPick,
     onClose,
+    onBatch,
+    resources = ["library", "mdi", "objects", "adapter"] as Resource[],
+    embedded = false,
   }: {
     onPick: (value: string, meta: { keywords: string[]; name: string }) => void;
     onClose: () => void;
+    onBatch?: (
+      items: Array<{
+        value: string;
+        meta: { keywords: string[]; name: string };
+      }>,
+    ) => void;
+    resources?: Resource[];
+    embedded?: boolean;
   } = $props();
 
   type Resource = "library" | "mdi" | "objects" | "adapter";
@@ -60,9 +71,19 @@
    *  resumes curation instead of the first adapter. */
   const saved = readIconSourcePrefs();
 
-  let resource = $state<Resource>(saved.resource);
+  let resource = $state<Resource>(
+    untrack(() =>
+      resources.includes(saved.resource)
+        ? saved.resource
+        : (resources[0] ?? "mdi"),
+    ),
+  );
   let search = $state("");
   let limit = $state(200);
+
+  const allowed = $derived(
+    RESOURCES.filter((entry) => resources.includes(entry.id)),
+  );
 
   // Adapter folders
   let basePath = $state(saved.basePath);
@@ -379,42 +400,96 @@
     if (resourceId === "mdi") void loadMdi();
   }
 
-  function pickLibrary(icon: LibraryIcon, close = true): void {
-    onPick(icon.value, {
-      keywords: icon.keywords,
-      name: icon.name ?? icon.value,
-    });
+  type ImportItem = {
+    value: string;
+    meta: { keywords: string[]; name: string };
+  };
+
+  function deliver(
+    item: ImportItem,
+    close: boolean,
+    into?: ImportItem[],
+  ): void {
+    if (into) {
+      into.push(item);
+      return;
+    }
+    onPick(item.value, item.meta);
     if (close) onClose();
   }
 
-  function pickMdi(icon: MdiIcon, close = true): void {
+  function pickLibrary(
+    icon: LibraryIcon,
+    close = true,
+    into?: ImportItem[],
+  ): void {
+    deliver(
+      {
+        value: icon.value,
+        meta: { keywords: icon.keywords, name: icon.name ?? icon.value },
+      },
+      close,
+      into,
+    );
+  }
+
+  function pickMdi(icon: MdiIcon, close = true, into?: ImportItem[]): void {
     const name = icon.n?.en ?? icon.id;
-    onPick(mdiIconValue(icon.p), {
-      keywords: [
-        ...new Set([...keywordWords(name), ...keywordWords(mdiName(icon.c))]),
-      ],
-      name,
-    });
-    if (close) onClose();
+    deliver(
+      {
+        value: mdiIconValue(icon.p),
+        meta: {
+          keywords: [
+            ...new Set([
+              ...keywordWords(name),
+              ...keywordWords(mdiName(icon.c)),
+            ]),
+          ],
+          name,
+        },
+      },
+      close,
+      into,
+    );
   }
 
-  function pickObject(entry: { id: string; value: string }): void {
-    onPick(brokerIconPath(entry.value, entry.id), {
-      keywords: keywordWords(entry.id),
-      name: entry.id.split(".").pop() ?? entry.id,
-    });
+  function pickObject(
+    entry: { id: string; value: string },
+    into?: ImportItem[],
+  ): void {
+    deliver(
+      {
+        value: brokerIconPath(entry.value, entry.id),
+        meta: {
+          keywords: keywordWords(entry.id),
+          name: entry.id.split(".").pop() ?? entry.id,
+        },
+      },
+      false,
+      into,
+    );
   }
 
-  async function pickFile(entry: SourceEntry, close = true): Promise<void> {
+  async function pickFile(
+    entry: SourceEntry,
+    close = true,
+    into?: ImportItem[],
+  ): Promise<void> {
     const reference = importValue(basePath, entry.path);
     const value =
       (downloadCopy ? await copyIconFile(reference, entry.label) : null) ??
       reference;
-    onPick(value, {
-      keywords: keywordsFromPath(basePath, entry.path),
-      name: entry.label,
-    });
-    if (close) onClose();
+    deliver(
+      {
+        value,
+        meta: {
+          keywords: keywordsFromPath(basePath, entry.path),
+          name: entry.label,
+        },
+      },
+      close,
+      into,
+    );
   }
 
   /** A local image file, stored in the shared space and added as its path. */
@@ -440,22 +515,27 @@
   }
 
   async function addAll(): Promise<void> {
+    const items: ImportItem[] = [];
     if (resource === "library") {
-      for (const icon of libraryShown) pickLibrary(icon, false);
-      onClose();
+      for (const icon of libraryShown) pickLibrary(icon, false, items);
+    } else if (resource === "mdi") {
+      for (const icon of mdiShown.slice(0, limit)) {
+        pickMdi(icon, false, items);
+      }
+    } else if (resource === "objects") {
+      for (const entry of objectShown.slice(0, limit)) {
+        pickObject(entry, items);
+      }
+    } else {
+      for (const entry of visibleIcons) {
+        await pickFile(entry, false, items);
+      }
+    }
+    if (onBatch) {
+      onBatch(items);
       return;
     }
-    if (resource === "mdi") {
-      for (const icon of mdiShown.slice(0, limit)) pickMdi(icon, false);
-      onClose();
-      return;
-    }
-    if (resource === "objects") {
-      for (const entry of objectShown.slice(0, limit)) pickObject(entry);
-      onClose();
-      return;
-    }
-    for (const entry of visibleIcons) await pickFile(entry, false);
+    for (const item of items) onPick(item.value, item.meta);
     onClose();
   }
 
@@ -471,24 +551,32 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Add icons">
+<div
+  class="modal"
+  class:embedded
+  role="dialog"
+  aria-modal="true"
+  aria-label="Add icons"
+>
   <div class="modal-content importer">
-    <div class="modal-head">
-      <h3>Add icons / images</h3>
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Close"
-        onclick={onClose}
-      >
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+    {#if !embedded}
+      <div class="modal-head">
+        <h3>Add icons / images</h3>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Close"
+          onclick={onClose}
+        >
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    {/if}
 
     <OptionTabs
       bind:value={resource}
       label="Icon sources"
-      tabs={RESOURCES}
+      tabs={allowed}
       collapsible={false}
       showHint={false}
       onchange={activate}
@@ -735,6 +823,25 @@
     justify-content: center;
     z-index: 1000;
     padding: 1rem;
+  }
+
+  .modal.embedded {
+    position: static;
+    inset: auto;
+    background: none;
+    z-index: auto;
+    padding: 0;
+    display: block;
+    min-height: 0;
+  }
+
+  .modal.embedded .modal-content {
+    width: auto;
+    max-height: none;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: 0;
   }
 
   .modal-content {

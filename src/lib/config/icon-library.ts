@@ -4,6 +4,7 @@
 
 import { DEVICE_TYPES } from "$lib/config/features";
 import { ROLE_GLYPH_DEFAULTS, presetGlyph } from "$lib/config/icon-ops";
+import { newId } from "$lib/utils/ids";
 
 /** One curated icon: a symbol name, an image path or HTML/SVG markup. */
 export interface LibraryIcon {
@@ -759,6 +760,35 @@ export function upsertLibraryIcon(pool: IconPool, icon: LibraryIcon): IconPool {
     ? pool.library.map((entry) => (entry.id === icon.id ? icon : entry))
     : [...pool.library, icon];
   return { ...pool, updatedAt: Date.now(), library };
+}
+
+/** Add a browsed value once; empty, duplicate and full pools are unchanged. */
+export function addLibraryValue(
+  pool: IconPool,
+  value: string,
+  meta?: { name?: string; keywords?: string[] },
+): { pool: IconPool; added: boolean } {
+  const trimmed = value.trim();
+  if (!trimmed || pool.library.some((entry) => entry.value === trimmed)) {
+    return { pool, added: false };
+  }
+  if (pool.library.length >= POOL_CAP) return { pool, added: false };
+  const name = meta?.name?.trim() || undefined;
+  const keywords = [
+    ...new Set([
+      ...(meta?.keywords ?? [])
+        .map((word) => word.trim().toLowerCase())
+        .filter(Boolean),
+      ...keywordWords(name ?? ""),
+    ]),
+  ];
+  const icon: LibraryIcon = {
+    id: newId(),
+    ...(name ? { name } : {}),
+    value: trimmed,
+    keywords,
+  };
+  return { pool: upsertLibraryIcon(pool, icon), added: true };
 }
 
 /** Removing an icon also removes any pairing that names it. */

@@ -5,6 +5,7 @@
     libraryKeywordCounts,
     pairChoices,
     splitTwins,
+    addLibraryValue,
   } from "$lib/config/icon-library";
   import { getIconPool, initIconPool } from "$lib/stores/icon-pool.svelte";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
@@ -12,6 +13,11 @@
   import { collectDocumentIcons, isImageIcon } from "$lib/utils/icon-url";
   import { isHtmlIcon } from "$lib/config/icon-html";
   import { writeIconFile } from "$lib/config/icon-files";
+  import IconImporter from "$lib/components/icons/IconImporter.svelte";
+  import {
+    commitIconPool,
+    isIconPoolWritable,
+  } from "$lib/stores/icon-pool.svelte";
 
   /** The one editor picker: the library, narrowed by keywords. The main tile
    *  icon may pick an on/off pair; every other consumer sees the same grid. */
@@ -36,6 +42,7 @@
   let customOpen = $state(false);
   let uploadError = $state("");
   let mode = $state<"icons" | "browse" | "manage">("icons");
+  let browseHint = $state("");
   // svelte-ignore state_referenced_locally
   let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
@@ -86,6 +93,61 @@
 
   function onKey(event: KeyboardEvent): void {
     if (event.key === "Escape") onClose();
+  }
+
+  function rememberBrowsed(
+    value: string,
+    meta?: { name?: string; keywords?: string[] },
+  ): void {
+    if (!isIconPoolWritable()) {
+      browseHint = "The icon is not saved in the library.";
+      return;
+    }
+    const next = addLibraryValue(getIconPool(), value, meta);
+    if (!next.added) return;
+    void commitIconPool(next.pool, getIconPool().updatedAt).then((status) => {
+      if (status !== "saved") {
+        browseHint = "The icon was picked, but the library was not saved.";
+      }
+    });
+  }
+
+  function pickBrowsed(
+    value: string,
+    meta: { keywords: string[]; name: string },
+  ): void {
+    rememberBrowsed(value, meta);
+    const twin = getIconPool().twins[value];
+    onPick(value, twins && twin ? { active: twin } : undefined);
+  }
+
+  async function importBrowsed(
+    items: Array<{
+      value: string;
+      meta: { keywords: string[]; name: string };
+    }>,
+  ): Promise<void> {
+    if (!isIconPoolWritable()) {
+      browseHint = "The icons were not added — the library is not writable.";
+      return;
+    }
+    let pool = getIconPool();
+    let added = 0;
+    for (const item of items) {
+      const next = addLibraryValue(pool, item.value, item.meta);
+      if (!next.added) continue;
+      pool = next.pool;
+      added++;
+    }
+    if (!added) {
+      browseHint = "Nothing new to add.";
+      return;
+    }
+    const status = await commitIconPool(pool, getIconPool().updatedAt);
+    browseHint =
+      status === "saved"
+        ? `Added ${added} icon(s).`
+        : "The icons were not saved — try again.";
   }
 </script>
 
@@ -269,7 +331,18 @@
         {/if}
       </div>
     {:else if mode === "browse"}
-      <p class="empty text-muted">Browse icon sources…</p>
+      {#if browseHint}
+        <p class="hint text-muted">{browseHint}</p>
+      {/if}
+      <div class="browse">
+        <IconImporter
+          embedded
+          resources={["mdi", "objects", "adapter"]}
+          onPick={pickBrowsed}
+          onBatch={importBrowsed}
+          onClose={() => (mode = "icons")}
+        />
+      </div>
     {:else}
       <p class="empty text-muted">Manage the icon library…</p>
     {/if}
@@ -437,6 +510,11 @@
     padding: 2rem 1rem;
     text-align: center;
     font-size: var(--body-sm);
+  }
+
+  .browse {
+    min-height: 0;
+    overflow: auto;
   }
 
   .foot {
