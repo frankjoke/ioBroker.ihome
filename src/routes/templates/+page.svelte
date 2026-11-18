@@ -32,8 +32,8 @@
     },
     {
       id: "icons",
-      label: "Icons & Images",
-      hint: "Manage the saved icons and images.",
+      label: "Default icons",
+      hint: "Role and template icons.",
     },
     {
       id: "help",
@@ -285,7 +285,7 @@
     </div>
   {:else if group === "icons"}
     {#await import("$lib/components/icons/IconPoolManager.svelte") then { default: IconPoolManager }}
-      <IconPoolManager bind:dirty />
+      <IconPoolManager mode="defaults" embedded bind:dirty />
     {:catch error}
       <p class="text-danger hint">
         The icon manager could not be loaded: {error}
