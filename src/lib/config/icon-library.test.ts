@@ -16,6 +16,7 @@ import {
   normalizeIconPool,
   offTwin,
   onTwin,
+  pairChoices,
   parseIconPool,
   removeLibraryIcon,
   roleChoicesFromObjects,
@@ -418,4 +419,15 @@ it("keeps the current twin and refuses a paired counterpart", () => {
   expect(
     suggestTwin(twinPool({ other: "bulb_on" }), "bulb_off"),
   ).toBeUndefined();
+});
+
+it("offers pair halves separately only for single fields", () => {
+  expect(pairChoices("bulb_off", "bulb_on", false)).toEqual([
+    { value: "bulb_off" },
+    { value: "bulb_on" },
+  ]);
+  expect(pairChoices("bulb_off", "bulb_on", true)).toEqual([
+    { value: "bulb_off", active: "bulb_on" },
+  ]);
+  expect(pairChoices("solo", undefined, true)).toEqual([{ value: "solo" }]);
 });

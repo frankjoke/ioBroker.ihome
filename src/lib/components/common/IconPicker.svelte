@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { base } from "$app/paths";
   import Icon from "$lib/components/common/Icon.svelte";
   import {
     filterLibrary,
     libraryKeywordCounts,
+    pairChoices,
     splitTwins,
   } from "$lib/config/icon-library";
   import { getIconPool, initIconPool } from "$lib/stores/icon-pool.svelte";
@@ -35,6 +35,7 @@
   let inUse = $state(false);
   let customOpen = $state(false);
   let uploadError = $state("");
+  let mode = $state<"icons" | "browse" | "manage">("icons");
   // svelte-ignore state_referenced_locally
   let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
@@ -71,11 +72,7 @@
     const list = filterLibrary(library, selected, search);
     return inUse ? list.filter((entry) => inUseValues.has(entry.value)) : list;
   });
-  const split = $derived(
-    twins
-      ? splitTwins(shown, getIconPool().twins)
-      : { pairs: [] as typeof shown, singles: shown },
-  );
+  const split = $derived(splitTwins(shown, getIconPool().twins));
   const pairs = $derived(split.pairs);
   const singles = $derived(split.singles);
   const twinOf = (value: string): string | undefined =>
@@ -108,135 +105,174 @@
       </button>
     </div>
 
-    <input type="search" placeholder="Search keywords…" bind:value={search} />
-
-    <div class="chips">
+    <div class="modes">
       <button
         type="button"
-        class="chip"
-        class:active={inUse}
-        title="Only icons already used in pages or templates"
-        onclick={() => (inUse = !inUse)}
+        class:active={mode === "icons"}
+        onclick={() => (mode = "icons")}>Icons</button
       >
-        In use
-      </button>
-      {#each keywordCounts as entry (entry.keyword)}
+      <button
+        type="button"
+        class:active={mode === "browse"}
+        onclick={() => (mode = "browse")}>Browse</button
+      >
+      <button
+        type="button"
+        class:active={mode === "manage"}
+        onclick={() => (mode = "manage")}>Manage</button
+      >
+    </div>
+
+    {#if mode === "icons"}
+      <input type="search" placeholder="Search keywords…" bind:value={search} />
+
+      <div class="chips">
         <button
           type="button"
           class="chip"
-          class:active={selected.includes(entry.keyword)}
-          onclick={() => toggleKeyword(entry.keyword)}
+          class:active={inUse}
+          title="Only icons already used in pages or templates"
+          onclick={() => (inUse = !inUse)}
         >
-          {entry.keyword}
-          <span class="chip-count">{entry.count}</span>
+          In use
         </button>
-      {/each}
-    </div>
-
-    <div class="results">
-      <button type="button" class="none" onclick={() => onPick("")}
-        >None — clear the icon</button
-      >
-
-      {#if icon && !shown.some((entry) => entry.value === icon || twinOf(entry.value) === icon)}
-        <p class="label-mono group-title">Current</p>
-        <div class="grid">
+        {#each keywordCounts as entry (entry.keyword)}
           <button
             type="button"
-            class="cell current"
-            title={icon}
-            aria-label="Current icon"
-            onclick={() => onPick(icon ?? "")}
+            class="chip"
+            class:active={selected.includes(entry.keyword)}
+            onclick={() => toggleKeyword(entry.keyword)}
           >
-            <Icon value={icon} size={22} />
+            {entry.keyword}
+            <span class="chip-count">{entry.count}</span>
           </button>
-        </div>
-      {/if}
+        {/each}
+      </div>
 
-      {#if pairs.length > 0}
-        <p class="label-mono group-title">On / Off pairs</p>
-        <div class="grid">
-          {#each pairs as entry (entry.id)}
-            {@const twin = twinOf(entry.value)}
+      <div class="results">
+        <button type="button" class="none" onclick={() => onPick("")}
+          >None — clear the icon</button
+        >
+
+        {#if icon && !shown.some((entry) => entry.value === icon || twinOf(entry.value) === icon)}
+          <p class="label-mono group-title">Current</p>
+          <div class="grid">
             <button
               type="button"
-              class="pair"
-              class:current={entry.value === icon || twin === icon}
-              title={`${entry.name ?? entry.value} (pair)`}
-              aria-label={`${entry.name ?? entry.value} (pair)`}
-              onclick={() => onPick(entry.value, { active: twin })}
+              class="cell current"
+              title={icon}
+              aria-label="Current icon"
+              onclick={() => onPick(icon ?? "")}
             >
-              <Icon value={entry.value} size={22} />
-              {#if twin}
-                <span class="pair-twin">
-                  <Icon value={twin} size={16} />
-                </span>
-              {/if}
+              <Icon value={icon} size={22} />
             </button>
-          {/each}
-        </div>
-      {/if}
-
-      {#if singles.length > 0}
-        <p class="label-mono group-title">Icons</p>
-        <div class="grid">
-          {#each singles as entry (entry.id)}
-            <button
-              type="button"
-              class="cell"
-              class:current={entry.value === icon}
-              title={entry.name ?? entry.value}
-              aria-label={entry.name ?? entry.value}
-              onclick={() => onPick(entry.value)}
-            >
-              <Icon value={entry.value} size={22} />
-            </button>
-          {/each}
-        </div>
-      {/if}
-
-      {#if pairs.length === 0 && singles.length === 0}
-        <p class="empty text-muted">
-          No icons match. Add some in
-          <a href={`${base}/#/templates?type=icons`} target="_blank"
-            >Templates → Icons &amp; Images</a
-          >.
-        </p>
-      {/if}
-    </div>
-
-    <div class="foot">
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        onclick={() => (customOpen = !customOpen)}>Custom…</button
-      >
-      {#if customOpen}
-        <div class="custom">
-          <input
-            type="text"
-            aria-label="Custom icon"
-            placeholder="URL, path, SVG or HTML"
-            bind:value={url}
-          />
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={!url.trim()}
-            onclick={() => onPick(url.trim())}>Use</button
-          >
-        </div>
-        <div class="custom">
-          <label class="upload">
-            <input type="file" accept="image/*,.svg" onchange={onFile} />
-            <span class="btn btn-outline btn-sm">Upload image…</span>
-          </label>
-        </div>
-        {#if uploadError}
-          <p class="text-danger upload-error">{uploadError}</p>
+          </div>
         {/if}
-      {/if}
-    </div>
+
+        {#if pairs.length > 0}
+          <p class="label-mono group-title">On / Off pairs</p>
+          <div class="grid">
+            {#each pairs as entry (entry.id)}
+              {@const twin = twinOf(entry.value)}
+              {#each pairChoices(entry.value, twin, twins) as choice, index (choice.value)}
+                <button
+                  type="button"
+                  class="cell"
+                  class:current={choice.value === icon ||
+                    choice.active === icon}
+                  title={choice.active
+                    ? `${entry.name ?? entry.value} (pair)`
+                    : `Use the ${index === 0 ? "off" : "on"} icon`}
+                  aria-label={choice.active
+                    ? `${entry.name ?? entry.value} (pair)`
+                    : `Use the ${index === 0 ? "off" : "on"} icon`}
+                  onclick={() =>
+                    onPick(
+                      choice.value,
+                      choice.active ? { active: choice.active } : undefined,
+                    )}
+                >
+                  <Icon value={choice.value} size={22} />
+                </button>
+              {/each}
+            {/each}
+          </div>
+        {/if}
+
+        {#if singles.length > 0}
+          <p class="label-mono group-title">Icons</p>
+          <div class="grid">
+            {#each singles as entry (entry.id)}
+              <button
+                type="button"
+                class="cell"
+                class:current={entry.value === icon}
+                title={entry.name ?? entry.value}
+                aria-label={entry.name ?? entry.value}
+                onclick={() => onPick(entry.value)}
+              >
+                <Icon value={entry.value} size={22} />
+              </button>
+            {/each}
+          </div>
+        {/if}
+
+        {#if pairs.length === 0 && singles.length === 0}
+          <div class="empty text-muted">
+            <p>No icons match.</p>
+            <span class="empty-actions">
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                onclick={() => (mode = "browse")}>Browse sources</button
+              >
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                onclick={() => (mode = "manage")}>Manage library</button
+              >
+            </span>
+          </div>
+        {/if}
+      </div>
+
+      <div class="foot">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          onclick={() => (customOpen = !customOpen)}>Custom…</button
+        >
+        {#if customOpen}
+          <div class="custom">
+            <input
+              type="text"
+              aria-label="Custom icon"
+              placeholder="URL, path, SVG or HTML"
+              bind:value={url}
+            />
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={!url.trim()}
+              onclick={() => onPick(url.trim())}>Use</button
+            >
+          </div>
+          <div class="custom">
+            <label class="upload">
+              <input type="file" accept="image/*,.svg" onchange={onFile} />
+              <span class="btn btn-outline btn-sm">Upload image…</span>
+            </label>
+          </div>
+          {#if uploadError}
+            <p class="text-danger upload-error">{uploadError}</p>
+          {/if}
+        {/if}
+      </div>
+    {:else if mode === "browse"}
+      <p class="empty text-muted">Browse icon sources…</p>
+    {:else}
+      <p class="empty text-muted">Manage the icon library…</p>
+    {/if}
   </div>
 </div>
 
@@ -272,6 +308,37 @@
 
   .modal-head h3 {
     margin: 0;
+  }
+
+  .modes {
+    display: flex;
+    gap: 2px;
+  }
+
+  .modes button {
+    flex: 1;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--body-sm);
+    cursor: pointer;
+  }
+
+  .modes button.active {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+
+  .empty-actions {
+    display: inline-flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+
+  .empty p {
+    margin: 0 0 0.35rem;
   }
 
   .chips {
@@ -343,8 +410,7 @@
     gap: 2px;
   }
 
-  .cell,
-  .pair {
+  .cell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -357,30 +423,14 @@
     cursor: pointer;
   }
 
-  .cell:hover,
-  .pair:hover {
+  .cell:hover {
     background-color: var(--surface-container);
     color: var(--text-color);
   }
 
-  .cell.current,
-  .pair.current {
+  .cell.current {
     border-color: var(--primary-color);
     color: var(--primary-color);
-  }
-
-  .pair {
-    position: relative;
-    width: 48px;
-  }
-
-  .pair-twin {
-    position: absolute;
-    right: 1px;
-    bottom: 1px;
-    display: inline-flex;
-    color: var(--text-muted);
-    opacity: 0.85;
   }
 
   .empty {

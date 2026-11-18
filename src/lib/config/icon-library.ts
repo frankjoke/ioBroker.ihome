@@ -692,6 +692,23 @@ export function suggestTwin(
   return undefined;
 }
 
+/** What clicking a pair row offers: one pair target, or two single targets. */
+export interface IconPickChoice {
+  value: string;
+  active?: string;
+}
+
+export function pairChoices(
+  off: string,
+  on: string | undefined,
+  pairAware: boolean,
+): IconPickChoice[] {
+  if (!on) return [{ value: off }];
+  return pairAware
+    ? [{ value: off, active: on }]
+    : [{ value: off }, { value: on }];
+}
+
 /** Paired icons first for the twin-aware picker; a pair is shown once. */
 export function splitTwins(
   entries: LibraryIcon[],
