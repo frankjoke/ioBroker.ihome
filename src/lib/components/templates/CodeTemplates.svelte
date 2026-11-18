@@ -40,6 +40,7 @@
     sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
+    onselect,
   }: {
     formulaOnly?: boolean;
     embedded?: boolean;
@@ -48,6 +49,8 @@
     sortDir?: "asc" | "desc";
     focus?: { kind: "formula" | "function"; id: string } | null;
     onFocusApplied?: () => void;
+    /** Reports the unfolded row (or null) so the page can remember it. */
+    onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
 
@@ -141,6 +144,7 @@
     draft = null;
     editorDirty = false;
     editorProblem = null;
+    onselect?.(null);
   }
 
   function start(entry: CodeEntry) {
@@ -162,6 +166,7 @@
     selected = entry;
     editorDirty = false;
     editorProblem = null;
+    onselect?.({ kind: entry.kind, id: entry.id });
   }
 
   function open(entry: CodeEntry) {
@@ -179,11 +184,11 @@
     }
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
-    lastFocus = key;
     const entry = entries.find(
       (item) => item.kind === focus.kind && item.id === focus.id,
     );
     if (!entry) return;
+    lastFocus = key;
     start(entry);
     onFocusApplied?.();
   });
@@ -201,6 +206,7 @@
         kind: "formula",
         id: template.id,
         name: "New formula",
+        description: "",
         preview: "",
         builtin: false,
         search: "",
@@ -218,6 +224,7 @@
         kind: "function",
         id: template.id,
         name: "New snippet",
+        description: "",
         preview: "",
         builtin: false,
         search: "",
@@ -225,6 +232,7 @@
     }
     editorDirty = false;
     editorProblem = null;
+    onselect?.(null);
   }
 
   function save(template: FormulaTemplate | FunctionTemplate) {
@@ -334,7 +342,7 @@
       <div class="filter-bar">
         <input
           type="search"
-          placeholder="Search name or code…"
+          placeholder="Search name, description or code…"
           bind:value={search}
         />
         <button
@@ -365,14 +373,25 @@
               class="item-line"
               onclick={(event) => onLineClick(event, entry)}
             >
-              <Icon value={typeIcon(entry)} size={18} />
-              <button type="button" class="name" onclick={() => open(entry)}>
+              <span
+                class="type"
+                title={entry.kind === "formula" ? "Formula" : "Function"}
+              >
+                <Icon value={typeIcon(entry)} size={18} />
+              </span>
+              <button
+                type="button"
+                class="name"
+                title={entry.kind === "formula" ? "Formula" : "Function"}
+                onclick={() => open(entry)}
+              >
                 {entry.name}
               </button>
-              <span class="badge"
-                >{entry.kind === "formula" ? "Formula" : "Function"}</span
-              >
-              <code class="preview">{entry.preview}</code>
+              {#if entry.description}
+                <span class="preview description">{entry.description}</span>
+              {:else}
+                <code class="preview">{entry.preview}</code>
+              {/if}
               <span class="item-actions">
                 {#if isOpen(entry)}
                   <IconButton
@@ -573,6 +592,14 @@
     font-family: var(--font-code);
     font-size: var(--body-sm);
     color: var(--text-muted);
+  }
+
+  .preview.description {
+    font-family: var(--font-family);
+  }
+
+  .type {
+    display: inline-flex;
   }
 
   .item-actions {

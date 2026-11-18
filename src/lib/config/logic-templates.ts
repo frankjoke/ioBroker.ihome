@@ -91,7 +91,8 @@ export function logicTemplateProblem(
       id,
       name: id,
       kind: "function" as const,
-      expr: { code: "0" },
+      mode: "statements" as const,
+      expr: { code: "return 0" },
     }));
   const issues = validateLogicDocument({
     version: 3,

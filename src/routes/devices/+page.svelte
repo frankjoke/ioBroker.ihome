@@ -18,6 +18,8 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
+  import ApplyTemplateModal from "$lib/components/templates/ApplyTemplateModal.svelte";
+  import DeviceCreateModal from "$lib/components/templates/DeviceCreateModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
@@ -30,6 +32,10 @@
   import { DEVICE_TYPES } from "$lib/config/features";
   import { sortDevices, type SortDir } from "$lib/config/sort";
   import { DEVICES_GUIDE } from "$lib/config/page-guides";
+  import { PRESETS } from "$lib/config/presets";
+  import { isLocalUi } from "$lib/config/locality";
+  import { withoutSecured } from "$lib/config/secured";
+  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { slotsReferencingDevice } from "$lib/config/layout-ops";
   import { getPageRegistry } from "$lib/stores/pages.svelte.js";
   import { onMount, tick } from "svelte";
@@ -40,6 +46,8 @@
   } from "$lib/pages.js";
   import { openSheet } from "$lib/stores/sheet.svelte.js";
   import type { Device, EnrichedControl } from "$lib/types/device";
+  import type { Template } from "$lib/types/display";
+  import { patchView, readView } from "$lib/stores/page-view";
 
   let editing = $state<Device | null>(null);
   /** The embedded form: its save, and whether it has unsaved changes. */
@@ -49,6 +57,8 @@
   let pendingOpen = $state<Device | null>(null);
   let askClose = $state(false);
   let showForm = $state(false);
+  let pickingTemplate = $state(false);
+  let createTemplate = $state<Template | null>(null);
   let showPageHelp = $state(false);
   /** The inline form's card, scrolled into view when an edit opens. */
   let inlineForm = $state<HTMLDivElement | null>(null);
@@ -62,6 +72,12 @@
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const devices = $derived(getCanonicalRegistry().devices ?? []);
+  const deviceTemplates = $derived.by(() =>
+    withoutSecured(
+      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      isLocalUi(),
+    ),
+  );
   const rooms = $derived(roomList(ioBroker.enums));
 
   const enrichedById = $derived(
@@ -156,10 +172,11 @@
     showForm = true;
   }
 
-  function editDevice(d: Device) {
+  function editDevice(d: Device, scroll = true) {
     formDirty = false;
     editing = d;
     showForm = true;
+    if (!scroll) return;
     // The editor sits under the device; bring it into view so a device far
     // down the list does not look un-edited at the top of the page.
     const reduce = globalThis.matchMedia?.(
@@ -256,12 +273,28 @@
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
   // waits for the registry, in case the request arrives before it is loaded.
   let requestedId = $state("");
+  let restoreId = $state("");
+  let wroteOpen = false;
   // A tile editor round trip leaves its tile address pending — offer the way
   // back to that tile (the layout route still takes and clears it).
   let backToTile = $state(false);
   onMount(() => {
     requestedId = takeRequestedDeviceConfig();
     backToTile = peekRequestedLayout() !== null;
+    if (!requestedId) restoreId = readView("/devices")?.openId ?? "";
+  });
+  $effect(() => {
+    if (!restoreId) return;
+    const device = devices.find((item) => item.id === restoreId);
+    if (!device) return;
+    restoreId = "";
+    editDevice(device, false);
+  });
+  $effect(() => {
+    const openId = showForm ? (editing?.id ?? null) : null;
+    if (!wroteOpen && openId === null) return;
+    wroteOpen = true;
+    patchView("/devices", { openId });
   });
   $effect(() => {
     if (!requestedId) return;
@@ -337,6 +370,15 @@
         </button>
         <button
           type="button"
+          class="btn btn-outline btn-sm"
+          disabled={showForm}
+          onclick={() => (pickingTemplate = true)}
+        >
+          <span class="material-symbols-outlined">dashboard_customize</span>
+          From template
+        </button>
+        <button
+          type="button"
           class="btn btn-primary btn-sm"
           disabled={showForm}
           onclick={addDevice}
@@ -370,7 +412,9 @@
 
   {#if devices.length === 0}
     <div class="card empty-state">
-      <p class="text-muted">No devices yet — add one to get started.</p>
+      <p class="text-muted">
+        No devices yet — add one or start from a template.
+      </p>
     </div>
   {:else}
     <div class="filter-block">
@@ -514,6 +558,29 @@
       device. They will show unavailable; no tiles are deleted.
     </p>
   </ConfirmModal>
+{/if}
+
+{#if pickingTemplate}
+  <ApplyTemplateModal
+    templates={deviceTemplates}
+    title="Create a device from a template"
+    intro="Pick a visual template; the next step asks for the state and the remaining slots."
+    confirmLabel="Continue"
+    confirmIcon="arrow_forward"
+    onPick={(template) => {
+      pickingTemplate = false;
+      createTemplate = template;
+    }}
+    onClose={() => (pickingTemplate = false)}
+  />
+{/if}
+
+{#if createTemplate}
+  <DeviceCreateModal
+    template={createTemplate}
+    onClose={() => (createTemplate = null)}
+    onCreated={(device) => editDevice(device)}
+  />
 {/if}
 
 <style>

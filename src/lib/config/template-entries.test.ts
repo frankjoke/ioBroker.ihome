@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { DeviceTemplate, LogicTemplate } from "$logic/types";
 import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
-import { filterTemplateEntries, templateEntries } from "./template-entries";
+import {
+  filterTemplateEntries,
+  helpLine,
+  templateEntries,
+} from "./template-entries";
 
 const device = {
   id: "d",
   name: "Lamp",
+  description: "A visual lamp tile",
   help: "visualhelp",
   type: "Light",
   features: [],
@@ -15,6 +20,7 @@ const device = {
 const logic = {
   id: "l",
   name: "Zulu",
+  description: "Turns something on",
   help: "logichelp",
   params: [],
   logic: {},
@@ -22,12 +28,14 @@ const logic = {
 const api = {
   id: "a",
   name: "Meter",
+  description: "Reads a meter",
   help: "apihelp",
   source: "({})",
 } as DeviceTemplate;
 const bundle = {
   id: "b",
   name: "TV",
+  description: "TV plus logic",
   help: "bundlehelp",
   items: [],
   device: { type: "Custom", features: [], slots: [] },
@@ -54,11 +62,33 @@ describe("templateEntries", () => {
     ]);
     expect(entries[3].parts).toEqual(["device", "logic"]);
     expect(entries[3].type).toBe("Custom");
+    expect(entries.map((entry) => entry.description)).toEqual([
+      "A visual lamp tile",
+      "Turns something on",
+      "Reads a meter",
+      "TV plus logic",
+    ]);
+    expect(entries.map((entry) => entry.help)).toEqual([
+      "visualhelp",
+      "logichelp",
+      "apihelp",
+      "bundlehelp",
+    ]);
     expect(entries.every((entry) => entry.builtin === false)).toBe(true);
     // A bundle is findable by the device type it creates.
     expect(
       filterTemplateEntries(entries, "custom", "asc").map((entry) => entry.id),
     ).toEqual(["b"]);
+    expect(
+      filterTemplateEntries(entries, "visual lamp", "asc").map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["d"]);
+    expect(
+      filterTemplateEntries(entries, "reads a meter", "asc").map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["a"]);
   });
 
   it("marks built-ins and filters/sorts", () => {
@@ -123,5 +153,15 @@ describe("templateEntries", () => {
       false,
       true,
     ]);
+  });
+});
+
+describe("helpLine", () => {
+  it("takes the first readable line without markdown markers", () => {
+    expect(helpLine("# Network device\n\nPolls a status endpoint.")).toBe(
+      "Network device",
+    );
+    expect(helpLine("**Bold** `code` text")).toBe("Bold code text");
+    expect(helpLine("```\ncode only\n```")).toBe("");
   });
 });

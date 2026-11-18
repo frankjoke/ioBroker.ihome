@@ -8,7 +8,9 @@ import {
   type StateChange,
 } from "./logic/engine";
 import { isRecord, parseLogicDocument } from "./logic/validate";
-import { subscriptionDiff } from "./logic/subscriptions";
+import { expandInputPatterns } from "./logic/pattern-ops";
+import { toStatementBodies } from "./logic/function-bodies";
+import { logicSubscriptions, subscriptionDiff } from "./logic/subscriptions";
 import {
   stateCommonDiff,
   stateObjectWithDiff,
@@ -624,6 +626,17 @@ class IHome extends utils.Adapter {
    * the old timers still armed. An unreadable or newer document leaves the
    * running engine untouched.
    */
+  /** The states a `*`/`?` input pattern names, for one engine build. */
+  private async logicPatternStates(pattern: string): Promise<string[]> {
+    try {
+      const objects = await this.getForeignObjectsAsync(pattern, "state");
+      return Object.keys(objects ?? {});
+    } catch (error) {
+      this.log.warn(`cannot expand logic pattern ${pattern}: ${String(error)}`);
+      return [];
+    }
+  }
+
   private async loadLogics(): Promise<void> {
     const loadId = ++this.logicLoad;
     const target = `${CONFIG_FOLDER}.logicList`;
@@ -646,53 +659,33 @@ class IHome extends utils.Adapter {
     }
     if (loadId !== this.logicLoad) return; // a newer reload won
     if (!doc) return;
+    doc = toStatementBodies(doc);
 
     await this.ensureAstroConfig();
     await this.ensureLogicStates(doc);
-
-    let next: Engine;
-    try {
-      next = createEngine(
-        doc,
-        {
-          read: (id) => this.logicValues.get(id)?.val,
-          readState: (id) => this.logicValues.get(id),
-          write: (id, value, ack) => this.writeLogicState(id, value, ack),
-          log: (level, logicId, message) =>
-            this.pushLogicLog(level, logicId, message),
-          message: (level, logicId, message, timeout) =>
-            this.pushMessage(level, logicId, message, timeout),
-          notify: (level, logicId, title, body) =>
-            this.notifyLogic(level, logicId, title, body),
-          now: () => Date.now(),
-          setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
-          clearTimeout: (handle) =>
-            clearTimeout(handle as unknown as ReturnType<typeof setTimeout>),
-          report: (logicId, reading) => {
-            this.logicInfo.set(logicId, reading);
-            this.scheduleLogicState();
-          },
-          resolveVariable: (name) => {
-            const constant = this.variables.constants[name];
-            if (constant) return { kind: "const", value: constant.val };
-            const variable = this.variables.states[name];
-            if (variable) return { kind: "state", stateId: variable.stateId };
-            return undefined;
-          },
-          callPlugin: (id, payload) =>
-            this.pluginHost?.call(id, payload) ??
-            Promise.resolve(pluginError("plugins are not available")),
-          nextAstro: (event, offset, from) =>
-            this.nextAstro(event, offset, from),
-        },
-        { ownFrom: this.namespace },
-      );
-    } catch (error) {
-      this.log.warn(`logic engine not rebuilt: ${error}`);
-      return;
+    // `*`/`?` input refs are expanded once per build; the stored document
+    // keeps the pattern, so the next build sees newly added states.
+    const expanded = await expandInputPatterns(doc, (pattern) =>
+      this.logicPatternStates(pattern),
+    );
+    for (const pattern of expanded.unmatched) {
+      this.log.warn(`logic input pattern “${pattern}” matches no state`);
     }
 
-    const ids = next.subscriptions();
+    const resolveVariable = (name: string) => {
+      const constant = this.variables.constants[name];
+      if (constant) return { kind: "const" as const, value: constant.val };
+      const variable = this.variables.states[name];
+      if (variable)
+        return { kind: "state" as const, stateId: variable.stateId };
+      return undefined;
+    };
+    const ids = logicSubscriptions(
+      expanded.doc,
+      resolveVariable,
+      this.namespace,
+    );
+
     // Anything a removed/disabled logic or a deleted variable no longer names
     // is unsubscribed here, so the broker stops sending it and nothing keeps
     // running for it.
@@ -729,21 +722,72 @@ class IHome extends utils.Adapter {
       );
     }
 
+    const deps = {
+      read: (id: string) => this.logicValues.get(id)?.val,
+      readState: (id: string) => this.logicValues.get(id),
+      write: (id: string, value: unknown, ack: boolean) =>
+        this.writeLogicState(id, value, ack),
+      log: (level: "info" | "warn", logicId: string, message: string) =>
+        this.pushLogicLog(level, logicId, message),
+      message: (
+        level: "info" | "warn" | "error",
+        logicId: string,
+        message: string,
+        timeout?: number,
+      ) => this.pushMessage(level, logicId, message, timeout),
+      notify: (
+        level: "info" | "warn" | "error",
+        logicId: string,
+        title: string,
+        body: string,
+      ) => this.notifyLogic(level, logicId, title, body),
+      now: () => Date.now(),
+      setTimeout: (fn: () => void, ms: number) =>
+        setTimeout(fn, ms) as unknown as number,
+      clearTimeout: (handle: number) =>
+        clearTimeout(handle as unknown as ReturnType<typeof setTimeout>),
+      report: (logicId: string, reading: LogicReading) => {
+        this.logicInfo.set(logicId, reading);
+        this.scheduleLogicState();
+      },
+      resolveVariable,
+      callPlugin: (id: string, payload: unknown) =>
+        this.pluginHost?.call(id, payload) ??
+        Promise.resolve(pluginError("plugins are not available")),
+      nextAstro: (event: AstroEvent, offset: number, from: number) =>
+        this.nextAstro(event, offset, from),
+    };
+
     try {
-      this.logicInfo.clear();
-      next.start();
+      if (!this.engine) {
+        const next = createEngine(expanded.doc, deps, {
+          ownFrom: this.namespace,
+        });
+        this.logicInfo.clear();
+        try {
+          next.start();
+        } catch (error) {
+          next.stop();
+          throw error;
+        }
+        this.engine = next;
+      } else {
+        const result = this.engine.update(expanded.doc);
+        // Changed logics report their fresh reading during update; only the
+        // removed entries are stale.
+        for (const id of result.removed) {
+          this.logicInfo.delete(id);
+        }
+      }
       this.scheduleLogicState();
     } catch (error) {
-      next.stop();
       this.log.warn(
-        `logic engine failed to start — keeping the running one: ${error}`,
+        `logic engine update failed — keeping the running one: ${error}`,
       );
       return;
     }
 
-    this.engine?.stop();
     this.logicIds = ids;
-    this.engine = next;
     const active = doc.logics.filter((logic) => logic.enabled !== false).length;
     this.log.info(
       `Logic engine: ${doc.logics.length} logic(s) (${active} active), ${ids.length} subscribed state(s)`,

@@ -149,6 +149,10 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### 0.4.2 (2026-11-18)
+
+Per-logic reload: saving a logic now restarts only the added, changed or removed logics; unchanged logics keep their `this`, memory output, machine state, `after` timers and task queues. State, memory and `$logic` references live in shared maps and equal timer schedules share one handle. Logic inputs gained `$value`/`$previous`/`$input`/`$source`, statement bodies, state collections and timer inputs. Configuration pages remember scroll, open row and active tab per browser tab. Template lists show descriptions (help as fallback) with the type as a tooltip; visual templates gained a Description field; Devices gained **From template** with the usual state picker.
+
 ### 0.4.0 (2026-11-16)
 
 File-backed templates and plugins. User templates (device/tile and bundle) now live as one JSON file per template in the shared `ihome.meta` space (`templates/<kind>/<id>.json`) and user plugins as one folder each (`plugins/<id>/plugin.json` + `index.js`); the folders are the source of truth and the old state documents stay as a read-only backup. Runtime plugin flags (enabled, debug, timeout, settings) stay in the adapter config. The Plugins page edits a plugin's manifest and code in place, imports by writing the folder, and reloads, installs or removes a plugin without an adapter restart. Every file write is verified by reading it back and a failed write restores the previous file; a broken file is reported and never overwritten. Import and refresh are icon buttons in the Plugins header.

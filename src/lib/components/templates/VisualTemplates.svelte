@@ -73,6 +73,16 @@
     );
   }
 
+  /** The description is part of the JSON draft and is edited before the code. */
+  function setDescription(description: string): void {
+    if (!draft) return;
+    json = JSON.stringify(
+      { ...draft, description: description || undefined },
+      null,
+      2,
+    );
+  }
+
   $effect(() => {
     if (!selected) return;
     if (selected.id !== loadedId) {
@@ -113,6 +123,9 @@
         ? allTemplates.filter(
             (template) =>
               String(template.name ?? "")
+                .toLowerCase()
+                .includes(q) ||
+              String(template.description ?? "")
                 .toLowerCase()
                 .includes(q) ||
               String(template.type ?? "")
@@ -337,6 +350,18 @@
           {/if}
         </div>
       {/if}
+      {#if draft}
+        <label class="field">
+          <span class="label-mono">Description</span>
+          <input
+            type="text"
+            value={draft.description ?? ""}
+            disabled={isBuiltin || !writable}
+            placeholder="One line for the template list"
+            oninput={(event) => setDescription(event.currentTarget.value)}
+          />
+        </label>
+      {/if}
       {#if draft && Array.isArray(draft.features)}
         <TemplateControlsEditor
           features={draft.features}
@@ -446,6 +471,13 @@
   .hint {
     margin: 0;
     font-size: var(--body-sm);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
   }
 
   .filter-bar {

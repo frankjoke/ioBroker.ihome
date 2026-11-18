@@ -14,6 +14,7 @@
   import {
     bundleParts,
     filterTemplateEntries,
+    helpLine,
     templateEntries,
     type TemplateEntry,
   } from "$lib/config/template-entries";
@@ -57,6 +58,7 @@
     sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
+    onselect,
   }: {
     dirty?: boolean;
     search?: string;
@@ -66,6 +68,8 @@
       id: string;
     } | null;
     onFocusApplied?: () => void;
+    /** Reports the unfolded row (or null) so the page can remember it. */
+    onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
   const local = isLocalUi();
@@ -110,6 +114,8 @@
                 kind: "bundle" as const,
                 parts: bundleParts(bundleDraft),
                 builtin: false,
+                help: "",
+                description: bundleDraft.description ?? "",
                 search: (bundleDraft.name || "New template").toLowerCase(),
               },
             ]
@@ -179,7 +185,7 @@
     dirty = editorDirty;
   });
 
-  function badge(entry: TemplateEntry): string {
+  function typeLabel(entry: TemplateEntry): string {
     const deviceBadge = entry.type ? `Device · ${entry.type}` : "Device";
     if (entry.kind === "device") return deviceBadge;
     if (entry.kind === "api") return "Logic + Device (API)";
@@ -281,6 +287,7 @@
     selected = null;
     editorDirty = false;
     bundleDraft = null;
+    onselect?.(null);
   }
 
   function start(entry: TemplateEntry) {
@@ -288,6 +295,7 @@
     selected = entry;
     editorDirty = false;
     error = "";
+    onselect?.({ kind: entry.kind, id: entry.id });
   }
 
   function open(entry: TemplateEntry) {
@@ -305,11 +313,11 @@
     }
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
-    lastFocus = key;
     const entry = entries.find(
       (item) => item.kind === focus.kind && item.id === focus.id,
     );
     if (!entry) return;
+    lastFocus = key;
     start(entry);
     onFocusApplied?.();
   });
@@ -325,6 +333,7 @@
       id: newId(),
       name: `${source.name} copy`,
       builtin: false,
+      help: "",
       basedOn: source.basedOn ?? source.type,
     };
     if (
@@ -342,6 +351,8 @@
       kind: "device",
       parts: ["device"],
       builtin: false,
+      help: "",
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -377,6 +388,8 @@
       kind: "logic",
       parts: ["logic"],
       builtin: false,
+      help: "",
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -416,6 +429,8 @@
       kind: "api",
       parts: ["logic", "api"],
       builtin: false,
+      help: "",
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -447,6 +462,8 @@
       kind: "bundle",
       parts: bundleParts(copy),
       builtin: false,
+      help: "",
+      description: copy.description ?? "",
       search: "",
     });
   }
@@ -481,6 +498,7 @@
           id: "",
           name: "",
           kind: "function",
+          mode: "statements",
           inputs: {},
           output: { scope: "memory" },
           expr: { code: "noop()" },
@@ -494,6 +512,8 @@
       kind: "bundle",
       parts: ["device", "logic"],
       builtin: false,
+      help: "",
+      description: draft.description ?? "",
       search: "new template",
     });
   }
@@ -601,11 +621,22 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="item-line" onclick={(event) => onLineClick(event, entry)}>
-            <Icon value={typeIcon(entry)} size={18} />
-            <button type="button" class="name" onclick={() => open(entry)}>
+            <span class="type" title={typeLabel(entry)}>
+              <Icon value={typeIcon(entry)} size={18} />
+            </span>
+            <button
+              type="button"
+              class="name"
+              title={typeLabel(entry)}
+              onclick={() => open(entry)}
+            >
               {entry.name}
             </button>
-            <span class="badge">{badge(entry)}</span>
+            <span class="detail"
+              >{entry.description ||
+                helpLine(entry.help) ||
+                typeLabel(entry)}</span
+            >
             <span class="item-actions">
               {#if isOpen(entry)}
                 <IconButton
@@ -830,11 +861,25 @@
   }
 
   .name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .type {
+    display: inline-flex;
+  }
+
+  .detail {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 
   .badge {

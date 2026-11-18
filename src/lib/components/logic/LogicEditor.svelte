@@ -36,7 +36,9 @@
   const output = $derived<Output>(
     draft.output ?? { scope: "memory", name: draft.id },
   );
-  const RESULT_PLACEHOLDER = 'get("temp") > 20 ? "On" : "Off"';
+  /** The open inputs row; focusing the result closes it. */
+  let inputRow = $state<string | null>(null);
+  const RESULT_PLACEHOLDER = "if ($value > 20) return true;\nreturn this.NOOP";
   const stateNames = $derived(
     draft.kind === "machine" ? Object.keys(draft.states) : [],
   );
@@ -206,13 +208,14 @@
       where={draft.name}
       {logics}
       selfId={draft.id}
+      bind:editing={inputRow}
     />
   </div>
 
   {#if draft.kind === "function"}
     <div class="block">
       <div class="test-head">
-        <span class="label-mono">Result expression</span>
+        <span class="label-mono">Result</span>
         <button
           type="button"
           class="btn btn-sm btn-outline"
@@ -232,12 +235,14 @@
       </div>
       <CodeField
         code={draft.expr.code}
-        label="Result expression"
+        label="Result"
         placeholder={RESULT_PLACEHOLDER}
-        hint="fetchJson(url, (data, error) => …)"
+        hint="return the output; this, $value, $previous, $source, $input are available"
+        mode="statements"
         allowNoop
         {logics}
         inputs={draft.inputs}
+        onfocus={() => (inputRow = null)}
         onchange={(code) => patch({ expr: { code } })}
       />
       {#if dirty}

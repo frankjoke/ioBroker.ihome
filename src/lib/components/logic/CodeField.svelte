@@ -24,6 +24,7 @@
     stateNames = [],
     logics = [],
     inputs = {},
+    onfocus,
   }: {
     code: string;
     onchange: (code: string) => void;
@@ -43,6 +44,8 @@
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
+    /** The field took focus (the caller may close another editor). */
+    onfocus?: () => void;
   } = $props();
 
   const STATEMENT_PLACEHOLDER =
@@ -161,13 +164,15 @@
         {/each}
       </select>
     {/if}
-    {#if allowNoop && mode === "expression"}
+    {#if allowNoop}
       <button
         type="button"
         class="btn btn-sm btn-outline"
         title="Leave the output unchanged"
         onmousedown={rememberSelection}
-        onclick={() => insertText("noop()")}>No update</button
+        onclick={() =>
+          insertText(mode === "statements" ? "return this.NOOP" : "this.NOOP")}
+        >No update</button
       >
     {/if}
     <SnippetSelect
@@ -177,6 +182,7 @@
     />
     {#if inputEntries.length > 0}
       <div class="badges">
+        <span class="label-mono">Insert</span>
         {#each inputEntries as [name, input] (name)}
           <button
             type="button"
@@ -207,6 +213,7 @@
       value={code}
       aria-label={label}
       aria-invalid={problem ? "true" : undefined}
+      onfocus={() => onfocus?.()}
       aria-describedby={[problem ? errorId : "", hint ? hintId : ""]
         .filter(Boolean)
         .join(" ") || undefined}

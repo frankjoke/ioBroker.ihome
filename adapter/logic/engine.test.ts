@@ -699,6 +699,132 @@ it("exposes $from and $self to rows", () => {
   expect(engine.memoryValue("meta")).toBe("B");
 });
 
+it("exposes $value and $previous to logic code", () => {
+  const { h, engine } = engineWith(
+    doc({
+      init: { run: false },
+      output: { scope: "memory" },
+      expr: code(
+        '`${get("$previous")}|${get("$value")}|${get("$input")}|${get("$source")}`',
+      ),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 6);
+  expect(engine.memoryValue("calc")).toBe("3|6|temp|0_userdata.0.T");
+  h.change("0_userdata.0.T", 8);
+  expect(engine.memoryValue("calc")).toBe("6|8|temp|0_userdata.0.T");
+});
+
+it("$source names a timer's schedule", () => {
+  const timed: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "tick",
+        name: "Tick",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          t: { from: { type: "timer", every: "60s" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.TICK", type: "string" },
+        expr: code('get("$source")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(timed, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(60_000);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.TICK", value: "every:60s", ack: false },
+  ]);
+});
+
+it("a variable input reads another logic's memory output", () => {
+  const document: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "producer",
+        name: "Producer",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        expr: code('get("e") * 10'),
+      },
+      {
+        id: "reader",
+        name: "Reader",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          m: {
+            from: { type: "state", ref: "$logic.producer" },
+            kind: "variable",
+          },
+        },
+        output: { scope: "memory" },
+        expr: code('get("m") + 1'),
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 1 });
+  const engine = createEngine(document, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.E", 4);
+  expect(engine.memoryValue("reader")).toBe(41);
+});
+
+it("runs a function body with this, early returns and noop", () => {
+  const { h, engine } = engineWith(
+    doc({
+      mode: "statements",
+      init: { run: false },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+      expr: code(
+        "this.count = (this.count ?? 0) + 1;\nif ($value > 10) return $value * this.count;\nreturn this.NOOP",
+      ),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 5);
+  expect(h.writes.filter((write) => write.id === "0_userdata.0.OUT")).toEqual(
+    [],
+  );
+  h.change("0_userdata.0.T", 11);
+  h.change("0_userdata.0.T", 12);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.OUT", value: 22, ack: false },
+    { id: "0_userdata.0.OUT", value: 36, ack: false },
+  ]);
+});
+
+it("runs a function when a variable input changes", () => {
+  const { h, engine } = engineWith(
+    doc({
+      init: { run: false },
+      inputs: {
+        temp: {
+          from: { type: "state", ref: "0_userdata.0.T" },
+          kind: "variable",
+        },
+      },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+      expr: code('get("temp") * 2'),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 7);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.OUT", value: 14, ack: false }]);
+});
+
 it("noop writes nothing", () => {
   const { h, engine } = engineWith(doc({ expr: code("noop()") }));
   engine.start();
@@ -3654,4 +3780,174 @@ it("rounds number items by their decimals when no conversion is given", () => {
     value: 12,
     ack: true,
   });
+});
+
+it("does not subscribe to $logic pseudo states", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "producer",
+        name: "Producer",
+        kind: "function",
+        output: { scope: "memory" },
+        expr: code("1"),
+      },
+      {
+        id: "reader",
+        name: "Reader",
+        kind: "function",
+        inputs: {
+          x: {
+            from: { type: "state", ref: "$logic.producer" },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory" },
+        expr: code('get("x")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  expect(engine.subscriptions()).toEqual([]);
+});
+
+it("only the linked logic runs on a state change", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        inputs: {
+          s: {
+            from: { type: "state", ref: "0_userdata.0.STATE" },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code('get("s")'),
+      },
+      {
+        id: "b",
+        name: "B",
+        kind: "function",
+        inputs: {
+          o: {
+            from: { type: "state", ref: "0_userdata.0.OTHER" },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code('get("0_userdata.0.STATE")'),
+      },
+    ],
+  };
+  const h = createHarness({
+    "0_userdata.0.STATE": 0,
+    "0_userdata.0.OTHER": 0,
+  });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.STATE", 1);
+  expect(h.writes.map((write) => write.id)).toEqual(["0_userdata.0.A"]);
+});
+
+it("shares one timer for two logics on the same schedule", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code('get("t")'),
+      },
+      {
+        id: "b",
+        name: "B",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code('get("t")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.clock.pending).toBe(1);
+  h.writes.length = 0;
+  h.clock.advance(600_000);
+  expect(h.writes.map((write) => write.id)).toEqual([
+    "0_userdata.0.A",
+    "0_userdata.0.B",
+  ]);
+});
+
+it("shares one timer for two logics on the same cron time", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: ["a", "b"].map((id) => ({
+      id,
+      name: id.toUpperCase(),
+      kind: "function" as const,
+      inputs: {
+        t: {
+          from: {
+            type: "timer" as const,
+            spec: { kind: "cron" as const, at: "08:00", days: "*" },
+          },
+          kind: "event" as const,
+        },
+      },
+      output: {
+        scope: "state" as const,
+        ref: `0_userdata.0.${id.toUpperCase()}`,
+        type: "number" as const,
+      },
+      expr: code('get("t")'),
+    })),
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.clock.pending).toBe(1);
+});
+
+it("keeps the written timer label as $source", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "src",
+        name: "Source",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.SRC", type: "string" },
+        expr: code('get("$source")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.clock.advance(600_000);
+  expect(h.writes.at(-1)?.value).toBe("every:10m");
 });

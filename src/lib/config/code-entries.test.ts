@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { codeEntries, filterCodeEntries } from "./code-entries";
 
-const formula = { id: "f", name: "Dew point", expr: "1 + 1" };
+const formula = {
+  id: "f",
+  name: "Dew point",
+  expr: "1 + 1",
+  notes: "Relative humidity",
+};
 const user = {
   id: "u",
   name: "Snippet",
+  description: "Turns a value into text",
   mode: "expression" as const,
   code: "2 + 2",
 };
@@ -25,6 +31,11 @@ describe("codeEntries", () => {
     ]);
     expect(entries.map((entry) => entry.builtin)).toEqual([false, false, true]);
     expect(entries[0].preview).toBe("1 + 1");
+    expect(entries.map((entry) => entry.description)).toEqual([
+      "Relative humidity",
+      "Turns a value into text",
+      "",
+    ]);
   });
 });
 
@@ -36,6 +47,14 @@ describe("filterCodeEntries", () => {
     ).toEqual(["f"]);
     expect(
       filterCodeEntries(entries, "2 + 2", "asc").map((entry) => entry.id),
+    ).toEqual(["u"]);
+    expect(
+      filterCodeEntries(entries, "humidity", "asc").map((entry) => entry.id),
+    ).toEqual(["f"]);
+    expect(
+      filterCodeEntries(entries, "turns a value", "asc").map(
+        (entry) => entry.id,
+      ),
     ).toEqual(["u"]);
     expect(filterCodeEntries(entries, "", "desc")[0].id).toBe("u");
   });

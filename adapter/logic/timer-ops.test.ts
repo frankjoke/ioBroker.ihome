@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { nextCron, timerLabel } from "./timer-ops";
+import { nextCron, parseCronAt, timerLabel } from "./timer-ops";
 
 it("finds the next matching cron minute", () => {
   const from = new Date(2026, 10, 3, 7, 30, 20).getTime(); // Tue 3 Nov 2026
@@ -37,4 +37,28 @@ it("labels every, astro and cron timers", () => {
   expect(timerLabel({ kind: "cron", at: "07:30", days: [1, 2, 3, 4, 5] })).toBe(
     "cron 07:30 · Mon,Tue,Wed,Thu,Fri",
   );
+});
+
+it("accepts lists and the @ / at: forms", () => {
+  expect(parseCronAt("@10,12,15,17:10")).toEqual({
+    hour: [10, 12, 15, 17],
+    minute: [10],
+    second: [0],
+  });
+  expect(parseCronAt("at:*:15")).toEqual({
+    hour: "*",
+    minute: [15],
+    second: [0],
+  });
+  expect(parseCronAt("25:00")).toBeUndefined();
+  expect(parseCronAt("*:*:*")).toBeUndefined();
+});
+
+it("finds the next hour of a list", () => {
+  const from = new Date(2026, 10, 3, 9, 30).getTime();
+  const next = nextCron(
+    { kind: "cron", at: "10,12,15,17:10", days: "*" },
+    from,
+  )!;
+  expect(new Date(next)).toEqual(new Date(2026, 10, 3, 10, 10, 0));
 });

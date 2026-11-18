@@ -8,9 +8,13 @@ vi.stubGlobal("document", {
 const { RELOAD_AFTER_HIDDEN_MS, onEditorPage, reloadOnReturn } =
   await import("$lib/tools.svelte.js");
 
-it("leaves config pages alone", () => {
+it("leaves editor pages alone", () => {
   expect(onEditorPage("/config/devices")).toBe(true);
+  expect(onEditorPage("/ihome/config/devices")).toBe(true);
+  expect(onEditorPage("/logic")).toBe(true);
+  expect(onEditorPage("/ihome/logic")).toBe(true);
   expect(onEditorPage("/p/rooms")).toBe(false);
+  expect(onEditorPage("/ihome/p/rooms")).toBe(false);
 });
 
 it("keeps the page for a short look away", () => {

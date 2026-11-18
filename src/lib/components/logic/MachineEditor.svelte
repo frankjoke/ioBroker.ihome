@@ -44,13 +44,8 @@
       .filter((variable) => variable.kind === "state")
       .map((variable) => ({ name: variable.name, type: variable.type })),
   );
-  const eventInputs = $derived(
-    Object.entries(logic.inputs ?? {})
-      .filter(
-        ([, input]) => input.kind === "event" || input.from.type === "timer",
-      )
-      .map(([name]) => name),
-  );
+  /** Every input can trigger a row: a change runs the machine, the row names it. */
+  const eventInputs = $derived(Object.keys(logic.inputs ?? {}));
 
   /** One state and one event row open at a time, like the slot lists. */
   let openState = $state<string | null>(null);

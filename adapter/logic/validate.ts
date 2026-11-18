@@ -207,77 +207,36 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
       const source = input?.from;
       const timers = input?.timers;
       if (timers !== undefined) {
-        if ((input.kind ?? "variable") !== "event") {
-          add(
-            id,
-            `inputs.${name}.timers`,
-            "only an event can repeat on a timer",
-          );
-        }
         if (!Array.isArray(timers)) {
           add(id, `inputs.${name}.timers`, "timers must be an array");
         } else {
-          timers.forEach((timer, index) => {
-            const path = `inputs.${name}.timers.${index}`;
-            if (typeof timer === "string") {
-              const ms = parseDuration(timer);
-              if (ms === null || ms <= 0) add(id, path, "invalid duration");
-              return;
-            }
-            if (!isRecord(timer)) {
-              add(id, path, "invalid timer");
-              return;
-            }
-            if (timer.kind === "astro") {
-              if (!isAstroEvent(String(timer.event))) {
-                add(id, `${path}.event`, `unknown astro event`);
-              }
-              if (
-                timer.offset !== undefined &&
-                !Number.isFinite(timer.offset)
-              ) {
-                add(id, `${path}.offset`, "offset must be minutes");
-              }
-            } else if (timer.kind === "cron") {
-              if (typeof timer.at !== "string" || !parseCronAt(timer.at)) {
-                add(
-                  id,
-                  `${path}.at`,
-                  "time is HH:MM[:SS]; * is allowed per part, but not all",
-                );
-              }
-              const days = timer.days;
-              if (
-                days !== undefined &&
-                days !== "*" &&
-                (!Array.isArray(days) ||
-                  days.some(
-                    (day) => !Number.isInteger(day) || day < 0 || day > 6,
-                  ))
-              ) {
-                add(id, `${path}.days`, "days are 0-6 or *");
-              }
-            } else {
-              add(id, path, "unknown timer kind");
-            }
-          });
+          timers.forEach((timer, index) =>
+            checkTimer(id, timer, `inputs.${name}.timers.${index}`, add),
+          );
         }
       }
       if (!isRecord(source)) {
         add(id, `inputs.${name}.from`, "input without a source");
       } else if (source.type === "timer") {
-        const every = parseDuration(source.every as string);
-        if (every === null || every <= 0) {
-          add(id, `inputs.${name}.from.every`, "invalid duration");
-        }
-        if ((input.kind ?? "variable") === "variable") {
-          add(id, `inputs.${name}.from.type`, "a variable cannot be a timer");
+        const hasEvery = typeof source.every === "string";
+        const hasSpec = source.spec !== undefined;
+        if (hasEvery === hasSpec) {
+          add(
+            id,
+            `inputs.${name}.from`,
+            "a timer needs exactly one of every or spec",
+          );
+        } else if (hasEvery) {
+          const every = parseDuration(source.every as string);
+          if (every === null || every <= 0) {
+            add(id, `inputs.${name}.from.every`, "invalid duration");
+          }
+        } else {
+          checkTimer(id, source.spec, `inputs.${name}.from.spec`, add);
         }
       } else if (source.type === "state" || source.type === "memory") {
         const hasTimers =
-          input.kind === "event" &&
-          Array.isArray(input.timers) &&
-          input.timers.length > 0;
+          Array.isArray(input.timers) && input.timers.length > 0;
         if (typeof source.ref !== "string" || (!source.ref && !hasTimers)) {
           add(id, `inputs.${name}.from.ref`, "source without a ref");
         }
@@ -293,7 +252,7 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
             );
           }
         }
-        if (source.type === "state" && input.kind === "event") {
+        if (source.type === "state") {
           const refs = [source.ref, ...(source.refs ?? [])];
           for (const ref of refs) {
             if (typeof ref !== "string" || !ref.startsWith("$logic.")) {
@@ -312,11 +271,6 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
         ) {
           add(id, `inputs.${name}.kind`, "unknown input kind");
         }
-        if ((input.kind ?? "variable") === "variable") {
-          if (source.type === "state" && (source.refs?.length ?? 0) > 0) {
-            add(id, `inputs.${name}.from.refs`, "a variable has one source");
-          }
-        }
         if (
           input.source !== undefined &&
           input.source !== "external" &&
@@ -332,19 +286,30 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
 
     if (logic.kind === "function") {
       const fn = logic as FunctionLogic;
+      if (
+        fn.mode !== undefined &&
+        fn.mode !== "expression" &&
+        fn.mode !== "statements"
+      ) {
+        add(id, "mode", "mode must be expression or statements");
+      }
       if (!("expr" in fn) || fn.expr == null) {
         add(id, "expr", "function logic without an expression");
+      } else if (fn.mode === "statements") {
+        if (!isRecord(fn.expr) || typeof fn.expr.code !== "string") {
+          add(id, "expr", "expression has no code");
+        } else {
+          const message = checkStatementCode(fn.expr.code);
+          if (message) add(id, "expr", message);
+        }
       } else {
         checkExpr(fn.expr, (path, message) => add(id, path, message), "expr");
       }
-      const hasEvent = Object.values(inputs).some(
-        (input) => input?.kind === "event" || input?.from?.type === "timer",
-      );
-      if (!hasEvent) {
+      if (Object.keys(inputs).length === 0) {
         add(
           id,
           "inputs",
-          "function logic has no event input; it runs once at start",
+          "function logic has no input — it runs once at start",
           "warn",
         );
       }
@@ -612,10 +577,6 @@ function checkRow(
     }
   } else if (typeof input !== "string" || !inputNames.has(input)) {
     add(id, `${path}.on`, `unknown input ${String(input)}`);
-  } else {
-    const isEvent =
-      inputs[input]?.kind === "event" || inputs[input]?.from?.type === "timer";
-    if (!isEvent) add(id, `${path}.on`, `input ${input} is not an event`);
   }
   if (row?.is) {
     if (!isRecord(row.is) || !row.is.op) {
@@ -678,6 +639,48 @@ function checkRow(
       "warn",
     );
   }
+}
+
+/** One timer spec: a duration, an astro event, or a clock time. */
+function checkTimer(id: string, timer: unknown, path: string, add: Add): void {
+  if (typeof timer === "string") {
+    const ms = parseDuration(timer);
+    if (ms === null || ms <= 0) add(id, path, "invalid duration");
+    return;
+  }
+  if (!isRecord(timer)) {
+    add(id, path, "invalid timer");
+    return;
+  }
+  if (timer.kind === "astro") {
+    if (!isAstroEvent(String(timer.event))) {
+      add(id, `${path}.event`, `unknown astro event`);
+    }
+    if (timer.offset !== undefined && !Number.isFinite(timer.offset)) {
+      add(id, `${path}.offset`, "offset must be minutes");
+    }
+    return;
+  }
+  if (timer.kind === "cron") {
+    if (typeof timer.at !== "string" || !parseCronAt(timer.at)) {
+      add(
+        id,
+        `${path}.at`,
+        "time is HH:MM[:SS] (lists and * per part are allowed, not all)",
+      );
+    }
+    const days = timer.days;
+    if (
+      days !== undefined &&
+      days !== "*" &&
+      (!Array.isArray(days) ||
+        days.some((day) => !Number.isInteger(day) || day < 0 || day > 6))
+    ) {
+      add(id, `${path}.days`, "days are 0-6 or *");
+    }
+    return;
+  }
+  add(id, path, "unknown timer kind");
 }
 
 function checkActionCode(

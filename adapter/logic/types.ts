@@ -43,7 +43,8 @@ export const OPERATORS: readonly Operator[] = [
 export type InputSource =
   | { type: "state"; ref: string; refs?: string[] }
   | { type: "memory"; ref: string }
-  | { type: "timer"; every: Duration };
+  /** A timer input: `every` for a duration, `spec` for astro/cron (one of them). */
+  | { type: "timer"; every?: Duration; spec?: TimerSpec };
 
 export type AstroEvent =
   | "nightEnd"
@@ -74,9 +75,9 @@ export type TimerSpec =
 
 export interface Input {
   from: InputSource;
-  /** Variables are read-only values from one source; events trigger rows. */
+  /** Legacy, ignored: every input delivers each change. Written as "event". */
   kind: "variable" | "event";
-  /** Event only: repeating triggers beside `from` (D32). */
+  /** Legacy (pre timer inputs): extra triggers beside a state source. */
   timers?: TimerSpec[];
   /** Legacy (pre row-usage): read as the row default, no longer written. */
   mode?: "changed" | "any";
@@ -125,7 +126,7 @@ export interface Ref {
   ref: string;
 }
 
-/** A bare JavaScript expression; "no update" is the runtime value of noop(). */
+/** A bare JavaScript expression; "no update" is the runtime value of this.NOOP. */
 export type Expr = { code: string };
 
 export interface OnRow {
@@ -195,6 +196,11 @@ export interface LogicBase {
 
 export interface FunctionLogic extends LogicBase {
   kind: "function";
+  /** Default "expression": `expr.code` is one expression and its value is the
+   *  output. "statements": `expr.code` is a function body; `this` lives as long
+   *  as the logic runs and `return value` is the output (no return or
+   *  `this.NOOP` writes nothing). */
+  mode?: "expression" | "statements";
   expr: Expr;
 }
 

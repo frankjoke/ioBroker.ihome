@@ -4,6 +4,8 @@ export interface CodeEntry {
   kind: "formula" | "function";
   id: string;
   name: string;
+  /** The human text: formula notes or function description; empty when none. */
+  description: string;
   preview: string;
   builtin: boolean;
   search: string;
@@ -13,6 +15,7 @@ function entry(
   kind: CodeEntry["kind"],
   id: string,
   name: string,
+  description: string,
   preview: string,
   builtin: boolean,
 ): CodeEntry {
@@ -20,9 +23,10 @@ function entry(
     kind,
     id,
     name,
+    description,
     preview,
     builtin,
-    search: `${name} ${preview}`.toLowerCase(),
+    search: `${name} ${description} ${preview}`.toLowerCase(),
   };
 }
 
@@ -33,13 +37,34 @@ export function codeEntries(
 ): CodeEntry[] {
   return [
     ...formulas.map((template) =>
-      entry("formula", template.id, template.name, template.expr, false),
+      entry(
+        "formula",
+        template.id,
+        template.name,
+        template.notes ?? "",
+        template.expr,
+        false,
+      ),
     ),
     ...userFunctions.map((template) =>
-      entry("function", template.id, template.name, template.code, false),
+      entry(
+        "function",
+        template.id,
+        template.name,
+        template.description ?? "",
+        template.code,
+        false,
+      ),
     ),
     ...builtinFunctions.map((template) =>
-      entry("function", template.id, template.name, template.code, true),
+      entry(
+        "function",
+        template.id,
+        template.name,
+        template.description ?? "",
+        template.code,
+        true,
+      ),
     ),
   ];
 }

@@ -97,13 +97,31 @@ export function reloadOnReturn(lastVisible, now = Date.now()) {
   return now - lastVisible > RELOAD_AFTER_HIDDEN_MS;
 }
 
+/** Pages whose editors live in memory until Save. */
+const EDITOR_ROUTES = [
+  "/config",
+  "/logic",
+  "/devices",
+  "/templates",
+  "/plugins",
+  "/server",
+  "/admin",
+];
+
 /**
  * A config page keeps its editor values in memory until Save, so the page must
- * not reload under the user there.
+ * not reload under the user there. The deployed app lives under a base
+ * (`/ihome`), so the route can follow one path segment.
  * @param {string} [path]
  */
 export function onEditorPage(path = location.pathname) {
-  return path.startsWith("/config");
+  const route = path.replace(/\/+$/, "");
+  return EDITOR_ROUTES.some(
+    (prefix) =>
+      route === prefix ||
+      route.endsWith(prefix) ||
+      route.includes(`${prefix}/`),
+  );
 }
 
 export const currentTime = new SvelteDate();

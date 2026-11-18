@@ -11,16 +11,27 @@
     label = "State",
     onchange,
     logics = [],
+    logicTrigger = false,
   }: {
     value: string;
     label?: string;
     onchange: (id: string) => void;
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
+    /** Offer logics as `$logic.<id>` sources (a logic input) instead of their
+     *  output state (a template parameter). */
+    logicTrigger?: boolean;
   } = $props();
 
   let picking = $state(false);
-  const shown = $derived(value ? variableNameFor(value, getVariables()) : "");
+  /** A logic source reads by name; a state keeps its id. */
+  const shown = $derived.by(() => {
+    if (!value) return "";
+    if (!value.startsWith("$logic."))
+      return variableNameFor(value, getVariables());
+    const id = value.slice("$logic.".length);
+    return logics.find((logic) => logic.id === id)?.name ?? id;
+  });
 </script>
 
 <div class="ref-field">
@@ -48,7 +59,7 @@
     mode="state"
     title={label}
     {logics}
-    logicPick="state"
+    logicPick={logicTrigger ? "trigger" : "state"}
     currentState={value}
     onState={(id) => {
       onchange(id);

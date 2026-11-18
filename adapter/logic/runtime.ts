@@ -149,7 +149,13 @@ function forEachRow(
 export function forEachExpression(logic: LogicDef, fn: ExprVisitor): void {
   if (!isRecord(logic)) return;
   if (logic.kind === "function") {
-    if (isExpr(logic.expr)) fn(logic.expr, "expr", "expression");
+    if (isExpr(logic.expr)) {
+      fn(
+        logic.expr,
+        "expr",
+        logic.mode === "statements" ? "statements" : "expression",
+      );
+    }
     return;
   }
   if (isExpr(logic.init?.state)) {
@@ -224,6 +230,14 @@ export function createLogicRuntime(
   };
   const defineHidden = (name: string, value: unknown): void =>
     define(name, value, false);
+  /** An event/context literal, read live: `$value`, `$from`, … in code. */
+  const defineLive = (name: string): void => {
+    Object.defineProperty(sandbox, name, {
+      get: () => hooks.describe(name)?.value,
+      configurable: false,
+      enumerable: false,
+    });
+  };
   const defineSlot = (name: string): void => {
     Object.defineProperty(sandbox, name, {
       value: undefined,
@@ -239,6 +253,19 @@ export function createLogicRuntime(
     "__task_error",
   ]) {
     defineSlot(slot);
+  }
+  for (const name of [
+    "$init",
+    "$start",
+    "$from",
+    "$self",
+    "$ack",
+    "$ts",
+    "$value",
+    "$previous",
+    "$input",
+  ]) {
+    defineLive(name);
   }
   const taskRunner = new Script(
     "__task_cb.call(__task_this, __task_data, __task_error)",
@@ -271,7 +298,16 @@ export function createLogicRuntime(
     let name = stateNames.get(stateKey);
     if (!name) {
       name = `__state_${hiddenCount++}`;
-      defineHidden(name, runInContext("({})", context));
+      const object = runInContext("({})", context) as Record<string, unknown>;
+      // The "no update" constant belongs to the state object, like the
+      // helpers a block keeps there; the global NOOP is the same value.
+      Object.defineProperty(object, "NOOP", {
+        value: NOOP,
+        writable: false,
+        configurable: false,
+        enumerable: false,
+      });
+      defineHidden(name, object);
       stateNames.set(stateKey, name);
     }
     return name;
@@ -385,6 +421,8 @@ export function createLogicRuntime(
     );
   });
   define("noop", () => NOOP);
+  /** The form to write: a constant, not a call. `noop()` stays for stored code. */
+  define("NOOP", NOOP);
   define("NOACTION", NOACTION);
 
   const run = (script: Script, depth: number, object?: unknown): unknown => {

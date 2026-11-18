@@ -12,8 +12,6 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import MultiStateField from "./MultiStateField.svelte";
-  import StateRefField from "./StateRefField.svelte";
-  import VariableModal from "./VariableModal.svelte";
   import TimerModal from "./TimerModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { timerLabel } from "$logic/timer-ops";
@@ -27,6 +25,9 @@
     where = "",
     logics = [],
     selfId = "",
+    /** The row whose fields are open; the parent binds it to close it when the
+     *  code field takes focus. */
+    editing = $bindable(null),
   }: {
     inputs: Record<string, Input>;
     onchange: (inputs: Record<string, Input>) => void;
@@ -38,18 +39,17 @@
     logics?: LogicDef[];
     /** The logic being edited, excluded from its own event sources. */
     selfId?: string;
+    editing?: string | null;
   } = $props();
 
-  /** The row whose fields are open; one at a time. */
-  let editing = $state<string | null>(null);
   /** Deleting an input always asks first. */
   let pendingDelete = $state<string | null>(null);
-  /** The add-variable dialog: name and source in one step. */
-  let addingVariable = $state(false);
   /** The event whose + State opens the picker. */
   let sourceFor = $state<string | null>(null);
-  /** The timer being added/edited (index null = new). */
-  let timerEdit = $state<{ name: string; index: number | null } | null>(null);
+  /** The timer input whose schedule is being edited. */
+  let timerEdit = $state<string | null>(null);
+  /** The timer dialog for a brand-new timer input. */
+  let addingTimer = $state(false);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
   const otherLogics = $derived(logics.filter((logic) => logic.id !== selfId));
@@ -116,18 +116,34 @@
     toggle(name);
   }
 
-  function add(kind: "variable" | "event") {
+  function uniqueName(base: string): string {
     let index = Object.keys(inputs).length + 1;
-    let name = kind === "event" ? `event${index}` : `variable${index}`;
-    while (name in inputs) {
-      name = `${kind === "event" ? "event" : "variable"}${++index}`;
-    }
-    const from: InputSource =
-      kind === "event"
-        ? { type: "state", ref: "", refs: [] }
-        : { type: "state", ref: "" };
-    onchange({ ...inputs, [name]: { from, kind } });
+    let name = `${base}${index}`;
+    while (name in inputs) name = `${base}${++index}`;
+    return name;
+  }
+
+  /** A state collection: one name, one or more states/patterns. */
+  function addVariable() {
+    const name = uniqueName("variable");
+    onchange({
+      ...inputs,
+      [name]: { from: { type: "state", ref: "", refs: [] }, kind: "event" },
+    });
     editing = name;
+  }
+
+  function timerInput(spec: TimerSpec): InputSource {
+    return typeof spec === "string"
+      ? { type: "timer", every: spec }
+      : { type: "timer", spec };
+  }
+
+  /** Saving the timer dialog for a new or an existing timer input. */
+  function saveTimerInput(name: string, spec: TimerSpec) {
+    const input = inputs[name];
+    if (!input) return;
+    update(name, { ...input, from: timerInput(spec) });
   }
 
   function sourceLabel(input: Input): string {
@@ -148,7 +164,8 @@
     }
     if (input.from.type === "memory")
       return input.from.ref || "(no memory name)";
-    return `every ${input.from.every}`;
+    const spec = input.from.spec ?? input.from.every;
+    return spec ? timerLabel(spec) : "(no schedule)";
   }
 
   /** The first source's current reading, like the state picker shows it. */
@@ -198,15 +215,15 @@
   <div class="inputs-head">
     <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
+      <button type="button" class="btn btn-sm" onclick={addVariable}>
+        <span class="material-symbols-outlined">add</span> Variable
+      </button>
       <button
         type="button"
         class="btn btn-sm"
-        onclick={() => (addingVariable = true)}
+        onclick={() => (addingTimer = true)}
       >
-        <span class="material-symbols-outlined">add</span> Variable
-      </button>
-      <button type="button" class="btn btn-sm" onclick={() => add("event")}>
-        <span class="material-symbols-outlined">add</span> Event
+        <span class="material-symbols-outlined">add</span> Timer
       </button>
     </span>
   </div>
@@ -229,25 +246,17 @@
             {name}
           </button>
         {/if}
-        <span class="badge badge-secondary">{input.kind}</span>
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
         {#if sourceReading(input)}
           <span class="input-reading mono">{sourceReading(input)}</span>
         {/if}
         <span class="item-actions">
-          {#if input.kind === "event"}
+          {#if input.from.type === "state"}
             <button
               type="button"
               class="btn btn-sm"
-              title="Add a state, variable or logic event"
+              title="Add a state, logic or pattern source"
               onclick={() => (sourceFor = name)}>+ State</button
-            >
-            <button
-              type="button"
-              class="btn btn-sm"
-              title="Add a repeating timer (every …)"
-              onclick={() => (timerEdit = { name, index: null })}
-              >+ Timer</button
             >
           {/if}
           <IconButton
@@ -264,44 +273,45 @@
           <div class="fields">
             {#if input.from.type === "state"}
               <div class="field wide">
-                <span class="label-mono">
-                  {input.kind === "event" ? "Sources" : "State"}
-                </span>
-                {#if input.kind === "event"}
-                  <MultiStateField
-                    value={[input.from.ref, ...(input.from.refs ?? [])].filter(
-                      Boolean,
-                    )}
-                    label={`Sources for ${name}`}
-                    {logics}
-                    {selfId}
-                    hideAdd
-                    timers={input.timers ?? []}
-                    onTimers={(timers) =>
-                      update(name, {
-                        ...input,
-                        timers: timers.length ? timers : undefined,
-                      })}
-                    onEditTimer={(index) => (timerEdit = { name, index })}
-                    onchange={(ids) =>
-                      update(name, {
-                        ...input,
-                        from: {
-                          type: "state",
-                          ref: ids[0] ?? "",
-                          refs: ids.slice(1),
-                        },
-                      })}
+                <span class="label-mono">Sources</span>
+                <MultiStateField
+                  value={[input.from.ref, ...(input.from.refs ?? [])].filter(
+                    Boolean,
+                  )}
+                  label={`Sources for ${name}`}
+                  {logics}
+                  {selfId}
+                  hideAdd
+                  timers={input.timers ?? []}
+                  onTimers={(timers) =>
+                    update(name, {
+                      ...input,
+                      timers: timers.length ? timers : undefined,
+                    })}
+                  onchange={(ids) =>
+                    update(name, {
+                      ...input,
+                      from: {
+                        type: "state",
+                        ref: ids[0] ?? "",
+                        refs: ids.slice(1),
+                      },
+                    })}
+                />
+                <label class="field"
+                  ><span class="label-mono">or pattern</span>
+                  <input
+                    class="mono"
+                    aria-label={`Pattern for ${name}`}
+                    placeholder="alias.0.Gang.*.motion"
+                    onchange={(e) => {
+                      const pattern = e.currentTarget.value.trim();
+                      if (!pattern) return;
+                      e.currentTarget.value = "";
+                      addSource(name, pattern);
+                    }}
                   />
-                {:else}
-                  <StateRefField
-                    value={input.from.ref}
-                    label={`State for ${name}`}
-                    logics={otherLogics}
-                    onchange={(ref) =>
-                      update(name, { ...input, from: { type: "state", ref } })}
-                  />
-                {/if}
+                </label>
               </div>
             {:else if input.from.type === "memory"}
               <label class="field"
@@ -322,23 +332,17 @@
                 />
               </label>
             {:else}
-              <label class="field"
-                ><span class="label-mono">Every</span>
-                <input
-                  class="mono"
-                  aria-label={`Every for ${name}`}
-                  placeholder="30s / 2m / 1h"
-                  value={input.from.every}
-                  onchange={(e) =>
-                    update(name, {
-                      ...input,
-                      from: {
-                        type: "timer",
-                        every: e.currentTarget.value.trim(),
-                      },
-                    })}
-                />
-              </label>
+              <div class="field wide">
+                <span class="label-mono">Schedule</span>
+                <div class="row">
+                  <span class="mono">{sourceLabel(input)}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() => (timerEdit = name)}>Edit</button
+                  >
+                </div>
+              </div>
             {/if}
           </div>
         </div>
@@ -347,9 +351,7 @@
   {/each}
 
   {#if Object.keys(inputs).length === 0}
-    <p class="hint text-muted">
-      No local variables or events yet — use the buttons above.
-    </p>
+    <p class="hint text-muted">No local inputs yet — use the buttons above.</p>
   {/if}
 </div>
 
@@ -367,48 +369,32 @@
   />
 {/if}
 
-{#if timerEdit}
+{#if addingTimer}
   <TimerModal
-    timer={timerEdit.index === null
-      ? null
-      : (inputs[timerEdit.name]?.timers?.[timerEdit.index] ?? null)}
     onSave={(timer) => {
-      const target = timerEdit;
-      const input = target ? inputs[target.name] : undefined;
-      if (target && input) {
-        let base = input;
-        const timers = [...(input.timers ?? [])];
-        if (target.index === null && input.from.type === "timer") {
-          timers.unshift(input.from.every);
-          base = { ...input, from: { type: "state", ref: "", refs: [] } };
-        }
-        if (target.index === null) timers.push(timer);
-        else timers[target.index] = timer;
-        update(target.name, { ...base, timers });
-      }
-      timerEdit = null;
+      const name = uniqueName("timer");
+      onchange({
+        ...inputs,
+        [name]: { from: timerInput(timer), kind: "event" },
+      });
+      editing = name;
+      addingTimer = false;
     }}
-    onCancel={() => (timerEdit = null)}
+    onCancel={() => (addingTimer = false)}
   />
 {/if}
 
-{#if addingVariable}
-  <VariableModal
-    objects={ioBroker.objects}
-    {rooms}
-    {roomsOf}
-    enums={ioBroker.enums}
-    logics={otherLogics}
-    existing={Object.keys(inputs)}
-    onCreate={(name, ref) => {
-      onchange({
-        ...inputs,
-        [name]: { from: { type: "state", ref }, kind: "variable" },
-      });
-      editing = name;
-      addingVariable = false;
+{#if timerEdit}
+  <TimerModal
+    timer={(() => {
+      const from = inputs[timerEdit]?.from;
+      return from?.type === "timer" ? (from.spec ?? from.every ?? null) : null;
+    })()}
+    onSave={(timer) => {
+      if (timerEdit) saveTimerInput(timerEdit, timer);
+      timerEdit = null;
     }}
-    onCancel={() => (addingVariable = false)}
+    onCancel={() => (timerEdit = null)}
   />
 {/if}
 
