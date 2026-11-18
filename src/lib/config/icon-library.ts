@@ -823,6 +823,10 @@ export function setTwin(
     return { ...pool, updatedAt: Date.now(), twins };
   }
   const on = twin.trim();
+  // One relation per value: a new pair replaces a relation on either half.
+  for (const [key, value] of Object.entries(twins)) {
+    if (key === on || value === off || value === on) delete twins[key];
+  }
   twins[off] = on;
   const library = pool.library.some((icon) => icon.value === on)
     ? pool.library

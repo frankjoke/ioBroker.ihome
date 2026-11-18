@@ -457,3 +457,13 @@ it("adds a browsed icon once and respects the cap", () => {
   };
   expect(addLibraryValue(full, "beyond").added).toBe(false);
 });
+
+it("setting a twin clears a relation on either half", () => {
+  let pool = twinPool();
+  pool = setTwin(pool, "door_open", "door_closed");
+  pool = setTwin(pool, "bulb_off", "door_closed");
+  expect(pool.twins).toEqual({ bulb_off: "door_closed" });
+  pool = setTwin(pool, "door_open", "lamp-filled");
+  pool = setTwin(pool, "lamp-filled", "door_closed");
+  expect(pool.twins).toEqual({ "lamp-filled": "door_closed" });
+});

@@ -3,6 +3,7 @@
   import {
     filterLibrary,
     libraryKeywordCounts,
+    offTwin,
     pairChoices,
     splitTwins,
     addLibraryValue,
@@ -14,6 +15,7 @@
   import { isHtmlIcon } from "$lib/config/icon-html";
   import { writeIconFile } from "$lib/config/icon-files";
   import IconImporter from "$lib/components/icons/IconImporter.svelte";
+  import IconPoolManager from "$lib/components/icons/IconPoolManager.svelte";
   import {
     commitIconPool,
     isIconPoolWritable,
@@ -43,6 +45,10 @@
   let uploadError = $state("");
   let mode = $state<"icons" | "browse" | "manage">("icons");
   let browseHint = $state("");
+  let manageDirty = $state(false);
+  let manager = $state<{ save: () => Promise<boolean> }>();
+  let pending = $state<"icons" | "browse" | "manage" | "close" | null>(null);
+  let savingGuard = $state(false);
   // svelte-ignore state_referenced_locally
   let url = $state(icon && (isImageIcon(icon) || isHtmlIcon(icon)) ? icon : "");
 
@@ -92,7 +98,39 @@
   }
 
   function onKey(event: KeyboardEvent): void {
-    if (event.key === "Escape") onClose();
+    if (event.key === "Escape") requestClose();
+  }
+
+  function go(next: "icons" | "browse" | "manage"): void {
+    if (next === mode) return;
+    if (mode === "manage" && manageDirty) {
+      pending = next;
+      return;
+    }
+    mode = next;
+  }
+
+  function requestClose(): void {
+    if (mode === "manage" && manageDirty) {
+      pending = "close";
+      return;
+    }
+    onClose();
+  }
+
+  function resume(): void {
+    const next = pending;
+    pending = null;
+    if (next === "close") onClose();
+    else if (next) mode = next;
+  }
+
+  async function saveAndLeave(): Promise<void> {
+    savingGuard = true;
+    const saved = await manager?.save();
+    savingGuard = false;
+    // A conflict or a failed save keeps the prompt and its message.
+    if (saved) resume();
   }
 
   function rememberBrowsed(
@@ -117,8 +155,14 @@
     meta: { keywords: string[]; name: string },
   ): void {
     rememberBrowsed(value, meta);
-    const twin = getIconPool().twins[value];
-    onPick(value, twins && twin ? { active: twin } : undefined);
+    const pool = getIconPool();
+    const active = twins && offTwin(pool.twins, value);
+    if (active) {
+      onPick(active, { active: value });
+      return;
+    }
+    const twin = twins ? pool.twins[value] : undefined;
+    onPick(value, twin ? { active: twin } : undefined);
   }
 
   async function importBrowsed(
@@ -154,14 +198,14 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="modal" role="dialog" aria-modal="true" aria-label="Choose an icon">
-  <div class="modal-content">
+  <div class="modal-content" class:wide={mode !== "icons"}>
     <div class="modal-head">
       <h3>Choose an icon</h3>
       <button
         type="button"
         class="icon-btn"
         aria-label="Close"
-        onclick={onClose}
+        onclick={requestClose}
       >
         <span class="material-symbols-outlined">close</span>
       </button>
@@ -171,17 +215,17 @@
       <button
         type="button"
         class:active={mode === "icons"}
-        onclick={() => (mode = "icons")}>Icons</button
+        onclick={() => go("icons")}>Icons</button
       >
       <button
         type="button"
         class:active={mode === "browse"}
-        onclick={() => (mode = "browse")}>Browse</button
+        onclick={() => go("browse")}>Browse</button
       >
       <button
         type="button"
         class:active={mode === "manage"}
-        onclick={() => (mode = "manage")}>Manage</button
+        onclick={() => go("manage")}>Manage</button
       >
     </div>
 
@@ -286,12 +330,12 @@
               <button
                 type="button"
                 class="btn btn-outline btn-sm"
-                onclick={() => (mode = "browse")}>Browse sources</button
+                onclick={() => go("browse")}>Browse sources</button
               >
               <button
                 type="button"
                 class="btn btn-outline btn-sm"
-                onclick={() => (mode = "manage")}>Manage library</button
+                onclick={() => go("manage")}>Manage library</button
               >
             </span>
           </div>
@@ -340,11 +384,51 @@
           resources={["mdi", "objects", "adapter"]}
           onPick={pickBrowsed}
           onBatch={importBrowsed}
-          onClose={() => (mode = "icons")}
+          onClose={() => go("icons")}
         />
       </div>
     {:else}
-      <p class="empty text-muted">Manage the icon library…</p>
+      <div class="manage">
+        <IconPoolManager
+          embedded
+          mode="library"
+          bind:this={manager}
+          bind:dirty={manageDirty}
+          onBrowse={() => go("browse")}
+        />
+      </div>
+    {/if}
+
+    {#if pending}
+      <div
+        class="guard"
+        role="alertdialog"
+        aria-label="Unsaved library changes"
+      >
+        <p>Save your library changes first?</p>
+        <div class="guard-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            disabled={savingGuard}
+            onclick={saveAndLeave}
+          >
+            {savingGuard ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            disabled={savingGuard}
+            onclick={resume}>Discard</button
+          >
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            disabled={savingGuard}
+            onclick={() => (pending = null)}>Keep editing</button
+          >
+        </div>
+      </div>
     {/if}
   </div>
 </div>
@@ -371,6 +455,37 @@
     flex-direction: column;
     padding: 1rem;
     gap: 0.6rem;
+  }
+
+  .modal-content.wide {
+    width: min(860px, 100%);
+  }
+
+  .manage {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .guard {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1010;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg, 8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+  }
+
+  .guard p {
+    margin: 0 0 0.5rem;
+  }
+
+  .guard-actions {
+    display: flex;
+    gap: 0.4rem;
   }
 
   .modal-head {
