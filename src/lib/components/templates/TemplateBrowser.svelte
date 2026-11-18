@@ -14,6 +14,7 @@
   import {
     bundleParts,
     filterTemplateEntries,
+    helpLine,
     templateEntries,
     type TemplateEntry,
   } from "$lib/config/template-entries";
@@ -113,6 +114,7 @@
                 kind: "bundle" as const,
                 parts: bundleParts(bundleDraft),
                 builtin: false,
+                help: "",
                 description: bundleDraft.description ?? "",
                 search: (bundleDraft.name || "New template").toLowerCase(),
               },
@@ -331,6 +333,7 @@
       id: newId(),
       name: `${source.name} copy`,
       builtin: false,
+      help: "",
       basedOn: source.basedOn ?? source.type,
     };
     if (
@@ -348,6 +351,7 @@
       kind: "device",
       parts: ["device"],
       builtin: false,
+      help: "",
       description: copy.description ?? "",
       search: "",
     });
@@ -384,6 +388,7 @@
       kind: "logic",
       parts: ["logic"],
       builtin: false,
+      help: "",
       description: copy.description ?? "",
       search: "",
     });
@@ -424,6 +429,7 @@
       kind: "api",
       parts: ["logic", "api"],
       builtin: false,
+      help: "",
       description: copy.description ?? "",
       search: "",
     });
@@ -456,6 +462,7 @@
       kind: "bundle",
       parts: bundleParts(copy),
       builtin: false,
+      help: "",
       description: copy.description ?? "",
       search: "",
     });
@@ -505,6 +512,7 @@
       kind: "bundle",
       parts: ["device", "logic"],
       builtin: false,
+      help: "",
       description: draft.description ?? "",
       search: "new template",
     });
@@ -624,7 +632,11 @@
             >
               {entry.name}
             </button>
-            <span class="detail">{entry.description || typeLabel(entry)}</span>
+            <span class="detail"
+              >{entry.description ||
+                helpLine(entry.help) ||
+                typeLabel(entry)}</span
+            >
             <span class="item-actions">
               {#if isOpen(entry)}
                 <IconButton

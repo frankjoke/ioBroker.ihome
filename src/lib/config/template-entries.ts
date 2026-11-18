@@ -12,6 +12,8 @@ export interface TemplateEntry {
   builtin: boolean;
   /** The short description; empty when the template has none. */
   description: string;
+  /** The long-form help text; used as the row fallback when description is empty. */
+  help: string;
   search: string;
   /** The device type a device or bundle template creates. */
   type?: string;
@@ -24,9 +26,9 @@ function entry(
   id: string,
   name: string,
   description: string,
+  help: string,
   parts: TemplatePart[],
   builtin: boolean,
-  detail: string,
   type?: string,
   secured?: boolean,
 ): TemplateEntry {
@@ -37,7 +39,8 @@ function entry(
     parts,
     builtin,
     description,
-    search: `${name} ${type ?? ""} ${description} ${detail}`.toLowerCase(),
+    help,
+    search: `${name} ${type ?? ""} ${description} ${help}`.toLowerCase(),
     ...(type ? { type } : {}),
     ...(secured ? { secured: true } : {}),
   };
@@ -68,9 +71,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["device"],
         true,
-        `${template.type} ${template.help ?? ""}`,
         template.type,
       ),
     ),
@@ -80,9 +83,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["device"],
         false,
-        `${template.type} ${template.help ?? ""}`,
         template.type,
         template.secured === true,
       ),
@@ -93,9 +96,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["logic"],
         true,
-        `${template.description ?? ""} ${template.help ?? ""}`,
       ),
     ),
     ...input.logicUser.map((template) =>
@@ -104,9 +107,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["logic"],
         false,
-        `${template.description ?? ""} ${template.help ?? ""}`,
         undefined,
         template.secured === true,
       ),
@@ -117,9 +120,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["logic", "api"],
         true,
-        `${template.description ?? ""} ${template.help ?? ""}`,
       ),
     ),
     ...input.apiUser.map((template) =>
@@ -128,9 +131,9 @@ export function templateEntries(input: {
         template.id,
         template.name,
         template.description ?? "",
+        template.help ?? "",
         ["logic", "api"],
         false,
-        `${template.description ?? ""} ${template.help ?? ""}`,
         undefined,
         template.secured === true,
       ),
@@ -141,9 +144,9 @@ export function templateEntries(input: {
         bundle.id,
         bundle.name,
         bundle.description ?? "",
+        bundle.help ?? "",
         bundleParts(bundle),
         true,
-        `${bundle.description ?? ""} ${bundle.help ?? ""}`,
         bundle.device?.type,
       ),
     ),
@@ -153,9 +156,9 @@ export function templateEntries(input: {
         bundle.id,
         bundle.name,
         bundle.description ?? "",
+        bundle.help ?? "",
         bundleParts(bundle),
         false,
-        `${bundle.description ?? ""} ${bundle.help ?? ""}`,
         bundle.device?.type,
         bundle.secured === true,
       ),
@@ -174,4 +177,22 @@ export function filterTemplateEntries(
     : [...entries];
   const direction = dir === "asc" ? 1 : -1;
   return list.sort((a, b) => direction * a.name.localeCompare(b.name));
+}
+
+/** The first readable line of the long help, for the one-line template row. */
+export function helpLine(help: string): string {
+  let fenced = false;
+  for (const part of help.split("\n")) {
+    const line = part.trim();
+    if (line.startsWith("```")) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || !line) continue;
+    return line
+      .replace(/^#{1,6}\s*/, "")
+      .replace(/^[-*]\s+/, "")
+      .replace(/\*\*|__|`/g, "");
+  }
+  return "";
 }

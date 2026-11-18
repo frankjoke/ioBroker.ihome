@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { DeviceTemplate, LogicTemplate } from "$logic/types";
 import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
-import { filterTemplateEntries, templateEntries } from "./template-entries";
+import {
+  filterTemplateEntries,
+  helpLine,
+  templateEntries,
+} from "./template-entries";
 
 const device = {
   id: "d",
@@ -63,6 +67,12 @@ describe("templateEntries", () => {
       "Turns something on",
       "Reads a meter",
       "TV plus logic",
+    ]);
+    expect(entries.map((entry) => entry.help)).toEqual([
+      "visualhelp",
+      "logichelp",
+      "apihelp",
+      "bundlehelp",
     ]);
     expect(entries.every((entry) => entry.builtin === false)).toBe(true);
     // A bundle is findable by the device type it creates.
@@ -143,5 +153,15 @@ describe("templateEntries", () => {
       false,
       true,
     ]);
+  });
+});
+
+describe("helpLine", () => {
+  it("takes the first readable line without markdown markers", () => {
+    expect(helpLine("# Network device\n\nPolls a status endpoint.")).toBe(
+      "Network device",
+    );
+    expect(helpLine("**Bold** `code` text")).toBe("Bold code text");
+    expect(helpLine("```\ncode only\n```")).toBe("");
   });
 });
