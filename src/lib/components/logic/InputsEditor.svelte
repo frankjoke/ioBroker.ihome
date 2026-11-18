@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Input, LogicDef } from "$logic/types";
+  import type { Input, InputSource, LogicDef, TimerSpec } from "$logic/types";
   import { onMount } from "svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { stateIdFor, variableNameFor } from "$lib/config/variables";
@@ -12,7 +12,6 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import MultiStateField from "./MultiStateField.svelte";
-  import StateRefField from "./StateRefField.svelte";
   import TimerModal from "./TimerModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { timerLabel } from "$logic/timer-ops";
@@ -47,8 +46,10 @@
   let pendingDelete = $state<string | null>(null);
   /** The event whose + State opens the picker. */
   let sourceFor = $state<string | null>(null);
-  /** The timer being added/edited (index null = new). */
-  let timerEdit = $state<{ name: string; index: number | null } | null>(null);
+  /** The timer input whose schedule is being edited. */
+  let timerEdit = $state<string | null>(null);
+  /** The timer dialog for a brand-new timer input. */
+  let addingTimer = $state(false);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
   const otherLogics = $derived(logics.filter((logic) => logic.id !== selfId));
@@ -115,15 +116,34 @@
     toggle(name);
   }
 
-  function add() {
+  function uniqueName(base: string): string {
     let index = Object.keys(inputs).length + 1;
-    let name = `event${index}`;
-    while (name in inputs) name = `event${++index}`;
+    let name = `${base}${index}`;
+    while (name in inputs) name = `${base}${++index}`;
+    return name;
+  }
+
+  /** A state collection: one name, one or more states/patterns. */
+  function addVariable() {
+    const name = uniqueName("variable");
     onchange({
       ...inputs,
       [name]: { from: { type: "state", ref: "", refs: [] }, kind: "event" },
     });
     editing = name;
+  }
+
+  function timerInput(spec: TimerSpec): InputSource {
+    return typeof spec === "string"
+      ? { type: "timer", every: spec }
+      : { type: "timer", spec };
+  }
+
+  /** Saving the timer dialog for a new or an existing timer input. */
+  function saveTimerInput(name: string, spec: TimerSpec) {
+    const input = inputs[name];
+    if (!input) return;
+    update(name, { ...input, from: timerInput(spec) });
   }
 
   function sourceLabel(input: Input): string {
@@ -144,7 +164,8 @@
     }
     if (input.from.type === "memory")
       return input.from.ref || "(no memory name)";
-    return `every ${input.from.every}`;
+    const spec = input.from.spec ?? input.from.every;
+    return spec ? timerLabel(spec) : "(no schedule)";
   }
 
   /** The first source's current reading, like the state picker shows it. */
@@ -194,8 +215,15 @@
   <div class="inputs-head">
     <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
-      <button type="button" class="btn btn-sm" onclick={add}>
-        <span class="material-symbols-outlined">add</span> Event
+      <button type="button" class="btn btn-sm" onclick={addVariable}>
+        <span class="material-symbols-outlined">add</span> Variable
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm"
+        onclick={() => (addingTimer = true)}
+      >
+        <span class="material-symbols-outlined">add</span> Timer
       </button>
     </span>
   </div>
@@ -218,30 +246,17 @@
             {name}
           </button>
         {/if}
-        <span
-          class="badge badge-secondary"
-          title={input.kind === "event"
-            ? "Sources and timers; runs the logic on every change"
-            : "One source; runs the logic on every change"}>{input.kind}</span
-        >
         <span class="input-source mono text-muted">{sourceLabel(input)}</span>
         {#if sourceReading(input)}
           <span class="input-reading mono">{sourceReading(input)}</span>
         {/if}
         <span class="item-actions">
-          {#if input.kind === "event"}
+          {#if input.from.type === "state"}
             <button
               type="button"
               class="btn btn-sm"
-              title="Add a state, variable or logic event"
+              title="Add a state, logic or pattern source"
               onclick={() => (sourceFor = name)}>+ State</button
-            >
-            <button
-              type="button"
-              class="btn btn-sm"
-              title="Add a repeating timer (every …)"
-              onclick={() => (timerEdit = { name, index: null })}
-              >+ Timer</button
             >
           {/if}
           <IconButton
@@ -258,59 +273,45 @@
           <div class="fields">
             {#if input.from.type === "state"}
               <div class="field wide">
-                <span class="label-mono">
-                  {input.kind === "event" ? "Sources" : "State"}
-                </span>
-                {#if input.kind === "event"}
-                  <MultiStateField
-                    value={[input.from.ref, ...(input.from.refs ?? [])].filter(
-                      Boolean,
-                    )}
-                    label={`Sources for ${name}`}
-                    {logics}
-                    {selfId}
-                    hideAdd
-                    timers={input.timers ?? []}
-                    onTimers={(timers) =>
-                      update(name, {
-                        ...input,
-                        timers: timers.length ? timers : undefined,
-                      })}
-                    onEditTimer={(index) => (timerEdit = { name, index })}
-                    onchange={(ids) =>
-                      update(name, {
-                        ...input,
-                        from: {
-                          type: "state",
-                          ref: ids[0] ?? "",
-                          refs: ids.slice(1),
-                        },
-                      })}
+                <span class="label-mono">Sources</span>
+                <MultiStateField
+                  value={[input.from.ref, ...(input.from.refs ?? [])].filter(
+                    Boolean,
+                  )}
+                  label={`Sources for ${name}`}
+                  {logics}
+                  {selfId}
+                  hideAdd
+                  timers={input.timers ?? []}
+                  onTimers={(timers) =>
+                    update(name, {
+                      ...input,
+                      timers: timers.length ? timers : undefined,
+                    })}
+                  onchange={(ids) =>
+                    update(name, {
+                      ...input,
+                      from: {
+                        type: "state",
+                        ref: ids[0] ?? "",
+                        refs: ids.slice(1),
+                      },
+                    })}
+                />
+                <label class="field"
+                  ><span class="label-mono">or pattern</span>
+                  <input
+                    class="mono"
+                    aria-label={`Pattern for ${name}`}
+                    placeholder="alias.0.Gang.*.motion"
+                    onchange={(e) => {
+                      const pattern = e.currentTarget.value.trim();
+                      if (!pattern) return;
+                      e.currentTarget.value = "";
+                      addSource(name, pattern);
+                    }}
                   />
-                  <label class="field"
-                    ><span class="label-mono">or pattern</span>
-                    <input
-                      class="mono"
-                      aria-label={`Pattern for ${name}`}
-                      placeholder="alias.0.Gang.*.motion"
-                      onchange={(e) => {
-                        const pattern = e.currentTarget.value.trim();
-                        if (!pattern) return;
-                        e.currentTarget.value = "";
-                        addSource(name, pattern);
-                      }}
-                    />
-                  </label>
-                {:else}
-                  <StateRefField
-                    value={input.from.ref}
-                    label={`State for ${name}`}
-                    logics={otherLogics}
-                    logicTrigger
-                    onchange={(ref) =>
-                      update(name, { ...input, from: { type: "state", ref } })}
-                  />
-                {/if}
+                </label>
               </div>
             {:else if input.from.type === "memory"}
               <label class="field"
@@ -331,23 +332,17 @@
                 />
               </label>
             {:else}
-              <label class="field"
-                ><span class="label-mono">Every</span>
-                <input
-                  class="mono"
-                  aria-label={`Every for ${name}`}
-                  placeholder="30s / 2m / 1h"
-                  value={input.from.every}
-                  onchange={(e) =>
-                    update(name, {
-                      ...input,
-                      from: {
-                        type: "timer",
-                        every: e.currentTarget.value.trim(),
-                      },
-                    })}
-                />
-              </label>
+              <div class="field wide">
+                <span class="label-mono">Schedule</span>
+                <div class="row">
+                  <span class="mono">{sourceLabel(input)}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() => (timerEdit = name)}>Edit</button
+                  >
+                </div>
+              </div>
             {/if}
           </div>
         </div>
@@ -356,9 +351,7 @@
   {/each}
 
   {#if Object.keys(inputs).length === 0}
-    <p class="hint text-muted">
-      No local variables or events yet — use the buttons above.
-    </p>
+    <p class="hint text-muted">No local inputs yet — use the buttons above.</p>
   {/if}
 </div>
 
@@ -376,25 +369,29 @@
   />
 {/if}
 
+{#if addingTimer}
+  <TimerModal
+    onSave={(timer) => {
+      const name = uniqueName("timer");
+      onchange({
+        ...inputs,
+        [name]: { from: timerInput(timer), kind: "event" },
+      });
+      editing = name;
+      addingTimer = false;
+    }}
+    onCancel={() => (addingTimer = false)}
+  />
+{/if}
+
 {#if timerEdit}
   <TimerModal
-    timer={timerEdit.index === null
-      ? null
-      : (inputs[timerEdit.name]?.timers?.[timerEdit.index] ?? null)}
+    timer={(() => {
+      const from = inputs[timerEdit]?.from;
+      return from?.type === "timer" ? (from.spec ?? from.every ?? null) : null;
+    })()}
     onSave={(timer) => {
-      const target = timerEdit;
-      const input = target ? inputs[target.name] : undefined;
-      if (target && input) {
-        let base = input;
-        const timers = [...(input.timers ?? [])];
-        if (target.index === null && input.from.type === "timer") {
-          timers.unshift(input.from.every);
-          base = { ...input, from: { type: "state", ref: "", refs: [] } };
-        }
-        if (target.index === null) timers.push(timer);
-        else timers[target.index] = timer;
-        update(target.name, { ...base, timers });
-      }
+      if (timerEdit) saveTimerInput(timerEdit, timer);
       timerEdit = null;
     }}
     onCancel={() => (timerEdit = null)}

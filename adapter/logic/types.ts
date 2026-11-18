@@ -43,7 +43,8 @@ export const OPERATORS: readonly Operator[] = [
 export type InputSource =
   | { type: "state"; ref: string; refs?: string[] }
   | { type: "memory"; ref: string }
-  | { type: "timer"; every: Duration };
+  /** A timer input: `every` for a duration, `spec` for astro/cron (one of them). */
+  | { type: "timer"; every?: Duration; spec?: TimerSpec };
 
 export type AstroEvent =
   | "nightEnd"
@@ -74,9 +75,9 @@ export type TimerSpec =
 
 export interface Input {
   from: InputSource;
-  /** Variables are read-only values from one source; events trigger rows. */
+  /** Legacy, ignored: every input delivers each change. Written as "event". */
   kind: "variable" | "event";
-  /** Event only: repeating triggers beside `from` (D32). */
+  /** Legacy (pre timer inputs): extra triggers beside a state source. */
   timers?: TimerSpec[];
   /** Legacy (pre row-usage): read as the row default, no longer written. */
   mode?: "changed" | "any";

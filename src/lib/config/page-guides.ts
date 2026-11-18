@@ -83,9 +83,9 @@ output works inside the adapter only.
 
 - Add a **Logic** and give it states, events and actions.
 - Add an **Action** for a computed value or a reusable function.
-- An **Event** holds one or more sources and optional timers; every new value
-  runs the action. Older documents may also show single-source *variable*
-  inputs, which run the same way.
+- A **Variable** holds one or more states (or a pattern) under one name;
+  a **Timer** is a schedule (every, cron or astro). Every new value or fire
+  runs the action.
 - Start from a built-in logic with **From template**.
 - Open a row to edit it; Save sits on its line.
 - Show the adapter log, and filter by room or function.

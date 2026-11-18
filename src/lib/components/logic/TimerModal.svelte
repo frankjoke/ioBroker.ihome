@@ -136,10 +136,10 @@
               <input
                 class="mono"
                 bind:value={at}
-                placeholder="07:30 / *:30 / 07:*:15"
+                placeholder="@15:30 / *:15 / 10,12,15,17:10"
               />
             </label>
-            <span class="hint text-muted">* = every</span>
+            <span class="hint text-muted">* = every, lists allowed</span>
           </div>
           <div class="field">
             <span class="label-mono">Days</span>

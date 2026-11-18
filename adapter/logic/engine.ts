@@ -1296,20 +1296,26 @@ export function createEngine(
     return names[0];
   }
 
+  function armSpec(
+    rt: Runtime,
+    input: InputRuntime,
+    spec: TimerSpec,
+    key: string,
+  ): void {
+    if (typeof spec === "string") armOneTimer(rt, input, spec, key);
+    else if (spec.kind === "astro") armAstroTimer(rt, input, spec, key);
+    else armCronTimer(rt, input, spec, key);
+  }
+
   function armTimer(rt: Runtime, input: InputRuntime): void {
-    if (input.input.from.type === "timer") {
-      armOneTimer(rt, input, input.input.from.every, input.name);
+    const from = input.input.from;
+    if (from.type === "timer") {
+      const spec = from.spec ?? from.every;
+      if (spec) armSpec(rt, input, spec, input.name);
     }
-    (input.input.timers ?? []).forEach((timer, index) => {
-      const key = `${input.name}#${index}`;
-      if (typeof timer === "string") {
-        armOneTimer(rt, input, timer, key);
-      } else if (timer.kind === "astro") {
-        armAstroTimer(rt, input, timer, key);
-      } else {
-        armCronTimer(rt, input, timer, key);
-      }
-    });
+    (input.input.timers ?? []).forEach((timer, index) =>
+      armSpec(rt, input, timer, `${input.name}#${index}`),
+    );
   }
 
   function fireInputTimer(

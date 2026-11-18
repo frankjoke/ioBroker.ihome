@@ -437,7 +437,7 @@ it("rejects an unknown logic in a local event's sources", () => {
   ).toBe(true);
 });
 
-it("accepts a timer-only event and rejects timers on a variable", () => {
+it("accepts timer inputs, cron lists and legacy attached timers", () => {
   const ok: LogicDocument = {
     version: 3,
     logics: [
@@ -446,8 +446,16 @@ it("accepts a timer-only event and rejects timers on a variable", () => {
         name: "t",
         kind: "machine",
         inputs: {
-          tick: {
-            from: { type: "state", ref: "", refs: [] },
+          tick: { from: { type: "timer", every: "5m" }, kind: "event" },
+          at: {
+            from: {
+              type: "timer",
+              spec: { kind: "cron", at: "10,12,15,17:10", days: "*" },
+            },
+            kind: "event",
+          },
+          legacy: {
+            from: { type: "state", ref: "0_userdata.0.B", refs: [] },
             kind: "event",
             timers: ["5m"],
           },
@@ -459,13 +467,15 @@ it("accepts a timer-only event and rejects timers on a variable", () => {
   };
   expect(validateLogicDocument(ok)).toEqual([]);
 
-  const bad = structuredClone(ok);
-  (
-    bad.logics[0] as { inputs: Record<string, { kind: string }> }
-  ).inputs.tick.kind = "variable";
+  const both = structuredClone(ok);
+  both.logics[0].inputs!.tick.from = {
+    type: "timer",
+    every: "5m",
+    spec: { kind: "cron", at: "07:30", days: "*" },
+  };
   expect(
-    validateLogicDocument(bad).some((i) =>
-      i.message.includes("only an event can repeat on a timer"),
+    validateLogicDocument(both).some((issue) =>
+      issue.message.includes("exactly one of every or spec"),
     ),
   ).toBe(true);
 });

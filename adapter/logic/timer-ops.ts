@@ -25,16 +25,21 @@ export function isAstroEvent(name: string): name is AstroEvent {
 }
 
 export interface CronParts {
-  hour: number | "*";
-  minute: number | "*";
-  second: number | "*";
+  /** Sorted values, or `*` for every value. */
+  hour: number[] | "*";
+  minute: number[] | "*";
+  second: number[] | "*";
 }
 
-const CRON_PART = /^(\*|\d{1,2})$/;
+const CRON_PART = /^(\*|\d{1,2}(?:,\d{1,2})*)$/;
 
-/** `HH:MM[:SS]`, each part `*` or a number; never all `*`. */
+/** `HH:MM[:SS]`, each part `*` or a comma list (`10,12,15`); never all `*`. */
 export function parseCronAt(at: string): CronParts | undefined {
-  const parts = at.trim().split(":");
+  // `@15:30` and `at:15:30` are accepted as well as the bare time.
+  const parts = at
+    .trim()
+    .replace(/^(?:at:|@)/i, "")
+    .split(":");
   if (parts.length < 2 || parts.length > 3) return undefined;
   const [rawHour, rawMinute, rawSecond] = parts;
   if (
@@ -44,16 +49,17 @@ export function parseCronAt(at: string): CronParts | undefined {
   ) {
     return undefined;
   }
-  const parse = (raw: string, max: number): number | "*" | undefined => {
+  const parse = (raw: string, max: number): number[] | "*" | undefined => {
     if (raw === "*") return "*";
-    const value = Number(raw);
-    return Number.isInteger(value) && value >= 0 && value <= max
-      ? value
-      : undefined;
+    const values = [...new Set(raw.split(",").map(Number))];
+    if (values.some((value) => !Number.isInteger(value) || value > max)) {
+      return undefined;
+    }
+    return values.sort((a, b) => a - b);
   };
   const hour = parse(rawHour, 23);
   const minute = parse(rawMinute, 59);
-  const second = rawSecond === undefined ? 0 : parse(rawSecond, 59);
+  const second = rawSecond === undefined ? [0] : parse(rawSecond, 59);
   if (hour === undefined || minute === undefined || second === undefined) {
     return undefined;
   }
@@ -73,15 +79,15 @@ export function nextCron(
   const first = Math.floor(from / 1000) * 1000 + 1000;
   const base = new Date(first);
   const hours =
-    parts.hour === "*" ? Array.from({ length: 24 }, (_, i) => i) : [parts.hour];
+    parts.hour === "*" ? Array.from({ length: 24 }, (_, i) => i) : parts.hour;
   const minutes =
     parts.minute === "*"
       ? Array.from({ length: 60 }, (_, i) => i)
-      : [parts.minute];
+      : parts.minute;
   const seconds =
     parts.second === "*"
       ? Array.from({ length: 60 }, (_, i) => i)
-      : [parts.second];
+      : parts.second;
 
   for (let offset = 0; offset <= 366; offset++) {
     const day = new Date(base.getFullYear(), base.getMonth(), base.getDate());
