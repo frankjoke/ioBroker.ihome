@@ -3812,3 +3812,47 @@ it("does not subscribe to $logic pseudo states", () => {
   const engine = createEngine(doc, h.deps);
   expect(engine.subscriptions()).toEqual([]);
 });
+
+it("only the linked logic runs on a state change", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        inputs: {
+          s: {
+            from: { type: "state", ref: "0_userdata.0.STATE" },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code('get("s")'),
+      },
+      {
+        id: "b",
+        name: "B",
+        kind: "function",
+        inputs: {
+          o: {
+            from: { type: "state", ref: "0_userdata.0.OTHER" },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code('get("0_userdata.0.STATE")'),
+      },
+    ],
+  };
+  const h = createHarness({
+    "0_userdata.0.STATE": 0,
+    "0_userdata.0.OTHER": 0,
+  });
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.change("0_userdata.0.STATE", 1);
+  expect(h.writes.map((write) => write.id)).toEqual(["0_userdata.0.A"]);
+});

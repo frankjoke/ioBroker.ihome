@@ -11,6 +11,12 @@ import {
 } from "./runtime";
 import { nextCron, timerSource } from "./timer-ops";
 import { collectRefs, type ResolveVariable } from "./subscriptions";
+import {
+  createLogicIndex,
+  createMemoryMap,
+  createStateMap,
+  type Binding,
+} from "./registries";
 import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
 import { createPluginQueue, type PluginQueue } from "./plugin-queue";
 import type { PluginReply } from "../plugin-ops";
@@ -112,8 +118,6 @@ interface InputRuntime {
   input: Input;
   /** A state input may name several states: any of them is the same event. */
   stateIds: string[];
-  /** Per source, so a second button with the same value still fires. */
-  lastById: Map<string, unknown>;
   last?: unknown;
   hasLast: boolean;
   /** Value-based `changed` of the last update of this input. */
@@ -127,6 +131,9 @@ interface InputRuntime {
 }
 
 interface Runtime {
+  id: string;
+  /** Position in the document; dispatch order follows it. */
+  seq: number;
   def: LogicDef;
   inputs: Map<string, InputRuntime>;
   output: Output;
@@ -204,12 +211,9 @@ export function createEngine(
 ): Engine {
   const ownFrom = options.ownFrom;
   const maxDepth = options.maxDepth ?? 32;
-  const memory = new Map<string, unknown>();
-  /** Write time, writer and value-based `changed` of every memory value. */
-  const memoryMeta = new Map<
-    string,
-    { ts: number; from: string; changed: boolean }
-  >();
+  const memories = createMemoryMap<Runtime>();
+  const states = createStateMap<Runtime>();
+  const logicIndex = createLogicIndex<Runtime>();
   const issues = validateLogicDocument(doc);
   const declaredMemory = new Set<string>(
     (doc.memory ?? []).map((entry) => entry.name),
@@ -228,7 +232,7 @@ export function createEngine(
     return variable?.kind === "state" ? variable.stateId : undefined;
   };
 
-  for (const def of doc.logics) {
+  for (const [seq, def] of doc.logics.entries()) {
     if (def.enabled === false) continue;
     if (logicHasErrors(issues, def.id)) {
       const messages = issues
@@ -252,7 +256,6 @@ export function createEngine(
         name,
         input,
         stateIds,
-        lastById: new Map<string, unknown>(),
         hasLast: false,
       });
     }
@@ -276,13 +279,14 @@ export function createEngine(
             name: row.on,
             input: { from: { type: "state", ref: name }, kind: "event" },
             stateIds: [variable.stateId],
-            lastById: new Map<string, unknown>(),
             hasLast: false,
           });
         }
       }
     }
     const rt: Runtime = {
+      id: def.id,
+      seq,
       def,
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
@@ -370,6 +374,48 @@ export function createEngine(
     runtimes.push(rt);
   }
 
+  /** Register a runtime's input and output links in the shared maps. */
+  function linkRuntime(rt: Runtime): void {
+    for (const input of rt.inputs.values()) {
+      const from = input.input.from;
+      if (from.type === "state") {
+        for (const id of input.stateIds) {
+          states.link(
+            id,
+            { owner: rt, input: input.name },
+            deps.readState?.(id),
+            deps.read(id),
+          );
+        }
+        for (const ref of [from.ref, ...(from.refs ?? [])]) {
+          if (ref.startsWith("$logic.")) {
+            logicIndex.link(ref, { owner: rt, input: input.name });
+          }
+        }
+      } else if (from.type === "memory") {
+        memories.link(from.ref, { owner: rt, input: input.name });
+      }
+    }
+    if (rt.def.kind !== "machine") return;
+    const rows = [
+      ...Object.values(rt.def.states ?? {}).flatMap((state) => state.on ?? []),
+      ...(rt.def.all?.on ?? []),
+    ];
+    for (const row of rows) {
+      if (row.on.startsWith("$logic.")) logicIndex.linkRow(row.on, rt);
+    }
+    const target = outputTargetId(rt);
+    if (target) {
+      states.self(target, rt, deps.readState?.(target), deps.read(target));
+    }
+  }
+
+  function unlinkRuntime(rt: Runtime): void {
+    states.unlink(rt);
+    memories.unlink(rt);
+    logicIndex.unlink(rt);
+  }
+
   const queue: Job[] = [];
   /** Writes this engine made, per state id, for self-attribution. */
   const pendingWrites = new Map<
@@ -421,13 +467,13 @@ export function createEngine(
   }
 
   function memoryInfo(name: string): NameInfo {
-    const meta = memoryMeta.get(name);
+    const entry = memories.get(name);
     return {
-      value: memory.get(name),
+      value: entry?.value,
       ack: true,
-      from: meta?.from,
-      ts: meta?.ts ?? deps.now(),
-      changed: meta?.changed ?? false,
+      from: entry?.from,
+      ts: entry?.ts ?? deps.now(),
+      changed: entry?.changed ?? false,
       writable: true,
     };
   }
@@ -523,7 +569,7 @@ export function createEngine(
     }
     const input = rt.inputs.get(ref);
     if (input) return inputInfo(input);
-    if (memory.has(ref) || declaredMemory.has(ref)) return memoryInfo(ref);
+    if (memories.get(ref) || declaredMemory.has(ref)) return memoryInfo(ref);
     if (ref.includes(".")) return externalInfo(ref);
     const variable = deps.resolveVariable?.(ref);
     if (!variable) {
@@ -577,7 +623,7 @@ export function createEngine(
   function externalId(ref: string, rt: Runtime): string | undefined {
     const input = rt.inputs.get(ref);
     if (input) return undefined; // its sources are added explicitly below
-    if (memory.has(ref) || declaredMemory.has(ref)) return undefined;
+    if (memories.get(ref) || declaredMemory.has(ref)) return undefined;
     if (ref.startsWith("$logic.")) return undefined;
     if (ref.includes(".")) return ref;
     const variable = deps.resolveVariable?.(ref);
@@ -917,20 +963,17 @@ export function createEngine(
     depth: number,
     producer: string,
   ): boolean {
+    const current = memories.get(name);
     if (
       (forward ?? "changed") === "changed" &&
-      memory.has(name) &&
-      Object.is(memory.get(name), value)
+      current &&
+      Object.is(current.value, value)
     ) {
       return false;
     }
-    const previous = memory.get(name);
-    const hasPrevious = memory.has(name);
-    memory.set(name, value);
-    memoryMeta.set(name, {
+    const { previous, hasPrevious } = memories.write(name, value, {
       ts: deps.now(),
       from: producer,
-      changed: !hasPrevious || !Object.is(previous, value),
     });
     emitMemory(name, value, depth + 1, producer, previous, hasPrevious);
     return true;
@@ -959,7 +1002,7 @@ export function createEngine(
       }
       return;
     }
-    if (declaredMemory.has(ref) || memory.has(ref)) {
+    if (declaredMemory.has(ref) || memories.get(ref)) {
       writeMemory(ref, value, forward, depth, rt.def.id);
       return;
     }
@@ -1126,8 +1169,9 @@ export function createEngine(
     }
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
-      const previous = memory.get(name);
-      const hasPrevious = memory.has(name);
+      const entry = memories.get(name);
+      const previous = entry?.value;
+      const hasPrevious = entry !== undefined;
       rt.lastOutput = value;
       rt.hasOutput = true;
       if (rt.def.kind === "function") {
@@ -1174,8 +1218,9 @@ export function createEngine(
     const output = rt.output;
     if (output.scope === "memory") {
       const name = output.name ?? rt.def.id;
-      const previous = memory.get(name);
-      const hasPrevious = memory.has(name);
+      const entry = memories.get(name);
+      const previous = entry?.value;
+      const hasPrevious = entry !== undefined;
       rt.lastOutput = value;
       rt.hasOutput = true;
       const wrote = writeMemory(name, value, output.forward, depth, rt.def.id);
@@ -1211,8 +1256,7 @@ export function createEngine(
     if (output.scope === "memory") {
       // The machine's own state readout, stored without emitting an event.
       const name = output.name ?? def.id;
-      memory.set(name, chosen);
-      memoryMeta.set(name, { ts: deps.now(), from: "init", changed: false });
+      memories.seed(name, chosen, { ts: deps.now(), from: "init" });
     } else {
       const target = outputTargetId(rt);
       // Remember what the output holds, so the first transition writes only a
@@ -1404,30 +1448,25 @@ export function createEngine(
     previous: unknown,
     hasPrevious: boolean,
   ): void {
-    for (const rt of runtimes) {
-      for (const input of rt.inputs.values()) {
-        if (
-          input.input.from.type !== "memory" ||
-          input.input.from.ref !== name
-        ) {
-          continue;
-        }
-        enqueue({
-          rt,
-          input: input.name,
-          source: name,
-          value,
-          previous,
-          hasPrevious,
-          depth,
-          meta: {
-            from: `memory:${producer}`,
-            self: producer === rt.def.id,
-            ack: false,
-            ts: deps.now(),
-          },
-        });
-      }
+    for (const binding of memories.links(name)) {
+      const rt = binding.owner;
+      const input = rt.inputs.get(binding.input);
+      if (!input) continue;
+      enqueue({
+        rt,
+        input: input.name,
+        source: name,
+        value,
+        previous,
+        hasPrevious,
+        depth,
+        meta: {
+          from: `memory:${producer}`,
+          self: producer === rt.def.id,
+          ack: false,
+          ts: deps.now(),
+        },
+      });
     }
   }
 
@@ -1450,39 +1489,33 @@ export function createEngine(
       ack: false,
       ts: deps.now(),
     };
-    for (const rt of runtimes) {
+    const hit = logicIndex.get(input);
+    if (!hit) return;
+    // Document order; for one logic its state rows come before its inputs, as
+    // the loop did before the index existed.
+    const items = [
+      ...hit.rows.map((owner) => ({ owner, row: true, binding: undefined })),
+      ...hit.inputs.map((binding) => ({
+        owner: binding.owner,
+        row: false,
+        binding,
+      })),
+    ].sort(
+      (a, b) => a.owner.seq - b.owner.seq || Number(b.row) - Number(a.row),
+    );
+    for (const item of items) {
+      const rt = item.owner;
       const self = rt === producer;
-      // A row naming the logic directly, in the state it is in.
-      if (rt.def.kind === "machine" && rt.state) {
-        const rows = (rt.def as MachineLogic).states[rt.state]?.on ?? [];
-        if (rows.some((row) => row.on === input)) {
-          enqueue({
-            rt,
-            input,
-            source: input,
-            value,
-            previous,
-            hasPrevious,
-            depth,
-            meta: { ...meta, self },
-          });
-        }
-      }
-      // A local event input may name the logic output among its states.
-      for (const source of rt.inputs.values()) {
-        if (source.input.from.type !== "state") continue;
-        const refs = [source.input.from.ref, ...(source.input.from.refs ?? [])];
-        if (!refs.includes(input)) continue;
-        source.last = value;
-        source.hasLast = true;
-        source.lastChanged = hasPrevious ? !Object.is(previous, value) : true;
-        source.lastTs = meta.ts;
-        source.lastStateId = input;
-        source.lastFrom = meta.from;
-        source.lastAck = meta.ack;
+      if (item.row) {
+        const def = rt.def as MachineLogic;
+        const rows = [
+          ...(rt.state ? (def.states[rt.state]?.on ?? []) : []),
+          ...(def.all?.on ?? []),
+        ];
+        if (!rows.some((row) => row.on === input)) continue;
         enqueue({
           rt,
-          input: source.name,
+          input,
           source: input,
           value,
           previous,
@@ -1490,7 +1523,27 @@ export function createEngine(
           depth,
           meta: { ...meta, self },
         });
+        continue;
       }
+      const source = rt.inputs.get(item.binding!.input);
+      if (!source || source.input.from.type !== "state") continue;
+      source.last = value;
+      source.hasLast = true;
+      source.lastChanged = hasPrevious ? !Object.is(previous, value) : true;
+      source.lastTs = meta.ts;
+      source.lastStateId = input;
+      source.lastFrom = meta.from;
+      source.lastAck = meta.ack;
+      enqueue({
+        rt,
+        input: source.name,
+        source: input,
+        value,
+        previous,
+        hasPrevious,
+        depth,
+        meta: { ...meta, self },
+      });
     }
   }
 
@@ -1529,7 +1582,7 @@ export function createEngine(
 
   return {
     subscriptions,
-    memoryValue: (name) => memory.get(name),
+    memoryValue: (name) => memories.get(name)?.value,
     test(logicId: string): LogicTestResult {
       if (!started) return { ok: false, error: "logic engine is not started" };
       const rt = runtimes.find((entry) => entry.def.id === logicId);
@@ -1547,12 +1600,11 @@ export function createEngine(
     start() {
       if (started) return;
       started = true;
+      for (const rt of runtimes) linkRuntime(rt);
       for (const entry of doc.memory ?? []) {
-        memory.set(entry.name, entry.initial);
-        memoryMeta.set(entry.name, {
+        memories.seed(entry.name, entry.initial, {
           ts: deps.now(),
           from: "init",
-          changed: false,
         });
       }
       // Seed every state-backed input from the warmed cache: old = current,
@@ -1564,7 +1616,6 @@ export function createEngine(
             const cached = deps.readState?.(id);
             const value = cached ? cached.val : deps.read(id);
             if (!cached && value === undefined) continue;
-            input.lastById.set(id, value);
             input.last = value;
             input.hasLast = true;
             input.lastChanged = false;
@@ -1613,6 +1664,7 @@ export function createEngine(
         rt.timers.clear();
         rt.tasks?.stop();
         rt.pluginTasks?.stop();
+        unlinkRuntime(rt);
       }
       started = false;
       queue.length = 0;
@@ -1622,44 +1674,26 @@ export function createEngine(
     onStateChange(change) {
       if (!started) return;
       const writer = claimWrite(change.id, change.from ?? "", change.val);
-      for (const rt of runtimes) {
-        const self = writer === rt.def.id;
-        for (const input of rt.inputs.values()) {
-          if (!input.stateIds.includes(change.id)) continue;
-          const previous = input.lastById.get(change.id);
-          const hasPrevious = input.lastById.has(change.id);
-          input.lastById.set(change.id, change.val);
-          input.last = change.val;
-          input.hasLast = true;
-          input.lastChanged =
-            change.changed ?? !Object.is(previous, change.val);
-          input.lastTs = change.ts ?? deps.now();
-          input.lastStateId = change.id;
-          input.lastFrom = change.from;
-          input.lastAck = change.ack;
-          enqueue({
-            rt,
-            input: input.name,
-            source: change.id,
-            value: change.val,
-            previous,
-            hasPrevious,
-            depth: 0,
-            meta: {
-              from: change.from ?? "",
-              self,
-              ack: change.ack,
-              ts: change.ts,
-            },
-          });
-        }
-        // Someone else wrote this logic's own output: the machine follows it, so
-        // a wall switch or another adapter moves the state at once (D22).
-        if (
-          rt.def.kind === "machine" &&
-          !self &&
-          outputTargetId(rt) === change.id
-        ) {
+      const hit = states.change(change.id, change);
+      if (!hit) return;
+      const items = [
+        ...hit.links.map((binding) => ({
+          owner: binding.owner,
+          self: false,
+          binding: binding as Binding<Runtime> | undefined,
+        })),
+        ...hit.selves.map((owner) => ({
+          owner,
+          self: true,
+          binding: undefined,
+        })),
+      ].sort(
+        (a, b) => a.owner.seq - b.owner.seq || Number(a.self) - Number(b.self),
+      );
+      for (const item of items) {
+        const rt = item.owner;
+        if (item.self) {
+          if (writer === rt.def.id) continue;
           enqueue({
             rt,
             input: "$self",
@@ -1674,7 +1708,32 @@ export function createEngine(
               ts: change.ts,
             },
           });
+          continue;
         }
+        const input = rt.inputs.get(item.binding!.input);
+        if (!input) continue;
+        input.last = change.val;
+        input.hasLast = true;
+        input.lastChanged = hit.entry.changed;
+        input.lastTs = change.ts ?? deps.now();
+        input.lastStateId = change.id;
+        input.lastFrom = change.from;
+        input.lastAck = change.ack;
+        enqueue({
+          rt,
+          input: input.name,
+          source: change.id,
+          value: change.val,
+          previous: hit.previous,
+          hasPrevious: hit.hasPrevious,
+          depth: 0,
+          meta: {
+            from: change.from ?? "",
+            self: writer === rt.def.id,
+            ack: change.ack,
+            ts: change.ts,
+          },
+        });
       }
     },
   };
