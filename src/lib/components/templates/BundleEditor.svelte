@@ -529,6 +529,7 @@
                 id: draft.id,
                 name: draft.name || "Logic",
                 kind: "function",
+                mode: "statements",
                 inputs: {},
                 output: { scope: "memory" },
                 expr: { code: "noop()" },

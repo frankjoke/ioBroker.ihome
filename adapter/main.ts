@@ -9,6 +9,7 @@ import {
 } from "./logic/engine";
 import { isRecord, parseLogicDocument } from "./logic/validate";
 import { expandInputPatterns } from "./logic/pattern-ops";
+import { toStatementBodies } from "./logic/function-bodies";
 import { subscriptionDiff } from "./logic/subscriptions";
 import {
   stateCommonDiff,
@@ -658,6 +659,7 @@ class IHome extends utils.Adapter {
     }
     if (loadId !== this.logicLoad) return; // a newer reload won
     if (!doc) return;
+    doc = toStatementBodies(doc);
 
     await this.ensureAstroConfig();
     await this.ensureLogicStates(doc);

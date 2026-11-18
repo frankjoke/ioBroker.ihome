@@ -9,6 +9,7 @@ import {
   type Issue,
 } from "$logic/validate";
 import type { LogicDocument } from "$logic/types";
+import { toStatementBodies } from "$logic/function-bodies";
 
 export const LOGIC_LIST_ID = "ihome.0.config.logicList";
 
@@ -149,18 +150,20 @@ export function initLogics(): Promise<void> {
           }
           return true;
         }
-        const asString = JSON.stringify(parsed);
+        const doc = toStatementBodies(parsed);
+        const asString = JSON.stringify(doc);
         if (lastSent !== null && lastSent === asString) return true;
-        logicDocument = parsed;
-        issues = validateLogicDocument(parsed);
+        logicDocument = doc;
+        issues = validateLogicDocument(doc);
         loadKind = "loaded";
         return true;
       };
       const parsed = parseLogicDocument(st.value);
       if (parsed) {
         loadKind = "loaded";
-        logicDocument = parsed;
-        issues = validateLogicDocument(parsed);
+        const doc = toStatementBodies(parsed);
+        logicDocument = doc;
+        issues = validateLogicDocument(doc);
       } else if (st.value != null && st.value !== "") {
         loadKind = "unreadable";
         console.error(

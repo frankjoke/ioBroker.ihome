@@ -170,7 +170,8 @@ Use it to convert units (for example Wh to kWh with a factor of 0.001), scale a 
         },
       },
       output: { scope: "state", ref: "{{target}}", type: "number" },
-      expr: { code: 'get("value") * {{factor}}' },
+      mode: "statements",
+      expr: { code: 'return get("value") * {{factor}}' },
     },
   },
 ];

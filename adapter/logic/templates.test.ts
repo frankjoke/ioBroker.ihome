@@ -44,8 +44,9 @@ it("keeps typed parameters typed", () => {
     },
     "calc",
   );
+  expect((logic as { mode?: unknown }).mode).toBe("statements");
   expect((logic as { expr?: unknown }).expr).toEqual({
-    code: 'get("value") * 2.5',
+    code: 'return get("value") * 2.5',
   });
   expect(validateLogicDocument({ version: 3, logics: [logic] })).toEqual([]);
 });
