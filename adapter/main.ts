@@ -8,6 +8,7 @@ import {
   type StateChange,
 } from "./logic/engine";
 import { isRecord, parseLogicDocument } from "./logic/validate";
+import { expandInputPatterns } from "./logic/pattern-ops";
 import { subscriptionDiff } from "./logic/subscriptions";
 import {
   stateCommonDiff,
@@ -624,6 +625,17 @@ class IHome extends utils.Adapter {
    * the old timers still armed. An unreadable or newer document leaves the
    * running engine untouched.
    */
+  /** The states a `*`/`?` input pattern names, for one engine build. */
+  private async logicPatternStates(pattern: string): Promise<string[]> {
+    try {
+      const objects = await this.getForeignObjectsAsync(pattern, "state");
+      return Object.keys(objects ?? {});
+    } catch (error) {
+      this.log.warn(`cannot expand logic pattern ${pattern}: ${String(error)}`);
+      return [];
+    }
+  }
+
   private async loadLogics(): Promise<void> {
     const loadId = ++this.logicLoad;
     const target = `${CONFIG_FOLDER}.logicList`;
@@ -649,11 +661,19 @@ class IHome extends utils.Adapter {
 
     await this.ensureAstroConfig();
     await this.ensureLogicStates(doc);
+    // `*`/`?` input refs are expanded once per build; the stored document
+    // keeps the pattern, so the next build sees newly added states.
+    const expanded = await expandInputPatterns(doc, (pattern) =>
+      this.logicPatternStates(pattern),
+    );
+    for (const pattern of expanded.unmatched) {
+      this.log.warn(`logic input pattern “${pattern}” matches no state`);
+    }
 
     let next: Engine;
     try {
       next = createEngine(
-        doc,
+        expanded.doc,
         {
           read: (id) => this.logicValues.get(id)?.val,
           readState: (id) => this.logicValues.get(id),

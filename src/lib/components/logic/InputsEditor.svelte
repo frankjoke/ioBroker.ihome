@@ -300,11 +300,26 @@
                         },
                       })}
                   />
+                  <label class="field"
+                    ><span class="label-mono">or pattern</span>
+                    <input
+                      class="mono"
+                      aria-label={`Pattern for ${name}`}
+                      placeholder="alias.0.Gang.*.motion"
+                      onchange={(e) => {
+                        const pattern = e.currentTarget.value.trim();
+                        if (!pattern) return;
+                        e.currentTarget.value = "";
+                        addSource(name, pattern);
+                      }}
+                    />
+                  </label>
                 {:else}
                   <StateRefField
                     value={input.from.ref}
                     label={`State for ${name}`}
                     logics={otherLogics}
+                    logicTrigger
                     onchange={(ref) =>
                       update(name, { ...input, from: { type: "state", ref } })}
                   />

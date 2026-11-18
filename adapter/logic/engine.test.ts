@@ -704,14 +704,82 @@ it("exposes $value and $previous to logic code", () => {
     doc({
       init: { run: false },
       output: { scope: "memory" },
-      expr: code('`${get("$previous")}|${get("$value")}|${get("$input")}`'),
+      expr: code(
+        '`${get("$previous")}|${get("$value")}|${get("$input")}|${get("$source")}`',
+      ),
     }),
   );
   engine.start();
   h.change("0_userdata.0.T", 6);
-  expect(engine.memoryValue("calc")).toBe("3|6|temp");
+  expect(engine.memoryValue("calc")).toBe("3|6|temp|0_userdata.0.T");
   h.change("0_userdata.0.T", 8);
-  expect(engine.memoryValue("calc")).toBe("6|8|temp");
+  expect(engine.memoryValue("calc")).toBe("6|8|temp|0_userdata.0.T");
+});
+
+it("$source names a timer's schedule", () => {
+  const timed: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "tick",
+        name: "Tick",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          t: { from: { type: "timer", every: "60s" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.TICK", type: "string" },
+        expr: code('get("$source")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(timed, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.clock.advance(60_000);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.TICK", value: "every:60s", ack: false },
+  ]);
+});
+
+it("a variable input reads another logic's memory output", () => {
+  const document: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "producer",
+        name: "Producer",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          e: { from: { type: "state", ref: "0_userdata.0.E" }, kind: "event" },
+        },
+        output: { scope: "memory" },
+        expr: code('get("e") * 10'),
+      },
+      {
+        id: "reader",
+        name: "Reader",
+        kind: "function",
+        init: { run: false },
+        inputs: {
+          m: {
+            from: { type: "state", ref: "$logic.producer" },
+            kind: "variable",
+          },
+        },
+        output: { scope: "memory" },
+        expr: code('get("m") + 1'),
+      },
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 1 });
+  const engine = createEngine(document, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.E", 4);
+  expect(engine.memoryValue("reader")).toBe(41);
 });
 
 it("runs a function body with this, early returns and noop", () => {

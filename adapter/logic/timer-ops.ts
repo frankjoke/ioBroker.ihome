@@ -108,6 +108,22 @@ export function nextCron(
 }
 
 /** A timer as the editor and the chips show it. */
+/** The `$source` label of a timer: `every:20s`, `astro:night+20`, `cron:06:30`. */
+export function timerSource(timer: TimerSpec): string {
+  if (typeof timer === "string") return `every:${timer}`;
+  if (timer.kind === "astro") {
+    const offset = timer.offset ?? 0;
+    return `astro:${timer.event}${offset === 0 ? "" : offset > 0 ? `+${offset}` : `${offset}`}`;
+  }
+  const days =
+    timer.days === undefined ||
+    timer.days === "*" ||
+    (Array.isArray(timer.days) && timer.days.length === 7)
+      ? ""
+      : `:${timer.days.join(",")}`;
+  return `cron:${timer.at}${days}`;
+}
+
 export function timerLabel(timer: TimerSpec): string {
   if (typeof timer === "string") return `every ${timer}`;
   if (timer.kind === "astro") {

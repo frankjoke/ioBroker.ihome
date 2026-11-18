@@ -78,7 +78,7 @@
         {roomsOf}
         {enums}
         {logics}
-        logicPick="state"
+        logicPick="trigger"
         onPick={(id) => (ref = id)}
       />
     </div>

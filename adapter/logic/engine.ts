@@ -9,7 +9,7 @@ import {
   type LogicRuntime,
   type NameInfo,
 } from "./runtime";
-import { nextCron } from "./timer-ops";
+import { nextCron, timerSource } from "./timer-ops";
 import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
 import { createPluginQueue, type PluginQueue } from "./plugin-queue";
 import type { PluginReply } from "../plugin-ops";
@@ -173,6 +173,9 @@ interface TaskJob {
 interface Job {
   rt: Runtime;
   input: string;
+  /** What raised the run: a state id, memory name, `$logic.<id>`, timer spec
+   *  or a built-in trigger. Read by `$source`. */
+  source?: string;
   value: unknown;
   /** The source's value before this update; rows compare edges against it. */
   previous?: unknown;
@@ -223,6 +226,7 @@ export function createEngine(
 
   const runtimes: Runtime[] = [];
   const resolveStateId = (ref: string): string | undefined => {
+    if (ref.startsWith("$logic.")) return undefined;
     if (ref.includes(".")) return ref;
     const variable = deps.resolveVariable?.(ref);
     return variable?.kind === "state" ? variable.stateId : undefined;
@@ -298,6 +302,7 @@ export function createEngine(
         enqueue({
           rt,
           input: "$task",
+          source: "$task",
           value: undefined,
           hasPrevious: false,
           depth: task.depth,
@@ -331,6 +336,7 @@ export function createEngine(
         enqueue({
           rt,
           input: "$task",
+          source: "$task",
           value: undefined,
           hasPrevious: false,
           depth: task.depth,
@@ -489,9 +495,11 @@ export function createEngine(
                     ? currentJob?.hasPrevious
                       ? currentJob.previous
                       : undefined
-                    : ref === "$input"
-                      ? currentJob?.input
-                      : currentMeta.ts;
+                    : ref === "$source"
+                      ? (currentJob?.source ?? (rt.init ? "$init" : undefined))
+                      : ref === "$input"
+                        ? currentJob?.input
+                        : currentMeta.ts;
     return {
       value,
       ack: currentMeta.ack ?? true,
@@ -512,6 +520,7 @@ export function createEngine(
       ref === "$value" ||
       ref === "$previous" ||
       ref === "$input" ||
+      ref === "$source" ||
       ref === "$ts"
     ) {
       return pseudoInfo(rt, ref);
@@ -1233,6 +1242,7 @@ export function createEngine(
       handleMachine({
         rt,
         input: "$init",
+        source: "$init",
         value: true,
         previous: false,
         hasPrevious: true,
@@ -1302,7 +1312,11 @@ export function createEngine(
     });
   }
 
-  function fireInputTimer(rt: Runtime, input: InputRuntime): void {
+  function fireInputTimer(
+    rt: Runtime,
+    input: InputRuntime,
+    source: string,
+  ): void {
     const previous = input.last;
     const now = deps.now();
     input.last = now;
@@ -1315,6 +1329,7 @@ export function createEngine(
     enqueue({
       rt,
       input: input.name,
+      source,
       value: now,
       previous,
       hasPrevious: previous !== undefined,
@@ -1335,7 +1350,7 @@ export function createEngine(
     const handle = deps.setTimeout(() => {
       rt.timers.delete(key);
       if (!started) return;
-      fireInputTimer(rt, input);
+      fireInputTimer(rt, input, timerSource(every));
       armOneTimer(rt, input, every, key);
     }, ms);
     rt.timers.set(key, handle);
@@ -1360,7 +1375,7 @@ export function createEngine(
       () => {
         rt.timers.delete(key);
         if (!started) return;
-        fireInputTimer(rt, input);
+        fireInputTimer(rt, input, timerSource(timer));
         armAstroTimer(rt, input, timer, key);
       },
       Math.max(0, next - from),
@@ -1381,7 +1396,7 @@ export function createEngine(
       () => {
         rt.timers.delete(key);
         if (!started) return;
-        fireInputTimer(rt, input);
+        fireInputTimer(rt, input, timerSource(timer));
         armCronTimer(rt, input, timer, key);
       },
       Math.max(0, next - from),
@@ -1408,6 +1423,7 @@ export function createEngine(
         enqueue({
           rt,
           input: input.name,
+          source: name,
           value,
           previous,
           hasPrevious,
@@ -1451,6 +1467,7 @@ export function createEngine(
           enqueue({
             rt,
             input,
+            source: input,
             value,
             previous,
             hasPrevious,
@@ -1474,6 +1491,7 @@ export function createEngine(
         enqueue({
           rt,
           input: source.name,
+          source: input,
           value,
           previous,
           hasPrevious,
@@ -1587,6 +1605,7 @@ export function createEngine(
         enqueue({
           rt,
           input: "$start",
+          source: "$start",
           value: startedAt,
           previous: 0,
           hasPrevious: false,
@@ -1629,6 +1648,7 @@ export function createEngine(
           enqueue({
             rt,
             input: input.name,
+            source: change.id,
             value: change.val,
             previous,
             hasPrevious,
@@ -1651,6 +1671,7 @@ export function createEngine(
           enqueue({
             rt,
             input: "$self",
+            source: "$self",
             value: change.val,
             hasPrevious: false,
             depth: 0,
