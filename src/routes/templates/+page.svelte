@@ -298,7 +298,7 @@
         <input
           type="search"
           placeholder={group === "code"
-            ? "Search name or code…"
+            ? "Search name, description or code…"
             : "Search name or part…"}
           bind:value={search}
         />

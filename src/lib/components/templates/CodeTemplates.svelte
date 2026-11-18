@@ -206,6 +206,7 @@
         kind: "formula",
         id: template.id,
         name: "New formula",
+        description: "",
         preview: "",
         builtin: false,
         search: "",
@@ -223,6 +224,7 @@
         kind: "function",
         id: template.id,
         name: "New snippet",
+        description: "",
         preview: "",
         builtin: false,
         search: "",
@@ -340,7 +342,7 @@
       <div class="filter-bar">
         <input
           type="search"
-          placeholder="Search name or code…"
+          placeholder="Search name, description or code…"
           bind:value={search}
         />
         <button
@@ -371,14 +373,20 @@
               class="item-line"
               onclick={(event) => onLineClick(event, entry)}
             >
-              <Icon value={typeIcon(entry)} size={18} />
+              <span
+                class="type"
+                title={entry.kind === "formula" ? "Formula" : "Function"}
+              >
+                <Icon value={typeIcon(entry)} size={18} />
+              </span>
               <button type="button" class="name" onclick={() => open(entry)}>
                 {entry.name}
               </button>
-              <span class="badge"
-                >{entry.kind === "formula" ? "Formula" : "Function"}</span
-              >
-              <code class="preview">{entry.preview}</code>
+              {#if entry.description}
+                <span class="preview description">{entry.description}</span>
+              {:else}
+                <code class="preview">{entry.preview}</code>
+              {/if}
               <span class="item-actions">
                 {#if isOpen(entry)}
                   <IconButton
@@ -579,6 +587,14 @@
     font-family: var(--font-code);
     font-size: var(--body-sm);
     color: var(--text-muted);
+  }
+
+  .preview.description {
+    font-family: var(--font-family);
+  }
+
+  .type {
+    display: inline-flex;
   }
 
   .item-actions {
