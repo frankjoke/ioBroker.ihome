@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Input, InputSource, LogicDef, TimerSpec } from "$logic/types";
+  import type { Input, LogicDef } from "$logic/types";
   import { onMount } from "svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { stateIdFor, variableNameFor } from "$lib/config/variables";
@@ -13,7 +13,6 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import MultiStateField from "./MultiStateField.svelte";
   import StateRefField from "./StateRefField.svelte";
-  import VariableModal from "./VariableModal.svelte";
   import TimerModal from "./TimerModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { timerLabel } from "$logic/timer-ops";
@@ -46,8 +45,6 @@
 
   /** Deleting an input always asks first. */
   let pendingDelete = $state<string | null>(null);
-  /** The add-variable dialog: name and source in one step. */
-  let addingVariable = $state(false);
   /** The event whose + State opens the picker. */
   let sourceFor = $state<string | null>(null);
   /** The timer being added/edited (index null = new). */
@@ -118,17 +115,14 @@
     toggle(name);
   }
 
-  function add(kind: "variable" | "event") {
+  function add() {
     let index = Object.keys(inputs).length + 1;
-    let name = kind === "event" ? `event${index}` : `variable${index}`;
-    while (name in inputs) {
-      name = `${kind === "event" ? "event" : "variable"}${++index}`;
-    }
-    const from: InputSource =
-      kind === "event"
-        ? { type: "state", ref: "", refs: [] }
-        : { type: "state", ref: "" };
-    onchange({ ...inputs, [name]: { from, kind } });
+    let name = `event${index}`;
+    while (name in inputs) name = `event${++index}`;
+    onchange({
+      ...inputs,
+      [name]: { from: { type: "state", ref: "", refs: [] }, kind: "event" },
+    });
     editing = name;
   }
 
@@ -200,14 +194,7 @@
   <div class="inputs-head">
     <span class="label-mono">Local variables &amp; events</span>
     <span class="add-slot">
-      <button
-        type="button"
-        class="btn btn-sm"
-        onclick={() => (addingVariable = true)}
-      >
-        <span class="material-symbols-outlined">add</span> Variable
-      </button>
-      <button type="button" class="btn btn-sm" onclick={() => add("event")}>
+      <button type="button" class="btn btn-sm" onclick={add}>
         <span class="material-symbols-outlined">add</span> Event
       </button>
     </span>
@@ -411,26 +398,6 @@
       timerEdit = null;
     }}
     onCancel={() => (timerEdit = null)}
-  />
-{/if}
-
-{#if addingVariable}
-  <VariableModal
-    objects={ioBroker.objects}
-    {rooms}
-    {roomsOf}
-    enums={ioBroker.enums}
-    logics={otherLogics}
-    existing={Object.keys(inputs)}
-    onCreate={(name, ref) => {
-      onchange({
-        ...inputs,
-        [name]: { from: { type: "state", ref }, kind: "variable" },
-      });
-      editing = name;
-      addingVariable = false;
-    }}
-    onCancel={() => (addingVariable = false)}
   />
 {/if}
 
