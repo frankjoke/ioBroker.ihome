@@ -5,6 +5,10 @@
     templates,
     error = "",
     warning = "",
+    title = "Apply a template",
+    intro = "Replaces this tile's slots, size and look with the template. Its state or device source stays the anchor.",
+    confirmLabel = "Apply template",
+    confirmIcon = "file_open",
     onPick,
     onClose,
   }: {
@@ -13,6 +17,10 @@
     error?: string;
     /** What the tile loses when it reads more than one source. */
     warning?: string;
+    title?: string;
+    intro?: string;
+    confirmLabel?: string;
+    confirmIcon?: string;
     onPick: (template: Template) => void;
     onClose: () => void;
   } = $props();
@@ -42,18 +50,10 @@
   }}
 />
 
-<div
-  class="modal"
-  role="dialog"
-  aria-modal="true"
-  aria-label="Apply a template"
->
+<div class="modal" role="dialog" aria-modal="true" aria-label={title}>
   <div class="modal-card card">
-    <h3>Apply a template</h3>
-    <p class="hint text-muted">
-      Replaces this tile's slots, size and look with the template. Its state or
-      device source stays the anchor.
-    </p>
+    <h3>{title}</h3>
+    <p class="hint text-muted">{intro}</p>
     {#if warning}
       <p class="hint text-warning">{warning}</p>
     {/if}
@@ -94,9 +94,9 @@
         onclick={() => selected && onPick(selected)}
       >
         <span class="material-symbols-outlined" aria-hidden="true"
-          >file_open</span
+          >{confirmIcon}</span
         >
-        Apply template
+        {confirmLabel}
       </button>
     </div>
   </div>
