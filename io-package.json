@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "news": {
+      "0.4.2": {
+        "en": "Per-logic reload: saving a logic now restarts only that logic, while unchanged logics keep their memory, states and timers. Shared state and timer maps, one timer per schedule, richer logic inputs ($value/$previous/$input/$source, statements, state collections, timer inputs), page memory for scroll/open row/tab, template descriptions with type tooltips, and device creation from a template on the Devices page.",
+        "de": "Neuladen pro Logik: Beim Speichern wird nur noch die geänderte Logik neu gestartet; unveränderte Logiken behalten Speicher, Zustände und Timer. Gemeinsame Zustands- und Timer-Maps, ein Timer pro Zeitplan, erweiterte Logik-Eingänge ($value/$previous/$input/$source, Statements, Zustandssammlungen, Timer-Eingänge), Seitengedächtnis für Scrollposition/offene Zeile/Tab, Vorlagenbeschreibungen mit Typ-Tooltip und Geräteanlage aus einer Vorlage auf der Geräte-Seite."
+      },
       "0.4.1": {
         "en": "External access management in Server & Security (Caddy logins with hashed passwords, a generated import snippet, explicit validate/reload), icon twins that follow binary states, built-in role/template defaults, every installed icon adapter as an icon source, and UI polish (stronger tile edges, one keyboard focus ring, scroll padding, reduced-motion support).",
         "de": "Externer-Zugriff-Verwaltung unter Server & Sicherheit (Caddy-Logins mit gehashten Passwörtern, generierte Import-Datei, ausdrückliches Prüfen/Neuladen), Icon-Zwillingspaare für binäre Zustände, integrierte Rollen-/Vorlagen-Standardicons, alle installierten Icon-Adapter als Icon-Quelle und UI-Feinschliff (kräftigere Kachelränder, ein Tastatur-Fokusring, Scroll-Abstand, Unterstützung für reduzierte Bewegung)."
