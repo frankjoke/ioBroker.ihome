@@ -37,6 +37,8 @@
     roomsOf as roomsOfEnum,
   } from "$lib/config/rooms";
   import { VARIABLES_GUIDE } from "$lib/config/page-guides";
+  import { patchView, readView } from "$lib/stores/page-view";
+  import { onMount } from "svelte";
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const variables = $derived(getVariables());
@@ -60,6 +62,24 @@
   let kindFilter = $state<"" | "state" | "constant">("");
   let sortDir = $state<"asc" | "desc">("asc");
   let showPageHelp = $state(false);
+  let restoreId = $state("");
+  let wroteOpen = false;
+
+  onMount(() => {
+    restoreId = readView("/variables")?.openId ?? "";
+  });
+  $effect(() => {
+    if (!restoreId) return;
+    const variable = variables.find((item) => item.id === restoreId);
+    if (!variable) return;
+    restoreId = "";
+    startEdit(variable);
+  });
+  $effect(() => {
+    if (!wroteOpen && editing === null) return;
+    wroteOpen = true;
+    patchView("/variables", { openId: editing?.id ?? null });
+  });
 
   const shown = $derived.by(() => {
     const q = search.trim().toLowerCase();

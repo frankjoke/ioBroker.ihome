@@ -38,6 +38,7 @@
     getPickerValue,
   } from "$lib/picker-values.svelte.js";
   import { takeRequestedLogicConfig } from "$lib/pages.js";
+  import { patchView, readView } from "$lib/stores/page-view";
   import { LOGIC_GUIDE } from "$lib/config/page-guides";
 
   const doc = $derived(getLogicDocument());
@@ -60,21 +61,41 @@
   let inlineForm: HTMLElement | undefined = $state();
 
   $effect(() => {
-    if (selectedId && inlineForm) {
-      const reduce = globalThis.matchMedia?.(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      inlineForm.scrollIntoView({
-        block: "nearest",
-        behavior: reduce ? "auto" : "smooth",
-      });
+    if (!selectedId || !inlineForm) return;
+    if (skipAutoScroll) {
+      skipAutoScroll = false;
+      return;
     }
+    const reduce = globalThis.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    inlineForm.scrollIntoView({
+      block: "nearest",
+      behavior: reduce ? "auto" : "smooth",
+    });
   });
 
   /** A template apply asks for its generated logic to be opened on arrival. */
   let requestedId = $state("");
+  let restoreId = $state("");
+  let wroteOpen = false;
+  let skipAutoScroll = false;
   onMount(() => {
     requestedId = takeRequestedLogicConfig();
+    if (!requestedId) restoreId = readView("/logic")?.openId ?? "";
+  });
+  $effect(() => {
+    if (!restoreId) return;
+    const logic = doc.logics.find((item) => item.id === restoreId);
+    if (!logic) return;
+    restoreId = "";
+    skipAutoScroll = true;
+    openLogic(logic);
+  });
+  $effect(() => {
+    if (!wroteOpen && selectedId === null) return;
+    wroteOpen = true;
+    patchView("/logic", { openId: selectedId });
   });
   $effect(() => {
     if (!requestedId) return;

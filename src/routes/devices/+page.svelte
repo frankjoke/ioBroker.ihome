@@ -40,6 +40,7 @@
   } from "$lib/pages.js";
   import { openSheet } from "$lib/stores/sheet.svelte.js";
   import type { Device, EnrichedControl } from "$lib/types/device";
+  import { patchView, readView } from "$lib/stores/page-view";
 
   let editing = $state<Device | null>(null);
   /** The embedded form: its save, and whether it has unsaved changes. */
@@ -156,10 +157,11 @@
     showForm = true;
   }
 
-  function editDevice(d: Device) {
+  function editDevice(d: Device, scroll = true) {
     formDirty = false;
     editing = d;
     showForm = true;
+    if (!scroll) return;
     // The editor sits under the device; bring it into view so a device far
     // down the list does not look un-edited at the top of the page.
     const reduce = globalThis.matchMedia?.(
@@ -256,12 +258,28 @@
   // A Ctrl/Cmd+click on a tile lands here with a device to open. The effect
   // waits for the registry, in case the request arrives before it is loaded.
   let requestedId = $state("");
+  let restoreId = $state("");
+  let wroteOpen = false;
   // A tile editor round trip leaves its tile address pending — offer the way
   // back to that tile (the layout route still takes and clears it).
   let backToTile = $state(false);
   onMount(() => {
     requestedId = takeRequestedDeviceConfig();
     backToTile = peekRequestedLayout() !== null;
+    if (!requestedId) restoreId = readView("/devices")?.openId ?? "";
+  });
+  $effect(() => {
+    if (!restoreId) return;
+    const device = devices.find((item) => item.id === restoreId);
+    if (!device) return;
+    restoreId = "";
+    editDevice(device, false);
+  });
+  $effect(() => {
+    const openId = showForm ? (editing?.id ?? null) : null;
+    if (!wroteOpen && openId === null) return;
+    wroteOpen = true;
+    patchView("/devices", { openId });
   });
   $effect(() => {
     if (!requestedId) return;

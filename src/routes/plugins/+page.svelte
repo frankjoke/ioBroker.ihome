@@ -24,6 +24,7 @@
     savePlugin,
   } from "$lib/stores/plugins.svelte";
   import type { PluginView } from "$adapter/plugin-admin";
+  import { patchView, readView } from "$lib/stores/page-view";
 
   type View = "plugins" | "pages" | "help";
 
@@ -45,8 +46,18 @@
     },
   ];
 
-  let view = $state<View>("plugins");
-  let tabValue = $state<View | null>("plugins");
+  const savedView = readView("/plugins");
+  const savedTab =
+    savedView?.tab === "plugins" ||
+    savedView?.tab === "pages" ||
+    savedView?.tab === "help"
+      ? savedView.tab
+      : "plugins";
+  let view = $state<View>(savedTab);
+  let tabValue = $state<View | null>(savedTab);
+  $effect(() => {
+    patchView("/plugins", { tab: view });
+  });
   let pagesRef = $state<{ startCreate: () => void } | null>(null);
   let pagesCanCreate = $state(false);
   let busy = $state(false);
@@ -200,7 +211,13 @@
     {:else if plugins.length === 0}
       <p class="hint text-muted">No plugins found.</p>
     {:else}
-      <PluginList {plugins} {busy} onToggle={toggle} />
+      <PluginList
+        {plugins}
+        {busy}
+        onToggle={toggle}
+        initialOpenId={savedView?.openId ?? ""}
+        onselect={(id) => patchView("/plugins", { openId: id })}
+      />
     {/if}
   </div>
 

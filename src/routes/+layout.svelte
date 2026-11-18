@@ -1,8 +1,8 @@
 <script>
   import "../app.css";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { base } from "$app/paths";
-  import { goto } from "$app/navigation";
+  import { afterNavigate, beforeNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
   import { building, dev } from "$app/environment";
   import {
@@ -64,8 +64,87 @@
   } from "$lib/stores/connection.svelte";
   import { toast } from "$lib/stores/toasts.svelte";
   import { initIconPool } from "$lib/stores/icon-pool.svelte";
+  import { flushViews, patchView, readView } from "$lib/stores/page-view";
 
   let { children } = $props();
+
+  /** Display routes own the viewport; only configuration pages remember a place. */
+  const remembersPosition = (id) => !!id && id !== "/" && !id.startsWith("/p/");
+
+  let restoringScroll = true;
+
+  // The last user scroll is the offset to remember; navigation itself never
+  // writes one (SvelteKit also runs beforeNavigate for the initial load).
+  const rememberScroll = () => {
+    if (restoringScroll) return;
+    const id = page.route?.id;
+    if (remembersPosition(id)) patchView(id, { scrollY: window.scrollY });
+  };
+
+  beforeNavigate(() => {
+    flushViews();
+  });
+
+  /**
+   * The content often arrives after the route does (documents, plugins), so the
+   * saved offset is retried for a moment until the page is tall enough. A
+   * wheel/touch/key cancels it, so returning never fights the user.
+   */
+  const restoreScroll = (target) => {
+    restoringScroll = true;
+    const started = performance.now();
+    let cancelled = false;
+    const finish = (save) => {
+      if (cancelled) return;
+      cancelled = true;
+      restoringScroll = false;
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+      window.removeEventListener("keydown", stop);
+      if (save) rememberScroll();
+    };
+    // A user scroll wins; a timeout keeps the stored target for the next visit.
+    const stop = () => finish(true);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchstart", stop, { passive: true });
+    window.addEventListener("keydown", stop);
+    const attempt = () => {
+      if (cancelled) return;
+      window.scrollTo({ top: target, behavior: "auto" });
+      if (
+        Math.abs(window.scrollY - target) <= 2 ||
+        performance.now() - started > 2500
+      ) {
+        finish(false);
+        return;
+      }
+      requestAnimationFrame(attempt);
+    };
+    requestAnimationFrame(attempt);
+  };
+
+  const restoreHere = () => {
+    const id = page.route?.id;
+    const y = remembersPosition(id) ? readView(id)?.scrollY : undefined;
+    if (y === undefined) {
+      restoringScroll = false;
+      return;
+    }
+    void tick().then(() => restoreScroll(y));
+  };
+
+  afterNavigate(restoreHere);
+
+  onMount(() => {
+    window.addEventListener("scroll", rememberScroll, { passive: true });
+    restoreHere(); // afterNavigate does not fire for the initial hash route
+    const save = () => flushViews();
+    window.addEventListener("pagehide", save);
+    return () => {
+      window.removeEventListener("scroll", rememberScroll);
+      window.removeEventListener("pagehide", save);
+    };
+  });
 
   const storage = defineStorage(
     ["hostPort", { init: "" }],

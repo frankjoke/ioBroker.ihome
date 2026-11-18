@@ -15,6 +15,7 @@
     type TemplateKind,
   } from "$lib/config/template-file";
   import { installTemplateFile } from "$lib/template-import";
+  import { patchView, readView } from "$lib/stores/page-view";
 
   type Group = "code" | "templates" | "icons" | "help";
 
@@ -42,18 +43,35 @@
   ];
 
   /** The app is hash-routed, so `?type=` lives inside `page.url.hash`. */
-  function requestedGroup(): Group {
+  function hashQuery(): URLSearchParams {
     const hash = page.url.hash;
-    const hashQuery = hash.includes("?")
-      ? hash.slice(hash.indexOf("?") + 1)
-      : "";
-    const value =
-      page.url.searchParams.get("type") ??
-      new URLSearchParams(hashQuery).get("type");
+    return new URLSearchParams(
+      hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "",
+    );
+  }
+
+  function requestedGroup(): Group {
+    const value = page.url.searchParams.get("type") ?? hashQuery().get("type");
     return templateKind(value);
   }
 
-  const initialGroup = requestedGroup();
+  function hasRequestedGroup(): boolean {
+    return !!(page.url.searchParams.get("type") ?? hashQuery().get("type"));
+  }
+
+  function rememberedGroup(value: string | undefined): Group | undefined {
+    return value === "code" ||
+      value === "templates" ||
+      value === "icons" ||
+      value === "help"
+      ? value
+      : undefined;
+  }
+
+  const savedView = readView("/templates");
+  const initialGroup: Group = hasRequestedGroup()
+    ? requestedGroup()
+    : (rememberedGroup(savedView?.tab) ?? requestedGroup());
   let group = $state<Group>(initialGroup);
   let tabValue = $state<Group | null>(initialGroup);
   let dirty = $state(false);
@@ -65,7 +83,11 @@
     file: TemplateFile;
     name: string;
   } | null>(null);
-  let focus = $state<{ kind: TemplateKind; id: string } | null>(null);
+  let focus = $state<{ kind: TemplateKind; id: string } | null>(
+    savedView?.openId && savedView.kind
+      ? { kind: savedView.kind as TemplateKind, id: savedView.openId }
+      : null,
+  );
   let search = $state("");
   let sortDir = $state<"asc" | "desc">("asc");
   let codeRef = $state<{
@@ -120,6 +142,22 @@
     focus = { kind, id };
     importError = "";
   }
+
+  /** Remember which row is unfolded, for the next visit to this page. */
+  function rememberEntry(entry: { kind: string; id: string } | null): void {
+    patchView("/templates", {
+      openId: entry?.id ?? null,
+      kind: entry
+        ? entry.kind === "function"
+          ? "snippet"
+          : entry.kind
+        : undefined,
+    });
+  }
+
+  $effect(() => {
+    patchView("/templates", { tab: group });
+  });
 
   function onImport(file: TemplateFile, name: string): string | null {
     if (dirty) {
@@ -285,6 +323,7 @@
         bind:sortDir
         focus={codeFocus}
         onFocusApplied={() => (focus = null)}
+        onselect={rememberEntry}
       />
     {:else}
       <TemplateBrowser
@@ -294,6 +333,7 @@
         bind:sortDir
         focus={templateFocus}
         onFocusApplied={() => (focus = null)}
+        onselect={rememberEntry}
       />
     {/if}
   {/if}

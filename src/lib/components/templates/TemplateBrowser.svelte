@@ -57,6 +57,7 @@
     sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
+    onselect,
   }: {
     dirty?: boolean;
     search?: string;
@@ -66,6 +67,8 @@
       id: string;
     } | null;
     onFocusApplied?: () => void;
+    /** Reports the unfolded row (or null) so the page can remember it. */
+    onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
   const local = isLocalUi();
@@ -281,6 +284,7 @@
     selected = null;
     editorDirty = false;
     bundleDraft = null;
+    onselect?.(null);
   }
 
   function start(entry: TemplateEntry) {
@@ -288,6 +292,7 @@
     selected = entry;
     editorDirty = false;
     error = "";
+    onselect?.({ kind: entry.kind, id: entry.id });
   }
 
   function open(entry: TemplateEntry) {
@@ -305,11 +310,11 @@
     }
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
-    lastFocus = key;
     const entry = entries.find(
       (item) => item.kind === focus.kind && item.id === focus.id,
     );
     if (!entry) return;
+    lastFocus = key;
     start(entry);
     onFocusApplied?.();
   });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import PluginEditor from "./PluginEditor.svelte";
+  import { untrack } from "svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
@@ -18,6 +19,8 @@
     plugins,
     busy = false,
     onToggle,
+    onselect,
+    initialOpenId = "",
   }: {
     plugins: PluginView[];
     busy?: boolean;
@@ -26,6 +29,10 @@
       field: "enabled" | "debug",
       value: boolean,
     ) => void;
+    /** Reports the unfolded plugin (or null) so the page can remember it. */
+    onselect?: (id: string | null) => void;
+    /** The plugin that was open on the last visit, when it still exists. */
+    initialOpenId?: string;
   } = $props();
 
   const homeAdapter = ioBroker.namespace.split(".")[0] ?? "ihome";
@@ -33,7 +40,24 @@
     adapterIcon(ioBroker.objects as Map<string, any>, homeAdapter),
   );
 
-  let selectedId = $state("");
+  let selectedId = $state(
+    untrack(() =>
+      initialOpenId && plugins.some((plugin) => plugin.id === initialOpenId)
+        ? initialOpenId
+        : "",
+    ),
+  );
+  let restored = untrack(() => selectedId !== "");
+  $effect(() => {
+    if (restored || !initialOpenId) return;
+    if (!plugins.some((plugin) => plugin.id === initialOpenId)) return;
+    restored = true;
+    selectedId = initialOpenId;
+  });
+  $effect(() => {
+    if (!restored && !selectedId) return;
+    onselect?.(selectedId || null);
+  });
   let editorEl = $state<{ save: () => void } | undefined>();
   let editorDirty = $state(false);
   let editorValid = $state(true);

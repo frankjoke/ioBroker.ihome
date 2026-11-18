@@ -40,6 +40,7 @@
     sortDir = $bindable<"asc" | "desc">("asc"),
     focus = null,
     onFocusApplied,
+    onselect,
   }: {
     formulaOnly?: boolean;
     embedded?: boolean;
@@ -48,6 +49,8 @@
     sortDir?: "asc" | "desc";
     focus?: { kind: "formula" | "function"; id: string } | null;
     onFocusApplied?: () => void;
+    /** Reports the unfolded row (or null) so the page can remember it. */
+    onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
 
@@ -141,6 +144,7 @@
     draft = null;
     editorDirty = false;
     editorProblem = null;
+    onselect?.(null);
   }
 
   function start(entry: CodeEntry) {
@@ -162,6 +166,7 @@
     selected = entry;
     editorDirty = false;
     editorProblem = null;
+    onselect?.({ kind: entry.kind, id: entry.id });
   }
 
   function open(entry: CodeEntry) {
@@ -179,11 +184,11 @@
     }
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
-    lastFocus = key;
     const entry = entries.find(
       (item) => item.kind === focus.kind && item.id === focus.id,
     );
     if (!entry) return;
+    lastFocus = key;
     start(entry);
     onFocusApplied?.();
   });
@@ -225,6 +230,7 @@
     }
     editorDirty = false;
     editorProblem = null;
+    onselect?.(null);
   }
 
   function save(template: FormulaTemplate | FunctionTemplate) {
