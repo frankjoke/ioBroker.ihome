@@ -107,10 +107,18 @@ export interface LogicTestResult {
 export interface Engine {
   subscriptions(): string[];
   start(): void;
+  /** Apply a new document; only added, changed and removed logics restart. */
+  update(doc: LogicDocument): EngineUpdate;
   stop(): void;
   onStateChange(change: StateChange): void;
   memoryValue(name: string): unknown;
   test(logicId: string): LogicTestResult;
+}
+
+export interface EngineUpdate {
+  added: string[];
+  changed: string[];
+  removed: string[];
 }
 
 interface InputRuntime {
@@ -134,6 +142,8 @@ interface Runtime {
   id: string;
   /** Position in the document; dispatch order follows it. */
   seq: number;
+  /** What was linked when the runtime was built, for update comparisons. */
+  fingerprint: string;
   def: LogicDef;
   inputs: Map<string, InputRuntime>;
   output: Output;
@@ -213,16 +223,9 @@ export function createEngine(
   const states = createStateMap<Runtime>();
   const logicIndex = createLogicIndex<Runtime>();
   const issues = validateLogicDocument(doc);
-  const declaredMemory = new Set<string>(
-    (doc.memory ?? []).map((entry) => entry.name),
-  );
-  for (const def of doc.logics) {
-    if (def.output?.scope === "memory") {
-      declaredMemory.add(def.output.name ?? def.id);
-    }
-  }
+  let declaredMemory = declaredMemoryOf(doc);
+  let currentDoc = doc;
 
-  const runtimes: Runtime[] = [];
   const resolveStateId = (ref: string): string | undefined => {
     if (ref.startsWith("$logic.")) return undefined;
     if (ref.includes(".")) return ref;
@@ -230,17 +233,53 @@ export function createEngine(
     return variable?.kind === "state" ? variable.stateId : undefined;
   };
 
-  for (const [seq, def] of doc.logics.entries()) {
-    if (def.enabled === false) continue;
+  /** The state an output writes to, without a runtime (for fingerprints). */
+  function defOutputTarget(def: LogicDef): string | undefined {
+    const output = def.output;
+    if (!output) return undefined;
+    if (output.scope === "logic") {
+      return ownFrom ? `${ownFrom}.Logic.${def.id}` : undefined;
+    }
+    if (output.scope !== "state") return undefined;
+    return resolveStateId(output.ref) ?? output.ref;
+  }
+
+  function fingerprintOf(def: LogicDef): string {
+    return JSON.stringify({ def, outputTarget: defOutputTarget(def) });
+  }
+
+  function declaredMemoryOf(document: LogicDocument): Set<string> {
+    const names = new Set<string>(
+      (document.memory ?? []).map((entry) => entry.name),
+    );
+    for (const entry of document.logics) {
+      if (entry.output?.scope === "memory") {
+        names.add(entry.output.name ?? entry.id);
+      }
+    }
+    return names;
+  }
+
+  function logValidationErrors(
+    id: string,
+    issues: ReturnType<typeof validateLogicDocument>,
+  ): void {
+    const messages = issues
+      .filter((issue) => issue.logicId === id && issue.severity === "error")
+      .map((issue) => `${issue.path}: ${issue.message}`)
+      .join("; ");
+    deps.log("warn", id, `not started — ${messages}`);
+  }
+
+  function buildRuntime(
+    def: LogicDef,
+    seq: number,
+    issues: ReturnType<typeof validateLogicDocument>,
+  ): Runtime | undefined {
+    if (def.enabled === false) return undefined;
     if (logicHasErrors(issues, def.id)) {
-      const messages = issues
-        .filter(
-          (issue) => issue.logicId === def.id && issue.severity === "error",
-        )
-        .map((issue) => `${issue.path}: ${issue.message}`)
-        .join("; ");
-      deps.log("warn", def.id, `not started — ${messages}`);
-      continue;
+      logValidationErrors(def.id, issues);
+      return undefined;
     }
     const inputs = new Map<string, InputRuntime>();
     for (const [name, input] of Object.entries(def.inputs ?? {})) {
@@ -286,6 +325,7 @@ export function createEngine(
       id: def.id,
       seq,
       def,
+      fingerprint: fingerprintOf(def),
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
@@ -366,9 +406,15 @@ export function createEngine(
       });
     } catch (error) {
       deps.log("warn", def.id, errorText(error));
-      continue;
+      return undefined;
     }
-    runtimes.push(rt);
+    return rt;
+  }
+
+  let runtimes: Runtime[] = [];
+  for (const [seq, def] of doc.logics.entries()) {
+    const rt = buildRuntime(def, seq, issues);
+    if (rt) runtimes.push(rt);
   }
 
   /** Register a runtime's input and output links in the shared maps. */
@@ -1542,11 +1588,138 @@ export function createEngine(
       }
       return runFunction(rt, 0, "test");
     },
+    update(nextDoc) {
+      if (!started) throw new Error("logic engine is not started");
+      const nextIssues = validateLogicDocument(nextDoc);
+      const nextDeclared = declaredMemoryOf(nextDoc);
+      const oldById = new Map(runtimes.map((rt) => [rt.id, rt]));
+      const prepared = new Map<string, Runtime>();
+      const unchanged: Runtime[] = [];
+      const planned = new Set<string>();
+      const added: string[] = [];
+      const changed: string[] = [];
+      for (const [seq, def] of nextDoc.logics.entries()) {
+        if (def.enabled === false) continue;
+        if (logicHasErrors(nextIssues, def.id)) {
+          logValidationErrors(def.id, nextIssues);
+          continue;
+        }
+        planned.add(def.id);
+        const old = oldById.get(def.id);
+        if (!old) {
+          added.push(def.id);
+          const rt = buildRuntime(def, seq, nextIssues);
+          if (rt) prepared.set(def.id, rt);
+          continue;
+        }
+        const fingerprint = fingerprintOf(def);
+        if (fingerprint === old.fingerprint) {
+          old.seq = seq;
+          unchanged.push(old);
+          continue;
+        }
+        changed.push(def.id);
+        const rt = buildRuntime(def, seq, nextIssues);
+        if (rt) prepared.set(def.id, rt);
+      }
+      const keep = new Set(unchanged.map((rt) => rt.id));
+      const stopping = runtimes.filter((rt) => !keep.has(rt.id));
+      const changedSet = new Set(changed);
+      const removed = stopping
+        .map((rt) => rt.id)
+        .filter((id) => !changedSet.has(id));
+
+      // Document memory: untouched entries keep their live value. A removed
+      // declaration goes only when no logic output declares the name as well.
+      const oldDeclarations = currentDoc.memory ?? [];
+      const nextDeclarations = nextDoc.memory ?? [];
+      const nextByName = new Map(
+        nextDeclarations.map((entry) => [entry.name, entry]),
+      );
+      for (const entry of nextDeclarations) {
+        const old = oldDeclarations.find((prev) => prev.name === entry.name);
+        if (
+          !old ||
+          old.type !== entry.type ||
+          !Object.is(old.initial, entry.initial)
+        ) {
+          memories.seed(entry.name, entry.initial, {
+            ts: deps.now(),
+            from: "init",
+          });
+        }
+      }
+      for (const old of oldDeclarations) {
+        if (!nextByName.has(old.name) && !nextDeclared.has(old.name)) {
+          memories.remove(old.name);
+        }
+      }
+
+      for (const rt of stopping) {
+        clearTimer(rt);
+        rt.tasks?.stop();
+        rt.pluginTasks?.stop();
+        unlinkRuntime(rt);
+        const output = rt.output;
+        if (output.scope !== "memory") continue;
+        const name = output.name ?? rt.id;
+        const declaration = nextByName.get(name);
+        if (declaration) {
+          memories.seed(name, declaration.initial, {
+            ts: deps.now(),
+            from: "init",
+          });
+        } else {
+          const shared = nextDoc.logics.some(
+            (def) =>
+              def.id !== rt.id &&
+              def.output?.scope === "memory" &&
+              (def.output.name ?? def.id) === name,
+          );
+          // A name another surviving logic also declares is left alone.
+          if (!shared) memories.remove(name);
+        }
+      }
+
+      for (const rt of prepared.values()) linkRuntime(rt);
+      runtimes = [...unchanged, ...prepared.values()].sort(
+        (a, b) => a.seq - b.seq,
+      );
+      currentDoc = nextDoc;
+      declaredMemory = nextDeclared;
+
+      for (const rt of prepared.values()) {
+        if (rt.def.kind !== "function") continue;
+        rt.init = true;
+        if (rt.def.init?.run !== false) runFunction(rt, 0);
+        rt.init = false;
+      }
+      for (const rt of prepared.values()) {
+        if (rt.def.kind === "machine") startMachine(rt);
+      }
+      for (const rt of prepared.values()) addInputTimers(rt);
+      timers.armAll();
+      const startedAt = deps.now();
+      for (const rt of prepared.values()) {
+        if (rt.def.kind !== "machine") continue;
+        enqueue({
+          rt,
+          input: "$start",
+          source: "$start",
+          value: startedAt,
+          previous: 0,
+          hasPrevious: false,
+          depth: 0,
+          meta: { from: "start", self: true, ts: startedAt },
+        });
+      }
+      return { added, changed, removed };
+    },
     start() {
       if (started) return;
       started = true;
       for (const rt of runtimes) linkRuntime(rt);
-      for (const entry of doc.memory ?? []) {
+      for (const entry of currentDoc.memory ?? []) {
         memories.seed(entry.name, entry.initial, {
           ts: deps.now(),
           from: "init",
