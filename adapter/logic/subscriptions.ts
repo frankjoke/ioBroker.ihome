@@ -97,6 +97,16 @@ export function logicSubscriptions(
         if (id) ids.add(id);
       }
     }
+    if (def.kind === "machine") {
+      for (const state of Object.values(def.states ?? {})) {
+        for (const row of state.on ?? []) {
+          if (!row.on.startsWith("$var.")) continue;
+          if (inputNames.has(row.on)) continue;
+          const id = stateId(row.on.slice("$var.".length), resolveVariable);
+          if (id) ids.add(id);
+        }
+      }
+    }
     const target = outputTarget(def, ownFrom, resolveVariable);
     if (target) ids.add(target);
   }

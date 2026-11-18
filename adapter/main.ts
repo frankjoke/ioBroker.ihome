@@ -773,7 +773,9 @@ class IHome extends utils.Adapter {
         this.engine = next;
       } else {
         const result = this.engine.update(expanded.doc);
-        for (const id of [...result.changed, ...result.removed]) {
+        // Changed logics report their fresh reading during update; only the
+        // removed entries are stale.
+        for (const id of result.removed) {
           this.logicInfo.delete(id);
         }
       }

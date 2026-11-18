@@ -1481,7 +1481,9 @@ export function createEngine(
     previous: unknown,
     hasPrevious: boolean,
   ): void {
-    for (const binding of memories.links(name)) {
+    for (const binding of [...memories.links(name)].sort(
+      (a, b) => a.owner.seq - b.owner.seq,
+    )) {
       const rt = binding.owner;
       const input = rt.inputs.get(binding.input);
       if (!input) continue;
@@ -1719,6 +1721,8 @@ export function createEngine(
           const shared = nextDoc.logics.some(
             (def) =>
               def.id !== rt.id &&
+              def.enabled !== false &&
+              !logicHasErrors(nextIssues, def.id) &&
               def.output?.scope === "memory" &&
               (def.output.name ?? def.id) === name,
           );

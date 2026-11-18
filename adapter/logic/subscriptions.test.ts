@@ -162,3 +162,27 @@ it("uses the namespace for a logic output target", () => {
     "ihome.0.Logic.out",
   ]);
 });
+
+it("subscribes the state behind a $var row", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        start: "Idle",
+        output: { scope: "memory" },
+        states: {
+          Idle: { on: [{ on: "$var.Alarm", goto: "Hit" }] },
+          Hit: {},
+        },
+      },
+    ],
+  };
+  const resolve = (name: string) =>
+    name === "Alarm"
+      ? { kind: "state" as const, stateId: "0_userdata.0.FLAG" }
+      : undefined;
+  expect(logicSubscriptions(doc, resolve)).toEqual(["0_userdata.0.FLAG"]);
+});

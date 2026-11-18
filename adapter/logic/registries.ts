@@ -203,7 +203,19 @@ export function createMemoryMap<O extends Owner>(): MemoryMap<O> {
       return entries.get(name);
     },
     remove(name) {
-      entries.delete(name);
+      const entry = entries.get(name);
+      if (!entry) return;
+      if (entry.links.length === 0) {
+        entries.delete(name);
+        return;
+      }
+      // Readers stay linked; the value is gone without an event.
+      entry.value = undefined;
+      entry.previous = undefined;
+      entry.hasPrevious = false;
+      entry.changed = false;
+      entry.ts = undefined;
+      entry.from = undefined;
     },
     links(name) {
       return entries.get(name)?.links ?? [];

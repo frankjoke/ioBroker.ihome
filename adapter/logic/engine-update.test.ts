@@ -458,13 +458,26 @@ it("subscription set matches the pure function", () => {
         output: { scope: "state", ref: "0_userdata.0.R", type: "number" },
         expr: code('get("0_userdata.0.CODE")'),
       }),
+      {
+        id: "m",
+        name: "M",
+        kind: "machine",
+        start: "Idle",
+        output: { scope: "memory" },
+        states: {
+          Idle: { on: [{ on: "$var.Alarm", goto: "Hit" }] },
+          Hit: {},
+        },
+      },
     ],
   };
   const h = createHarness({ "0_userdata.0.E": 1 });
   const resolve = (name: string) =>
     name === "blind"
       ? { kind: "state" as const, stateId: "0_userdata.0.VAR" }
-      : undefined;
+      : name === "Alarm"
+        ? { kind: "state" as const, stateId: "0_userdata.0.FLAG" }
+        : undefined;
   const engine = createEngine(document, {
     ...h.deps,
     resolveVariable: resolve,
@@ -472,4 +485,75 @@ it("subscription set matches the pure function", () => {
   expect(engine.subscriptions().sort()).toEqual(
     logicSubscriptions(document, resolve).sort(),
   );
+});
+
+it("keeps a memory reader linked when its producer changes", () => {
+  const document = (pExpr: Expr, enabled = true): LogicDocument => ({
+    version: 3,
+    logics: [
+      fn("p", {
+        enabled,
+        inputs: { e: input("0_userdata.0.E") },
+        expr: pExpr,
+      }),
+      fn("r", {
+        inputs: {
+          m: { from: { type: "memory", ref: "p" }, kind: "event" },
+        },
+        expr: code('get("m") + 1'),
+      }),
+    ],
+  });
+  const { h, engine } = started(document(code('get("e") * 10')), {
+    "0_userdata.0.E": 1,
+  });
+  h.change("0_userdata.0.E", 2);
+  expect(engine.memoryValue("r")).toBe(21);
+  engine.update(document(code('get("e") * 10 + 0')));
+  h.change("0_userdata.0.E", 3);
+  expect(engine.memoryValue("r")).toBe(31);
+  engine.update(document(code('get("e") * 10 + 0'), false));
+  engine.update(document(code('get("e") * 10 + 0'), true));
+  h.change("0_userdata.0.E", 4);
+  expect(engine.memoryValue("r")).toBe(41);
+});
+
+it("dispatches memory readers in document order", () => {
+  const document = (order: string[]): LogicDocument => ({
+    version: 3,
+    logics: [
+      fn("p", {
+        inputs: { e: input("0_userdata.0.E") },
+        expr: code('get("e")'),
+      }),
+      ...order.map((id) =>
+        fn(id, {
+          inputs: {
+            m: { from: { type: "memory", ref: "p" }, kind: "event" },
+          },
+          output: {
+            scope: "state",
+            ref: `0_userdata.0.${id.toUpperCase()}`,
+            type: "number",
+          },
+          expr: code('get("m")'),
+        }),
+      ),
+    ],
+  });
+  const { h, engine } = started(document(["b", "c"]), {
+    "0_userdata.0.E": 1,
+  });
+  h.change("0_userdata.0.E", 2);
+  expect(h.writes.map((write) => write.id)).toEqual([
+    "0_userdata.0.B",
+    "0_userdata.0.C",
+  ]);
+  engine.update(document(["c", "b"]));
+  h.writes.length = 0;
+  h.change("0_userdata.0.E", 3);
+  expect(h.writes.map((write) => write.id)).toEqual([
+    "0_userdata.0.C",
+    "0_userdata.0.B",
+  ]);
 });
