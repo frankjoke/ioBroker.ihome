@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Template } from "$lib/types/display";
+  import { helpLine } from "$lib/config/template-entries";
 
   let {
     templates,
@@ -38,6 +39,12 @@
             .includes(q) ||
           String(template.type ?? "")
             .toLowerCase()
+            .includes(q) ||
+          String(template.description ?? "")
+            .toLowerCase()
+            .includes(q) ||
+          String(template.help ?? "")
+            .toLowerCase()
             .includes(q),
       )
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -67,12 +74,18 @@
           type="button"
           class="template-row"
           class:active={selected?.id === template.id}
+          title={template.type}
           onclick={() => (selected = template)}
         >
           <span class="name">{template.name}</span>
-          <span class="badge"
-            >{template.type}{template.builtin ? " · built-in" : ""}</span
+          <span class="detail"
+            >{template.description ||
+              helpLine(template.help ?? "") ||
+              template.type}</span
           >
+          {#if template.builtin}
+            <span class="badge">built-in</span>
+          {/if}
         </button>
       {/each}
       {#if shown.length === 0}
@@ -175,7 +188,22 @@
   }
 
   .template-row .name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 600;
+  }
+
+  .template-row .detail {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--body-sm);
+    color: var(--text-muted);
   }
 
   .template-row .badge {
