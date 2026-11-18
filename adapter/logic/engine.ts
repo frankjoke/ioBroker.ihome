@@ -10,6 +10,7 @@ import {
   type NameInfo,
 } from "./runtime";
 import { nextCron, timerSource } from "./timer-ops";
+import { collectRefs, type ResolveVariable } from "./subscriptions";
 import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
 import { createPluginQueue, type PluginQueue } from "./plugin-queue";
 import type { PluginReply } from "../plugin-ops";
@@ -76,12 +77,7 @@ export interface EngineDeps {
   callPlugin?(id: string, payload: unknown): Promise<PluginReply>;
   /** Publish a logic's live readout for the logic list. */
   report?(logicId: string, reading: LogicReading): void;
-  resolveVariable?(
-    name: string,
-  ):
-    | { kind: "const"; value: unknown }
-    | { kind: "state"; stateId: string }
-    | undefined;
+  resolveVariable?: ResolveVariable;
   /** The next astro time after `from`, in ms; undefined when no location. */
   nextAstro?(
     event: AstroEvent,
@@ -582,20 +578,10 @@ export function createEngine(
     const input = rt.inputs.get(ref);
     if (input) return undefined; // its sources are added explicitly below
     if (memory.has(ref) || declaredMemory.has(ref)) return undefined;
+    if (ref.startsWith("$logic.")) return undefined;
     if (ref.includes(".")) return ref;
     const variable = deps.resolveVariable?.(ref);
     return variable?.kind === "state" ? variable.stateId : undefined;
-  }
-
-  function collectRefs(value: unknown, out: string[]): void {
-    if (Array.isArray(value)) {
-      for (const item of value) collectRefs(item, out);
-    } else if (isRecord(value)) {
-      for (const [key, item] of Object.entries(value)) {
-        if (key === "ref" && typeof item === "string") out.push(item);
-        else collectRefs(item, out);
-      }
-    }
   }
 
   function subscriptions(): string[] {

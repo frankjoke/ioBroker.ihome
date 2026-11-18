@@ -3781,3 +3781,34 @@ it("rounds number items by their decimals when no conversion is given", () => {
     ack: true,
   });
 });
+
+it("does not subscribe to $logic pseudo states", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "producer",
+        name: "Producer",
+        kind: "function",
+        output: { scope: "memory" },
+        expr: code("1"),
+      },
+      {
+        id: "reader",
+        name: "Reader",
+        kind: "function",
+        inputs: {
+          x: {
+            from: { type: "state", ref: "$logic.producer" },
+            kind: "event",
+          },
+        },
+        output: { scope: "memory" },
+        expr: code('get("x")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  expect(engine.subscriptions()).toEqual([]);
+});

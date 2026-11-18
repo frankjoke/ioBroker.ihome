@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { subscriptionDiff } from "./subscriptions";
+import { logicSubscriptions, subscriptionDiff } from "./subscriptions";
 import { createEngine } from "./engine";
 import { createHarness } from "./testing";
 import type { LogicDocument } from "./types";
@@ -66,4 +66,99 @@ it("a disabled logic subscribes to nothing", () => {
   doc.logics[0].enabled = false;
   const h = createHarness({});
   expect(createEngine(doc, h.deps).subscriptions()).toEqual([]);
+});
+
+const mixedDoc = (): LogicDocument => ({
+  version: 3,
+  memory: [{ name: "MEM", type: "number", initial: 0 }],
+  logics: [
+    {
+      id: "producer",
+      name: "Producer",
+      kind: "function",
+      output: { scope: "memory" },
+      expr: { code: "1" },
+    },
+    {
+      id: "main",
+      name: "Main",
+      kind: "function",
+      inputs: {
+        s: {
+          from: {
+            type: "state",
+            ref: "0_userdata.0.SENSOR",
+            refs: ["0_userdata.0.SENSOR2"],
+          },
+          kind: "event",
+        },
+        m: { from: { type: "memory", ref: "MEM" }, kind: "event" },
+        t: { from: { type: "timer", every: "1h" }, kind: "event" },
+        l: {
+          from: { type: "state", ref: "$logic.producer" },
+          kind: "event",
+        },
+      },
+      output: { scope: "state", ref: "0_userdata.0.OUT", type: "number" },
+      expr: { code: 'get("0_userdata.0.CODE") + get("blind")' },
+    },
+    {
+      id: "off",
+      name: "Off",
+      enabled: false,
+      kind: "function",
+      inputs: {
+        x: { from: { type: "state", ref: "0_userdata.0.OFF" }, kind: "event" },
+      },
+      output: { scope: "memory" },
+      expr: { code: "1" },
+    },
+    {
+      id: "dup",
+      name: "Dup1",
+      kind: "function",
+      output: { scope: "memory" },
+      expr: { code: "1" },
+    },
+    {
+      id: "dup",
+      name: "Dup2",
+      kind: "function",
+      output: { scope: "memory" },
+      expr: { code: "2" },
+    },
+  ],
+});
+
+const mixedResolve = (name: string) =>
+  name === "blind"
+    ? { kind: "state" as const, stateId: "0_userdata.0.VAR" }
+    : undefined;
+
+it("collects the document's subscriptions without an engine", () => {
+  expect(logicSubscriptions(mixedDoc(), mixedResolve).sort()).toEqual([
+    "0_userdata.0.CODE",
+    "0_userdata.0.OUT",
+    "0_userdata.0.SENSOR",
+    "0_userdata.0.SENSOR2",
+    "0_userdata.0.VAR",
+  ]);
+});
+
+it("uses the namespace for a logic output target", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "out",
+        name: "Out",
+        kind: "function",
+        output: { scope: "logic", type: "number" },
+        expr: { code: "1" },
+      },
+    ],
+  };
+  expect(logicSubscriptions(doc, undefined, "ihome.0")).toEqual([
+    "ihome.0.Logic.out",
+  ]);
 });
