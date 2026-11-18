@@ -3331,7 +3331,7 @@
     min-width: 0;
   }
 
-  .grow input {
+  .grow input:not([type="color"]) {
     width: 100%;
   }
 
