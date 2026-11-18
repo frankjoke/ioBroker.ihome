@@ -379,7 +379,12 @@
               >
                 <Icon value={typeIcon(entry)} size={18} />
               </span>
-              <button type="button" class="name" onclick={() => open(entry)}>
+              <button
+                type="button"
+                class="name"
+                title={entry.kind === "formula" ? "Formula" : "Function"}
+                onclick={() => open(entry)}
+              >
                 {entry.name}
               </button>
               {#if entry.description}
