@@ -88,6 +88,7 @@
               background={b.background}
               bold={b.bold}
               title={b.title}
+              value={b.value}
             />
           {/each}
         </div>

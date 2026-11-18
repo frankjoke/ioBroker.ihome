@@ -850,3 +850,25 @@ it("suppresses the face default for an active, disabled or device-owned face", (
     }),
   ).toBeUndefined();
 });
+
+it("a detail badge ignores a face-hiding rule and keeps its label", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "badge",
+        source: "offline",
+        where: "modal",
+        options: { badgeLabel: false },
+        rules: [{ when: "true", hidden: true }],
+      },
+    ]),
+    none,
+    { raw: noRaw },
+  );
+  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
+  expect(parts.modalBadges[0].labelHidden).toBeUndefined();
+});

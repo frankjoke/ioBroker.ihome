@@ -187,6 +187,8 @@
   );
   /** The open rule, by slot and rule index. */
   let openRule = $state<{ slot: number; rule: number } | null>(null);
+  /** Which slot's rules help is open, if any. */
+  let rulesHelpFor = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   /** The state picker for an HTML slot's document or a frame's URL. */
   let htmlSourceFor = $state<number | null>(null);
@@ -2605,16 +2607,52 @@
                     <span class="label-mono"
                       >Rules ({slot.rules?.length ?? 0})</span
                     >
-                    <button
-                      type="button"
-                      class="icon-btn"
-                      title="Add rule"
-                      aria-label="Add rule"
-                      onclick={() => addRuleAt(i)}
-                    >
-                      <span class="material-symbols-outlined">add</span>
-                    </button>
+                    <span class="item-actions">
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="How rules work"
+                        aria-label="How rules work"
+                        aria-expanded={rulesHelpFor === i}
+                        onclick={() =>
+                          (rulesHelpFor = rulesHelpFor === i ? null : i)}
+                      >
+                        <span class="material-symbols-outlined">help</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="Add rule"
+                        aria-label="Add rule"
+                        onclick={() => addRuleAt(i)}
+                      >
+                        <span class="material-symbols-outlined">add</span>
+                      </button>
+                    </span>
                   </div>
+                  {#if rulesHelpFor === i}
+                    <div class="rule-help text-muted">
+                      <p>
+                        Each rule has a <code>when</code> expression
+                        (JavaScript, exact <code>true</code> only). Matching
+                        rules apply in order, and the
+                        <strong>last match wins</strong>
+                        for each setting. The dot shows the live result: green = true,
+                        red = error.
+                      </p>
+                      <p>
+                        <strong>icon</strong> replaces the glyph,
+                        <strong>colour</strong> tints it, <strong>glow</strong>
+                        adds the glow, <strong>hidden</strong> hides the slot,
+                        <strong>disabled</strong> makes the control inert,
+                        <strong>background</strong> sets the cell background and
+                        <strong>tone</strong> colours badges.
+                        <strong>only</strong> is a visibility gate: with at
+                        least one <code>only</code> rule the slot shows only while
+                        one of them matches. Use the arrows to reorder.
+                      </p>
+                    </div>
+                  {/if}
                   {#each slot.rules ?? [] as rule, ri (ri)}
                     {@const ruleOpen =
                       openRule?.slot === i && openRule.rule === ri}
@@ -2696,11 +2734,21 @@
                           <div class="rule-line">
                             <button
                               type="button"
-                              class="btn btn-sm"
+                              class="btn btn-sm rule-icon"
+                              title={rule.icon
+                                ? `Icon: ${rule.icon}`
+                                : "Choose an icon"}
+                              aria-label={rule.icon
+                                ? "Change rule icon"
+                                : "Choose rule icon"}
                               onclick={() =>
                                 (ruleIconFor = { slot: i, rule: ri })}
                             >
-                              {rule.icon || "icon…"}
+                              {#if rule.icon}
+                                <Icon value={rule.icon} size={16} />
+                              {:else}
+                                icon…
+                              {/if}
                             </button>
                             {#if rule.icon}
                               <button
@@ -2712,20 +2760,23 @@
                                   )}>clear</button
                               >
                             {/if}
-                            <input
-                              type="color"
-                              class="color-input"
-                              aria-label="Rule colour"
-                              value={isHexColor(rule.color)
-                                ? rule.color
-                                : "#000000"}
-                              oninput={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    color: e.currentTarget.value,
-                                  }),
-                                )}
-                            />
+                            <label class="check" title="Rule colour">
+                              <span class="label-mono">colour</span>
+                              <input
+                                type="color"
+                                class="color-input"
+                                aria-label="Rule colour"
+                                value={isHexColor(rule.color)
+                                  ? rule.color
+                                  : "#000000"}
+                                oninput={(e) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, {
+                                      color: e.currentTarget.value,
+                                    }),
+                                  )}
+                              />
+                            </label>
                             {#if rule.color}
                               <button
                                 type="button"
@@ -3293,12 +3344,34 @@
   }
 
   .color-input {
+    flex: 0 0 auto;
     inline-size: 2rem;
+    min-inline-size: 2rem;
     block-size: 1.5rem;
     padding: 0;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: transparent;
+  }
+
+  .rule-icon {
+    flex: 0 0 auto;
+    min-inline-size: 2.2rem;
+  }
+
+  .rule-help {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--surface-container-low);
+    font-size: var(--body-sm);
+  }
+
+  .rule-help p {
+    margin: 0;
   }
 
   .slot-rules {
@@ -3320,6 +3393,7 @@
 
   .rule-line {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     min-width: 0;

@@ -368,6 +368,7 @@ function controlBadge(
   device: BadgeDevice,
   scope: Scope,
   raw?: (source: string) => BadgeControl | undefined,
+  detail = false,
 ): ResolvedBadge | undefined {
   const pick =
     typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
@@ -385,7 +386,8 @@ function controlBadge(
   );
   // A hidden slot or control produces no badge — the same fold the tile body
   // uses for its slots (a rule may hide a badge by value, not just by state).
-  if (style.hidden === true) return undefined;
+  // The detail page is the inventory: its chips ignore this.
+  if (!detail && style.hidden === true) return undefined;
   // Colour precedence: a matched rule's colour, then a matched rule's tone,
   // then the slot's static colour, then the tone default (`info`).
   const explicitTone = TONES.includes(style.tone as BadgeTone);
@@ -429,6 +431,7 @@ export function resolveBadges(
   now: number,
   pool: PoolEntry[] = [],
   raw?: (source: string) => BadgeControl | undefined,
+  detail = false,
 ): ResolvedBadge[] {
   // Accept a bare number too (the device-wide newest `ts`).
   const stamp = typeof time === "number" ? time : undefined;
@@ -448,9 +451,9 @@ export function resolveBadges(
   for (const slot of slots ?? []) {
     // A badge hidden by its own rules produces nothing — including the derived
     // ago/offline badges, which resolve no control and so never reach
-    // `controlBadge`'s own guard.
+    // `controlBadge`'s own guard. The detail chips always show.
     const style = resolveStyle(slot.rules ?? [], scope);
-    if (style.hidden === true) continue;
+    if (!detail && style.hidden === true) continue;
     const tone = TONES.includes(style.tone as BadgeTone)
       ? (style.tone as BadgeTone)
       : undefined;
@@ -504,12 +507,14 @@ export function resolveBadges(
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).
-      badge = controlBadge(slot, device, scope, raw);
+      badge = controlBadge(slot, device, scope, raw, detail);
     }
     if (badge) {
-      // The chip can show just its icon; the value stays in the title and the
-      // detail page.
-      if (slot.options?.badgeLabel === false) badge.labelHidden = true;
+      // The chip can show just its icon on the tile; the detail page always
+      // shows the label and value too.
+      if (slot.options?.badgeLabel === false && !detail) {
+        badge.labelHidden = true;
+      }
       if (slot.options?.bold === true) badge.bold = true;
       out.push(badge);
     }

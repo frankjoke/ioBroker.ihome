@@ -138,9 +138,11 @@ export function tileParts(
   const badgeSlots = slots.filter(
     (s) => slotVisible(s, active) && slotTileMode(s) === "badge",
   );
-  // Badges that also live in the modal become its chip strip (A34).
+  // Badges that also live in the modal become its chip strip (A34). The
+  // detail page is the inventory: a face rule that hides the chip there does
+  // not remove it, and the chip always shows icon, label and value.
   const modalBadgeSlots = slots.filter(
-    (s) => s.kind === "badge" && slotVisible(s, active) && inDetail(s),
+    (s) => s.kind === "badge" && inDetail(s),
   );
   const modalBadges = raw
     ? modalBadgeSlots.flatMap((s) =>
@@ -151,6 +153,7 @@ export function tileParts(
           opts?.now ?? Date.now(),
           pool,
           raw,
+          true,
         ),
       )
     : [];
