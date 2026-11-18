@@ -2651,6 +2651,15 @@
                         least one <code>only</code> rule the slot shows only while
                         one of them matches. Use the arrows to reorder.
                       </p>
+                      <p>
+                        Names are the control's feature or label, lowercased
+                        with
+                        <code>_</code>: a control labelled “Bewegung” is
+                        <code>bewegung</code>. Controls that share a feature get
+                        a suffix (<code>power</code>, <code>power2</code>, …).
+                        Use
+                        <code>get("state.id")</code> for a raw state.
+                      </p>
                     </div>
                   {/if}
                   {#each slot.rules ?? [] as rule, ri (ri)}
