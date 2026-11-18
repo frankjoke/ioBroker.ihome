@@ -244,8 +244,45 @@ export function createEngine(
     return resolveStateId(output.ref) ?? output.ref;
   }
 
-  function fingerprintOf(def: LogicDef): string {
-    return JSON.stringify({ def, outputTarget: defOutputTarget(def) });
+  function fingerprintOf(
+    def: LogicDef,
+    stateIds: string[],
+    declared: Set<string>,
+  ): string {
+    const refs: string[] = [];
+    collectRefs(def, refs);
+    forEachExpression(def, (expr) => refs.push(...extractRefs(expr.code)));
+    const memoryNames = [...new Set(refs)]
+      .filter((ref) => declared.has(ref))
+      .sort();
+    return JSON.stringify({
+      def,
+      stateIds,
+      outputTarget: defOutputTarget(def),
+      memoryNames,
+    });
+  }
+
+  /** The input states a definition resolves to right now (variables included). */
+  function resolvedStateIds(def: LogicDef): string[] {
+    const ids: string[] = [];
+    const add = (ref: string): void => {
+      const id = resolveStateId(ref);
+      if (id) ids.push(id);
+    };
+    for (const input of Object.values(def.inputs ?? {})) {
+      if (input.from.type !== "state") continue;
+      add(input.from.ref);
+      for (const ref of input.from.refs ?? []) add(ref);
+    }
+    if (def.kind === "machine") {
+      for (const state of Object.values(def.states ?? {})) {
+        for (const row of state.on ?? []) {
+          if (row.on.startsWith("$var.")) add(row.on.slice("$var.".length));
+        }
+      }
+    }
+    return ids;
   }
 
   function declaredMemoryOf(document: LogicDocument): Set<string> {
@@ -275,6 +312,7 @@ export function createEngine(
     def: LogicDef,
     seq: number,
     issues: ReturnType<typeof validateLogicDocument>,
+    declared: Set<string>,
   ): Runtime | undefined {
     if (def.enabled === false) return undefined;
     if (logicHasErrors(issues, def.id)) {
@@ -325,7 +363,11 @@ export function createEngine(
       id: def.id,
       seq,
       def,
-      fingerprint: fingerprintOf(def),
+      fingerprint: fingerprintOf(
+        def,
+        [...inputs.values()].flatMap((input) => input.stateIds),
+        declared,
+      ),
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
@@ -413,7 +455,7 @@ export function createEngine(
 
   let runtimes: Runtime[] = [];
   for (const [seq, def] of doc.logics.entries()) {
-    const rt = buildRuntime(def, seq, issues);
+    const rt = buildRuntime(def, seq, issues, declaredMemory);
     if (rt) runtimes.push(rt);
   }
 
@@ -1608,18 +1650,22 @@ export function createEngine(
         const old = oldById.get(def.id);
         if (!old) {
           added.push(def.id);
-          const rt = buildRuntime(def, seq, nextIssues);
+          const rt = buildRuntime(def, seq, nextIssues, nextDeclared);
           if (rt) prepared.set(def.id, rt);
           continue;
         }
-        const fingerprint = fingerprintOf(def);
+        const fingerprint = fingerprintOf(
+          def,
+          resolvedStateIds(def),
+          nextDeclared,
+        );
         if (fingerprint === old.fingerprint) {
           old.seq = seq;
           unchanged.push(old);
           continue;
         }
         changed.push(def.id);
-        const rt = buildRuntime(def, seq, nextIssues);
+        const rt = buildRuntime(def, seq, nextIssues, nextDeclared);
         if (rt) prepared.set(def.id, rt);
       }
       const keep = new Set(unchanged.map((rt) => rt.id));

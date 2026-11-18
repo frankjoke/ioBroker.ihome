@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { createEngine } from "./engine";
+import { logicSubscriptions } from "./subscriptions";
 import { createHarness } from "./testing";
 import type { Expr, FunctionLogic, LogicDocument } from "./types";
 
@@ -369,4 +370,106 @@ it("does not replay an old output to a reader added later", () => {
   expect(engine.memoryValue("r")).toBeUndefined();
   h.change("0_userdata.0.E", 3);
   expect(engine.memoryValue("r")).toBe(30);
+});
+
+it("restarts only the logic whose variable mapping changed", () => {
+  const document: LogicDocument = {
+    version: 3,
+    logics: [
+      fn("a", {
+        mode: "statements",
+        inputs: { v: { from: { type: "state", ref: "blind" }, kind: "event" } },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code('this.n = (this.n ?? 0) + 1; return get("v");'),
+      }),
+      fn("b", {
+        mode: "statements",
+        inputs: { o: input("0_userdata.0.O") },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code("this.n = (this.n ?? 0) + 1; return this.n;"),
+      }),
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.X": 1, "0_userdata.0.Y": 5 });
+  let target = "0_userdata.0.X";
+  h.deps.resolveVariable = (name) =>
+    name === "blind" ? { kind: "state", stateId: target } : undefined;
+  const engine = createEngine(document, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.change("0_userdata.0.X", 2);
+  expect(h.writes.at(-1)?.value).toBe(2);
+  target = "0_userdata.0.Y";
+  engine.update(document);
+  h.writes.length = 0;
+  h.change("0_userdata.0.Y", 6);
+  expect(h.writes).toEqual([{ id: "0_userdata.0.A", value: 6, ack: false }]);
+});
+
+it("restarts only the logic whose expanded pattern gained a state", () => {
+  const document = (aRefs: string[]): LogicDocument => ({
+    version: 3,
+    logics: [
+      fn("a", {
+        mode: "statements",
+        inputs: {
+          p: {
+            from: { type: "state", ref: aRefs[0], refs: aRefs.slice(1) },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code("this.n = (this.n ?? 0) + 1; return this.n;"),
+      }),
+      fn("b", {
+        mode: "statements",
+        inputs: { o: input("0_userdata.0.O") },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code("this.n = (this.n ?? 0) + 1; return this.n;"),
+      }),
+    ],
+  });
+  const { h, engine } = started(document(["0_userdata.0.OLD"]), {
+    "0_userdata.0.OLD": 0,
+    "0_userdata.0.O": 0,
+  });
+  h.change("0_userdata.0.OLD", 1);
+  expect(h.writes.at(-1)?.value).toBe(1);
+  engine.update(document(["0_userdata.0.OLD", "0_userdata.0.NEW"]));
+  h.change("0_userdata.0.OLD", 2);
+  expect(h.writes.at(-1)?.value).toBe(1);
+});
+
+it("subscription set matches the pure function", () => {
+  const document: LogicDocument = {
+    version: 3,
+    memory: [{ name: "m", type: "number", initial: 0 }],
+    logics: [
+      fn("p", {
+        inputs: { e: input("0_userdata.0.E") },
+        expr: code('get("e")'),
+      }),
+      fn("r", {
+        inputs: {
+          l: { from: { type: "state", ref: "$logic.p" }, kind: "variable" },
+          t: { from: { type: "timer", every: "1h" }, kind: "event" },
+          m: { from: { type: "memory", ref: "m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.R", type: "number" },
+        expr: code('get("0_userdata.0.CODE")'),
+      }),
+    ],
+  };
+  const h = createHarness({ "0_userdata.0.E": 1 });
+  const resolve = (name: string) =>
+    name === "blind"
+      ? { kind: "state" as const, stateId: "0_userdata.0.VAR" }
+      : undefined;
+  const engine = createEngine(document, {
+    ...h.deps,
+    resolveVariable: resolve,
+  });
+  expect(engine.subscriptions().sort()).toEqual(
+    logicSubscriptions(document, resolve).sort(),
+  );
 });
