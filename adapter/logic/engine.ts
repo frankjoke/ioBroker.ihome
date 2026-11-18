@@ -9,13 +9,15 @@ import {
   type LogicRuntime,
   type NameInfo,
 } from "./runtime";
-import { nextCron, timerSource } from "./timer-ops";
+import { timerSource } from "./timer-ops";
 import { collectRefs, type ResolveVariable } from "./subscriptions";
 import {
   createLogicIndex,
   createMemoryMap,
   createStateMap,
+  createTimerMap,
   type Binding,
+  type TimerBinding,
 } from "./registries";
 import { createTaskQueue, type FetchLike, type TaskQueue } from "./tasks";
 import { createPluginQueue, type PluginQueue } from "./plugin-queue";
@@ -23,7 +25,6 @@ import type { PluginReply } from "../plugin-ops";
 import { isRecord, logicHasErrors, validateLogicDocument } from "./validate";
 import type {
   AstroEvent,
-  Duration,
   Expr,
   Forward,
   FunctionLogic,
@@ -35,7 +36,6 @@ import type {
   Output,
   OutputType,
   StateDef,
-  TimerSpec,
 } from "./types";
 
 export interface StateChange {
@@ -142,8 +142,6 @@ interface Runtime {
   /** Machine only: the current state and its `after` timer. */
   state?: string;
   timer?: number;
-  /** Timer inputs of this logic, by input name. */
-  timers: Map<string, number>;
   /** True only while this logic's start evaluation runs (D19). */
   init: boolean;
   /** The `$start` timestamp while that event is being handled (D28). */
@@ -291,7 +289,6 @@ export function createEngine(
       inputs,
       output: def.output ?? { scope: "memory", name: def.id },
       hasOutput: false,
-      timers: new Map<string, number>(),
       init: false,
     };
     rt.tasks = createTaskQueue(
@@ -414,6 +411,7 @@ export function createEngine(
     states.unlink(rt);
     memories.unlink(rt);
     logicIndex.unlink(rt);
+    timers.remove(rt);
   }
 
   const queue: Job[] = [];
@@ -429,6 +427,16 @@ export function createEngine(
   let started = false;
   let chainSeen = new Set<string>();
   let chainWarned = new Set<string>();
+
+  const timers = createTimerMap<Runtime>({
+    now: () => deps.now(),
+    setTimeout: deps.setTimeout,
+    clearTimeout: deps.clearTimeout,
+    nextAstro: deps.nextAstro,
+    warn: (logicId, message) => deps.log("warn", logicId, message),
+    isStarted: () => started,
+    fire: (binding) => fireTimer(binding),
+  });
 
   const warn = (logicId: string, message: string) =>
     deps.log("warn", logicId, message);
@@ -1326,33 +1334,35 @@ export function createEngine(
     return names[0];
   }
 
-  function armSpec(
-    rt: Runtime,
-    input: InputRuntime,
-    spec: TimerSpec,
-    key: string,
-  ): void {
-    if (typeof spec === "string") armOneTimer(rt, input, spec, key);
-    else if (spec.kind === "astro") armAstroTimer(rt, input, spec, key);
-    else armCronTimer(rt, input, spec, key);
-  }
-
-  function armTimer(rt: Runtime, input: InputRuntime): void {
-    const from = input.input.from;
-    if (from.type === "timer") {
-      const spec = from.spec ?? from.every;
-      if (spec) armSpec(rt, input, spec, input.name);
+  function addInputTimers(rt: Runtime): void {
+    for (const input of rt.inputs.values()) {
+      const from = input.input.from;
+      if (from.type === "timer") {
+        const spec = from.spec ?? from.every;
+        if (spec) {
+          timers.add({
+            owner: rt,
+            input: input.name,
+            spec,
+            label: timerSource(spec),
+          });
+        }
+      }
+      for (const spec of input.input.timers ?? []) {
+        timers.add({
+          owner: rt,
+          input: input.name,
+          spec,
+          label: timerSource(spec),
+        });
+      }
     }
-    (input.input.timers ?? []).forEach((timer, index) =>
-      armSpec(rt, input, timer, `${input.name}#${index}`),
-    );
   }
 
-  function fireInputTimer(
-    rt: Runtime,
-    input: InputRuntime,
-    source: string,
-  ): void {
+  function fireTimer(binding: TimerBinding<Runtime>): void {
+    const rt = binding.owner;
+    const input = rt.inputs.get(binding.input);
+    if (!input) return;
     const previous = input.last;
     const now = deps.now();
     input.last = now;
@@ -1365,7 +1375,7 @@ export function createEngine(
     enqueue({
       rt,
       input: input.name,
-      source,
+      source: binding.label,
       value: now,
       previous,
       hasPrevious: previous !== undefined,
@@ -1373,71 +1383,6 @@ export function createEngine(
       fromTimer: true,
       meta: { from: "timer", self: true, ts: now },
     });
-  }
-
-  function armOneTimer(
-    rt: Runtime,
-    input: InputRuntime,
-    every: Duration,
-    key: string,
-  ): void {
-    const ms = parseDuration(every);
-    if (ms === null || ms <= 0) return;
-    const handle = deps.setTimeout(() => {
-      rt.timers.delete(key);
-      if (!started) return;
-      fireInputTimer(rt, input, timerSource(every));
-      armOneTimer(rt, input, every, key);
-    }, ms);
-    rt.timers.set(key, handle);
-  }
-
-  function armAstroTimer(
-    rt: Runtime,
-    input: InputRuntime,
-    timer: Extract<TimerSpec, { kind: "astro" }>,
-    key: string,
-  ): void {
-    const from = deps.now();
-    const next = deps.nextAstro?.(timer.event, timer.offset ?? 0, from);
-    if (next === undefined) {
-      warnOnce(
-        rt.def.id,
-        "astro timers need the system latitude/longitude — skipped",
-      );
-      return;
-    }
-    const handle = deps.setTimeout(
-      () => {
-        rt.timers.delete(key);
-        if (!started) return;
-        fireInputTimer(rt, input, timerSource(timer));
-        armAstroTimer(rt, input, timer, key);
-      },
-      Math.max(0, next - from),
-    );
-    rt.timers.set(key, handle);
-  }
-
-  function armCronTimer(
-    rt: Runtime,
-    input: InputRuntime,
-    timer: Extract<TimerSpec, { kind: "cron" }>,
-    key: string,
-  ): void {
-    const from = deps.now();
-    const next = nextCron(timer, from);
-    if (next === undefined) return;
-    const handle = deps.setTimeout(
-      () => {
-        rt.timers.delete(key);
-        if (!started) return;
-        fireInputTimer(rt, input, timerSource(timer));
-        armCronTimer(rt, input, timer, key);
-      },
-      Math.max(0, next - from),
-    );
-    rt.timers.set(key, handle);
   }
 
   function emitMemory(
@@ -1638,9 +1583,8 @@ export function createEngine(
       }
       // The shared start instant: timers and `$start` measure from it (D28).
       const startedAt = deps.now();
-      for (const rt of runtimes) {
-        for (const input of rt.inputs.values()) armTimer(rt, input);
-      }
+      for (const rt of runtimes) addInputTimers(rt);
+      timers.armAll();
       // `$start` (D28): after every logic is up, each machine sees one event in
       // the state it adopted, carrying the start timestamp.
       for (const rt of runtimes) {
@@ -1658,10 +1602,9 @@ export function createEngine(
       }
     },
     stop() {
+      timers.stop();
       for (const rt of runtimes) {
         clearTimer(rt);
-        for (const handle of rt.timers.values()) deps.clearTimeout(handle);
-        rt.timers.clear();
         rt.tasks?.stop();
         rt.pluginTasks?.stop();
         unlinkRuntime(rt);

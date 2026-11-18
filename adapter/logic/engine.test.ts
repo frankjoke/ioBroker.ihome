@@ -3856,3 +3856,98 @@ it("only the linked logic runs on a state change", () => {
   h.change("0_userdata.0.STATE", 1);
   expect(h.writes.map((write) => write.id)).toEqual(["0_userdata.0.A"]);
 });
+
+it("shares one timer for two logics on the same schedule", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.A", type: "number" },
+        expr: code('get("t")'),
+      },
+      {
+        id: "b",
+        name: "B",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.B", type: "number" },
+        expr: code('get("t")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.clock.pending).toBe(1);
+  h.writes.length = 0;
+  h.clock.advance(600_000);
+  expect(h.writes.map((write) => write.id)).toEqual([
+    "0_userdata.0.A",
+    "0_userdata.0.B",
+  ]);
+});
+
+it("shares one timer for two logics on the same cron time", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: ["a", "b"].map((id) => ({
+      id,
+      name: id.toUpperCase(),
+      kind: "function" as const,
+      inputs: {
+        t: {
+          from: {
+            type: "timer" as const,
+            spec: { kind: "cron" as const, at: "08:00", days: "*" },
+          },
+          kind: "event" as const,
+        },
+      },
+      output: {
+        scope: "state" as const,
+        ref: `0_userdata.0.${id.toUpperCase()}`,
+        type: "number" as const,
+      },
+      expr: code('get("t")'),
+    })),
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  expect(h.clock.pending).toBe(1);
+});
+
+it("keeps the written timer label as $source", () => {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "src",
+        name: "Source",
+        kind: "function",
+        inputs: {
+          t: { from: { type: "timer", every: "10m" }, kind: "event" },
+        },
+        output: { scope: "state", ref: "0_userdata.0.SRC", type: "string" },
+        expr: code('get("$source")'),
+      },
+    ],
+  };
+  const h = createHarness({});
+  const engine = createEngine(doc, h.deps);
+  h.attach(engine);
+  engine.start();
+  h.writes.length = 0;
+  h.clock.advance(600_000);
+  expect(h.writes.at(-1)?.value).toBe("every:10m");
+});

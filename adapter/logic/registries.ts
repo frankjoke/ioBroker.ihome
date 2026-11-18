@@ -2,6 +2,10 @@
  *  or logic output, and what the last value was. A map is the authority for
  *  dispatch; per-logic read caches stay in the engine. */
 
+import { parseDuration } from "./duration";
+import { nextCron, parseCronAt } from "./timer-ops";
+import type { AstroEvent, TimerSpec } from "./types";
+
 export interface Owner {
   id: string;
   seq: number;
@@ -247,6 +251,148 @@ export function createLogicIndex<O extends Owner>(): LogicIndex<O> {
       return entry
         ? { inputs: [...entry.inputs], rows: [...entry.rows] }
         : undefined;
+    },
+  };
+}
+
+export interface TimerBinding<O extends Owner = Owner> extends Binding<O> {
+  spec: TimerSpec;
+  /** The text this connection wrote, for `$source`. */
+  label: string;
+}
+
+interface TimerEntry<O extends Owner> {
+  key: string;
+  spec: TimerSpec;
+  handle?: number;
+  bindings: TimerBinding<O>[];
+}
+
+export interface TimerMap<O extends Owner> {
+  add(binding: TimerBinding<O>): void;
+  remove(owner: O): void;
+  armAll(): void;
+  stop(): void;
+  pending(): number;
+}
+
+/**
+ * One registration per schedule, regardless of how many logics use it. The key
+ * is the parsed schedule, so `20m` and `1200s` share; each binding keeps its own
+ * label for `$source`. Adding a logic to a running entry does not re-arm it.
+ */
+export function createTimerMap<O extends Owner>(deps: {
+  now(): number;
+  setTimeout(fn: () => void, ms: number): number;
+  clearTimeout(handle: number): void;
+  nextAstro?(
+    event: AstroEvent,
+    offset: number,
+    from: number,
+  ): number | undefined;
+  warn(logicId: string, message: string): void;
+  isStarted(): boolean;
+  fire(binding: TimerBinding<O>): void;
+}): TimerMap<O> {
+  const entries = new Map<string, TimerEntry<O>>();
+  const warned = new Set<string>();
+
+  const keyOf = (spec: TimerSpec): string | undefined => {
+    if (typeof spec === "string") {
+      const ms = parseDuration(spec);
+      return ms !== null && ms > 0 ? `every:${ms}` : undefined;
+    }
+    if (spec.kind === "astro") {
+      return `astro:${spec.event}:${spec.offset ?? 0}`;
+    }
+    const parts = parseCronAt(spec.at);
+    if (!parts) return undefined;
+    const days =
+      spec.days === undefined || spec.days === "*"
+        ? "*"
+        : [...new Set(spec.days)].sort((a, b) => a - b).join(",");
+    return `cron:${parts.hour}:${parts.minute}:${parts.second}:${days}`;
+  };
+
+  const nextAt = (spec: TimerSpec, from: number): number | undefined => {
+    if (typeof spec === "string") {
+      const ms = parseDuration(spec);
+      return ms === null ? undefined : from + ms;
+    }
+    if (spec.kind === "astro") {
+      return deps.nextAstro?.(spec.event, spec.offset ?? 0, from);
+    }
+    return nextCron(spec, from);
+  };
+
+  const arm = (entry: TimerEntry<O>): void => {
+    if (entry.handle !== undefined || !deps.isStarted()) return;
+    const from = deps.now();
+    const at = nextAt(entry.spec, from);
+    if (at === undefined) {
+      if (warned.has(entry.key)) return;
+      warned.add(entry.key);
+      const astro =
+        typeof entry.spec !== "string" && entry.spec.kind === "astro";
+      deps.warn(
+        entry.bindings[0]?.owner.id ?? "timer",
+        astro
+          ? "astro timers need the system latitude/longitude — skipped"
+          : `timer “${entry.bindings[0]?.label ?? entry.key}” cannot be scheduled`,
+      );
+      return;
+    }
+    entry.handle = deps.setTimeout(
+      () => {
+        entry.handle = undefined;
+        if (!deps.isStarted()) return;
+        const bindings = [...entry.bindings].sort(
+          (a, b) => a.owner.seq - b.owner.seq,
+        );
+        for (const binding of bindings) deps.fire(binding);
+        arm(entry);
+      },
+      Math.max(0, at - from),
+    );
+  };
+
+  return {
+    add(binding) {
+      const key = keyOf(binding.spec);
+      if (!key) {
+        deps.warn(binding.owner.id, `invalid timer “${binding.label}”`);
+        return;
+      }
+      let entry = entries.get(key);
+      if (!entry) {
+        entry = { key, spec: binding.spec, bindings: [] };
+        entries.set(key, entry);
+      }
+      entry.bindings.push(binding);
+      arm(entry);
+    },
+    remove(owner) {
+      for (const [key, entry] of entries) {
+        entry.bindings = entry.bindings.filter(
+          (binding) => binding.owner !== owner,
+        );
+        if (entry.bindings.length > 0) continue;
+        if (entry.handle !== undefined) deps.clearTimeout(entry.handle);
+        entries.delete(key);
+      }
+    },
+    armAll() {
+      for (const entry of entries.values()) arm(entry);
+    },
+    stop() {
+      for (const entry of entries.values()) {
+        if (entry.handle !== undefined) deps.clearTimeout(entry.handle);
+        entry.handle = undefined;
+      }
+    },
+    pending() {
+      return [...entries.values()].filter((entry) => entry.handle !== undefined)
+        .length;
     },
   };
 }
