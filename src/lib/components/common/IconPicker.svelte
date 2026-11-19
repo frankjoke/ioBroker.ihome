@@ -167,35 +167,6 @@
     const twin = twins ? pool.twins[value] : undefined;
     onPick(value, twin ? { active: twin } : undefined);
   }
-
-  async function importBrowsed(
-    items: Array<{
-      value: string;
-      meta: { keywords: string[]; name: string };
-    }>,
-  ): Promise<void> {
-    if (!isIconPoolWritable()) {
-      browseHint = "The icons were not added — the library is not writable.";
-      return;
-    }
-    let pool = getIconPool();
-    let added = 0;
-    for (const item of items) {
-      const next = addLibraryValue(pool, item.value, item.meta);
-      if (!next.added) continue;
-      pool = next.pool;
-      added++;
-    }
-    if (!added) {
-      browseHint = "Nothing new to add.";
-      return;
-    }
-    const status = await commitIconPool(pool, getIconPool().updatedAt);
-    browseHint =
-      status === "saved"
-        ? `Added ${added} icon(s).`
-        : "The icons were not saved — try again.";
-  }
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -386,7 +357,6 @@
           embedded
           resources={["mdi", "objects", "adapter"]}
           onPick={pickBrowsed}
-          onBatch={importBrowsed}
           onClose={() => go("icons")}
         />
       </div>
