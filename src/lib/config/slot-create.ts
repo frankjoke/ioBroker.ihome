@@ -19,7 +19,7 @@ import {
   type FeatureCandidate,
 } from "$lib/config/template-suggest";
 import { sanitizeLabel, newLocalTaken } from "$lib/config/virtual-ops";
-import { matchingOverride } from "$lib/config/source-overrides";
+import { matchingOverride, sourceRuleName } from "$lib/config/source-overrides";
 import type { TemplateReference } from "$lib/config/template-reference";
 import type { Control, Device, Widget } from "$lib/types/device";
 import type { EnsuredOverride, SourceOverride } from "$lib/types/overrides";
@@ -724,20 +724,22 @@ function materializeRoleTile(
     });
   }
 
-  // A tile's rules are scoped by `tileSourceControls` (the override's name) and
-  // `ruleScope` sanitizes that name (`Power (W)` → `power_w`, a renamed
-  // `power2` stays `power2`). Build the same locals in slot order so a template
-  // rule names the local the tile will actually have.
+  // A tile's rules are scoped by `tileSourceControls` (the override's name,
+  // else the id leaf) and `ruleScope` sanitizes that name (`Power (W)` →
+  // `power_w`, a renamed `power2` stays `power2`). Broker names are only the
+  // label aliases `ruleScope` appends last, so a leaf keeps its local even when
+  // another slot's broker name collides with it. Build the same locals in slot
+  // order so a template rule names the local the tile will actually have.
   const taken = newLocalTaken();
   const roleLocal = new Map<string, string>();
   for (const entry of bound) {
     if (!entry.role) continue;
     const fill = fills.get(entry.role);
     const name =
-      entry.override?.name ||
-      localizeName(fill?.object?.common?.name) ||
-      fill?.ref ||
-      entry.role;
+      sourceRuleName({
+        overrideName: entry.override?.name,
+        stateId: fill?.stateId ?? fill?.ref,
+      }) ?? entry.role;
     const local = sanitizeLabel(name, taken);
     if (!roleLocal.has(entry.role)) roleLocal.set(entry.role, local);
   }

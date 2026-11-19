@@ -202,8 +202,24 @@ export interface OverrideGroup {
 }
 
 /** A state's raw expression name: the last segment of its id. */
-function stateLeaf(stateId: string): string {
+export function stateLeaf(stateId: string): string {
   return String(stateId).split(".").pop() || String(stateId);
+}
+
+/** The name a rule writes for one bound source: the override's name, a
+ *  control's own feature, else the leaf of its state id. The broker's label is
+ *  display only — `ruleScope` adds it last, as a suffixed alias. Shared with
+ *  the template materialiser, so its mirrors cannot drift again. */
+export function sourceRuleName(source: {
+  overrideName?: string;
+  controlFeature?: string;
+  stateId?: string;
+}): string | undefined {
+  return (
+    source.overrideName ||
+    source.controlFeature ||
+    (source.stateId ? stateLeaf(source.stateId) : undefined)
+  );
 }
 
 /** A new override's identity: the id leaf as `name`, the broker's localized

@@ -28,6 +28,7 @@ import type {
   ScopeExtras,
 } from "$lib/config/virtual-ops";
 import type { GlobalVariable } from "$lib/config/variables";
+import { sourceRuleName } from "$lib/config/source-overrides";
 import type { HistorySpec } from "$lib/types/device";
 import type { SourceOverride } from "$lib/types/overrides";
 import { offTwin, onTwin } from "$lib/config/icon-library";
@@ -140,11 +141,11 @@ export function tileSourceControls(
       ? opts.overrides?.find((o) => o.id === resolved.overrideId)
       : undefined;
     const name =
-      override?.name ??
-      resolved.control?.feature ??
-      (resolved.stateId
-        ? String(resolved.stateId).split(".").pop() || resolved.stateId
-        : resolved.label);
+      sourceRuleName({
+        overrideName: override?.name,
+        controlFeature: resolved.control?.feature,
+        stateId: resolved.stateId,
+      }) ?? resolved.label;
     if (!name) return undefined;
     return {
       feature: name,

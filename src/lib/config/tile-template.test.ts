@@ -8,6 +8,9 @@ import {
   materializeTemplateTileFromFills,
   materializeTemplateTileFromState,
 } from "$lib/config/slot-create";
+import { tileSourceControls } from "$lib/config/tile-parts";
+import { ruleScope } from "$lib/config/rule-ops";
+import { evaluateVirtual } from "$lib/config/virtual-ops";
 import type { SourceLook } from "$lib/config/slot-source";
 import type { TemplateReference } from "$lib/config/template-reference";
 import type { SlotSource, Template, TileConfig } from "$lib/types/display";
@@ -629,4 +632,48 @@ it("rewrites a rule to a reused override's sanitized local", () => {
     override: "kept",
   });
   expect(result.slots[0].rules).toEqual([{ when: "truthy(power_w)" }]);
+});
+
+it("keeps a rule on its own slot when a broker name collides with a leaf", () => {
+  const template = {
+    id: "collision",
+    name: "Collision",
+    type: "Custom",
+    roles: ["state", "value"],
+    features: [],
+    slots: [
+      { kind: "value", source: "state", rules: [{ when: "value > 0" }] },
+      { kind: "value", source: "value" },
+    ],
+  } as unknown as Template;
+  const objects = new Map<string, any>([
+    ["dev.0.state", object({ name: "Value", type: "number" })],
+    ["dev.0.value", object({ name: "Value", type: "number" })],
+  ]);
+  const reference = (id: string) => ({
+    ref: id,
+    stateId: id,
+    object: objects.get(id),
+  });
+  const fills = new Map<string, TemplateReference>([
+    ["state", reference("dev.0.state")],
+    ["value", reference("dev.0.value")],
+  ]);
+  const result = materializeTemplateTileFromFills(
+    template,
+    fills,
+    reference("dev.0.state"),
+  );
+  // Slot A's broker name must not take slot B's leaf: the rule keeps naming
+  // B's reading, so it stays true while A is 0.
+  const rule = result.slots[0].rules?.[0]?.when ?? "";
+  expect(rule).toBe("value > 0");
+  const controls = tileSourceControls(result.slots, {
+    objects,
+    states: new Map([
+      ["dev.0.state", { val: 0 }],
+      ["dev.0.value", { val: 1 }],
+    ]),
+  });
+  expect(evaluateVirtual(rule, ruleScope(controls, [])).value).toBe(true);
 });
