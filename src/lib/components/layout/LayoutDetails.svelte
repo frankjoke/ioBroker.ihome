@@ -2139,10 +2139,13 @@
                   {/if}
                   {#if slot.kind !== "value" || slot.options?.hideUnit !== true}
                     <label class="small">
-                      <span class="label-mono">Unit</span>
+                      {#if slot.kind !== "value"}
+                        <span class="label-mono">Unit</span>
+                      {/if}
                       <input
                         type="text"
                         class="unit-input"
+                        aria-label="Unit"
                         value={slot.unit ?? ""}
                         title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
                         oninput={(e) =>
@@ -2169,7 +2172,60 @@
                           })}
                       />
                     </label>
+                    <label
+                      class="check"
+                      title="Off keeps the colour and its homes but draws nothing"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.spark !== undefined &&
+                          slot.spark.enabled !== false}
+                        disabled={!sparkReady(i)}
+                        onchange={(e) =>
+                          e.currentTarget.checked
+                            ? setSpark(i, { enabled: true })
+                            : setSpark(i, { enabled: false })}
+                      />
+                      <span>Sparkline</span>
+                    </label>
+                    {#if slot.spark}
+                      <div class="small">
+                        <span class="label-mono">colour</span>
+                        <ColorSelect
+                          label="Chart colour"
+                          defaultLabel="auto"
+                          value={slot.spark.color}
+                          onChange={(v) => setSpark(i, { color: v })}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        class:on={slot.spark.where !== undefined}
+                        title={sparkWhereTitle(i)}
+                        aria-label={sparkWhereTitle(i)}
+                        onclick={() =>
+                          edit((t) =>
+                            patchSpark(t, i, {
+                              where:
+                                nextSparkWhere(i) === "both"
+                                  ? undefined
+                                  : nextSparkWhere(i),
+                            }),
+                          )}
+                      >
+                        <span class="material-symbols-outlined"
+                          >{WHERE_GLYPH[slot.spark.where ?? "both"]}</span
+                        >
+                      </button>
+                    {/if}
                   </div>
+                  {#if !sparkReady(i)}
+                    <p class="note text-muted">
+                      No history for this control — configure it in the device
+                      editor.
+                    </p>
+                  {/if}
                 {/if}
                 {#if slot.kind === "level"}
                   <div class="row">
@@ -2434,63 +2490,6 @@
                     <p class="note text-muted">
                       The tile Look and device icon still show; this switch
                       hides only the slot's own fallback.
-                    </p>
-                  {/if}
-                {/if}
-                {#if slot.kind === "value"}
-                  <div class="row">
-                    <label
-                      class="check"
-                      title="Off keeps the colour and its homes but draws nothing"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={slot.spark !== undefined &&
-                          slot.spark.enabled !== false}
-                        disabled={!sparkReady(i)}
-                        onchange={(e) =>
-                          e.currentTarget.checked
-                            ? setSpark(i, { enabled: true })
-                            : setSpark(i, { enabled: false })}
-                      />
-                      <span>Sparkline</span>
-                    </label>
-                    {#if slot.spark}
-                      <div class="small">
-                        <span class="label-mono">colour</span>
-                        <ColorSelect
-                          label="Chart colour"
-                          defaultLabel="auto"
-                          value={slot.spark.color}
-                          onChange={(v) => setSpark(i, { color: v })}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        class:on={slot.spark.where !== undefined}
-                        title={sparkWhereTitle(i)}
-                        aria-label={sparkWhereTitle(i)}
-                        onclick={() =>
-                          edit((t) =>
-                            patchSpark(t, i, {
-                              where:
-                                nextSparkWhere(i) === "both"
-                                  ? undefined
-                                  : nextSparkWhere(i),
-                            }),
-                          )}
-                      >
-                        <span class="material-symbols-outlined"
-                          >{WHERE_GLYPH[slot.spark.where ?? "both"]}</span
-                        >
-                      </button>
-                    {/if}
-                  </div>
-                  {#if !sparkReady(i)}
-                    <p class="note text-muted">
-                      No history for this control — configure it in the device
-                      editor.
                     </p>
                   {/if}
                 {/if}
