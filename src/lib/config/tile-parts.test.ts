@@ -88,7 +88,7 @@ it("a tile-only slot never counts as modal content", () => {
   expect(parts.hasModal).toBe(false);
 });
 
-it("a rule-hidden modal slot is not modal content", () => {
+it("a rule-hidden modal slot still gets its detail row", () => {
   const parts = tileParts(
     device(),
     tile([
@@ -96,13 +96,16 @@ it("a rule-hidden modal slot is not modal content", () => {
         kind: "value",
         source: "humidity",
         where: "modal",
-        rules: [{ when: "true", hidden: true }],
+        rules: [{ when: "true", hidden: true, color: "var(--danger-color)" }],
       },
     ]),
     none,
   );
-  expect(parts.modal).toEqual([]);
-  expect(parts.hasModal).toBe(false);
+  // Detail mode is the tile settings' business: rules do not hide, colour or
+  // icon a row there.
+  expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
+  expect(parts.modal[0].style).toEqual({});
+  expect(parts.hasModal).toBe(true);
 });
 
 it("a frame slot passes through without a control", () => {
@@ -257,12 +260,12 @@ it("keeps a tile badge in the corners and out of the modal", () => {
   expect(parts.hasModal).toBe(false);
 });
 
-it("a badge only in the modal is modal content, resolved or not", () => {
+it("a badge in the detail counts as modal content, resolved or not", () => {
   // Without a resolver the sheet still gets a yes — it asks about content, not
   // about what a chip would say.
   const asked = tileParts(
     device(),
-    tile([{ kind: "badge", source: "offline", where: "modal" }]),
+    tile([{ kind: "badge", source: "offline", detail: "full" }]),
     none,
   );
   expect(asked.modalBadges).toEqual([]);
@@ -274,7 +277,7 @@ it("a badge only in the modal is modal content, resolved or not", () => {
   });
   const resolved = tileParts(
     unreachable,
-    tile([{ kind: "badge", source: "offline", where: "modal" }]),
+    tile([{ kind: "badge", source: "offline", detail: "full" }]),
     none,
     { raw: noRaw },
   );
@@ -295,7 +298,7 @@ it("a raw-state modal row counts only when the resolver knows it", () => {
   expect(tileParts(device(), t, none, { raw }).hasModal).toBe(true);
 });
 
-it("an active-gated modal row counts only while the tile is not active", () => {
+it("a tile-active rule does not remove the detail row", () => {
   const t = tile([
     {
       kind: "value",
@@ -304,8 +307,9 @@ it("an active-gated modal row counts only while the tile is not active", () => {
       rules: [{ when: "active", hidden: true }],
     },
   ]);
+  // Detail mode follows the slot's Detail span, not the tile's active rules.
   expect(tileParts(device(), t, none).hasModal).toBe(true);
-  expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(false);
+  expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(true);
 });
 
 it("falls back to the template's own slots when the placement has none", () => {
@@ -361,6 +365,34 @@ it("moves a badge-mode slot to the corner, keeping its detail row", () => {
   expect(parts.badgeSlots.map((s) => s.source)).toEqual(["humidity"]);
   expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
   expect(tileHeadlineSlot(t.slots!)).toBe(t.slots![0]);
+});
+
+it("an only gate hides the badge but keeps its detail row", () => {
+  const t = tile([
+    {
+      kind: "value",
+      source: "humidity",
+      tile: "badge",
+      detail: "full",
+      icon: { glyph: "battery" },
+      rules: [
+        {
+          when: "false",
+          only: true,
+          color: "var(--surface-color)",
+          background: "var(--danger-color)",
+        },
+      ],
+    },
+  ]);
+  const parts = tileParts(device(), t, none);
+  // The gate hides it on the tile; the detail list is governed by the Detail
+  // span alone, so its row stays and no rule reaches its icon.
+  expect(parts.badgeSlots).toHaveLength(1);
+  expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
+  const row = parts.modal[0];
+  expect(row.style).toEqual({});
+  expect(rowIcon(row, "modal")).toEqual({ glyph: "battery", color: undefined });
 });
 
 it("reads a row's icon from the descriptor, the rule icon winning", () => {
@@ -851,7 +883,7 @@ it("suppresses the face default for an active, disabled or device-owned face", (
   ).toBeUndefined();
 });
 
-it("a detail badge ignores a face-hiding rule and keeps its label", () => {
+it("a detail badge mirrors the tile's rule and label", () => {
   const unreachable = device({
     controls: [control("c1", "temperature", false)],
   });
@@ -861,14 +893,36 @@ it("a detail badge ignores a face-hiding rule and keeps its label", () => {
       {
         kind: "badge",
         source: "offline",
-        where: "modal",
+        detail: "full",
         options: { badgeLabel: false },
-        rules: [{ when: "true", hidden: true }],
+        rules: [{ when: "true", color: "var(--danger-color)" }],
       },
     ]),
     none,
     { raw: noRaw },
   );
   expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
-  expect(parts.modalBadges[0].labelHidden).toBeUndefined();
+  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
+  // Like the tile, an icon-only chip stays icon-only in the detail header.
+  expect(parts.modalBadges[0].labelHidden).toBe(true);
+});
+
+it("a detail badge hidden on the tile leaves the header", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "badge",
+        source: "offline",
+        detail: "full",
+        rules: [{ when: "true", hidden: true }],
+      },
+    ]),
+    none,
+    { raw: noRaw },
+  );
+  expect(parts.modalBadges).toEqual([]);
 });

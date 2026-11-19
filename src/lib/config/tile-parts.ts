@@ -112,14 +112,16 @@ export function tileParts(
   // A source or hint that matches nothing goes dormant (A20); the slots that
   // actually render are the ones with a reading (a frame needs none) that no
   // rule hides.
-  const rows: SlotRow[] = pickSlotControls<SlotControl>(slots, shownControls, {
-    active,
-    raw,
-  })
+  const resolvedRows: SlotRow[] = pickSlotControls<SlotControl>(
+    slots,
+    shownControls,
+    {
+      active,
+      raw,
+    },
+  )
     .filter(
-      (r) =>
-        (r.slot.kind === "frame" || r.slot.kind === "html" || r.control) &&
-        styleOf(r.slot, r.control).hidden !== true,
+      (r) => r.slot.kind === "frame" || r.slot.kind === "html" || r.control,
     )
     .map((r) => ({
       slot: r.slot,
@@ -127,23 +129,42 @@ export function tileParts(
       style: styleOf(r.slot, r.control),
       iconIsTemplate: templateGlyph(r.slot),
     }));
+  const rows = resolvedRows.filter((r) => r.style.hidden !== true);
 
   // The body is every row that lives on the tile (A59: nothing draws as a
   // layer of its own any more — the chart comes from the rows).
   // The body is every row that draws as a tile body element; a badge-mode
   // slot leaves it for a corner chip (A34).
   const body = rows.filter((r) => slotTileMode(r.slot) === "normal");
-  const modal = rows.filter((r) => inDetail(r.slot));
+  // The detail page is governed by the tile settings alone: the Detail span and
+  // the icon/label/value homes. Rules (visibility, colour, icon) and the
+  // active/inactive gate never reach it. The pick runs on showWhen-free clones
+  // so a face-only slot still gets its row and control.
+  const detailSlots = slots.map((s) =>
+    s.showWhen ? { ...s, showWhen: undefined } : s,
+  );
+  const modal: SlotRow[] = pickSlotControls<SlotControl>(
+    detailSlots,
+    shownControls,
+    { active: true, raw },
+  )
+    .filter(
+      (r) => r.slot.kind === "frame" || r.slot.kind === "html" || r.control,
+    )
+    .map((r) => ({
+      slot: r.slot,
+      control: r.control,
+      style: {},
+      iconIsTemplate: false,
+    }))
+    .filter((r) => inDetail(r.slot));
 
   const badgeSlots = slots.filter(
     (s) => slotVisible(s, active) && slotTileMode(s) === "badge",
   );
-  // Badges that also live in the modal become its chip strip (A34). The
-  // detail page is the inventory: a face rule that hides the chip there does
-  // not remove it, and the chip always shows icon, label and value.
-  const modalBadgeSlots = slots.filter(
-    (s) => s.kind === "badge" && inDetail(s),
-  );
+  // The detail header mirrors the tile's corner badges: the same chips, rules
+  // and label behaviour; only their place changes (left to right of the title).
+  const modalBadgeSlots = badgeSlots.filter((s) => inDetail(s));
   const modalBadges = raw
     ? modalBadgeSlots.flatMap((s) =>
         resolveBadges(
@@ -153,7 +174,6 @@ export function tileParts(
           opts?.now ?? Date.now(),
           pool,
           raw,
-          true,
         ),
       )
     : [];
@@ -322,7 +342,15 @@ export function rowIcon(
       : on === false
         ? (offTwin(twins!, picked) ?? picked)
         : picked;
-  return { glyph, color: row.style.color, disabled: row.style.disabled };
+  // A chip's rule colours are for the corner badge (often text on a filled
+  // background). The detail row is a normal line: reusing that colour there can
+  // paint an icon invisible (white on white).
+  const chip = home === "modal" && slotTileMode(row.slot) === "badge";
+  return {
+    glyph,
+    color: chip ? undefined : row.style.color,
+    disabled: row.style.disabled,
+  };
 }
 
 /** Does the slot's reading/control draw in `home`? `hideValue` turns the body
