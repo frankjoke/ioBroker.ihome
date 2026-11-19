@@ -36,6 +36,7 @@
   } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { initLogics } from "$lib/stores/logics.svelte";
+  import { initOverrides } from "$lib/stores/overrides.svelte";
   import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
@@ -388,6 +389,7 @@
       await initVariables();
       await initTemplates();
       await initLogics();
+      await initOverrides();
       // Migrate from the *canonical* device list — a synchronous snapshot — not
       // from the enriched display store, which polls every 50ms and can still
       // hold the pre-backfill (or empty) device set (review C2). Without devices
@@ -438,6 +440,7 @@
     initVariables();
     initTemplates();
     initLogics();
+    initOverrides();
     // The phone reporter runs on every route: a PWA cold start on the
     // dashboard must register and heartbeat without opening Server & Security.
     initPhone();
