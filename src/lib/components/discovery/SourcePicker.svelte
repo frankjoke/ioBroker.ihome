@@ -60,6 +60,7 @@
     onSource,
     onControls,
     onState,
+    onTemplate,
     onClose,
     logics = [],
     logicPick = undefined,
@@ -89,6 +90,8 @@
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
     onState?: (stateId: string) => void;
+    /** New-tile Templates tab: the chosen tile template. */
+    onTemplate?: (template: Template) => void;
     /** The document's logics, for the picker's Logic tab. */
     logics?: LogicDef[];
     /** What a logic selection means: an event trigger or its output state. */
@@ -96,11 +99,12 @@
     onClose: () => void;
   } = $props();
 
-  type Tab = "device" | "state" | "page" | "badge" | "html";
+  type Tab = "device" | "state" | "template" | "page" | "badge" | "html";
 
   const TABS: Record<PickerMode, { id: Tab; label: string }[]> = {
     slot: [
       { id: "device", label: "From device" },
+      { id: "template", label: "Templates" },
       { id: "state", label: "Any state" },
       { id: "page", label: "Web page" },
       { id: "badge", label: "Badge" },
@@ -117,8 +121,22 @@
     state: [{ id: "state", label: "Any state" }],
   };
   const tabs = $derived(
-    TABS[mode].filter((entry) => showBadge || entry.id !== "badge"),
+    TABS[mode]
+      .filter((entry) => showBadge || entry.id !== "badge")
+      .filter((entry) => entry.id !== "template" || suggestTemplates),
   );
+
+  /** Template list for the new-tile tab: name, type and description. */
+  const filteredTemplates = $derived.by(() => {
+    const query = search.trim().toLowerCase();
+    return templates.filter(
+      (template) =>
+        !query ||
+        `${template.name ?? ""} ${template.type} ${template.description ?? ""}`
+          .toLowerCase()
+          .includes(query),
+    );
+  });
 
   // An item that already has a state opens where that state lives; a picker
   // that adds a new source still starts on the device list.
@@ -627,6 +645,42 @@
           {logicPick}
         />
       {/if}
+    {:else if tab === "template"}
+      <div class="device-pick">
+        <div class="row-input">
+          <input
+            type="search"
+            placeholder="Search templates…"
+            bind:value={search}
+          />
+        </div>
+        {#if filteredTemplates.length === 0}
+          <p class="empty text-muted">
+            No tile templates yet — save one from a tile with the floppy in the
+            tile editor.
+          </p>
+        {:else}
+          <ul class="list device-list">
+            {#each filteredTemplates as template (template.id)}
+              <li class="device-row">
+                <button
+                  type="button"
+                  class="template-row"
+                  onclick={() => onTemplate?.(template)}
+                >
+                  <span class="template-main">
+                    <span class="name">{template.name || template.id}</span>
+                    <span class="meta text-muted">{template.type}</span>
+                  </span>
+                  <span class="template-desc text-muted"
+                    >{template.description || template.type}</span
+                  >
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
     {:else if tab === "page"}
       <div class="placeholder">
         <div class="row-input">
@@ -1038,6 +1092,43 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm, 4px);
     padding: 0.2rem;
+  }
+
+  .template-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 2px 4px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .template-row:hover {
+    background-color: var(--surface-container);
+  }
+
+  .template-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .template-main .name {
+    flex: 1 1 auto;
+  }
+
+  .template-desc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--body-sm);
   }
 
   .results {
