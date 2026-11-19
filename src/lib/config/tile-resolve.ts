@@ -60,7 +60,7 @@ function pseudoControl(
     type: resolved?.type,
     states: resolved?.states,
     meta:
-      resolved?.control?.meta ??
+      resolved?.meta ??
       (resolved
         ? effectiveCommon(
             { id: "", feature: "", writable: false } as EnrichedControl,

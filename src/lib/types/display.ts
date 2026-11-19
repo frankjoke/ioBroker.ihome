@@ -275,7 +275,7 @@ export interface SlotSpark {
  *  A v1 document still carries a string source; the migration converts it. */
 export type SlotSource =
   | { kind: "control"; device: string; control: string }
-  | { kind: "state"; stateId: string }
+  | { kind: "state"; stateId: string; override?: string }
   | { kind: "device"; device: string };
 
 /** How a slot appears in the detail page: a full line, half a line (pairs with
