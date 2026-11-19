@@ -2119,21 +2119,41 @@
                         )}
                     />
                   </label>
-                  <label class="small">
-                    <span class="label-mono">Unit</span>
-                    <input
-                      type="text"
-                      class="unit-input"
-                      value={slot.unit ?? ""}
-                      title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
-                      oninput={(e) =>
-                        edit((t) =>
-                          patchSlot(t, i, {
-                            unit: e.currentTarget.value.trim() || undefined,
-                          }),
-                        )}
-                    />
-                  </label>
+                  {#if slot.kind === "value"}
+                    <label
+                      class="check"
+                      title="Show the unit (off saves width)"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.options?.hideUnit !== true}
+                        onchange={(e) =>
+                          patchOptions(i, {
+                            hideUnit: e.currentTarget.checked
+                              ? undefined
+                              : true,
+                          })}
+                      />
+                      <span>unit</span>
+                    </label>
+                  {/if}
+                  {#if slot.kind !== "value" || slot.options?.hideUnit !== true}
+                    <label class="small">
+                      <span class="label-mono">Unit</span>
+                      <input
+                        type="text"
+                        class="unit-input"
+                        value={slot.unit ?? ""}
+                        title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
+                        oninput={(e) =>
+                          edit((t) =>
+                            patchSlot(t, i, {
+                              unit: e.currentTarget.value.trim() || undefined,
+                            }),
+                          )}
+                      />
+                    </label>
+                  {/if}
                 </div>
                 {#if slot.kind === "value"}
                   <div class="row">
@@ -2148,19 +2168,6 @@
                             decimals: num(e.currentTarget.value),
                           })}
                       />
-                    </label>
-                    <label class="check" title="Hide the unit to save width">
-                      <input
-                        type="checkbox"
-                        checked={slot.options?.hideUnit !== true}
-                        onchange={(e) =>
-                          patchOptions(i, {
-                            hideUnit: e.currentTarget.checked
-                              ? undefined
-                              : true,
-                          })}
-                      />
-                      <span>unit</span>
                     </label>
                   </div>
                 {/if}
