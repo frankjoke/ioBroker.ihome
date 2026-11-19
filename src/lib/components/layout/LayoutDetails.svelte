@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { isHexColor } from "$lib/config/appearance";
   import {
     patchPage,
     patchPlacement,
@@ -50,13 +49,14 @@
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
-  import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
+  import { ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/devices";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
+  import ColorSelect from "$lib/components/common/ColorSelect.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import { iconTitle } from "$lib/config/icon-html";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
@@ -1078,13 +1078,6 @@
     );
   }
 
-  /** The colour select's value: "" (auto), a palette token, or "custom". */
-  function sparkColorValue(slot: Slot): string {
-    const color = slot.spark?.color;
-    if (!color) return "";
-    return Object.values(BADGE_COLORS).includes(color) ? color : "custom";
-  }
-
   /** The icon's homes cycle both → tile → modal → both (A57); a modal-only
    *  slot has no tile to show on, so "tile" is skipped for it. */
   function nextIconWhere(i: number): "tile" | "both" | "modal" {
@@ -1172,35 +1165,10 @@
   aria: string,
   set: (v: string | undefined) => void,
 )}
-  <label class="small">
+  <div class="small">
     <span class="label-mono">{label}</span>
-    <select
-      value={isHexColor(value ?? "") ? "custom" : (value ?? "")}
-      onchange={(e) => {
-        const next = e.currentTarget.value;
-        if (next === "custom") {
-          if (!isHexColor(value ?? "")) set("#494bd6");
-          return;
-        }
-        set(next || undefined);
-      }}
-    >
-      <option value="">default</option>
-      {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
-        <option value={token}>{name}</option>
-      {/each}
-      <option value="custom">custom…</option>
-    </select>
-    {#if isHexColor(value ?? "")}
-      <input
-        type="color"
-        class="color-input"
-        aria-label={aria}
-        value={value ?? ""}
-        oninput={(e) => set(e.currentTarget.value)}
-      />
-    {/if}
-  </label>
+    <ColorSelect label={aria} {value} onChange={set} />
+  </div>
 {/snippet}
 
 <div class="details">
@@ -2329,88 +2297,28 @@
                         <option value="bottom">bottom</option>
                       </select>
                     </label>
-                    <label class="small">
+                    <div class="small">
                       <span class="label-mono">colour</span>
-                      <select
-                        value={isHexColor(String(slot.options?.color ?? ""))
-                          ? "custom"
-                          : String(slot.options?.color ?? "")}
-                        onchange={(e) => {
-                          const value = e.currentTarget.value;
-                          if (value === "custom") {
-                            if (
-                              !isHexColor(String(slot.options?.color ?? ""))
-                            ) {
-                              patchOptions(i, { color: "#494bd6" });
-                            }
-                            return;
-                          }
-                          patchOptions(i, { color: value || undefined });
-                        }}
-                      >
-                        <option value="">default</option>
-                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
-                          <option value={name}>{name}</option>
-                        {/each}
-                        <option value="custom">custom…</option>
-                      </select>
-                    </label>
-                    {#if isHexColor(String(slot.options?.color ?? ""))}
-                      <input
-                        type="color"
-                        class="color-input"
-                        aria-label="Badge colour"
-                        value={String(slot.options?.color)}
-                        oninput={(e) =>
-                          patchOptions(i, { color: e.currentTarget.value })}
+                      <ColorSelect
+                        label="Badge colour"
+                        value={typeof slot.options?.color === "string"
+                          ? slot.options.color
+                          : undefined}
+                        onChange={(v) => patchOptions(i, { color: v })}
                       />
-                    {/if}
+                    </div>
                   </div>
                   <div class="row wrap">
-                    <label class="small">
+                    <div class="small">
                       <span class="label-mono">bg</span>
-                      <select
-                        value={isHexColor(
-                          String(slot.options?.background ?? ""),
-                        )
-                          ? "custom"
-                          : String(slot.options?.background ?? "")}
-                        onchange={(e) => {
-                          const value = e.currentTarget.value;
-                          if (value === "custom") {
-                            if (
-                              !isHexColor(
-                                String(slot.options?.background ?? ""),
-                              )
-                            ) {
-                              patchOptions(i, { background: "#1e3a8a" });
-                            }
-                            return;
-                          }
-                          patchOptions(i, {
-                            background: value || undefined,
-                          });
-                        }}
-                      >
-                        <option value="">default</option>
-                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
-                          <option value={name}>{name}</option>
-                        {/each}
-                        <option value="custom">custom…</option>
-                      </select>
-                    </label>
-                    {#if isHexColor(String(slot.options?.background ?? ""))}
-                      <input
-                        type="color"
-                        class="color-input"
-                        aria-label="Badge background"
-                        value={String(slot.options?.background)}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            background: e.currentTarget.value,
-                          })}
+                      <ColorSelect
+                        label="Badge background"
+                        value={typeof slot.options?.background === "string"
+                          ? slot.options.background
+                          : undefined}
+                        onChange={(v) => patchOptions(i, { background: v })}
                       />
-                    {/if}
+                    </div>
                     <label class="check" title="Use a heavier badge label">
                       <input
                         type="checkbox"
@@ -2541,38 +2449,15 @@
                       <span>Sparkline</span>
                     </label>
                     {#if slot.spark}
-                      <label class="small">
+                      <div class="small">
                         <span class="label-mono">colour</span>
-                        <select
-                          value={sparkColorValue(slot)}
-                          onchange={(e) => {
-                            const value = e.currentTarget.value;
-                            if (value === "custom") {
-                              if (!isHexColor(slot.spark?.color ?? "")) {
-                                setSpark(i, { color: "#494bd6" });
-                              }
-                              return;
-                            }
-                            setSpark(i, { color: value || undefined });
-                          }}
-                        >
-                          <option value="">auto</option>
-                          {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
-                            <option value={token}>{name}</option>
-                          {/each}
-                          <option value="custom">custom…</option>
-                        </select>
-                      </label>
-                      {#if isHexColor(slot.spark.color ?? "")}
-                        <input
-                          type="color"
-                          class="color-input"
-                          aria-label="Chart colour"
+                        <ColorSelect
+                          label="Chart colour"
+                          defaultLabel="auto"
                           value={slot.spark.color}
-                          oninput={(e) =>
-                            setSpark(i, { color: e.currentTarget.value })}
+                          onChange={(v) => setSpark(i, { color: v })}
                         />
-                      {/if}
+                      </div>
                       <button
                         type="button"
                         class="icon-btn"
@@ -2769,23 +2654,17 @@
                                   )}>clear</button
                               >
                             {/if}
-                            <label class="check" title="Rule colour">
+                            <div class="small">
                               <span class="label-mono">colour</span>
-                              <input
-                                type="color"
-                                class="color-input"
-                                aria-label="Rule colour"
-                                value={isHexColor(rule.color)
-                                  ? rule.color
-                                  : "#000000"}
-                                oninput={(e) =>
+                              <ColorSelect
+                                label="Rule colour"
+                                value={rule.color}
+                                onChange={(v) =>
                                   edit((t) =>
-                                    patchRule(t, i, ri, {
-                                      color: e.currentTarget.value,
-                                    }),
+                                    patchRule(t, i, ri, { color: v }),
                                   )}
                               />
-                            </label>
+                            </div>
                             {#if rule.color}
                               <button
                                 type="button"
@@ -2857,35 +2736,17 @@
                             </label>
                           </div>
                           <div class="rule-line">
-                            <label class="small grow">
+                            <div class="small grow">
                               <span class="label-mono">background</span>
-                              <input
-                                type="text"
-                                value={rule.background ?? ""}
-                                oninput={(e) =>
+                              <ColorSelect
+                                label="Rule background colour"
+                                value={rule.background}
+                                onChange={(v) =>
                                   edit((t) =>
-                                    patchRule(t, i, ri, {
-                                      background:
-                                        e.currentTarget.value.trim() ||
-                                        undefined,
-                                    }),
+                                    patchRule(t, i, ri, { background: v }),
                                   )}
                               />
-                              <input
-                                type="color"
-                                class="color-input"
-                                aria-label="Rule background colour"
-                                value={isHexColor(rule.background)
-                                  ? rule.background
-                                  : "#000000"}
-                                oninput={(e) =>
-                                  edit((t) =>
-                                    patchRule(t, i, ri, {
-                                      background: e.currentTarget.value,
-                                    }),
-                                  )}
-                              />
-                            </label>
+                            </div>
                             <label class="small">
                               <span class="label-mono">tone</span>
                               <select
@@ -3349,17 +3210,6 @@
 
   .unit-input {
     width: 3.5rem;
-  }
-
-  .color-input {
-    flex: 0 0 auto;
-    inline-size: 2rem;
-    min-inline-size: 2rem;
-    block-size: 1.5rem;
-    padding: 0;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: transparent;
   }
 
   .rule-icon {

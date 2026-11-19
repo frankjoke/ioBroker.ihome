@@ -6,6 +6,7 @@ import {
   evalRule,
   offlineBadge,
   resolveBadges,
+  resolveColorToken,
   resolveStyle,
   stateIdsInExpression,
   ruleScope,
@@ -670,8 +671,14 @@ it("badges take a named or custom colour, rules first", () => {
   // Named colours resolve to theme tokens; a hex passes through; junk is dropped.
   const at = (s: Slot) => resolveBadges([s], device, undefined, NOW)[0];
   expect(at(slot({ color: "danger" })).color).toBe("var(--danger-color)");
+  expect(at(slot({ color: "var(--danger-color)" })).color).toBe(
+    "var(--danger-color)",
+  );
   expect(at(slot({ color: "#123456" })).color).toBe("#123456");
   expect(at(slot({ color: "chartreuse" })).color).toBeUndefined();
+  expect(resolveColorToken("surface")).toBe("var(--surface-color)");
+  expect(resolveColorToken("var(--text-color)")).toBe("var(--text-color)");
+  expect(resolveColorToken("#123456")).toBeUndefined();
   // A matched rule colour outranks everything; a matched rule tone outranks the
   // slot colour (the static base yields to the condition).
   expect(

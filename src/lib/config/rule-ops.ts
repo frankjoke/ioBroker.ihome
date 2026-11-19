@@ -32,12 +32,20 @@ export const BADGE_COLORS: Record<string, string> = {
   success: "var(--success-color)",
   warning: "var(--warning-color)",
   danger: "var(--danger-color)",
+  surface: "var(--surface-color)",
 };
+
+/** A palette name or token → its theme token; anything else is not a palette
+ *  colour. Stored values may use either form (older badges store names). */
+export function resolveColorToken(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  if (value in BADGE_COLORS) return BADGE_COLORS[value];
+  return Object.values(BADGE_COLORS).includes(value) ? value : undefined;
+}
 
 function badgeColor(value: unknown): string | undefined {
   if (typeof value !== "string" || !value) return undefined;
-  if (value in BADGE_COLORS) return BADGE_COLORS[value];
-  return isHexColor(value) ? value : undefined;
+  return resolveColorToken(value) ?? (isHexColor(value) ? value : undefined);
 }
 
 /** Where a badge sits: one of nine anchors on the tile's edge. */
