@@ -7,6 +7,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
+  import { registerProgramStateId } from "$lib/stores/devices.svelte";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
   import {
     evaluateOverride,
@@ -123,6 +124,16 @@
     expr: draft.expr,
     precision: draft.precision,
   });
+  // The derived preview needs live sibling values even before the override is
+  // saved: register the group and let the connection subscribe it.
+  $effect(() => {
+    if (draft.kind !== "derived") return;
+    for (const id of group.stateIds) {
+      if (id.includes(".")) registerProgramStateId(id);
+    }
+    ioBroker.syncSubscriptions();
+  });
+
   const preview = $derived.by(() => {
     if (draft.kind !== "derived") return undefined;
     try {

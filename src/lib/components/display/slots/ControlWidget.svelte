@@ -81,12 +81,14 @@
   });
   /** A read-only level is a reading, not a disabled slider. */
   const widget = $derived(
-    widgetOverride ??
-      (control.writable === true &&
-      control.type === "boolean" &&
-      (control.widget ?? "value") === "value"
-        ? "switch"
-        : effectiveWidget(control.widget, control.writable === true)),
+    widgetOverride === "level" && control.writable !== true
+      ? "value"
+      : (widgetOverride ??
+          (control.writable === true &&
+          control.type === "boolean" &&
+          (control.widget ?? "value") === "value"
+            ? "switch"
+            : effectiveWidget(control.widget, control.writable === true))),
   );
 
   // Keep a drag on a slider from reaching the tile underneath it.
