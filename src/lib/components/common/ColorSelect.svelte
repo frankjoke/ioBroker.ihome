@@ -22,6 +22,9 @@
   } = $props();
 
   let open = $state(false);
+  /** The custom inputs stay open only while the user is working on them: a
+   *  custom value in the trigger is enough to show the choice. */
+  let editing = $state(false);
   let root = $state<HTMLElement>();
 
   const entries = $derived(Object.entries(BADGE_COLORS));
@@ -34,23 +37,37 @@
 
   function pick(next: string | undefined): void {
     open = false;
+    editing = false;
     onChange(next);
   }
 
   function pickCustom(): void {
     open = false;
     if (!custom) onChange(customDefault);
+    editing = true;
+  }
+
+  /** Done with the custom inputs; an empty field clears the colour. */
+  function commitCustom(): void {
+    editing = false;
+    if (!value?.trim()) onChange(undefined);
   }
 
   function closeOutside(event: MouseEvent): void {
-    if (open && root && !root.contains(event.target as Node)) open = false;
+    if (root && !root.contains(event.target as Node)) {
+      open = false;
+      editing = false;
+    }
   }
 </script>
 
 <svelte:window
   onclick={closeOutside}
   onkeydown={(e) => {
-    if (e.key === "Escape") open = false;
+    if (e.key === "Escape") {
+      open = false;
+      editing = false;
+    }
   }}
 />
 
@@ -61,7 +78,10 @@
     aria-label={label}
     aria-haspopup="listbox"
     aria-expanded={open}
-    onclick={() => (open = !open)}
+    onclick={() => {
+      open = !open;
+      editing = false;
+    }}
   >
     <span class="swatch" class:empty={!value} style:background={value ?? ""}
     ></span>
@@ -105,20 +125,28 @@
     </div>
   {/if}
 
-  {#if custom}
+  {#if editing}
     <div class="custom">
       <input
         type="color"
         aria-label={`${label} picker`}
         value={isHexColor(value) ? value : customDefault}
         oninput={(e) => onChange(e.currentTarget.value)}
+        onchange={commitCustom}
       />
       <input
         type="text"
         aria-label={`${label} value`}
-        {value}
+        value={value ?? ""}
         placeholder={customDefault}
         oninput={(e) => onChange(e.currentTarget.value.trim())}
+        onkeydown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitCustom();
+          }
+        }}
+        onblur={commitCustom}
       />
     </div>
   {/if}
