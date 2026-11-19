@@ -9,6 +9,7 @@
   import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import TemplateSuggestionModal from "$lib/components/templates/TemplateSuggestionModal.svelte";
+  import TemplateTileModal from "$lib/components/templates/TemplateTileModal.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
     addPage,
@@ -38,6 +39,7 @@
   import {
     applyTileSeed,
     materializeTemplateTile,
+    materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
     slotFromControl,
@@ -115,6 +117,12 @@
   let pendingTileState = $state<{
     reference: TemplateReference;
     suggestions: TemplateSuggestion[];
+    pageId: string;
+    sectionId: string;
+    at?: number;
+  } | null>(null);
+  let pendingTemplate = $state<{
+    template: Template;
     pageId: string;
     sectionId: string;
     at?: number;
@@ -465,6 +473,33 @@
         ),
       ];
     }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
+  }
+
+  /** A new tile from a saved template, bound to the chosen states. */
+  function addTemplateTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    fills: Map<string, TemplateReference>,
+    main: TemplateReference,
+    at?: number,
+  ): void {
+    const materialized = materializeTemplateTileFromFills(
+      template,
+      fills,
+      main,
+    );
+    if (materialized.slots.length === 0) {
+      materialized.slots = [
+        slotFromState(
+          main.ref,
+          main.object,
+          slotKindForWidget(widgetForState(main.object)),
+        ),
+      ];
+    }
+    pendingTemplate = null;
     commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
@@ -1003,6 +1038,17 @@
     logicPick="state"
     suggestTemplates={target.kind === "newTile"}
     onStatePicked={onTileStatePicked}
+    onTemplate={target.kind === "newTile"
+      ? (template) => {
+          pendingTemplate = {
+            template,
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+            at: target.at,
+          };
+          pickerFor = null;
+        }
+      : undefined}
     onSlots={(slots) => {
       // Snapshot before closing: `target` reads the reactive value, which
       // becomes null the moment `pickerFor` is cleared.
@@ -1013,6 +1059,24 @@
       }
     }}
     onClose={() => (pickerFor = null)}
+  />
+{/if}
+
+{#if pendingTemplate}
+  {@const target = pendingTemplate}
+  <TemplateTileModal
+    template={target.template}
+    logics={getLogicDocument().logics}
+    onCreate={(fills, main) =>
+      addTemplateTile(
+        target.pageId,
+        target.sectionId,
+        target.template,
+        fills,
+        main,
+        target.at,
+      )}
+    onClose={() => (pendingTemplate = null)}
   />
 {/if}
 

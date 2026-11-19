@@ -10,6 +10,7 @@
   import { effectiveFunctions, effectiveRoom } from "$lib/config/state-meta";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
   import DeviceEditorPane from "$lib/components/config/DeviceEditorPane.svelte";
+  import { helpLine } from "$lib/config/template-entries";
   import { upsertDevice } from "$lib/registry.svelte.js";
   import {
     preselectedControlIds,
@@ -673,7 +674,9 @@
                     <span class="meta text-muted">{template.type}</span>
                   </span>
                   <span class="template-desc text-muted"
-                    >{template.description || template.type}</span
+                    >{template.description ||
+                      helpLine(template.help ?? "") ||
+                      template.type}</span
                   >
                 </button>
               </li>
