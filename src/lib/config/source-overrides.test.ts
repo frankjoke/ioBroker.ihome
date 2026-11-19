@@ -420,6 +420,7 @@ describe("ensureRepairOverride", () => {
       role: "switch",
     });
     expect(byRole.id).toBe("a");
+    expect(byRole.name).toBe("lamp");
     expect(byRole.registry).toBe(base);
     const byName = ensureRepairOverride(base, "s", {
       kind: "repair",
@@ -427,6 +428,7 @@ describe("ensureRepairOverride", () => {
       role: "switch.light",
     });
     expect(byName.id).toBe("a");
+    expect(byName.name).toBe("lamp");
     // A derived override with the same name is not a repair to reuse.
     const withDerived = {
       ...emptyOverrideRegistry(),
@@ -443,6 +445,7 @@ describe("ensureRepairOverride", () => {
       role: "value.power",
     });
     expect(created.id).not.toBe("d");
+    expect(created.name).toBe("power2");
     expect(created.registry.overrides).toHaveLength(2);
     expect(
       created.registry.overrides.find((o) => o.id === created.id)?.name,

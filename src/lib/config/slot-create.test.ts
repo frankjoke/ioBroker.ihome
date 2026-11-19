@@ -411,6 +411,23 @@ it("materialises feature slots and keeps raw state slots", () => {
   ]);
 });
 
+it("refuses a role template against a device without producing slots", () => {
+  const roleTemplate = {
+    ...template,
+    roles: ["switch", "value_power"],
+    features: [],
+    slots: [
+      {
+        kind: "switch",
+        source: "switch",
+        repair: { kind: "repair", name: "switch", role: "switch" },
+      },
+    ],
+  } as Template;
+  const result = materializeTemplateTile(roleTemplate, light, [roleTemplate]);
+  expect(result.slots).toEqual([]);
+});
+
 it("rewrites the active feature and drops an unfilled one", () => {
   const withBattery = {
     ...template,

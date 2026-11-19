@@ -40,6 +40,14 @@ export function templateFeatures(template: Template): FeatureDef[] {
   return presetForType(template.type).features;
 }
 
+/** Why a visual template cannot be used as a device template, or null. A role
+ *  template binds states, so it must never reach a device tile or bundle part. */
+export function templateDeviceProblem(template: Template): string | null {
+  return template.roles?.length
+    ? `“${template.name}” is a role template — it fits states, not devices.`
+    : null;
+}
+
 /** The feature whose state is picked first; old templates use the first. */
 export function primaryFeature(features: FeatureDef[]): FeatureDef | undefined {
   return features.find((feature) => feature.primary === true) ?? features[0];

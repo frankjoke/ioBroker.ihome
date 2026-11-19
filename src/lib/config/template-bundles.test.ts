@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TemplateBundle } from "$lib/types/templates";
+import type { Template } from "$lib/types/display";
 import { evaluateDeviceTemplate } from "./device-templates";
 import { NETWORK_DEVICE_BUNDLE } from "./builtin-bundles";
 import {
@@ -233,6 +234,47 @@ describe("part helpers", () => {
     expect(
       logicPartFromTemplate({ id: "l", name: "L", params: [], logic: body }),
     ).toEqual({ logic: body });
+  });
+
+  it("refuses a role template as a device part", () => {
+    const roleTemplate = {
+      id: "r",
+      name: "Climate",
+      type: "Custom",
+      features: [],
+      roles: ["temperature", "switch"],
+      slots: [
+        {
+          kind: "value",
+          source: "temperature",
+          repair: { kind: "repair", name: "temperature" },
+        },
+      ],
+    } as unknown as Template;
+    expect(() => devicePartFromTemplate(roleTemplate)).toThrow(
+      /role template/i,
+    );
+    // A bundle document edited by hand or imported keeps its old value: the
+    // problem is reported before anything is written.
+    const problem = templateBundleProblem(
+      {
+        ...bundle(),
+        device: {
+          type: "Custom",
+          features: [],
+          slots: [
+            {
+              kind: "value",
+              source: "temperature",
+              repair: { kind: "repair", name: "temperature" },
+            },
+          ],
+        },
+      } as TemplateBundle,
+      [],
+      [],
+    );
+    expect(problem).toMatch(/role template/i);
   });
 });
 

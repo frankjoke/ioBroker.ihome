@@ -40,3 +40,10 @@ export interface OverrideRegistry {
   migratedDevices?: boolean;
   overrides: SourceOverride[];
 }
+
+/** What a template apply binds after ensuring a repair: the override's id and
+ *  the name the tile's rule scope will sanitize into a local. */
+export interface EnsuredOverride {
+  id: string;
+  name: string;
+}

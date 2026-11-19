@@ -1,6 +1,7 @@
 import { expressionSyntaxProblem } from "$lib/config/code-syntax";
 import { evaluateDeviceTemplate } from "$lib/config/device-templates";
 import { logicTemplateProblem } from "$lib/config/logic-templates";
+import { templateDeviceProblem } from "$lib/config/template-ops";
 import { visualTemplateProblem } from "$lib/config/visual-templates";
 import { validateDeviceTemplate } from "$logic/device-templates";
 import type {
@@ -233,6 +234,11 @@ export function templateBundleProblem(
     }
   }
   if (bundle.device) {
+    // A device part that still carries a role template's repair is not a device
+    // template: it would write role sources and template-only fields.
+    if ((bundle.device.slots ?? []).some((slot) => slot.repair !== undefined)) {
+      return "A role template cannot be used as a bundle's device part.";
+    }
     const problem = visualTemplateProblem(
       { ...bundle.device, id: bundle.id, name: bundle.name },
       [],
@@ -283,6 +289,8 @@ export function templateBundleProblem(
 
 /** Copy a visual template into a bundle's device part (drop its identity). */
 export function devicePartFromTemplate(template: Template): TemplateDevicePart {
+  const problem = templateDeviceProblem(template);
+  if (problem) throw new Error(problem);
   const part: TemplateDevicePart = {
     type: template.type,
     features: structuredClone(template.features),

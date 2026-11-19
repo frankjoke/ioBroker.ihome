@@ -172,9 +172,11 @@ export function ensureRepairOverride(
   stateId: string,
   repair: Omit<SourceOverride, "id" | "stateId">,
   variables: GlobalVariable[] = [],
-): { registry: OverrideRegistry; id: string } {
+): { registry: OverrideRegistry; id: string; name: string } {
   const existing = matchingOverride(reg.overrides, stateId, repair, variables);
-  if (existing) return { registry: reg, id: existing.id };
+  if (existing) {
+    return { registry: reg, id: existing.id, name: existing.name };
+  }
   const names = new Set(
     overridesForState(reg, stateId, variables).map((o) =>
       o.name.trim().toLowerCase(),
@@ -189,7 +191,7 @@ export function ensureRepairOverride(
     id: newId(),
     stateId,
   };
-  return { registry: upsertOverride(reg, override), id: override.id };
+  return { registry: upsertOverride(reg, override), id: override.id, name };
 }
 
 /** The siblings a derived expression can name with `$.`. */

@@ -1,6 +1,6 @@
 import type { Control, Device } from "$lib/types/device";
 import type { Template } from "$lib/types/display";
-import { templateFeatures } from "./template-ops";
+import { templateDeviceProblem, templateFeatures } from "./template-ops";
 
 export interface DeviceTemplateFill {
   feature: string;
@@ -26,6 +26,8 @@ export interface CreateDeviceInput {
 export function planDeviceCreate(
   input: CreateDeviceInput,
 ): { device: Device } | { problem: string } {
+  const roleProblem = templateDeviceProblem(input.template);
+  if (roleProblem) return { problem: roleProblem };
   const name = input.name.trim();
   if (!name) return { problem: "Give the device a name." };
 

@@ -35,7 +35,10 @@
     editTile,
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
-  import { templateById } from "$lib/config/template-ops";
+  import {
+    templateById,
+    templateDeviceProblem,
+  } from "$lib/config/template-ops";
   import {
     applyTileSeed,
     autoFillRoles,
@@ -462,6 +465,12 @@
     device: Device,
     at?: number,
   ): void {
+    const problem = templateDeviceProblem(template);
+    if (problem) {
+      actionError = problem;
+      pickerFor = null;
+      return;
+    }
     const materialized = materializeTemplateTile(
       template,
       device,

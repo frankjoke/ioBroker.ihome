@@ -73,3 +73,14 @@ it("rejects unknown and duplicate fills", () => {
     }),
   ).toHaveProperty("problem");
 });
+
+it("refuses a role template and writes no device", () => {
+  const roleTemplate = {
+    ...PRESETS.Light,
+    roles: ["switch", "value_power"],
+    features: [],
+  } as Template;
+  expect(planDeviceCreate({ ...base, template: roleTemplate })).toEqual({
+    problem: expect.stringMatching(/role template/i),
+  });
+});

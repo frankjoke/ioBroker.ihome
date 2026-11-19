@@ -10,7 +10,7 @@ import {
 } from "$lib/config/slot-create";
 import type { SourceLook } from "$lib/config/slot-source";
 import type { TemplateReference } from "$lib/config/template-reference";
-import type { SlotSource, TileConfig } from "$lib/types/display";
+import type { SlotSource, Template, TileConfig } from "$lib/types/display";
 
 const object = (common: Record<string, unknown>) => ({ type: "state", common });
 
@@ -435,7 +435,7 @@ it("binds role fills and creates one override per repaired state", () => {
     reference("fresh.temperature"),
     (stateId, repair) => {
       calls.push({ stateId, name: repair.name });
-      return `ov-${repair.name}`;
+      return { id: `ov-${repair.name}`, name: repair.name };
     },
   );
   expect(calls).toEqual([
@@ -451,8 +451,9 @@ it("binds role fills and creates one override per repaired state", () => {
   // The template-only repair never reaches the tile.
   expect(result.slots.every((slot) => slot.repair === undefined)).toBe(true);
   expect(result.slots[0].label).toBe("Temperature");
-  // The rule now names the created override, not the template role row.
-  expect(result.slots[2].rules).toEqual([{ when: "truthy(switch)" }]);
+  // `switch` is a JS reserved word, so the tile's rule scope sanitizes it to
+  // `switch2`; the materialised rule must name the local the tile builds.
+  expect(result.slots[2].rules).toEqual([{ when: "truthy(switch2)" }]);
   expect(objects.size).toBe(3);
 });
 
@@ -468,9 +469,9 @@ it("drops unbound roles and never recreates a picked override", () => {
     climateTemplate(),
     fills,
     reference("fresh.temperature"),
-    (stateId) => {
+    (stateId, repair) => {
       calls.push(stateId);
-      return "new";
+      return { id: "new", name: repair.name };
     },
   );
   expect(result.slots.map((slot) => slot.source)).toEqual([
@@ -493,9 +494,9 @@ it("creates one override per state even when two roles share it", () => {
     climateTemplate(),
     fills,
     shared,
-    (stateId) => {
+    (stateId, repair) => {
       calls.push(stateId);
-      return `ov-${stateId}`;
+      return { id: `ov-${stateId}`, name: repair.name };
     },
   );
   expect(calls).toEqual(["fresh.temperature", "fresh.switch"]);
@@ -508,13 +509,14 @@ it("creates one override per state even when two roles share it", () => {
   expect(objects.get("fresh.temperature")?.common.role).toBe("temperature");
 });
 
-it("round-trips a saved template into a state tile with its rules", () => {
+it("round-trips a saved template into a state tile with resolvable rules", () => {
   const result = collectTileTemplate(lamp(), {
     id: "t1",
     name: "AZFL Light",
     type: "Light",
     look,
   });
+  const calls: string[] = [];
   const materialized = materializeTemplateTileFromState(
     result.template,
     {
@@ -524,15 +526,107 @@ it("round-trips a saved template into a state tile with its rules", () => {
     },
     look.objects,
     "switch_light",
+    [],
+    (_stateId, repair) => {
+      calls.push(repair.name);
+      return { id: `ov-${repair.name}`, name: repair.name };
+    },
   );
+  expect(calls).toEqual([
+    "switch_light",
+    "level_dimmer",
+    "level_color_temperature",
+    "indicator_reachable",
+    "value_interval",
+  ]);
   const power = materialized.slots[0];
   expect(power.kind).toBe("switch");
   expect(power.label).toBe("Power");
   expect(power.rules?.length).toBe(1);
+  expect(power.source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.SET",
+    override: "ov-switch_light",
+  });
+  expect(materialized.slots.every((slot) => slot.repair === undefined)).toBe(
+    true,
+  );
   const availability = materialized.slots.find(
     (slot) => slot.options?.derive === "ago",
   );
+  // The rule names the override the apply created, so the tile's scope has it.
   expect(availability?.rules).toEqual([
     { when: "!isOnline(indicator_reachable)", only: true, tone: "danger" },
   ]);
+});
+
+it("rewrites a rule to the sanitized local of a renamed repair", () => {
+  const template = {
+    id: "r",
+    name: "Rule template",
+    type: "Custom",
+    roles: ["power"],
+    features: [],
+    slots: [
+      {
+        kind: "value",
+        source: "power",
+        rules: [{ when: "truthy(power)" }],
+        repair: { kind: "repair", name: "power" },
+      },
+    ],
+  } as unknown as Template;
+  const fill = {
+    ref: "fresh.power",
+    stateId: "fresh.power",
+    object: object({ name: "Power", role: "value.power", type: "number" }),
+  };
+  const result = materializeTemplateTileFromFills(
+    template,
+    new Map([["power", fill]]),
+    fill,
+    () => ({ id: "new", name: "power2" }),
+  );
+  expect(result.slots[0].source).toEqual({
+    kind: "state",
+    stateId: "fresh.power",
+    override: "new",
+  });
+  expect(result.slots[0].rules).toEqual([{ when: "truthy(power2)" }]);
+});
+
+it("rewrites a rule to a reused override's sanitized local", () => {
+  const template = {
+    id: "r",
+    name: "Rule template",
+    type: "Custom",
+    roles: ["power"],
+    features: [],
+    slots: [
+      {
+        kind: "value",
+        source: "power",
+        rules: [{ when: "truthy(power)" }],
+        repair: { kind: "repair", name: "power" },
+      },
+    ],
+  } as unknown as Template;
+  const fill = {
+    ref: "fresh.power",
+    stateId: "fresh.power",
+    object: object({ name: "Power", role: "value.power", type: "number" }),
+    overrideId: "kept",
+    overrideName: "Power (W)",
+  };
+  const result = materializeTemplateTileFromFills(
+    template,
+    new Map([["power", fill]]),
+    fill,
+  );
+  expect(result.slots[0].source).toEqual({
+    kind: "state",
+    stateId: "fresh.power",
+    override: "kept",
+  });
+  expect(result.slots[0].rules).toEqual([{ when: "truthy(power_w)" }]);
 });

@@ -1,4 +1,5 @@
 import { uniqueSlug } from "$lib/config/slug";
+import { templateDeviceProblem } from "$lib/config/template-ops";
 import { parseDuration } from "$logic/duration";
 import {
   instantiateTemplate,
@@ -36,6 +37,8 @@ export function planDeviceApply(
   template: Template,
   device: Device | undefined,
 ): { device: Device } | { problem: string } {
+  const roleProblem = templateDeviceProblem(template);
+  if (roleProblem) return { problem: roleProblem };
   if (!device) {
     return { problem: "Choose a device to apply the template to." };
   }
@@ -136,6 +139,11 @@ export function bundleDeviceTemplate(
   name: string,
   params: Record<string, unknown> = {},
 ): Template {
+  if ((part.slots ?? []).some((slot) => slot.repair !== undefined)) {
+    throw new Error(
+      "A role template cannot be used as a bundle's device part.",
+    );
+  }
   const substituted = substituteTemplateParams(
     structuredClone(part),
     params,

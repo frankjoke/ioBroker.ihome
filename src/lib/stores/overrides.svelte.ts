@@ -13,7 +13,11 @@ import {
 } from "$lib/config/source-overrides";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { getVariables } from "$lib/stores/variables.svelte";
-import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
+import type {
+  EnsuredOverride,
+  OverrideRegistry,
+  SourceOverride,
+} from "$lib/types/overrides";
 
 /** The result of a save attempt, so the editor can word the outcome. */
 export type OverrideSave = "saved" | "conflict" | "failed";
@@ -200,11 +204,12 @@ export async function commitOverrides(
 
 /** Binds a template's repairs while an apply runs, then commits them once. */
 export interface OverrideEnsurer {
-  /** The override id a state binds: the existing one, else a created repair. */
+  /** The override a state binds: the existing one, else a created repair, with
+   *  the name its rule local will be sanitized from. */
   ensure: (
     stateId: string,
     repair: Omit<SourceOverride, "id" | "stateId">,
-  ) => string;
+  ) => EnsuredOverride;
   /** One save; "unchanged" when no repair was created. */
   save: () => Promise<OverrideSave | "unchanged">;
 }
@@ -218,7 +223,7 @@ export function createOverrideEnsurer(): OverrideEnsurer {
   const base = registry;
   let next = base;
   return {
-    ensure(stateId, repair) {
+    ensure(stateId, repair): EnsuredOverride {
       const result = ensureRepairOverride(
         next,
         stateId,
@@ -226,7 +231,7 @@ export function createOverrideEnsurer(): OverrideEnsurer {
         getVariables(),
       );
       next = result.registry;
-      return result.id;
+      return { id: result.id, name: result.name };
     },
     async save() {
       if (next === base) return "unchanged";

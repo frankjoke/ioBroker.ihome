@@ -20,7 +20,11 @@
   } from "$lib/config/size-ops";
   import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
   import { getSettings } from "$lib/stores/settings.svelte";
-  import { effectiveSpan, slotVisible } from "$lib/config/template-ops";
+  import {
+    effectiveSpan,
+    slotVisible,
+    templateDeviceProblem,
+  } from "$lib/config/template-ops";
   import {
     addRule,
     applyPoolIcon,
@@ -732,6 +736,11 @@
       const target = devices.find((entry) => entry.id === anchor.device);
       if (!target) {
         applyTemplateError = "The tile's device is gone.";
+        return;
+      }
+      const problem = templateDeviceProblem(template);
+      if (problem) {
+        applyTemplateError = problem;
         return;
       }
       materialized = materializeTemplateTile(template, target, allTemplates);

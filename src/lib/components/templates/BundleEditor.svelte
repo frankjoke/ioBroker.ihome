@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { PRESETS } from "$lib/config/presets";
+  import { templateDeviceProblem } from "$lib/config/template-ops";
   import {
     devicePartFromTemplate,
     logicPartFromTemplate,
@@ -62,7 +63,7 @@
     withoutSecured(
       [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
       local,
-    ),
+    ).filter((template) => !template.roles?.length),
   );
   const logicChoices = $derived(
     withoutSecured(
@@ -179,6 +180,11 @@
     const id = (event.currentTarget as HTMLSelectElement).value;
     const template = deviceChoices.find((entry) => entry.id === id);
     if (!template) return;
+    const problem = templateDeviceProblem(template);
+    if (problem) {
+      saveError = problem;
+      return;
+    }
     draft.device = devicePartFromTemplate($state.snapshot(template));
   }
 

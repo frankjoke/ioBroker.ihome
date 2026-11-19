@@ -18,10 +18,11 @@ import {
   roleMatchRank,
   type FeatureCandidate,
 } from "$lib/config/template-suggest";
+import { sanitizeLabel, newLocalTaken } from "$lib/config/virtual-ops";
 import { matchingOverride } from "$lib/config/source-overrides";
 import type { TemplateReference } from "$lib/config/template-reference";
 import type { Control, Device, Widget } from "$lib/types/device";
-import type { SourceOverride } from "$lib/types/overrides";
+import type { EnsuredOverride, SourceOverride } from "$lib/types/overrides";
 import type {
   ActiveCondition,
   Background,
@@ -291,6 +292,10 @@ export function materializeTemplateTile(
   title?: string;
   icon?: string;
 } {
+  // A role template is bound to states, never a device's controls: producing
+  // slots here would write role strings and the template-only `repair` into a
+  // device tile. Callers show `templateDeviceProblem`; this is the last guard.
+  if (template.roles?.length) return { slots: [] };
   const slots = materializeAgo(
     materializeSlots(template, device),
     template,
@@ -323,12 +328,17 @@ export function materializeTemplateTileFromState(
   objects: Map<string, any>,
   anchorFeature?: string,
   overrides: SourceOverride[] = [],
+  ensureOverride?: (
+    stateId: string,
+    repair: TemplateRepair,
+  ) => EnsuredOverride | undefined,
 ): ReturnType<typeof materializeTemplateTile> {
   if (template.roles?.length) {
     return materializeTemplateTileFromFills(
       template,
       autoFillRoles(template, main, objects, anchorFeature, overrides),
       main,
+      ensureOverride,
     );
   }
   const { fills } = autoFillTemplate(template, main, objects, anchorFeature);
@@ -575,7 +585,7 @@ export function materializeTemplateTileFromFills(
   ensureOverride?: (
     stateId: string,
     repair: TemplateRepair,
-  ) => string | undefined,
+  ) => EnsuredOverride | undefined,
 ): ReturnType<typeof materializeTemplateTile> {
   if (template.roles?.length) {
     return materializeRoleTile(template, fills, main, ensureOverride);
@@ -674,53 +684,91 @@ function materializeRoleTile(
   ensureOverride?: (
     stateId: string,
     repair: TemplateRepair,
-  ) => string | undefined,
+  ) => EnsuredOverride | undefined,
 ): ReturnType<typeof materializeTemplateTile> {
   const roles = new Set(template.roles ?? []);
   /** The override each state got, so two roles on one state share it. */
-  const ensured = new Map<string, string>();
-  const bound: Slot[] = [];
+  const ensured = new Map<string, EnsuredOverride>();
+  const bound: { slot: Slot; role: string; override?: EnsuredOverride }[] = [];
 
   for (const slot of template.slots ?? []) {
     const { repair, ...presentation } = slot;
     const role = typeof slot.source === "string" ? slot.source : "";
     if (!role || !roles.has(role)) {
-      bound.push(presentation);
+      bound.push({ slot: presentation, role: "" });
       continue;
     }
     const fill = fills.get(role);
     if (!fill) continue;
-    let overrideId = fill.overrideId ?? ensured.get(fill.stateId);
-    if (!overrideId && repair && ensureOverride) {
-      overrideId = ensureOverride(fill.stateId, repair);
+    let override = ensured.get(fill.stateId);
+    if (fill.overrideId) {
+      override = {
+        id: fill.overrideId,
+        name: fill.overrideName ?? override?.name ?? role,
+      };
+    } else if (!override && repair && ensureOverride) {
+      override = ensureOverride(fill.stateId, repair);
     }
-    if (overrideId) ensured.set(fill.stateId, overrideId);
-    const next: Slot = {
-      ...presentation,
-      source: {
-        kind: "state",
-        stateId: fill.ref,
-        ...(overrideId ? { override: overrideId } : {}),
+    if (override) ensured.set(fill.stateId, override);
+    bound.push({
+      slot: {
+        ...presentation,
+        source: {
+          kind: "state",
+          stateId: fill.ref,
+          ...(override ? { override: override.id } : {}),
+        },
       },
-    };
-    // An existing override has its own name; a rule written for the template's
-    // role must follow it.
-    if (fill.overrideName && fill.overrideName !== role && next.rules?.length) {
-      const pattern = new RegExp(`\\b${role}\\b`, "g");
-      next.rules = next.rules.map((rule) =>
+      role,
+      ...(override ? { override } : {}),
+    });
+  }
+
+  // A tile's rules are scoped by `tileSourceControls` (the override's name) and
+  // `ruleScope` sanitizes that name (`Power (W)` → `power_w`, a renamed
+  // `power2` stays `power2`). Build the same locals in slot order so a template
+  // rule names the local the tile will actually have.
+  const taken = newLocalTaken();
+  const roleLocal = new Map<string, string>();
+  for (const entry of bound) {
+    if (!entry.role) continue;
+    const fill = fills.get(entry.role);
+    const name =
+      entry.override?.name ||
+      localizeName(fill?.object?.common?.name) ||
+      fill?.ref ||
+      entry.role;
+    const local = sanitizeLabel(name, taken);
+    if (!roleLocal.has(entry.role)) roleLocal.set(entry.role, local);
+  }
+  const keys = [...roleLocal.entries()]
+    .filter(([role, local]) => role !== local)
+    .map(([role]) => role)
+    .sort((a, b) => b.length - a.length);
+  const pattern = keys.length
+    ? new RegExp(`\\b(${keys.join("|")})\\b`, "g")
+    : null;
+  const rewrite = (slot: Slot): Slot => {
+    if (!pattern || !slot.rules?.length) return slot;
+    return {
+      ...slot,
+      rules: slot.rules.map((rule) =>
         rule.when
           ? {
               ...rule,
-              when: rule.when.replace(pattern, fill.overrideName!),
+              when: rule.when.replace(
+                pattern,
+                (name) => roleLocal.get(name) ?? name,
+              ),
             }
           : rule,
-      );
-    }
-    bound.push(next);
-  }
+      ),
+    };
+  };
+  const boundSlots = bound.map((entry) => rewrite(entry.slot));
 
   const mainRef = main.ref;
-  const withAgo = bound.map((slot) =>
+  const withAgo = boundSlots.map((slot) =>
     slot.source === "ago"
       ? {
           ...slot,

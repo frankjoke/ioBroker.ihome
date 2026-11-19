@@ -35,6 +35,26 @@ it("substitutes shared params in a device part", () => {
   expect(template.slots[0].options?.html).toBe('<p data-id="tv">tv</p>');
 });
 
+it("refuses a role device part and writes no template", () => {
+  expect(() =>
+    bundleDeviceTemplate(
+      {
+        type: "Custom",
+        features: [],
+        slots: [
+          {
+            kind: "value",
+            source: "temperature",
+            repair: { kind: "repair", name: "temperature" },
+          },
+        ],
+      },
+      "tpl",
+      "Climate",
+    ),
+  ).toThrow(/role template/i);
+});
+
 it("leaves a device part without placeholders unchanged", () => {
   const part = { type: "Custom" as const, features: [], slots: [] };
   expect(bundleDeviceTemplate(part, "tpl", "TV", { wakeDevice: "tv" })).toEqual(
@@ -83,6 +103,16 @@ describe("planDeviceApply", () => {
     expect(planDeviceApply(template, device({ type: "Switch" }))).toMatchObject(
       { problem: expect.stringMatching(/type|Light|Switch/i) },
     );
+  });
+
+  it("refuses a role template and leaves the device untouched", () => {
+    const light = device();
+    const before = structuredClone(light);
+    const plan = planDeviceApply({ ...template, roles: ["switch"] }, light);
+    expect(plan).toMatchObject({
+      problem: expect.stringMatching(/role template/i),
+    });
+    expect(light).toEqual(before);
   });
 });
 
