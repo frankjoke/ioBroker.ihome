@@ -89,6 +89,7 @@
               bold={b.bold}
               title={b.title}
               value={b.value}
+              labelHidden={b.labelHidden}
             />
           {/each}
         </div>
