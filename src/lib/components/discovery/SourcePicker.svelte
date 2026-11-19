@@ -172,6 +172,7 @@
   let badgeState = $state("");
   /** The inline device form: a new device (`device: null`) or one being edited. */
   let deviceForm = $state<{ device: Device | null } | null>(null);
+  let root = $state<HTMLElement>();
   /** The device editors fold out only where a device is picked, not inside the
    *  device form's own control picker. */
   const canEditDevices = $derived(mode === "slot" || mode === "source");
@@ -626,13 +627,23 @@
   }
 
   function onKey(event: KeyboardEvent): void {
-    if (event.key === "Escape" && !deviceForm) onClose();
+    if (event.key !== "Escape" || deviceForm) return;
+    // Only the topmost dialog reacts: one Escape closes one layer.
+    const dialogs = [...document.querySelectorAll('[role="dialog"]')];
+    if (dialogs.length && dialogs[dialogs.length - 1] !== root) return;
+    onClose();
   }
 </script>
 
 <svelte:window onkeydown={onKey} />
 
-<div class="modal" role="dialog" aria-modal="true" aria-label={title}>
+<div
+  class="modal"
+  role="dialog"
+  aria-modal="true"
+  aria-label={title}
+  bind:this={root}
+>
   <div class="modal-content">
     <div class="modal-head">
       <h3>{title}</h3>

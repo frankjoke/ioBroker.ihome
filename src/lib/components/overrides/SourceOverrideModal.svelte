@@ -302,6 +302,10 @@
   $effect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      // The code editor's own state picker owns Escape while it is open.
+      if (document.querySelector('[aria-label="Insert state reference"]')) {
+        return;
+      }
       event.stopPropagation();
       if (confirmDelete) {
         confirmDelete = false;
