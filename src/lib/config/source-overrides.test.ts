@@ -31,6 +31,17 @@ describe("normalizeOverrideRegistry", () => {
     expect(normalizeOverrideRegistry("x")).toBeNull();
   });
 
+  it("reads the stored form: JSON string or { val } envelope", () => {
+    const doc = { version: 1, updatedAt: 5, overrides: [repair()] };
+    expect(
+      normalizeOverrideRegistry(JSON.stringify(doc))?.overrides,
+    ).toHaveLength(1);
+    expect(
+      normalizeOverrideRegistry({ val: JSON.stringify(doc) })?.overrides,
+    ).toHaveLength(1);
+    expect(normalizeOverrideRegistry({ val: doc })?.overrides).toHaveLength(1);
+  });
+
   it("drops entries without an id, stateId or name", () => {
     const reg = normalizeOverrideRegistry({
       version: 1,

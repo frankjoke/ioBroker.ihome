@@ -1,3 +1,4 @@
+import { num, parseDoc } from "$lib/config/doc-parse";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 
 /** The config document every override lives in. */
@@ -28,23 +29,20 @@ function normalizeOverride(value: unknown): SourceOverride | null {
 export function normalizeOverrideRegistry(
   value: unknown,
 ): OverrideRegistry | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const doc = value as Record<string, unknown>;
-  if (!Array.isArray(doc.overrides)) return null;
-  const overrides = doc.overrides
-    .map(normalizeOverride)
-    .filter((o): o is SourceOverride => o !== null);
-  // A non-empty list that loses every entry is corrupt, not an empty registry.
-  if (doc.overrides.length > 0 && overrides.length === 0) return null;
-  return {
-    version: 1,
-    updatedAt:
-      typeof doc.updatedAt === "number" && Number.isFinite(doc.updatedAt)
-        ? doc.updatedAt
-        : 0,
-    ...(doc.migratedDevices === true ? { migratedDevices: true } : {}),
-    overrides,
-  };
+  return parseDoc(value, (doc) => {
+    if (!Array.isArray(doc.overrides)) return null;
+    const overrides = doc.overrides
+      .map(normalizeOverride)
+      .filter((o): o is SourceOverride => o !== null);
+    // A non-empty list that loses every entry is corrupt, not an empty registry.
+    if (doc.overrides.length > 0 && overrides.length === 0) return null;
+    return {
+      version: 1,
+      updatedAt: num(doc.updatedAt, 0),
+      ...(doc.migratedDevices === true ? { migratedDevices: true } : {}),
+      overrides,
+    };
+  });
 }
 
 export function overrideById(
