@@ -1,4 +1,20 @@
 import { num, parseDoc } from "$lib/config/doc-parse";
+import { applyRead } from "$lib/utils/transform";
+import { type GlobalVariable, resolveVariable } from "$lib/config/variables";
+import {
+  buildScope,
+  evaluateVirtual,
+  roundValue,
+  sanitizeLabel,
+  type PoolEntry,
+} from "$lib/config/virtual-ops";
+import {
+  aliasBaseIds,
+  deviceGroupOfState,
+  groupOfState,
+  groupStates,
+} from "$lib/config/template-suggest";
+import { isOnline, stateIdsInExpression, truthy } from "$lib/config/rule-ops";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 
 /** The config document every override lives in. */
@@ -97,4 +113,157 @@ export function removeOverride(
   id: string,
 ): OverrideRegistry {
   return { ...reg, overrides: reg.overrides.filter((o) => o.id !== id) };
+}
+
+/** The siblings a derived expression can name with `$.`. */
+export interface OverrideGroup {
+  /** Sanitized name → the state it reads, and the override it resolves through. */
+  names: Map<string, { stateId: string; override?: string }>;
+  stateIds: string[];
+}
+
+/** A state's raw expression name: its `common.name`, else its leaf id. */
+function stateLabel(object: any, stateId: string): string {
+  const name = String(object?.common?.name ?? "").trim();
+  return name || String(stateId).split(".").pop() || stateId;
+}
+
+/**
+ * The anchor's siblings, in the same order the template auto-fill uses: the
+ * anchor and its alias bases, the alias base group, the alias group, then the
+ * device group. Overrides are added first, so an override name wins over a raw
+ * sibling with that name (the raw state stays reachable via `get("<id>")`).
+ */
+export function overrideGroup(
+  stateId: string,
+  objects: Map<string, any>,
+  registry: OverrideRegistry,
+  variables: GlobalVariable[] = [],
+): OverrideGroup {
+  const target = resolveVariable(stateId, variables);
+  const anchor =
+    target?.kind === "state" && target.stateId ? target.stateId : stateId;
+  const bases = aliasBaseIds(objects.get(anchor));
+  const aliasGroup = groupOfState(anchor, objects);
+  const baseGroups = bases.map((id) => groupOfState(id, objects, true));
+  const deviceGroup = deviceGroupOfState(anchor, objects);
+  const stateIds = [
+    ...new Set([
+      anchor,
+      ...bases,
+      ...baseGroups.flatMap((group) =>
+        groupStates(group, objects).map((entry) => entry.stateId),
+      ),
+      ...groupStates(aliasGroup, objects).map((entry) => entry.stateId),
+      ...groupStates(deviceGroup, objects).map((entry) => entry.stateId),
+    ]),
+  ];
+
+  const names: OverrideGroup["names"] = new Map();
+  const taken = new Set<string>();
+  const claimed = new Set<string>();
+  for (const id of stateIds) {
+    for (const override of overridesForState(registry, id)) {
+      const name = sanitizeLabel(override.name, taken);
+      claimed.add(sanitizeLabel(override.name, new Set()));
+      names.set(name, { stateId: id, override: override.id });
+    }
+  }
+  for (const id of stateIds) {
+    const label = stateLabel(objects.get(id), id);
+    if (claimed.has(sanitizeLabel(label, new Set()))) continue;
+    names.set(sanitizeLabel(label, taken), { stateId: id });
+  }
+  return { names, stateIds };
+}
+
+/**
+ * The `$.name` identifiers an expression reads, in order, unique. Bracket
+ * access (`$["name"]`) still evaluates but is not captured as an input — the
+ * editor writes dot access.
+ */
+function dollarNames(expr: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const re = /\$\.([A-Za-z_$][\w$]*)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(String(expr ?? "")))) {
+    if (!seen.has(match[1])) {
+      seen.add(match[1]);
+      out.push(match[1]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Evaluate a derived override against its group. `$.name` reads a sibling's
+ * live value through a repair override's read transform; a name the group does
+ * not know is an error, never a silent `undefined`, and v1 refuses to chain
+ * derived overrides (a derived sibling would need ordering/recursion, so it
+ * throws instead). `get("<id>")` reads anything the caller subscribed.
+ */
+export function evaluateOverride(
+  override: SourceOverride,
+  ctx: {
+    group: OverrideGroup;
+    states: Map<string, any>;
+    registry: OverrideRegistry;
+    objects: Map<string, any>;
+  },
+): { value?: unknown; error?: string; inputs: string[] } {
+  const expr = override.expr ?? "";
+  const valueOf = (id: string) => ctx.states.get(id)?.val;
+  const siblings: Record<string, unknown> = {};
+  for (const [name, entry] of ctx.group.names) {
+    const repair = entry.override
+      ? overrideById(ctx.registry, entry.override)
+      : undefined;
+    if (repair?.kind === "derived") {
+      Object.defineProperty(siblings, name, {
+        enumerable: true,
+        get() {
+          throw new Error(`derived override "${name}" is not readable`);
+        },
+      });
+      continue;
+    }
+    siblings[name] = repair
+      ? applyRead(valueOf(entry.stateId), repair.transform)
+      : valueOf(entry.stateId);
+  }
+
+  const inputs: string[] = [];
+  const seen = new Set<string>();
+  for (const name of dollarNames(expr)) {
+    const stateId = ctx.group.names.get(name)?.stateId;
+    if (stateId && !seen.has(stateId)) {
+      seen.add(stateId);
+      inputs.push(stateId);
+    }
+  }
+  for (const stateId of stateIdsInExpression(expr)) {
+    if (!seen.has(stateId)) {
+      seen.add(stateId);
+      inputs.push(stateId);
+    }
+  }
+
+  const pool: PoolEntry[] = [
+    ...new Set([...ctx.group.stateIds, ...inputs]),
+  ].map((id) => ({ stateId: id, value: valueOf(id) }));
+  const scope = buildScope([], pool);
+  // A Proxy turns a typo into an error instead of `undefined` arithmetic.
+  scope.locals.$ = new Proxy(siblings, {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && !(prop in target)) {
+        throw new Error(`unknown sibling "${prop}"`);
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  scope.helpers = { ...scope.helpers, truthy, isOnline };
+  const { value, error } = evaluateVirtual(expr, scope);
+  if (error) return { value: undefined, error, inputs };
+  return { value: roundValue(value, override.precision), inputs };
 }

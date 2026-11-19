@@ -167,7 +167,8 @@ export function groupOfState(
   return parts.slice(0, 2).join(".");
 }
 
-function groupStates(
+/** Every state object directly under a channel/folder/device id. */
+export function groupStates(
   groupId: string,
   objects: Map<string, any>,
 ): TemplateReference[] {
@@ -182,7 +183,7 @@ function groupStates(
 
 /** The nearest device object, else the adapter instance (a channel group's
  *  parent device carries availability/battery states). */
-function deviceGroupOfState(
+export function deviceGroupOfState(
   stateId: string,
   objects: Map<string, any>,
 ): string {
