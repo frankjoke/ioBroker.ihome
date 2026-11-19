@@ -2138,18 +2138,6 @@
                 {#if slot.kind === "value"}
                   <div class="row">
                     <label class="small">
-                      <span class="label-mono">index</span>
-                      <input
-                        type="number"
-                        class="num-input"
-                        value={String(slot.options?.index ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            index: num(e.currentTarget.value),
-                          })}
-                      />
-                    </label>
-                    <label class="small">
                       <span class="label-mono">decimals</span>
                       <input
                         type="number"
