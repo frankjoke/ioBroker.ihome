@@ -2,10 +2,12 @@
   import { untrack } from "svelte";
   import TransformEditor from "$lib/components/config/TransformEditor.svelte";
   import HistoryEditor from "$lib/components/config/HistoryEditor.svelte";
+  import CodeField from "$lib/components/logic/CodeField.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
+  import { getLogicDocument } from "$lib/stores/logics.svelte";
   import {
     evaluateOverride,
     overrideGroup,
@@ -210,11 +212,6 @@
     setState(newValue.trim(), newLabel);
     newValue = "";
     newLabel = "";
-  }
-
-  function insertSibling(name: string): void {
-    const current = text(draft.expr);
-    draft.expr = `${current}${current.trim() ? " " : ""}$.${name}`;
   }
 
   function clean(): SourceOverride {
@@ -587,35 +584,20 @@
         </label>
       </div>
 
-      <label class="field">
-        <span class="label-mono">Expression</span>
-        <textarea
-          rows="3"
-          spellcheck="false"
-          class="mono"
-          bind:value={draft.expr}
-          placeholder="$.humidity * 0.5 + $.temperature * 0.5"
-        ></textarea>
-      </label>
-
-      <div class="siblings">
-        <span class="label-mono">Siblings ($.name = live value)</span>
-        {#each siblings as sibling (sibling.name)}
-          <button
-            type="button"
-            class="btn btn-sm"
-            title={`Insert $.${sibling.name}`}
-            onclick={() => insertSibling(sibling.name)}
-          >
-            <code>$.{sibling.name}</code>
-            <span class="text-muted">{sibling.value}</span>
-          </button>
-        {:else}
-          <span class="hint text-muted">
-            No sibling states in this state's group.
-          </span>
-        {/each}
-      </div>
+      <CodeField
+        label="Expression"
+        mode="expression"
+        minRows={2}
+        code={draft.expr ?? ""}
+        onchange={(code) => (draft.expr = code)}
+        placeholder="$.humidity * 0.5 + $.temperature * 0.5"
+        logics={getLogicDocument().logics}
+        quickInserts={siblings.map((sibling) => ({
+          label: `$.${sibling.name}`,
+          insert: `$.${sibling.name}`,
+          title: `$.${sibling.name} = ${sibling.value}`,
+        }))}
+      />
 
       <div class="preview">
         <span class="label-mono">Result</span>
@@ -780,19 +762,6 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-  }
-
-  .siblings {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-  }
-
-  .siblings .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
   }
 
   .preview {

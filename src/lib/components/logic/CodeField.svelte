@@ -29,6 +29,7 @@
     stateNames = [],
     logics = [],
     inputs = {},
+    quickInserts = [],
     onfocus,
   }: {
     code: string;
@@ -49,6 +50,8 @@
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
+    /** Extra quick-insert badges (e.g. the override's $.siblings). */
+    quickInserts?: { label: string; insert: string; title?: string }[];
     /** The field took focus (the caller may close another editor). */
     onfocus?: () => void;
   } = $props();
@@ -220,6 +223,23 @@
             onmousedown={rememberSelection}
             onclick={() => insertReference(name)}>{name}</button
           >
+        {/each}
+      </div>
+    {/if}
+    {#if quickInserts.length > 0}
+      <div class="badges">
+        <span class="label-mono">Insert</span>
+        {#each quickInserts as item (item.insert)}
+          <button
+            type="button"
+            class="badge badge-secondary badge-button"
+            title={item.title ?? item.insert}
+            aria-label={`Insert ${item.insert}`}
+            onmousedown={rememberSelection}
+            onclick={() => insertText(item.insert)}
+          >
+            {item.label}
+          </button>
         {/each}
       </div>
     {/if}
