@@ -181,6 +181,7 @@ describe("overrideGroup", () => {
 
   it("adds the broker name as an alias of its id leaf", () => {
     const objects = new Map<string, any>([
+      ["aaa.0.xxx.yyy", { type: "channel", common: {} }],
       [
         "aaa.0.xxx.yyy.humidity",
         { type: "state", common: { name: { de: "Feuchtigkeit" } } },
@@ -198,6 +199,44 @@ describe("overrideGroup", () => {
     expect(names.get("humidity")?.stateId).toBe("aaa.0.xxx.yyy.humidity");
     expect(names.get("feuchtigkeit")?.stateId).toBe("aaa.0.xxx.yyy.humidity");
     expect(names.get("temperature")?.stateId).toBe("aaa.0.xxx.yyy.temperature");
+  });
+
+  it("names only the nearest device's direct states, not the adapter", () => {
+    const objects = new Map<string, any>([
+      ["zigbee.0", { type: "adapter", common: {} }],
+      [
+        "zigbee.0.a4c13804b536ffc1",
+        { type: "device", common: { name: "Sensor" } },
+      ],
+      [
+        "zigbee.0.a4c13804b536ffc1.humidity",
+        { type: "state", common: { name: "Feuchtigkeit" } },
+      ],
+      [
+        "zigbee.0.a4c13804b536ffc1.temperature",
+        { type: "state", common: { name: "Temperatur" } },
+      ],
+      ...Array.from(
+        { length: 100 },
+        (_, i) =>
+          [
+            `zigbee.0.other${i}`,
+            { type: "state", common: { name: `Other ${i}` } },
+          ] as [string, any],
+      ),
+    ]);
+    const group = overrideGroup(
+      "zigbee.0.a4c13804b536ffc1.humidity",
+      objects,
+      emptyOverrideRegistry(),
+    );
+    expect([...group.names.keys()].sort()).toEqual([
+      "feuchtigkeit",
+      "humidity",
+      "temperatur",
+      "temperature",
+    ]);
+    expect(group.names.size).toBe(4);
   });
 
   it("lets an override name win over a raw sibling", () => {

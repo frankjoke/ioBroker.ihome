@@ -18,11 +18,11 @@ import {
   aliasBaseIds,
   deviceGroupOfState,
   groupOfState,
-  groupStates,
 } from "$lib/config/template-suggest";
 import { isOnline, stateIdsInExpression, truthy } from "$lib/config/rule-ops";
 import { newId } from "$lib/utils/ids";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
+import type { TemplateReference } from "$lib/config/template-reference";
 
 /** The config document every override lives in. */
 export const OVERRIDE_LIST_ID = "ihome.0.config.overrideList";
@@ -238,13 +238,31 @@ export function seedOverrideName(
   };
 }
 
+/** Every state object directly under a channel/folder/device id — no nested
+ *  channels, so a fallback to the adapter cannot pull in the whole namespace. */
+function directStates(
+  groupId: string,
+  objects: Map<string, any>,
+): TemplateReference[] {
+  const prefix = `${groupId}.`;
+  const out: TemplateReference[] = [];
+  for (const [id, object] of objects.entries()) {
+    if (object?.type !== "state" || !id.startsWith(prefix)) continue;
+    if (id.slice(prefix.length).includes(".")) continue;
+    out.push({ ref: id, stateId: id, object });
+  }
+  return out;
+}
+
 /**
  * The anchor's siblings, in the same order the template auto-fill uses: the
  * anchor and its alias bases, the alias base group, the alias group, then the
  * device group. Overrides are added first, so an override name wins over a raw
  * sibling with that name (the raw state stays reachable via `get("<id>")`).
  * Every raw sibling is named by its id leaf; the broker's localized name is
- * only a secondary alias, added while that name is still free.
+ * only a secondary alias, added while that name is still free. Only direct
+ * children of the nearest channel/device are named: a fallback to the adapter
+ * instance must not flood `$.` with the whole adapter.
  */
 export function overrideGroup(
   stateId: string,
@@ -256,7 +274,7 @@ export function overrideGroup(
   const anchor =
     target?.kind === "state" && target.stateId ? target.stateId : stateId;
   const bases = aliasBaseIds(objects.get(anchor));
-  const aliasGroup = groupOfState(anchor, objects);
+  const aliasGroup = groupOfState(anchor, objects, true);
   const baseGroups = bases.map((id) => groupOfState(id, objects, true));
   const deviceGroup = deviceGroupOfState(anchor, objects);
   const stateIds = [
@@ -264,10 +282,10 @@ export function overrideGroup(
       anchor,
       ...bases,
       ...baseGroups.flatMap((group) =>
-        groupStates(group, objects).map((entry) => entry.stateId),
+        directStates(group, objects).map((entry) => entry.stateId),
       ),
-      ...groupStates(aliasGroup, objects).map((entry) => entry.stateId),
-      ...groupStates(deviceGroup, objects).map((entry) => entry.stateId),
+      ...directStates(aliasGroup, objects).map((entry) => entry.stateId),
+      ...directStates(deviceGroup, objects).map((entry) => entry.stateId),
     ]),
   ];
 
