@@ -336,15 +336,20 @@ export function boundFills(
  *  whole feature list. */
 export function templateBindingRows(template: Template): FeatureDef[] {
   const features = templateFeatures(template);
+  const known = new Set(features.map((feature) => feature.feature));
   const used = new Set<string>();
+  const add = (value: string | undefined): void => {
+    if (value && known.has(value)) used.add(value);
+  };
   for (const slot of template.slots ?? []) {
-    if (typeof slot.source === "string" && slot.source) used.add(slot.source);
-    const pick =
-      typeof slot.options?.pick === "string" ? slot.options.pick : "";
-    if (pick) used.add(pick);
+    add(typeof slot.source === "string" ? slot.source : undefined);
+    add(typeof slot.options?.pick === "string" ? slot.options.pick : undefined);
   }
-  const activeSource = template.active?.source;
-  if (typeof activeSource === "string" && activeSource) used.add(activeSource);
+  add(
+    typeof template.active?.source === "string"
+      ? template.active.source
+      : undefined,
+  );
   if (!used.size) return features;
   return features.filter(
     (feature) => used.has(feature.feature) || feature.primary,

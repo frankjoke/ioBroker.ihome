@@ -51,6 +51,7 @@
       getVariables(),
     );
     if ("problem" in resolved) {
+      picking = null;
       error = resolved.problem;
       return;
     }
@@ -156,6 +157,8 @@
     mode="state"
     title={`Choose ${rows.find((feature) => feature.feature === picking)?.label ?? "the source"}`}
     {logics}
+    logicPick="state"
+    currentState={picking ? (fills.get(picking)?.stateId ?? "") : ""}
     onState={(stateId) => pick(picking!, stateId)}
     onClose={() => (picking = null)}
   />

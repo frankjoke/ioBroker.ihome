@@ -133,7 +133,7 @@
     return templates.filter(
       (template) =>
         !query ||
-        `${template.name ?? ""} ${template.type} ${template.description ?? ""}`
+        `${template.name ?? ""} ${template.type} ${template.description ?? ""} ${helpLine(template.help ?? "")}`
           .toLowerCase()
           .includes(query),
     );
@@ -657,12 +657,15 @@
         </div>
         {#if filteredTemplates.length === 0}
           <p class="empty text-muted">
-            No tile templates yet — save one from a tile with the floppy in the
-            tile editor.
+            {search.trim()
+              ? "No template matches the search."
+              : "No tile templates yet — save one from a tile with the floppy in the tile editor."}
           </p>
         {:else}
           <ul class="list device-list">
             {#each filteredTemplates as template (template.id)}
+              {@const hint =
+                template.description || helpLine(template.help ?? "")}
               <li class="device-row">
                 <button
                   type="button"
@@ -673,11 +676,9 @@
                     <span class="name">{template.name || template.id}</span>
                     <span class="meta text-muted">{template.type}</span>
                   </span>
-                  <span class="template-desc text-muted"
-                    >{template.description ||
-                      helpLine(template.help ?? "") ||
-                      template.type}</span
-                  >
+                  {#if hint}
+                    <span class="template-desc text-muted">{hint}</span>
+                  {/if}
                 </button>
               </li>
             {/each}

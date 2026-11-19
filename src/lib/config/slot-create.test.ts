@@ -695,6 +695,48 @@ it("takes unambiguous auto-fills and lets manual choices win", () => {
   ]);
 });
 
+it("ignores slot sources that are not catalog features", () => {
+  const t = {
+    ...PRESETS.Light,
+    active: undefined,
+    slots: [
+      { kind: "value", source: "ago" },
+      { kind: "value", source: "hue.0.raw" },
+    ],
+  } as unknown as Template;
+  expect(templateBindingRows(t).map((f) => f.feature)).toEqual(
+    PRESETS.Light.features.map((f) => f.feature),
+  );
+});
+
+it("keeps a raw frame slot when materialising from fills", () => {
+  const t = {
+    ...PRESETS.Light,
+    slots: [{ kind: "frame", options: { url: "https://example.test" } }],
+  } as unknown as Template;
+  const { main } = lampFixture();
+  const result = materializeTemplateTileFromFills(t, new Map(), main);
+  expect(result.slots).toHaveLength(1);
+  expect(result.slots[0].kind).toBe("frame");
+});
+
+it("offers the active feature as a row even without a slot", () => {
+  const t = {
+    ...PRESETS.Light,
+    features: [
+      ...PRESETS.Light.features,
+      {
+        feature: "extra",
+        label: "Extra",
+        widget: "value",
+        roleHints: [],
+      },
+    ],
+    active: { source: "extra", op: "truthy" },
+  } as unknown as Template;
+  expect(templateBindingRows(t).map((f) => f.feature)).toContain("extra");
+});
+
 it("marks the frozen template icon as automatic", () => {
   const tile = materializedTileConfig({ slots: [], icon: "ac_unit" });
   expect(tile.icon).toBe("ac_unit");
