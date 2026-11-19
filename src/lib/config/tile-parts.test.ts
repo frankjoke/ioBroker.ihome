@@ -1169,3 +1169,121 @@ it("a badge rule names a slot's override", () => {
   expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
   expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
 });
+
+// The display builds one rule list from the tile's own slots and hands it to
+// `tileParts`; these pin that the rows and the badged slots read that list.
+
+it("a derive-ago badge keeps its name in the tile scope", () => {
+  const dev = device({
+    controls: [
+      { ...control("c1", "temperature"), liveValue: 21 },
+      { ...control("c2", "connected"), liveValue: "offline" },
+    ],
+  });
+  const slots: Slot[] = [
+    {
+      kind: "value",
+      source: { kind: "control", device: "d1", control: "c1" },
+      rules: [{ when: "!isOnline(connected)", hidden: true }],
+    },
+    {
+      kind: "badge",
+      source: { kind: "control", device: "d1", control: "c2" },
+      options: { derive: "ago" },
+    },
+  ];
+  const resolution = resolveTile({ slots }, "T", {
+    devices: [dev],
+    states: new Map(),
+    objects: new Map(),
+  });
+  const controls = tileSourceControls(slots, {
+    device: resolution.device,
+    devices: [dev],
+  });
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    controls,
+  });
+  expect(parts.body).toHaveLength(0);
+});
+
+it("suffixes names once, so body and corner badges agree", () => {
+  const dev = device({
+    controls: [
+      {
+        ...control("c1", "power"),
+        label: "Power state",
+        liveValue: "offline",
+      },
+      { ...control("c2", "temperature"), liveValue: 21 },
+    ],
+  });
+  const overrides = [repair("o", "s", "power")];
+  const states = new Map([["s", { val: 7 }]]);
+  const slots: Slot[] = [
+    {
+      kind: "badge",
+      source: { kind: "control", device: "d1", control: "c1" },
+      options: { derive: "ago" },
+    },
+    {
+      kind: "value",
+      source: { kind: "state", stateId: "s", override: "o" },
+      rules: [{ when: "power === 'offline'", hidden: true }],
+    },
+  ];
+  const resolution = resolveTile({ slots }, "T", {
+    devices: [dev],
+    states,
+    objects: new Map(),
+    overrides,
+  });
+  const controls = tileSourceControls(slots, {
+    device: resolution.device,
+    devices: [dev],
+    states,
+    overrides,
+  });
+  // The badge's `power` comes first, so the override's power becomes `power2`.
+  const locals = ruleScope(controls, []).locals;
+  expect(locals.power).toBe("offline");
+  expect(locals.power2).toBe(7);
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    controls,
+  });
+  expect(parts.body).toHaveLength(0);
+});
+
+it("a device badge's name reaches a detail badge's rule", () => {
+  const bridge = {
+    id: "bridge",
+    name: "bridge",
+    type: "Switch",
+    available: false,
+    exists: true,
+    controls: [{ ...control("c1", "temperature"), available: false }],
+  } as unknown as EnrichedDevice;
+  const slots: Slot[] = [
+    {
+      kind: "badge",
+      source: { kind: "device", device: "bridge" },
+      detail: "full",
+      rules: [{ when: "!isOnline(bridge)", color: "var(--danger-color)" }],
+    },
+  ];
+  const resolution = resolveTile({ slots }, "T", {
+    devices: [bridge],
+    states: new Map([["c1.state", { val: 1 }]]),
+    objects: new Map(),
+  });
+  const controls = tileSourceControls(slots, {
+    device: resolution.device,
+    devices: [bridge],
+  });
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    controls,
+    raw: noRaw,
+  });
+  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
+  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
+});

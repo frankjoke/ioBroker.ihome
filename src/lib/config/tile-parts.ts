@@ -22,7 +22,11 @@ import {
   type ResolvedSource,
   type SourceLook,
 } from "$lib/config/slot-source";
-import type { LocalControl, PoolEntry } from "$lib/config/virtual-ops";
+import type {
+  LocalControl,
+  PoolEntry,
+  ScopeExtras,
+} from "$lib/config/virtual-ops";
 import type { GlobalVariable } from "$lib/config/variables";
 import type { HistorySpec } from "$lib/types/device";
 import type { SourceOverride } from "$lib/types/overrides";
@@ -205,6 +209,12 @@ export function tileParts(
     objects?: Map<string, any>;
     variables?: GlobalVariable[];
     derived?: SourceLook["derived"];
+    /** The tile's one rule list, built by the display from the tile's own
+     *  slots (raw, so a device/derive badge keeps its name) plus the watch
+     *  overrides. Absent → built from `slots`, for a caller holding a raw tile. */
+    controls?: LocalControl[];
+    /** Rule locals beyond the sources: the config's variables. */
+    extras?: ScopeExtras;
   },
 ): TileParts {
   const active = opts?.active === true;
@@ -233,19 +243,23 @@ export function tileParts(
   };
 
   // Rule locals are the tile's bound sources — overrides and watch overrides
-  // included — plus the pool helpers, and the tile's own `active` flag wins the
-  // name over a source of the same name (A30).
-  const sourceControls = tileSourceControls(slots, {
-    device,
-    devices: opts?.devices,
-    states: opts?.states,
-    objects: opts?.objects,
-    variables: opts?.variables,
-    overrides: opts?.overrides,
-    derived: opts?.derived,
-    watchOverrides: tile?.watchOverrides,
-  });
-  const baseScope = ruleScope(sourceControls, pool);
+  // included — plus the pool helpers and the config's variables, and the
+  // tile's own `active` flag wins the name over a source of the same name
+  // (A30). The display hands in its one list so the rows, their badges and the
+  // corner chips cannot disagree on a name or a suffix.
+  const sourceControls =
+    opts?.controls ??
+    tileSourceControls(slots, {
+      device,
+      devices: opts?.devices,
+      states: opts?.states,
+      objects: opts?.objects,
+      variables: opts?.variables,
+      overrides: opts?.overrides,
+      derived: opts?.derived,
+      watchOverrides: tile?.watchOverrides,
+    });
+  const baseScope = ruleScope(sourceControls, pool, opts?.extras);
   const scope = { ...baseScope, locals: { ...baseScope.locals, active } };
 
   /** Slot rules first, the control's own defaults last — the last match wins. */

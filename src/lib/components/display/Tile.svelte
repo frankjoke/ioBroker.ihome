@@ -303,6 +303,8 @@
       objects: ioBroker.objects as Map<string, any>,
       variables: getVariables(),
       derived: getDerived,
+      controls: sourceControls,
+      extras: variableExtras(),
     }),
   );
 
@@ -840,7 +842,7 @@
         slot={r.slot}
         {device}
         control={r.control}
-        style={slotStyle(r.slot, r.control)}
+        style={r.style}
         icon={r === headlineRow ? undefined : bodyIcon(r)}
         single={surfaceOnly}
         onPrimary={actionFor(r.control)}
