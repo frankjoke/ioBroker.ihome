@@ -32,11 +32,12 @@ export interface ResolvedTemplate {
   background?: Background;
 }
 
-/** A template's control schema: its own features, else the type preset's. */
+/** A template's control schema: its own features, else the type preset's. A
+ *  role template has no features — its roles are the binding contract. */
 export function templateFeatures(template: Template): FeatureDef[] {
-  return template.features?.length
-    ? template.features
-    : presetForType(template.type).features;
+  if (template.features?.length) return template.features;
+  if (template.roles?.length) return [];
+  return presetForType(template.type).features;
 }
 
 /** The feature whose state is picked first; old templates use the first. */

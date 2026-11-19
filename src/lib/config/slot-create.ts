@@ -1,5 +1,5 @@
 import { localizeName } from "$lib/config/format";
-import { widgetFor, type FeatureDef } from "$lib/config/features";
+import { widgetFor } from "$lib/config/features";
 import { glyphForRole, presetGlyph } from "$lib/config/icon-ops";
 import {
   resolveControl,
@@ -9,11 +9,19 @@ import {
 } from "$lib/config/template-ops";
 import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
 import {
+  aliasBaseIds,
   autoFillTemplate,
+  deviceGroupOfState,
+  groupOfState,
+  groupStates,
+  isInfrastructure,
+  roleMatchRank,
   type FeatureCandidate,
 } from "$lib/config/template-suggest";
+import { matchingOverride } from "$lib/config/source-overrides";
 import type { TemplateReference } from "$lib/config/template-reference";
 import type { Control, Device, Widget } from "$lib/types/device";
+import type { SourceOverride } from "$lib/types/overrides";
 import type {
   ActiveCondition,
   Background,
@@ -21,6 +29,7 @@ import type {
   Slot,
   SlotKind,
   Template,
+  TemplateRepair,
   TileConfig,
   TileLook,
 } from "$lib/types/display";
@@ -313,7 +322,15 @@ export function materializeTemplateTileFromState(
   main: TemplateReference,
   objects: Map<string, any>,
   anchorFeature?: string,
+  overrides: SourceOverride[] = [],
 ): ReturnType<typeof materializeTemplateTile> {
+  if (template.roles?.length) {
+    return materializeTemplateTileFromFills(
+      template,
+      autoFillRoles(template, main, objects, anchorFeature, overrides),
+      main,
+    );
+  }
   const { fills } = autoFillTemplate(template, main, objects, anchorFeature);
   return materializeTemplateTileFromFills(template, boundFills(fills), main);
 }
@@ -331,16 +348,53 @@ export function boundFills(
       ref: fill.ref,
       stateId: fill.stateId ?? fill.ref,
       object: fill.object,
+      ...(fill.overrideId ? { overrideId: fill.overrideId } : {}),
+      ...(fill.overrideName ? { overrideName: fill.overrideName } : {}),
     });
   }
   for (const [feature, ref] of manual) out.set(feature, ref);
   return out;
 }
 
+/** A row the template applicator offers: a role (role template) or a feature
+ *  (legacy feature template). */
+export interface TemplateBindingRow {
+  /** The fill map key and the slot's source string. */
+  key: string;
+  label: string;
+  primary: boolean;
+  /** The role template's repaired unit, for auto-fill. */
+  unit?: string;
+  /** The role template's saved repair, recreated on the picked state. */
+  repair?: TemplateRepair;
+}
+
 /** The features the mapping modal offers: those a slot (or `active`) names,
  *  plus the primary. A template whose slots carry no feature hint offers its
- *  whole feature list. */
-export function templateBindingRows(template: Template): FeatureDef[] {
+ *  whole feature list. Role templates list their roles instead. */
+export function templateBindingRows(template: Template): TemplateBindingRow[] {
+  if (template.roles?.length) {
+    const active =
+      typeof template.active?.source === "string" ? template.active.source : "";
+    const rows: TemplateBindingRow[] = template.roles.map((role) => {
+      const slot = (template.slots ?? []).find(
+        (entry) => entry.source === role,
+      );
+      const repair = slot?.repair;
+      const label = String(slot?.label ?? repair?.label ?? "").trim() || role;
+      const unit = slot?.unit ?? repair?.unit;
+      return {
+        key: role,
+        label,
+        primary: false,
+        ...(unit ? { unit } : {}),
+        ...(repair ? { repair } : {}),
+      };
+    });
+    const primary = rows.find((row) => row.key === active) ?? rows[0];
+    if (primary) primary.primary = true;
+    return rows;
+  }
   const features = templateFeatures(template);
   const known = new Set(features.map((feature) => feature.feature));
   const used = new Set<string>();
@@ -356,15 +410,181 @@ export function templateBindingRows(template: Template): FeatureDef[] {
       ? template.active.source
       : undefined,
   );
-  if (!used.size) return features;
-  return features.filter(
-    (feature) => used.has(feature.feature) || feature.primary,
-  );
+  const rows = !used.size
+    ? features
+    : features.filter(
+        (feature) => used.has(feature.feature) || feature.primary,
+      );
+  return rows.map((feature) => ({
+    key: feature.feature,
+    label: feature.label,
+    primary: feature.primary === true,
+  }));
 }
 
-/** A complete tile from a template and an explicit feature → source map.
- *  Unbound feature slots are left out; raw (frame/HTML) and `ago` slots stay. */
+/** The states auto-fill may offer: the main state's group, its alias bases and
+ *  the parent device, minus the main state and its bases. */
+function siblingPool(
+  main: TemplateReference,
+  objects: Map<string, any>,
+): TemplateReference[] {
+  const bases = aliasBaseIds(main.object);
+  const aliasGroup = groupOfState(main.stateId, objects);
+  const baseGroups = bases
+    .map((id) => groupOfState(id, objects, true))
+    .filter((id) => id !== aliasGroup);
+  const exclude = new Set([main.stateId, ...bases]);
+  const basePool = [
+    ...new Set(baseGroups.flatMap((group) => groupStates(group, objects))),
+  ].filter((entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry));
+  const aliasPool = groupStates(aliasGroup, objects).filter(
+    (entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry),
+  );
+  const deviceGroup = deviceGroupOfState(main.stateId, objects);
+  const devicePool =
+    deviceGroup !== aliasGroup
+      ? groupStates(deviceGroup, objects).filter(
+          (entry) => !exclude.has(entry.stateId) && !isInfrastructure(entry),
+        )
+      : [];
+  const seen = new Set<string>();
+  return [...basePool, ...aliasPool, ...devicePool].filter((entry) => {
+    if (seen.has(entry.stateId)) return false;
+    seen.add(entry.stateId);
+    return true;
+  });
+}
+
+/** Whether a sibling state fits a role row by role, unit or name. Exact/leaf
+ *  role (4) beats family role (3), then unit (2), then name (1). */
+function roleFitScore(
+  entry: TemplateReference,
+  repair: TemplateRepair | undefined,
+  role: string,
+): number {
+  const common = entry.object?.common ?? {};
+  const wanted = String(repair?.role ?? role ?? "")
+    .trim()
+    .toLowerCase();
+  const rank = roleMatchRank(wanted, String(common.role ?? ""));
+  if (rank === 3) return 4;
+  if (rank === 2) return 3;
+  const unit = String(repair?.unit ?? "")
+    .trim()
+    .toLowerCase();
+  const stateUnit = String(common.unit ?? "")
+    .trim()
+    .toLowerCase();
+  if (unit && stateUnit && unit === stateUnit) return 2;
+  const label = String(repair?.label ?? "")
+    .trim()
+    .toLowerCase();
+  const name = String(common.name ?? "").toLowerCase();
+  if (label && name && (name.includes(label) || label.includes(name))) return 1;
+  return 0;
+}
+
+/**
+ * Auto-fill a role template from the main state's siblings: a unique role
+ * match wins, then a unique unit, then a unique name. A state's existing
+ * repair is carried on the fill, so applying never duplicates it.
+ */
+export function autoFillRoles(
+  template: Template,
+  main: TemplateReference,
+  objects: Map<string, any>,
+  anchorRole?: string,
+  overrides: SourceOverride[] = [],
+): Map<string, TemplateReference> {
+  const roles = template.roles ?? [];
+  const fallback =
+    typeof template.active?.source === "string"
+      ? template.active.source
+      : roles[0];
+  const anchor =
+    anchorRole && roles.includes(anchorRole) ? anchorRole : fallback;
+  const pool = siblingPool(main, objects);
+  const out = new Map<string, TemplateReference>();
+  const used = new Set([main.stateId, ...aliasBaseIds(main.object)]);
+  if (anchor) {
+    out.set(anchor, withOverride(main, overrides, template, anchor));
+    used.add(main.stateId);
+  }
+  for (const role of roles) {
+    if (role === anchor) continue;
+    const slot = (template.slots ?? []).find((entry) => entry.source === role);
+    const repair = slot?.repair;
+    const scored = pool
+      .filter((entry) => !used.has(entry.stateId))
+      .map((entry) => ({
+        entry,
+        score: Math.max(
+          roleFitScore(entry, repair, role),
+          ...overrides
+            .filter((o) => o.kind === "repair" && o.stateId === entry.stateId)
+            .map((o) => {
+              const rank = roleMatchRank(repair?.role ?? role, o.role ?? "");
+              return rank === 3 ? 4 : rank === 2 ? 3 : 0;
+            }),
+        ),
+      }));
+    for (const score of [4, 3, 2, 1]) {
+      const hits = scored.filter((item) => item.score === score);
+      if (hits.length === 0) continue;
+      if (hits.length > 1) break; // ambiguous: never guess
+      const entry = hits[0].entry;
+      out.set(role, withOverride(entry, overrides, template, role));
+      used.add(entry.stateId);
+      break;
+    }
+  }
+  return out;
+}
+
+/** A sibling fill, carrying the override a role already resolves through. */
+function withOverride(
+  reference: TemplateReference,
+  overrides: SourceOverride[],
+  template: Template,
+  role: string,
+): TemplateReference {
+  if (reference.overrideId) return reference;
+  const slot = (template.slots ?? []).find((entry) => entry.source === role);
+  const repair = slot?.repair;
+  const hit = matchingOverride(overrides, reference.stateId, {
+    name: repair?.name ?? role,
+    role: repair?.role ?? role,
+  });
+  return hit
+    ? {
+        ...reference,
+        overrideId: hit.id,
+        overrideName: hit.name,
+      }
+    : reference;
+}
+
+/** A complete tile from a template and an explicit role/feature → source map.
+ *  Unbound roles/features are left out; raw (frame/HTML) and `ago` slots stay.
+ *  Role templates recreate their repair through `ensureOverride`, which the
+ *  caller wires to the override store (one call per state without an override). */
 export function materializeTemplateTileFromFills(
+  template: Template,
+  fills: Map<string, TemplateReference>,
+  main: TemplateReference,
+  ensureOverride?: (
+    stateId: string,
+    repair: TemplateRepair,
+  ) => string | undefined,
+): ReturnType<typeof materializeTemplateTile> {
+  if (template.roles?.length) {
+    return materializeRoleTile(template, fills, main, ensureOverride);
+  }
+  return materializeFeatureTile(template, fills, main);
+}
+
+/** Legacy feature templates: binds the fills by feature name. */
+function materializeFeatureTile(
   template: Template,
   fills: Map<string, TemplateReference>,
   main: TemplateReference,
@@ -388,7 +608,7 @@ export function materializeTemplateTileFromFills(
     const kind = WIDGET_KINDS.includes(slot.kind)
       ? slotKindForWidget(widgetForMeta(entry.object?.common ?? {}, def.widget))
       : slot.kind;
-    const base = slotFromState(entry.ref, entry.object, kind);
+    const base = slotFromState(entry.ref, entry.object, kind, entry.overrideId);
     const options: Record<string, unknown> = { ...(base.options ?? {}) };
     for (const [key, value] of Object.entries(slot.options ?? {})) {
       if (key !== "pick" && value !== undefined) options[key] = value;
@@ -433,6 +653,110 @@ export function materializeTemplateTileFromFills(
           active: {
             ...template.active,
             source: { kind: "state", stateId: activeFill.ref },
+          },
+        }
+      : {}),
+    ...(template.look ? { look: template.look } : {}),
+    ...(template.size ? { size: template.size } : {}),
+    ...(template.background ? { background: template.background } : {}),
+    ...(template.border === false ? { border: false } : {}),
+    ...(template.padding === false ? { padding: false } : {}),
+    ...(name ? { title: name } : {}),
+    ...(glyph ? { icon: glyph } : {}),
+  };
+}
+
+/** A role template: the slot's saved presentation, bound to a picked state. */
+function materializeRoleTile(
+  template: Template,
+  fills: Map<string, TemplateReference>,
+  main: TemplateReference,
+  ensureOverride?: (
+    stateId: string,
+    repair: TemplateRepair,
+  ) => string | undefined,
+): ReturnType<typeof materializeTemplateTile> {
+  const roles = new Set(template.roles ?? []);
+  /** The override each state got, so two roles on one state share it. */
+  const ensured = new Map<string, string>();
+  const bound: Slot[] = [];
+
+  for (const slot of template.slots ?? []) {
+    const { repair, ...presentation } = slot;
+    const role = typeof slot.source === "string" ? slot.source : "";
+    if (!role || !roles.has(role)) {
+      bound.push(presentation);
+      continue;
+    }
+    const fill = fills.get(role);
+    if (!fill) continue;
+    let overrideId = fill.overrideId ?? ensured.get(fill.stateId);
+    if (!overrideId && repair && ensureOverride) {
+      overrideId = ensureOverride(fill.stateId, repair);
+    }
+    if (overrideId) ensured.set(fill.stateId, overrideId);
+    const next: Slot = {
+      ...presentation,
+      source: {
+        kind: "state",
+        stateId: fill.ref,
+        ...(overrideId ? { override: overrideId } : {}),
+      },
+    };
+    // An existing override has its own name; a rule written for the template's
+    // role must follow it.
+    if (fill.overrideName && fill.overrideName !== role && next.rules?.length) {
+      const pattern = new RegExp(`\\b${role}\\b`, "g");
+      next.rules = next.rules.map((rule) =>
+        rule.when
+          ? {
+              ...rule,
+              when: rule.when.replace(pattern, fill.overrideName!),
+            }
+          : rule,
+      );
+    }
+    bound.push(next);
+  }
+
+  const mainRef = main.ref;
+  const withAgo = bound.map((slot) =>
+    slot.source === "ago"
+      ? {
+          ...slot,
+          options: {
+            ...slot.options,
+            of: mainRef,
+            ...(slot.options?.from ? {} : { from: "lc" }),
+          },
+        }
+      : slot,
+  );
+
+  const activeSource = template.active?.source;
+  const activeFill =
+    typeof activeSource === "string" ? fills.get(activeSource) : undefined;
+  const activeSlot =
+    typeof activeSource === "string"
+      ? withAgo.find(
+          (slot) =>
+            typeof slot.source === "object" &&
+            slot.source.kind === "state" &&
+            slot.source.stateId === activeFill?.ref,
+        )
+      : undefined;
+  const name = localizeName(main.object?.common?.name);
+  const glyph = withAgo[0]?.icon?.glyph ?? presetGlyph(template.type);
+  return {
+    slots: withAgo,
+    ...(activeFill && template.active
+      ? {
+          active: {
+            ...template.active,
+            source:
+              activeSlot && typeof activeSlot.source === "object"
+                ? activeSlot.source
+                : { kind: "state", stateId: activeFill.ref },
           },
         }
       : {}),

@@ -4,21 +4,26 @@
   import { untrack } from "svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { localizeName } from "$lib/config/format";
-  import { primaryFeature } from "$lib/config/template-ops";
-  import { boundFills, templateBindingRows } from "$lib/config/slot-create";
+  import {
+    autoFillRoles,
+    boundFills,
+    templateBindingRows,
+  } from "$lib/config/slot-create";
+  import { matchingOverride } from "$lib/config/source-overrides";
   import { autoFillTemplate } from "$lib/config/template-suggest";
   import {
     resolveTemplateReference,
     type TemplateReference,
   } from "$lib/config/template-reference";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import type { Template } from "$lib/types/display";
   import type { LogicDef } from "$logic/types";
 
-  /** Bind a tile template's features to states: the main feature first, the
-   *  rest auto-filled from the same device/parent when the match is clear.
-   *  Unbound features are left out of the created tile. */
+  /** Bind a tile template's roles to states: the main role first, the rest
+   *  auto-filled from the same device/parent when the match is clear. Unbound
+   *  roles are left out; applying creates the missing overrides. */
   let {
     template,
     logics = [],
@@ -35,19 +40,20 @@
   } = $props();
 
   const rows = $derived(templateBindingRows(template));
-  const primary = $derived(primaryFeature(rows) ?? rows[0]);
+  const primary = $derived(rows.find((row) => row.primary) ?? rows[0]);
+  const roleBased = $derived(!!template.roles?.length);
 
-  let picking = $state<string | null>(untrack(() => primary?.feature ?? null));
+  let picking = $state<string | null>(untrack(() => primary?.key ?? null));
   const manualFills = new SvelteMap<string, TemplateReference>();
   const fills = new SvelteMap<string, TemplateReference>();
-  /** Features the user removed; a later auto-fill must not bring them back. */
+  /** Roles the user removed; a later auto-fill must not bring them back. */
   const cleared = new SvelteSet<string>();
   let error = $state("");
 
   const sourceName = (ref: TemplateReference): string =>
     localizeName(ref.object?.common?.name) || ref.ref;
 
-  function pick(feature: string, stateId: string): void {
+  function pick(key: string, stateId: string, overrideId?: string): void {
     const resolved = resolveTemplateReference(
       stateId,
       ioBroker.objects as Map<string, any>,
@@ -59,35 +65,73 @@
       return;
     }
     error = "";
-    cleared.delete(feature);
-    manualFills.set(feature, resolved.reference);
+    cleared.delete(key);
+    const overrides = getOverrideRegistry().overrides;
+    const override = overrideId
+      ? overrides.find((entry) => entry.id === overrideId)
+      : undefined;
+    const row = rows.find((entry) => entry.key === key);
+    // Existing override wins: a raw pick still binds the state's matching
+    // repair instead of silently dropping it.
+    const existing =
+      !override && row?.repair
+        ? matchingOverride(
+            overrides,
+            resolved.reference.stateId,
+            { name: row.repair.name, role: row.repair.role },
+            getVariables(),
+          )
+        : undefined;
+    const reference: TemplateReference = {
+      ...resolved.reference,
+      ...(override
+        ? { overrideId: override.id, overrideName: override.name }
+        : existing
+          ? { overrideId: existing.id, overrideName: existing.name }
+          : {}),
+    };
+    manualFills.set(key, reference);
     picking = null;
-    if (feature === primary?.feature) {
-      const auto = autoFillTemplate(
-        template,
-        resolved.reference,
-        ioBroker.objects as Map<string, any>,
-        feature,
-      );
-      fills.clear();
-      for (const [name, ref] of boundFills(auto.fills, manualFills)) {
-        fills.set(name, ref);
+    if (key === primary?.key) {
+      if (roleBased) {
+        fills.clear();
+        for (const [name, fill] of autoFillRoles(
+          template,
+          reference,
+          ioBroker.objects as Map<string, any>,
+          key,
+          overrides,
+        )) {
+          fills.set(name, fill);
+        }
+        for (const [name, fill] of manualFills) fills.set(name, fill);
+      } else {
+        const auto = autoFillTemplate(
+          template,
+          reference,
+          ioBroker.objects as Map<string, any>,
+          key,
+        );
+        fills.clear();
+        for (const [name, fill] of boundFills(auto.fills, manualFills)) {
+          fills.set(name, fill);
+        }
       }
       for (const name of cleared) fills.delete(name);
     } else {
-      fills.set(feature, resolved.reference);
+      fills.set(key, reference);
     }
   }
 
-  /** Drop a bound feature (auto-filled or chosen); Create drops its slot. */
-  function clear(feature: string): void {
-    cleared.add(feature);
-    fills.delete(feature);
-    manualFills.delete(feature);
+  /** Drop a bound role (auto-filled or chosen); Create drops its slot. */
+  function clear(key: string): void {
+    cleared.add(key);
+    fills.delete(key);
+    manualFills.delete(key);
   }
 
   function create(): void {
-    const main = primary ? fills.get(primary.feature) : undefined;
+    const main = primary ? fills.get(primary.key) : undefined;
     if (!main) return;
     onCreate(fills, main);
   }
@@ -119,40 +163,48 @@
     </div>
 
     <p class="hint text-muted">
-      Pick the main feature's state first; the others fill from the same device
-      or parent when the match is clear. Unset features are not added to the
-      tile.
+      {#if roleBased}
+        Pick the main role's state first; the others fill from the same device
+        or parent when the role, unit or name is clear. Missing overrides are
+        created on the picked states. Unset roles are not added to the tile.
+      {:else}
+        Pick the main feature's state first; the others fill from the same
+        device or parent when the match is clear. Unset features are not added
+        to the tile.
+      {/if}
     </p>
     {#if error}
       <p class="text-danger hint">{error}</p>
     {/if}
 
     <ul class="features">
-      {#each rows as feature (feature.feature)}
-        {@const bound = fills.get(feature.feature)}
-        {@const main = feature.feature === primary?.feature}
+      {#each rows as row (row.key)}
+        {@const bound = fills.get(row.key)}
+        {@const main = row.key === primary?.key}
         <li class="feature-row">
           <span class="feature-name">
-            {feature.label}
+            {row.label}
             {#if main}<span class="main-badge">main</span>{/if}
           </span>
           <span class="source" title={bound?.stateId ?? ""}>
-            {bound ? sourceName(bound) : "not set"}
+            {bound
+              ? `${sourceName(bound)}${bound.overrideName ? ` · ${bound.overrideName}` : ""}`
+              : "not set"}
           </span>
           {#if bound}
             <IconButton
               icon="delete"
               danger
-              label={`Clear the ${feature.label} assignment`}
-              onclick={() => clear(feature.feature)}
+              label={`Clear the ${row.label} assignment`}
+              onclick={() => clear(row.key)}
             />
           {/if}
           <button
             type="button"
             class="icon-btn"
-            title={`Choose the ${feature.label} state`}
-            aria-label={`Choose the ${feature.label} state`}
-            onclick={() => (picking = feature.feature)}
+            title={`Choose the ${row.label} state`}
+            aria-label={`Choose the ${row.label} state`}
+            onclick={() => (picking = row.key)}
           >
             <span class="material-symbols-outlined">edit</span>
           </button>
@@ -165,7 +217,7 @@
       <button
         type="button"
         class="btn btn-primary"
-        disabled={!primary || !fills.get(primary.feature)}
+        disabled={!primary || !fills.get(primary.key)}
         onclick={create}>Create tile</button
       >
     </div>
@@ -175,11 +227,11 @@
 {#if picking}
   <SourcePicker
     mode="state"
-    title={`Choose ${rows.find((feature) => feature.feature === picking)?.label ?? "the source"}`}
+    title={`Choose ${rows.find((row) => row.key === picking)?.label ?? "the source"}`}
     {logics}
     logicPick="state"
     currentState={picking ? (fills.get(picking)?.stateId ?? "") : ""}
-    onState={(stateId) => pick(picking!, stateId)}
+    onState={(stateId, overrideId) => pick(picking!, stateId, overrideId)}
     onClose={() => (picking = null)}
   />
 {/if}

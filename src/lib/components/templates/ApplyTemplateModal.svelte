@@ -40,6 +40,9 @@
           String(template.type ?? "")
             .toLowerCase()
             .includes(q) ||
+          (template.roles ?? []).some((role) =>
+            role.toLowerCase().includes(q),
+          ) ||
           String(template.description ?? "")
             .toLowerCase()
             .includes(q) ||
@@ -49,6 +52,11 @@
       )
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
   });
+  /** A role template says what it asks for; a legacy one its device type. */
+  const detail = (template: Template): string =>
+    template.roles?.length
+      ? `${template.roles.length} role${template.roles.length === 1 ? "" : "s"}`
+      : String(template.type ?? "");
 </script>
 
 <svelte:window
@@ -74,14 +82,14 @@
           type="button"
           class="template-row"
           class:active={selected?.id === template.id}
-          title={template.type}
+          title={detail(template)}
           onclick={() => (selected = template)}
         >
           <span class="name">{template.name}</span>
           <span class="detail"
             >{template.description ||
               helpLine(template.help ?? "") ||
-              template.type}</span
+              detail(template)}</span
           >
           {#if template.builtin}
             <span class="badge">built-in</span>

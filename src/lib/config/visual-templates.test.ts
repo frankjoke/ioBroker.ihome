@@ -49,6 +49,23 @@ describe("visualTemplateProblem", () => {
     ).toMatch(/rules/i);
   });
 
+  it("rejects malformed roles but accepts role templates", () => {
+    expect(
+      visualTemplateProblem({ ...valid, roles: ["switch", 5] }, []),
+    ).toMatch(/roles/i);
+    expect(
+      visualTemplateProblem(
+        {
+          ...valid,
+          features: [],
+          roles: ["temperature", "humidity", "switch"],
+          slots: [{ kind: "value", source: "temperature" }],
+        },
+        [],
+      ),
+    ).toBeNull();
+  });
+
   it("rejects a malformed size", () => {
     expect(
       visualTemplateProblem({ ...valid, size: { w: 0, h: 1 } }, []),

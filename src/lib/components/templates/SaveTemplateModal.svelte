@@ -52,8 +52,9 @@
   <form class="modal-card card" onsubmit={submit}>
     <h3>Save tile as template</h3>
     <p class="hint text-muted">
-      State and control sources become feature hints, so the template fits
-      another device of the same type. Slots that match no feature are left out.
+      State sources become roles with their repaired fields, so the template
+      fits another set of states. Applying it creates the missing overrides.
+      Slots that match no role are left out.
     </p>
     <label class="field">
       <span class="label-mono">Name</span>

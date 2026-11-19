@@ -98,6 +98,14 @@ export function visualTemplateProblem(
   }
   const featureIssue = featureProblem(template.features);
   if (featureIssue) return featureIssue;
+  if (template.roles !== undefined) {
+    if (
+      !Array.isArray(template.roles) ||
+      template.roles.some((role) => typeof role !== "string" || !role.trim())
+    ) {
+      return "roles must be an array of non-empty strings.";
+    }
+  }
   if (!Array.isArray(template.slots)) {
     return "slots must be an array.";
   }

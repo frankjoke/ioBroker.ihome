@@ -1,5 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
+import type { SourceOverride } from "$lib/types/overrides";
 
 /** Tile size hint, 1–40 fine modules wide and 1–20 high. Clamped per breakpoint — never a coordinate. */
 export type SizeW =
@@ -281,6 +282,10 @@ export type SlotSource =
   | { kind: "state"; stateId: string; override?: string }
   | { kind: "device"; device: string };
 
+/** The override fields a template slot used, minus identity: applying the
+ *  template recreates them as an override on the picked state (spec §3.4). */
+export type TemplateRepair = Omit<SourceOverride, "id" | "stateId">;
+
 /** How a slot appears in the detail page: a full line, half a line (pairs with
  *  the next half), or no row at all. */
 export type SlotDetail = "full" | "half" | "hidden";
@@ -316,6 +321,9 @@ export interface Slot {
   icon?: SlotIcon;
   /** The slot's chart (A59); absent = no chart. */
   spark?: SlotSpark;
+  /** Template-only: the repair this slot's state used, so an apply can
+   *  recreate it on the picked state. Never written to a tile. */
+  repair?: TemplateRepair;
 }
 
 export interface Template {
@@ -330,6 +338,9 @@ export interface Template {
   /** Hidden outside the local network; absent = not secured. */
   secured?: boolean;
   type: DeviceType;
+  /** Role-based tile templates: one role per bound source, in slot order
+   *  (spec §3.4). Absent on legacy feature templates. */
+  roles?: string[];
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */
   background?: Background;

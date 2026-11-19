@@ -85,9 +85,10 @@
     showBadge?: boolean;
     /** control mode: picking replaces one state instead of adding. */
     single?: boolean;
-    /** New tile: hand a picked state back instead of creating a slot. */
+    /** New tile: hand a picked state (and its override) back instead of
+     *  creating a slot. */
     suggestTemplates?: boolean;
-    onStatePicked?: (id: string, object: any) => void;
+    onStatePicked?: (id: string, object: any, overrideId?: string) => void;
     onSlots?: (slots: Slot[]) => void;
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
@@ -457,7 +458,11 @@
   function pickRawState(id: string, overrideId?: string): void {
     if (mode === "slot") {
       if (suggestTemplates) {
-        onStatePicked?.(id, objectForState(id));
+        onStatePicked?.(
+          id,
+          objectForOverride(objectForState(id), overrideId),
+          overrideId,
+        );
         return;
       }
       pickState(id, overrideId);

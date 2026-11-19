@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import {
   applyTileSeed,
+  autoFillRoles,
   boundFills,
   materializeTemplateTile,
   materializeTemplateTileFromFills,
@@ -662,14 +663,14 @@ it("lists only the features the template binds, plus the primary", () => {
       { feature: "unused", label: "Unused", widget: "value", roleHints: [] },
     ],
   } as Template;
-  expect(templateBindingRows(t).map((f) => f.feature)).not.toContain("unused");
-  expect(templateBindingRows(t).map((f) => f.feature)).toContain("power");
+  expect(templateBindingRows(t).map((f) => f.key)).not.toContain("unused");
+  expect(templateBindingRows(t).map((f) => f.key)).toContain("power");
   const raw = {
     ...PRESETS.Light,
     active: undefined,
     slots: [{ kind: "value", source: { kind: "state", stateId: "x" } }],
   } as unknown as Template;
-  expect(templateBindingRows(raw).map((f) => f.feature)).toEqual(
+  expect(templateBindingRows(raw).map((f) => f.key)).toEqual(
     PRESETS.Light.features.map((f) => f.feature),
   );
 });
@@ -710,7 +711,7 @@ it("ignores slot sources that are not catalog features", () => {
       { kind: "value", source: "hue.0.raw" },
     ],
   } as unknown as Template;
-  expect(templateBindingRows(t).map((f) => f.feature)).toEqual(
+  expect(templateBindingRows(t).map((f) => f.key)).toEqual(
     PRESETS.Light.features.map((f) => f.feature),
   );
 });
@@ -740,7 +741,209 @@ it("offers the active feature as a row even without a slot", () => {
     ],
     active: { source: "extra", op: "truthy" },
   } as unknown as Template;
-  expect(templateBindingRows(t).map((f) => f.feature)).toContain("extra");
+  expect(templateBindingRows(t).map((f) => f.key)).toContain("extra");
+});
+
+it("lists role rows for a role template, the active role first", () => {
+  const t = {
+    id: "r",
+    name: "Roles",
+    type: "Custom",
+    roles: ["temperature", "humidity", "switch"],
+    features: [],
+    active: { source: "switch", op: "truthy" },
+    slots: [
+      {
+        kind: "value",
+        source: "temperature",
+        label: "Temperature",
+        repair: {
+          kind: "repair",
+          name: "temperature",
+          label: "Temperature",
+          unit: "°C",
+          role: "temperature",
+        },
+      },
+      { kind: "value", source: "humidity", label: "Humidity" },
+      {
+        kind: "switch",
+        source: "switch",
+        repair: { kind: "repair", name: "switch", role: "switch" },
+      },
+    ],
+  } as Template;
+  const rows = templateBindingRows(t);
+  expect(rows.map((row) => row.key)).toEqual([
+    "temperature",
+    "humidity",
+    "switch",
+  ]);
+  expect(rows[0].label).toBe("Temperature");
+  expect(rows[0].unit).toBe("°C");
+  expect(rows.find((row) => row.primary)?.key).toBe("switch");
+});
+
+it("auto-fills sibling roles by role, then unit, then name", () => {
+  const main = {
+    ref: "home.climate.main",
+    stateId: "home.climate.main",
+    object: {
+      type: "state",
+      common: { name: "Climate", role: "temperature", type: "number" },
+    },
+  };
+  const objects = new Map<string, any>([
+    ["home.climate", { type: "channel", common: { name: "Home" } }],
+    ["home.climate.main", main.object],
+    [
+      "home.climate.humidity",
+      {
+        type: "state",
+        common: { name: "Humidity", role: "humidity", type: "number" },
+      },
+    ],
+    [
+      "home.climate.second",
+      {
+        type: "state",
+        common: {
+          name: "Outdoor temperature",
+          role: "temperature",
+          type: "number",
+        },
+      },
+    ],
+    [
+      "home.climate.unit",
+      {
+        type: "state",
+        common: {
+          name: "Humidity sensor",
+          role: "value",
+          type: "number",
+          unit: "%",
+        },
+      },
+    ],
+    [
+      "home.climate.switch",
+      {
+        type: "state",
+        common: { name: "Lamp", role: "switch", type: "boolean" },
+      },
+    ],
+  ]);
+  const t = {
+    id: "r2",
+    name: "Roles",
+    type: "Custom",
+    roles: ["temperature", "humidity", "switch"],
+    features: [],
+    active: { source: "temperature", op: "truthy" },
+    slots: [
+      {
+        kind: "value",
+        source: "temperature",
+        repair: {
+          kind: "repair",
+          name: "temperature",
+          role: "temperature",
+          unit: "°C",
+        },
+      },
+      {
+        kind: "value",
+        source: "humidity",
+        repair: {
+          kind: "repair",
+          name: "humidity",
+          role: "humidity",
+          unit: "%",
+        },
+      },
+      {
+        kind: "switch",
+        source: "switch",
+        repair: { kind: "repair", name: "switch", role: "switch" },
+      },
+    ],
+  } as Template;
+  const overrides = [
+    {
+      id: "ov-hum",
+      stateId: "home.climate.humidity",
+      kind: "repair" as const,
+      name: "Humidity %",
+      role: "humidity",
+    },
+  ];
+  const fills = autoFillRoles(t, main, objects, "temperature", overrides);
+  // The anchor keeps the picked state.
+  expect(fills.get("temperature")?.stateId).toBe("home.climate.main");
+  // The role match wins over the unit/name match on the other state.
+  expect(fills.get("humidity")?.stateId).toBe("home.climate.humidity");
+  expect(fills.get("humidity")?.overrideId).toBe("ov-hum");
+  expect(fills.get("switch")?.stateId).toBe("home.climate.switch");
+  // A second role with the same role name is ambiguous and is not stolen.
+  expect(fills.get("temperature")?.stateId).not.toBe("home.climate.second");
+});
+
+it("prefers an exact role over a generic family match", () => {
+  const main = {
+    ref: "home.climate.main",
+    stateId: "home.climate.main",
+    object: {
+      type: "state",
+      common: { name: "Lamp", role: "switch", type: "boolean" },
+    },
+  };
+  const objects = new Map<string, any>([
+    ["home.climate", { type: "channel", common: { name: "Home" } }],
+    ["home.climate.main", main.object],
+    [
+      "home.climate.power",
+      {
+        type: "state",
+        common: {
+          name: "Power",
+          role: "value.power",
+          type: "number",
+          unit: "W",
+        },
+      },
+    ],
+    [
+      "home.climate.factor",
+      {
+        type: "state",
+        common: { name: "Power factor", role: "value", type: "number" },
+      },
+    ],
+  ]);
+  const t = {
+    id: "r3",
+    name: "Roles",
+    type: "Custom",
+    roles: ["switch", "value_power"],
+    features: [],
+    active: { source: "switch", op: "truthy" },
+    slots: [
+      {
+        kind: "switch",
+        source: "switch",
+        repair: { kind: "repair", name: "switch", role: "switch" },
+      },
+      {
+        kind: "value",
+        source: "value_power",
+        repair: { kind: "repair", name: "value_power", role: "value.power" },
+      },
+    ],
+  } as Template;
+  const fills = autoFillRoles(t, main, objects, "switch", []);
+  // `value` is a role family of `value.power`; the exact reading still wins.
+  expect(fills.get("value_power")?.stateId).toBe("home.climate.power");
 });
 
 it("marks the frozen template icon as automatic", () => {

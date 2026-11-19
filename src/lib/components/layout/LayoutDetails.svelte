@@ -56,6 +56,7 @@
   import {
     getDerived,
     getOverrideRegistry,
+    createOverrideEnsurer,
   } from "$lib/stores/overrides.svelte";
   import { ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
@@ -80,7 +81,9 @@
     tileSourceCount,
   } from "$lib/config/tile-template";
   import {
+    autoFillRoles,
     materializeTemplateTile,
+    materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
   } from "$lib/config/slot-create";
@@ -638,8 +641,8 @@
       type,
       look: sourceLook,
     });
-    if (result.template.features.length === 0) {
-      saveTemplateError = "No slot in this tile maps to a known feature.";
+    if (!result.template.roles?.length) {
+      saveTemplateError = "No slot in this tile could be bound to a role.";
       return;
     }
     const problem = visualTemplateProblem(
@@ -666,7 +669,7 @@
     }.`;
   }
 
-  function applyTemplate(template: Template): void {
+  async function applyTemplate(template: Template): Promise<void> {
     applyTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
@@ -683,15 +686,48 @@
         applyTemplateError = "The tile's source state is gone.";
         return;
       }
-      materialized = materializeTemplateTileFromState(
-        template,
-        {
-          ref: anchor.stateId,
-          stateId: resolved.stateId,
-          object: resolved.object,
-        },
-        sourceLook.objects,
-      );
+      const override = resolved.overrideId
+        ? getOverrideRegistry().overrides.find(
+            (entry) => entry.id === resolved.overrideId,
+          )
+        : undefined;
+      const reference = {
+        ref: anchor.stateId,
+        stateId: resolved.stateId,
+        object: resolved.object,
+        ...(override
+          ? { overrideId: override.id, overrideName: override.name }
+          : {}),
+      };
+      if (template.roles?.length) {
+        const ensurer = createOverrideEnsurer();
+        materialized = materializeTemplateTileFromFills(
+          template,
+          autoFillRoles(
+            template,
+            reference,
+            sourceLook.objects,
+            undefined,
+            getOverrideRegistry().overrides,
+          ),
+          reference,
+          (stateId, repair) => ensurer.ensure(stateId, repair),
+        );
+        const saved = await ensurer.save();
+        if (saved === "conflict" || saved === "failed") {
+          applyTemplateError =
+            "The template was not applied — its new overrides could not be saved.";
+          return;
+        }
+      } else {
+        materialized = materializeTemplateTileFromState(
+          template,
+          reference,
+          sourceLook.objects,
+          undefined,
+          getOverrideRegistry().overrides,
+        );
+      }
     } else {
       const target = devices.find((entry) => entry.id === anchor.device);
       if (!target) {
@@ -2831,7 +2867,7 @@
       templates={allTemplates}
       error={applyTemplateError}
       warning={applyTemplateWarning}
-      onPick={applyTemplate}
+      onPick={(template) => void applyTemplate(template)}
       onClose={() => (applyTemplateOpen = false)}
     />
   {/if}

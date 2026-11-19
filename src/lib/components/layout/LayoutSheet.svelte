@@ -38,6 +38,7 @@
   import { templateById } from "$lib/config/template-ops";
   import {
     applyTileSeed,
+    autoFillRoles,
     materializeTemplateTile,
     materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
@@ -74,6 +75,11 @@
     isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import {
+    createOverrideEnsurer,
+    getOverrideRegistry,
+    type OverrideEnsurer,
+  } from "$lib/stores/overrides.svelte";
   import { isLocalUi } from "$lib/config/locality";
   import { withoutSecured } from "$lib/config/secured";
   import { devicesEnrichedStore } from "$lib/stores/devices";
@@ -370,12 +376,23 @@
     addTileWith(
       pageId,
       sectionId,
-      [slotFromState(reference.ref, reference.object, kind)],
+      [
+        slotFromState(
+          reference.ref,
+          reference.object,
+          kind,
+          reference.overrideId,
+        ),
+      ],
       at,
     );
   }
 
-  function onTileStatePicked(id: string, object: any): void {
+  function onTileStatePicked(
+    id: string,
+    object: any,
+    overrideId?: string,
+  ): void {
     const target = pickerFor;
     if (!target || target.kind !== "newTile") return;
     if (!writable) {
@@ -393,7 +410,15 @@
       actionError = resolved.problem;
       return;
     }
-    const reference = resolved.reference;
+    const override = overrideId
+      ? getOverrideRegistry().overrides.find((entry) => entry.id === overrideId)
+      : undefined;
+    const reference: TemplateReference = {
+      ...resolved.reference,
+      ...(override
+        ? { overrideId: override.id, overrideName: override.name }
+        : {}),
+    };
     const suggestions = suggestTemplatesForState(reference, allTemplates);
     if (suggestions.length === 0) {
       createBlankTile(target.pageId, target.sectionId, reference, target.at);
@@ -449,27 +474,54 @@
     commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
-  /** A tile picked for a state: no device is created, only the tile. */
-  function addStateTile(
+  /** A tile picked for a state: no device is created, only the tile. Missing
+   *  overrides the template repairs are created once, before the tile saves. */
+  async function addStateTile(
     pageId: string,
     sectionId: string,
     template: Template,
     reference: TemplateReference,
-    anchorFeature: string | undefined,
+    anchorKey: string | undefined,
     at?: number,
-  ): void {
-    const materialized = materializeTemplateTileFromState(
-      template,
-      reference,
-      ioBroker.objects as Map<string, any>,
-      anchorFeature,
-    );
+  ): Promise<void> {
+    const objects = ioBroker.objects as Map<string, any>;
+    let materialized;
+    if (template.roles?.length) {
+      const ensurer = createOverrideEnsurer();
+      materialized = materializeTemplateTileFromFills(
+        template,
+        autoFillRoles(
+          template,
+          reference,
+          objects,
+          anchorKey,
+          getOverrideRegistry().overrides,
+        ),
+        reference,
+        (stateId, repair) => ensurer.ensure(stateId, repair),
+      );
+      const saved = await ensurer.save();
+      if (saved === "conflict" || saved === "failed") {
+        actionError =
+          "The tile was not created — its new overrides could not be saved.";
+        return;
+      }
+    } else {
+      materialized = materializeTemplateTileFromState(
+        template,
+        reference,
+        objects,
+        anchorKey,
+        getOverrideRegistry().overrides,
+      );
+    }
     if (materialized.slots.length === 0) {
       materialized.slots = [
         slotFromState(
           reference.ref,
           reference.object,
           slotKindForWidget(widgetForState(reference.object)),
+          reference.overrideId,
         ),
       ];
     }
@@ -477,25 +529,35 @@
   }
 
   /** A new tile from a saved template, bound to the chosen states. */
-  function addTemplateTile(
+  async function addTemplateTile(
     pageId: string,
     sectionId: string,
     template: Template,
     fills: Map<string, TemplateReference>,
     main: TemplateReference,
     at?: number,
-  ): void {
+  ): Promise<void> {
+    const ensurer: OverrideEnsurer = createOverrideEnsurer();
     const materialized = materializeTemplateTileFromFills(
       template,
       fills,
       main,
+      (stateId, repair) => ensurer.ensure(stateId, repair),
     );
+    const saved = await ensurer.save();
+    if (saved === "conflict" || saved === "failed") {
+      pendingTemplate = null;
+      actionError =
+        "The tile was not created — its new overrides could not be saved.";
+      return;
+    }
     if (materialized.slots.length === 0) {
       materialized.slots = [
         slotFromState(
           main.ref,
           main.object,
           slotKindForWidget(widgetForState(main.object)),
+          main.overrideId,
         ),
       ];
     }
@@ -1068,7 +1130,7 @@
     template={target.template}
     logics={getLogicDocument().logics}
     onCreate={(fills, main) =>
-      addTemplateTile(
+      void addTemplateTile(
         target.pageId,
         target.sectionId,
         target.template,
@@ -1084,14 +1146,14 @@
   <TemplateSuggestionModal
     state={pendingTileState.reference}
     templates={allTemplates}
-    onPick={(template, feature) => {
+    onPick={(template, key) => {
       const target = pendingTileState!;
-      addStateTile(
+      void addStateTile(
         target.pageId,
         target.sectionId,
         template,
         target.reference,
-        feature.feature,
+        key,
         target.at,
       );
       pendingTileState = null;

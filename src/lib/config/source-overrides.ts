@@ -21,6 +21,7 @@ import {
   groupStates,
 } from "$lib/config/template-suggest";
 import { isOnline, stateIdsInExpression, truthy } from "$lib/config/rule-ops";
+import { newId } from "$lib/utils/ids";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 
 /** The config document every override lives in. */
@@ -126,6 +127,69 @@ export function removeOverride(
   id: string,
 ): OverrideRegistry {
   return { ...reg, overrides: reg.overrides.filter((o) => o.id !== id) };
+}
+
+/** The override a template's repair stands for on a state: same role first,
+ *  then the same name. Only a repair is reusable — a derived value is not. */
+export function matchingOverride(
+  overrides: SourceOverride[],
+  stateId: string,
+  repair: { name?: string; role?: string },
+  variables: GlobalVariable[] = [],
+): SourceOverride | undefined {
+  const wanted = stateIdFor(stateId, variables);
+  const own = overrides.filter(
+    (o) => o.kind === "repair" && stateIdFor(o.stateId, variables) === wanted,
+  );
+  const role = String(repair.role ?? "")
+    .trim()
+    .toLowerCase();
+  if (role) {
+    const hit = own.find(
+      (o) =>
+        String(o.role ?? "")
+          .trim()
+          .toLowerCase() === role,
+    );
+    if (hit) return hit;
+  }
+  const name = String(repair.name ?? "")
+    .trim()
+    .toLowerCase();
+  if (name) {
+    return own.find((o) => o.name.trim().toLowerCase() === name);
+  }
+  return undefined;
+}
+
+/**
+ * The override a template repair applies to a state: the existing one wins,
+ * otherwise the repair is created with a name unique on that state. Returns
+ * the registry to commit and the id the slots bind.
+ */
+export function ensureRepairOverride(
+  reg: OverrideRegistry,
+  stateId: string,
+  repair: Omit<SourceOverride, "id" | "stateId">,
+  variables: GlobalVariable[] = [],
+): { registry: OverrideRegistry; id: string } {
+  const existing = matchingOverride(reg.overrides, stateId, repair, variables);
+  if (existing) return { registry: reg, id: existing.id };
+  const names = new Set(
+    overridesForState(reg, stateId, variables).map((o) =>
+      o.name.trim().toLowerCase(),
+    ),
+  );
+  let name = repair.name;
+  let i = 2;
+  while (names.has(name.trim().toLowerCase())) name = `${repair.name}${i++}`;
+  const override: SourceOverride = {
+    ...repair,
+    name,
+    id: newId(),
+    stateId,
+  };
+  return { registry: upsertOverride(reg, override), id: override.id };
 }
 
 /** The siblings a derived expression can name with `$.`. */

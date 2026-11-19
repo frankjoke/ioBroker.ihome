@@ -132,6 +132,32 @@ describe("templateEntries", () => {
     }
   });
 
+  it("carries role templates' roles and searches them", () => {
+    const roleTemplate = {
+      ...device,
+      id: "roles",
+      name: "Climate",
+      roles: ["temperature", "humidity"],
+      features: [],
+    } as unknown as Template;
+    const entries = templateEntries({
+      presets: [],
+      visual: [roleTemplate],
+      logicBuiltins: [],
+      logicUser: [],
+      apiBuiltins: [],
+      apiUser: [],
+      bundleBuiltins: [],
+      bundleUser: [],
+    });
+    expect(entries[0].roles).toEqual(["temperature", "humidity"]);
+    expect(
+      filterTemplateEntries(entries, "humidity", "asc").map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["roles"]);
+  });
+
   it("carries the secured flag only from user definitions", () => {
     const entries = templateEntries({
       presets: [device],

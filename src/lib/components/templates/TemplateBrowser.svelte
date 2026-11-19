@@ -187,7 +187,14 @@
 
   function typeLabel(entry: TemplateEntry): string {
     const deviceBadge = entry.type ? `Device · ${entry.type}` : "Device";
-    if (entry.kind === "device") return deviceBadge;
+    if (entry.kind === "device") {
+      if (entry.roles?.length) {
+        return `Tile · ${entry.roles.length} role${
+          entry.roles.length === 1 ? "" : "s"
+        }`;
+      }
+      return deviceBadge;
+    }
     if (entry.kind === "api") return "Logic + Device (API)";
     if (entry.kind === "bundle") {
       return (
@@ -656,30 +663,32 @@
                     Apply
                   </button>
                 {:else if entry.kind === "device"}
-                  <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    disabled={editorDirty ||
-                      !applyWritable ||
-                      blocked ||
-                      !deviceWritable}
-                    onclick={() => openDeviceCreate(entry)}
-                  >
-                    <span class="material-symbols-outlined">add</span>
-                    New device
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline btn-sm"
-                    disabled={editorDirty ||
-                      !applyWritable ||
-                      blocked ||
-                      !deviceWritable}
-                    onclick={() => openDeviceApply(entry)}
-                  >
-                    <span class="material-symbols-outlined">play_arrow</span>
-                    Apply
-                  </button>
+                  {#if !entry.roles?.length}
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      disabled={editorDirty ||
+                        !applyWritable ||
+                        blocked ||
+                        !deviceWritable}
+                      onclick={() => openDeviceCreate(entry)}
+                    >
+                      <span class="material-symbols-outlined">add</span>
+                      New device
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      disabled={editorDirty ||
+                        !applyWritable ||
+                        blocked ||
+                        !deviceWritable}
+                      onclick={() => openDeviceApply(entry)}
+                    >
+                      <span class="material-symbols-outlined">play_arrow</span>
+                      Apply
+                    </button>
+                  {/if}
                 {:else if entry.kind === "logic"}
                   <button
                     type="button"
@@ -720,6 +729,9 @@
                   disabled={!writable || blocked}
                   onclick={duplicateSelected}
                 />
+              {/if}
+              {#if entry.roles?.length}
+                <span class="badge">{entry.roles.length} roles</span>
               {/if}
               {#if entry.builtin}
                 <span class="badge">built-in</span>

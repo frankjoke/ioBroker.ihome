@@ -5,6 +5,7 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
   OVERRIDE_LIST_ID,
   emptyOverrideRegistry,
+  ensureRepairOverride,
   evaluateOverride,
   normalizeOverrideRegistry,
   overrideById,
@@ -195,6 +196,43 @@ export async function commitOverrides(
   use(doc, "loaded");
   saveFailed = false;
   return "saved";
+}
+
+/** Binds a template's repairs while an apply runs, then commits them once. */
+export interface OverrideEnsurer {
+  /** The override id a state binds: the existing one, else a created repair. */
+  ensure: (
+    stateId: string,
+    repair: Omit<SourceOverride, "id" | "stateId">,
+  ) => string;
+  /** One save; "unchanged" when no repair was created. */
+  save: () => Promise<OverrideSave | "unchanged">;
+}
+
+/**
+ * A short-lived ensurer for one template apply. It edits a local copy so the
+ * materialiser can bind ids before the single `commitOverrides` call; a failed
+ * save leaves the store as it was (`commitOverrides` only writes on success).
+ */
+export function createOverrideEnsurer(): OverrideEnsurer {
+  const base = registry;
+  let next = base;
+  return {
+    ensure(stateId, repair) {
+      const result = ensureRepairOverride(
+        next,
+        stateId,
+        repair,
+        getVariables(),
+      );
+      next = result.registry;
+      return result.id;
+    },
+    async save() {
+      if (next === base) return "unchanged";
+      return commitOverrides(next, base.updatedAt);
+    },
+  };
 }
 
 /** Load the document; an absent one is a valid empty registry. */

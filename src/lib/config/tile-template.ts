@@ -1,13 +1,13 @@
-import { featureCatalog, type FeatureDef } from "$lib/config/features";
+import { featureCatalog } from "$lib/config/features";
 import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
 import { featureMatchRank } from "$lib/config/template-suggest";
 import { sanitizeLabel } from "$lib/config/virtual-ops";
 import type { DeviceType } from "$lib/types/device";
 import type {
-  ActiveCondition,
   Rule,
   Slot,
   Template,
+  TemplateRepair,
   TileConfig,
 } from "$lib/types/display";
 
@@ -54,57 +54,6 @@ export function tileSourceCount(tile: TileConfig | undefined): number {
     else devices.add(source.device);
   }
   return devices.size + (states ? 1 : 0);
-}
-
-/** The state id behind a slot's source, for re-linking an `ago` badge. */
-function sourceId(slot: Slot, look: SourceLook): string | undefined {
-  if (!slot.source || typeof slot.source !== "object") return undefined;
-  return resolveSlotSource(slot.source, look)?.stateId;
-}
-
-/** The feature a slot reads: control feature, then role, then label. */
-function featureForSlot(
-  slot: Slot,
-  catalog: FeatureDef[],
-  look: SourceLook,
-): FeatureDef | undefined {
-  const pick =
-    typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
-  if (typeof slot.source === "string") {
-    const hint = slot.source;
-    return (
-      catalog.find((feature) => feature.feature === hint) ??
-      (pick ? catalog.find((feature) => feature.feature === pick) : undefined)
-    );
-  }
-  if (!slot.source) return undefined;
-  const resolved = resolveSlotSource(slot.source, look);
-  const controlFeature = resolved?.control?.feature;
-  if (controlFeature) {
-    const hit = catalog.find((feature) => feature.feature === controlFeature);
-    if (hit) return hit;
-  }
-  if (resolved?.object) {
-    let best: FeatureDef | undefined;
-    let rank = 0;
-    for (const feature of catalog) {
-      const score = featureMatchRank(feature, resolved.object);
-      if (score > rank) {
-        best = feature;
-        rank = score;
-      }
-    }
-    if (best) return best;
-  }
-  const label = String(slot.label ?? resolved?.label ?? "")
-    .trim()
-    .toLowerCase();
-  if (!label) return undefined;
-  return catalog.find(
-    (feature) =>
-      feature.label.toLowerCase() === label ||
-      feature.feature.toLowerCase() === label,
-  );
 }
 
 /**
@@ -171,22 +120,43 @@ export function inferTemplateType(
   return best;
 }
 
-/** A tile's slots as a reusable template: state/control sources become feature
- *  hints, so the template materialises against another device of the same type. */
+/** A number from a slot option, so a repair keeps the tuned range. */
+function optionNumber(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : Number(value);
+  return value === undefined ||
+    value === null ||
+    value === "" ||
+    !Number.isFinite(n)
+    ? undefined
+    : n;
+}
+
+/** A tile's slots as a reusable role template: one role per bound source, with
+ *  the repair fields the source presented, so applying it to a fresh state can
+ *  recreate the override (spec §3.4). */
 export function collectTileTemplate(
   tile: TileConfig,
   options: TileTemplateOptions,
 ): TileTemplateResult {
-  const catalog = featureCatalog(options.type);
   type Part =
-    | { kind: "feature"; slot: Slot; feature: FeatureDef }
+    | {
+        kind: "bound";
+        slot: Slot;
+        role: string;
+        stateId?: string;
+        override?: string;
+      }
     | { kind: "ago"; slot: Slot }
     | { kind: "raw"; slot: Slot };
   const parts: Part[] = [];
   const aliases = new Map<string, string | null>();
+  /** One role per distinct source; two slots reading it share the role. */
+  const roleForSource = new Map<string, string>();
+  const roles: string[] = [];
+  const taken = new Set<string>();
   let omitted = 0;
 
-  /** A rule's local name for a source: feature, state name and slot label. */
+  /** A rule's local name for a source: override name, state name and label. */
   const localName = (value: unknown): string | undefined => {
     const text = String(value ?? "").trim();
     return text ? sanitizeLabel(text, new Set()) : undefined;
@@ -207,90 +177,136 @@ export function collectTileTemplate(
       parts.push({ kind: "ago", slot });
       continue;
     }
-    const feature = featureForSlot(slot, catalog, options.look);
-    if (!feature) {
+    if (!slot.source) {
       omitted++;
       continue;
     }
-    parts.push({ kind: "feature", slot, feature });
-    const target = sanitizeLabel(feature.feature, new Set());
+    const source = slot.source;
     const resolved =
-      slot.source && typeof slot.source === "object"
-        ? resolveSlotSource(slot.source, options.look)
+      typeof source === "object"
+        ? resolveSlotSource(source, options.look)
         : undefined;
-    addAlias(localName(slot.label), target);
-    addAlias(localName(resolved?.label), target);
-    addAlias(localName(resolved?.control?.feature), target);
-  }
-
-  const mapped = parts.filter(
-    (part): part is Extract<Part, { kind: "feature" }> =>
-      part.kind === "feature",
-  );
-  const activeFeature = (() => {
-    const active = tile.active;
-    if (!active?.source) return undefined;
-    if (typeof active.source === "string") {
-      return catalog.find((feature) => feature.feature === active.source);
+    if (
+      typeof source === "object" &&
+      (!resolved || resolved.available === false)
+    ) {
+      omitted++;
+      continue;
     }
-    return featureForSlot(
-      { kind: "value", source: active.source },
-      catalog,
-      options.look,
-    );
-  })();
-  const primary =
-    activeFeature ??
-    mapped.find((entry) => entry.feature.feature === "power")?.feature ??
-    mapped[0]?.feature;
-  const features = [
-    ...new Map(
-      mapped.map((entry) => [entry.feature.feature, entry.feature]),
-    ).values(),
-  ].map((feature) => ({
-    ...feature,
-    primary: feature.feature === primary?.feature ? true : undefined,
-  }));
+    const identity =
+      typeof source === "object" && source.kind === "state"
+        ? `state:${resolved?.stateId ?? source.stateId}:override:${source.override ?? ""}`
+        : typeof source === "object" && source.kind === "control"
+          ? `control:${source.device}:${source.control}`
+          : undefined;
+    let role = identity ? roleForSource.get(identity) : undefined;
+    if (!role) {
+      // The role a state expects: its override/object role, else the widget
+      // class (`switch`, `button`, `value`, `level`, …).
+      const baseRole =
+        String(resolved?.role ?? "").trim() ||
+        String(resolved?.widget ?? "").trim() ||
+        (typeof source === "string" ? source : slot.kind);
+      role = sanitizeLabel(baseRole, taken);
+      if (identity) roleForSource.set(identity, role);
+      roles.push(role);
+    }
+    const meta = resolved?.meta;
+    const label =
+      String(slot.label ?? resolved?.label ?? "").trim() || undefined;
+    const unit =
+      typeof slot.unit === "string"
+        ? slot.unit
+        : resolved?.unit
+          ? resolved.unit
+          : undefined;
+    const min = optionNumber(slot.options?.min) ?? meta?.min;
+    const max = optionNumber(slot.options?.max) ?? meta?.max;
+    const step = optionNumber(slot.options?.step) ?? meta?.step;
+    const decimals = optionNumber(slot.options?.decimals);
+    const repair: TemplateRepair = {
+      kind: "repair",
+      name: role,
+      ...(label ? { label } : {}),
+      ...(unit ? { unit } : {}),
+      ...(meta?.type ? { type: meta.type } : {}),
+      ...(resolved?.role ? { role: resolved.role } : {}),
+      ...(meta?.states ? { states: meta.states } : {}),
+      ...(min !== undefined ? { min } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(step !== undefined ? { step } : {}),
+      ...(decimals !== undefined ? { decimals } : {}),
+      ...(meta?.read !== undefined ? { read: meta.read } : {}),
+      ...(meta?.write !== undefined ? { write: meta.write } : {}),
+      ...(meta?.unit === "" ? { hideUnit: true } : {}),
+      ...(resolved?.transform ? { transform: resolved.transform } : {}),
+      ...(resolved?.history ? { history: resolved.history } : {}),
+    };
+    const slotOptions = { ...(slot.options ?? {}) };
+    delete slotOptions.pick;
+    const rest = { ...slot };
+    delete rest.from;
+    parts.push({
+      kind: "bound",
+      slot: {
+        ...rest,
+        source: role,
+        ...(Object.keys(slotOptions).length ? { options: slotOptions } : {}),
+        repair,
+      },
+      role,
+      ...(typeof source === "object" && source.kind === "state"
+        ? {
+            stateId: resolved?.stateId ?? source.stateId,
+            ...(source.override ? { override: source.override } : {}),
+          }
+        : typeof source === "object" && source.kind === "control"
+          ? { stateId: resolved?.stateId }
+          : {}),
+    });
+    addAlias(localName(slot.label), role);
+    addAlias(localName(resolved?.label), role);
+    if (typeof source === "string") addAlias(localName(source), role);
+    const override = resolved?.overrideId
+      ? options.look.overrides?.find((o) => o.id === resolved.overrideId)
+      : undefined;
+    addAlias(localName(override?.name), role);
+    addAlias(localName(override?.label), role);
+  }
 
   const slots: Slot[] = [];
   for (const part of parts) {
-    if (part.kind === "raw") {
+    if (part.kind === "raw" || part.kind === "bound") {
       slots.push(part.slot);
       continue;
     }
-    if (part.kind === "ago") {
-      const of =
-        typeof part.slot.options?.of === "string" ? part.slot.options.of : "";
-      const target =
-        mapped.find((entry) => sourceId(entry.slot, options.look) === of)
-          ?.feature.feature ?? primary?.feature;
-      slots.push({
-        ...part.slot,
-        options: {
-          ...part.slot.options,
-          ...(target ? { of: target } : {}),
-        },
-      });
-      continue;
-    }
-    const slotOptions = { ...part.slot.options };
-    delete slotOptions.pick;
-    const rest = { ...part.slot };
-    delete rest.from;
+    const of =
+      typeof part.slot.options?.of === "string" ? part.slot.options.of : "";
+    const boundParts = parts.filter(
+      (entry): entry is Extract<Part, { kind: "bound" }> =>
+        entry.kind === "bound",
+    );
+    const target =
+      boundParts.find((entry) => entry.stateId === of && !entry.override)
+        ?.role ??
+      boundParts.find((entry) => entry.stateId === of)?.role ??
+      roles[0];
     slots.push({
-      ...rest,
-      source: part.feature.feature,
-      ...(Object.keys(slotOptions).length ? { options: slotOptions } : {}),
+      ...part.slot,
+      options: {
+        ...part.slot.options,
+        ...(target ? { of: target } : {}),
+      },
     });
   }
 
   // A rule written against a state's local name (e.g. `available`) must name
-  // the feature (`connected`) in the template, or it breaks on the next tile.
+  // the role (`indicator_reachable`) in the template, or it breaks on apply.
   const names = [...aliases.entries()]
     .filter(([, target]) => target)
     .map(([name]) => name);
   const aliasPattern = names.length
-    ? new RegExp(`\\b(${names.join("|")})\\b`, "g")
+    ? new RegExp(`\\b(${names.join("|")})\\b`, "gi")
     : null;
   const rewriteRule = (rule: Rule): Rule =>
     aliasPattern && rule.when
@@ -298,7 +314,7 @@ export function collectTileTemplate(
           ...rule,
           when: rule.when.replace(
             aliasPattern,
-            (name) => aliases.get(name) ?? name,
+            (name) => aliases.get(name.toLowerCase()) ?? name,
           ),
         }
       : rule;
@@ -306,10 +322,25 @@ export function collectTileTemplate(
     slot.rules?.length ? { ...slot, rules: slot.rules.map(rewriteRule) } : slot,
   );
 
-  const active: ActiveCondition | undefined =
-    tile.active && activeFeature
-      ? { ...tile.active, source: activeFeature.feature }
+  const active = (() => {
+    const condition = tile.active;
+    if (!condition?.source) return undefined;
+    const activeSource = condition.source;
+    if (typeof activeSource === "string" && taken.has(activeSource)) {
+      return { ...condition, source: activeSource };
+    }
+    const activeId =
+      typeof activeSource === "object"
+        ? resolveSlotSource(activeSource, options.look)?.stateId
+        : undefined;
+    const part = parts.find(
+      (entry) =>
+        entry.kind === "bound" && entry.stateId && entry.stateId === activeId,
+    );
+    return part?.kind === "bound"
+      ? { ...condition, source: part.role }
       : undefined;
+  })();
 
   return {
     omitted,
@@ -319,7 +350,8 @@ export function collectTileTemplate(
       type: options.type,
       basedOn: options.type,
       builtin: false,
-      features,
+      roles,
+      features: [],
       slots: rewritten,
       ...(tile.size ? { size: tile.size } : {}),
       ...(tile.look ? { look: tile.look } : {}),

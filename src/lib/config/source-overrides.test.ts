@@ -3,7 +3,9 @@ import type { GlobalVariable } from "./variables";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 import {
   emptyOverrideRegistry,
+  ensureRepairOverride,
   evaluateOverride,
+  matchingOverride,
   normalizeOverrideRegistry,
   overrideById,
   overrideGroup,
@@ -403,6 +405,69 @@ describe("upsertOverride / removeOverride", () => {
     expect(next.updatedAt).toBe(7);
     expect(next.migratedDevices).toBe(true);
     expect(removeOverride(next, "a").updatedAt).toBe(7);
+  });
+});
+
+describe("ensureRepairOverride", () => {
+  it("reuses an existing repair by role or name and never duplicates it", () => {
+    const base = {
+      ...emptyOverrideRegistry(),
+      overrides: [repair({ role: "switch", name: "lamp" })],
+    };
+    const byRole = ensureRepairOverride(base, "s", {
+      kind: "repair",
+      name: "switch",
+      role: "switch",
+    });
+    expect(byRole.id).toBe("a");
+    expect(byRole.registry).toBe(base);
+    const byName = ensureRepairOverride(base, "s", {
+      kind: "repair",
+      name: "lamp",
+      role: "switch.light",
+    });
+    expect(byName.id).toBe("a");
+    // A derived override with the same name is not a repair to reuse.
+    const withDerived = {
+      ...emptyOverrideRegistry(),
+      overrides: [
+        {
+          ...repair({ id: "d", role: "value.power" }),
+          kind: "derived" as const,
+        },
+      ],
+    };
+    const created = ensureRepairOverride(withDerived, "s", {
+      kind: "repair",
+      name: "power",
+      role: "value.power",
+    });
+    expect(created.id).not.toBe("d");
+    expect(created.registry.overrides).toHaveLength(2);
+    expect(
+      created.registry.overrides.find((o) => o.id === created.id)?.name,
+    ).toBe("power2");
+  });
+
+  it("matches only the same state and keeps the repair's fields", () => {
+    const reg = ensureRepairOverride(emptyOverrideRegistry(), "state.one", {
+      kind: "repair",
+      name: "power",
+      label: "Power",
+      unit: "W",
+      role: "value.power",
+    });
+    expect(
+      matchingOverride(reg.registry.overrides, "state.two", {
+        name: "power",
+      }),
+    ).toBeUndefined();
+    expect(reg.registry.overrides[0]).toMatchObject({
+      stateId: "state.one",
+      name: "power",
+      unit: "W",
+      kind: "repair",
+    });
   });
 });
 
