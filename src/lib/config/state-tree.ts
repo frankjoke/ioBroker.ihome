@@ -65,17 +65,27 @@ export function collectStates(objects: Map<string, any>): StateRef[] {
   return out;
 }
 
+/** Search text without whitespace, so "dewpoint" finds "Dew point". */
+function searchKey(text: string): string {
+  return String(text ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
 export function applyFilters(
   states: StateRef[],
   filters: StateFilters,
   roomsOf?: (id: string) => string[],
   functionsOf?: (id: string) => string[],
+  /** Override names/labels per state id, so a repair is findable by its name. */
+  overrideNames?: (id: string) => string[],
 ): StateRef[] {
   const adapters = toList(filters.adapter);
   const types = toList(filters.type);
   const roles = toList(filters.role);
   const roomSel = toList(filters.room);
   const functionSel = toList(filters.functions);
+  const query = filters.search ? searchKey(filters.search) : "";
   return states.filter((s) => {
     const common = s.obj?.common ?? {};
     if (adapters.length && !adapters.includes(adapterOf(s.id))) return false;
@@ -89,10 +99,17 @@ export function applyFilters(
       !roles.some((r) => String(common.role ?? "").includes(r))
     )
       return false;
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      const name = nameText(common.name).toLowerCase();
-      if (!s.id.toLowerCase().includes(q) && !name.includes(q)) return false;
+    if (query) {
+      const name = nameText(common.name);
+      if (
+        !searchKey(s.id).includes(query) &&
+        !searchKey(name).includes(query) &&
+        !(overrideNames?.(s.id) ?? []).some((text) =>
+          searchKey(text).includes(query),
+        )
+      ) {
+        return false;
+      }
     }
     if (roomSel.length) {
       const r = roomsOf?.(s.id) ?? [];

@@ -18,10 +18,19 @@
     rememberPickedState,
     takePickedState,
   } from "$lib/picker-state.svelte.js";
-  import { SvelteSet } from "svelte/reactivity";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
   import { enumsOfState, enumLabelFromObject } from "$lib/config/rooms";
+  import { variableMatches, stateIdFor } from "$lib/config/variables";
+  import { removeOverride, upsertOverride } from "$lib/config/source-overrides";
+  import {
+    commitOverrides,
+    getOverrideRegistry,
+    isOverridesWritable,
+  } from "$lib/stores/overrides.svelte";
+  import type { SourceOverride } from "$lib/types/overrides";
   import type { LogicDef } from "$logic/types";
 
   type Tab = "states" | "variables" | "logic";
@@ -37,6 +46,8 @@
     currentState = "",
     logics = [],
     logicPick = undefined,
+    /** Offer the per-state override list and editor (a tile's sources). */
+    manageOverrides = false,
   }: {
     objects: Map<string, any>;
     roomsOf: (id: string) => string[];
@@ -45,13 +56,15 @@
     selection?: Set<string>;
     onToggle?: (id: string) => void;
     /** When set, a state is picked with one click instead of ticked. */
-    onPick?: (id: string) => void;
+    onPick?: (id: string, overrideId?: string) => void;
     /** The state this item already uses: the tree opens at it. */
     currentState?: string;
     /** The document's logics, for the Logic tab. */
     logics?: LogicDef[];
     /** What a logic selection means: an event trigger or its output state. */
     logicPick?: "trigger" | "state";
+    /** The state rows manage their overrides (add, edit, pick a sub-entry). */
+    manageOverrides?: boolean;
   } = $props();
 
   // Every open starts from the whole tree: a search from the previous open (or
@@ -62,6 +75,15 @@
   let tab = $state<Tab>("states");
   /** The states results box, so a searched/picked line can be scrolled to. */
   let resultsEl = $state<HTMLElement>();
+  /** The override sub-lists the user unfolded (keyed by real state id). */
+  const expandedOverrides = new SvelteSet<string>();
+  /** The override being added (`override` absent) or edited. */
+  let overrideForm = $state<{
+    stateId: string;
+    object: any;
+    override?: SourceOverride;
+  } | null>(null);
+  const canManageOverrides = $derived(manageOverrides && !!onPick);
 
   const allStates = $derived(collectStates(objects));
   const adapters = $derived(
@@ -78,22 +100,51 @@
   );
 
   const functionsOf = (id: string) => enumsOfState(enums, id, "functions");
+  /** Every override, grouped by the real state id it belongs to. */
+  const overridesById = $derived.by(() => {
+    const map = new SvelteMap<string, SourceOverride[]>();
+    for (const override of getOverrideRegistry().overrides) {
+      const id = stateIdFor(override.stateId, getVariables());
+      const list = map.get(id) ?? [];
+      list.push(override);
+      map.set(id, list);
+    }
+    return map;
+  });
+  /** Override names/labels per real state id, so a search finds a repair. */
+  const overrideNamesById = $derived.by(() => {
+    const map = new SvelteMap<string, string[]>();
+    for (const [id, list] of overridesById) {
+      map.set(
+        id,
+        list.flatMap((override) => [override.name, override.label ?? ""]),
+      );
+    }
+    return map;
+  });
   const filtered = $derived(
-    applyFilters(allStates, pickerFilters, roomsOf, functionsOf),
+    applyFilters(
+      allStates,
+      pickerFilters,
+      roomsOf,
+      functionsOf,
+      (id) => overrideNamesById.get(id) ?? [],
+    ),
   );
   // Global state variables, as the pickable aliases they are: the search box
-  // filters them by name or by the real state id, the other filters stay for
-  // the broker tree (a variable's adapter is not its own).
+  // filters them by name, id, the broker state's name and unit, the other
+  // filters stay for the broker tree (a variable's adapter is not its own).
   const searchText = $derived((pickerFilters.search ?? "").toLowerCase());
   const variableNode = $derived(
     buildVariableNode(
       getVariables()
         .filter((v) => v.kind === "state" && v.stateId)
-        .filter(
-          (v) =>
-            !searchText ||
-            v.name.toLowerCase().includes(searchText) ||
-            String(v.stateId).toLowerCase().includes(searchText),
+        .filter((v) =>
+          variableMatches(
+            v,
+            objects.get(String(v.stateId)),
+            pickerFilters.search ?? "",
+          ),
         ),
       objects,
     ),
@@ -122,19 +173,83 @@
       .filter((row): row is { id: string; name: string; ref: string } => !!row);
   });
 
-  function pick(id: string) {
-    if (onPick) onPick(id);
+  function pick(id: string, overrideId?: string) {
+    if (onPick) onPick(id, overrideId);
     else onToggle(id);
   }
 
   /** A one-click tree pick: remember its folder for the next open. A variable
    *  leaf stores the real state so the next open lands in the broker tree. */
-  function pickFromTree(id: string) {
+  function pickFromTree(id: string, overrideId?: string) {
     const variable = getVariables().find(
       (v) => v.kind === "state" && v.name === id,
     );
     rememberPickedState(variable?.stateId ? String(variable.stateId) : id);
-    pick(id);
+    pick(id, overrideId);
+  }
+
+  function overridesFor(stateId: string): SourceOverride[] {
+    return overridesById.get(stateId) ?? [];
+  }
+
+  function toggleOverrides(id: string) {
+    if (expandedOverrides.has(id)) expandedOverrides.delete(id);
+    else expandedOverrides.add(id);
+  }
+
+  function addOverride(stateId: string, object: any) {
+    overrideForm = { stateId, object };
+  }
+
+  function editOverride(
+    stateId: string,
+    object: any,
+    override: SourceOverride,
+  ) {
+    overrideForm = { stateId, object, override };
+  }
+
+  /** The picker owns the document write, so the modal stays a form. A failed
+   *  save throws: the modal shows the reason and keeps the draft. */
+  async function saveOverride(next: SourceOverride): Promise<void> {
+    if (!isOverridesWritable()) {
+      throw new Error("The override list is not readable — nothing was saved.");
+    }
+    const registry = getOverrideRegistry();
+    const result = await commitOverrides(
+      upsertOverride(registry, next),
+      registry.updatedAt,
+    );
+    if (result !== "saved") {
+      throw new Error(
+        result === "conflict"
+          ? "The override list changed elsewhere — review and save again."
+          : "The override could not be saved (not connected?).",
+      );
+    }
+    overrideForm = null;
+    expandedOverrides.add(stateIdFor(next.stateId, getVariables()));
+  }
+
+  async function deleteOverride(id: string): Promise<void> {
+    if (!isOverridesWritable()) {
+      throw new Error(
+        "The override list is not readable — nothing was deleted.",
+      );
+    }
+    const registry = getOverrideRegistry();
+    const result = await commitOverrides(
+      removeOverride(registry, id),
+      registry.updatedAt,
+    );
+    if (result !== "saved") {
+      throw new Error(
+        result === "conflict"
+          ? "The override list changed elsewhere — review and delete again."
+          : "The override could not be deleted (not connected?).",
+      );
+    }
+    overrideForm = null;
   }
 
   /** Alias link: reveal the original state whatever filters were set. */
@@ -277,6 +392,11 @@
         {enums}
         {objects}
         onAlias={goToAlias}
+        overridesOf={canManageOverrides ? overridesFor : undefined}
+        expandedOverrides={canManageOverrides ? expandedOverrides : undefined}
+        onToggleOverrides={canManageOverrides ? toggleOverrides : undefined}
+        onAddOverride={canManageOverrides ? addOverride : undefined}
+        onEditOverride={canManageOverrides ? editOverride : undefined}
       />
     {/if}
   </div>
@@ -300,6 +420,11 @@
         {enums}
         {objects}
         onAlias={goToAlias}
+        overridesOf={canManageOverrides ? overridesFor : undefined}
+        expandedOverrides={canManageOverrides ? expandedOverrides : undefined}
+        onToggleOverrides={canManageOverrides ? toggleOverrides : undefined}
+        onAddOverride={canManageOverrides ? addOverride : undefined}
+        onEditOverride={canManageOverrides ? editOverride : undefined}
       />
     {/if}
   </div>
@@ -332,6 +457,18 @@
       </ul>
     {/if}
   </div>
+{/if}
+
+{#if overrideForm}
+  <SourceOverrideModal
+    stateId={overrideForm.stateId}
+    object={overrideForm.object}
+    override={overrideForm.override}
+    existingNames={overridesFor(overrideForm.stateId).map((o) => o.name)}
+    onSave={saveOverride}
+    onDelete={deleteOverride}
+    onClose={() => (overrideForm = null)}
+  />
 {/if}
 
 <style>

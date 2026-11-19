@@ -97,11 +97,13 @@ export function slotFromControl(
   };
 }
 
-/** A slot from a raw broker state, with the state's own metadata copied. */
+/** A slot from a raw broker state, with the state's own metadata copied. An
+ *  override id binds the slot to that state's repair/derived presentation. */
 export function slotFromState(
   stateId: string,
   object: any,
   kind: SlotKind,
+  overrideId?: string,
 ): Slot {
   const common = object?.common ?? {};
   const options = rangeOptions(common);
@@ -113,7 +115,11 @@ export function slotFromState(
   const glyph = ownIcon ?? glyphForRole(common.role, common.type);
   return {
     kind,
-    source: { kind: "state", stateId },
+    source: {
+      kind: "state",
+      stateId,
+      ...(overrideId ? { override: overrideId } : {}),
+    },
     ...(label ? { label } : {}),
     ...(common.unit ? { unit: common.unit } : {}),
     ...(Object.keys(options).length ? { options } : {}),

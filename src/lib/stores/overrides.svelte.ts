@@ -11,6 +11,7 @@ import {
   overrideGroup,
 } from "$lib/config/source-overrides";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { getVariables } from "$lib/stores/variables.svelte";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 
 /** The result of a save attempt, so the editor can word the outcome. */
@@ -51,7 +52,7 @@ function compute(
   reg: OverrideRegistry,
 ): { value?: unknown; error?: string; inputs: string[] } {
   const objects = objectsSource();
-  const group = overrideGroup(override.stateId, objects, reg);
+  const group = overrideGroup(override.stateId, objects, reg, getVariables());
   return evaluateOverride(override, {
     group,
     states: statesSource(),

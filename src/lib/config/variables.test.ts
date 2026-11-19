@@ -16,8 +16,10 @@ import {
   validName,
   validStateId,
   variableLocals,
+  variableMatches,
   variableNameFor,
   variableStateSpec,
+  type GlobalVariable,
 } from "$lib/config/variables";
 
 describe("buildStateId", () => {
@@ -394,6 +396,44 @@ describe("migrateVariables", () => {
       max: 50,
       step: 0.5,
     });
+  });
+});
+
+describe("variableMatches", () => {
+  const v = {
+    id: "v",
+    name: "alias",
+    kind: "state",
+    type: "number",
+    stateId: "alias.0.Hum",
+  } as GlobalVariable;
+
+  it("matches the state object's broker name", () => {
+    expect(
+      variableMatches(v, { common: { name: "Kitchen humidity" } }, "kitchen"),
+    ).toBe(true);
+    expect(
+      variableMatches(v, { common: { name: "Kitchen humidity" } }, "nope"),
+    ).toBe(false);
+  });
+
+  it("matches the variable's own text and the unit", () => {
+    expect(variableMatches(v, undefined, "alias.0")).toBe(true);
+    expect(variableMatches(v, undefined, "ALIAS")).toBe(true);
+    expect(variableMatches(v, { common: { unit: "°C" } }, "°c")).toBe(true);
+    expect(variableMatches(v, undefined, "")).toBe(true);
+  });
+
+  it("matches a constant's value", () => {
+    const c = {
+      id: "c",
+      name: "gas_price",
+      kind: "constant",
+      type: "number",
+      value: "0.35",
+    } as GlobalVariable;
+    expect(variableMatches(c, undefined, "0.35")).toBe(true);
+    expect(variableMatches(c, undefined, "gas")).toBe(true);
   });
 });
 

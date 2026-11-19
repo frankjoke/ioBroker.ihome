@@ -397,3 +397,55 @@ it("sourceStateIds subscribes a derived override's inputs", () => {
     ),
   ).toEqual(["s", "s.a", "s.b"]);
 });
+
+const variables: SourceLook["variables"] = [
+  {
+    id: "v1",
+    name: "LampVar",
+    kind: "state",
+    type: "string",
+    stateId: "0_userdata.0.lamp",
+  },
+  {
+    id: "v2",
+    name: "OtherVar",
+    kind: "state",
+    type: "number",
+    stateId: "0_userdata.0.other",
+  },
+];
+
+it("applies an override stored under a variable name", () => {
+  const l = stateLook({
+    id: "0_userdata.0.lamp",
+    value: "12",
+    overrides: [repair({ stateId: "LampVar", unit: "A", type: "number" })],
+  });
+  l.variables = variables;
+  const source = resolveSlotSource(
+    { kind: "state", stateId: "LampVar", override: "o" },
+    l,
+  );
+  expect(source?.overrideId).toBe("o");
+  expect(source?.unit).toBe("A");
+  expect(source?.value).toBe(12);
+});
+
+it("subscribes variable-named derived inputs as their states", () => {
+  expect(
+    sourceStateIds(
+      { kind: "state", stateId: "LampVar", override: "d" },
+      [],
+      variables,
+      [
+        {
+          id: "d",
+          stateId: "LampVar",
+          kind: "derived",
+          name: "sum",
+          inputs: ["OtherVar"],
+        },
+      ],
+    ),
+  ).toEqual(["0_userdata.0.lamp", "0_userdata.0.other"]);
+});

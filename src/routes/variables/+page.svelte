@@ -19,6 +19,7 @@
     splitStateId,
     validName,
     validStateId,
+    variableMatches,
     type GlobalVariable,
   } from "$lib/config/variables";
   import { formatValue } from "$lib/config/format";
@@ -82,18 +83,12 @@
   });
 
   const shown = $derived.by(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     const list = variables.filter((v) => {
       if (
-        q &&
-        !(
-          v.name.toLowerCase().includes(q) ||
-          (v.stateId ?? "").toLowerCase().includes(q) ||
-          (v.value ?? "").toLowerCase().includes(q)
-        )
-      ) {
+        !variableMatches(v, v.stateId ? objects.get(v.stateId) : undefined, q)
+      )
         return false;
-      }
       if (kindFilter && v.kind !== kindFilter) return false;
       const enums = v.enums ?? [];
       if (roomFilter && !enums.includes(roomFilter)) return false;

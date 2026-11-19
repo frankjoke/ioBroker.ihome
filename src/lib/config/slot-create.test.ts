@@ -342,6 +342,12 @@ it("creates a raw-state slot with the state's metadata", () => {
   });
 });
 
+it("binds a raw-state slot to an override", () => {
+  expect(
+    slotFromState("x.0.a", { common: { name: "A" } }, "value", "o1").source,
+  ).toEqual({ kind: "state", stateId: "x.0.a", override: "o1" });
+});
+
 it("maps widgets to their slot kind", () => {
   expect(slotKindForWidget("switch")).toBe("switch");
   expect(slotKindForWidget("level")).toBe("level");

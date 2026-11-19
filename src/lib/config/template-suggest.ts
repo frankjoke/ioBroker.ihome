@@ -69,7 +69,8 @@ const INFRASTRUCTURE_LEAVES = new Set([
   "deviceTypeList",
 ]);
 
-function isInfrastructure(entry: TemplateReference): boolean {
+/** A configuration/availability leaf the auto-fill never offers by name. */
+export function isInfrastructure(entry: { stateId?: string }): boolean {
   const leaf =
     String(entry.stateId ?? "")
       .split(".")
@@ -357,13 +358,7 @@ export function suggestTemplatesForState(
   state: { stateId: string; object: any },
   templates: Template[],
 ): TemplateSuggestion[] {
-  if (
-    isInfrastructure({
-      ref: state.stateId,
-      stateId: state.stateId,
-      object: state.object,
-    })
-  ) {
+  if (isInfrastructure({ stateId: state.stateId })) {
     return [];
   }
   const scored: TemplateSuggestion[] = [];

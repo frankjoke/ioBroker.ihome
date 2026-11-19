@@ -161,7 +161,10 @@ export function resolveSlotSource(
     if (!wanted) return base;
 
     const override = (look.overrides ?? []).find((o) => o.id === wanted);
-    if (override && override.stateId !== stateId) {
+    if (
+      override &&
+      stateIdFor(override.stateId, look.variables ?? []) !== stateId
+    ) {
       return {
         ...base,
         error: `override "${wanted}" belongs to "${override.stateId}", not "${stateId}"`,
@@ -248,7 +251,11 @@ export function sourceStateIds(
     const override = source.override
       ? overrides.find((o) => o.id === source.override)
       : undefined;
-    const inputs = override?.stateId === stateId ? (override.inputs ?? []) : [];
+    const bound =
+      !!override && stateIdFor(override.stateId, variables) === stateId;
+    const inputs = bound
+      ? (override.inputs ?? []).map((id) => stateIdFor(id, variables))
+      : [];
     return [...new Set([stateId, ...inputs])];
   }
   if (source.kind === "device") return [];

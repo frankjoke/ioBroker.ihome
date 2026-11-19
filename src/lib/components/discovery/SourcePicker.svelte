@@ -23,6 +23,7 @@
   import { resolveTemplate } from "$lib/config/template-ops";
   import { widgetForState } from "$lib/config/slot-source";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
   import { stateIdFor } from "$lib/config/variables";
   import { localizeName } from "$lib/config/format";
   import { suggestFeature, stateLabel } from "$lib/config/features";
@@ -90,7 +91,7 @@
     onSlots?: (slots: Slot[]) => void;
     onSource?: (source: SlotSource) => void;
     onControls?: (controls: Control[]) => void;
-    onState?: (stateId: string) => void;
+    onState?: (stateId: string, overrideId?: string) => void;
     /** New-tile Templates tab: the chosen tile template. */
     onTemplate?: (template: Template) => void;
     /** The document's logics, for the picker's Logic tab. */
@@ -298,8 +299,40 @@
     );
   }
 
-  function stateSource(id: string): SlotSource {
-    return { kind: "state", stateId: id };
+  function stateSource(id: string, overrideId?: string): SlotSource {
+    return {
+      kind: "state",
+      stateId: id,
+      ...(overrideId ? { override: overrideId } : {}),
+    };
+  }
+
+  /** What an override presents: a repair wins over the broker object, while a
+   *  derived value supplies its own fields and inherits nothing (the resolver's
+   *  same rule), so the slot kind follows the override, not the raw object. */
+  function objectForOverride(object: any, overrideId?: string): any {
+    if (!overrideId) return object;
+    const override = getOverrideRegistry().overrides.find(
+      (o) => o.id === overrideId,
+    );
+    if (!override) return object;
+    const own: Record<string, unknown> = {};
+    for (const key of [
+      "unit",
+      "type",
+      "role",
+      "states",
+      "min",
+      "max",
+      "step",
+    ] as const) {
+      if (override[key] !== undefined) own[key] = override[key];
+    }
+    const name = override.label ?? override.name;
+    if (name) own.name = name;
+    return override.kind === "repair"
+      ? { ...object, common: { ...(object?.common ?? {}), ...own } }
+      : { common: own };
   }
 
   /** Slot sources on this tile first, then the unused controls of the devices
@@ -394,26 +427,26 @@
     if (suggestions.length) onSlots?.(suggestions);
   }
 
-  function pickState(id: string): void {
-    const object = objectForState(id);
+  function pickState(id: string, overrideId?: string): void {
+    const object = objectForOverride(objectForState(id), overrideId);
     const kind =
       stateKind === "auto"
         ? slotKindForWidget(widgetForState(object))
         : stateKind;
-    onSlots?.([slotFromState(id, object, kind)]);
+    onSlots?.([slotFromState(id, object, kind, overrideId)]);
   }
 
   /** One click on a tree leaf: add a slot, set a source, add a control, or
    *  hand a state to the Variables page. */
-  function pickRawState(id: string): void {
+  function pickRawState(id: string, overrideId?: string): void {
     if (mode === "slot") {
       if (suggestTemplates) {
         onStatePicked?.(id, objectForState(id));
         return;
       }
-      pickState(id);
-    } else if (mode === "source") onSource?.(stateSource(id));
-    else if (mode === "state") onState?.(id);
+      pickState(id, overrideId);
+    } else if (mode === "source") onSource?.(stateSource(id, overrideId));
+    else if (mode === "state") onState?.(id, overrideId);
     else togglePickedState(id);
   }
 
@@ -491,11 +524,15 @@
     if (mode !== "slot") return;
     let slot: Slot | null = null;
     if (source.kind === "state") {
-      const object = objectForState(source.stateId);
+      const object = objectForOverride(
+        objectForState(source.stateId),
+        source.override,
+      );
       slot = slotFromState(
         source.stateId,
         object,
         kind ?? slotKindForWidget(widgetForState(object)),
+        source.override,
       );
     } else if (source.kind === "control") {
       const device = allDevices.find((d) => d.id === source.device);
@@ -644,6 +681,7 @@
           {currentState}
           {logics}
           {logicPick}
+          manageOverrides={mode === "slot" || mode === "source"}
         />
       {/if}
     {:else if tab === "template"}

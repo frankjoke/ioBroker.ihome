@@ -1,7 +1,12 @@
 import { num, parseDoc } from "$lib/config/doc-parse";
 import { localizeName } from "$lib/config/format";
 import { applyRead } from "$lib/utils/transform";
-import { type GlobalVariable, resolveVariable } from "$lib/config/variables";
+import {
+  type GlobalVariable,
+  convertValue,
+  resolveVariable,
+  stateIdFor,
+} from "$lib/config/variables";
 import {
   buildScope,
   evaluateVirtual,
@@ -72,25 +77,32 @@ export function overrideById(
 export function overridesForState(
   reg: OverrideRegistry,
   stateId: string,
+  variables: GlobalVariable[] = [],
 ): SourceOverride[] {
-  return reg.overrides.filter((o) => o.stateId === stateId);
+  const wanted = stateIdFor(stateId, variables);
+  return reg.overrides.filter(
+    (o) => stateIdFor(o.stateId, variables) === wanted,
+  );
 }
 
-/** Name uniqueness applies per state, case-insensitive. */
+/** Name uniqueness applies per state, case-insensitive. A state id may be a
+ *  variable name; both sides are resolved before they are compared. */
 export function overrideNameTaken(
   reg: OverrideRegistry,
   stateId: string,
   name: string,
   exceptId?: string,
+  variables: GlobalVariable[] = [],
 ): boolean {
   const key = String(name ?? "")
     .trim()
     .toLowerCase();
   if (!key) return false;
+  const wanted = stateIdFor(stateId, variables);
   return reg.overrides.some(
     (o) =>
       o.id !== exceptId &&
-      o.stateId === stateId &&
+      stateIdFor(o.stateId, variables) === wanted &&
       o.name.trim().toLowerCase() === key,
   );
 }
@@ -164,7 +176,7 @@ export function overrideGroup(
   const taken = new Set<string>();
   const claimed = new Set<string>();
   for (const id of stateIds) {
-    for (const override of overridesForState(registry, id)) {
+    for (const override of overridesForState(registry, id, variables)) {
       const name = sanitizeLabel(override.name, taken);
       claimed.add(sanitizeLabel(override.name, new Set()));
       names.set(name, { stateId: id, override: override.id });
@@ -195,6 +207,17 @@ function dollarNames(expr: string): string[] {
     }
   }
   return out;
+}
+
+/**
+ * A repair declares the state's real scalar type; a derived expression must
+ * read the same corrected value the slot renders ("12" as the number 12).
+ * Undeclared or unparseable values pass through.
+ */
+function declaredValue(value: unknown, type: string | undefined): unknown {
+  if (type !== "number" && type !== "boolean") return value;
+  const { value: out, error } = convertValue(String(value), type);
+  return error ? value : out;
 }
 
 /**
@@ -230,7 +253,11 @@ export function evaluateOverride(
       continue;
     }
     siblings[name] = repair
-      ? applyRead(valueOf(entry.stateId), repair.transform)
+      ? declaredValue(
+          applyRead(valueOf(entry.stateId), repair.transform),
+          repair.type ??
+            String(ctx.objects.get(entry.stateId)?.common?.type ?? ""),
+        )
       : valueOf(entry.stateId);
   }
 

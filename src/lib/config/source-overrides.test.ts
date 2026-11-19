@@ -313,6 +313,22 @@ describe("evaluateOverride", () => {
     expect(res.inputs).toEqual(["s.0.temperature"]);
   });
 
+  it("coerces a repaired sibling's text by its declared type", () => {
+    const ctx = fixtureGroup({ temperature: 0 }, [
+      {
+        id: "o",
+        stateId: "s.0.temperature",
+        kind: "repair",
+        name: "temperature",
+        type: "number",
+      },
+    ]);
+    ctx.objects.get("s.0.temperature").common.type = "string";
+    ctx.states.set("s.0.temperature", { val: "12" });
+    const res = evaluateOverride(derived("$.temperature + 1"), ctx);
+    expect(res.value).toBe(13);
+  });
+
   it("refuses another derived override as a sibling", () => {
     const ctx = fixtureGroup({ temperature: 21, humidity: 50 }, [
       {
@@ -387,5 +403,46 @@ describe("upsertOverride / removeOverride", () => {
     expect(next.updatedAt).toBe(7);
     expect(next.migratedDevices).toBe(true);
     expect(removeOverride(next, "a").updatedAt).toBe(7);
+  });
+});
+
+describe("variable-named state ids", () => {
+  const variables: GlobalVariable[] = [
+    {
+      id: "v",
+      name: "LampVar",
+      kind: "state",
+      type: "boolean",
+      stateId: "0_userdata.0.lamp",
+    },
+  ];
+
+  it("finds an override stored under a variable name by the real state id", () => {
+    const reg = upsertOverride(
+      emptyOverrideRegistry(),
+      repair({ stateId: "LampVar" }),
+    );
+    expect(
+      overridesForState(reg, "0_userdata.0.lamp", variables).map((o) => o.id),
+    ).toEqual(["a"]);
+  });
+
+  it("checks names against the state a variable names", () => {
+    const reg = upsertOverride(
+      emptyOverrideRegistry(),
+      repair({ stateId: "LampVar" }),
+    );
+    expect(
+      overrideNameTaken(
+        reg,
+        "0_userdata.0.lamp",
+        " POWER ",
+        undefined,
+        variables,
+      ),
+    ).toBe(true);
+    expect(
+      overrideNameTaken(reg, "0_userdata.0.lamp", "power", "a", variables),
+    ).toBe(false);
   });
 });

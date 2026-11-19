@@ -858,7 +858,12 @@
     const source = slot.source;
     if (!source) return "no source";
     if (typeof source === "string") return source; // legacy v1 source
-    if (source.kind === "state") return source.stateId;
+    if (source.kind === "state") {
+      const override = source.override
+        ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+        : undefined;
+      return override ? `${source.stateId} · ${override.name}` : source.stateId;
+    }
     const device = devices.find((d) => d.id === source.device);
     if (source.kind === "device") return device?.name || source.device;
     const control = device?.controls?.find((c) => c.id === source.control);
@@ -1089,7 +1094,7 @@
   }
 
   /** Does this slot's reading carry history (A63)? Drives the hint and the
-   *  disabled toggle. */
+   *  disabled toggle. A raw state is fed by its override's history. */
   function sparkReady(i: number): boolean {
     const source = shownSlots[i]?.source;
     if (!source) return false;
@@ -1102,6 +1107,12 @@
               c.feature === source || c.id === source || c.stateId === source,
           ),
       );
+    }
+    if (source.kind === "state") {
+      const override = source.override
+        ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+        : undefined;
+      return !!override?.history;
     }
     if (source.kind !== "control") return false;
     return hasHistory(
@@ -2243,8 +2254,8 @@
                   </div>
                   {#if !sparkReady(i)}
                     <p class="note text-muted">
-                      No history for this control — configure it in the device
-                      editor.
+                      No history for this source — set it on the state's
+                      override, or in the device editor.
                     </p>
                   {/if}
                 {/if}
