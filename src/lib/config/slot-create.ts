@@ -1,5 +1,5 @@
 import { localizeName } from "$lib/config/format";
-import { widgetFor } from "$lib/config/features";
+import { widgetFor, type FeatureDef } from "$lib/config/features";
 import { glyphForRole, presetGlyph } from "$lib/config/icon-ops";
 import {
   resolveControl,
@@ -8,7 +8,10 @@ import {
   tileTitle,
 } from "$lib/config/template-ops";
 import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
-import { autoFillTemplate } from "$lib/config/template-suggest";
+import {
+  autoFillTemplate,
+  type FeatureCandidate,
+} from "$lib/config/template-suggest";
 import type { TemplateReference } from "$lib/config/template-reference";
 import type { Control, Device, Widget } from "$lib/types/device";
 import type {
@@ -304,29 +307,59 @@ export function materializeTemplateTileFromState(
   main: TemplateReference,
   objects: Map<string, any>,
   anchorFeature?: string,
-): {
-  slots: Slot[];
-  active?: ActiveCondition;
-  look?: TileLook;
-  size?: Size;
-  background?: Background;
-  border?: boolean;
-  padding?: boolean;
-  title?: string;
-  icon?: string;
-} {
-  const features = templateFeatures(template);
-  const byName = new Map(features.map((feature) => [feature.feature, feature]));
+): ReturnType<typeof materializeTemplateTile> {
   const { fills } = autoFillTemplate(template, main, objects, anchorFeature);
-  const filled = new Map<string, TemplateReference>();
+  return materializeTemplateTileFromFills(template, boundFills(fills), main);
+}
+
+/** The source chosen per feature, keeping only unambiguous auto-fills and
+ *  letting a manual choice win over them. */
+export function boundFills(
+  fills: FeatureCandidate[],
+  manual: Map<string, TemplateReference> = new Map(),
+): Map<string, TemplateReference> {
+  const out = new Map<string, TemplateReference>();
   for (const fill of fills) {
     if (!fill.ref || !fill.object) continue;
-    filled.set(fill.feature.feature, {
+    out.set(fill.feature.feature, {
       ref: fill.ref,
       stateId: fill.stateId ?? fill.ref,
       object: fill.object,
     });
   }
+  for (const [feature, ref] of manual) out.set(feature, ref);
+  return out;
+}
+
+/** The features the mapping modal offers: those a slot (or `active`) names,
+ *  plus the primary. A template whose slots carry no feature hint offers its
+ *  whole feature list. */
+export function templateBindingRows(template: Template): FeatureDef[] {
+  const features = templateFeatures(template);
+  const used = new Set<string>();
+  for (const slot of template.slots ?? []) {
+    if (typeof slot.source === "string" && slot.source) used.add(slot.source);
+    const pick =
+      typeof slot.options?.pick === "string" ? slot.options.pick : "";
+    if (pick) used.add(pick);
+  }
+  const activeSource = template.active?.source;
+  if (typeof activeSource === "string" && activeSource) used.add(activeSource);
+  if (!used.size) return features;
+  return features.filter(
+    (feature) => used.has(feature.feature) || feature.primary,
+  );
+}
+
+/** A complete tile from a template and an explicit feature → source map.
+ *  Unbound feature slots are left out; raw (frame/HTML) and `ago` slots stay. */
+export function materializeTemplateTileFromFills(
+  template: Template,
+  fills: Map<string, TemplateReference>,
+  main: TemplateReference,
+): ReturnType<typeof materializeTemplateTile> {
+  const features = templateFeatures(template);
+  const byName = new Map(features.map((feature) => [feature.feature, feature]));
 
   const slots: Slot[] = [];
   for (const slot of template.slots ?? []) {
@@ -338,7 +371,7 @@ export function materializeTemplateTileFromState(
       slots.push(slot);
       continue;
     }
-    const entry = filled.get(hint);
+    const entry = fills.get(hint);
     if (!entry) continue;
     const def = byName.get(hint)!;
     const kind = WIDGET_KINDS.includes(slot.kind)
@@ -363,7 +396,7 @@ export function materializeTemplateTileFromState(
 
   // The ago badge tracks the main control, exactly as the device tile does.
   const primary = features.find((feature) => feature.primary) ?? features[0];
-  const mainRef = (primary && filled.get(primary.feature)?.ref) ?? main.ref;
+  const mainRef = (primary && fills.get(primary.feature)?.ref) ?? main.ref;
   const bound = slots.map((slot) =>
     slot.source === "ago"
       ? {
@@ -379,7 +412,7 @@ export function materializeTemplateTileFromState(
 
   const activeSource = template.active?.source;
   const activeFill =
-    typeof activeSource === "string" ? filled.get(activeSource) : undefined;
+    typeof activeSource === "string" ? fills.get(activeSource) : undefined;
   const name = localizeName(main.object?.common?.name);
   const glyph = bound[0]?.icon?.glyph ?? presetGlyph(template.type);
   return {

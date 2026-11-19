@@ -1,7 +1,9 @@
 import { it, expect } from "vitest";
 import {
   applyTileSeed,
+  boundFills,
   materializeTemplateTile,
+  materializeTemplateTileFromFills,
   materializeTemplateTileFromState,
   materializedTileConfig,
   preselectedControlIds,
@@ -9,6 +11,7 @@ import {
   slotFromControl,
   slotFromState,
   slotKindForWidget,
+  templateBindingRows,
   tileSeed,
 } from "$lib/config/slot-create";
 import { PRESETS } from "$lib/config/presets";
@@ -34,6 +37,58 @@ const device = (over: Partial<Device> = {}): Device => ({
   controls: [],
   ...over,
 });
+
+/** The alias fixture the template materialisation tests share. */
+const lampFixture = () => {
+  const main = {
+    ref: "alias.0.Lamp.SET",
+    stateId: "alias.0.Lamp.SET",
+    object: {
+      type: "state",
+      common: { name: "Lamp", role: "switch.light", type: "boolean" },
+    },
+  };
+  const objects = new Map<string, any>([
+    ["alias.0.Lamp", { type: "channel", common: { name: "Lamp" } }],
+    ["alias.0.Lamp.SET", main.object],
+    [
+      "alias.0.Lamp.brightness",
+      {
+        type: "state",
+        common: {
+          name: "Brightness",
+          role: "level.dimmer",
+          type: "number",
+          min: 0,
+          max: 100,
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.colortemp",
+      {
+        type: "state",
+        common: {
+          name: "Color temperature",
+          role: "level.color.temperature",
+          type: "number",
+        },
+      },
+    ],
+    [
+      "alias.0.Lamp.available",
+      {
+        type: "state",
+        common: {
+          name: "Available",
+          role: "indicator.reachable",
+          type: "boolean",
+        },
+      },
+    ],
+  ]);
+  return { main, objects };
+};
 
 it("carries the bare-face options into the tile", () => {
   expect(
@@ -497,53 +552,7 @@ it("drops a switch's availability badge when there is no connected control", () 
 });
 
 it("builds a Light tile from a state without creating a device", () => {
-  const main = {
-    ref: "alias.0.Lamp.SET",
-    stateId: "alias.0.Lamp.SET",
-    object: {
-      type: "state",
-      common: { name: "Lamp", role: "switch.light", type: "boolean" },
-    },
-  };
-  const objects = new Map<string, any>([
-    ["alias.0.Lamp", { type: "channel", common: { name: "Lamp" } }],
-    ["alias.0.Lamp.SET", main.object],
-    [
-      "alias.0.Lamp.brightness",
-      {
-        type: "state",
-        common: {
-          name: "Brightness",
-          role: "level.dimmer",
-          type: "number",
-          min: 0,
-          max: 100,
-        },
-      },
-    ],
-    [
-      "alias.0.Lamp.colortemp",
-      {
-        type: "state",
-        common: {
-          name: "Color temperature",
-          role: "level.color.temperature",
-          type: "number",
-        },
-      },
-    ],
-    [
-      "alias.0.Lamp.available",
-      {
-        type: "state",
-        common: {
-          name: "Available",
-          role: "indicator.reachable",
-          type: "boolean",
-        },
-      },
-    ],
-  ]);
+  const { main, objects } = lampFixture();
   const result = materializeTemplateTileFromState(
     PRESETS.Light,
     main,
@@ -593,6 +602,97 @@ it("builds a Light tile from a state without creating a device", () => {
     source: { kind: "state", stateId: "alias.0.Lamp.SET" },
     op: "truthy",
   });
+});
+
+it("binds only filled features and drops the rest", () => {
+  const { main, objects } = lampFixture();
+  const fills = new Map([
+    ["power", main],
+    [
+      "brightness",
+      {
+        ref: "alias.0.Lamp.brightness",
+        stateId: "alias.0.Lamp.brightness",
+        object: objects.get("alias.0.Lamp.brightness"),
+      },
+    ],
+  ]);
+  const result = materializeTemplateTileFromFills(PRESETS.Light, fills, main);
+  expect(result.slots.map((slot) => slot.kind)).toEqual([
+    "switch",
+    "level",
+    "badge",
+  ]);
+  const ago = result.slots.find((slot) => slot.source === "ago");
+  expect(ago?.options?.of).toBe("alias.0.Lamp.SET");
+  expect(result.active?.source).toEqual({
+    kind: "state",
+    stateId: "alias.0.Lamp.SET",
+  });
+  expect(result.title).toBe("Lamp");
+});
+
+it("keeps active only when its feature is bound", () => {
+  const { main, objects } = lampFixture();
+  const fills = new Map([
+    [
+      "brightness",
+      {
+        ref: "alias.0.Lamp.brightness",
+        stateId: "alias.0.Lamp.brightness",
+        object: objects.get("alias.0.Lamp.brightness"),
+      },
+    ],
+  ]);
+  const result = materializeTemplateTileFromFills(PRESETS.Light, fills, main);
+  expect(result.active).toBeUndefined();
+});
+
+it("lists only the features the template binds, plus the primary", () => {
+  const t = {
+    ...PRESETS.Light,
+    features: [
+      ...PRESETS.Light.features,
+      { feature: "unused", label: "Unused", widget: "value", roleHints: [] },
+    ],
+  } as Template;
+  expect(templateBindingRows(t).map((f) => f.feature)).not.toContain("unused");
+  expect(templateBindingRows(t).map((f) => f.feature)).toContain("power");
+  const raw = {
+    ...PRESETS.Light,
+    active: undefined,
+    slots: [{ kind: "value", source: { kind: "state", stateId: "x" } }],
+  } as unknown as Template;
+  expect(templateBindingRows(raw).map((f) => f.feature)).toEqual(
+    PRESETS.Light.features.map((f) => f.feature),
+  );
+});
+
+it("takes unambiguous auto-fills and lets manual choices win", () => {
+  const { main } = lampFixture();
+  const power = PRESETS.Light.features.find((f) => f.feature === "power")!;
+  const brightness = PRESETS.Light.features.find(
+    (f) => f.feature === "brightness",
+  )!;
+  const fills = [
+    {
+      feature: power,
+      ref: main.ref,
+      stateId: main.stateId,
+      object: main.object,
+      candidates: [main],
+      ambiguous: false,
+    },
+    { feature: brightness, candidates: [], ambiguous: true },
+  ];
+  expect([...boundFills(fills).keys()]).toEqual(["power"]);
+  const manual = new Map([
+    ["brightness", { ref: "x", stateId: "x", object: {} }],
+  ]);
+  expect([...boundFills(fills, manual).keys()]).toEqual([
+    "power",
+    "brightness",
+  ]);
 });
 
 it("marks the frozen template icon as automatic", () => {
