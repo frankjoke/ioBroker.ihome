@@ -96,6 +96,12 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
         };
       }
       if (id === h.PAGE_LIST) return { val: JSON.stringify(h.pages) };
+      if (id === h.TEMPLATE_LIST) {
+        // The legacy state is stale on upgraded installs (files are the truth).
+        return {
+          val: JSON.stringify({ version: 0, updatedAt: 0, templates: [] }),
+        };
+      }
       return null;
     }),
     setState: vi.fn(async (id: string, value: string) => {
@@ -213,6 +219,9 @@ describe("device migration runner", () => {
       PAGE_BACKUP_ID,
       TEMPLATE_BACKUP_ID,
     ]);
+    // Templates are file-backed: the backup is the loaded registry, never the
+    // stale legacy state.
+    expect(JSON.parse(h.state.calls[2].value!)).toEqual(h.templates);
     const stored = h.state.calls[3].value;
     expect(stored).toContain('"mig-light-c1"');
     const marker = h.state.calls[6].value;

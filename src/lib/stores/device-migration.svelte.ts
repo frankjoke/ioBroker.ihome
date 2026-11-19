@@ -23,7 +23,6 @@ import {
   commitTemplatesNow,
   getTemplateRegistry,
   isTemplatesWritable,
-  TEMPLATE_LIST_ID,
 } from "$lib/stores/templates.svelte";
 import {
   commitOverrides,
@@ -139,10 +138,9 @@ async function planMigration(): Promise<Plan | Refusal> {
     variables: getVariableLibrary().variables ?? [],
   };
 
-  const [deviceRaw, pageRaw, templateRaw] = await Promise.all([
+  const [deviceRaw, pageRaw] = await Promise.all([
     readDocument(DEVICE_LIST_ID),
     readDocument(PAGE_LIST_ID),
-    readDocument(TEMPLATE_LIST_ID),
   ]);
   return {
     status: "ready",
@@ -160,8 +158,11 @@ async function planMigration(): Promise<Plan | Refusal> {
       },
       {
         id: TEMPLATE_BACKUP_ID,
+        // Templates are file-backed: the legacy state is stale on upgraded
+        // installs, so back up what was actually loaded. Restoring this means
+        // rewriting the files (`syncKind`), not copying a directory back.
         name: "iHome templates (pre-source-overrides backup)",
-        value: templateRaw ?? JSON.stringify(templates),
+        value: JSON.stringify(templates),
       },
     ],
   };

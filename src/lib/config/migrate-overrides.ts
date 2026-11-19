@@ -1,4 +1,4 @@
-import { sanitizeLabel } from "$lib/config/virtual-ops";
+import { newLocalTaken, sanitizeLabel } from "$lib/config/virtual-ops";
 import {
   overrideGroup,
   overrideNameTaken,
@@ -12,7 +12,7 @@ import {
   type GlobalVariable,
 } from "$lib/config/variables";
 import { templateFeatures, tileTitle } from "$lib/config/template-ops";
-import { tileHeadlineSlot } from "$lib/config/tile-parts";
+import { tileHeadlineSlot, tileSourceControls } from "$lib/config/tile-parts";
 import type {
   Control,
   ControlCommon,
@@ -110,7 +110,9 @@ function repairFields(control: Control): Partial<SourceOverride> {
   put("max", numberOr(control.max, common.max));
   put("step", numberOr(control.step, common.step));
   put("read", flagOr(control.read, common.read));
-  put("write", flagOr(control.write, common.write));
+  // The old render gate was `control.writable`, not the broker's write flag:
+  // an unchecked writable control must stay read-only.
+  put("write", flagOr(control.write, control.writable));
   if (control.hideUnit === true) out.hideUnit = true;
   put("transform", control.transform as Transform | undefined);
   put("history", control.history as HistorySpec | undefined);
@@ -263,7 +265,7 @@ function virtualLocals(
   device: Device,
   variables: GlobalVariable[],
 ): Map<string, VirtualLocal> {
-  const taken = new Set<string>();
+  const taken = newLocalTaken();
   const locals = new Map<string, VirtualLocal>();
   for (const variable of variables) {
     const key = String(variable.name ?? "");
@@ -601,6 +603,7 @@ export function migrateDevices(
     entries,
     registry,
     variables,
+    objects,
     now,
     log,
   );
@@ -626,6 +629,7 @@ interface TileContext {
   entries: Map<string, DeviceEntry>;
   registry: OverrideRegistry;
   variables: GlobalVariable[];
+  objects: Map<string, any>;
   log: string[];
 }
 
@@ -816,7 +820,7 @@ function ruleLocals(
 ): Map<string, string> {
   const locals = new Map<string, string>();
   if (!device) return locals;
-  const taken = new Set<string>();
+  const taken = newLocalTaken();
   device.device.controls?.forEach((control, index) => {
     const entry = device.byKey.get(controlKey(control, index));
     const feature = sanitizeLabel(control.feature, taken);
@@ -870,6 +874,61 @@ function watchOverrides(
   return watch.length ? watch : undefined;
 }
 
+/** The rule local every bound override gets in the migrated tile, in the same
+ *  order `tileSourceControls` + `ruleScope` assign them. */
+function finalRuleLocals(
+  slots: Slot[],
+  watch: string[] | undefined,
+  ctx: TileContext,
+): Map<string, string> {
+  const controls = tileSourceControls(slots, {
+    states: new Map(),
+    objects: ctx.objects,
+    variables: ctx.variables,
+    overrides: ctx.registry.overrides,
+    watchOverrides: watch,
+  });
+  const taken = newLocalTaken();
+  const locals = new Map<string, string>();
+  for (const control of controls) {
+    const local = sanitizeLabel(control.feature, taken);
+    if (control.overrideId) locals.set(control.overrideId, local);
+  }
+  return locals;
+}
+
+/** Old rule name → the local the migrated tile will actually have. This also
+ *  fixes a name suffix (`power` → `power2`) with a single non-chaining pass. */
+function ruleRenames(
+  slots: Slot[],
+  device: DeviceEntry | undefined,
+  watch: string[] | undefined,
+  ctx: TileContext,
+): Map<string, string> {
+  const old = ruleLocals(device, ctx.variables);
+  if (!old.size) return new Map();
+  const finals = finalRuleLocals(slots, watch, ctx);
+  const renames = new Map<string, string>();
+  for (const [name, id] of old) {
+    const final = finals.get(id);
+    if (final && final !== name) renames.set(name, final);
+  }
+  return renames;
+}
+
+function renameRule(rule: Rule, renames: Map<string, string>): Rule {
+  if (!rule.when || !renames.size) return rule;
+  const replacements: { start: number; end: number; text: string }[] = [];
+  for (const token of scanExpression(rule.when)) {
+    if (token.getRef !== undefined) continue;
+    const next = renames.get(token.text);
+    if (!next || next === token.text) continue;
+    replacements.push({ start: token.start, end: token.end, text: next });
+  }
+  if (!replacements.length) return rule;
+  return { ...rule, when: applyReplacements(rule.when, replacements) };
+}
+
 function migratePlacement(
   placement: Placement,
   ctx: TileContext,
@@ -879,17 +938,24 @@ function migratePlacement(
   const device = deviceId ? ctx.entries.get(deviceId) : undefined;
   let changed = false;
   let slots: Slot[] = tile?.slots ?? [];
+  let sourceConverted = false;
   let headline: Extract<SlotSource, { kind: "state" }> | undefined;
   if (slots.length) {
     const converted = slots.map((slot) => {
       const next = convertTileSlot(slot, device, ctx);
-      if (next !== slot) changed = true;
+      if (next !== slot) {
+        changed = true;
+        if (next.source !== slot.source) sourceConverted = true;
+      }
       return next;
     });
     headline = headlineSource(converted, device, ctx);
     slots = converted.map((slot) => {
       const next = badgeOf(slot, headline?.stateId, device, ctx);
-      if (next !== slot) changed = true;
+      if (next !== slot) {
+        changed = true;
+        if (next.source !== slot.source) sourceConverted = true;
+      }
       return next;
     });
   }
@@ -910,6 +976,24 @@ function migratePlacement(
   const watchChanged =
     (watch ?? []).join("\n") !== (tile?.watchOverrides ?? []).join("\n");
   if (watchChanged) changed = true;
+
+  // A rule keeps reading the feature it always named; when the migrated
+  // override had to take a suffixed name (`power2`), that token follows.
+  // Only a tile that still had a legacy source is rewritten, so a second run
+  // over an already-migrated tile never swaps locals back.
+  const renames = sourceConverted
+    ? ruleRenames(slots, device, watch, ctx)
+    : new Map<string, string>();
+  if (renames.size) {
+    slots = slots.map((slot) => {
+      if (!slot.rules?.length) return slot;
+      const rules = slot.rules.map((rule) => renameRule(rule, renames));
+      if (rules.every((rule, index) => rule === slot.rules![index]))
+        return slot;
+      changed = true;
+      return { ...slot, rules };
+    });
+  }
 
   const active = tile?.active
     ? {
@@ -975,10 +1059,11 @@ function migratePages(
   entries: Map<string, DeviceEntry>,
   registry: OverrideRegistry,
   variables: GlobalVariable[],
+  objects: Map<string, any>,
   now: number,
   log: string[],
 ): { registry: PageRegistry; changed: boolean } {
-  const ctx: TileContext = { entries, registry, variables, log };
+  const ctx: TileContext = { entries, registry, variables, objects, log };
   let changed = false;
   const nextPages = (pages.pages ?? []).map((page) => ({
     ...page,

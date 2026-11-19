@@ -66,6 +66,8 @@ export interface TileParts {
  *  override — the name the rule writes and the live value it reads. */
 export interface TileSourceControl extends LocalControl {
   stateId?: string;
+  /** The override the source binds, when it resolves through one. */
+  overrideId?: string;
   /** The override's chart feed (spec §4): this entry's rows still chart. */
   history?: HistorySpec;
   /** The control's own default rules, as the slot style folds them. */
@@ -152,6 +154,7 @@ export function tileSourceControls(
       label: resolved.label ?? name,
       liveValue: resolved.value,
       stateId: resolved.stateId,
+      overrideId: resolved.overrideId,
       history: resolved.history,
       rules: resolved.control?.rules,
     };

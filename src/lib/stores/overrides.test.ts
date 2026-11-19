@@ -108,6 +108,26 @@ it("an absent document is an empty writable registry", async () => {
   expect(store.isOverridesWritable()).toBe(true);
 });
 
+it("registers every override's state and its derived inputs", async () => {
+  await load(
+    doc(7, [
+      repair("o1", "s.0.a", "power"),
+      {
+        id: "o2",
+        stateId: "s.0.b",
+        kind: "derived",
+        name: "sum",
+        expr: 'get("s.0.c")',
+        inputs: [],
+      },
+    ]),
+  );
+  // A watch override has no slot to register its state; the store must.
+  expect(h.registered).toContain("s.0.a");
+  expect(h.registered).toContain("s.0.b");
+  expect(h.registered).toContain("s.0.c");
+});
+
 it("creates the document object when the adapter has not made it yet", async () => {
   const store = await load(null);
   expect(h.docObject.created).toContain(OVERRIDE_LIST_ID);

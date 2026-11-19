@@ -13,6 +13,7 @@ import {
 } from "$lib/config/source-overrides";
 import { registerProgramStateId } from "$lib/stores/devices.svelte";
 import { getVariables } from "$lib/stores/variables.svelte";
+import { stateIdFor } from "$lib/config/variables";
 import type {
   EnsuredOverride,
   OverrideRegistry,
@@ -112,7 +113,12 @@ function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
   registry = doc;
   loadKind = kind;
   registerProgramStateId(OVERRIDE_LIST_ID);
+  const variables = getVariables();
   for (const override of doc.overrides) {
+    // A watch override has no slot to register its state (spec §3.3); the
+    // store is the one place every override anchor is subscribed.
+    const anchor = stateIdFor(override.stateId, variables);
+    if (anchor.includes(".")) registerProgramStateId(anchor);
     for (const id of override.inputs ?? []) registerProgramStateId(id);
   }
 }

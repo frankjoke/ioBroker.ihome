@@ -128,6 +128,39 @@ describe("migrateDevices — repairs", () => {
     expect(res.changed).toBe(true);
   });
 
+  it("keeps the writable intent, not the broker's write flag", () => {
+    const res = migrateDevices({
+      devices: [
+        device({
+          controls: [
+            control({
+              id: "on",
+              feature: "power",
+              writable: true,
+              common: { write: false },
+            }),
+            control({
+              id: "off",
+              feature: "mode",
+              stateId: "hm.0.light.mode",
+              writable: false,
+              common: { write: true },
+            }),
+          ],
+        }),
+      ],
+      pages: pages(placement([])),
+      templates: emptyTemplates(),
+      objects: out(["hm.0.light.power", "hm.0.light.mode"]),
+    });
+    expect(
+      res.overrides.overrides.find((o) => o.name === "power"),
+    ).toMatchObject({ write: true });
+    expect(
+      res.overrides.overrides.find((o) => o.name === "mode"),
+    ).toMatchObject({ write: false });
+  });
+
   it("keeps the chart feed: a migrated sparkline row reports history", () => {
     const power = control({ history: { duration: 2, durationUnit: "hours" } });
     const migrated = migrateDevices({
@@ -352,6 +385,45 @@ describe("migrateDevices — virtual controls", () => {
     });
   });
 
+  it("seeds virtual locals with the helper names", () => {
+    const d = device({
+      id: "sensor",
+      name: "Sensor",
+      type: "Thermometer",
+      controls: [
+        control({
+          id: "p",
+          feature: "power",
+          label: "Max",
+          stateId: "hm.0.sensor.power",
+          writable: false,
+        }),
+        control({
+          id: "t",
+          feature: "temperature",
+          stateId: "hm.0.sensor.temperature",
+          writable: false,
+        }),
+        control({
+          id: "v",
+          feature: "double",
+          kind: "virtual",
+          writable: false,
+          virtual: { expr: "max2 + temperature" },
+        }),
+      ],
+    });
+    const res = migrateDevices({
+      devices: [d],
+      pages: pages(placement([])),
+      templates: emptyTemplates(),
+      objects: out(["hm.0.sensor.power", "hm.0.sensor.temperature"]),
+    });
+    const derived = res.overrides.overrides.find((o) => o.kind === "derived")!;
+    expect(derived.stateId).toBe("hm.0.sensor.power");
+    expect(derived.expr).toBe("$.power + $.temperature");
+  });
+
   it("rewrites a $. name that would read another state to get()", () => {
     // Both inputs carry the feature "value", so both repairs are called
     // "value"; the group can only give the anchor's state that name.
@@ -515,6 +587,103 @@ describe("migrateDevices — rules and tiles", () => {
       "power",
       "battery",
     ]);
+  });
+
+  it("rewrites a rule to the suffixed override name", () => {
+    const input = {
+      devices: [
+        device({
+          controls: [control({ id: "c1", feature: "power" })],
+        }),
+      ],
+      pages: pages(
+        placement([
+          {
+            kind: "switch",
+            source: {
+              kind: "control" as const,
+              device: "light",
+              control: "c1",
+            },
+            rules: [{ when: "truthy(power)", color: "green" }],
+          },
+        ]),
+      ),
+      templates: emptyTemplates(),
+      overrides: {
+        version: 1 as const,
+        updatedAt: 1,
+        overrides: [
+          {
+            id: "user",
+            stateId: "hm.0.light.power",
+            kind: "repair" as const,
+            name: "power",
+          },
+        ],
+      },
+      objects: out(["hm.0.light.power"]),
+    };
+    const res = migrateDevices(input);
+    const migrated = res.overrides.overrides.find(
+      (o) => o.id === "mig-light-c1",
+    )!;
+    expect(migrated.name).toBe("power2");
+    const slot = res.pages.pages[0].groups[0].tiles![0].tile!.slots![0];
+    expect((slot.source as any).override).toBe("mig-light-c1");
+    expect(slot.rules?.[0].when).toBe("truthy(power2)");
+    const controls = tileSourceControls([slot], {
+      overrides: res.overrides.overrides,
+      states: new Map(),
+      objects: out(["hm.0.light.power"]),
+    });
+    expect(controls.map((entry) => entry.feature)).toEqual(["power2"]);
+
+    const second = migrateDevices({
+      ...input,
+      overrides: res.overrides,
+      pages: res.pages,
+      templates: res.templates,
+    });
+    expect(second.changed).toBe(false);
+    expect(second.pages).toBe(res.pages);
+  });
+
+  it("seeds rule locals with the helper names", () => {
+    const res = migrateDevices({
+      devices: [
+        device({
+          controls: [
+            control({
+              id: "p",
+              feature: "power",
+              label: "Max",
+              writable: false,
+            }),
+            control({
+              id: "t",
+              feature: "temperature",
+              stateId: "hm.0.sensor.temperature",
+              writable: false,
+            }),
+          ],
+        }),
+      ],
+      pages: pages(
+        placement([
+          {
+            kind: "value",
+            source: { kind: "control", device: "light", control: "t" },
+            rules: [{ when: "max2 > 10", hidden: true }],
+          },
+        ]),
+      ),
+      templates: emptyTemplates(),
+      objects: out(["hm.0.light.power", "hm.0.sensor.temperature"]),
+    });
+    const power = res.overrides.overrides.find((o) => o.name === "power")!;
+    const tile = res.pages.pages[0].groups[0].tiles![0].tile!;
+    expect(tile.watchOverrides).toEqual([power.id]);
   });
 
   it("binds a device-wide ago/offline badge to the headline source", () => {
