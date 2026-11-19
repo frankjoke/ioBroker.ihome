@@ -189,6 +189,31 @@ describe("overrideGroup", () => {
     expect(ctx.group.names.get("temperature")?.override).toBe("o");
   });
 
+  it("reads a localized common.name", () => {
+    const objects = new Map<string, any>([
+      [
+        "s.0.temperature",
+        {
+          type: "state",
+          common: { name: { en: "Temperature", de: "Temperatur" } },
+        },
+      ],
+      [
+        "s.0.humidity",
+        {
+          type: "state",
+          common: { name: { en: "Humidity", de: "Luftfeuchte" } },
+        },
+      ],
+    ]);
+    const group = overrideGroup(
+      "s.0.temperature",
+      objects,
+      emptyOverrideRegistry(),
+    );
+    expect([...group.names.keys()]).toEqual(["temperature", "humidity"]);
+  });
+
   it("suffixes duplicate sibling names", () => {
     const objects = new Map<string, any>([
       ["s.0.a", { type: "state", common: { name: "value" } }],

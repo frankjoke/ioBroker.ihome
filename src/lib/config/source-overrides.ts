@@ -1,4 +1,5 @@
 import { num, parseDoc } from "$lib/config/doc-parse";
+import { localizeName } from "$lib/config/format";
 import { applyRead } from "$lib/utils/transform";
 import { type GlobalVariable, resolveVariable } from "$lib/config/variables";
 import {
@@ -124,7 +125,7 @@ export interface OverrideGroup {
 
 /** A state's raw expression name: its `common.name`, else its leaf id. */
 function stateLabel(object: any, stateId: string): string {
-  const name = String(object?.common?.name ?? "").trim();
+  const name = localizeName(object?.common?.name).trim();
   return name || String(stateId).split(".").pop() || stateId;
 }
 
