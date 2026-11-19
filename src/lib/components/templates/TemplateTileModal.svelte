@@ -1,7 +1,8 @@
 <script lang="ts">
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
   import { untrack } from "svelte";
-  import { SvelteMap } from "svelte/reactivity";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { localizeName } from "$lib/config/format";
   import { primaryFeature } from "$lib/config/template-ops";
   import { boundFills, templateBindingRows } from "$lib/config/slot-create";
@@ -39,6 +40,8 @@
   let picking = $state<string | null>(untrack(() => primary?.feature ?? null));
   const manualFills = new SvelteMap<string, TemplateReference>();
   const fills = new SvelteMap<string, TemplateReference>();
+  /** Features the user removed; a later auto-fill must not bring them back. */
+  const cleared = new SvelteSet<string>();
   let error = $state("");
 
   const sourceName = (ref: TemplateReference): string =>
@@ -56,6 +59,7 @@
       return;
     }
     error = "";
+    cleared.delete(feature);
     manualFills.set(feature, resolved.reference);
     picking = null;
     if (feature === primary?.feature) {
@@ -69,9 +73,17 @@
       for (const [name, ref] of boundFills(auto.fills, manualFills)) {
         fills.set(name, ref);
       }
+      for (const name of cleared) fills.delete(name);
     } else {
       fills.set(feature, resolved.reference);
     }
+  }
+
+  /** Drop a bound feature (auto-filled or chosen); Create drops its slot. */
+  function clear(feature: string): void {
+    cleared.add(feature);
+    fills.delete(feature);
+    manualFills.delete(feature);
   }
 
   function create(): void {
@@ -127,6 +139,14 @@
           <span class="source" title={bound?.stateId ?? ""}>
             {bound ? sourceName(bound) : "not set"}
           </span>
+          {#if bound}
+            <IconButton
+              icon="delete"
+              danger
+              label={`Clear the ${feature.label} assignment`}
+              onclick={() => clear(feature.feature)}
+            />
+          {/if}
           <button
             type="button"
             class="icon-btn"

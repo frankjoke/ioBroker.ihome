@@ -5,8 +5,30 @@ vi.stubGlobal("document", {
   readyState: "complete",
   visibilityState: "visible",
 });
-const { RELOAD_AFTER_HIDDEN_MS, onEditorPage, reloadOnReturn } =
-  await import("$lib/tools.svelte.js");
+const {
+  RELOAD_AFTER_HIDDEN_MS,
+  canReload,
+  onDisplayRoute,
+  onEditorPage,
+  reloadOnReturn,
+  routePath,
+} = await import("$lib/tools.svelte.js");
+
+it("reads the hash route over the pathname", () => {
+  expect(routePath("/ihome/", "#/logic")).toBe("/logic");
+  expect(routePath("/ihome/", "")).toBe("/ihome/");
+});
+
+it("reloads only in the display's view mode", () => {
+  expect(onDisplayRoute("/")).toBe(true);
+  expect(onDisplayRoute("/layout")).toBe(true);
+  expect(onDisplayRoute("/p/rooms")).toBe(true);
+  expect(onDisplayRoute("/ihome/p/rooms")).toBe(true);
+  expect(onDisplayRoute("/logic")).toBe(false);
+  expect(canReload("/p/rooms", false)).toBe(true);
+  expect(canReload("/", true)).toBe(false);
+  expect(canReload("/logic", false)).toBe(false);
+});
 
 it("leaves editor pages alone", () => {
   expect(onEditorPage("/config/devices")).toBe(true);

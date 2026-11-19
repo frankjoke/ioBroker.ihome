@@ -12,7 +12,7 @@
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
   import { SIZE_UNIT } from "$lib/config/size-ops";
-  import { defineStorage, onEditorPage } from "$lib/tools.svelte";
+  import { defineStorage, canReload } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
     setStateSource,
@@ -278,15 +278,16 @@
   const ui = $derived(effectiveUi(getSettings()));
 
   // A wall display stays open for days; a periodic reload clears a socket that
-  // died without an event. Visible pages only (a phone in a pocket already
-  // reloads on return) and never while editing (forms live in memory until Save).
-  // Any config write restarts the count, so configuring never meets a reload.
+  // died without an event. Display view mode only: config pages, the layout
+  // editor, dialogs and the cog menu hold in-memory state. Visible pages only
+  // (a phone in a pocket already reloads on return). Any config write restarts
+  // the count, so configuring never meets a reload.
   $effect(() => {
     const minutes = ui.reloadMinutes;
     ioBroker.configChangedAt; // tracked: a config write re-arms the timer
     if (minutes <= 0) return;
     const id = setInterval(() => {
-      if (document.visibilityState === "visible" && !onEditorPage())
+      if (document.visibilityState === "visible" && canReload())
         location.reload();
     }, minutes * 60_000);
     return () => clearInterval(id);

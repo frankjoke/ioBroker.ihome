@@ -7,7 +7,7 @@ import { subscriptionPlan } from "./subscriptions";
 import { customs, enums, states, objects } from "./StateClass.svelte.js";
 import {
   getVisibility,
-  onEditorPage,
+  canReload,
   reloadOnReturn,
   typeOfP,
 } from "./tools.svelte";
@@ -262,7 +262,7 @@ document.onvisibilitychange = () => {
   // A tab that slept comes back with a dead socket that never reconnects, so
   // reload instead of waiting. Editor forms only live in memory until Save, so
   // an open config page is left alone.
-  if (reloadOnReturn(lastVisible) && !onEditorPage()) {
+  if (reloadOnReturn(lastVisible) && canReload()) {
     location.reload();
     return;
   }
