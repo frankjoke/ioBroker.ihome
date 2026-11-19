@@ -39,15 +39,12 @@
     dirty = $bindable(false),
     mode = "all",
     embedded = false,
-    onBrowse,
   }: {
     dirty?: boolean;
     /** "library" hides the defaults; "defaults" renders only the defaults. */
     mode?: "all" | "library" | "defaults";
-    /** Hide the manager's own tab bar, chrome and nested importer. */
+    /** Hide the manager's own tab bar and chrome. */
     embedded?: boolean;
-    /** Add/import inside the picker starts Browse instead of a nested modal. */
-    onBrowse?: () => void;
   } = $props();
 
   type Importer =
@@ -444,8 +441,7 @@
                 savedHint = "";
                 added = 0;
                 skipped = 0;
-                if (onBrowse) onBrowse();
-                else importer = { mode: "add" };
+                importer = { mode: "add" };
               }}
             >
               + Icon / Image

@@ -98,7 +98,10 @@
   }
 
   function onKey(event: KeyboardEvent): void {
-    if (event.key === "Escape") requestClose();
+    if (event.key !== "Escape") return;
+    // A nested manager importer handles its own Escape; don't close both.
+    if (document.querySelector('[aria-label="Add icons"]')) return;
+    requestClose();
   }
 
   function go(next: "icons" | "browse" | "manage"): void {
@@ -394,7 +397,6 @@
           mode="library"
           bind:this={manager}
           bind:dirty={manageDirty}
-          onBrowse={() => go("browse")}
         />
       </div>
     {/if}
