@@ -98,11 +98,12 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: flex-start;
-    /* Lines keep their content height; without this the 100vh min-height
-       stretches the lines and leaves a blank band before the next row. */
+    /* Lines keep their content height instead of stretching to fill the page;
+       a blank band would otherwise appear before the next row. */
     align-content: flex-start;
     gap: 1.25rem;
-    min-height: 100vh;
+    flex: 1 1 auto;
+    min-height: 0;
     /* A phone's margin is 4px (see pagePad above). */
     padding: var(--page-pad, 8px);
     /* A User Interface default (ui-settings.ts); an explicit page background

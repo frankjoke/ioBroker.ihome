@@ -575,6 +575,9 @@
   }
 
   .app-shell.display .app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     max-width: none;
     margin: 0;
     padding: 0;

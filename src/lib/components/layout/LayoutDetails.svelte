@@ -598,6 +598,19 @@
     saveTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
+    const templateRegistry = getTemplateRegistry();
+    const wanted = name.trim().toLowerCase();
+    if (
+      (templateRegistry.templates ?? []).some(
+        (template) =>
+          String(template.name ?? "")
+            .trim()
+            .toLowerCase() === wanted,
+      )
+    ) {
+      saveTemplateError = `A template named “${name}” already exists.`;
+      return;
+    }
     const result = collectTileTemplate(config, {
       id: newId(),
       name,
@@ -608,7 +621,6 @@
       saveTemplateError = "No slot in this tile maps to a known feature.";
       return;
     }
-    const templateRegistry = getTemplateRegistry();
     const problem = visualTemplateProblem(
       result.template,
       (templateRegistry.templates ?? []).map((template) => template.id),
