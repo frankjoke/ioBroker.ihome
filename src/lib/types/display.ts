@@ -138,6 +138,9 @@ export interface TileConfig {
    *  it. Absent, empty or malformed → the page opens freely, and a tile with no
    *  detail page ignores it entirely (`tileNeedsPin`). Not part of a template. */
   pin?: string;
+  /** Overrides a rule names although no slot binds them (spec §3.3): their
+   *  names join the tile's rule scope. Written by the device migration. */
+  watchOverrides?: string[];
   /** Hidden from every list and from the display outside the local network.
    *  A visibility layer, not an authorisation boundary. */
   secured?: boolean;

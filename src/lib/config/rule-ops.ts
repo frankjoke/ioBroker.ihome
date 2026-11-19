@@ -426,7 +426,9 @@ function controlBadge(
  * Badges for a tile, in slot order. `ago` and `offline` are derived from the
  * device itself, so a template gets them without declaring a control for them.
  * `pool` is the subscribed state pool (as tile rules use), so a badge rule can
- * read a raw state id with `get("<id>")` when the device watches it.
+ * read a raw state id with `get("<id>")` when the device watches it. `controls`
+ * is the tile's rule scope (`tileSourceControls`): a badge rule must see the
+ * same names the tile's slots resolve to, overrides included.
  */
 export function resolveBadges(
   slots: Slot[],
@@ -436,12 +438,16 @@ export function resolveBadges(
   pool: PoolEntry[] = [],
   raw?: (source: string) => BadgeControl | undefined,
   detail = false,
+  controls?: LocalControl[],
 ): ResolvedBadge[] {
   // Accept a bare number too (the device-wide newest `ts`).
   const stamp = typeof time === "number" ? time : undefined;
   const clock: TimeSource =
     typeof time === "object" && time !== null ? time : { at: () => stamp };
-  const scope = ruleScope((device.controls ?? []) as LocalControl[], pool);
+  const scope = ruleScope(
+    controls ?? ((device.controls ?? []) as LocalControl[]),
+    pool,
+  );
   /** A derived badge may name one control/device key (`options.of`): its
    *  availability is that source's, not the whole tile's synthetic bag. */
   const offlineFor = (of: string | undefined): ResolvedBadge | undefined => {

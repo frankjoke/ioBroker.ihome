@@ -3,6 +3,7 @@ import type { Slot, SlotKind, Template, TileConfig } from "$lib/types/display";
 import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
+  resolveControl,
   resolveTemplate,
   slotVisible,
 } from "$lib/config/template-ops";
@@ -16,7 +17,15 @@ import {
   type ResolvedStyle,
   type TimeSource,
 } from "$lib/config/rule-ops";
-import type { PoolEntry } from "$lib/config/virtual-ops";
+import {
+  resolveSlotSource,
+  type ResolvedSource,
+  type SourceLook,
+} from "$lib/config/slot-source";
+import type { LocalControl, PoolEntry } from "$lib/config/virtual-ops";
+import type { GlobalVariable } from "$lib/config/variables";
+import type { HistorySpec } from "$lib/types/device";
+import type { SourceOverride } from "$lib/types/overrides";
 import { offTwin, onTwin } from "$lib/config/icon-library";
 
 /** One slot of a tile, resolved: what it shows and how it looks right now. */
@@ -48,6 +57,125 @@ export interface TileParts {
   hasModal: boolean;
 }
 
+/** What a tile's rules can name: one local per bound source, or per watch
+ *  override — the name the rule writes and the live value it reads. */
+export interface TileSourceControl extends LocalControl {
+  stateId?: string;
+  /** The override's chart feed (spec §4): this entry's rows still chart. */
+  history?: HistorySpec;
+  /** The control's own default rules, as the slot style folds them. */
+  rules?: Rule[];
+}
+
+/** What `tileSourceControls` reads beyond the slots themselves. */
+export interface SourceControlOpts {
+  /** The tile's own control bag: legacy string sources resolve here. */
+  device?: { controls?: TileControlLike[] };
+  /** A control source names its own device (legacy until the migration). */
+  devices?: EnrichedDevice[];
+  states?: Map<string, any>;
+  objects?: Map<string, any>;
+  variables?: GlobalVariable[];
+  /** The overrides a raw-state source can bind to. */
+  overrides?: SourceOverride[];
+  derived?: SourceLook["derived"];
+  /** Overrides a rule names although no slot binds them (spec §3.3). */
+  watchOverrides?: string[];
+}
+
+/** The control-bag fields a rule local reads. */
+export type TileControlLike = {
+  kind?: "state" | "virtual";
+  feature?: string;
+  label?: string;
+  liveValue?: unknown;
+  stateId?: string;
+  history?: HistorySpec;
+  rules?: Rule[];
+};
+
+/** A control of the tile's own bag as a rule local. */
+function bagControl(control: TileControlLike): TileSourceControl {
+  return {
+    kind: control.kind,
+    feature: control.feature,
+    label: control.label ?? control.feature,
+    liveValue: control.liveValue,
+    stateId: control.stateId,
+    history: control.history,
+    rules: control.rules,
+  };
+}
+
+/**
+ * The tile's rule scope, in slot order (spec §3.3): one local per bound source,
+ * named by the override's **name** (its label stays the display label), then
+ * the watch overrides. `ruleScope` suffixes a repeated name, in this order, so
+ * `power2` keeps meaning what it meant before the migration. A frame/html or
+ * source-less slot binds no reading and contributes nothing.
+ */
+export function tileSourceControls(
+  slots: Slot[],
+  opts: SourceControlOpts = {},
+): TileSourceControl[] {
+  const look: SourceLook = {
+    devices: opts.devices ?? [],
+    states: opts.states ?? new Map(),
+    objects: opts.objects ?? new Map(),
+    variables: opts.variables,
+    overrides: opts.overrides,
+    derived: opts.derived,
+  };
+  /** A resolved source as a local; the override's name wins over its label. */
+  const control = (
+    resolved: ResolvedSource | undefined,
+  ): TileSourceControl | undefined => {
+    if (!resolved) return undefined;
+    const override = resolved.overrideId
+      ? opts.overrides?.find((o) => o.id === resolved.overrideId)
+      : undefined;
+    const name =
+      override?.name ??
+      resolved.control?.feature ??
+      resolved.label ??
+      resolved.stateId;
+    if (!name) return undefined;
+    return {
+      feature: name,
+      label: resolved.label ?? name,
+      liveValue: resolved.value,
+      stateId: resolved.stateId,
+      history: resolved.history,
+      rules: resolved.control?.rules,
+    };
+  };
+  const out: TileSourceControl[] = [];
+  for (const slot of slots ?? []) {
+    if (slot.kind === "frame" || slot.kind === "html" || !slot.source) continue;
+    const source = slot.source;
+    if (typeof source === "string") {
+      // A v1 string source (or a resolved `slot:N`): the tile's own bag knows it.
+      const found = resolveControl(opts.device?.controls ?? [], source);
+      if (found) out.push(bagControl(found));
+      continue;
+    }
+    const entry = control(resolveSlotSource(source, look));
+    if (entry) out.push(entry);
+  }
+  for (const id of opts.watchOverrides ?? []) {
+    const override = opts.overrides?.find((o) => o.id === id);
+    if (!override) continue;
+    const entry = control(
+      resolveSlotSource(
+        { kind: "state", stateId: override.stateId, override: id },
+        look,
+      ),
+    );
+    if (entry) out.push(entry);
+  }
+  return out;
+}
+
 /**
  * A tile's resolved parts, in one place (A46/A47): the display's `Tile` renders
  * them and the sheet asks the same resolution whether a tile has a detail page
@@ -70,6 +198,13 @@ export function tileParts(
     pool?: PoolEntry[];
     time?: TimeSource | number;
     now?: number;
+    /** The override look a raw-state slot resolves through (spec §3.3). */
+    overrides?: SourceOverride[];
+    devices?: EnrichedDevice[];
+    states?: Map<string, any>;
+    objects?: Map<string, any>;
+    variables?: GlobalVariable[];
+    derived?: SourceLook["derived"];
   },
 ): TileParts {
   const active = opts?.active === true;
@@ -97,9 +232,20 @@ export function tileParts(
     );
   };
 
-  // Rule locals are the device's controls plus the pool helpers, and the tile's
-  // own `active` flag wins the name over a control alias of the same name (A30).
-  const baseScope = ruleScope(device.controls ?? [], pool);
+  // Rule locals are the tile's bound sources — overrides and watch overrides
+  // included — plus the pool helpers, and the tile's own `active` flag wins the
+  // name over a source of the same name (A30).
+  const sourceControls = tileSourceControls(slots, {
+    device,
+    devices: opts?.devices,
+    states: opts?.states,
+    objects: opts?.objects,
+    variables: opts?.variables,
+    overrides: opts?.overrides,
+    derived: opts?.derived,
+    watchOverrides: tile?.watchOverrides,
+  });
+  const baseScope = ruleScope(sourceControls, pool);
   const scope = { ...baseScope, locals: { ...baseScope.locals, active } };
 
   /** Slot rules first, the control's own defaults last — the last match wins. */
@@ -174,6 +320,8 @@ export function tileParts(
           opts?.now ?? Date.now(),
           pool,
           raw,
+          false,
+          sourceControls,
         ),
       )
     : [];

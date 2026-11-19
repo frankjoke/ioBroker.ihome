@@ -27,11 +27,16 @@
     stateLook,
     tileParts,
     tileSeries,
+    tileSourceControls,
     type SlotRow,
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { devicesEnrichedStore, getVirtualPool } from "$lib/stores/devices";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import {
+    getDerived,
+    getOverrideRegistry,
+  } from "$lib/stores/overrides.svelte";
   import {
     stateIdFor,
     variableScope,
@@ -110,6 +115,8 @@
     states: ioBroker.states as Map<string, any>,
     objects: ioBroker.objects as Map<string, any>,
     variables: getVariables(),
+    overrides: getOverrideRegistry().overrides,
+    derived: getDerived,
   });
   const resolution = $derived(
     resolveTile(tile ?? placement?.tile, title ?? placement?.title, sourceLook),
@@ -117,6 +124,8 @@
   /** The control bag derived from this tile's slots — never a device identity. */
   const device = $derived(resolution.device);
   const workingTile = $derived(resolution.tile);
+  /** The tile as configured: its slots carry the sources the rules name. */
+  const rawTile = $derived(tile ?? placement?.tile);
 
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
@@ -139,11 +148,25 @@
     return resolveControl(shownControls, slot.source);
   }
 
-  // Rule locals are the device's controls (by label, falling back to feature) plus
-  // the pool helpers — the same language the formula editor uses. The config's
-  // variables join in: constants by value, state variables by live value.
+  // Rule locals are the tile's bound sources — overrides and watch overrides
+  // included — plus the pool helpers — the same language the formula editor
+  // uses. The config's variables join in: constants by value, state variables
+  // by live value. Built from the tile's own slots, so a rule writes the
+  // override's name, whatever the resolved slots call it.
+  const sourceControls = $derived(
+    tileSourceControls(rawTile?.slots ?? [], {
+      device,
+      devices: $devicesEnrichedStore,
+      states: ioBroker.states as Map<string, any>,
+      objects: ioBroker.objects as Map<string, any>,
+      variables: getVariables(),
+      overrides: getOverrideRegistry().overrides,
+      derived: getDerived,
+      watchOverrides: workingTile?.watchOverrides,
+    }),
+  );
   const baseScope = $derived(
-    ruleScope(device.controls ?? [], getVirtualPool(), variableExtras()),
+    ruleScope(sourceControls, getVirtualPool(), variableExtras()),
   );
 
   /** Variables as scope extras for this tile's rules. */
@@ -274,6 +297,12 @@
       raw: rawControl,
       pool: getVirtualPool(),
       time: clock,
+      overrides: getOverrideRegistry().overrides,
+      devices: $devicesEnrichedStore,
+      states: ioBroker.states as Map<string, any>,
+      objects: ioBroker.objects as Map<string, any>,
+      variables: getVariables(),
+      derived: getDerived,
     }),
   );
 
@@ -300,7 +329,6 @@
   );
   // resolveTile rewrites each source to a `slot:N` pseudo key; the original
   // placement's slot at the same index still names the device.
-  const rawTile = $derived(tile ?? placement?.tile);
   const rawHeadlineSource = $derived(
     rawTile?.slots?.[slots.indexOf(headline)]?.source,
   );
@@ -535,6 +563,8 @@
         Date.now(),
         getVirtualPool(),
         rawControl,
+        false,
+        sourceControls,
       )) {
         const key = anchorKey(anchors[i]);
         (byAnchor[key] ??= []).push(badge);

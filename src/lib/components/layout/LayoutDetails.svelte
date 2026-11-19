@@ -44,11 +44,19 @@
     setSlotTile,
     slotTileMode,
   } from "$lib/config/tile-ops";
-  import { hasHistory, tileHeadlineSlot } from "$lib/config/tile-parts";
+  import {
+    hasHistory,
+    tileHeadlineSlot,
+    tileSourceControls,
+  } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import {
+    getDerived,
+    getOverrideRegistry,
+  } from "$lib/stores/overrides.svelte";
   import { ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
@@ -233,6 +241,8 @@
     states: (ioBroker.states ?? new Map()) as Map<string, any>,
     objects: (ioBroker.objects ?? new Map()) as Map<string, any>,
     variables: getVariables(),
+    overrides: getOverrideRegistry().overrides,
+    derived: getDerived,
   });
   /** The tile's synthetic control bag: what its slots read, nothing more. */
   const device = $derived(
@@ -299,11 +309,22 @@
   /** How many of them still live on the tile — the guard for A34. */
   const tileVisibleCount = $derived(shownSlots.filter(onTile).length);
 
-  /** The tile's active reading, and the scope the rules' live dots evaluate in. */
+  /** The tile's active reading, and the scope the rules' live dots evaluate in:
+   *  the same list the display builds, so a dot honours an override's name. */
   const tileActive = $derived(evalActive(activeCond, activeValue));
   const scope = $derived.by(() => {
     if (!device) return undefined;
-    const base = ruleScope(device.controls ?? [], getVirtualPool());
+    const controls = tileSourceControls(shownSlots, {
+      device,
+      devices,
+      states: sourceLook.states,
+      objects: sourceLook.objects,
+      variables: getVariables(),
+      overrides: getOverrideRegistry().overrides,
+      derived: getDerived,
+      watchOverrides: tile?.tile?.watchOverrides,
+    });
+    const base = ruleScope(controls, getVirtualPool());
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
 

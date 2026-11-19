@@ -16,6 +16,7 @@ import {
   tileHeadlineSlot,
   tileParts,
   tileSeries,
+  tileSourceControls,
   valueShown,
   type SlotRow,
 } from "$lib/config/tile-parts";
@@ -28,7 +29,8 @@ import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
 import { TEMPERATURE_ICON } from "$lib/config/presets";
 import { resolveTile } from "$lib/config/tile-resolve";
-import { resolveBadges } from "$lib/config/rule-ops";
+import { resolveBadges, ruleScope } from "$lib/config/rule-ops";
+import type { SourceOverride } from "$lib/types/overrides";
 
 const control = (
   id: string,
@@ -53,9 +55,20 @@ const device = (over: Partial<EnrichedDevice> = {}): EnrichedDevice =>
     ...over,
   }) as EnrichedDevice;
 
-const tile = (slots: Slot[]): TileConfig => ({ slots });
+const tile = (slots: Slot[], over: Partial<TileConfig> = {}): TileConfig => ({
+  slots,
+  ...over,
+});
 const none: Template[] = [];
 const noRaw = (): SlotControl | undefined => undefined;
+
+/** One repair override, as the registry stores it. */
+const repair = (
+  id: string,
+  stateId: string,
+  name: string,
+  over: Partial<SourceOverride> = {},
+): SourceOverride => ({ id, stateId, kind: "repair", name, ...over });
 
 it("splits the chain's slots by where they live", () => {
   const parts = tileParts(
@@ -925,4 +938,234 @@ it("a detail badge hidden on the tile leaves the header", () => {
     { raw: noRaw },
   );
   expect(parts.modalBadges).toEqual([]);
+});
+
+// ------------------------------------------------------- override rule scope
+
+it("builds a rule local from a slot's override", () => {
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+    ],
+    {
+      overrides: [repair("o", "s", "power", { label: "Leistung" })],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(controls).toHaveLength(1);
+  // The rule writes the override's name; its label is only the display label.
+  expect(controls[0]).toMatchObject({
+    feature: "power",
+    label: "Leistung",
+    liveValue: 7,
+  });
+});
+
+it("keeps a control source working until the migration", () => {
+  const dev = device({
+    controls: [{ ...control("c1", "temperature"), liveValue: 21 }],
+  });
+  const byControl = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "control", device: "d1", control: "c1" },
+      },
+    ],
+    { devices: [dev] },
+  );
+  expect(byControl[0]).toMatchObject({
+    feature: "temperature",
+    liveValue: 21,
+  });
+  // A v1 string source resolves through the tile's own control bag.
+  const byName = tileSourceControls(
+    [{ kind: "value", source: "temperature" }],
+    { device: dev },
+  );
+  expect(byName[0]).toMatchObject({ feature: "temperature", liveValue: 21 });
+});
+
+it("appends a watch override without a slot", () => {
+  const controls = tileSourceControls([], {
+    overrides: [repair("b", "battery", "battery")],
+    states: new Map([["battery", { val: 15 }]]),
+    watchOverrides: ["b"],
+  });
+  expect(controls).toHaveLength(1);
+  expect(controls[0]).toMatchObject({ feature: "battery", liveValue: 15 });
+});
+
+it("suffixes a duplicate override name in the rule scope", () => {
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s1", override: "a" },
+      },
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s2", override: "b" },
+      },
+    ],
+    {
+      overrides: [repair("a", "s1", "power"), repair("b", "s2", "power")],
+      states: new Map([
+        ["s1", { val: 1 }],
+        ["s2", { val: 2 }],
+      ]),
+    },
+  );
+  const locals = ruleScope(controls, []).locals;
+  expect(locals.power).toBe(1);
+  expect(locals.power2).toBe(2);
+});
+
+it("carries a repair's history on its rule local", () => {
+  const history = { duration: 24, durationUnit: "hours" as const };
+  const controls = tileSourceControls(
+    [{ kind: "value", source: { kind: "state", stateId: "s", override: "o" } }],
+    {
+      overrides: [repair("o", "s", "power", { history })],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(controls[0].history).toEqual(history);
+});
+
+it("a slot rule can name another slot's override", () => {
+  const parts = tileParts(
+    device(),
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        rules: [{ when: "power > 5", hidden: true }],
+      },
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+    ]),
+    none,
+    {
+      overrides: [repair("o", "s", "power")],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(parts.body).toHaveLength(0);
+});
+
+it("names a resolved override by its name, not its label", () => {
+  const overrides = [repair("o", "s", "power", { label: "Leistung" })];
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          rules: [{ when: "power > 5", hidden: true }],
+        },
+      ],
+    },
+    "T",
+    {
+      devices: [],
+      states: new Map([["s", { val: 7 }]]),
+      objects: new Map(),
+      overrides,
+    },
+  );
+  expect(resolution.device.controls[0].feature).toBe("power");
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+  });
+  expect(parts.body).toHaveLength(0);
+});
+
+it("keeps a watch override in scope without a slot", () => {
+  const overrides = [repair("o", "s", "power"), repair("b", "b", "battery")];
+  const states = new Map([
+    ["s", { val: 1 }],
+    ["b", { val: 15 }],
+  ]);
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          rules: [{ when: "battery < 20", color: "red" }],
+        },
+      ],
+      watchOverrides: ["b"],
+    },
+    "T",
+    { devices: [], states, objects: new Map(), overrides },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+    states,
+  });
+  expect(parts.body[0].style.color).toBe("red");
+});
+
+it("keeps a repaired state charting", () => {
+  const history = { duration: 24, durationUnit: "hours" as const };
+  const overrides = [repair("o", "s", "power", { history })];
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          spark: {},
+        },
+      ],
+    },
+    "T",
+    {
+      devices: [],
+      states: new Map([["s", { val: 7 }]]),
+      objects: new Map(),
+      overrides,
+    },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+  });
+  expect(hasHistory(parts.body[0].control)).toBe(true);
+  expect(tileSeries(parts.body).map((s) => s.control.stateId)).toEqual(["s"]);
+});
+
+it("a badge rule names a slot's override", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+      {
+        kind: "badge",
+        source: "offline",
+        detail: "full",
+        rules: [{ when: "power > 5", color: "var(--danger-color)" }],
+      },
+    ]),
+    none,
+    {
+      raw: noRaw,
+      overrides: [repair("o", "s", "power")],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
+  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
 });
