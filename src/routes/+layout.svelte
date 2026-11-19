@@ -37,6 +37,7 @@
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { initLogics } from "$lib/stores/logics.svelte";
   import { initOverrides } from "$lib/stores/overrides.svelte";
+  import { dryRunDeviceMigration } from "$lib/stores/device-migration.svelte";
   import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
@@ -397,6 +398,10 @@
       const canonical = getCanonicalRegistry().devices ?? [];
       if (canonical.length) {
         await migrateLayout(canonical, getTemplateRegistry().templates);
+        // The one-time device → override migration reports what it would do;
+        // its write path (`applyDeviceMigration(true)`) is a user-confirmed
+        // step and is never called from here.
+        await dryRunDeviceMigration();
       }
       // The per-document markers are the durable record; this installation
       // marker stops an older client (whose parse drops them) from making the

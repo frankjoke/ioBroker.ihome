@@ -101,6 +101,44 @@ export function commitTemplates(next: TemplateRegistry): boolean {
 }
 
 /**
+ * The awaited file write for a one-time migration: every template goes to its
+ * file now, stale files are removed, and only a success replaces the in-memory
+ * registry. A failure leaves the registry as it was (a retry rewrites all files).
+ */
+export async function commitTemplatesNow(
+  next: TemplateRegistry,
+): Promise<boolean> {
+  if (!isTemplatesWritable()) {
+    console.error(
+      "templates are not readable (no successful load) — the change was not saved",
+    );
+    return false;
+  }
+  if (!ioBroker.connected) {
+    saveFailed = true;
+    return false;
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const templates = next.templates ?? [];
+  try {
+    await syncKind("device", templates, Object.keys(knownIds));
+  } catch (e) {
+    saveFailed = true;
+    console.error("save templates:", e);
+    return false;
+  }
+  knownIds = Object.fromEntries(
+    templates.map((template) => [template.id, true]),
+  );
+  setTemplateRegistry(next);
+  saveFailed = false;
+  return true;
+}
+
+/**
  * The template document, plus every raw state and rule id its templates name:
  * a device that has no slots of its own renders the chain's, so the chain's
  * sources and rules must be in the used set too.

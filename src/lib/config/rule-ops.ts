@@ -170,6 +170,7 @@ export interface BadgeDevice {
   controls?: {
     id?: string;
     feature?: string;
+    stateId?: string;
     available?: boolean;
     hidden?: boolean;
     liveValue?: unknown;
@@ -452,7 +453,13 @@ export function resolveBadges(
    *  availability is that source's, not the whole tile's synthetic bag. */
   const offlineFor = (of: string | undefined): ResolvedBadge | undefined => {
     if (!of) return offlineBadge(device);
-    const control = (device.controls ?? []).find((c) => c.id === of);
+    const controls = device.controls ?? [];
+    // A migrated badge names the headline state (`stateId`); a control key or
+    // feature still resolves, so hand-written badges keep working.
+    const control =
+      controls.find((c) => c.id === of) ??
+      controls.find((c) => c.feature === of) ??
+      controls.find((c) => c.stateId === of);
     return control
       ? offlineBadge({ controls: [control] } as unknown as BadgeDevice)
       : undefined;

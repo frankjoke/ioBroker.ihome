@@ -230,6 +230,42 @@ export function commitLayout(next: PageRegistry): boolean {
 }
 
 /**
+ * The awaited write path for a one-time migration: commit now, not on the
+ * debounce, so the caller knows the document landed before writing the next
+ * one. A failure leaves the in-memory registry and the stored document as they
+ * were.
+ */
+export async function commitLayoutNow(next: PageRegistry): Promise<boolean> {
+  if (!isLayoutWritable()) {
+    console.error(
+      "pageList is not writable yet (no successful load) — the change was not saved",
+    );
+    return false;
+  }
+  if (!ioBroker.connected) {
+    saveFailed = true;
+    return false;
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const snapshot = JSON.stringify(next);
+  try {
+    await ioBroker.setState(PAGE_LIST_ID, snapshot);
+  } catch (e) {
+    saveFailed = true;
+    console.error("save pages:", e);
+    return false;
+  }
+  lastSent = snapshot;
+  setPageRegistry(next);
+  pagesLoadKind = "loaded";
+  saveFailed = false;
+  return true;
+}
+
+/**
  * The one-time bridge from a filter-based document to placements (A15), called
  * once both the registry and the device list are loaded. It is a no-op when the
  * document is already current, so it is safe on every connect.
