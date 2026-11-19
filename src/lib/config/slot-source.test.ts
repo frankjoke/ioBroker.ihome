@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import {
   resolveSlotSource,
+  sourceChipKey,
   sourceStateIds,
   type SourceLook,
 } from "$lib/config/slot-source";
@@ -377,6 +378,41 @@ it("carries the override's history to the chart", () => {
     }),
   );
   expect(source?.history).toEqual(history);
+});
+
+it("carries a repair override's transform for the write path", () => {
+  const transform = {
+    read: {
+      kind: "scale" as const,
+      inMin: 0,
+      inMax: 1,
+      outMin: 0,
+      outMax: 100,
+    },
+    write: {
+      kind: "scale" as const,
+      inMin: 0,
+      inMax: 100,
+      outMin: 0,
+      outMax: 1,
+    },
+  };
+  const source = resolveSlotSource(
+    { kind: "state", stateId: "s", override: "o" },
+    stateLook({ overrides: [repair({ transform })] }),
+  );
+  expect(source?.transform).toEqual(transform);
+});
+
+it("keys a source chip by its kind and override", () => {
+  expect(sourceChipKey({ kind: "state", stateId: "s" })).toBe("s:override:");
+  expect(sourceChipKey({ kind: "state", stateId: "s", override: "o" })).toBe(
+    "s:override:o",
+  );
+  expect(
+    sourceChipKey({ kind: "control", device: "d", control: "c" }, "s"),
+  ).toBe("s:control:d:c");
+  expect(sourceChipKey({ kind: "device", device: "d" })).toBe("device:d");
 });
 
 it("sourceStateIds subscribes a derived override's inputs", () => {

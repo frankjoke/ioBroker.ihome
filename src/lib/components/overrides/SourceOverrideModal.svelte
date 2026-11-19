@@ -296,14 +296,27 @@
     }
   }
 
-  function onKey(event: KeyboardEvent): void {
-    if (event.key !== "Escape") return;
-    if (showHistory || confirmDelete) return;
-    onClose();
-  }
+  // Capture at the window: the source picker behind this modal listens for
+  // Escape too, and one Escape must close one layer (history, delete confirm,
+  // then this modal) — never the picker and this draft with it.
+  $effect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      if (confirmDelete) {
+        confirmDelete = false;
+        return;
+      }
+      if (showHistory) {
+        showHistory = false;
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
 </script>
-
-<svelte:window onkeydown={onKey} />
 
 <div class="modal" role="dialog" aria-modal="true" aria-label="Source override">
   <div class="modal-content">
@@ -548,6 +561,15 @@
         <label class="field">
           <span class="label-mono">Unit</span>
           <input type="text" bind:value={draft.unit} placeholder="°C" />
+        </label>
+        <label class="field">
+          <span class="label-mono">Role</span>
+          <select bind:value={draft.role}>
+            <option value="">— none —</option>
+            {#each roleOptions as role (role)}
+              <option value={role}>{role}</option>
+            {/each}
+          </select>
         </label>
         <label class="field">
           <span class="label-mono">Precision</span>

@@ -21,7 +21,7 @@
   } from "$lib/config/slot-create";
   import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
   import { resolveTemplate } from "$lib/config/template-ops";
-  import { widgetForState } from "$lib/config/slot-source";
+  import { sourceChipKey, widgetForState } from "$lib/config/slot-source";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
   import { stateIdFor } from "$lib/config/variables";
@@ -348,17 +348,22 @@
       kind: SlotKind;
     }[] = [];
     const seen = new SvelteSet<string>();
+    /** The states a chip already shows, so the unused-control list can skip
+     *  them (an override is a different chip, the state is still covered). */
+    const usedStateIds = new SvelteSet<string>();
     const deviceIds: string[] = [];
     const addUsed = (
       source: SlotSource,
       stateId: string | undefined,
       label: string,
       kind: SlotKind,
+      title?: string,
     ) => {
-      const key = stateId ?? JSON.stringify(source);
+      const key = sourceChipKey(source, stateId);
       if (seen.has(key)) return;
       seen.add(key);
-      used.push({ key, label, title: stateId, source, kind });
+      if (stateId) usedStateIds.add(stateId);
+      used.push({ key, label, title: title ?? stateId, source, kind });
     };
     for (const slot of slots) {
       const source = slot.source;
@@ -366,7 +371,18 @@
       if (source.kind === "state") {
         const id = stateIdFor(source.stateId, getVariables());
         const name = localizeName(objects.get(id)?.common?.name);
-        addUsed(source, id, name || id, slot.kind);
+        const override = source.override
+          ? getOverrideRegistry().overrides.find(
+              (o) => o.id === source.override,
+            )
+          : undefined;
+        addUsed(
+          source,
+          id,
+          override?.name ?? (name || id),
+          slot.kind,
+          override ? `${id} · ${override.name}` : id,
+        );
         continue;
       }
       if (!deviceIds.includes(source.device)) deviceIds.push(source.device);
@@ -387,7 +403,7 @@
       .map((d) => ({
         device: d,
         controls: (d.controls ?? []).filter(
-          (c) => !c.hidden && !(c.stateId && seen.has(c.stateId)),
+          (c) => !c.hidden && !(c.stateId && usedStateIds.has(c.stateId)),
         ),
       }))
       .filter((group) => group.controls.length > 0);

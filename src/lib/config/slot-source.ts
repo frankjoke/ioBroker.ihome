@@ -4,6 +4,7 @@ import type {
   EnrichedControl,
   EnrichedDevice,
   HistorySpec,
+  Transform,
   Widget,
 } from "$lib/types/device";
 import type { SlotSource } from "$lib/types/display";
@@ -54,6 +55,9 @@ export interface ResolvedSource {
   error?: string;
   /** The chart feed a repair override supplies. */
   history?: HistorySpec;
+  /** The bound repair's transform: the read step already shaped `value`, the
+   *  write step belongs to the state, so writes go through it too. */
+  transform?: Transform;
 }
 
 const NO_CONTROL = { id: "", feature: "", writable: false } as Control;
@@ -185,6 +189,7 @@ export function resolveSlotSource(
         writable: override.write ?? base.writable,
         overrideId: override.id,
         history: override.history,
+        transform: override.transform,
       };
     }
     // A derived override resolves through the evaluator; the registry entry,
@@ -234,6 +239,22 @@ export function resolveSlotSource(
  *  a control, with no device-type fallback. */
 export function widgetForState(object: any): Widget {
   return widgetForMeta(effectiveCommon(NO_CONTROL, object));
+}
+
+/** What a source picker chip dedupes by: a state's override is part of the
+ *  source, so a raw state, a repair and a derived stay three distinct chips. */
+export function sourceChipKey(
+  source: SlotSource | string,
+  stateId?: string,
+): string {
+  if (typeof source === "string") return stateId ?? source;
+  if (source.kind === "state") {
+    return `${stateId ?? source.stateId}:override:${source.override ?? ""}`;
+  }
+  if (source.kind === "control") {
+    return `${stateId ?? ""}:control:${source.device}:${source.control}`;
+  }
+  return `device:${source.device}`;
 }
 
 /** Every state id a source needs subscribed. Control sources resolve through

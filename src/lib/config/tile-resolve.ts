@@ -80,7 +80,7 @@ function pseudoControl(
     exists: resolved?.available === true,
     object: resolved?.object,
     widget,
-    transform: resolved?.control?.transform,
+    transform: resolved?.transform ?? resolved?.control?.transform,
     history: resolved?.history ?? resolved?.control?.history,
     rules: resolved?.control?.rules,
     hidden: resolved?.control?.hidden === true,
