@@ -964,6 +964,29 @@ it("builds a rule local from a slot's override", () => {
   });
 });
 
+it("names a raw state slot from the id leaf, keeping its label", () => {
+  const objects = new Map<string, any>([
+    [
+      "aaa.0.xxx.yyy.humidity",
+      { type: "state", common: { name: "Feuchtigkeit", type: "number" } },
+    ],
+  ]);
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "aaa.0.xxx.yyy.humidity" },
+      },
+    ],
+    { objects, states: new Map([["aaa.0.xxx.yyy.humidity", { val: 55 }]]) },
+  );
+  expect(controls[0]).toMatchObject({
+    feature: "humidity",
+    label: "Feuchtigkeit",
+    liveValue: 55,
+  });
+});
+
 it("keeps a control source working until the migration", () => {
   const dev = device({
     controls: [{ ...control("c1", "temperature"), liveValue: 21 }],

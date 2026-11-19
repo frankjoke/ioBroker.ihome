@@ -201,10 +201,25 @@ export interface OverrideGroup {
   stateIds: string[];
 }
 
-/** A state's raw expression name: its `common.name`, else its leaf id. */
-function stateLabel(object: any, stateId: string): string {
-  const name = localizeName(object?.common?.name).trim();
-  return name || String(stateId).split(".").pop() || stateId;
+/** A state's raw expression name: the last segment of its id. */
+function stateLeaf(stateId: string): string {
+  return String(stateId).split(".").pop() || String(stateId);
+}
+
+/** A new override's identity: the id leaf as `name`, the broker's localized
+ *  `common.name` only as the display `label` when it says something else. */
+export function seedOverrideName(
+  stateId: string,
+  object: any,
+  existingNames: string[] = [],
+): { name: string; label?: string } {
+  const leaf = stateLeaf(stateId);
+  const broker = localizeName(object?.common?.name).trim();
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
+  return {
+    name: sanitizeLabel(leaf, taken),
+    label: broker && broker !== leaf ? broker : undefined,
+  };
 }
 
 /**
@@ -212,6 +227,8 @@ function stateLabel(object: any, stateId: string): string {
  * anchor and its alias bases, the alias base group, the alias group, then the
  * device group. Overrides are added first, so an override name wins over a raw
  * sibling with that name (the raw state stays reachable via `get("<id>")`).
+ * Every raw sibling is named by its id leaf; the broker's localized name is
+ * only a secondary alias, added while that name is still free.
  */
 export function overrideGroup(
   stateId: string,
@@ -248,10 +265,19 @@ export function overrideGroup(
       names.set(name, { stateId: id, override: override.id });
     }
   }
+  // Leaves first, so a broker name can never displace another state's identity.
   for (const id of stateIds) {
-    const label = stateLabel(objects.get(id), id);
-    if (claimed.has(sanitizeLabel(label, new Set()))) continue;
-    names.set(sanitizeLabel(label, taken), { stateId: id });
+    const leafName = sanitizeLabel(stateLeaf(id), new Set());
+    if (!claimed.has(leafName)) {
+      names.set(sanitizeLabel(stateLeaf(id), taken), { stateId: id });
+    }
+  }
+  for (const id of stateIds) {
+    const alias = localizeName(objects.get(id)?.common?.name).trim();
+    const aliasName = alias ? sanitizeLabel(alias, new Set()) : "";
+    if (aliasName && !claimed.has(aliasName) && !names.has(aliasName)) {
+      names.set(aliasName, { stateId: id });
+    }
   }
   return { names, stateIds };
 }

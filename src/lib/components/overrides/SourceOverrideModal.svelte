@@ -10,10 +10,10 @@
     evaluateOverride,
     overrideGroup,
     overrideNameTaken,
+    seedOverrideName,
   } from "$lib/config/source-overrides";
   import { normalizeStates } from "$lib/config/state-meta";
   import { isInfrastructure } from "$lib/config/template-suggest";
-  import { sanitizeLabel } from "$lib/config/virtual-ops";
   import { formatValue, localizeName } from "$lib/config/format";
   import { stateIdFor } from "$lib/config/variables";
   import { applyRead } from "$lib/utils/transform";
@@ -62,14 +62,13 @@
 
   function seed(): SourceOverride {
     if (override) return { ...override };
-    const taken = new Set(existingNames.map((n) => n.trim().toLowerCase()));
-    const leaf = String(stateId).split(".").pop() ?? stateId;
+    const { name, label } = seedOverrideName(stateId, object, existingNames);
     return {
       id: newId(),
       stateId,
       kind: "repair",
-      name: sanitizeLabel(objectName || leaf, taken),
-      label: objectName || undefined,
+      name,
+      label,
       unit: text(common.unit) || undefined,
       type: text(common.type) || undefined,
       role: text(common.role) || undefined,
@@ -140,12 +139,16 @@
     }
   });
   /** The `$.` names the expression may use: overrides first, then real siblings,
-   *  with the config/availability leaves left out (the template rule). */
-  const siblings = $derived.by(() =>
-    [...group.names.entries()]
+   *  with the config/availability leaves left out (the template rule). A raw
+   *  state's broker-name alias is not a second chip — the leaf stands for it. */
+  const siblings = $derived.by(() => {
+    const seen: Record<string, boolean> = {};
+    return [...group.names.entries()]
       .filter(([, entry]) => {
         if (entry.override === draft.id) return false;
         if (entry.override) return true;
+        if (seen[entry.stateId]) return false;
+        seen[entry.stateId] = true;
         return !isInfrastructure({ stateId: entry.stateId });
       })
       .map(([name, entry]) => {
@@ -163,8 +166,8 @@
             sibling?.unit ?? objects.get(entry.stateId)?.common?.unit,
           ),
         };
-      }),
-  );
+      });
+  });
 
   /** The feed the history editor writes back: an override is a control with no
    *  device, so the same editor works with a synthetic one. */

@@ -12,6 +12,7 @@ import {
   overrideNameTaken,
   overridesForState,
   removeOverride,
+  seedOverrideName,
   upsertOverride,
 } from "./source-overrides";
 
@@ -169,13 +170,34 @@ const derived = (
 });
 
 describe("overrideGroup", () => {
-  it("names the anchor and its siblings from common.name", () => {
+  it("names the anchor and its siblings from the id leaf", () => {
     const ctx = fixtureGroup({ temperature: 21, humidity: 50 });
     expect([...ctx.group.names.keys()]).toEqual(["temperature", "humidity"]);
     expect(ctx.group.names.get("humidity")).toEqual({
       stateId: "s.0.humidity",
     });
     expect(ctx.group.stateIds).toEqual(["s.0.temperature", "s.0.humidity"]);
+  });
+
+  it("adds the broker name as an alias of its id leaf", () => {
+    const objects = new Map<string, any>([
+      [
+        "aaa.0.xxx.yyy.humidity",
+        { type: "state", common: { name: { de: "Feuchtigkeit" } } },
+      ],
+      [
+        "aaa.0.xxx.yyy.temperature",
+        { type: "state", common: { name: { de: "Temperatur" } } },
+      ],
+    ]);
+    const names = overrideGroup(
+      "aaa.0.xxx.yyy.humidity",
+      objects,
+      emptyOverrideRegistry(),
+    ).names;
+    expect(names.get("humidity")?.stateId).toBe("aaa.0.xxx.yyy.humidity");
+    expect(names.get("feuchtigkeit")?.stateId).toBe("aaa.0.xxx.yyy.humidity");
+    expect(names.get("temperature")?.stateId).toBe("aaa.0.xxx.yyy.temperature");
   });
 
   it("lets an override name win over a raw sibling", () => {
@@ -189,9 +211,35 @@ describe("overrideGroup", () => {
       },
     ]);
     expect(ctx.group.names.get("temperature")?.override).toBe("o");
+    // The raw state keeps its broker name as the secondary alias.
+    expect(ctx.group.names.get("temperature2")).toBeUndefined();
   });
 
-  it("reads a localized common.name", () => {
+  it("skips a raw leaf claimed by an override", () => {
+    const objects = new Map<string, any>([
+      [
+        "aaa.0.xxx.yyy.humidity",
+        { type: "state", common: { name: "Feuchtigkeit" } },
+      ],
+      [
+        "aaa.0.xxx.yyy.temperature",
+        { type: "state", common: { name: "Temperatur" } },
+      ],
+    ]);
+    const registry = upsertOverride(emptyOverrideRegistry(), {
+      id: "o",
+      stateId: "aaa.0.xxx.yyy.humidity",
+      kind: "repair",
+      name: "temperature",
+    });
+    const group = overrideGroup("aaa.0.xxx.yyy.humidity", objects, registry);
+    expect(group.names.get("temperature")).toEqual({
+      stateId: "aaa.0.xxx.yyy.humidity",
+      override: "o",
+    });
+  });
+
+  it("keeps the id leaf when common.name is localized", () => {
     const objects = new Map<string, any>([
       [
         "s.0.temperature",
@@ -213,16 +261,20 @@ describe("overrideGroup", () => {
       objects,
       emptyOverrideRegistry(),
     );
+    // The names the app localizes to are the leaves again: no duplicate alias.
     expect([...group.names.keys()]).toEqual(["temperature", "humidity"]);
   });
 
-  it("suffixes duplicate sibling names", () => {
+  it("adds a shared broker name as an alias once", () => {
     const objects = new Map<string, any>([
       ["s.0.a", { type: "state", common: { name: "value" } }],
       ["s.0.b", { type: "state", common: { name: "Value" } }],
     ]);
     const group = overrideGroup("s.0.a", objects, emptyOverrideRegistry());
-    expect([...group.names.keys()]).toEqual(["value", "value2"]);
+    expect(group.names.get("a")?.stateId).toBe("s.0.a");
+    expect(group.names.get("b")?.stateId).toBe("s.0.b");
+    expect(group.names.get("value")?.stateId).toBe("s.0.a");
+    expect(group.names.size).toBe(3);
   });
 
   it("reads the alias base's group", () => {
@@ -253,6 +305,10 @@ describe("overrideGroup", () => {
     ]);
     const registry = emptyOverrideRegistry();
     const group = overrideGroup("alias.0.dew", objects, registry);
+    // The leaf names the state; the broker names stay reachable as aliases.
+    expect(group.names.get("temp")?.stateId).toBe("shelly.0.temp");
+    expect(group.names.get("temperature")?.stateId).toBe("shelly.0.temp");
+    expect(group.names.get("hum")?.stateId).toBe("shelly.0.hum");
     const res = evaluateOverride(derived("$.temperature + $.humidity"), {
       group,
       states,
@@ -275,6 +331,38 @@ describe("overrideGroup", () => {
     ];
     const group = overrideGroup("Outside_temp", objects, registry, variables);
     expect(group.stateIds).toContain("s.0.temperature");
+  });
+});
+
+describe("seedOverrideName", () => {
+  const object = { common: { name: "Feuchtigkeit" } };
+
+  it("names a new override from the id leaf, the broker name as label", () => {
+    expect(seedOverrideName("aaa.0.xxx.yyy.humidity", object, [])).toEqual({
+      name: "humidity",
+      label: "Feuchtigkeit",
+    });
+  });
+
+  it("drops the label when it is the leaf", () => {
+    expect(
+      seedOverrideName("aaa.0.xxx.yyy.humidity", {
+        common: { name: "humidity" },
+      }),
+    ).toEqual({ name: "humidity", label: undefined });
+    expect(seedOverrideName("aaa.0.xxx.yyy.humidity", undefined)).toEqual({
+      name: "humidity",
+      label: undefined,
+    });
+  });
+
+  it("suffixes a name the state already uses", () => {
+    expect(
+      seedOverrideName("aaa.0.xxx.yyy.humidity", object, [
+        "Humidity",
+        "humidity2",
+      ]).name,
+    ).toBe("humidity3");
   });
 });
 

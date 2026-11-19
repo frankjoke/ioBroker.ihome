@@ -130,7 +130,8 @@ export function tileSourceControls(
     overrides: opts.overrides,
     derived: opts.derived,
   };
-  /** A resolved source as a local; the override's name wins over its label. */
+  /** A resolved source as a local; the override's name wins over its label,
+   *  and a raw state is named by its id leaf, not the broker's label. */
   const control = (
     resolved: ResolvedSource | undefined,
   ): TileSourceControl | undefined => {
@@ -141,8 +142,9 @@ export function tileSourceControls(
     const name =
       override?.name ??
       resolved.control?.feature ??
-      resolved.label ??
-      resolved.stateId;
+      (resolved.stateId
+        ? String(resolved.stateId).split(".").pop() || resolved.stateId
+        : resolved.label);
     if (!name) return undefined;
     return {
       feature: name,
