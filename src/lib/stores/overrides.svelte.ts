@@ -120,6 +120,25 @@ async function readState(): Promise<{ value?: unknown } | null> {
   return state;
 }
 
+/** The adapter owns the document objects, but an old adapter may not have run
+ *  since the SPA was updated: create it so the first save cannot be rejected. */
+async function ensureOverridesObject(): Promise<void> {
+  const obj = await ioBroker.getObject(OVERRIDE_LIST_ID);
+  if (!obj) {
+    await ioBroker.emitAsync("setObject", OVERRIDE_LIST_ID, {
+      type: "state",
+      common: {
+        name: "iHome source overrides",
+        type: "string",
+        role: "text.json",
+        read: true,
+        write: true,
+      },
+      native: {},
+    });
+  }
+}
+
 /**
  * Write the whole document. The state is re-read first: a save from another tab
  * or instance since this one loaded is a conflict, not an overwrite. `updatedAt`
@@ -140,6 +159,16 @@ export async function commitOverrides(
     return "failed";
   }
   const state = await readState();
+  if (!state && registry.updatedAt > 0) {
+    // The re-read failed after a real document was loaded: writing would
+    // replace something this store never read. A fresh (updatedAt 0) document
+    // still creates normally.
+    saveFailed = true;
+    console.error(
+      "the override list could not be re-read — the change was not saved",
+    );
+    return "failed";
+  }
   const current =
     state && state.value != null && state.value !== ""
       ? normalizeOverrideRegistry(state.value)
@@ -185,6 +214,11 @@ export function initOverrides(): Promise<void> {
         );
         initPromise = null;
         return;
+      }
+      try {
+        await ensureOverridesObject();
+      } catch (e) {
+        console.error("initOverrides ensureOverridesObject:", e);
       }
       const state = await readState();
       const value = state?.value;

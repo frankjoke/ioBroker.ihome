@@ -109,6 +109,7 @@ const DOCS = [
   "variableList",
   "settings",
   "logicList",
+  "overrideList",
   "pluginPages",
   "pluginSettings",
 ] as const;

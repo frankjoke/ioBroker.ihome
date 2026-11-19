@@ -6,11 +6,12 @@ const h = vi.hoisted(() => {
   const objects = new Map<string, any>();
   const registered: string[] = [];
   const link = { connected: true };
+  const docObject = { exists: false, created: [] as string[] };
   const setState = vi.fn(async (_id: string, value: unknown) => {
     if (state.failWrite) throw new Error("write denied");
     state.value = value;
   });
-  return { state, states, objects, registered, link, setState };
+  return { state, states, objects, registered, link, docObject, setState };
 });
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
@@ -24,6 +25,10 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
     getState: vi.fn(async () =>
       h.state.value === null ? null : { value: h.state.value },
     ),
+    getObject: vi.fn(async () => (h.docObject.exists ? { _id: "doc" } : null)),
+    emitAsync: vi.fn(async (event: string, id: string) => {
+      if (event === "setObject") h.docObject.created.push(id);
+    }),
     setState: h.setState,
     states: h.states,
     objects: h.objects,
@@ -62,6 +67,7 @@ async function load(
   h.state.value = stateValue;
   h.state.failWrite = false;
   h.link.connected = connected;
+  h.docObject.created.length = 0;
   h.states.clear();
   h.objects.clear();
   h.registered.length = 0;
@@ -77,6 +83,8 @@ async function load(
 beforeEach(() => {
   h.state.value = null;
   h.state.failWrite = false;
+  h.docObject.exists = false;
+  h.docObject.created.length = 0;
 });
 
 it("loads and normalizes the stored document", async () => {
@@ -98,6 +106,17 @@ it("an absent document is an empty writable registry", async () => {
   const store = await load(null);
   expect(store.getOverrideRegistry().overrides).toEqual([]);
   expect(store.isOverridesWritable()).toBe(true);
+});
+
+it("creates the document object when the adapter has not made it yet", async () => {
+  const store = await load(null);
+  expect(h.docObject.created).toContain(OVERRIDE_LIST_ID);
+  expect(store.isOverridesWritable()).toBe(true);
+
+  // An object that already exists is left alone.
+  h.docObject.exists = true;
+  await load(null);
+  expect(h.docObject.created).toEqual([]);
 });
 
 it("an unreadable document is never overwritten", async () => {
@@ -169,6 +188,28 @@ it("a failed write keeps the in-memory document", async () => {
   ).toBe("failed");
   expect(store.getOverrideRegistry()).toBe(before);
   expect(store.overrideSaveFailed()).toBe(true);
+});
+
+it("a failed pre-write read never replaces a loaded document", async () => {
+  const store = await load(doc(1, [repair("o1", "s.0.a", "power")]));
+  const before = store.getOverrideRegistry();
+  h.state.value = null; // the pre-write re-read now fails
+  expect(await store.commitOverrides({ ...before, overrides: [] }, 1)).toBe(
+    "failed",
+  );
+  expect(h.setState).not.toHaveBeenCalled();
+  expect(store.getOverrideRegistry()).toBe(before);
+  expect(store.overrideSaveFailed()).toBe(true);
+});
+
+it("a fresh document still creates when the state is absent", async () => {
+  const store = await load(null);
+  const next = {
+    ...store.getOverrideRegistry(),
+    overrides: [repair("o1", "s.0.a", "power")],
+  };
+  expect(await store.commitOverrides(next, 0)).toBe("saved");
+  expect(h.setState).toHaveBeenCalledTimes(1);
 });
 
 it("derives the value and inputs from the live state group", async () => {
