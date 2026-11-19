@@ -126,20 +126,14 @@
   let mdiState = $state<"idle" | "loading" | "ready" | "error">("idle");
   let mdiError = $state("");
 
-  // ioBroker objects
+  // ioBroker objects: empty adapter means all adapters
   let objectAdapter = $state("");
-  let objectTouched = $state(false);
 
   $effect(() => {
     if (mdiTouched || mdiCategory) return;
     if (mdiState === "ready" && mdiCategoryCounts.length) {
       mdiCategory = mdiCategoryCounts[0].id;
     }
-  });
-
-  $effect(() => {
-    if (objectTouched || objectAdapter) return;
-    if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
   });
 
   // Adapter and meta objects are not in the state cache; both are fetched once
@@ -625,17 +619,13 @@
             </label>
           {/if}
           {#if resource === "objects"}
-            <select
-              aria-label="ioBroker adapter"
-              bind:value={objectAdapter}
-              onchange={() => (objectTouched = true)}
-            >
+            <select aria-label="ioBroker adapter" bind:value={objectAdapter}>
+              <option value="">-- all -- ({objectIcons.length})</option>
               {#each objectAdapters as adapter (adapter.name)}
                 <option value={adapter.name}
                   >{adapter.name} ({adapter.list.length})</option
                 >
               {/each}
-              <option value="">-- all --</option>
             </select>
           {/if}
           {#if resource === "mdi"}
