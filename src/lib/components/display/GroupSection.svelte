@@ -5,6 +5,7 @@
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
   import { openSheetGated, sheet } from "$lib/stores/sheet.svelte.js";
+  import EditingOutline from "./EditingOutline.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -78,6 +79,9 @@
   class:editing-target={editingTarget}
   style="{background} {width}"
 >
+  {#if editingTarget}
+    <EditingOutline />
+  {/if}
   {#if group.title && !bare}
     <!-- Ctrl/Cmd+click is a power-user shortcut on a heading, not a control; the
          layout editor stays reachable via the AppBar pencil, so no key handler. -->

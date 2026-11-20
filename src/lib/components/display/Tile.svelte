@@ -61,6 +61,7 @@
   } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
   import { openSheetGated, sheet } from "$lib/stores/sheet.svelte.js";
+  import EditingOutline from "./EditingOutline.svelte";
   import { tileNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
@@ -778,6 +779,9 @@
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
 >
+  {#if editingTarget}
+    <EditingOutline />
+  {/if}
   {#if chartFull && chart.length}
     <div class="tile-chart-full">
       <TileChart
