@@ -16,7 +16,9 @@
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
-  import { isLocalUi } from "$lib/config/session-locality.svelte";
+  import ExternalSessionsCard from "$lib/components/config/ExternalSessionsCard.svelte";
+  import { getPlugins, loadPlugins } from "$lib/stores/plugins.svelte";
+  import { isLocalUi, sessionClass } from "$lib/config/session-locality.svelte";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
@@ -25,6 +27,21 @@
   /** External management only exists on the LAN: the card is not rendered
    *  when this page is opened through the public https host. */
   const localSession = $derived(isLocalUi());
+
+  /** The Caddy card is optional; the core policy card is not. */
+  const caddyPlugin = $derived(
+    getPlugins().some((plugin) => plugin.id === "external-access"),
+  );
+  const session = $derived(sessionClass());
+
+  // The plugin list can only load after the socket is up; the Caddy item
+  // appears once it has.
+  let pluginsAsked = false;
+  $effect(() => {
+    if (!isConnected || pluginsAsked) return;
+    pluginsAsked = true;
+    void loadPlugins().catch(() => undefined);
+  });
 
   /** One collapsible item per form; the line keeps what fits, the editor the rest. */
   let openSection = $state("");
@@ -272,18 +289,44 @@
               type="button"
               class="name"
               aria-expanded={openSection === "external"}
-              onclick={() => toggle("external")}>External access</button
+              onclick={() => toggle("external")}>External sessions</button
             >
             <span class="item-actions"
-              ><span class="badge badge-secondary">Caddy</span></span
+              ><span class="badge badge-secondary"
+                >{session.external ? "external" : "local"}</span
+              ></span
             >
           </div>
           {#if openSection === "external"}
-            <div class="item-editor">
-              <ExternalAccessCard />
+            <div class="item-editor settings-card-body">
+              <ExternalSessionsCard />
             </div>
           {/if}
         </div>
+
+        {#if caddyPlugin}
+          <div class="item" class:open={openSection === "caddy"}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="item-line" onclick={(e) => onLineClick(e, "caddy")}>
+              <Icon value="key" size={18} />
+              <button
+                type="button"
+                class="name"
+                aria-expanded={openSection === "caddy"}
+                onclick={() => toggle("caddy")}>Caddy users</button
+              >
+              <span class="item-actions"
+                ><span class="badge badge-secondary">Caddy</span></span
+              >
+            </div>
+            {#if openSection === "caddy"}
+              <div class="item-editor">
+                <ExternalAccessCard />
+              </div>
+            {/if}
+          </div>
+        {/if}
       {/if}
 
       <div class="item" class:open={openSection === "about"}>
