@@ -15,6 +15,8 @@
     validateExternalCaddy,
     writeExternalSnippet,
   } from "$lib/stores/external-access.svelte";
+  import { externalSessionSettings } from "$lib/config/locality";
+  import { getSettings, updateSettings } from "$lib/stores/settings.svelte";
   import { onMount } from "svelte";
   import { base } from "$app/paths";
 
@@ -26,6 +28,7 @@
   let outputs = $state("");
   let pendingRemove = $state<string | null>(null);
   let working = $state("");
+  let externalNote = $state("");
 
   onMount(() => {
     void loadExternalAccess();
@@ -87,6 +90,21 @@
     } finally {
       working = "";
     }
+  }
+
+  async function useAsExternal(): Promise<void> {
+    if (!publicUrl.url) return;
+    const host = new URL(publicUrl.url).hostname.toLowerCase();
+    const cur = externalSessionSettings(getSettings().externalSession);
+    if (!cur.externalHosts.includes(host)) {
+      await updateSettings({
+        externalSession: {
+          ...cur,
+          externalHosts: [...cur.externalHosts, host],
+        },
+      });
+    }
+    externalNote = `${host} added to External hosts`;
   }
 
   async function add(): Promise<void> {
@@ -162,8 +180,17 @@
         class:badge-warning={!publicUrl.ok}
         >{publicUrl.status ?? publicUrl.error ?? "unchecked"}</span
       >
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        onclick={() => void useAsExternal()}>Use as external host</button
+      >
     {/if}
   </div>
+
+  {#if externalNote}
+    <p class="hint text-muted">{externalNote}</p>
+  {/if}
 
   <div class="users">
     {#each users as row (row.user)}
