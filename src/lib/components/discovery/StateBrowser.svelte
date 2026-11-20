@@ -296,6 +296,8 @@
     if (!focus) return;
     const parents = parentIds(focus);
     for (const id of parents) pickerExpanded.add(id);
+    // The item's own state: show its overrides too, not just its line.
+    if (overridesFor(focus).length) expandedOverrides.add(focus);
     const found = await scrollTo(`[data-node="state:${focus}"]`);
     const parent = parents[parents.length - 1];
     if (!found && parent) await scrollTo(`[data-branch="${parent}"]`);
