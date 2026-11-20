@@ -47,7 +47,7 @@
 
   const doc = $derived(getLogicDocument());
   const builtinIds = new Set(BUILTIN_DEVICE_TEMPLATES.map((entry) => entry.id));
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   let selectedId = $state(BUILTIN_DEVICE_TEMPLATES[0].id);
   const allTemplates = $derived(
     withoutSecured(

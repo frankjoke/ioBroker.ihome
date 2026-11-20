@@ -172,8 +172,8 @@
     label: "Security",
     hint: "Hide this tile from the UI outside the local network.",
   } as const;
-  const local = isLocalUi();
-  const tileTabs = local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS;
+  const local = $derived(isLocalUi());
+  const tileTabs = $derived(local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS);
 
   let width = $state(1400);
   onMount(() => {

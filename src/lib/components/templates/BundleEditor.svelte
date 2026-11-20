@@ -51,7 +51,7 @@
 
   const writable = $derived(isTemplateBundlesWritable());
   const saveFailed = $derived(templateBundleSaveFailed());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   const logicChoices = $derived(
     withoutSecured(
       [...BUILTIN_TEMPLATES, ...(getLogicDocument().templates ?? [])],

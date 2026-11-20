@@ -18,21 +18,20 @@
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
   import ExternalSessionsCard from "$lib/components/config/ExternalSessionsCard.svelte";
   import { getPlugins, loadPlugins } from "$lib/stores/plugins.svelte";
-  import { isLocalUi, sessionClass } from "$lib/config/session-locality.svelte";
+  import { sessionClass } from "$lib/config/session-locality.svelte";
+  import { showsExternalPolicyCard } from "$lib/config/locality";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);
   /** The fieldset is editable after an unlock, or when the PIN is skipped. */
   const locked = $derived(!isUnlocked() && storage.pinDisabled !== true);
-  /** External management only exists on the LAN: the card is not rendered
-   *  when this page is opened through the public https host. */
-  const localSession = $derived(isLocalUi());
-
-  /** The Caddy card is optional; the core policy card is not. */
+  /** The plugin card is optional; the core policy card must stay reachable,
+   *  including while force-external is on (it is the only way back). */
   const caddyPlugin = $derived(
     getPlugins().some((plugin) => plugin.id === "external-access"),
   );
   const session = $derived(sessionClass());
+  const showExternalCard = $derived(showsExternalPolicyCard(session));
 
   // The plugin list can only load after the socket is up; the Caddy item
   // appears once it has.
@@ -279,7 +278,7 @@
         {/if}
       </div>
 
-      {#if localSession}
+      {#if showExternalCard}
         <div class="item" class:open={openSection === "external"}>
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->

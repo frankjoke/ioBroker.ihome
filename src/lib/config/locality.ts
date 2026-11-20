@@ -77,21 +77,34 @@ export function externalSessionSettings(raw: unknown): ExternalSessionSettings {
   };
 }
 
-/** localhost, mDNS, RFC1918, IPv4 link-local, IPv6 loopback/ULA/link-local. */
+/** localhost, mDNS, RFC1918, IPv4 link-local, IPv6 loopback/ULA/link-local.
+ *  Internet hostnames that merely start with those digits are not literals. */
 export function isPrivateHost(value: string): boolean {
   const host = normalizeHost(value);
   if (!host) return false;
   if (host === "localhost") return true;
   if (host.endsWith(".local")) return true;
-  if (host === "::1") return true;
-  if (/^f[cd]/.test(host)) return true;
-  if (/^fe[89ab]/.test(host)) return true;
-  if (host.startsWith("10.")) return true;
-  if (host.startsWith("127.")) return true;
-  if (host.startsWith("192.168.")) return true;
-  if (host.startsWith("169.254.")) return true;
-  const second = /^172\.(\d{1,3})\./.exec(host);
-  return !!second && Number(second[1]) >= 16 && Number(second[1]) <= 31;
+  if (host.includes(":")) {
+    if (host === "::1") return true;
+    if (/^f[cd]/.test(host)) return true;
+    if (/^fe[89ab]/.test(host)) return true;
+    return false;
+  }
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const parts = match.slice(1).map(Number);
+  if (parts.some((part) => part > 255)) return false;
+  const [a, b] = parts;
+  if (a === 10 || a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  return a === 172 && b >= 16 && b <= 31;
+}
+
+/** The policy card stays reachable while force-external is on, or the toggle
+ *  would lock the operator out of the only UI that can turn it off. */
+export function showsExternalPolicyCard(session: SessionClass): boolean {
+  return !session.external || session.reason === "force-external";
 }
 
 function isHttps(protocol: string): boolean {

@@ -4,6 +4,7 @@
   import { BUILTIN_PAGES } from "$lib/config/builtin-pages";
   import {
     getSettings,
+    initSettings,
     settingsSaveFailed,
     updateSettings,
   } from "$lib/stores/settings.svelte";
@@ -46,6 +47,8 @@
 
   async function saveHosts(): Promise<void> {
     error = "";
+    // Compose after the first read: the store may still be loading.
+    await initSettings();
     const localHosts = parseHostList(localText);
     const externalHosts = parseHostList(externalText);
     const both = localHosts.filter((host) => externalHosts.includes(host));
@@ -64,6 +67,7 @@
   }
 
   async function saveForce(): Promise<void> {
+    await initSettings();
     const current = externalSessionSettings(getSettings().externalSession);
     await updateSettings({
       externalSession: { ...current, forceExternal },

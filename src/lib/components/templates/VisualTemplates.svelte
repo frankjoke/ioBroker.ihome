@@ -27,7 +27,7 @@
   const registry = $derived(getTemplateRegistry());
   const writable = $derived(isTemplatesWritable());
   const saveFailed = $derived(getTemplateSaveFailed());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   const presets = Object.values(PRESETS);
   const presetIds = new Set(presets.map((template) => template.id));
   const allTemplates = $derived([...presets, ...(registry.templates ?? [])]);

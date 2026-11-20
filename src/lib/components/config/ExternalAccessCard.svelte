@@ -16,7 +16,11 @@
     writeExternalSnippet,
   } from "$lib/stores/external-access.svelte";
   import { externalSessionSettings } from "$lib/config/locality";
-  import { getSettings, updateSettings } from "$lib/stores/settings.svelte";
+  import {
+    getSettings,
+    initSettings,
+    updateSettings,
+  } from "$lib/stores/settings.svelte";
   import { onMount } from "svelte";
   import { base } from "$app/paths";
 
@@ -94,6 +98,7 @@
 
   async function useAsExternal(): Promise<void> {
     if (!publicUrl.url) return;
+    await initSettings();
     const host = new URL(publicUrl.url).hostname.toLowerCase();
     const cur = externalSessionSettings(getSettings().externalSession);
     if (!cur.externalHosts.includes(host)) {

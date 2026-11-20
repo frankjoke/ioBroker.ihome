@@ -27,7 +27,7 @@
   const writable = $derived(isLogicsWritable());
   const blocked = $derived(logicBlocked());
   const saveFailed = $derived(logicSaveFailed());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   const builtinIds = new Set(BUILTIN_TEMPLATES.map((template) => template.id));
   const allTemplates = $derived([
     ...BUILTIN_TEMPLATES,

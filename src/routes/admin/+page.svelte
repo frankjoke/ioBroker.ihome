@@ -7,7 +7,7 @@
 
   const storage = getStorage();
   /** The ioBroker Admin tabs are local-only (see builtin-pages.ts). */
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
 
   /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
   function adminTab(): string {

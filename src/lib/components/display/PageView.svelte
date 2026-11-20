@@ -16,7 +16,7 @@
 
   let { page }: { page: Page } = $props();
 
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
 
   // The breakpoint follows the *container*, not the window: the display is the
   // whole window on the wall, but the layout sheet renders it beside/in front of

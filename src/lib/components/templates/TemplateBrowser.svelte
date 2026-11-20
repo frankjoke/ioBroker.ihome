@@ -69,7 +69,7 @@
     onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
 
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);

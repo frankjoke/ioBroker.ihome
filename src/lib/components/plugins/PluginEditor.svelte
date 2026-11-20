@@ -35,7 +35,7 @@
   let usage = $state(plugin.usage ?? "");
   // svelte-ignore state_referenced_locally
   let secured = $state(plugin.secured === true);
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   // svelte-ignore state_referenced_locally
   let settings = $state<Record<string, unknown>>({
     ...defaults(plugin.settingsSchema, plugin.settings),

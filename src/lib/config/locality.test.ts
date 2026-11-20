@@ -3,6 +3,7 @@ import {
   classifySession,
   externalSessionSettings,
   parseHostList,
+  showsExternalPolicyCard,
 } from "./locality";
 
 const cfg = (over: Record<string, unknown> = {}) => ({
@@ -153,4 +154,41 @@ it("parses host text one per line", () => {
       Array.from({ length: 101 }, (_, i) => `h${i}.test`).join("\n"),
     ),
   ).toHaveLength(100);
+});
+
+it("treats only IP literals and *.local as private hosts", () => {
+  expect(classifySession({ protocol: "https:", hostname: "fdic.gov" })).toEqual(
+    { external: true, reason: "https" },
+  );
+  expect(classifySession({ protocol: "https:", hostname: "fc2.com" })).toEqual({
+    external: true,
+    reason: "https",
+  });
+  expect(
+    classifySession({ protocol: "http:", hostname: "10.example.com" }),
+  ).toEqual({ external: true, reason: "public-http" });
+  expect(
+    classifySession({ protocol: "http:", hostname: "172.15.1.1" }),
+  ).toEqual({ external: true, reason: "public-http" });
+  expect(
+    classifySession({ protocol: "http:", hostname: "172.16.1.1" }),
+  ).toEqual({ external: false, reason: "private-host" });
+  expect(
+    classifySession({ protocol: "http:", hostname: "172.31.1.1" }),
+  ).toEqual({ external: false, reason: "private-host" });
+});
+
+it("keeps the core card reachable while force-external is on", () => {
+  expect(
+    showsExternalPolicyCard({ external: false, reason: "private-host" }),
+  ).toBe(true);
+  expect(
+    showsExternalPolicyCard({ external: true, reason: "force-external" }),
+  ).toBe(true);
+  expect(
+    showsExternalPolicyCard({ external: true, reason: "public-http" }),
+  ).toBe(false);
+  expect(
+    showsExternalPolicyCard({ external: true, reason: "explicit-external" }),
+  ).toBe(false);
 });
