@@ -122,6 +122,7 @@
 
 <style>
   .group {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
