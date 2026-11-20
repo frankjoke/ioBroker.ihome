@@ -61,9 +61,7 @@ export function parseHostList(text: string): string[] {
 }
 
 /** Lenient read of `settings.externalSession`; junk becomes the defaults. */
-export function externalSessionSettings(
-  raw: unknown,
-): ExternalSessionSettings {
+export function externalSessionSettings(raw: unknown): ExternalSessionSettings {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { localHosts: [], externalHosts: [], forceExternal: false };
   }
@@ -117,7 +115,8 @@ export function classifySession(args: {
 }): SessionClass {
   const settings = externalSessionSettings(args.settings);
   const host = normalizeHost(args.hostname);
-  if (settings.forceExternal) return { external: true, reason: "force-external" };
+  if (settings.forceExternal)
+    return { external: true, reason: "force-external" };
   if (settings.localHosts.includes(host)) {
     return { external: false, reason: "explicit-local" };
   }
@@ -128,5 +127,3 @@ export function classifySession(args: {
   if (isHttps(args.protocol)) return { external: true, reason: "https" };
   return { external: true, reason: "public-http" };
 }
-
-

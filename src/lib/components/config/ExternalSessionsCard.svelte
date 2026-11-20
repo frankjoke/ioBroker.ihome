@@ -1,8 +1,5 @@
 <script lang="ts">
-  import {
-    externalSessionSettings,
-    parseHostList,
-  } from "$lib/config/locality";
+  import { externalSessionSettings, parseHostList } from "$lib/config/locality";
   import { isDefaultPin } from "$lib/config/pin.svelte";
   import { BUILTIN_PAGES } from "$lib/config/builtin-pages";
   import {
@@ -111,8 +108,8 @@
 </label>
 
 <p class="hint text-muted">
-  PIN: {pinSet ? "set" : "default"} · Secured tiles: {securedTiles} · Hidden
-  built-in pages: {hiddenPages}
+  PIN: {pinSet ? "set" : "default"} · Secured tiles: {securedTiles} · Hidden built-in
+  pages: {hiddenPages}
 </p>
 
 {#if settingsSaveFailed()}
