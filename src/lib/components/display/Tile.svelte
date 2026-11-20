@@ -760,7 +760,7 @@
   class:single-surface={surfaceOnly}
   class:no-border={workingTile?.border === false}
   class:no-padding={workingTile?.padding === false}
-  class:editing-target={editingTarget}
+  class:editing-selected={editingTarget}
   data-page-id={anchor?.pageId}
   data-section-id={anchor?.sectionId}
   data-placement-id={anchor?.placementId}

@@ -76,7 +76,7 @@
   class:new-line={group.newLine === true}
   class:phone={bp === "phone"}
   class:bare
-  class:editing-target={editingTarget}
+  class:editing-selected={editingTarget}
   style="{background} {width}"
 >
   {#if editingTarget}
