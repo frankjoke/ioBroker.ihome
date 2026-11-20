@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
+  LEGACY_BUILTIN_PLUGINS,
   MAX_PLUGIN_CODE,
   MAX_PLUGIN_USAGE,
   parsePluginMessage,
@@ -346,34 +347,24 @@ describe("seedBuiltinPlugins", () => {
         settingsSchema: BUILTIN_PLUGINS[2].settingsSchema,
         code: undefined,
       },
-      {
-        id: "external-access",
-        name: BUILTIN_PLUGINS[3].name,
-        enabled: true,
-        builtin: true,
-        timeoutMs: 20_000,
-        debug: false,
-        secured: true,
-        help: BUILTIN_PLUGINS[3].help,
-        usage: BUILTIN_PLUGINS[3].usage,
-        settingsSchema: BUILTIN_PLUGINS[3].settingsSchema,
-        code: undefined,
-      },
     ]);
   });
 
-  it("seeds external-access as secured and keeps an explicit opt-out", () => {
-    const seeded = seedBuiltinPlugins([]);
+  it("retires external-access: never seeded, the legacy entry still works", () => {
     expect(
-      seeded.find((plugin) => plugin.id === "external-access")?.secured,
+      pluginConfigWithBuiltins([]).some(
+        (plugin) => plugin.id === "external-access",
+      ),
+    ).toBe(false);
+    expect(
+      LEGACY_BUILTIN_PLUGINS.some((plugin) => plugin.id === "external-access"),
     ).toBe(true);
-
-    const upgraded = pluginConfigWithBuiltins([{ id: "external-access" }]);
-    expect(upgraded[0]).toMatchObject({ secured: true });
-    const optedOut = pluginConfigWithBuiltins([
-      { id: "external-access", secured: false },
+    const kept = pluginConfigWithBuiltins([
+      { id: "external-access", builtin: true, secured: false },
     ]);
-    expect(optedOut[0]).toMatchObject({ secured: false });
+    expect(
+      kept.find((plugin) => plugin.id === "external-access"),
+    ).toMatchObject({ builtin: true, secured: false });
   });
 });
 
@@ -410,9 +401,11 @@ describe("plugin replies", () => {
   });
 });
 
-describe("external-access built-in", () => {
+describe("external-access legacy definition", () => {
   it("is defined with its four settings", () => {
-    const def = BUILTIN_PLUGINS.find((entry) => entry.id === "external-access");
+    const def = LEGACY_BUILTIN_PLUGINS.find(
+      (entry) => entry.id === "external-access",
+    );
     expect(def?.name).toBeTruthy();
     expect(def?.settingsSchema?.map((setting) => setting.name)).toEqual([
       "dir",
@@ -422,12 +415,11 @@ describe("external-access built-in", () => {
     ]);
     expect(def?.usage).toContain("basic_auth");
   });
-});
 
-describe("external-access timeout", () => {
-  it("gets a longer call budget than the default", () => {
-    const seeded = seedBuiltinPlugins([]);
-    const entry = seeded.find((plugin) => plugin.id === "external-access");
-    expect(entry?.timeoutMs).toBe(20_000);
+  it("keeps its longer call budget", () => {
+    const def = LEGACY_BUILTIN_PLUGINS.find(
+      (entry) => entry.id === "external-access",
+    );
+    expect(def?.timeoutMs).toBe(20_000);
   });
 });

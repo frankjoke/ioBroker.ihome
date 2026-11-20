@@ -250,3 +250,33 @@ describe("plugin settings document", () => {
     expect(stageRemoval(stageRemoval(base, "u"), "u").removals).toEqual(["u"]);
   });
 });
+
+it("keeps a legacy external-access runtime entry and its settings", () => {
+  const native = [
+    plugin("external-access", {
+      name: "External access (Caddy)",
+      builtin: true,
+      timeoutMs: 20000,
+      settings: { dir: "/native" },
+    }),
+  ];
+  const doc: PluginSettingsDocument = {
+    version: 1,
+    settings: {
+      "external-access": {
+        enabled: false,
+        timeoutMs: 20000,
+        debug: false,
+        settings: { dir: "/live", caddyConfig: "/etc/caddy/Caddyfile" },
+      },
+    },
+    staged: [],
+    removals: [],
+  };
+  expect(mergePluginSettings(native, doc)[0]).toMatchObject({
+    id: "external-access",
+    builtin: true,
+    enabled: false,
+    settings: { dir: "/live", caddyConfig: "/etc/caddy/Caddyfile" },
+  });
+});

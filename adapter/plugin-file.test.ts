@@ -256,3 +256,16 @@ it("rejects a malformed version", () => {
     ).toMatchObject({ problem: expect.stringContaining("version") });
   }
 });
+
+it("accepts the retired external-access id as a user plugin", () => {
+  const parsed = parsePluginFile({
+    format: "ihome-plugin",
+    version: 1,
+    plugin: {
+      id: "external-access",
+      name: "External access (Caddy)",
+      code: "module.exports = () => ({ call() {} });",
+    },
+  });
+  expect(parsed).toMatchObject({ plugin: { id: "external-access" } });
+});

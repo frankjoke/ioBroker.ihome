@@ -243,6 +243,11 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       },
     ],
   },
+];
+
+/** Retired built-ins: valid for an existing config entry (migration
+ *  fallback) but never seeded for new installs. */
+export const LEGACY_BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "external-access",
     name: "External access (Caddy)",

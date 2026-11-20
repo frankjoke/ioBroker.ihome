@@ -60,6 +60,7 @@ import {
 import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
+  LEGACY_BUILTIN_PLUGINS,
   parsePluginMessage,
   pluginConfigWithBuiltins,
   pluginError,
@@ -1388,11 +1389,10 @@ class IHome extends utils.Adapter {
             : {}),
           code: entry.code,
         }));
-        const patched = applyPluginPatches(
-          temporary,
-          stagedPatches,
-          BUILTIN_PLUGINS,
-        );
+        const patched = applyPluginPatches(temporary, stagedPatches, [
+          ...BUILTIN_PLUGINS,
+          ...LEGACY_BUILTIN_PLUGINS,
+        ]);
         if (patched.problems.length > 0) {
           return pluginError(patched.problems.join("; "));
         }
@@ -1415,11 +1415,10 @@ class IHome extends utils.Adapter {
       let active = this.pluginConfig;
       if (activePatches.length > 0) {
         const previous = this.pluginConfig;
-        const patched = applyPluginPatches(
-          active,
-          activePatches,
-          BUILTIN_PLUGINS,
-        );
+        const patched = applyPluginPatches(active, activePatches, [
+          ...BUILTIN_PLUGINS,
+          ...LEGACY_BUILTIN_PLUGINS,
+        ]);
         if (patched.problems.length > 0) {
           return pluginError(patched.problems.join("; "));
         }
