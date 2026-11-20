@@ -1,0 +1,146 @@
+{
+  "format": "ihome-plugin",
+  "version": 1,
+  "plugin": {
+    "id": "nut.ups",
+    "name": "NUT UPS",
+    "timeoutMs": 8000,
+    "help": "Read-only monitor for one Network UPS Tools (NUT) UPS. Polls its variables and writes them to iHome states.",
+    "usage": "**Settings**\n\n```ts\n{ host: \"localhost\", port: 3493, ups: \"piups\", base: \"plugins.nut.ups\", interval: 30 }\n```\n\nWrites one state per NUT variable under the `base` folder. A relative\n`base` (default `plugins.nut.ups`) writes to\n`ihome.0.plugins.nut.ups.*`; an absolute value such as\n`0_userdata.0.nut` writes there instead. States include\n`ups.status`, `battery.charge`, `output.voltage` plus `connected`,\n`online`, `onBattery`, `lowBattery`, `charging`, `discharging`, `error`\nand `lastUpdate`.\n\n**From a logic**\n\n```js\ncall(\"nut.ups\", { refresh: true }, (data, error) => {\n  if (error) return log(error, \"warn\");\n  log(data.status + \" · \" + data.batteryCharge + \"%\");\n});\n```\n\nRead-only: the example uses no credentials. The NUT server must allow\n`LIST VAR` (normal on the LAN). Beeper and load commands are not included.\n\nEnabling the plugin creates a **NUT UPS** device from its bundled template;\nif the device already exists, iHome asks before updating it.",
+    "settingsSchema": [
+      {
+        "name": "host",
+        "label": "NUT host",
+        "type": "string",
+        "default": "localhost",
+        "description": "Host running upsd (the NUT server)."
+      },
+      {
+        "name": "port",
+        "label": "Port",
+        "type": "number",
+        "default": 3493,
+        "description": "NUT server port; default 3493."
+      },
+      {
+        "name": "ups",
+        "label": "UPS name",
+        "type": "string",
+        "default": "ups",
+        "description": "UPS name from ups.conf, e.g. piups."
+      },
+      {
+        "name": "base",
+        "label": "State folder",
+        "type": "string",
+        "default": "plugins.nut.ups",
+        "description": "Relative to iHome (plugins.nut.ups → ihome.0.plugins.nut.ups) or an absolute folder such as 0_userdata.0.nut."
+      },
+      {
+        "name": "interval",
+        "label": "Poll interval (s)",
+        "type": "number",
+        "default": 30,
+        "description": "Seconds between polls; minimum 5."
+      }
+    ],
+    "settings": {
+      "host": "localhost",
+      "port": 3493,
+      "ups": "ups",
+      "base": "plugins.nut.ups",
+      "interval": 30
+    },
+    "bundle": {
+      "version": 1,
+      "device": {
+        "name": "NUT UPS",
+        "type": "Custom",
+        "icon": "battery_charging_full",
+        "size": {
+          "w": 4,
+          "h": 2
+        },
+        "controls": [
+          {
+            "state": "battery.charge",
+            "feature": "value",
+            "label": "Battery",
+            "unit": "%",
+            "role": "value.battery",
+            "type": "number"
+          },
+          {
+            "state": "battery.runtime",
+            "feature": "value",
+            "label": "Runtime",
+            "unit": "min",
+            "role": "value.interval",
+            "type": "number",
+            "transform": {
+              "read": {
+                "kind": "formula",
+                "expr": "x / 60"
+              }
+            }
+          },
+          {
+            "state": "ups.load",
+            "feature": "value",
+            "label": "Load",
+            "unit": "%",
+            "role": "value",
+            "type": "number"
+          },
+          {
+            "state": "ups.status",
+            "feature": "value",
+            "label": "Status",
+            "role": "text",
+            "type": "string"
+          },
+          {
+            "state": "output.voltage",
+            "feature": "value",
+            "label": "Output voltage",
+            "unit": "V",
+            "role": "value.voltage",
+            "type": "number"
+          },
+          {
+            "state": "device.model",
+            "feature": "value",
+            "label": "Model",
+            "role": "text",
+            "type": "string"
+          },
+          {
+            "state": "connected",
+            "feature": "value",
+            "label": "Connected",
+            "role": "indicator.connected",
+            "type": "boolean"
+          },
+          {
+            "state": "onBattery",
+            "feature": "value",
+            "label": "On battery",
+            "role": "indicator.alarm",
+            "type": "boolean"
+          },
+          {
+            "state": "lastUpdate",
+            "feature": "value",
+            "label": "Last update",
+            "unit": "ago",
+            "role": "date.start",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "code": "/**\r\n * iHome user plugin: read-only Network UPS Tools (NUT) monitor.\r\n *\r\n * Polls `LIST VAR <ups>` over TCP and writes one state per NUT variable under\r\n * `plugins.<id>.<variable>` in the iHome namespace (default\r\n * `ihome.0.plugins.nut.ups.*`; `base` can move it). Derived states make logic simple:\r\n * `nut.connected`, `nut.online`, `nut.onBattery`, `nut.lowBattery`,\r\n * `nut.charging`, `nut.discharging`, `nut.error`, `nut.lastUpdate`.\r\n *\r\n * No credentials are used. NUT normally allows `LIST VAR` read-only on the LAN.\r\n */\r\nmodule.exports = (api) => {\r\n  const net = require(\"node:net\");\r\n\r\n  const NUMERIC = {\r\n    \"battery.charge\": { unit: \"%\", role: \"value.battery\" },\r\n    \"battery.charge.low\": { unit: \"%\", role: \"value.battery\" },\r\n    \"battery.runtime\": { unit: \"s\", role: \"value.interval\" },\r\n    \"battery.runtime.low\": { unit: \"s\", role: \"value.interval\" },\r\n    \"battery.voltage\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"input.voltage\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"input.frequency\": { unit: \"Hz\", role: \"value\" },\r\n    \"input.transfer.high\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"input.transfer.low\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"output.voltage\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"output.voltage.nominal\": { unit: \"V\", role: \"value.voltage\" },\r\n    \"output.frequency.nominal\": { unit: \"Hz\", role: \"value\" },\r\n    \"ups.load\": { unit: \"%\", role: \"value\" },\r\n    \"ups.temperature\": { unit: \"°C\", role: \"value.temperature\" },\r\n    \"ups.realpower\": { unit: \"W\", role: \"value.power\" },\r\n    \"ups.power.nominal\": { unit: \"VA\", role: \"value.power\" },\r\n    \"ups.delay.shutdown\": { unit: \"s\", role: \"value.interval\" },\r\n    \"ups.delay.start\": { unit: \"s\", role: \"value.interval\" },\r\n    \"ups.timer.shutdown\": { unit: \"s\", role: \"value.interval\" },\r\n    \"ups.timer.start\": { unit: \"s\", role: \"value.interval\" },\r\n  };\r\n\r\n  const DERIVED = {\r\n    connected: {\r\n      type: \"boolean\",\r\n      role: \"indicator.connected\",\r\n      name: \"Connection to the NUT server\",\r\n    },\r\n    error: { type: \"string\", role: \"text\", name: \"Last NUT error\" },\r\n    lastUpdate: {\r\n      type: \"string\",\r\n      role: \"date.start\",\r\n      name: \"Last successful poll\",\r\n    },\r\n    online: { type: \"boolean\", role: \"indicator\", name: \"UPS on mains (OL)\" },\r\n    onBattery: {\r\n      type: \"boolean\",\r\n      role: \"indicator.alarm\",\r\n      name: \"UPS on battery (OB)\",\r\n    },\r\n    lowBattery: {\r\n      type: \"boolean\",\r\n      role: \"indicator.alarm\",\r\n      name: \"Battery low (LB)\",\r\n    },\r\n    charging: {\r\n      type: \"boolean\",\r\n      role: \"indicator\",\r\n      name: \"Battery charging (CHRG)\",\r\n    },\r\n    discharging: {\r\n      type: \"boolean\",\r\n      role: \"indicator\",\r\n      name: \"Battery discharging (DISCHRG)\",\r\n    },\r\n  };\r\n\r\n  const pluginId = api.id || \"nut.ups\";\r\n  const namespace = api.namespace;\r\n  let current = api;\r\n  let timer = null;\r\n  let polling = null;\r\n  let settings = readSettings(api.settings);\r\n  let target = targetOf(settings.base);\r\n  let last = {\r\n    connected: false,\r\n    status: \"\",\r\n    batteryCharge: null,\r\n    batteryRuntime: null,\r\n    load: null,\r\n    outputVoltage: null,\r\n    lastUpdate: \"\",\r\n    error: \"not polled yet\",\r\n  };\r\n  const known = new Set();\r\n\r\n  function readSettings(raw) {\r\n    const port = Number(raw && raw.port);\r\n    const interval = Number(raw && raw.interval);\r\n    return {\r\n      host: String((raw && raw.host) || \"localhost\").trim() || \"localhost\",\r\n      port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 3493,\r\n      ups: String((raw && raw.ups) || \"ups\").trim() || \"ups\",\r\n      base:\r\n        String((raw && raw.base) || \"plugins.\" + pluginId).trim() ||\r\n        \"plugins.\" + pluginId,\r\n      interval:\r\n        (Number.isFinite(interval) ? Math.max(5, Math.round(interval)) : 30) *\r\n        1000,\r\n    };\r\n  }\r\n\r\n  /**\r\n   * `base` may be relative (`nut` -> ihome.0.nut) or an absolute state folder\r\n   * (`0_userdata.0.nut` -> foreign states).\r\n   */\r\n  function targetOf(base) {\r\n    const value = base.replace(/^\\.+|\\.+$/g, \"\") || \"nut\";\r\n    const absolute = /^[A-Za-z0-9_-]+\\.[0-9]+(?:\\.|$)/.test(value);\r\n    if (!absolute || value === namespace || value.startsWith(namespace + \".\")) {\r\n      const prefix =\r\n        value === namespace\r\n          ? \"\"\r\n          : value.startsWith(namespace + \".\")\r\n            ? value.slice(namespace.length + 1)\r\n            : value;\r\n      return { prefix, foreign: false };\r\n    }\r\n    return { prefix: value, foreign: true };\r\n  }\r\n\r\n  function stateId(id) {\r\n    return target.prefix ? target.prefix + \".\" + id : id;\r\n  }\r\n\r\n  async function setValue(id, value) {\r\n    if (target.foreign) {\r\n      await current.state.setForeign(id, value, { ack: true });\r\n    } else {\r\n      await current.state.set(id, value, { ack: true });\r\n    }\r\n  }\r\n\r\n  async function getObject(id) {\r\n    return target.foreign\r\n      ? current.objects.getForeign(id)\r\n      : current.objects.get(id);\r\n  }\r\n\r\n  async function setObject(id, object) {\r\n    if (target.foreign) await current.objects.setForeign(id, object);\r\n    else await current.objects.set(id, object);\r\n  }\r\n\r\n  function toNumber(value) {\r\n    if (value === undefined || value === \"\") return null;\r\n    const number = Number(value);\r\n    return Number.isFinite(number) ? number : null;\r\n  }\r\n\r\n  function errorText(error) {\r\n    if (!(error instanceof Error)) return String(error);\r\n    if (error.message) return error.message;\r\n    const nested = error.errors;\r\n    if (Array.isArray(nested) && nested.length > 0) {\r\n      return nested\r\n        .map((entry) =>\r\n          entry instanceof Error ? entry.message : String(entry),\r\n        )\r\n        .join(\"; \");\r\n    }\r\n    return error.name || \"unknown error\";\r\n  }\r\n\r\n  async function ensureFolder() {\r\n    const id = target.prefix;\r\n    if (!id || known.has(\"::\" + id)) return;\r\n    const existing = await getObject(id);\r\n    if (!existing) {\r\n      await setObject(id, {\r\n        type: \"folder\",\r\n        common: { name: \"NUT UPS\" },\r\n        native: {},\r\n      });\r\n    }\r\n    known.add(\"::\" + id);\r\n  }\r\n\r\n  async function ensureObject(id, common) {\r\n    if (known.has(id)) return;\r\n    const existing = await getObject(id);\r\n    if (!existing) {\r\n      await setObject(id, {\r\n        type: \"state\",\r\n        common: { ...common, read: true, write: false },\r\n        native: {},\r\n      });\r\n    }\r\n    known.add(id);\r\n  }\r\n\r\n  function query(command) {\r\n    return new Promise((resolve, reject) => {\r\n      const socket = net.connect({\r\n        host: settings.host,\r\n        port: settings.port,\r\n      });\r\n      let text = \"\";\r\n      let finished = false;\r\n\r\n      function finish(error) {\r\n        if (finished) return;\r\n        finished = true;\r\n        socket.destroy();\r\n        if (error) reject(error);\r\n        else resolve(text);\r\n      }\r\n\r\n      socket.setTimeout(4000, () => finish(new Error(\"NUT timeout after 4s\")));\r\n      socket.on(\"error\", (error) => finish(error));\r\n      socket.on(\"end\", () => finish(new Error(\"NUT closed the connection\")));\r\n      socket.on(\"connect\", () => socket.write(command + \"\\n\"));\r\n      socket.on(\"data\", (chunk) => {\r\n        text += chunk.toString(\"utf8\");\r\n        const error = /^ERR(?:\\s|$)/m.exec(text);\r\n        if (error) {\r\n          finish(\r\n            new Error(\r\n              text.split(/\\r?\\n/).find((line) => line.startsWith(\"ERR\")) ||\r\n                \"NUT error\",\r\n            ),\r\n          );\r\n          return;\r\n        }\r\n        if (/^END LIST(?:\\s|$)/m.test(text)) finish();\r\n      });\r\n    });\r\n  }\r\n\r\n  function parseVars(text) {\r\n    const vars = {};\r\n    for (const line of text.split(/\\r?\\n/)) {\r\n      const match = /^VAR\\s+\\S+\\s+(\\S+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"/.exec(line);\r\n      if (match) vars[match[1]] = match[2].replace(/\\\\([\"\\\\])/g, \"$1\");\r\n    }\r\n    return vars;\r\n  }\r\n\r\n  async function pollOnce() {\r\n    await ensureFolder();\r\n    for (const [id, definition] of Object.entries(DERIVED)) {\r\n      await ensureObject(stateId(id), {\r\n        name: definition.name,\r\n        type: definition.type,\r\n        role: definition.role,\r\n      });\r\n    }\r\n\r\n    const vars = parseVars(await query(\"LIST VAR \" + settings.ups));\r\n    if (vars[\"ups.status\"] === undefined) {\r\n      throw new Error(\r\n        \"NUT returned no ups.status; check the UPS name '\" + settings.ups + \"'\",\r\n      );\r\n    }\r\n\r\n    for (const [name, value] of Object.entries(vars)) {\r\n      const id = stateId(name);\r\n      const meta = NUMERIC[name];\r\n      const type = meta ? \"number\" : \"string\";\r\n      await ensureObject(id, {\r\n        name,\r\n        type,\r\n        role: meta ? meta.role : \"text\",\r\n        ...(meta && meta.unit ? { unit: meta.unit } : {}),\r\n      });\r\n      await setValue(id, type === \"number\" ? toNumber(value) : value);\r\n    }\r\n\r\n    const flags = new Set(String(vars[\"ups.status\"]).split(/\\s+/));\r\n    const booleans = {\r\n      online: flags.has(\"OL\"),\r\n      onBattery: flags.has(\"OB\"),\r\n      lowBattery: flags.has(\"LB\"),\r\n      charging: flags.has(\"CHRG\"),\r\n      discharging: flags.has(\"DISCHRG\"),\r\n    };\r\n    for (const [id, value] of Object.entries(booleans)) {\r\n      await setValue(stateId(id), value);\r\n    }\r\n\r\n    const stamp = new Date().toISOString();\r\n    await setValue(stateId(\"lastUpdate\"), stamp);\r\n    await setValue(stateId(\"connected\"), true);\r\n    await setValue(stateId(\"error\"), \"\");\r\n\r\n    if (!last.connected && last.error && last.error !== \"not polled yet\") {\r\n      current.log.info(\"NUT \" + settings.ups + \" reconnected\");\r\n    }\r\n    last = {\r\n      connected: true,\r\n      status: vars[\"ups.status\"],\r\n      batteryCharge: toNumber(vars[\"battery.charge\"]),\r\n      batteryRuntime: toNumber(vars[\"battery.runtime\"]),\r\n      load: toNumber(vars[\"ups.load\"]),\r\n      outputVoltage: toNumber(vars[\"output.voltage\"]),\r\n      lastUpdate: stamp,\r\n      error: \"\",\r\n    };\r\n    return last;\r\n  }\r\n\r\n  function poll() {\r\n    if (polling) return polling;\r\n    polling = (async () => {\r\n      try {\r\n        return await pollOnce();\r\n      } catch (error) {\r\n        const message = errorText(error);\r\n        const first = message !== last.error;\r\n        last = { ...last, connected: false, error: message };\r\n        try {\r\n          await ensureFolder();\r\n          await ensureObject(stateId(\"connected\"), {\r\n            name: DERIVED.connected.name,\r\n            type: DERIVED.connected.type,\r\n            role: DERIVED.connected.role,\r\n          });\r\n          await ensureObject(stateId(\"error\"), {\r\n            name: DERIVED.error.name,\r\n            type: DERIVED.error.type,\r\n            role: DERIVED.error.role,\r\n          });\r\n          await setValue(stateId(\"connected\"), false);\r\n          await setValue(stateId(\"error\"), message);\r\n        } catch {\r\n          // Nothing to write yet; the next interval retries.\r\n        }\r\n        if (first) current.log.warn(\"NUT poll failed: \" + message);\r\n        else current.log.debug(\"NUT poll failed: \" + message);\r\n        return last;\r\n      } finally {\r\n        polling = null;\r\n      }\r\n    })();\r\n    return polling;\r\n  }\r\n\r\n  function startTimer() {\r\n    if (timer) clearInterval(timer);\r\n    timer = setInterval(() => void poll(), settings.interval);\r\n  }\r\n\r\n  function logStart(log) {\r\n    log.info(\r\n      \"NUT monitor \" +\r\n        settings.ups +\r\n        \" on \" +\r\n        settings.host +\r\n        \":\" +\r\n        settings.port +\r\n        \" -> \" +\r\n        (target.prefix || namespace) +\r\n        \" every \" +\r\n        settings.interval / 1000 +\r\n        \"s\",\r\n    );\r\n  }\r\n\r\n  return {\r\n    async start() {\r\n      current = api;\r\n      settings = readSettings(api.settings);\r\n      target = targetOf(settings.base);\r\n      startTimer();\r\n      logStart(current.log);\r\n      void poll();\r\n    },\r\n\r\n    async call(payload) {\r\n      if (payload && payload.refresh === true) await poll();\r\n      return { ...last };\r\n    },\r\n\r\n    async reload(next) {\r\n      current = next;\r\n      settings = readSettings(next.settings);\r\n      target = targetOf(settings.base);\r\n      startTimer();\r\n      logStart(next.log);\r\n      await poll();\r\n    },\r\n\r\n    async stop() {\r\n      if (timer) clearInterval(timer);\r\n      timer = null;\r\n      current.log.info(\"NUT monitor stopped\");\r\n    },\r\n  };\r\n};\r\n",
+    "api": 1,
+    "version": "1.0.0"
+  }
+}

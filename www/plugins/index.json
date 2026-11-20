@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "nut.ups",
+      "name": "NUT UPS",
+      "description": "Network UPS Tools: battery, load and status as a device.",
+      "version": "1.0.0",
+      "api": 1,
+      "file": "nut.ups.json"
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "description": "Ask the local OpenCode server; chat sessions carry the ioBroker MCP tools.",
+      "version": "1.0.0",
+      "api": 1,
+      "file": "opencode.json"
+    }
+  ]
+}
