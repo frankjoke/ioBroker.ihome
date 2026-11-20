@@ -56,9 +56,6 @@
   const common = $derived(
     (control.object?.common ?? {}) as Record<string, any>,
   );
-  /** A short enum reads better expanded; a long one stays a select. */
-  const ENUM_EXPANDED_MAX = 4;
-  const enums = $derived(enumOptions());
   const range = $derived(
     levelRange((control.meta ?? common) as Record<string, unknown>, options),
   );
@@ -166,39 +163,18 @@
     onchange={(e) => write(e.currentTarget.value)}
   />
 {:else if showValue && widget === "enum"}
-  {#if enums.length > 0 && enums.length <= ENUM_EXPANDED_MAX}
-    <span
-      class="enum-group"
-      role="group"
-      aria-label={control.label || control.feature}
-    >
-      {#each enums as opt (opt.value)}
-        <button
-          type="button"
-          class="enum-btn"
-          class:active={String(control.liveValue ?? "") === opt.value}
-          aria-pressed={String(control.liveValue ?? "") === opt.value}
-          disabled={!control.writable}
-          onpointerdown={stop}
-          onclick={(e) => write(e.currentTarget.value)}
-          value={opt.value}>{opt.label}</button
-        >
-      {/each}
-    </span>
-  {:else}
-    <select
-      aria-label={control.label || control.feature}
-      value={String(control.liveValue ?? "")}
-      disabled={!control.writable}
-      onpointerdown={stop}
-      onclick={stop}
-      onchange={(e) => write(e.currentTarget.value)}
-    >
-      {#each enums as opt (opt.value)}
-        <option value={opt.value}>{opt.label}</option>
-      {/each}
-    </select>
-  {/if}
+  <select
+    aria-label={control.label || control.feature}
+    value={String(control.liveValue ?? "")}
+    disabled={!control.writable}
+    onpointerdown={stop}
+    onclick={stop}
+    onchange={(e) => write(e.currentTarget.value)}
+  >
+    {#each enumOptions() as opt (opt.value)}
+      <option value={opt.value}>{opt.label}</option>
+    {/each}
+  </select>
 {:else if widget === "button"}
   <button
     type="button"
@@ -292,34 +268,6 @@
   select {
     max-width: 100%;
     font-size: var(--body-sm);
-  }
-
-  .enum-group {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 2px;
-  }
-
-  .enum-btn {
-    padding: 0 5px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-size: var(--body-sm);
-    line-height: 1.5;
-    cursor: pointer;
-  }
-
-  .enum-btn.active {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-  }
-
-  .enum-btn:disabled {
-    cursor: default;
-    opacity: 0.65;
   }
 
   .mono {
