@@ -1215,6 +1215,14 @@
     }
   }
 
+  /* Phones keep half the display visible: 2×2 tiles stay in reach, both sides
+     scroll on their own. */
+  @media (max-width: 640px) {
+    .sheet {
+      height: 50vh;
+    }
+  }
+
   .sheet-head {
     display: flex;
     align-items: center;
