@@ -28,7 +28,9 @@
   /** The plugin card is optional; the core policy card must stay reachable,
    *  including while force-external is on (it is the only way back). */
   const caddyPlugin = $derived(
-    getPlugins().some((plugin) => plugin.id === "external-access"),
+    getPlugins().some(
+      (plugin) => plugin.id === "external-access" && plugin.enabled,
+    ),
   );
   const session = $derived(sessionClass());
   const showExternalCard = $derived(showsExternalPolicyCard(session));
