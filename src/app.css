@@ -875,9 +875,9 @@ label {
 }
 
 /* The layout editor's marching outline: the tile or section it is editing.
-   The line sits outside the element's border; a tile reserves its 12px glow via
-   --editing-offset. Paint-only and pointer-neutral; the global reduced-motion
-   rule turns it into a static dashed line. */
+   A 4px offset keeps the 2px line inside the 6px tile gap, so it never touches
+   the next tile — glowing or not. Paint-only and pointer-neutral; the global
+   reduced-motion rule turns it into a static dashed line. */
 .editing-target {
   position: relative;
 }

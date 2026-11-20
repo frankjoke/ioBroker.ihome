@@ -390,9 +390,7 @@
       accentColor ?? "transparent"
     }; --tile-glow-color: ${
       look.glow ?? accentColor ?? "transparent"
-    }; --tile-glow: ${glowing ? 1 : 0}; --editing-offset: ${
-      glowing ? "16px" : "4px"
-    };${
+    }; --tile-glow: ${glowing ? 1 : 0};${
       tileStyle.background ? ` background-color: ${tileStyle.background};` : ""
     }${look.background ? ` ${backgroundCss(look.background)}` : ""}`,
   );

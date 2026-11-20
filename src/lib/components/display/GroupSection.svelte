@@ -133,8 +133,6 @@
     padding: 4px 6px 6px;
     border: 1px solid transparent;
     border-radius: var(--border-radius-md, 12px);
-    /* The editor's marching outline sits just outside this box. */
-    --editing-offset: 4px;
     /* A User Interface default (ui-settings.ts); an explicit background is
        inline and wins. */
     background-color: var(--ui-section-bg, transparent);
