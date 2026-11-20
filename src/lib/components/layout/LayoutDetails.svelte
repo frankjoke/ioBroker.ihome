@@ -9,7 +9,7 @@
   } from "$lib/config/layout-ops";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { resolveSection } from "$lib/config/pages-ops";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     BREAKPOINTS,

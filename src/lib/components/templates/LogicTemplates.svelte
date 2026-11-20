@@ -4,7 +4,7 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { BUILTIN_TEMPLATES } from "$logic/templates";
   import { logicTemplateProblem } from "$lib/config/logic-templates";

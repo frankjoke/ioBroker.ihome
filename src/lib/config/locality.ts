@@ -129,33 +129,4 @@ export function classifySession(args: {
   return { external: true, reason: "public-http" };
 }
 
-/** Temporary until Task 2 moves every caller to session-locality. */
-export function isLocalSession(args: {
-  protocol: string;
-  host: string;
-  publicHost?: string;
-}): boolean {
-  const host = String(args.host ?? "")
-    .trim()
-    .toLowerCase();
-  const publicHost = String(args.publicHost ?? "")
-    .trim()
-    .toLowerCase();
-  if (publicHost && host === publicHost) return false;
-  return (
-    String(args.protocol ?? "")
-      .trim()
-      .toLowerCase() === "http:"
-  );
-}
 
-/** Temporary until Task 2 supplies the settings-driven resolver. */
-export function isLocalUi(
-  where?: { protocol: string; host: string } | null,
-): boolean {
-  const page =
-    where !== undefined
-      ? where
-      : (globalThis.location as { protocol: string; host: string } | undefined);
-  return !!page && isLocalSession(page);
-}

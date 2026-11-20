@@ -5,7 +5,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";

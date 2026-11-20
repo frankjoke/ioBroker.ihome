@@ -10,7 +10,7 @@
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { newId } from "$lib/utils/ids";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     BUILTIN_PAGES,

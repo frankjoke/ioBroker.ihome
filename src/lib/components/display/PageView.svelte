@@ -10,7 +10,7 @@
   } from "$lib/config/size-ops";
   import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
   import { getSettings } from "$lib/stores/settings.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import GroupSection from "./GroupSection.svelte";
   import type { Page } from "$lib/types/display";
 

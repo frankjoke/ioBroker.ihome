@@ -78,7 +78,7 @@
     getOverrideRegistry,
     type OverrideEnsurer,
   } from "$lib/stores/overrides.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";

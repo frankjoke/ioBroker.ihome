@@ -16,7 +16,7 @@
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
 
   const storage = getStorage();
   const isConnected = $derived(!!ioBroker.connected);

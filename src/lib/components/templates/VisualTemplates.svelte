@@ -7,7 +7,7 @@
   import TemplateControlsEditor from "./TemplateControlsEditor.svelte";
   import { PRESETS } from "$lib/config/presets";
   import { parseTemplateRegistry } from "$lib/config/template-ops";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { visualTemplateProblem } from "$lib/config/visual-templates";
   import {

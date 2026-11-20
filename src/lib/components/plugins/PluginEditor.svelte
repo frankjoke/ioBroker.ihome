@@ -3,7 +3,7 @@
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
   import { reloadPlugin, savePlugin } from "$lib/stores/plugins.svelte";
   import { savePluginManifest } from "$lib/config/plugin-storage";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import {
     META_ADAPTER,
     readMetaText,

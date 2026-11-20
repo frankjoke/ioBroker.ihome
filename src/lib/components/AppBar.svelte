@@ -29,7 +29,7 @@
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { pluginPageHref } from "$lib/config/plugin-pages";
   import { BUILTIN_PAGES, adminPageHref } from "$lib/config/builtin-pages";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     getPluginPages,
