@@ -125,8 +125,7 @@ export function validPushPayload(value: unknown): PushPayload | null {
   };
 }
 
-export function normalizePushPayload(value: unknown): PushPayload {
-  const record = isRecord(value) ? value : {};
+export function normalizePushPayload(value: unknown): PushPayload {  const record = isRecord(value) ? value : {};
   const title =
     (typeof record.title === "string" ? record.title.trim() : "").slice(
       0,
@@ -151,6 +150,21 @@ export function normalizePushPayload(value: unknown): PushPayload {
     ...(tag ? { tag } : {}),
     ...(url ? { url } : {}),
     ...(record.showBody === true ? { showBody: true } : {}),
+  };
+}
+
+/** Push-service lifetime: anything older is dropped, not queued while the
+ *  phone is offline. */
+export const PUSH_TTL_SECONDS = 300;
+
+/** Web Push options: a five-minute TTL; errors jump the doze queue. */
+export function pushOptions(payload: PushPayload): {
+  TTL: number;
+  urgency: "high" | "normal";
+} {
+  return {
+    TTL: PUSH_TTL_SECONDS,
+    urgency: payload.level === "error" ? "high" : "normal",
   };
 }
 

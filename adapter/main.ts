@@ -83,6 +83,7 @@ import {
 import {
   ensureVapidKeys,
   normalizePushPayload,
+  pushOptions,
   pushStatePayload,
   removePushSubscription,
   sendPushes,
@@ -1881,6 +1882,7 @@ class IHome extends utils.Adapter {
       webpush.sendNotification(
         { endpoint: entry.endpoint, keys: entry.keys },
         JSON.stringify(safe),
+        pushOptions(safe),
       ),
     );
     for (const error of result.errors) {
