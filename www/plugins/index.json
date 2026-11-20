@@ -16,6 +16,14 @@
       "version": "1.0.0",
       "api": 1,
       "file": "opencode.json"
+    },
+    {
+      "id": "external-access",
+      "name": "External access (Caddy)",
+      "description": "Caddy Basic-Auth users: hashes, snippet, validate and reload.",
+      "version": "1.0.0",
+      "api": 1,
+      "file": "external-access.json"
     }
   ]
 }
