@@ -36,6 +36,7 @@ export interface PluginRuntime {
   enabled?: boolean;
   debug?: boolean;
   timeoutMs?: number;
+  secured?: boolean;
   settings?: Record<string, unknown>;
 }
 
@@ -230,6 +231,7 @@ export function mergePlugin(
     builtin: false,
     timeoutMs,
     debug: runtime.debug === true,
+    ...(runtime.secured !== undefined ? { secured: runtime.secured } : {}),
     ...(manifest.help ? { help: manifest.help } : {}),
     ...(manifest.usage ? { usage: manifest.usage } : {}),
     ...(runtime.settings ? { settings: runtime.settings } : {}),
@@ -305,9 +307,12 @@ export async function adoptFilePlugin(
   entry: AdapterPlugin,
   artifact: ImportedPlugin,
 ): Promise<{ entry: AdapterPlugin } | { problem: string }> {
-  const ensured = await ensurePluginFiles(host, {
+  const runtime = {
     ...runtimeOnly({ ...entry, builtin: false }),
     name: artifact.name,
+  };
+  const ensured = await ensurePluginFiles(host, {
+    ...runtime,
     ...(artifact.api !== undefined ? { api: artifact.api } : {}),
     ...(artifact.version ? { version: artifact.version } : {}),
     ...(artifact.help ? { help: artifact.help } : {}),
@@ -319,12 +324,7 @@ export async function adoptFilePlugin(
     code: artifact.code,
   });
   if ("problem" in ensured) return { problem: ensured.problem };
-  return {
-    entry: {
-      ...runtimeOnly({ ...entry, builtin: false }),
-      name: artifact.name,
-    },
-  };
+  return { entry: runtime };
 }
 
 /** The runtime half kept in config: no code, schema, help or bundle. */
@@ -334,6 +334,7 @@ export function runtimeOnly(plugin: AdapterPlugin): AdapterPlugin {
     name: plugin.name,
     enabled: plugin.enabled,
     ...(plugin.builtin ? { builtin: true } : {}),
+    ...(plugin.secured !== undefined ? { secured: plugin.secured } : {}),
     timeoutMs: plugin.timeoutMs,
     debug: plugin.debug,
   };

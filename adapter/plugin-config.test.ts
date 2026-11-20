@@ -280,3 +280,22 @@ it("keeps a legacy external-access runtime entry and its settings", () => {
     settings: { dir: "/live", caddyConfig: "/etc/caddy/Caddyfile" },
   });
 });
+
+it("keeps the previous settings of an active plugin that lost them", () => {
+  const doc = pluginSettingsDoc(
+    [plugin("external-access", { name: "External access (Caddy)" })],
+    {
+      "external-access": {
+        enabled: true,
+        timeoutMs: 20_000,
+        debug: false,
+        secured: true,
+        settings: { dir: "/data", caddyConfig: "/etc/caddy/Caddyfile" },
+      },
+    },
+  );
+  expect(doc.settings["external-access"]).toMatchObject({
+    secured: true,
+    settings: { dir: "/data", caddyConfig: "/etc/caddy/Caddyfile" },
+  });
+});

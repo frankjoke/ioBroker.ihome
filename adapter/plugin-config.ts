@@ -66,14 +66,25 @@ export function pluginSettingsDoc(
     if (!active.has(id)) settings[id] = entry;
   }
   for (const plugin of plugins) {
+    // A failed file read can leave an active entry without its portable
+    // fields; the previous entry is then the only copy of the values.
+    const prev = previous[plugin.id];
     settings[plugin.id] = {
       enabled: plugin.enabled,
       timeoutMs: plugin.timeoutMs,
       debug: plugin.debug,
-      ...(plugin.secured !== undefined ? { secured: plugin.secured } : {}),
+      ...(plugin.secured !== undefined
+        ? { secured: plugin.secured }
+        : prev?.secured !== undefined
+          ? { secured: prev.secured }
+          : {}),
       ...(plugin.help ? { help: plugin.help } : {}),
       ...(plugin.usage ? { usage: plugin.usage } : {}),
-      ...(plugin.settings ? { settings: plugin.settings } : {}),
+      ...(plugin.settings
+        ? { settings: plugin.settings }
+        : prev?.settings
+          ? { settings: prev.settings }
+          : {}),
       ...(plugin.settingsSchema
         ? { settingsSchema: plugin.settingsSchema }
         : {}),

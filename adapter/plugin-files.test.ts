@@ -113,6 +113,7 @@ it("merges the file content with the runtime flags", async () => {
     enabled: true,
     debug: true,
     timeoutMs: 5000,
+    secured: true,
     settings: { tz: "UTC" },
   });
   expect(merged).toMatchObject({
@@ -121,6 +122,7 @@ it("merges the file content with the runtime flags", async () => {
     enabled: true,
     debug: true,
     timeoutMs: 5000,
+    secured: true,
     settings: { tz: "UTC" },
     builtin: false,
     help: "h",
@@ -366,6 +368,7 @@ it("adopts a retired built-in as a file plugin and keeps the runtime flags", asy
       id: "external-access",
       name: "External access (Caddy)",
       enabled: true,
+      secured: true,
       timeoutMs: 20_000,
       debug: false,
     },

@@ -1314,10 +1314,16 @@ class IHome extends utils.Adapter {
       this.pluginProblems.delete(id);
       const runtime = next.find((entry) => entry.id === id);
       const settings = this.pluginSettings.settings[id];
+      // A retired built-in keeps its local-only default until the settings
+      // document says otherwise (an explicit false still wins).
+      const legacySecured = LEGACY_BUILTIN_PLUGINS.find(
+        (def) => def.id === id,
+      )?.secured;
       const merged = mergePlugin(read.files, {
         enabled: runtime?.enabled ?? settings?.enabled,
         debug: runtime?.debug ?? settings?.debug,
         timeoutMs: runtime?.timeoutMs ?? settings?.timeoutMs,
+        secured: runtime?.secured ?? settings?.secured ?? legacySecured,
         settings: runtime?.settings ?? settings?.settings,
       });
       const index = next.findIndex((entry) => entry.id === id);
@@ -1603,6 +1609,7 @@ class IHome extends utils.Adapter {
         enabled: current?.enabled ?? saved?.enabled ?? false,
         debug: current?.debug ?? saved?.debug,
         timeoutMs: current?.timeoutMs ?? saved?.timeoutMs,
+        secured: current?.secured ?? saved?.secured,
         settings: current?.settings ?? saved?.settings,
       });
       // A newly installed plugin waits, disabled, until the user enables it.
@@ -2295,8 +2302,8 @@ class IHome extends utils.Adapter {
 
     const rawPlugins = (this.config as { plugins?: unknown }).plugins;
     const persistedPlugins = pluginConfigWithBuiltins(rawPlugins);
-    // Parse the upgraded list, so a new built-in default (e.g. external-access
-    // secured) is in effect on this start, not the next one.
+    // Parse the upgraded list, so a new built-in default (e.g. a secured flag)
+    // is in effect on this start, not the next one.
     const nativePlugins = seedBuiltinPlugins(
       persistedPlugins,
       undefined,
