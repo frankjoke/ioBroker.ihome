@@ -325,7 +325,9 @@
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
   // click): select it, so the drill-down opens on what was clicked. Otherwise
-  // resume the last edited node — even after a reload, and even on another page.
+  // resume the last edited node only when it is on this display page: a
+  // remembered node on another page must not drag the display away from the
+  // page the pencil was used on.
   onMount(() => {
     const requested = takeRequestedLayout();
     if (requested) {
@@ -336,8 +338,7 @@
       const restored = remembered
         ? restoreSelection(registry, remembered, visibleTile)
         : null;
-      if (restored) {
-        if (restored.pageId !== pageId) onPage(restored.pageId);
+      if (restored && restored.pageId === pageId) {
         selection = restored;
       } else {
         restoring = false;
