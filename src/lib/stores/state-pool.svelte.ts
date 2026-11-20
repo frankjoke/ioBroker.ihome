@@ -16,7 +16,11 @@ export function getVirtualPool(): PoolEntry[] {
   const states = (ioBroker.states ?? new SvelteMap()) as Map<string, any>;
   const objects = (ioBroker.objects ?? new SvelteMap()) as Map<string, any>;
   const variables = getVariableLibrary().variables ?? [];
-  const entries = new SvelteMap<string, PoolEntry>();
+  // A plain Map: the pool is a throwaway snapshot. As a SvelteMap every set()
+  // recorded a write (a full stack capture in dev) — hundreds per call, per
+  // tile, per state change — and pinned the main thread.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const entries = new Map<string, PoolEntry>();
   const add = (stateId: string, entry: Omit<PoolEntry, "stateId">) => {
     if (!stateId.includes(".") || entries.has(stateId)) return;
     entries.set(stateId, { stateId, ...entry });
