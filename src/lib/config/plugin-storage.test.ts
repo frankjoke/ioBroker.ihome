@@ -97,3 +97,24 @@ it("removes the whole folder in one call", async () => {
   });
   setMetaTransport(null);
 });
+
+it("keeps api and version when writing and editing the manifest", async () => {
+  const { files } = memory({});
+  await writePluginFiles({
+    id: "clock",
+    name: "Clock",
+    api: 1,
+    version: "1.2.3",
+    code: "module.exports = () => ({});",
+  });
+  expect(JSON.parse(files["plugins/clock/plugin.json"])).toMatchObject({
+    api: 1,
+    version: "1.2.3",
+  });
+  await savePluginManifest("clock", { name: "Big clock", help: "", usage: "" });
+  expect(JSON.parse(files["plugins/clock/plugin.json"])).toMatchObject({
+    api: 1,
+    version: "1.2.3",
+  });
+  setMetaTransport(null);
+});

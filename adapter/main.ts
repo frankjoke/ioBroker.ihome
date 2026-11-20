@@ -1399,6 +1399,8 @@ class IHome extends utils.Adapter {
         staged = patched.plugins.map((entry): ImportedPlugin => ({
           id: entry.id,
           name: entry.name,
+          ...(entry.api !== undefined ? { api: entry.api } : {}),
+          ...(entry.version ? { version: entry.version } : {}),
           timeoutMs: entry.timeoutMs,
           ...(entry.help ? { help: entry.help } : {}),
           ...(entry.usage ? { usage: entry.usage } : {}),
@@ -1525,6 +1527,8 @@ class IHome extends utils.Adapter {
         pluginFile({
           id: plugin.id,
           name: plugin.name,
+          ...(plugin.api !== undefined ? { api: plugin.api } : {}),
+          ...(plugin.version ? { version: plugin.version } : {}),
           timeoutMs: plugin.timeoutMs,
           ...(plugin.help ? { help: plugin.help } : {}),
           ...(plugin.usage ? { usage: plugin.usage } : {}),

@@ -243,3 +243,16 @@ it("carries api and version, defaults api to 1 and rejects a newer api", () => {
     });
   }
 });
+
+it("rejects a malformed version", () => {
+  const code = "module.exports = () => ({ call() {} });";
+  for (const version of [5, "", "x".repeat(33)]) {
+    expect(
+      parsePluginFile({
+        format: "ihome-plugin",
+        version: 1,
+        plugin: { id: "v", name: "V", code, version },
+      }),
+    ).toMatchObject({ problem: expect.stringContaining("version") });
+  }
+});

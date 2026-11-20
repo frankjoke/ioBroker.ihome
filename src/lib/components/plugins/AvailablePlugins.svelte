@@ -16,6 +16,7 @@
     loadPlugins,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   let entries = $state<PluginCatalogEntry[]>([]);
   let loading = $state(true);
@@ -24,6 +25,8 @@
   let pending = $state<PluginCatalogEntry | null>(null);
 
   const installed = $derived(new Set(getPlugins().map((plugin) => plugin.id)));
+  /** Installed state is only trustworthy once the plugin list has arrived. */
+  const listReady = $derived(ioBroker.connected && getPlugins().length > 0);
 
   onMount(() => {
     void loadCatalog();
@@ -60,6 +63,7 @@
   }
 
   async function apply(entry: PluginCatalogEntry): Promise<void> {
+    if (!listReady) return;
     pending = null;
     busy = entry.id;
     error = "";
@@ -98,7 +102,7 @@
   }
 
   function install(entry: PluginCatalogEntry): void {
-    if (busy) return;
+    if (busy || !listReady) return;
     if (installed.has(entry.id)) pending = entry;
     else void apply(entry);
   }
@@ -126,7 +130,7 @@
               <button
                 type="button"
                 class="btn btn-primary btn-sm"
-                disabled={busy === entry.id}
+                disabled={!listReady || busy !== ""}
                 onclick={() => install(entry)}
               >
                 {installed.has(entry.id) ? "Reinstall" : "Install"}
