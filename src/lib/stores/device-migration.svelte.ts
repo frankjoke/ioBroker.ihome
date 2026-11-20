@@ -209,6 +209,7 @@ export async function applyDeviceMigration(
   }
   const plan = await planMigration();
   if (plan.status !== "ready") {
+    console.error("device migration:", plan.status, plan.reason);
     if (plan.status === "skipped" && plan.reason !== "already migrated") {
       toast.error(`Device migration: ${plan.reason}`);
     }
@@ -233,6 +234,7 @@ export async function applyDeviceMigration(
       getOverrideRegistry().updatedAt,
     );
     if (overrides !== "saved") {
+      console.error(`device migration: overrides not saved (${overrides})`);
       toast.error(`Device migration: overrides not saved (${overrides})`);
       return {
         status: "failed",
@@ -242,6 +244,7 @@ export async function applyDeviceMigration(
       };
     }
     if (!(await commitLayoutNow(result.pages))) {
+      console.error("device migration: pages not saved");
       toast.error("Device migration: pages not saved");
       return {
         status: "failed",
@@ -251,6 +254,7 @@ export async function applyDeviceMigration(
       };
     }
     if (!(await commitTemplatesNow(result.templates))) {
+      console.error("device migration: templates not saved");
       toast.error("Device migration: templates not saved");
       return {
         status: "failed",
@@ -267,6 +271,7 @@ export async function applyDeviceMigration(
     current.updatedAt,
   );
   if (marker !== "saved") {
+    console.error(`device migration: marker not saved (${marker})`);
     toast.error(`Device migration: marker not saved (${marker})`);
     return {
       status: "failed",

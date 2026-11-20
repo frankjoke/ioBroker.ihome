@@ -37,7 +37,10 @@
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { initLogics } from "$lib/stores/logics.svelte";
   import { initOverrides } from "$lib/stores/overrides.svelte";
-  import { dryRunDeviceMigration } from "$lib/stores/device-migration.svelte";
+  import {
+    applyDeviceMigration,
+    dryRunDeviceMigration,
+  } from "$lib/stores/device-migration.svelte";
   import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
@@ -402,6 +405,15 @@
         // its write path (`applyDeviceMigration(true)`) is a user-confirmed
         // step and is never called from here.
         await dryRunDeviceMigration();
+        // One-time device → override conversion: backups first, marker last.
+        // Once the marker is set this refuses at once; the device code can then
+        // be removed without touching a migrated installation.
+        const migrated = await applyDeviceMigration(true);
+        if (migrated.status === "ready") {
+          console.info(
+            `[migration] applied: changed=${migrated.changed}, ${migrated.log.length} note(s)`,
+          );
+        }
       }
       // The per-document markers are the durable record; this installation
       // marker stops an older client (whose parse drops them) from making the
