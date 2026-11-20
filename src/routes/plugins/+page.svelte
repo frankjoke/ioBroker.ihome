@@ -4,10 +4,11 @@
   import PluginList from "$lib/components/plugins/PluginList.svelte";
   import PluginPagesList from "$lib/components/plugins/PluginPagesList.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
+  import AvailablePlugins from "$lib/components/plugins/AvailablePlugins.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import { PLUGIN_GUIDE } from "$lib/config/plugin-guide";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     getPlugins,
@@ -177,6 +178,8 @@
         onselect={(id) => patchView("/plugins", { openId: id })}
       />
     {/if}
+
+    <AvailablePlugins />
   </div>
 
   <div class="tab-panel" hidden={view !== "pages"}>

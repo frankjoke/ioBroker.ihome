@@ -9,6 +9,7 @@ import {
   MAX_PLUGIN_CODE,
   MAX_PLUGIN_HELP,
   MAX_PLUGIN_USAGE,
+  SUPPORTED_PLUGIN_API,
   pluginBundleOf,
   pluginSettingsSchema,
   validPluginId,
@@ -20,6 +21,10 @@ import {
 export interface PluginManifest {
   id: string;
   name: string;
+  /** Plugin API the code needs; absent means 1. */
+  api?: number;
+  /** Display version from the manifest. */
+  version?: string;
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
@@ -139,6 +144,29 @@ export async function readPluginFiles(
   const name = text(raw.name, 120);
   if (!name)
     return { problem: `plugins/${pluginId}/plugin.json needs a name.` };
+  const rawApi = raw.api === undefined ? 1 : raw.api;
+  if (typeof rawApi !== "number" || !Number.isInteger(rawApi) || rawApi < 1) {
+    return { problem: `plugins/${pluginId}/plugin.json has an invalid api.` };
+  }
+  if (rawApi > SUPPORTED_PLUGIN_API) {
+    return {
+      problem: `plugins/${pluginId}/plugin.json needs iHome plugin API ${rawApi}; update iHome.`,
+    };
+  }
+  let version: string | undefined;
+  if (raw.version !== undefined) {
+    if (typeof raw.version !== "string") {
+      return {
+        problem: `plugins/${pluginId}/plugin.json has an invalid version.`,
+      };
+    }
+    version = raw.version.trim();
+    if (!version || version.length > 32) {
+      return {
+        problem: `plugins/${pluginId}/plugin.json has an invalid version.`,
+      };
+    }
+  }
 
   const code = await readText(host, `${PLUGIN_DIR}/${pluginId}/index.js`);
   if (code === null || !code.trim()) {
@@ -168,6 +196,8 @@ export async function readPluginFiles(
   const manifest: PluginManifest = {
     id: pluginId,
     name,
+    api: rawApi,
+    ...(version ? { version } : {}),
     ...(text(raw.help, MAX_PLUGIN_HELP)
       ? { help: text(raw.help, MAX_PLUGIN_HELP) }
       : {}),
@@ -193,6 +223,8 @@ export function mergePlugin(
   return {
     id: manifest.id,
     name: manifest.name,
+    ...(manifest.api !== undefined ? { api: manifest.api } : {}),
+    ...(manifest.version ? { version: manifest.version } : {}),
     enabled: runtime.enabled === true,
     builtin: false,
     timeoutMs,
@@ -239,12 +271,21 @@ export async function ensurePluginFiles(
 export function pluginManifestOf(
   plugin: Pick<
     AdapterPlugin,
-    "id" | "name" | "help" | "usage" | "settingsSchema" | "bundle"
+    | "id"
+    | "name"
+    | "api"
+    | "version"
+    | "help"
+    | "usage"
+    | "settingsSchema"
+    | "bundle"
   >,
 ): PluginManifest {
   return {
     id: plugin.id,
     name: plugin.name,
+    ...(plugin.api !== undefined ? { api: plugin.api } : {}),
+    ...(plugin.version ? { version: plugin.version } : {}),
     ...(plugin.help ? { help: plugin.help } : {}),
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),

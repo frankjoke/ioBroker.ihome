@@ -31,6 +31,10 @@ export type PluginViewStatus =
 export interface PluginView {
   id: string;
   name: string;
+  /** Plugin API the code needs; absent means 1. */
+  api?: number;
+  /** Display version from the manifest. */
+  version?: string;
   enabled: boolean;
   builtin: boolean;
   timeoutMs: number;
@@ -205,6 +209,8 @@ export function pluginView(
   return {
     id: plugin.id,
     name: plugin.name,
+    ...(plugin.api !== undefined ? { api: plugin.api } : {}),
+    ...(plugin.version ? { version: plugin.version } : {}),
     enabled: plugin.enabled,
     builtin: plugin.builtin === true,
     timeoutMs: plugin.timeoutMs,

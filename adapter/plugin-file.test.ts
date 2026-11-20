@@ -23,13 +23,13 @@ const base = {
 describe("parsePluginFile", () => {
   it("parses a valid file and defaults the timeout", () => {
     expect(parsePluginFile(base)).toEqual({
-      plugin: { ...base.plugin, timeoutMs: 5000 },
+      plugin: { ...base.plugin, api: 1, timeoutMs: 5000 },
     });
   });
 
   it("accepts a JSON string", () => {
     expect(parsePluginFile(JSON.stringify(base))).toEqual({
-      plugin: { ...base.plugin, timeoutMs: 5000 },
+      plugin: { ...base.plugin, api: 1, timeoutMs: 5000 },
     });
   });
 
@@ -100,7 +100,7 @@ describe("parsePluginFile", () => {
         plugin: { ...base.plugin, bundle },
       }),
     ).toEqual({
-      plugin: { ...base.plugin, timeoutMs: 5000, bundle },
+      plugin: { ...base.plugin, api: 1, timeoutMs: 5000, bundle },
     });
   });
 
@@ -207,9 +207,52 @@ describe("plugin files", () => {
     const plugin = { id: "demo.echo", name: "Echo", code: "x" } as const;
     const text = serializePluginFile(pluginFile(plugin));
     expect(parsePluginFile(JSON.parse(text))).toEqual({
-      plugin: { ...plugin, timeoutMs: 5000 },
+      plugin: { ...plugin, api: 1, timeoutMs: 5000 },
     });
     expect(JSON.parse(text).format).toBe("ihome-plugin");
     expect(JSON.parse(text).version).toBe(1);
   });
+});
+
+it("carries api and version, defaults api to 1 and rejects a newer api", () => {
+  const code = "module.exports = () => ({ call() {} });";
+  const parsed = parsePluginFile({
+    format: "ihome-plugin",
+    version: 1,
+    plugin: { id: "demo", name: "Demo", code, api: 1, version: "1.2.3" },
+  });
+  expect(parsed).toMatchObject({ plugin: { api: 1, version: "1.2.3" } });
+  const old = parsePluginFile({
+    format: "ihome-plugin",
+    version: 1,
+    plugin: { id: "old", name: "Old", code },
+  });
+  expect(old).toMatchObject({ plugin: { api: 1 } });
+  const newer = parsePluginFile({
+    format: "ihome-plugin",
+    version: 1,
+    plugin: { id: "new", name: "New", code, api: 2 },
+  });
+  expect(newer).toMatchObject({
+    problem: expect.stringContaining("plugin API"),
+  });
+  if ("plugin" in parsed) {
+    expect(pluginFile(parsed.plugin).plugin).toMatchObject({
+      api: 1,
+      version: "1.2.3",
+    });
+  }
+});
+
+it("rejects a malformed version", () => {
+  const code = "module.exports = () => ({ call() {} });";
+  for (const version of [5, "", "x".repeat(33)]) {
+    expect(
+      parsePluginFile({
+        format: "ihome-plugin",
+        version: 1,
+        plugin: { id: "v", name: "V", code, version },
+      }),
+    ).toMatchObject({ problem: expect.stringContaining("version") });
+  }
 });

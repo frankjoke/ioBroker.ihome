@@ -78,7 +78,7 @@
     getOverrideRegistry,
     type OverrideEnsurer,
   } from "$lib/stores/overrides.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
@@ -136,7 +136,7 @@
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   /** A secured tile is local-only, in the sheet as on the display. */
   const visibleTile = (placement: Placement) =>
     local || placement.tile?.secured !== true;
@@ -325,7 +325,9 @@
 
   // A tile (or a section/page) on the display handed us its address (Ctrl/Cmd+
   // click): select it, so the drill-down opens on what was clicked. Otherwise
-  // resume the last edited node — even after a reload, and even on another page.
+  // resume the last edited node only when it is on this display page: a
+  // remembered node on another page must not drag the display away from the
+  // page the pencil was used on.
   onMount(() => {
     const requested = takeRequestedLayout();
     if (requested) {
@@ -336,8 +338,7 @@
       const restored = remembered
         ? restoreSelection(registry, remembered, visibleTile)
         : null;
-      if (restored) {
-        if (restored.pageId !== pageId) onPage(restored.pageId);
+      if (restored && restored.pageId === pageId) {
         selection = restored;
       } else {
         restoring = false;
@@ -1025,6 +1026,7 @@
         openModal={modalShown ? modalRequest : null}
         onModalClose={() => (modalShown = false)}
         onDetail={noteDetail}
+        preview
       />
     </div>
   {/if}
@@ -1210,6 +1212,14 @@
       height: 62vh;
       border-top: 1px solid var(--border-color);
       border-left: 0;
+    }
+  }
+
+  /* Phones keep half the display visible: 2×2 tiles stay in reach, both sides
+     scroll on their own. */
+  @media (max-width: 640px) {
+    .sheet {
+      height: 50vh;
     }
   }
 

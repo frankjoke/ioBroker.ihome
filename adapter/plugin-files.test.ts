@@ -296,3 +296,32 @@ it("splits a config plugin into manifest and runtime", () => {
     debug: false,
   });
 });
+
+it("carries the manifest api and version into the plugin", () => {
+  const files = {
+    manifest: { id: "clock", name: "Clock", api: 1, version: "2.0.0" },
+    code: "module.exports = {}",
+  };
+  expect(mergePlugin(files)).toMatchObject({ api: 1, version: "2.0.0" });
+});
+
+it("refuses a newer api or a bad version in a folder", async () => {
+  const base = { id: "clock", name: "Clock" };
+  const newer = host({
+    "ihome.meta/plugins/clock/plugin.json": JSON.stringify({ ...base, api: 2 }),
+    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
+  });
+  expect(await readPluginFiles(newer, "clock")).toMatchObject({
+    problem: expect.stringContaining("plugin API"),
+  });
+  const badVersion = host({
+    "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
+      ...base,
+      version: 5,
+    }),
+    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
+  });
+  expect(await readPluginFiles(badVersion, "clock")).toMatchObject({
+    problem: expect.stringContaining("version"),
+  });
+});

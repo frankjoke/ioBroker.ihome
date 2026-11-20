@@ -3,11 +3,11 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import { adminPageUrl } from "$lib/transport";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
 
   const storage = getStorage();
   /** The ioBroker Admin tabs are local-only (see builtin-pages.ts). */
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
 
   /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
   function adminTab(): string {

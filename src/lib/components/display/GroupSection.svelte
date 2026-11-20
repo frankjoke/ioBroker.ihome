@@ -4,7 +4,8 @@
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
-  import { openSheetGated } from "$lib/stores/sheet.svelte.js";
+  import { openSheetGated, sheet } from "$lib/stores/sheet.svelte.js";
+  import EditingOutline from "./EditingOutline.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -15,6 +16,7 @@
     bp,
     pageId,
     bare = false,
+    preview = false,
   }: {
     group: Group;
     tiles: ResolvedTile[];
@@ -24,7 +26,18 @@
     pageId: string;
     /** The page has one populated section: render its tiles without chrome. */
     bare?: boolean;
+    /** Preview only: never paints the editor's selection outline. */
+    preview?: boolean;
   } = $props();
+
+  /** The layout editor's selected section: `app.css` paints the marching outline. */
+  const editingTarget = $derived(
+    sheet.open &&
+      !preview &&
+      sheet.selection?.kind === "section" &&
+      sheet.selection.pageId === pageId &&
+      sheet.selection.sectionId === group.id,
+  );
 
   /**
    * The section is exactly as wide as its tiles need (the pass decided), plus
@@ -63,8 +76,12 @@
   class:new-line={group.newLine === true}
   class:phone={bp === "phone"}
   class:bare
+  class:editing-selected={editingTarget}
   style="{background} {width}"
 >
+  {#if editingTarget}
+    <EditingOutline />
+  {/if}
   {#if group.title && !bare}
     <!-- Ctrl/Cmd+click is a power-user shortcut on a heading, not a control; the
          layout editor stays reachable via the AppBar pencil, so no key handler. -->
@@ -97,6 +114,7 @@
         limit={modules}
         newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
+        {preview}
       />
     {/each}
   </div>
@@ -104,6 +122,7 @@
 
 <style>
   .group {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;

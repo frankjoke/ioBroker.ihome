@@ -83,6 +83,7 @@ import {
 import {
   ensureVapidKeys,
   normalizePushPayload,
+  pushOptions,
   pushStatePayload,
   removePushSubscription,
   sendPushes,
@@ -1294,6 +1295,8 @@ class IHome extends utils.Adapter {
           {
             id: imported.id,
             name: imported.name,
+            ...(imported.api !== undefined ? { api: imported.api } : {}),
+            ...(imported.version ? { version: imported.version } : {}),
             enabled: false,
             builtin: false,
             timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,
@@ -1396,6 +1399,8 @@ class IHome extends utils.Adapter {
         staged = patched.plugins.map((entry): ImportedPlugin => ({
           id: entry.id,
           name: entry.name,
+          ...(entry.api !== undefined ? { api: entry.api } : {}),
+          ...(entry.version ? { version: entry.version } : {}),
           timeoutMs: entry.timeoutMs,
           ...(entry.help ? { help: entry.help } : {}),
           ...(entry.usage ? { usage: entry.usage } : {}),
@@ -1522,6 +1527,8 @@ class IHome extends utils.Adapter {
         pluginFile({
           id: plugin.id,
           name: plugin.name,
+          ...(plugin.api !== undefined ? { api: plugin.api } : {}),
+          ...(plugin.version ? { version: plugin.version } : {}),
           timeoutMs: plugin.timeoutMs,
           ...(plugin.help ? { help: plugin.help } : {}),
           ...(plugin.usage ? { usage: plugin.usage } : {}),
@@ -1881,6 +1888,7 @@ class IHome extends utils.Adapter {
       webpush.sendNotification(
         { endpoint: entry.endpoint, keys: entry.keys },
         JSON.stringify(safe),
+        pushOptions(safe),
       ),
     );
     for (const error of result.errors) {

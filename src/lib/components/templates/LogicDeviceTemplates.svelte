@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     BUILTIN_DEVICE_TEMPLATES,
@@ -47,7 +47,7 @@
 
   const doc = $derived(getLogicDocument());
   const builtinIds = new Set(BUILTIN_DEVICE_TEMPLATES.map((entry) => entry.id));
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   let selectedId = $state(BUILTIN_DEVICE_TEMPLATES[0].id);
   const allTemplates = $derived(
     withoutSecured(

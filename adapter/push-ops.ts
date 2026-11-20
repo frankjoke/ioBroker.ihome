@@ -154,6 +154,21 @@ export function normalizePushPayload(value: unknown): PushPayload {
   };
 }
 
+/** Push-service lifetime: anything older is dropped, not queued while the
+ *  phone is offline. */
+export const PUSH_TTL_SECONDS = 300;
+
+/** Web Push options: a five-minute TTL; errors jump the doze queue. */
+export function pushOptions(payload: PushPayload): {
+  TTL: number;
+  urgency: "high" | "normal";
+} {
+  return {
+    TTL: PUSH_TTL_SECONDS,
+    urgency: payload.level === "error" ? "high" : "normal",
+  };
+}
+
 /**
  * A written text state as a push message: one line is the body under the app
  * title; with two or more lines the first is the title and the rest the body.

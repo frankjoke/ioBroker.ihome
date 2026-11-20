@@ -5,7 +5,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { PRESETS } from "$lib/config/presets";
   import { BUILTIN_BUNDLES } from "$lib/config/builtin-bundles";
@@ -69,7 +69,7 @@
     onselect?: (entry: { kind: string; id: string } | null) => void;
   } = $props();
   let lastFocus = "";
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
 
   let selected = $state<TemplateEntry | null>(null);
   let editorDirty = $state(false);

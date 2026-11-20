@@ -29,7 +29,7 @@
   import { inspectGradient, isHexColor } from "$lib/config/appearance";
   import { pluginPageHref } from "$lib/config/plugin-pages";
   import { BUILTIN_PAGES, adminPageHref } from "$lib/config/builtin-pages";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi, sessionClass } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     getPluginPages,
@@ -54,6 +54,12 @@
   const isDisplay = $derived(routeId === "/" || routeId.startsWith("/p/"));
   /** The ioBroker Admin tabs are local-only. */
   const builtinPages = $derived(withoutSecured(BUILTIN_PAGES, isLocalUi()));
+  /** An external session over plain http is the unsafe exposure case. */
+  const session = $derived(sessionClass());
+  const insecureExternal = $derived(
+    session.external &&
+      (globalThis.location?.protocol ?? "https:") !== "https:",
+  );
 
   /** The hash router keeps `?tab=` inside the hash, not in `searchParams`. */
   const adminTab = $derived.by(() => {
@@ -390,6 +396,16 @@
       </a>
     {/if}
 
+    {#if insecureExternal}
+      <span
+        class="badge badge-warning insecure-chip"
+        title="External access over plain http — not a secure way to expose iHome"
+      >
+        <Icon value="warning" size={18} />
+        http
+      </span>
+    {/if}
+
     <div class="cog-menu">
       <button
         type="button"
@@ -713,6 +729,13 @@
 
   .current-page .menu-current {
     max-width: none;
+  }
+
+  .insecure-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
   }
 
   .cog-menu {

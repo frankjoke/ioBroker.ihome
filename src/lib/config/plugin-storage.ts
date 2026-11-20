@@ -22,14 +22,7 @@ function folder(id: string): string {
 
 /** Write a plugin's folder; both files are verified by a read-back. */
 export async function writePluginFiles(plugin: ImportedPlugin): Promise<void> {
-  const manifest = pluginManifestOf({
-    id: plugin.id,
-    name: plugin.name,
-    ...(plugin.help ? { help: plugin.help } : {}),
-    ...(plugin.usage ? { usage: plugin.usage } : {}),
-    ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
-    ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
-  });
+  const manifest = pluginManifestOf(plugin);
   await verifiedWrite(
     META_ADAPTER,
     `${folder(plugin.id)}/plugin.json`,
@@ -44,6 +37,8 @@ export async function writePluginFiles(plugin: ImportedPlugin): Promise<void> {
 
 interface StoredManifest {
   name: string;
+  api?: number;
+  version?: string;
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
@@ -70,6 +65,8 @@ export async function savePluginManifest(
   const manifest = pluginManifestOf({
     id,
     name: patch.name,
+    ...(current.api !== undefined ? { api: current.api } : {}),
+    ...(current.version ? { version: current.version } : {}),
     ...(patch.help ? { help: patch.help } : {}),
     ...(patch.usage ? { usage: patch.usage } : {}),
     ...(current.settingsSchema

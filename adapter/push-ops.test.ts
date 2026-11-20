@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import {
   ensureVapidKeys,
   normalizePushPayload,
+  pushOptions,
   pushStatePayload,
   removePushSubscription,
   sendPushes,
@@ -164,4 +165,19 @@ it("validates and normalizes a payload", () => {
   expect(
     validPushPayload({ title: "Alarm", body: "Pump", showBody: true }),
   ).toMatchObject({ showBody: true });
+});
+
+it("ages pushes out after five minutes and marks errors urgent", () => {
+  expect(pushOptions({ title: "T", body: "B", level: "info" })).toEqual({
+    TTL: 300,
+    urgency: "normal",
+  });
+  expect(pushOptions({ title: "T", body: "B", level: "warn" })).toEqual({
+    TTL: 300,
+    urgency: "normal",
+  });
+  expect(pushOptions({ title: "T", body: "B", level: "error" })).toEqual({
+    TTL: 300,
+    urgency: "high",
+  });
 });
