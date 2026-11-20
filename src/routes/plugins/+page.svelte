@@ -4,15 +4,8 @@
   import PluginList from "$lib/components/plugins/PluginList.svelte";
   import PluginPagesList from "$lib/components/plugins/PluginPagesList.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
-  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
-  import {
-    applyPluginBundle,
-    bundleHash,
-    deviceBundleHash,
-    findPluginDevice,
-  } from "$lib/config/plugin-bundle";
   import { PLUGIN_GUIDE } from "$lib/config/plugin-guide";
   import { isLocalUi } from "$lib/config/locality";
   import { withoutSecured } from "$lib/config/secured";
@@ -62,8 +55,6 @@
   let pagesCanCreate = $state(false);
   let busy = $state(false);
   let importOpen = $state(false);
-  let pendingBundle = $state<PluginView | null>(null);
-  let bundleError = $state("");
   const plugins = $derived(withoutSecured(getPlugins(), isLocalUi()));
   const loading = $derived(pluginsLoading());
   const error = $derived(pluginsError());
@@ -102,41 +93,12 @@
     value: boolean,
   ): Promise<void> {
     busy = true;
-    bundleError = "";
-    let saved = false;
     try {
       await savePlugin({ id: plugin.id, [field]: value });
-      saved = true;
     } catch {
       // The store exposes the message.
     } finally {
       busy = false;
-    }
-    if (!saved || field !== "enabled" || !value || !plugin.bundle) return;
-    try {
-      const existing = findPluginDevice(plugin.id);
-      if (existing) {
-        if (deviceBundleHash(existing) !== bundleHash(plugin.bundle)) {
-          pendingBundle = plugin;
-        }
-      } else {
-        applyPluginBundle(plugin);
-      }
-    } catch (failure) {
-      bundleError =
-        failure instanceof Error ? failure.message : String(failure);
-    }
-  }
-
-  function applyBundle(): void {
-    const plugin = pendingBundle;
-    pendingBundle = null;
-    if (!plugin) return;
-    try {
-      applyPluginBundle(plugin);
-    } catch (failure) {
-      bundleError =
-        failure instanceof Error ? failure.message : String(failure);
     }
   }
 </script>
@@ -202,10 +164,6 @@
     {#if error}
       <p class="text-danger hint">{error}</p>
     {/if}
-    {#if bundleError}
-      <p class="text-danger hint">{bundleError}</p>
-    {/if}
-
     {#if loading && plugins.length === 0}
       <p class="hint text-muted">Loading plugins…</p>
     {:else if plugins.length === 0}
@@ -240,21 +198,6 @@
       void refresh();
     }}
   />
-{/if}
-
-{#if pendingBundle}
-  <ConfirmModal
-    title="Update the generated device?"
-    confirmLabel="Update"
-    cancelLabel="Keep"
-    onConfirm={applyBundle}
-    onCancel={() => (pendingBundle = null)}
-  >
-    <p class="text-muted">
-      {pendingBundle.name} already has a device from this plugin. Update it from the
-      plugin template? Matching controls keep their ids, so tiles keep working.
-    </p>
-  </ConfirmModal>
 {/if}
 
 <style>

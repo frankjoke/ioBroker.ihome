@@ -40,7 +40,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({ ioBroker: h.ioBroker }));
-vi.mock("$lib/stores/devices.svelte", () => ({
+vi.mock("$lib/stores/program-states.svelte", () => ({
   registerProgramStateId: vi.fn(),
 }));
 vi.mock("$lib/stores/phone.svelte", () => ({

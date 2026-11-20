@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { BUILTIN_FUNCTIONS } from "./function-presets";
-import { snippetChoices } from "./snippets";
+import { codeTemplateChoices, snippetChoices } from "./snippets";
+
+describe("codeTemplateChoices", () => {
+  it("adds saved formulas to expression choices, never to statements", () => {
+    const formulas = [
+      { id: "f1", name: "Dew point", expr: "$.a + $.b" },
+      { id: "f2", name: "Empty", expr: "  " },
+    ];
+    const expr = codeTemplateChoices([], formulas, "expression");
+    expect(expr.some((entry) => entry.id === "formula:f1")).toBe(true);
+    expect(expr.some((entry) => entry.id === "formula:f2")).toBe(false);
+    expect(
+      codeTemplateChoices([], formulas, "statements").some((entry) =>
+        entry.id.startsWith("formula:"),
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("snippetChoices", () => {
   it("filters by mode and puts built-ins first", () => {

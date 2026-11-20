@@ -1,6 +1,5 @@
 <script lang="ts">
   import { suggestTemplatesForState } from "$lib/config/template-suggest";
-  import type { FeatureDef } from "$lib/config/features";
   import type { Template } from "$lib/types/display";
 
   let {
@@ -12,7 +11,8 @@
   }: {
     state: { stateId: string; object: any };
     templates: Template[];
-    onPick: (template: Template, feature: FeatureDef) => void;
+    /** The template and the role (or feature) the state fills in it. */
+    onPick: (template: Template, key: string) => void;
     onBlank: () => void;
     onClose: () => void;
   } = $props();
@@ -41,11 +41,11 @@
             <button
               type="button"
               class="suggestion"
-              onclick={() => onPick(suggestion.template, suggestion.feature)}
+              onclick={() => onPick(suggestion.template, suggestion.key)}
             >
               <span class="suggestion-name">{suggestion.template.name}</span>
               <span class="badge">{suggestion.template.type}</span>
-              <span class="hint text-muted">{suggestion.feature.label}</span>
+              <span class="hint text-muted">{suggestion.label}</span>
             </button>
           {/each}
         </div>

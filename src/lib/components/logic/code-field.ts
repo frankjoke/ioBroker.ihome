@@ -32,3 +32,45 @@ export function gotoInsertAt(
   const state = stateNames[index - 2];
   return state === undefined ? null : `goto(${JSON.stringify(state)})`;
 }
+
+/**
+ * Wrap the selection in a block comment, or remove the markers when it already
+ * has both. With no selection (or no focus) an empty `/*  * /` is inserted at
+ * the caret. Surrounding whitespace stays outside the markers.
+ */
+export function toggleComment(
+  code: string,
+  start: number,
+  end: number,
+  focused: boolean,
+): { text: string; start: number; end: number } {
+  const [from, to] = insertRange(focused, start, end, code.length);
+  if (from === to) {
+    const insert = "/*  */";
+    return {
+      text: code.slice(0, from) + insert + code.slice(from),
+      start: from + 3,
+      end: from + 3,
+    };
+  }
+  const selected = code.slice(from, to);
+  const core = selected.trim();
+  const lead = core ? selected.slice(0, selected.indexOf(core)) : "";
+  const trail = core
+    ? selected.slice(selected.indexOf(core) + core.length)
+    : "";
+  let replacement: string;
+  if (!core) {
+    replacement = `/* ${selected} */`;
+  } else if (core.startsWith("/*") && core.endsWith("*/")) {
+    const inner = core.slice(2, -2).replace(/^ /, "").replace(/ $/, "");
+    replacement = lead + inner + trail;
+  } else {
+    replacement = `${lead}/* ${core} */${trail}`;
+  }
+  return {
+    text: code.slice(0, from) + replacement + code.slice(to),
+    start: from,
+    end: from + replacement.length,
+  };
+}

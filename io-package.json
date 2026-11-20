@@ -289,6 +289,18 @@
       "native": {}
     },
     {
+      "_id": "config.overrideList",
+      "type": "state",
+      "common": {
+        "name": "iHome source overrides",
+        "type": "string",
+        "role": "text.json",
+        "read": true,
+        "write": true
+      },
+      "native": {}
+    },
+    {
       "_id": "config.iconPool",
       "type": "state",
       "common": {

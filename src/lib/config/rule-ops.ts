@@ -13,8 +13,6 @@ import {
 import { formatAge, splitReading } from "$lib/config/format";
 import { normalizeStates, unitFor } from "$lib/config/state-meta";
 import { pickControl } from "$lib/config/template-ops";
-import { isHtmlIcon } from "$lib/config/icon-html";
-import { isImageIcon } from "$lib/utils/icon-url";
 import type { ControlMeta } from "$lib/types/device";
 
 export type BadgeTone = "info" | "ok" | "warn" | "danger";
@@ -34,12 +32,20 @@ export const BADGE_COLORS: Record<string, string> = {
   success: "var(--success-color)",
   warning: "var(--warning-color)",
   danger: "var(--danger-color)",
+  surface: "var(--surface-color)",
 };
+
+/** A palette name or token → its theme token; anything else is not a palette
+ *  colour. Stored values may use either form (older badges store names). */
+export function resolveColorToken(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  if (value in BADGE_COLORS) return BADGE_COLORS[value];
+  return Object.values(BADGE_COLORS).includes(value) ? value : undefined;
+}
 
 function badgeColor(value: unknown): string | undefined {
   if (typeof value !== "string" || !value) return undefined;
-  if (value in BADGE_COLORS) return BADGE_COLORS[value];
-  return isHexColor(value) ? value : undefined;
+  return resolveColorToken(value) ?? (isHexColor(value) ? value : undefined);
 }
 
 /** Where a badge sits: one of nine anchors on the tile's edge. */
@@ -164,6 +170,7 @@ export interface BadgeDevice {
   controls?: {
     id?: string;
     feature?: string;
+    stateId?: string;
     available?: boolean;
     hidden?: boolean;
     liveValue?: unknown;
@@ -368,6 +375,7 @@ function controlBadge(
   device: BadgeDevice,
   scope: Scope,
   raw?: (source: string) => BadgeControl | undefined,
+  detail = false,
 ): ResolvedBadge | undefined {
   const pick =
     typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
@@ -385,7 +393,8 @@ function controlBadge(
   );
   // A hidden slot or control produces no badge — the same fold the tile body
   // uses for its slots (a rule may hide a badge by value, not just by state).
-  if (style.hidden === true) return undefined;
+  // The detail page is the inventory: its chips ignore this.
+  if (!detail && style.hidden === true) return undefined;
   // Colour precedence: a matched rule's colour, then a matched rule's tone,
   // then the slot's static colour, then the tone default (`info`).
   const explicitTone = TONES.includes(style.tone as BadgeTone);
@@ -398,11 +407,9 @@ function controlBadge(
     normalizeStates(control.meta?.states ?? control.states),
     control.meta?.role ?? control.role,
   );
-  // A promoted value keeps its symbol or HTML as the chip's face; an image
-  // icon cannot draw in a badge.
+  // A promoted value keeps its symbol, image or HTML as the chip's face.
   const glyph = slot.icon?.glyph;
-  const ownGlyph =
-    glyph && (isHtmlIcon(glyph) || !isImageIcon(glyph)) ? glyph : undefined;
+  const ownGlyph = glyph || undefined;
   return {
     source: object?.key ?? String(slot.source),
     icon: style.icon ?? ownGlyph ?? "info",
@@ -420,7 +427,9 @@ function controlBadge(
  * Badges for a tile, in slot order. `ago` and `offline` are derived from the
  * device itself, so a template gets them without declaring a control for them.
  * `pool` is the subscribed state pool (as tile rules use), so a badge rule can
- * read a raw state id with `get("<id>")` when the device watches it.
+ * read a raw state id with `get("<id>")` when the device watches it. `controls`
+ * is the tile's rule scope (`tileSourceControls`): a badge rule must see the
+ * same names the tile's slots resolve to, overrides included.
  */
 export function resolveBadges(
   slots: Slot[],
@@ -429,17 +438,28 @@ export function resolveBadges(
   now: number,
   pool: PoolEntry[] = [],
   raw?: (source: string) => BadgeControl | undefined,
+  detail = false,
+  controls?: LocalControl[],
 ): ResolvedBadge[] {
   // Accept a bare number too (the device-wide newest `ts`).
   const stamp = typeof time === "number" ? time : undefined;
   const clock: TimeSource =
     typeof time === "object" && time !== null ? time : { at: () => stamp };
-  const scope = ruleScope((device.controls ?? []) as LocalControl[], pool);
+  const scope = ruleScope(
+    controls ?? ((device.controls ?? []) as LocalControl[]),
+    pool,
+  );
   /** A derived badge may name one control/device key (`options.of`): its
    *  availability is that source's, not the whole tile's synthetic bag. */
   const offlineFor = (of: string | undefined): ResolvedBadge | undefined => {
     if (!of) return offlineBadge(device);
-    const control = (device.controls ?? []).find((c) => c.id === of);
+    const controls = device.controls ?? [];
+    // A migrated badge names the headline state (`stateId`); a control key or
+    // feature still resolves, so hand-written badges keep working.
+    const control =
+      controls.find((c) => c.id === of) ??
+      controls.find((c) => c.feature === of) ??
+      controls.find((c) => c.stateId === of);
     return control
       ? offlineBadge({ controls: [control] } as unknown as BadgeDevice)
       : undefined;
@@ -448,9 +468,9 @@ export function resolveBadges(
   for (const slot of slots ?? []) {
     // A badge hidden by its own rules produces nothing — including the derived
     // ago/offline badges, which resolve no control and so never reach
-    // `controlBadge`'s own guard.
+    // `controlBadge`'s own guard. The detail chips always show.
     const style = resolveStyle(slot.rules ?? [], scope);
-    if (style.hidden === true) continue;
+    if (!detail && style.hidden === true) continue;
     const tone = TONES.includes(style.tone as BadgeTone)
       ? (style.tone as BadgeTone)
       : undefined;
@@ -504,12 +524,14 @@ export function resolveBadges(
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).
-      badge = controlBadge(slot, device, scope, raw);
+      badge = controlBadge(slot, device, scope, raw, detail);
     }
     if (badge) {
-      // The chip can show just its icon; the value stays in the title and the
-      // detail page.
-      if (slot.options?.badgeLabel === false) badge.labelHidden = true;
+      // The chip can show just its icon on the tile; the detail page always
+      // shows the label and value too.
+      if (slot.options?.badgeLabel === false && !detail) {
+        badge.labelHidden = true;
+      }
       if (slot.options?.bold === true) badge.bold = true;
       out.push(badge);
     }

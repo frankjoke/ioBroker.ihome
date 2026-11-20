@@ -17,6 +17,8 @@ export interface TemplateEntry {
   search: string;
   /** The device type a device or bundle template creates. */
   type?: string;
+  /** Role-based tile templates: the roles their states fill. */
+  roles?: string[];
   /** Hidden outside the local network; absent = not secured. */
   secured?: boolean;
 }
@@ -31,6 +33,7 @@ function entry(
   builtin: boolean,
   type?: string,
   secured?: boolean,
+  roles?: string[],
 ): TemplateEntry {
   return {
     id,
@@ -40,8 +43,10 @@ function entry(
     builtin,
     description,
     help,
-    search: `${name} ${type ?? ""} ${description} ${help}`.toLowerCase(),
+    search:
+      `${name} ${type ?? ""} ${(roles ?? []).join(" ")} ${description} ${help}`.toLowerCase(),
     ...(type ? { type } : {}),
+    ...(roles?.length ? { roles } : {}),
     ...(secured ? { secured: true } : {}),
   };
 }
@@ -75,6 +80,8 @@ export function templateEntries(input: {
         ["device"],
         true,
         template.type,
+        false,
+        template.roles,
       ),
     ),
     ...input.visual.map((template) =>
@@ -88,6 +95,7 @@ export function templateEntries(input: {
         false,
         template.type,
         template.secured === true,
+        template.roles,
       ),
     ),
     ...input.logicBuiltins.map((template) =>

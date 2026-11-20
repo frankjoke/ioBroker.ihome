@@ -129,6 +129,13 @@
   let testMessage = $state("");
   let testError = $state(false);
 
+  // A test result describes the saved action; any edit invalidates it.
+  $effect(() => {
+    draft;
+    testMessage = "";
+    testError = false;
+  });
+
   function formatTestValue(value: unknown): string {
     if (typeof value === "string") return value;
     try {

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { getUsedStateIds } from "$lib/stores/devices";
+import { getUsedStateIds } from "$lib/stores/devices.svelte";
 import { SvelteSet } from "svelte/reactivity";
 
 const loaded = new SvelteSet();

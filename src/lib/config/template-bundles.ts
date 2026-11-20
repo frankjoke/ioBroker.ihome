@@ -10,11 +10,9 @@ import type {
   LogicTemplate,
   TemplateParam,
 } from "$logic/types";
-import type { Template } from "$lib/types/display";
 import type {
   TemplateBundle,
   TemplateBundleLibrary,
-  TemplateDevicePart,
   TemplateItem,
   TemplateLogicPart,
 } from "$lib/types/templates";
@@ -233,6 +231,11 @@ export function templateBundleProblem(
     }
   }
   if (bundle.device) {
+    // A device part that still carries a role template's repair is not a device
+    // template: it would write role sources and template-only fields.
+    if ((bundle.device.slots ?? []).some((slot) => slot.repair !== undefined)) {
+      return "A role template cannot be used as a bundle's device part.";
+    }
     const problem = visualTemplateProblem(
       { ...bundle.device, id: bundle.id, name: bundle.name },
       [],
@@ -279,18 +282,6 @@ export function templateBundleProblem(
     }
   }
   return null;
-}
-
-/** Copy a visual template into a bundle's device part (drop its identity). */
-export function devicePartFromTemplate(template: Template): TemplateDevicePart {
-  const part: TemplateDevicePart = {
-    type: template.type,
-    features: structuredClone(template.features),
-    slots: structuredClone(template.slots),
-  };
-  if (template.size) part.size = template.size;
-  if (template.background) part.background = template.background;
-  return part;
 }
 
 /** Copy a logic template into a bundle's logic part (drop its identity). */

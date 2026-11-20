@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import {
   CHART_PALETTE,
+  chartLayout,
   binaryOn,
   hasHistory,
   faceDefaultGlyph,
@@ -16,6 +17,7 @@ import {
   tileHeadlineSlot,
   tileParts,
   tileSeries,
+  tileSourceControls,
   valueShown,
   type SlotRow,
 } from "$lib/config/tile-parts";
@@ -26,9 +28,9 @@ import type {
 } from "$lib/types/device";
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
-import { TEMPERATURE_ICON } from "$lib/config/presets";
 import { resolveTile } from "$lib/config/tile-resolve";
-import { resolveBadges } from "$lib/config/rule-ops";
+import { ruleScope } from "$lib/config/rule-ops";
+import type { SourceOverride } from "$lib/types/overrides";
 
 const control = (
   id: string,
@@ -53,9 +55,20 @@ const device = (over: Partial<EnrichedDevice> = {}): EnrichedDevice =>
     ...over,
   }) as EnrichedDevice;
 
-const tile = (slots: Slot[]): TileConfig => ({ slots });
+const tile = (slots: Slot[], over: Partial<TileConfig> = {}): TileConfig => ({
+  slots,
+  ...over,
+});
 const none: Template[] = [];
 const noRaw = (): SlotControl | undefined => undefined;
+
+/** One repair override, as the registry stores it. */
+const repair = (
+  id: string,
+  stateId: string,
+  name: string,
+  over: Partial<SourceOverride> = {},
+): SourceOverride => ({ id, stateId, kind: "repair", name, ...over });
 
 it("splits the chain's slots by where they live", () => {
   const parts = tileParts(
@@ -88,7 +101,7 @@ it("a tile-only slot never counts as modal content", () => {
   expect(parts.hasModal).toBe(false);
 });
 
-it("a rule-hidden modal slot is not modal content", () => {
+it("a rule-hidden modal slot still gets its detail row", () => {
   const parts = tileParts(
     device(),
     tile([
@@ -96,13 +109,16 @@ it("a rule-hidden modal slot is not modal content", () => {
         kind: "value",
         source: "humidity",
         where: "modal",
-        rules: [{ when: "true", hidden: true }],
+        rules: [{ when: "true", hidden: true, color: "var(--danger-color)" }],
       },
     ]),
     none,
   );
-  expect(parts.modal).toEqual([]);
-  expect(parts.hasModal).toBe(false);
+  // Detail mode is the tile settings' business: rules do not hide, colour or
+  // icon a row there.
+  expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
+  expect(parts.modal[0].style).toEqual({});
+  expect(parts.hasModal).toBe(true);
 });
 
 it("a frame slot passes through without a control", () => {
@@ -144,7 +160,6 @@ it("a writable state source yields a switch row", () => {
     { slots: [{ kind: "switch", source: { kind: "state", stateId } }] },
     "Lamp",
     {
-      devices: [],
       states: new Map([[stateId, { val: false }]]),
       objects: new Map([
         [stateId, { common: { name: "Lamp", type: "boolean", write: true } }],
@@ -159,82 +174,6 @@ it("a writable state source yields a switch row", () => {
     stateId,
     liveValue: false,
   });
-});
-
-it("a device badge reports only the device it names", () => {
-  const stateId = "dev.0.state";
-  const make = (available: boolean, derive?: "ago") => {
-    const resolution = resolveTile(
-      {
-        slots: [
-          {
-            kind: "badge",
-            source: { kind: "device", device: "dev" },
-            ...(derive ? { options: { derive } } : {}),
-          },
-        ],
-      },
-      "Dev",
-      {
-        devices: [
-          {
-            id: "dev",
-            name: "Dev",
-            type: "Switch",
-            available,
-            exists: true,
-            controls: [
-              {
-                id: "c1",
-                feature: "power",
-                stateId,
-                writable: true,
-                available,
-                exists: true,
-              },
-            ],
-          } as unknown as EnrichedDevice,
-        ],
-        states: new Map([[stateId, { val: false, ts: 1000 }]]),
-        objects: new Map([[stateId, { common: {} }]]),
-      },
-    );
-    return {
-      resolution,
-      parts: tileParts(resolution.device, resolution.tile, none),
-    };
-  };
-
-  const offline = make(false);
-  expect(offline.parts.badgeSlots[0].source).toBe("offline");
-  expect(offline.parts.badgeSlots[0].options?.of).toBe("slot:0");
-  expect(
-    resolveBadges(
-      offline.parts.badgeSlots,
-      offline.resolution.device,
-      { at: () => undefined },
-      2000,
-    ).map((b) => b.source),
-  ).toEqual(["offline"]);
-
-  const online = make(true);
-  expect(
-    resolveBadges(
-      online.parts.badgeSlots,
-      online.resolution.device,
-      { at: () => undefined },
-      2000,
-    ),
-  ).toEqual([]);
-
-  const ago = make(true, "ago");
-  const badges = resolveBadges(
-    ago.parts.badgeSlots,
-    ago.resolution.device,
-    { at: (source) => (source === "slot:0" ? 1000 : undefined) },
-    2000,
-  );
-  expect(badges.map((b) => b.source)).toEqual(["ago"]);
 });
 
 it("a blank tile does not inherit the preset chain", () => {
@@ -257,12 +196,12 @@ it("keeps a tile badge in the corners and out of the modal", () => {
   expect(parts.hasModal).toBe(false);
 });
 
-it("a badge only in the modal is modal content, resolved or not", () => {
+it("a badge in the detail counts as modal content, resolved or not", () => {
   // Without a resolver the sheet still gets a yes — it asks about content, not
   // about what a chip would say.
   const asked = tileParts(
     device(),
-    tile([{ kind: "badge", source: "offline", where: "modal" }]),
+    tile([{ kind: "badge", source: "offline", detail: "full" }]),
     none,
   );
   expect(asked.modalBadges).toEqual([]);
@@ -274,7 +213,7 @@ it("a badge only in the modal is modal content, resolved or not", () => {
   });
   const resolved = tileParts(
     unreachable,
-    tile([{ kind: "badge", source: "offline", where: "modal" }]),
+    tile([{ kind: "badge", source: "offline", detail: "full" }]),
     none,
     { raw: noRaw },
   );
@@ -295,7 +234,7 @@ it("a raw-state modal row counts only when the resolver knows it", () => {
   expect(tileParts(device(), t, none, { raw }).hasModal).toBe(true);
 });
 
-it("an active-gated modal row counts only while the tile is not active", () => {
+it("a tile-active rule does not remove the detail row", () => {
   const t = tile([
     {
       kind: "value",
@@ -304,23 +243,14 @@ it("an active-gated modal row counts only while the tile is not active", () => {
       rules: [{ when: "active", hidden: true }],
     },
   ]);
+  // Detail mode follows the slot's Detail span, not the tile's active rules.
   expect(tileParts(device(), t, none).hasModal).toBe(true);
-  expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(false);
+  expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(true);
 });
 
-it("falls back to the template's own slots when the placement has none", () => {
-  const parts = tileParts(device(), undefined, none);
-  expect(parts.body.length).toBeGreaterThan(0);
-});
-
-it("exposes the very slots its rows carry, chain or materialised (A46/A52)", () => {
+it("exposes the very slots its rows carry (A46/A52)", () => {
   // The headline pick and the row icons compare slot references, so the
-  // resolution must hand out the same objects its rows carry — a second
-  // `resolveTemplate` call would be a different array.
-  const chain = tileParts(device(), undefined, none);
-  expect(chain.slots.length).toBeGreaterThan(0);
-  expect(chain.body[0]?.slot).toBe(chain.slots[0]);
-
+  // resolution must hand out the same objects its rows carry.
   const mine = tile([
     { kind: "value", source: "temperature" },
     { kind: "value", source: "humidity" },
@@ -361,6 +291,34 @@ it("moves a badge-mode slot to the corner, keeping its detail row", () => {
   expect(parts.badgeSlots.map((s) => s.source)).toEqual(["humidity"]);
   expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
   expect(tileHeadlineSlot(t.slots!)).toBe(t.slots![0]);
+});
+
+it("an only gate hides the badge but keeps its detail row", () => {
+  const t = tile([
+    {
+      kind: "value",
+      source: "humidity",
+      tile: "badge",
+      detail: "full",
+      icon: { glyph: "battery" },
+      rules: [
+        {
+          when: "false",
+          only: true,
+          color: "var(--surface-color)",
+          background: "var(--danger-color)",
+        },
+      ],
+    },
+  ]);
+  const parts = tileParts(device(), t, none);
+  // The gate hides it on the tile; the detail list is governed by the Detail
+  // span alone, so its row stays and no rule reaches its icon.
+  expect(parts.badgeSlots).toHaveLength(1);
+  expect(parts.modal.map((r) => r.slot.source)).toEqual(["humidity"]);
+  const row = parts.modal[0];
+  expect(row.style).toEqual({});
+  expect(rowIcon(row, "modal")).toEqual({ glyph: "battery", color: undefined });
 });
 
 it("reads a row's icon from the descriptor, the rule icon winning", () => {
@@ -457,51 +415,6 @@ it("carries the style's colour and dim into the icon", () => {
     color: "var(--warning-color)",
     disabled: true,
   });
-});
-
-it("a found device icon stands in for a template's glyph (A67)", () => {
-  // The chain's own slots: their glyph is the template's, so the device's
-  // found icon takes over…
-  const chain = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    undefined,
-    none,
-  );
-  const head = chain.rows.find((r) => r.slot.icon?.glyph === TEMPERATURE_ICON);
-  expect(head?.iconIsTemplate).toBe(true);
-  expect(rowIcon(head!, "tile", "https://x/dev.png")?.glyph).toBe(
-    "https://x/dev.png",
-  );
-  // …a glyph of the user's own keeps standing…
-  const own = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    tile([
-      { kind: "value", source: "temperature", icon: { glyph: "water_drop" } },
-    ]),
-    none,
-  );
-  expect(own.rows[0].iconIsTemplate).toBe(false);
-  expect(rowIcon(own.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
-    "water_drop",
-  );
-  // …and a rule's icon still wins (A51/A58).
-  const ruled = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    tile([
-      {
-        kind: "value",
-        source: "temperature",
-        icon: { glyph: "device_thermostat" },
-        rules: [{ when: "true", icon: "bolt" }],
-      },
-    ]),
-    none,
-  );
-  expect(rowIcon(ruled.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
-    "bolt",
-  );
-  // With no found icon, the template's own glyph stays.
-  expect(rowIcon(head!, "tile")?.glyph).toBe(TEMPERATURE_ICON);
 });
 
 const withHistory = (id: string, feature: string) =>
@@ -737,18 +650,15 @@ it("the tile icon is separate from the headline slot icon", () => {
   expect(faceGlyph({ glyph: "look" }, "tile", "slot")).toBe("look");
   expect(faceGlyph({}, "tile", "slot")).toBe("tile");
   expect(faceGlyph({}, undefined, "slot")).toBe("slot");
-  // Header: state look → tile icon → headline slot icon → device icon.
-  expect(
-    headerIcon("tile", { glyph: "look" }, { glyph: "slot" }, "device"),
-  ).toEqual({ glyph: "look" });
+  // Header: state look → tile icon → headline slot icon.
+  expect(headerIcon("tile", { glyph: "look" }, { glyph: "slot" })).toEqual({
+    glyph: "look",
+  });
   expect(
     headerIcon(undefined, { glyph: "look", color: "red" }, { glyph: "slot" }),
   ).toEqual({ glyph: "look", color: "red" });
   expect(headerIcon(undefined, {}, { glyph: "slot" })).toEqual({
     glyph: "slot",
-  });
-  expect(headerIcon(undefined, {}, undefined, "device")).toEqual({
-    glyph: "device",
   });
   expect(headerIcon(undefined, {})).toBeUndefined();
 });
@@ -781,52 +691,41 @@ it("switches a row icon with its twin from the row's own state", () => {
     control: { liveValue, meta: { type: "boolean" } },
     style: {},
   });
-  expect(rowIcon(row(true), "tile", undefined, twins)?.glyph).toBe("bulb-on");
-  expect(rowIcon(row(false), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(true), "tile", twins)?.glyph).toBe("bulb-on");
+  expect(rowIcon(row(false), "tile", twins)?.glyph).toBe("bulb-off");
   // the on half is drawn when that is what the document picked
-  expect(rowIcon(row(true, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
-    "bulb-on",
-  );
-  expect(rowIcon(row(false, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
+  expect(rowIcon(row(true, "bulb-on"), "modal", twins)?.glyph).toBe("bulb-on");
+  expect(rowIcon(row(false, "bulb-on"), "modal", twins)?.glyph).toBe(
     "bulb-off",
   );
   // no twin or no twins map: unchanged
-  expect(rowIcon(row(true), "tile", undefined)?.glyph).toBe("bulb-off");
-  expect(rowIcon(row(1), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(true), "tile")?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(1), "tile", twins)?.glyph).toBe("bulb-off");
 });
 
 it("falls back to a role icon for a bare row, but not for a disabled one", () => {
   const bare: SlotRow = { slot: { kind: "value", source: "s" }, style: {} };
-  expect(rowIcon(bare, "tile", undefined, undefined, "water_drop")?.glyph).toBe(
+  expect(rowIcon(bare, "tile", undefined, "water_drop")?.glyph).toBe(
     "water_drop",
   );
   const on: SlotRow = {
     ...bare,
     control: { liveValue: true, meta: { type: "boolean" } },
   };
-  expect(rowIcon(on, "tile", undefined, { a: "b" }, "a")?.glyph).toBe("b");
+  expect(rowIcon(on, "tile", { a: "b" }, "a")?.glyph).toBe("b");
   const disabled: SlotRow = {
     slot: { kind: "value", source: "s", icon: { glyph: "x", enabled: false } },
     style: {},
   };
-  expect(
-    rowIcon(disabled, "tile", undefined, undefined, "water_drop"),
-  ).toBeUndefined();
+  expect(rowIcon(disabled, "tile", undefined, "water_drop")).toBeUndefined();
 });
 
-it("orders the face: look, tile, slot, default, device", () => {
-  expect(faceGlyph({}, undefined, undefined, "thermostat", "object.png")).toBe(
-    "thermostat",
-  );
-  expect(faceGlyph({}, undefined, undefined, undefined, "object.png")).toBe(
-    "object.png",
-  );
-  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def", "obj")).toBe(
-    "look",
-  );
+it("orders the face: look, tile, slot, default", () => {
+  expect(faceGlyph({}, undefined, undefined, "thermostat")).toBe("thermostat");
+  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def")).toBe("look");
 });
 
-it("suppresses the face default for an active, disabled or device-owned face", () => {
+it("suppresses the face default for an active or disabled face", () => {
   const headline: Slot = { kind: "value", source: "s" };
   expect(
     faceDefaultGlyph({ hasActive: false, headline, poolValue: "def" }),
@@ -841,12 +740,296 @@ it("suppresses the face default for an active, disabled or device-owned face", (
       poolValue: "def",
     }),
   ).toBeUndefined();
-  expect(
-    faceDefaultGlyph({
-      hasActive: false,
-      headline,
-      deviceOwnIcon: "own",
-      poolValue: "def",
-    }),
-  ).toBeUndefined();
 });
+
+it("a detail badge mirrors the tile's rule and label", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "badge",
+        source: "offline",
+        detail: "full",
+        options: { badgeLabel: false },
+        rules: [{ when: "true", color: "var(--danger-color)" }],
+      },
+    ]),
+    none,
+    { raw: noRaw },
+  );
+  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
+  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
+  // Like the tile, an icon-only chip stays icon-only in the detail header.
+  expect(parts.modalBadges[0].labelHidden).toBe(true);
+});
+
+it("a detail badge hidden on the tile leaves the header", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "badge",
+        source: "offline",
+        detail: "full",
+        rules: [{ when: "true", hidden: true }],
+      },
+    ]),
+    none,
+    { raw: noRaw },
+  );
+  expect(parts.modalBadges).toEqual([]);
+});
+
+// ------------------------------------------------------- override rule scope
+
+it("builds a rule local from a slot's override", () => {
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+    ],
+    {
+      overrides: [repair("o", "s", "power", { label: "Leistung" })],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(controls).toHaveLength(1);
+  // The rule writes the override's name; its label is only the display label.
+  expect(controls[0]).toMatchObject({
+    feature: "power",
+    label: "Leistung",
+    liveValue: 7,
+  });
+});
+
+it("names a raw state slot from the id leaf, keeping its label", () => {
+  const objects = new Map<string, any>([
+    [
+      "aaa.0.xxx.yyy.humidity",
+      { type: "state", common: { name: "Feuchtigkeit", type: "number" } },
+    ],
+  ]);
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "aaa.0.xxx.yyy.humidity" },
+      },
+    ],
+    { objects, states: new Map([["aaa.0.xxx.yyy.humidity", { val: 55 }]]) },
+  );
+  expect(controls[0]).toMatchObject({
+    feature: "humidity",
+    label: "Feuchtigkeit",
+    liveValue: 55,
+  });
+});
+
+it("resolves a v1 string source through the tile's own control bag", () => {
+  const dev = device({
+    controls: [{ ...control("c1", "temperature"), liveValue: 21 }],
+  });
+  const byName = tileSourceControls(
+    [{ kind: "value", source: "temperature" }],
+    { device: dev },
+  );
+  expect(byName[0]).toMatchObject({ feature: "temperature", liveValue: 21 });
+});
+
+it("appends a watch override without a slot", () => {
+  const controls = tileSourceControls([], {
+    overrides: [repair("b", "battery", "battery")],
+    states: new Map([["battery", { val: 15 }]]),
+    watchOverrides: ["b"],
+  });
+  expect(controls).toHaveLength(1);
+  expect(controls[0]).toMatchObject({ feature: "battery", liveValue: 15 });
+});
+
+it("suffixes a duplicate override name in the rule scope", () => {
+  const controls = tileSourceControls(
+    [
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s1", override: "a" },
+      },
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s2", override: "b" },
+      },
+    ],
+    {
+      overrides: [repair("a", "s1", "power"), repair("b", "s2", "power")],
+      states: new Map([
+        ["s1", { val: 1 }],
+        ["s2", { val: 2 }],
+      ]),
+    },
+  );
+  const locals = ruleScope(controls, []).locals;
+  expect(locals.power).toBe(1);
+  expect(locals.power2).toBe(2);
+});
+
+it("carries a repair's history on its rule local", () => {
+  const history = { duration: 24, durationUnit: "hours" as const };
+  const controls = tileSourceControls(
+    [{ kind: "value", source: { kind: "state", stateId: "s", override: "o" } }],
+    {
+      overrides: [repair("o", "s", "power", { history })],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(controls[0].history).toEqual(history);
+});
+
+it("a slot rule can name another slot's override", () => {
+  const parts = tileParts(
+    device(),
+    tile([
+      {
+        kind: "value",
+        source: "temperature",
+        rules: [{ when: "power > 5", hidden: true }],
+      },
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+    ]),
+    none,
+    {
+      overrides: [repair("o", "s", "power")],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(parts.body).toHaveLength(0);
+});
+
+it("reads the chart layout, legacy booleans included", () => {
+  expect(chartLayout(undefined)).toBe("band");
+  expect(chartLayout({})).toBe("band");
+  expect(chartLayout({ mode: "header" })).toBe("header");
+  expect(chartLayout({ full: true })).toBe("full");
+  expect(chartLayout({ separate: true })).toBe("full");
+});
+
+it("names a resolved override by its name, not its label", () => {
+  const overrides = [repair("o", "s", "power", { label: "Leistung" })];
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          rules: [{ when: "power > 5", hidden: true }],
+        },
+      ],
+    },
+    "T",
+    {
+      states: new Map([["s", { val: 7 }]]),
+      objects: new Map(),
+      overrides,
+    },
+  );
+  expect(resolution.device.controls[0].feature).toBe("power");
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+  });
+  expect(parts.body).toHaveLength(0);
+});
+
+it("keeps a watch override in scope without a slot", () => {
+  const overrides = [repair("o", "s", "power"), repair("b", "b", "battery")];
+  const states = new Map([
+    ["s", { val: 1 }],
+    ["b", { val: 15 }],
+  ]);
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          rules: [{ when: "battery < 20", color: "red" }],
+        },
+      ],
+      watchOverrides: ["b"],
+    },
+    "T",
+    { states, objects: new Map(), overrides },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+    states,
+  });
+  expect(parts.body[0].style.color).toBe("red");
+});
+
+it("keeps a repaired state charting", () => {
+  const history = { duration: 24, durationUnit: "hours" as const };
+  const overrides = [repair("o", "s", "power", { history })];
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "value",
+          source: { kind: "state", stateId: "s", override: "o" },
+          spark: {},
+        },
+      ],
+    },
+    "T",
+    {
+      states: new Map([["s", { val: 7 }]]),
+      objects: new Map(),
+      overrides,
+    },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none, {
+    overrides,
+  });
+  expect(hasHistory(parts.body[0].control)).toBe(true);
+  expect(tileSeries(parts.body).map((s) => s.control.stateId)).toEqual(["s"]);
+});
+
+it("a badge rule names a slot's override", () => {
+  const unreachable = device({
+    controls: [control("c1", "temperature", false)],
+  });
+  const parts = tileParts(
+    unreachable,
+    tile([
+      {
+        kind: "value",
+        source: { kind: "state", stateId: "s", override: "o" },
+      },
+      {
+        kind: "badge",
+        source: "offline",
+        detail: "full",
+        rules: [{ when: "power > 5", color: "var(--danger-color)" }],
+      },
+    ]),
+    none,
+    {
+      raw: noRaw,
+      overrides: [repair("o", "s", "power")],
+      states: new Map([["s", { val: 7 }]]),
+    },
+  );
+  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
+  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
+});
+
+// The display builds one rule list from the tile's own slots and hands it to
+// `tileParts`; these pin that the rows and the badged slots read that list.

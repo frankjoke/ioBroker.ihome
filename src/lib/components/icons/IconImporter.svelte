@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getIconPool } from "$lib/stores/icon-pool.svelte";
   import {
@@ -25,14 +25,18 @@
   import { brokerIconPath } from "$lib/config/icon-ops";
   import { copyIconFile, writeIconFile } from "$lib/config/icon-files";
 
-  /** Pick one icon (single pick closes the browser) or many ("Add all"). The
-   *  values are already in stored form; keywords/name are suggestions. */
+  /** Pick one icon and close. The values are already in stored form;
+   *  keywords/name are suggestions. */
   let {
     onPick,
     onClose,
+    resources = ["library", "mdi", "objects", "adapter"] as Resource[],
+    embedded = false,
   }: {
     onPick: (value: string, meta: { keywords: string[]; name: string }) => void;
     onClose: () => void;
+    resources?: Resource[];
+    embedded?: boolean;
   } = $props();
 
   type Resource = "library" | "mdi" | "objects" | "adapter";
@@ -60,9 +64,22 @@
    *  resumes curation instead of the first adapter. */
   const saved = readIconSourcePrefs();
 
-  let resource = $state<Resource>(saved.resource);
+  let resource = $state<Resource>(
+    untrack(() =>
+      resources.includes(saved.resource)
+        ? saved.resource
+        : (resources[0] ?? "mdi"),
+    ),
+  );
   let search = $state("");
   let limit = $state(200);
+  /** A pasted SVG/HTML, image URL or path: the importer's non-file entry. */
+  let customOpen = $state(false);
+  let customValue = $state("");
+
+  const allowed = $derived(
+    RESOURCES.filter((entry) => resources.includes(entry.id)),
+  );
 
   // Adapter folders
   let basePath = $state(saved.basePath);
@@ -105,20 +122,14 @@
   let mdiState = $state<"idle" | "loading" | "ready" | "error">("idle");
   let mdiError = $state("");
 
-  // ioBroker objects
+  // ioBroker objects: empty adapter means all adapters
   let objectAdapter = $state("");
-  let objectTouched = $state(false);
 
   $effect(() => {
     if (mdiTouched || mdiCategory) return;
     if (mdiState === "ready" && mdiCategoryCounts.length) {
       mdiCategory = mdiCategoryCounts[0].id;
     }
-  });
-
-  $effect(() => {
-    if (objectTouched || objectAdapter) return;
-    if (objectAdapters.length) objectAdapter = objectAdapters[0].name;
   });
 
   // Adapter and meta objects are not in the state cache; both are fetched once
@@ -379,42 +390,58 @@
     if (resourceId === "mdi") void loadMdi();
   }
 
-  function pickLibrary(icon: LibraryIcon, close = true): void {
-    onPick(icon.value, {
-      keywords: icon.keywords,
-      name: icon.name ?? icon.value,
-    });
-    if (close) onClose();
+  type ImportItem = {
+    value: string;
+    meta: { keywords: string[]; name: string };
+  };
+
+  function deliver(item: ImportItem): void {
+    onPick(item.value, item.meta);
+    onClose();
   }
 
-  function pickMdi(icon: MdiIcon, close = true): void {
-    const name = icon.n?.en ?? icon.id;
-    onPick(mdiIconValue(icon.p), {
-      keywords: [
-        ...new Set([...keywordWords(name), ...keywordWords(mdiName(icon.c))]),
-      ],
-      name,
+  function pickLibrary(icon: LibraryIcon): void {
+    deliver({
+      value: icon.value,
+      meta: { keywords: icon.keywords, name: icon.name ?? icon.value },
     });
-    if (close) onClose();
+  }
+
+  function pickMdi(icon: MdiIcon): void {
+    const name = icon.n?.en ?? icon.id;
+    deliver({
+      value: mdiIconValue(icon.p),
+      meta: {
+        keywords: [
+          ...new Set([...keywordWords(name), ...keywordWords(mdiName(icon.c))]),
+        ],
+        name,
+      },
+    });
   }
 
   function pickObject(entry: { id: string; value: string }): void {
-    onPick(brokerIconPath(entry.value, entry.id), {
-      keywords: keywordWords(entry.id),
-      name: entry.id.split(".").pop() ?? entry.id,
+    deliver({
+      value: brokerIconPath(entry.value, entry.id),
+      meta: {
+        keywords: keywordWords(entry.id),
+        name: entry.id.split(".").pop() ?? entry.id,
+      },
     });
   }
 
-  async function pickFile(entry: SourceEntry, close = true): Promise<void> {
+  async function pickFile(entry: SourceEntry): Promise<void> {
     const reference = importValue(basePath, entry.path);
     const value =
       (downloadCopy ? await copyIconFile(reference, entry.label) : null) ??
       reference;
-    onPick(value, {
-      keywords: keywordsFromPath(basePath, entry.path),
-      name: entry.label,
+    deliver({
+      value,
+      meta: {
+        keywords: keywordsFromPath(basePath, entry.path),
+        name: entry.label,
+      },
     });
-    if (close) onClose();
   }
 
   /** A local image file, stored in the shared space and added as its path. */
@@ -439,23 +466,17 @@
       });
   }
 
-  async function addAll(): Promise<void> {
-    if (resource === "library") {
-      for (const icon of libraryShown) pickLibrary(icon, false);
-      onClose();
-      return;
-    }
-    if (resource === "mdi") {
-      for (const icon of mdiShown.slice(0, limit)) pickMdi(icon, false);
-      onClose();
-      return;
-    }
-    if (resource === "objects") {
-      for (const entry of objectShown.slice(0, limit)) pickObject(entry);
-      onClose();
-      return;
-    }
-    for (const entry of visibleIcons) await pickFile(entry, false);
+  /** A name for a pasted value: the file stem, else a generic "Custom icon". */
+  function customName(value: string): string {
+    const file = value.split(/[?#]/)[0].split("/").pop()?.trim() ?? "";
+    return file.replace(/\.[^.]+$/, "") || "Custom icon";
+  }
+
+  function useCustom(): void {
+    const value = customValue.trim();
+    if (!value) return;
+    const name = customName(value);
+    onPick(value, { keywords: keywordWords(name), name });
     onClose();
   }
 
@@ -471,24 +492,69 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Add icons">
+<div
+  class="modal"
+  class:embedded
+  role="dialog"
+  aria-modal="true"
+  aria-label="Add icons"
+>
   <div class="modal-content importer">
-    <div class="modal-head">
-      <h3>Add icons / images</h3>
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Close"
-        onclick={onClose}
-      >
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+    {#if !embedded}
+      <div class="modal-head">
+        <h3>Add icons / images</h3>
+        <span class="head-actions">
+          <label class="upload">
+            <input type="file" accept="image/*,.svg" onchange={onUpload} />
+            <span class="btn btn-outline btn-sm">Upload image…</span>
+          </label>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            title="Paste an SVG, an image URL or a path"
+            onclick={() => (customOpen = !customOpen)}>SVG / web…</button
+          >
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="Close"
+            onclick={onClose}
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </span>
+      </div>
+      {#if customOpen}
+        <div class="custom-line">
+          <input
+            type="text"
+            aria-label="SVG or web icon"
+            placeholder="https://…, /path/icon.svg or <svg>…</svg>"
+            bind:value={customValue}
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                useCustom();
+              }
+            }}
+          />
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            disabled={!customValue.trim()}
+            onclick={useCustom}>Add</button
+          >
+        </div>
+      {/if}
+      {#if uploadError}
+        <p class="text-danger hint">{uploadError}</p>
+      {/if}
+    {/if}
 
     <OptionTabs
       bind:value={resource}
       label="Icon sources"
-      tabs={RESOURCES}
+      tabs={allowed}
       collapsible={false}
       showHint={false}
       onchange={activate}
@@ -537,17 +603,13 @@
             </label>
           {/if}
           {#if resource === "objects"}
-            <select
-              aria-label="ioBroker adapter"
-              bind:value={objectAdapter}
-              onchange={() => (objectTouched = true)}
-            >
+            <select aria-label="ioBroker adapter" bind:value={objectAdapter}>
+              <option value="">-- all -- ({objectIcons.length})</option>
               {#each objectAdapters as adapter (adapter.name)}
                 <option value={adapter.name}
                   >{adapter.name} ({adapter.list.length})</option
                 >
               {/each}
-              <option value="">-- all --</option>
             </select>
           {/if}
           {#if resource === "mdi"}
@@ -633,10 +695,7 @@
                     class="cell"
                     title={entry.id}
                     aria-label={entry.id}
-                    onclick={() => {
-                      pickObject(entry);
-                      onClose();
-                    }}
+                    onclick={() => pickObject(entry)}
                   >
                     <Icon value={entry.value} owner={entry.id} size={22} />
                   </button>
@@ -685,41 +744,15 @@
           {/if}
         </div>
 
-        <div class="upload-line">
-          <label class="upload">
-            <input type="file" accept="image/*,.svg" onchange={onUpload} />
-            <span class="btn btn-outline btn-sm">Upload image…</span>
-          </label>
-          {#if uploadError}
-            <span class="text-danger hint">{uploadError}</span>
-          {/if}
-        </div>
-
-        <div class="source-foot">
-          <span class="text-muted hint">
-            {#if resource === "adapter"}
-              {shownCount} icons, {folderEntries.length} folders
-            {:else}
-              {shownCount} icons
-            {/if}
-          </span>
-          {#if shownCount > 0}
-            <button
-              type="button"
-              class="btn btn-outline btn-sm"
-              onclick={() => void addAll()}
-            >
-              Add all shown
-            </button>
-          {/if}
-          {#if shownCount > limit}
+        {#if shownCount > limit}
+          <div class="source-foot">
             <button
               type="button"
               class="btn btn-sm"
               onclick={() => (limit += 200)}>Load more</button
             >
-          {/if}
-        </div>
+          </div>
+        {/if}
       </section>
     </div>
   </div>
@@ -735,6 +768,25 @@
     justify-content: center;
     z-index: 1000;
     padding: 1rem;
+  }
+
+  .modal.embedded {
+    position: static;
+    inset: auto;
+    background: none;
+    z-index: auto;
+    padding: 0;
+    display: block;
+    min-height: 0;
+  }
+
+  .modal.embedded .modal-content {
+    width: auto;
+    max-height: none;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: 0;
   }
 
   .modal-content {
@@ -753,10 +805,29 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
 
   .modal-head h3 {
     margin: 0;
+  }
+
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .custom-line {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .custom-line input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .importer-body {
@@ -875,12 +946,6 @@
   .hint {
     flex: 1 1 auto;
     font-size: var(--body-sm);
-  }
-
-  .upload-line {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
   }
 
   .upload input {

@@ -307,17 +307,6 @@ export function levelRange(
   };
 }
 
-/** Default device name: `Room.Type` (+ `.Superstate` when disambiguating). */
-export function suggestDeviceName(
-  type: DeviceType,
-  roomLabel: string,
-  superstateName: string,
-  disambiguate: boolean,
-): string {
-  const base = roomLabel ? `${roomLabel}.${type}` : type;
-  return disambiguate && superstateName ? `${base}.${superstateName}` : base;
-}
-
 /** Default label from a state's role tail, capitalised (value.humidity → Humidity). */
 export function roleLabel(obj: any): string {
   const role = String(obj?.common?.role ?? "");
@@ -338,35 +327,6 @@ export function stateLabel(id: string, obj?: any): string {
       ?.trim() ?? "";
   if (tail) return tail;
   return String(obj?.common?.name ?? "").trim();
-}
-
-const ROLE_TYPE_RULES: { test: RegExp; type: DeviceType }[] = [
-  { test: /button|taste/, type: "Button" },
-  { test: /light|dimmer|lamp/, type: "Light" },
-  { test: /blind|curtain|shutter/, type: "Blind" },
-  { test: /window/, type: "Window" },
-  { test: /motion/, type: "Motion" },
-  { test: /thermostat|setpoint|level\.temperature/, type: "Thermostat" },
-  { test: /aircondition|aircon|climate/, type: "AC" },
-  { test: /temperature|humidity|thermometer/, type: "Thermometer" },
-  { test: /switch|button|power/, type: "Switch" },
-];
-
-/**
- * Suggest a device type from a state object and (optionally) its parent
- * objects — the first matching role wins, then a type-based fallback.
- */
-export function suggestDeviceType(obj: any, ancestors: any[] = []): DeviceType {
-  const roles = [obj, ...ancestors]
-    .map((o) => String(o?.common?.role ?? ""))
-    .filter(Boolean);
-  for (const rule of ROLE_TYPE_RULES) {
-    if (roles.some((r) => rule.test.test(r))) return rule.type;
-  }
-  const type = String(obj?.common?.type ?? "");
-  if (type === "boolean") return "Switch";
-  if (type === "number") return "Value";
-  return "Custom";
 }
 
 /** Suggest a feature for a state object based on its common.role / common.type. */

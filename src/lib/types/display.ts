@@ -1,5 +1,6 @@
 import type { DeviceType } from "$lib/types/device";
 import type { FeatureDef } from "$lib/config/features";
+import type { SourceOverride } from "$lib/types/overrides";
 
 /** Tile size hint, 1–40 fine modules wide and 1–20 high. Clamped per breakpoint — never a coordinate. */
 export type SizeW =
@@ -99,11 +100,14 @@ export interface SectionAppearance {
  */
 /** Tile chart layout: a band after the tile name, or the whole tile face. */
 export interface TileChartConfig {
-  /** Fill the tile's content area instead of a band after the name. */
+  /** Where the chart sits: a band after the header, the whole content area, or
+   *  only behind the icon and name. */
+  mode?: "band" | "full" | "header";
+  /** Legacy: fill the content area (reads as `mode: "full"`). */
   full?: boolean;
   /** Legacy name for `full`; read when `full` is absent. */
   separate?: boolean;
-  /** Band height in px; absent → 56. Ignored when `full` is set. */
+  /** Band height in px; absent → 56. Ignored unless `mode` is `band`. */
   height?: number;
   /** Precision of the min/max labels; absent → the slot's decimals, else 1. */
   decimals?: number;
@@ -138,6 +142,9 @@ export interface TileConfig {
    *  it. Absent, empty or malformed → the page opens freely, and a tile with no
    *  detail page ignores it entirely (`tileNeedsPin`). Not part of a template. */
   pin?: string;
+  /** Overrides a rule names although no slot binds them (spec §3.3): their
+   *  names join the tile's rule scope. Written by the device migration. */
+  watchOverrides?: string[];
   /** Hidden from every list and from the display outside the local network.
    *  A visibility layer, not an authorisation boundary. */
   secured?: boolean;
@@ -275,8 +282,12 @@ export interface SlotSpark {
  *  A v1 document still carries a string source; the migration converts it. */
 export type SlotSource =
   | { kind: "control"; device: string; control: string }
-  | { kind: "state"; stateId: string }
+  | { kind: "state"; stateId: string; override?: string }
   | { kind: "device"; device: string };
+
+/** The override fields a template slot used, minus identity: applying the
+ *  template recreates them as an override on the picked state (spec §3.4). */
+export type TemplateRepair = Omit<SourceOverride, "id" | "stateId">;
 
 /** How a slot appears in the detail page: a full line, half a line (pairs with
  *  the next half), or no row at all. */
@@ -313,6 +324,9 @@ export interface Slot {
   icon?: SlotIcon;
   /** The slot's chart (A59); absent = no chart. */
   spark?: SlotSpark;
+  /** Template-only: the repair this slot's state used, so an apply can
+   *  recreate it on the picked state. Never written to a tile. */
+  repair?: TemplateRepair;
 }
 
 export interface Template {
@@ -327,6 +341,9 @@ export interface Template {
   /** Hidden outside the local network; absent = not secured. */
   secured?: boolean;
   type: DeviceType;
+  /** Role-based tile templates: one role per bound source, in slot order
+   *  (spec §3.4). Absent on legacy feature templates. */
+  roles?: string[];
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */
   background?: Background;

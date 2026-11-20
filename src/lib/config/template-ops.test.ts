@@ -11,6 +11,7 @@ import {
   primaryFeature,
   resolveControl,
   resolveTemplate,
+  templateDeviceProblem,
   templateFeatures,
   slotVisible,
   sourceForControl,
@@ -572,6 +573,20 @@ it("falls back to the type preset when a template has no features", () => {
   expect(
     templateFeatures({ ...PRESETS.Light, features: [] }).map((f) => f.feature),
   ).toEqual(PRESETS.Light.features.map((f) => f.feature));
+});
+
+it("does not fall back to the preset for a role template", () => {
+  expect(
+    templateFeatures({ ...PRESETS.Light, roles: ["switch"], features: [] }),
+  ).toEqual([]);
+  expect(templateDeviceProblem(PRESETS.Light)).toBeNull();
+  expect(
+    templateDeviceProblem({
+      ...PRESETS.Light,
+      roles: ["switch", "value_power"],
+      features: [],
+    }),
+  ).toMatch(/role template/i);
 });
 
 it("uses the flagged primary, else the first feature", () => {

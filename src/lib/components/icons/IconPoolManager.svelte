@@ -15,9 +15,11 @@
     removeLibraryIcon,
     setDefault,
     setTwin,
+    suggestTwin,
     upsertLibraryIcon,
     type IconPool,
     type LibraryIcon,
+    type TwinSuggestion,
   } from "$lib/config/icon-library";
   import {
     commitIconPool,
@@ -33,7 +35,17 @@
   import { newId } from "$lib/utils/ids";
   import { deleteIconFile, isMetaIconValue } from "$lib/config/icon-files";
 
-  let { dirty = $bindable(false) }: { dirty?: boolean } = $props();
+  let {
+    dirty = $bindable(false),
+    mode = "all",
+    embedded = false,
+  }: {
+    dirty?: boolean;
+    /** "library" hides the defaults; "defaults" renders only the defaults. */
+    mode?: "all" | "library" | "defaults";
+    /** Hide the manager's own tab bar and chrome. */
+    embedded?: boolean;
+  } = $props();
 
   type Importer =
     { mode: "add" } | { mode: "field"; id: string; field: "value" | "twin" };
@@ -48,7 +60,10 @@
   ] as const;
 
   let loaded = $state(false);
-  let tab = $state<"library" | "defaults">("library");
+  // svelte-ignore state_referenced_locally
+  let tab = $state<"library" | "defaults">(
+    mode === "defaults" ? "defaults" : "library",
+  );
   let draft = $state<IconPool>(emptyIconPool());
   let baseUpdatedAt = $state(0);
   let search = $state("");
@@ -88,6 +103,16 @@
     return libraryKeywordCounts(draft.library)
       .map((entry) => entry.keyword)
       .filter((word) => !current.has(word));
+  });
+  const showLibrary = $derived(
+    mode !== "defaults" && (mode === "library" || tab === "library"),
+  );
+  const twinSuggestion = $derived.by<TwinSuggestion | undefined>(() => {
+    if (!openIcon) return undefined;
+    const paired =
+      draft.twins[openIcon.value] !== undefined ||
+      Object.values(draft.twins).includes(openIcon.value);
+    return paired ? undefined : suggestTwin(draft, openIcon.value);
   });
 
   function clonePool(pool: IconPool): IconPool {
@@ -234,6 +259,13 @@
     savedHint = "";
   }
 
+  /** Apply a naming-based pair in its correct off/on direction. */
+  function applySuggestion(pair: TwinSuggestion): void {
+    if (!writable) return;
+    draft = setTwin(draft, pair.off, pair.on);
+    savedHint = "";
+  }
+
   /** A confirmed delete is committed at once: no second "save" step. */
   function remove(entry: LibraryIcon): void {
     if (!writable) return;
@@ -276,18 +308,18 @@
     );
   }
 
-  async function save(): Promise<void> {
-    if (saving) return;
+  export async function save(): Promise<boolean> {
+    if (saving) return false;
     hint = "";
     savedHint = "";
     conflict = "";
     if (!writable) {
       hint = "The icon library is not writable.";
-      return;
+      return false;
     }
     if (draft.library.some((icon) => !icon.value.trim())) {
       hint = "Every icon needs an icon.";
-      return;
+      return false;
     }
     const previous = getIconPool();
     const next: IconPool = { ...cleanDraft(), updatedAt: Date.now() };
@@ -312,12 +344,15 @@
         }
       }
       savedHint = "Saved.";
-    } else if (result === "conflict") {
+      return true;
+    }
+    if (result === "conflict") {
       conflict =
         "The icon library changed in another tab. Reload before saving.";
     } else {
       hint = "The icon library could not be saved.";
     }
+    return false;
   }
 
   function setDefaultEntry(
@@ -352,13 +387,15 @@
   </div>
 {:else}
   <div class="icon-pool-page">
-    <OptionTabs
-      bind:value={tab}
-      label="Icon manager"
-      tabs={TABS}
-      collapsible={false}
-      showHint={false}
-    />
+    {#if mode === "all"}
+      <OptionTabs
+        bind:value={tab}
+        label="Icon manager"
+        tabs={TABS}
+        collapsible={false}
+        showHint={false}
+      />
+    {/if}
 
     {#if loadKind === "unreadable"}
       <p class="text-danger hint">
@@ -386,7 +423,7 @@
       </p>
     {/if}
 
-    {#if tab === "library"}
+    {#if showLibrary}
       <div class="item">
         <div class="item-line title-line">
           <Icon value="apps" size={18} />
@@ -475,6 +512,18 @@
                       disabled={!writable}
                       onclick={() => setTwinValue(openIcon!.id, "")}
                     />
+                  {:else if twinSuggestion}
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      title={`Pair as off/on: ${twinSuggestion.off} / ${twinSuggestion.on}`}
+                      disabled={!writable}
+                      onclick={() => applySuggestion(twinSuggestion)}
+                    >
+                      Pair with {twinSuggestion.off === openIcon.value
+                        ? twinSuggestion.on
+                        : twinSuggestion.off}
+                    </button>
                   {/if}
                 </div>
               </div>

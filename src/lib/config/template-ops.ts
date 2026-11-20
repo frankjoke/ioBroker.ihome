@@ -32,11 +32,20 @@ export interface ResolvedTemplate {
   background?: Background;
 }
 
-/** A template's control schema: its own features, else the type preset's. */
+/** A template's control schema: its own features, else the type preset's. A
+ *  role template has no features — its roles are the binding contract. */
 export function templateFeatures(template: Template): FeatureDef[] {
-  return template.features?.length
-    ? template.features
-    : presetForType(template.type).features;
+  if (template.features?.length) return template.features;
+  if (template.roles?.length) return [];
+  return presetForType(template.type).features;
+}
+
+/** Why a visual template cannot be used as a device template, or null. A role
+ *  template binds states, so it must never reach a device tile or bundle part. */
+export function templateDeviceProblem(template: Template): string | null {
+  return template.roles?.length
+    ? `“${template.name}” is a role template — it fits states, not devices.`
+    : null;
 }
 
 /** The feature whose state is picked first; old templates use the first. */
@@ -159,10 +168,9 @@ export function resolveTemplate(
 }
 
 /**
- * The name a tile shows. Device names default to `Room.Type` (see
- * `suggestDeviceName`), so the type suffix is redundant *on a tile that is already
- * shaped by its type* — "Garten-Pool.Light" reads as "Garten-Pool". An explicit
- * `Device.title` (set in the device config) always wins.
+ * The name a tile shows. Migrated device names read as `Room.Type`, so the type
+ * suffix is redundant *on a tile that is already shaped by its type* —
+ * "Garten-Pool.Light" reads as "Garten-Pool". An explicit title always wins.
  */
 export function tileTitle(device: {
   name?: string;

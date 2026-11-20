@@ -4,6 +4,7 @@
 
 import { DEVICE_TYPES } from "$lib/config/features";
 import { ROLE_GLYPH_DEFAULTS, presetGlyph } from "$lib/config/icon-ops";
+import { newId } from "$lib/utils/ids";
 
 /** One curated icon: a symbol name, an image path or HTML/SVG markup. */
 export interface LibraryIcon {
@@ -644,6 +645,71 @@ export function offTwin(
   return Object.keys(twins).find((off) => twins[off] === value);
 }
 
+/** A suggested off/on pair for an unpaired icon, from its naming pattern. */
+export interface TwinSuggestion {
+  off: string;
+  on: string;
+}
+
+const TWIN_SUFFIXES: Array<[string, string]> = [
+  ["_off", "_on"],
+  ["-off", "-on"],
+  ["_outline", "_filled"],
+  ["-outline", "-filled"],
+  ["_open", "_closed"],
+  ["-open", "-closed"],
+];
+
+/**
+ * The pair an icon manager can offer for `value`: the existing relation first,
+ * then a counterpart with the opposite naming suffix. A counterpart already
+ * paired with another icon is not suggested.
+ */
+export function suggestTwin(
+  pool: IconPool,
+  value: string,
+): TwinSuggestion | undefined {
+  const existing = pool.twins[value];
+  if (existing) return { off: value, on: existing };
+  const otherOff = offTwin(pool.twins, value);
+  if (otherOff) return { off: otherOff, on: value };
+  const lower = value.toLowerCase();
+  const counterpart = (candidate: string): string | undefined =>
+    pool.library.find((icon) => icon.value.toLowerCase() === candidate)?.value;
+  const paired = (v: string): boolean =>
+    pool.twins[v] !== undefined || offTwin(pool.twins, v) !== undefined;
+  for (const [offSuffix, onSuffix] of TWIN_SUFFIXES) {
+    if (lower.endsWith(offSuffix)) {
+      const on = counterpart(value.slice(0, -offSuffix.length) + onSuffix);
+      if (!on || paired(on)) continue;
+      return { off: value, on };
+    }
+    if (lower.endsWith(onSuffix)) {
+      const off = counterpart(value.slice(0, -onSuffix.length) + offSuffix);
+      if (!off || paired(off)) continue;
+      return { off, on: value };
+    }
+  }
+  return undefined;
+}
+
+/** What clicking a pair row offers: one pair target, or two single targets. */
+export interface IconPickChoice {
+  value: string;
+  active?: string;
+}
+
+export function pairChoices(
+  off: string,
+  on: string | undefined,
+  pairAware: boolean,
+): IconPickChoice[] {
+  if (!on) return [{ value: off }];
+  return pairAware
+    ? [{ value: off, active: on }]
+    : [{ value: off }, { value: on }];
+}
+
 /** Paired icons first for the twin-aware picker; a pair is shown once. */
 export function splitTwins(
   entries: LibraryIcon[],
@@ -696,6 +762,35 @@ export function upsertLibraryIcon(pool: IconPool, icon: LibraryIcon): IconPool {
   return { ...pool, updatedAt: Date.now(), library };
 }
 
+/** Add a browsed value once; empty, duplicate and full pools are unchanged. */
+export function addLibraryValue(
+  pool: IconPool,
+  value: string,
+  meta?: { name?: string; keywords?: string[] },
+): { pool: IconPool; added: boolean } {
+  const trimmed = value.trim();
+  if (!trimmed || pool.library.some((entry) => entry.value === trimmed)) {
+    return { pool, added: false };
+  }
+  if (pool.library.length >= POOL_CAP) return { pool, added: false };
+  const name = meta?.name?.trim() || undefined;
+  const keywords = [
+    ...new Set([
+      ...(meta?.keywords ?? [])
+        .map((word) => word.trim().toLowerCase())
+        .filter(Boolean),
+      ...keywordWords(name ?? ""),
+    ]),
+  ];
+  const icon: LibraryIcon = {
+    id: newId(),
+    ...(name ? { name } : {}),
+    value: trimmed,
+    keywords,
+  };
+  return { pool: upsertLibraryIcon(pool, icon), added: true };
+}
+
 /** Removing an icon also removes any pairing that names it. */
 export function removeLibraryIcon(pool: IconPool, id: string): IconPool {
   const removed = pool.library.find((entry) => entry.id === id);
@@ -728,6 +823,10 @@ export function setTwin(
     return { ...pool, updatedAt: Date.now(), twins };
   }
   const on = twin.trim();
+  // One relation per value: a new pair replaces a relation on either half.
+  for (const [key, value] of Object.entries(twins)) {
+    if (key === on || value === off || value === on) delete twins[key];
+  }
   twins[off] = on;
   const library = pool.library.some((icon) => icon.value === on)
     ? pool.library

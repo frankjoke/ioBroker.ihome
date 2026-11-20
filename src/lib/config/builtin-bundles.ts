@@ -119,5 +119,3 @@ export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
     ],
   },
 };
-
-BUILTIN_BUNDLES.push(SAMSUNG_TV_BUNDLE);

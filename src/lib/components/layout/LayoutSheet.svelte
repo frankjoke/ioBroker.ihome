@@ -9,6 +9,7 @@
   import MoveTileModal from "$lib/components/layout/MoveTileModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import TemplateSuggestionModal from "$lib/components/templates/TemplateSuggestionModal.svelte";
+  import TemplateTileModal from "$lib/components/templates/TemplateTileModal.svelte";
   import { takeRequestedLayout } from "$lib/pages.js";
   import {
     addPage,
@@ -34,13 +35,13 @@
     editTile,
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
-  import { templateById } from "$lib/config/template-ops";
   import {
     applyTileSeed,
-    materializeTemplateTile,
+    autoFillRoles,
+    materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
-    slotFromControl,
+    type MaterializedTile,
     slotFromState,
     slotKindForWidget,
     tileSeed,
@@ -72,13 +73,16 @@
     isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import {
+    createOverrideEnsurer,
+    getOverrideRegistry,
+    type OverrideEnsurer,
+  } from "$lib/stores/overrides.svelte";
   import { isLocalUi } from "$lib/config/locality";
   import { withoutSecured } from "$lib/config/secured";
-  import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
   import type { PageRegistry, Placement, Slot } from "$lib/types/display";
-  import type { Device } from "$lib/types/device";
   import type { Template } from "$lib/types/display";
 
   let {
@@ -119,10 +123,15 @@
     sectionId: string;
     at?: number;
   } | null>(null);
+  let pendingTemplate = $state<{
+    template: Template;
+    pageId: string;
+    sectionId: string;
+    at?: number;
+  } | null>(null);
   let actionError = $state("");
 
   const registry = $derived(getPageRegistry());
-  const devices = $derived($devicesEnrichedStore);
   const saveFailed = $derived(getLayoutSaveFailed());
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
@@ -362,12 +371,23 @@
     addTileWith(
       pageId,
       sectionId,
-      [slotFromState(reference.ref, reference.object, kind)],
+      [
+        slotFromState(
+          reference.ref,
+          reference.object,
+          kind,
+          reference.overrideId,
+        ),
+      ],
       at,
     );
   }
 
-  function onTileStatePicked(id: string, object: any): void {
+  function onTileStatePicked(
+    id: string,
+    object: any,
+    overrideId?: string,
+  ): void {
     const target = pickerFor;
     if (!target || target.kind !== "newTile") return;
     if (!writable) {
@@ -385,7 +405,15 @@
       actionError = resolved.problem;
       return;
     }
-    const reference = resolved.reference;
+    const override = overrideId
+      ? getOverrideRegistry().overrides.find((entry) => entry.id === overrideId)
+      : undefined;
+    const reference: TemplateReference = {
+      ...resolved.reference,
+      ...(override
+        ? { overrideId: override.id, overrideName: override.name }
+        : {}),
+    };
     const suggestions = suggestTemplatesForState(reference, allTemplates);
     if (suggestions.length === 0) {
       createBlankTile(target.pageId, target.sectionId, reference, target.at);
@@ -403,7 +431,7 @@
   function commitMaterializedTile(
     pageId: string,
     sectionId: string,
-    materialized: ReturnType<typeof materializeTemplateTile>,
+    materialized: MaterializedTile,
     at?: number,
   ): void {
     const tile = materializedTileConfig(materialized);
@@ -422,49 +450,94 @@
     selection = { kind: "tile", pageId, sectionId, placementId: placement.id };
   }
 
-  function addMaterializedTile(
-    pageId: string,
-    sectionId: string,
-    template: Template,
-    device: Device,
-    at?: number,
-  ): void {
-    const materialized = materializeTemplateTile(
-      template,
-      device,
-      getTemplateRegistry().templates ?? [],
-    );
-    if (materialized.slots.length === 0) {
-      const primary = device.controls?.[0];
-      if (primary) materialized.slots = [slotFromControl(device, primary)];
-    }
-    commitMaterializedTile(pageId, sectionId, materialized, at);
-  }
-
-  /** A tile picked for a state: no device is created, only the tile. */
-  function addStateTile(
+  /** A tile picked for a state: no device is created, only the tile. Missing
+   *  overrides the template repairs are created once, before the tile saves. */
+  async function addStateTile(
     pageId: string,
     sectionId: string,
     template: Template,
     reference: TemplateReference,
-    anchorFeature: string | undefined,
+    anchorKey: string | undefined,
     at?: number,
-  ): void {
-    const materialized = materializeTemplateTileFromState(
-      template,
-      reference,
-      ioBroker.objects as Map<string, any>,
-      anchorFeature,
-    );
+  ): Promise<void> {
+    const objects = ioBroker.objects as Map<string, any>;
+    let materialized;
+    if (template.roles?.length) {
+      const ensurer = createOverrideEnsurer();
+      materialized = materializeTemplateTileFromFills(
+        template,
+        autoFillRoles(
+          template,
+          reference,
+          objects,
+          anchorKey,
+          getOverrideRegistry().overrides,
+        ),
+        reference,
+        (stateId, repair) => ensurer.ensure(stateId, repair),
+      );
+      const saved = await ensurer.save();
+      if (saved === "conflict" || saved === "failed") {
+        actionError =
+          "The tile was not created — its new overrides could not be saved.";
+        return;
+      }
+    } else {
+      materialized = materializeTemplateTileFromState(
+        template,
+        reference,
+        objects,
+        anchorKey,
+        getOverrideRegistry().overrides,
+      );
+    }
     if (materialized.slots.length === 0) {
       materialized.slots = [
         slotFromState(
           reference.ref,
           reference.object,
           slotKindForWidget(widgetForState(reference.object)),
+          reference.overrideId,
         ),
       ];
     }
+    commitMaterializedTile(pageId, sectionId, materialized, at);
+  }
+
+  /** A new tile from a saved template, bound to the chosen states. */
+  async function addTemplateTile(
+    pageId: string,
+    sectionId: string,
+    template: Template,
+    fills: Map<string, TemplateReference>,
+    main: TemplateReference,
+    at?: number,
+  ): Promise<void> {
+    const ensurer: OverrideEnsurer = createOverrideEnsurer();
+    const materialized = materializeTemplateTileFromFills(
+      template,
+      fills,
+      main,
+      (stateId, repair) => ensurer.ensure(stateId, repair),
+    );
+    const saved = await ensurer.save();
+    if (saved === "conflict" || saved === "failed") {
+      pendingTemplate = null;
+      actionError =
+        "The tile was not created — its new overrides could not be saved.";
+      return;
+    }
+    if (materialized.slots.length === 0) {
+      materialized.slots = [
+        slotFromState(
+          main.ref,
+          main.object,
+          slotKindForWidget(widgetForState(main.object)),
+          main.overrideId,
+        ),
+      ];
+    }
+    pendingTemplate = null;
     commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
@@ -497,26 +570,14 @@
     at?: number,
   ): void {
     if (!slots.length) return;
-    const source = slots[0]?.source;
-    const device =
-      source && typeof source === "object" && source.kind === "control"
-        ? devices.find((entry) => entry.id === source.device)
-        : undefined;
-    const template = device?.template
-      ? templateById(device.template, getTemplateRegistry().templates ?? [])
-      : undefined;
-    if (device && template) {
-      addMaterializedTile(pageId, sectionId, template, device, at);
-      return;
-    }
     const sectionIn = (reg: PageRegistry) =>
       reg.pages
         .find((p) => p.id === pageId)
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
-    // A new tile takes its name, size and default glyph from its first slot
-    // once (S11) — a frozen offer, not a live device link.
-    const seed = tileSeed(slots, devices, getTemplateRegistry().templates);
+    // A new tile takes its name and default glyph from its first slot once
+    // (S11) — a frozen offer, not a live link.
+    const seed = tileSeed(slots);
     const first =
       seed.icon && !slots[0].icon?.glyph
         ? { ...slots[0], icon: { ...slots[0].icon, glyph: seed.icon } }
@@ -762,7 +823,6 @@
     <div>
       <LayoutDetails
         {registry}
-        {devices}
         selection={{ kind: "page", pageId }}
         onChange={commitLayout}
       />
@@ -844,7 +904,6 @@
       <div>
         <LayoutDetails
           {registry}
-          {devices}
           selection={{ kind: "section", pageId, sectionId }}
           onChange={commitLayout}
         />
@@ -954,8 +1013,6 @@
     </div>
   {/if}
 
-  <!-- The sheet's body is always the tile editor: the device is a reusable
-       control collection on the Devices page, never a tile's identity. -->
   <!-- The sheet's own hidden Tile: it answers whether there is a detail page
          (A47, via `noteDetail`) and opens that modal for real when the box is
          ticked — only the tile resolves its rows. Non-modal, so it appears over
@@ -978,7 +1035,6 @@
     <div class="tile-editor">
       <LayoutDetails
         {registry}
-        {devices}
         selection={tileSelection}
         onChange={commitLayout}
         onAddSlot={openSlotPicker}
@@ -994,7 +1050,6 @@
   {@const target = pickerFor}
   <SourcePicker
     mode="slot"
-    {devices}
     templates={withoutSecured(getTemplateRegistry().templates ?? [], local)}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
@@ -1003,6 +1058,17 @@
     logicPick="state"
     suggestTemplates={target.kind === "newTile"}
     onStatePicked={onTileStatePicked}
+    onTemplate={target.kind === "newTile"
+      ? (template) => {
+          pendingTemplate = {
+            template,
+            pageId: target.pageId,
+            sectionId: target.sectionId,
+            at: target.at,
+          };
+          pickerFor = null;
+        }
+      : undefined}
     onSlots={(slots) => {
       // Snapshot before closing: `target` reads the reactive value, which
       // becomes null the moment `pickerFor` is cleared.
@@ -1016,18 +1082,36 @@
   />
 {/if}
 
+{#if pendingTemplate}
+  {@const target = pendingTemplate}
+  <TemplateTileModal
+    template={target.template}
+    logics={getLogicDocument().logics}
+    onCreate={(fills, main) =>
+      void addTemplateTile(
+        target.pageId,
+        target.sectionId,
+        target.template,
+        fills,
+        main,
+        target.at,
+      )}
+    onClose={() => (pendingTemplate = null)}
+  />
+{/if}
+
 {#if pendingTileState}
   <TemplateSuggestionModal
     state={pendingTileState.reference}
     templates={allTemplates}
-    onPick={(template, feature) => {
+    onPick={(template, key) => {
       const target = pendingTileState!;
-      addStateTile(
+      void addStateTile(
         target.pageId,
         target.sectionId,
         template,
         target.reference,
-        feature.feature,
+        key,
         target.at,
       );
       pendingTileState = null;

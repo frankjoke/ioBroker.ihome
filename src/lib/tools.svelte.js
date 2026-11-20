@@ -101,12 +101,17 @@ export function reloadOnReturn(lastVisible, now = Date.now()) {
 const EDITOR_ROUTES = [
   "/config",
   "/logic",
-  "/devices",
   "/templates",
   "/plugins",
   "/server",
   "/admin",
 ];
+
+/** The route the app is on: the hash route when there is one (the app is a
+ *  hash SPA in production), else the pathname. */
+export function routePath(pathname = location.pathname, hash = location.hash) {
+  return hash && hash.startsWith("#/") ? hash.slice(1) : pathname;
+}
 
 /**
  * A config page keeps its editor values in memory until Save, so the page must
@@ -114,7 +119,7 @@ const EDITOR_ROUTES = [
  * (`/ihome`), so the route can follow one path segment.
  * @param {string} [path]
  */
-export function onEditorPage(path = location.pathname) {
+export function onEditorPage(path = routePath()) {
   const route = path.replace(/\/+$/, "");
   return EDITOR_ROUTES.some(
     (prefix) =>
@@ -122,6 +127,32 @@ export function onEditorPage(path = location.pathname) {
       route.endsWith(prefix) ||
       route.includes(`${prefix}/`),
   );
+}
+
+/** The display's view routes: the layout and its pages. */
+export function onDisplayRoute(path = routePath()) {
+  const route = String(path ?? "").replace(/\/+$/, "") || "/";
+  return (
+    route === "/" ||
+    route === "/layout" ||
+    route.startsWith("/layout/") ||
+    route.includes("/p/")
+  );
+}
+
+/** True while a surface that must survive a reload is open: a modal, the cog
+ *  menu, or the layout editor. */
+export function overlaysOpen() {
+  if (typeof document === "undefined" || !document.querySelector) return false;
+  return !!document.querySelector(
+    '[role="dialog"], .cog-menu .menu-panel, .sheet',
+  );
+}
+
+/** Only the display's view mode may reload itself: config pages, edit mode,
+ *  dialogs and the cog menu all hold in-memory state. */
+export function canReload(path = routePath(), overlay = overlaysOpen()) {
+  return onDisplayRoute(path) && !overlay;
 }
 
 export const currentTime = new SvelteDate();

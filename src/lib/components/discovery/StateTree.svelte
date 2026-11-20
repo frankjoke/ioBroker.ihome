@@ -9,6 +9,7 @@
   import { enumsOfState, enumLabel } from "$lib/config/rooms";
   import { aliasBaseIds } from "$lib/config/template-suggest";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import type { SourceOverride } from "$lib/types/overrides";
 
   let {
     nodes,
@@ -18,18 +19,42 @@
     enums = undefined,
     objects = undefined,
     onAlias = undefined,
+    overridesOf = undefined,
+    expandedOverrides = undefined,
+    onToggleOverrides = undefined,
+    onAddOverride = undefined,
+    onEditOverride = undefined,
+    onDeleteOverride = undefined,
   }: {
     nodes: StateNode[];
     selection: Set<string>;
     onToggle: (id: string) => void;
-    /** When set, a leaf is a one-click button instead of a checkbox. */
-    onPick?: (id: string) => void;
+    /** When set, a leaf is a one-click button instead of a checkbox. The
+     *  optional id picks a sub-entry (an override of that state). */
+    onPick?: (id: string, overrideId?: string) => void;
     /** The enum cache, so a leaf's tooltip says which room/function it is in. */
     enums?: any;
     /** The object cache, to link an alias only when its original exists. */
     objects?: Map<string, any>;
     /** Jump to the state an alias points at. */
     onAlias?: (id: string) => void;
+    /** A state's overrides, keyed by its real broker id (variable leaves too). */
+    overridesOf?: (id: string) => SourceOverride[];
+    /** The states whose override sub-list is open. */
+    expandedOverrides?: Set<string>;
+    onToggleOverrides?: (id: string) => void;
+    /** Offer "add override" on the row; the browser opens its modal. */
+    onAddOverride?: (stateId: string, object: any) => void;
+    onEditOverride?: (
+      stateId: string,
+      object: any,
+      override: SourceOverride,
+    ) => void;
+    onDeleteOverride?: (
+      stateId: string,
+      object: any,
+      override: SourceOverride,
+    ) => void;
   } = $props();
 
   /** The first alias source that exists in the broker, or "". */
@@ -84,40 +109,97 @@
   <ul class="tree">
     {#each list as node (nodeKey(node))}
       {#if node.kind === "state"}
-        <li
-          class="leaf"
-          class:selected={selection.has(node.id)}
-          title={leafTitle(node)}
-          data-node={nodeKey(node)}
-        >
-          {#if onPick}
-            <button
-              type="button"
-              class="leaf-pick"
-              onclick={() => onPick(node.id)}
-            >
-              {@render leafBody(node)}
-            </button>
-          {:else}
-            <label>
-              <input
-                type="checkbox"
-                checked={selection.has(node.id)}
-                onchange={() => onToggle(node.id)}
-              />
-              {@render leafBody(node)}
-            </label>
-          {/if}
-          {#if onAlias}
-            {@const base = aliasTarget(node)}
-            {#if base}
+        {@const realId = node.obj?._id ?? node.id}
+        {@const stateOverrides = overridesOf?.(realId) ?? []}
+        {@const open = expandedOverrides?.has(realId) ?? false}
+        <li class="leaf-item" data-node={nodeKey(node)}>
+          <div
+            class="leaf"
+            class:selected={selection.has(node.id)}
+            title={leafTitle(node)}
+          >
+            {#if onPick}
+              <button
+                type="button"
+                class="leaf-pick"
+                onclick={() => onPick?.(node.id)}
+              >
+                {@render leafBody(node)}
+              </button>
+            {:else}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={selection.has(node.id)}
+                  onchange={() => onToggle(node.id)}
+                />
+                {@render leafBody(node)}
+              </label>
+            {/if}
+            {#if onAddOverride}
+              {#if stateOverrides.length}
+                <IconButton
+                  icon={open ? "expand_more" : "chevron_right"}
+                  label={`Show ${stateOverrides.length} override${stateOverrides.length === 1 ? "" : "s"} for ${node.label}`}
+                  active={open}
+                  onclick={() => onToggleOverrides?.(realId)}
+                />
+              {/if}
               <IconButton
-                icon="arrow_outward"
-                label={`Go to original state ${base}`}
-                title={`Original: ${base}`}
-                onclick={() => onAlias(base)}
+                icon="add"
+                label={`Add override for ${node.label}`}
+                onclick={() => onAddOverride?.(realId, node.obj)}
               />
             {/if}
+            {#if onAlias}
+              {@const base = aliasTarget(node)}
+              {#if base}
+                <IconButton
+                  icon="arrow_outward"
+                  label={`Go to original state ${base}`}
+                  title={`Original: ${base}`}
+                  onclick={() => onAlias?.(base)}
+                />
+              {/if}
+            {/if}
+          </div>
+          {#if open && stateOverrides.length}
+            <ul class="overrides">
+              {#each stateOverrides as entry (entry.id)}
+                <li class="override-row">
+                  <button
+                    type="button"
+                    class="override-pick"
+                    title={`${entry.kind} override · ${entry.name}`}
+                    onclick={() => onPick?.(node.id, entry.id)}
+                  >
+                    <span class="override-name">{entry.name}</span>
+                    {#if entry.label && entry.label !== entry.name}
+                      <span class="override-label text-muted"
+                        >{entry.label}</span
+                      >
+                    {/if}
+                    <span class="override-kind text-muted">{entry.kind}</span>
+                  </button>
+                  {#if onEditOverride}
+                    <IconButton
+                      icon="edit"
+                      label={`Edit override ${entry.name}`}
+                      onclick={() => onEditOverride?.(realId, node.obj, entry)}
+                    />
+                  {/if}
+                  {#if onDeleteOverride}
+                    <IconButton
+                      icon="delete"
+                      danger
+                      label={`Delete override ${entry.name}`}
+                      onclick={() =>
+                        onDeleteOverride?.(realId, node.obj, entry)}
+                    />
+                  {/if}
+                </li>
+              {/each}
+            </ul>
           {/if}
         </li>
       {:else}
@@ -177,6 +259,10 @@
   .branch-btn .material-symbols-outlined {
     font-size: 18px;
     color: var(--text-muted);
+  }
+
+  .leaf-item {
+    display: block;
   }
 
   .leaf {
@@ -244,5 +330,56 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     white-space: nowrap;
+  }
+
+  .overrides {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 2.1rem;
+  }
+
+  .override-row {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .override-pick {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.2rem 0.5rem;
+    border: none;
+    border-radius: var(--border-radius-sm, 4px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .override-pick:hover {
+    background-color: var(--surface-container);
+  }
+
+  .override-name {
+    font-size: var(--body-sm);
+    font-weight: 600;
+  }
+
+  .override-label {
+    font-size: var(--body-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .override-kind {
+    margin-left: auto;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 </style>

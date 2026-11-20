@@ -1,5 +1,5 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { phone } from "$lib/stores/phone.svelte";
 import { base64ToUint8Array } from "$lib/push-ops";
 

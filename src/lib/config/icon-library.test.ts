@@ -16,14 +16,19 @@ import {
   normalizeIconPool,
   offTwin,
   onTwin,
+  pairChoices,
   parseIconPool,
+  POOL_CAP,
+  addLibraryValue,
   removeLibraryIcon,
   roleChoicesFromObjects,
   seedLibrary,
   setDefault,
   setTwin,
   splitTwins,
+  suggestTwin,
   upsertLibraryIcon,
+  type IconPool,
   type LibraryIcon,
 } from "$lib/config/icon-library";
 
@@ -367,4 +372,98 @@ it("keeps the builtin marker on a normalized save", () => {
   const saved = normalizeIconPool(pool);
   expect(saved.builtin).toBe(BUILTIN_SEED_VERSION);
   expect(ensureBuiltinDefaults(saved)).toBe(saved);
+});
+
+const twinPool = (twins: Record<string, string> = {}): IconPool => ({
+  ...emptyIconPool(),
+  library: [
+    { id: "1", value: "bulb_off", keywords: [] },
+    { id: "2", value: "bulb_on", keywords: [] },
+    { id: "3", value: "lamp-outline", keywords: [] },
+    { id: "4", value: "lamp-filled", keywords: [] },
+    { id: "5", value: "door_open", keywords: [] },
+    { id: "6", value: "door_closed", keywords: [] },
+    { id: "7", value: "solo", keywords: [] },
+  ],
+  twins,
+});
+
+it("suggests the counterpart by naming pattern", () => {
+  const pool = twinPool();
+  expect(suggestTwin(pool, "bulb_off")).toEqual({
+    off: "bulb_off",
+    on: "bulb_on",
+  });
+  expect(suggestTwin(pool, "bulb_on")).toEqual({
+    off: "bulb_off",
+    on: "bulb_on",
+  });
+  expect(suggestTwin(pool, "lamp-outline")).toEqual({
+    off: "lamp-outline",
+    on: "lamp-filled",
+  });
+  expect(suggestTwin(pool, "lamp-filled")).toEqual({
+    off: "lamp-outline",
+    on: "lamp-filled",
+  });
+  expect(suggestTwin(pool, "door_closed")).toEqual({
+    off: "door_open",
+    on: "door_closed",
+  });
+  expect(suggestTwin(pool, "solo")).toBeUndefined();
+});
+
+it("keeps the current twin and refuses a paired counterpart", () => {
+  expect(suggestTwin(twinPool({ bulb_off: "bulb_on" }), "bulb_on")).toEqual({
+    off: "bulb_off",
+    on: "bulb_on",
+  });
+  expect(
+    suggestTwin(twinPool({ other: "bulb_on" }), "bulb_off"),
+  ).toBeUndefined();
+});
+
+it("offers pair halves separately only for single fields", () => {
+  expect(pairChoices("bulb_off", "bulb_on", false)).toEqual([
+    { value: "bulb_off" },
+    { value: "bulb_on" },
+  ]);
+  expect(pairChoices("bulb_off", "bulb_on", true)).toEqual([
+    { value: "bulb_off", active: "bulb_on" },
+  ]);
+  expect(pairChoices("solo", undefined, true)).toEqual([{ value: "solo" }]);
+});
+
+it("adds a browsed icon once and respects the cap", () => {
+  const first = addLibraryValue(emptyIconPool(), "mdi:bulb", {
+    name: "Bulb",
+    keywords: ["light", "light"],
+  });
+  expect(first.added).toBe(true);
+  const row = first.pool.library.find((icon) => icon.value === "mdi:bulb");
+  expect(row?.name).toBe("Bulb");
+  expect(row?.keywords).toEqual(["light", "bulb"]);
+  const again = addLibraryValue(first.pool, "mdi:bulb");
+  expect(again.added).toBe(false);
+  expect(again.pool.library.length).toBe(first.pool.library.length);
+
+  const full = {
+    ...emptyIconPool(),
+    library: Array.from({ length: POOL_CAP }, (_, i) => ({
+      id: String(i),
+      value: `v${i}`,
+      keywords: [],
+    })),
+  };
+  expect(addLibraryValue(full, "beyond").added).toBe(false);
+});
+
+it("setting a twin clears a relation on either half", () => {
+  let pool = twinPool();
+  pool = setTwin(pool, "door_open", "door_closed");
+  pool = setTwin(pool, "bulb_off", "door_closed");
+  expect(pool.twins).toEqual({ bulb_off: "door_closed" });
+  pool = setTwin(pool, "door_open", "lamp-filled");
+  pool = setTwin(pool, "lamp-filled", "door_closed");
+  expect(pool.twins).toEqual({ "lamp-filled": "door_closed" });
 });

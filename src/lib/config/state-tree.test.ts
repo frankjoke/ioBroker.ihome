@@ -97,6 +97,37 @@ it("filters by text search over id and name", () => {
     applyFilters(collectStates(objects), { search: "bright" }),
   ).toHaveLength(1);
 });
+
+const searchState = (id: string, name: string) => ({
+  id,
+  obj: { _id: id, type: "state", common: { name } },
+});
+
+it("filters by the state's common.name", () => {
+  const states = [
+    searchState("x.0.a", "Kitchen humidity"),
+    searchState("x.0.b", "Outside"),
+  ];
+  expect(applyFilters(states, { search: "kitchen" })).toHaveLength(1);
+});
+
+it("filters by an override name", () => {
+  const states = [searchState("x.0.a", "Kitchen")];
+  expect(
+    applyFilters(states, { search: "dewpoint" }, undefined, undefined, (id) =>
+      id === "x.0.a" ? ["Dew point"] : [],
+    ),
+  ).toHaveLength(1);
+});
+
+it("keeps a state whose own name and id do not match out of the override search", () => {
+  const states = [searchState("x.0.a", "Kitchen")];
+  expect(
+    applyFilters(states, { search: "dewpoint" }, undefined, undefined, () => [
+      "Outside",
+    ]),
+  ).toHaveLength(0);
+});
 it("treats empty filter values as no filter", () => {
   expect(
     applyFilters(collectStates(objects), {

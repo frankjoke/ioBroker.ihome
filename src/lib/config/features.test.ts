@@ -4,8 +4,6 @@ import {
   DEVICE_FEATURES,
   featureCatalog,
   suggestFeature,
-  suggestDeviceType,
-  suggestDeviceName,
   roleLabel,
   stateLabel,
   widgetFor,
@@ -33,67 +31,6 @@ it("uses the last state id segment as a control label", () => {
   ).toBe("openDoor");
   expect(stateLabel("MyVar")).toBe("MyVar");
   expect(stateLabel("", { common: { name: "Name" } })).toBe("Name");
-});
-
-it("names a device Room.Type", () => {
-  expect(suggestDeviceName("Thermometer", "Bad", "TemperaturBad", false)).toBe(
-    "Bad.Thermometer",
-  );
-});
-it("appends the superstate when disambiguating", () => {
-  expect(suggestDeviceName("Thermometer", "Bad", "TemperaturBad", true)).toBe(
-    "Bad.Thermometer.TemperaturBad",
-  );
-});
-it("omits the room when absent", () => {
-  expect(suggestDeviceName("Switch", "", "", false)).toBe("Switch");
-});
-it("omits the superstate when absent", () => {
-  expect(suggestDeviceName("Thermometer", "Bad", "", true)).toBe(
-    "Bad.Thermometer",
-  );
-});
-
-it("suggests Light for a switch.light role", () => {
-  expect(suggestDeviceType({ common: { role: "switch.light" } })).toBe("Light");
-});
-it("uses a parent folder's light role", () => {
-  expect(
-    suggestDeviceType({ common: { role: "switch" } }, [
-      { common: { role: "light" } },
-    ]),
-  ).toBe("Light");
-});
-it("gives a Custom device a button function", () => {
-  expect(widgetFor("Custom", "press")).toBe("button");
-});
-
-it("suggests Switch for a plain boolean", () => {
-  expect(suggestDeviceType({ common: { type: "boolean" } })).toBe("Switch");
-});
-it("suggests Motion for a sensor.motion role", () => {
-  expect(
-    suggestDeviceType({ common: { type: "boolean", role: "sensor.motion" } }),
-  ).toBe("Motion");
-});
-it("has a Motion feature", () => {
-  expect(DEVICE_FEATURES.Motion?.[0]?.feature).toBe("motion");
-});
-it("suggests Thermometer for a temperature role", () => {
-  expect(suggestDeviceType({ common: { role: "value.temperature" } })).toBe(
-    "Thermometer",
-  );
-});
-it("suggests Thermostat for a setpoint role", () => {
-  expect(suggestDeviceType({ common: { role: "level.temperature" } })).toBe(
-    "Thermostat",
-  );
-});
-it("falls back to Value for a bare number", () => {
-  expect(suggestDeviceType({ common: { type: "number" } })).toBe("Value");
-});
-it("falls back to Custom for a string", () => {
-  expect(suggestDeviceType({ common: { type: "string" } })).toBe("Custom");
 });
 
 it("suggests brightness for a level-role light", () => {

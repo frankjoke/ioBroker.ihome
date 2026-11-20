@@ -9,6 +9,10 @@ export interface TemplateReference {
   /** The real broker state id. */
   stateId: string;
   object: any;
+  /** The state's override the reference was picked through, when any. */
+  overrideId?: string;
+  /** That override's name, so rules can follow it instead of the role. */
+  overrideName?: string;
 }
 
 /**

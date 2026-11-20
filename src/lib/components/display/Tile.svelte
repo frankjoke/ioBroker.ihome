@@ -27,11 +27,17 @@
     stateLook,
     tileParts,
     tileSeries,
+    tileSourceControls,
+    chartLayout,
     type SlotRow,
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
-  import { devicesEnrichedStore, getVirtualPool } from "$lib/stores/devices";
+  import { getVirtualPool } from "$lib/stores/state-pool.svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
+  import {
+    getDerived,
+    getOverrideRegistry,
+  } from "$lib/stores/overrides.svelte";
   import {
     stateIdFor,
     variableScope,
@@ -53,7 +59,7 @@
     tileColumns,
     type Breakpoint,
   } from "$lib/config/size-ops";
-  import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
+  import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
   import { tileNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
@@ -106,10 +112,11 @@
   } = $props();
 
   const sourceLook = $derived<SourceLook>({
-    devices: $devicesEnrichedStore,
     states: ioBroker.states as Map<string, any>,
     objects: ioBroker.objects as Map<string, any>,
     variables: getVariables(),
+    overrides: getOverrideRegistry().overrides,
+    derived: getDerived,
   });
   const resolution = $derived(
     resolveTile(tile ?? placement?.tile, title ?? placement?.title, sourceLook),
@@ -117,6 +124,8 @@
   /** The control bag derived from this tile's slots — never a device identity. */
   const device = $derived(resolution.device);
   const workingTile = $derived(resolution.tile);
+  /** The tile as configured: its slots carry the sources the rules name. */
+  const rawTile = $derived(tile ?? placement?.tile);
 
   /** Hidden controls are not part of the tile at all. */
   const shownControls = $derived(
@@ -139,11 +148,24 @@
     return resolveControl(shownControls, slot.source);
   }
 
-  // Rule locals are the device's controls (by label, falling back to feature) plus
-  // the pool helpers — the same language the formula editor uses. The config's
-  // variables join in: constants by value, state variables by live value.
+  // Rule locals are the tile's bound sources — overrides and watch overrides
+  // included — plus the pool helpers — the same language the formula editor
+  // uses. The config's variables join in: constants by value, state variables
+  // by live value. Built from the tile's own slots, so a rule writes the
+  // override's name, whatever the resolved slots call it.
+  const sourceControls = $derived(
+    tileSourceControls(rawTile?.slots ?? [], {
+      device,
+      states: ioBroker.states as Map<string, any>,
+      objects: ioBroker.objects as Map<string, any>,
+      variables: getVariables(),
+      overrides: getOverrideRegistry().overrides,
+      derived: getDerived,
+      watchOverrides: workingTile?.watchOverrides,
+    }),
+  );
   const baseScope = $derived(
-    ruleScope(device.controls ?? [], getVirtualPool(), variableExtras()),
+    ruleScope(sourceControls, getVirtualPool(), variableExtras()),
   );
 
   /** Variables as scope extras for this tile's rules. */
@@ -274,6 +296,13 @@
       raw: rawControl,
       pool: getVirtualPool(),
       time: clock,
+      overrides: getOverrideRegistry().overrides,
+      states: ioBroker.states as Map<string, any>,
+      objects: ioBroker.objects as Map<string, any>,
+      variables: getVariables(),
+      derived: getDerived,
+      controls: sourceControls,
+      extras: variableExtras(),
     }),
   );
 
@@ -298,46 +327,16 @@
   const headlineControl = $derived(
     parts.rows.find((row) => row.slot === headline)?.control,
   );
-  // resolveTile rewrites each source to a `slot:N` pseudo key; the original
-  // placement's slot at the same index still names the device.
-  const rawTile = $derived(tile ?? placement?.tile);
-  const rawHeadlineSource = $derived(
-    rawTile?.slots?.[slots.indexOf(headline)]?.source,
-  );
-  const sourceDevice = $derived.by(() => {
-    const source = rawHeadlineSource;
-    if (!source || typeof source === "string" || source.kind !== "control") {
-      return undefined;
-    }
-    return $devicesEnrichedStore.find((entry) => entry.id === source.device);
-  });
+  // resolveTile rewrites each source to a `slot:N` pseudo key; the tile keeps
+  // its template id for the pool's per-template icon defaults.
   const templateId = $derived(
-    workingTile?.template ??
-      sourceDevice?.template ??
-      presetForType(sourceDevice?.type ?? device.type).id,
+    workingTile?.template ?? presetForType(undefined).id,
   );
   const poolPair = $derived(
     defaultPair(getIconPool(), templateId, headlineControl?.role),
   );
-  /** The headline control's own device: its explicit icon is a deliberate
-   *  choice and beats a pool default; an icon only derived from its objects
-   *  loses to one. */
-  const deviceOwnIcon = $derived(sourceDevice?.icon);
-  const deviceFaceIcon = $derived(sourceDevice?.objectIcon);
-  const devicePair = $derived(
-    deviceOwnIcon &&
-      !workingTile?.look?.inactive?.glyph &&
-      !workingTile?.look?.active?.glyph
-      ? sourceDevice?.activeIcon
-        ? { value: deviceOwnIcon, activeValue: sourceDevice.activeIcon }
-        : { value: deviceOwnIcon }
-      : undefined,
-  );
-  // A device's own icon is a deliberate choice: it wins over the pool pair.
-  // Otherwise the pool pair is the tile's face, with the device pair as fallback.
-  const automaticPair = $derived(
-    deviceOwnIcon ? devicePair : (poolPair ?? devicePair),
-  );
+  // The pool pair is the tile's face.
+  const automaticPair = $derived(poolPair);
   // What the tile's own active state says (A71). A field set here wins over the
   // rules for that state; an absent field keeps what the rules resolved.
   const look = $derived(
@@ -358,7 +357,6 @@
     faceDefaultGlyph({
       hasActive: !!workingTile?.active,
       headline,
-      deviceOwnIcon,
       poolValue: poolPair?.value,
     }),
   );
@@ -409,17 +407,22 @@
   );
   /** A lone frame/html slot is the whole face: no name, no padding. */
   const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
-  /** Sparkline layout: a band after the name, or the whole tile face. */
+  /** Sparkline layout: a band after the name, the whole content area, or only
+   *  behind the icon and name. */
   const chartConfig = $derived(workingTile?.chart);
-  const chartFull = $derived(
-    chartConfig?.full ?? chartConfig?.separate === true,
+  const chartMode = $derived(chartLayout(chartConfig));
+  const chartFull = $derived(chartMode === "full");
+  const chartHeader = $derived(
+    chartMode === "header" && (!!faceRow || !!tileName),
+  );
+  const chartBand = $derived(
+    chartMode === "band" || (chartMode === "header" && !chartHeader),
   );
   const chartHeight = $derived(chartConfig?.height ?? 56);
   const chartArea = $derived(chartConfig?.area === true);
 
-  /** The icon a row shows: state Look → tile icon → the row's own icon →
-   *  the device's face. The look/tile/device are tile-level and survive a
-   *  disabled slot icon. */
+  /** The icon a row shows: state Look → tile icon → the row's own icon.
+   *  The look/tile are tile-level and survive a disabled slot icon. */
   function rowGlyph(r: SlotRow, home: "tile" | "modal") {
     const main = r.slot === headline;
     const lk = main ? look : {};
@@ -427,7 +430,6 @@
     const icon = rowIcon(
       r,
       home,
-      deviceFaceIcon,
       main ? undefined : getIconPool().twins,
       main ? undefined : roleDefault(r.control),
     );
@@ -436,7 +438,6 @@
       main ? tileIcon : undefined,
       icon?.glyph,
       main ? (faceDefault ?? autoTileIcon) : undefined,
-      main ? deviceFaceIcon : undefined,
     );
     if (!glyph) return undefined;
     return {
@@ -464,7 +465,7 @@
   // visibility — a conditionally hidden headline still greets its own page.
   const headIcon = $derived.by(() => {
     // A54/A72: the tile's own icon, then its state look, then the headline's
-    // icon, then the device's face (A67).
+    // icon, then the pool default.
     const own = headline
       ? rowIcon(
           {
@@ -472,17 +473,13 @@
             style: slotStyle(headline, controlFor(headline)),
           },
           "modal",
-          deviceFaceIcon,
         )
       : undefined;
-    // A54/A72: tile icon, state look, headline icon, pool default, device face
-    // — the device's own icon beats the default only by making it absent.
     return (
       headerIcon(tileIcon, look, own) ??
       ((faceDefault ?? autoTileIcon)
         ? { glyph: faceDefault ?? autoTileIcon }
-        : undefined) ??
-      (deviceFaceIcon ? { glyph: deviceFaceIcon } : undefined)
+        : undefined)
     );
   });
 
@@ -505,13 +502,7 @@
       style: r.style,
       // The slot's own icon, not the tile's main/look icon: the headline row is
       // a line in the detail page, not the face.
-      icon: rowIcon(
-        r,
-        "modal",
-        deviceFaceIcon,
-        getIconPool().twins,
-        roleDefault(r.control),
-      ),
+      icon: rowIcon(r, "modal", getIconPool().twins, roleDefault(r.control)),
       // The row's own chart (A62): part of the row, so it follows the row.
       spark: rowSpark(parts.rows, r, "modal"),
       // The slot that *is* the tile's action stays a button in the modal too.
@@ -535,6 +526,8 @@
         Date.now(),
         getVirtualPool(),
         rawControl,
+        false,
+        sourceControls,
       )) {
         const key = anchorKey(anchors[i]);
         (byAnchor[key] ??= []).push(badge);
@@ -649,7 +642,7 @@
   }
 
   function onCapture(event: MouseEvent) {
-    if (!wantsDeviceConfig(event)) return;
+    if (!wantsTileConfig(event)) return;
     // Capture phase: the action buttons stopPropagation, so without this a
     // Ctrl+click on a light's icon would just switch the light.
     event.stopPropagation();
@@ -668,7 +661,7 @@
   function onActivate(event?: MouseEvent) {
     // Ctrl/Cmd+click is the shortcut to the editor — the one place a tile cannot
     // reach on its own.
-    if (wantsDeviceConfig(event)) {
+    if (wantsTileConfig(event)) {
       openEditor();
       return;
     }
@@ -736,7 +729,7 @@
     e.preventDefault();
     // Cmd/Ctrl+Enter is the keyboard form of the config shortcut.
     onActivate(
-      wantsDeviceConfig(e) ? ({ metaKey: true } as MouseEvent) : undefined,
+      wantsTileConfig(e) ? ({ metaKey: true } as MouseEvent) : undefined,
     );
   }
 </script>
@@ -780,21 +773,38 @@
       />
     </div>
   {/if}
-  {#if faceRow && !surfaceOnly}
-    {#if faceIcon}
-      <SlotRenderer
-        slot={faceRow.slot}
-        {device}
-        control={faceRow.control}
-        style={faceRow.style}
-        icon={faceIcon}
-        onPrimary={faceAction}
-        face
-      />
-    {/if}
+  {#if (faceRow && !surfaceOnly) || (tileName && !surfaceOnly)}
+    <div class="tile-head" class:header-chart={chartHeader && chart.length}>
+      {#if chartHeader && chart.length}
+        <div class="tile-chart-header">
+          <TileChart
+            series={chart}
+            wide
+            area={chartArea}
+            decimals={chartConfig?.decimals}
+          />
+        </div>
+      {/if}
+      <div class="tile-head-content">
+        {#if faceRow && !surfaceOnly}
+          {#if faceIcon}
+            <SlotRenderer
+              slot={faceRow.slot}
+              {device}
+              control={faceRow.control}
+              style={faceRow.style}
+              icon={faceIcon}
+              onPrimary={faceAction}
+              face
+            />
+          {/if}
+        {/if}
+        {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span
+          >{/if}
+      </div>
+    </div>
   {/if}
-  {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
-  {#if !chartFull && chart.length}
+  {#if chartBand && chart.length}
     <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
       <TileChart
         series={chart}
@@ -810,7 +820,7 @@
         slot={r.slot}
         {device}
         control={r.control}
-        style={slotStyle(r.slot, r.control)}
+        style={r.style}
         icon={r === headlineRow ? undefined : bodyIcon(r)}
         single={surfaceOnly}
         onPrimary={actionFor(r.control)}
@@ -917,6 +927,53 @@
 
   /* Sparkline full: one layer across the tile's content area, behind the name,
      icon and rows. The content is lifted above it below. */
+  .tile-head {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .tile-head-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .tile-chart-header {
+    position: absolute;
+    inset: 0;
+    /* Above the face icon and name: the header layout reads as one band over
+       the header, not as a backdrop behind the content. */
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+    /* A thin halo in the tile's own face colour keeps the strokes legible over
+       a bright glyph. Header layout only. */
+    filter: drop-shadow(
+      0 0 1px var(--ui-tile-bg, var(--surface-container-lowest))
+    );
+  }
+
+  /* The face icon and name become a watermark under the header chart: one
+     opacity knob for the whole header content box. */
+  .tile-head.header-chart .tile-head-content {
+    opacity: 0.55;
+  }
+
+  .tile-chart-header :global(.chart) {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+  }
+
   .tile-chart-full {
     position: absolute;
     top: calc(8px + var(--badge-inset-top, 0px));

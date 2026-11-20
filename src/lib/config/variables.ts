@@ -1,4 +1,5 @@
 import { newLocalTaken } from "$lib/config/virtual-ops";
+import { nameText } from "$lib/config/format";
 import type { StateSpec } from "$logic/state-common";
 
 /** A global variable: either a constant kept inside iHome, or a named
@@ -186,6 +187,37 @@ export function variableScope(
       return target?.kind === "state" ? target.stateId : undefined;
     },
   };
+}
+
+/**
+ * Does a variable match a list's search box? Its id, name and state id, the
+ * broker state's own name and unit, and a constant's value (spec: common.name
+ * joins search everywhere).
+ */
+export function variableMatches(
+  variable: GlobalVariable,
+  object: any,
+  query: string,
+): boolean {
+  const q = String(query ?? "")
+    .trim()
+    .toLowerCase();
+  if (!q) return true;
+  const common = object?.common ?? {};
+  return [
+    variable.id,
+    variable.name,
+    variable.stateId,
+    variable.value,
+    variable.unit,
+    nameText(common.name),
+    common.unit,
+  ].some(
+    (text) =>
+      text !== undefined &&
+      text !== null &&
+      String(text).toLowerCase().includes(q),
+  );
 }
 
 /**

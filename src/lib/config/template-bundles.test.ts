@@ -5,7 +5,6 @@ import { NETWORK_DEVICE_BUNDLE } from "./builtin-bundles";
 import {
   bundleApiSource,
   compileTemplateItems,
-  devicePartFromTemplate,
   evaluateBundleApi,
   logicPartFromTemplate,
   migrateTemplateBundleLibrary,
@@ -209,18 +208,6 @@ describe("templateBundleProblem", () => {
 });
 
 describe("part helpers", () => {
-  it("copies a visual template into a device part", () => {
-    const part = devicePartFromTemplate({
-      id: "x",
-      name: "X",
-      type: "Light",
-      features: [],
-      slots: [],
-      builtin: true,
-    });
-    expect(part).toEqual({ type: "Light", features: [], slots: [] });
-  });
-
   it("copies a logic template into a logic part", () => {
     const body = {
       id: "l",
@@ -233,6 +220,30 @@ describe("part helpers", () => {
     expect(
       logicPartFromTemplate({ id: "l", name: "L", params: [], logic: body }),
     ).toEqual({ logic: body });
+  });
+
+  it("refuses a role template as a device part", () => {
+    // A bundle document edited by hand or imported keeps its old value: the
+    // problem is reported before anything is written.
+    const problem = templateBundleProblem(
+      {
+        ...bundle(),
+        device: {
+          type: "Custom",
+          features: [],
+          slots: [
+            {
+              kind: "value",
+              source: "temperature",
+              repair: { kind: "repair", name: "temperature" },
+            },
+          ],
+        },
+      } as TemplateBundle,
+      [],
+      [],
+    );
+    expect(problem).toMatch(/role template/i);
   });
 });
 

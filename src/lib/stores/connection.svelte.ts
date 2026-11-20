@@ -1,5 +1,5 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import {
   connectionStatus,
   type ConnectionStatus,

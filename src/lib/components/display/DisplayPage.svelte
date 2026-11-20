@@ -128,7 +128,17 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* The circle's stage: it hands the remaining height to the page so a short
+     page still paints the whole display without a 100vh overflow. */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   /* The display's selection layer (A48): transparent, over every tile, under

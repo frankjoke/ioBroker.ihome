@@ -9,7 +9,12 @@
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
-  import { gotoInsertAt, insertAtCaret, insertRange } from "./code-field";
+  import {
+    gotoInsertAt,
+    insertAtCaret,
+    insertRange,
+    toggleComment,
+  } from "./code-field";
 
   let {
     code,
@@ -24,6 +29,7 @@
     stateNames = [],
     logics = [],
     inputs = {},
+    quickInserts = [],
     onfocus,
   }: {
     code: string;
@@ -44,6 +50,8 @@
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
+    /** Extra quick-insert badges (e.g. the override's $.siblings). */
+    quickInserts?: { label: string; insert: string; title?: string }[];
     /** The field took focus (the caller may close another editor). */
     onfocus?: () => void;
   } = $props();
@@ -131,6 +139,17 @@
   function insertReference(name: string) {
     return insertText(`get(${JSON.stringify(name)})`);
   }
+
+  async function toggleCommentSelection() {
+    const next = toggleComment(code, start, end, focusedBeforePress);
+    onchange(next.text);
+    await tick();
+    textarea?.focus();
+    textarea?.setSelectionRange(next.start, next.end);
+    start = next.start;
+    end = next.end;
+    focusedBeforePress = true;
+  }
 </script>
 
 <div class="code-field">
@@ -175,6 +194,16 @@
         >No update</button
       >
     {/if}
+    <button
+      type="button"
+      class="btn btn-sm btn-outline"
+      title="Comment or uncomment the selection"
+      aria-label="Comment or uncomment the selection"
+      onmousedown={rememberSelection}
+      onclick={toggleCommentSelection}
+    >
+      <span class="mono">/* */</span>
+    </button>
     <SnippetSelect
       {mode}
       onBeforeOpen={rememberSelection}
@@ -194,6 +223,23 @@
             onmousedown={rememberSelection}
             onclick={() => insertReference(name)}>{name}</button
           >
+        {/each}
+      </div>
+    {/if}
+    {#if quickInserts.length > 0}
+      <div class="badges">
+        <span class="label-mono">Insert</span>
+        {#each quickInserts as item (item.insert)}
+          <button
+            type="button"
+            class="badge badge-secondary badge-button"
+            title={item.title ?? item.insert}
+            aria-label={`Insert ${item.insert}`}
+            onmousedown={rememberSelection}
+            onclick={() => insertText(item.insert)}
+          >
+            {item.label}
+          </button>
         {/each}
       </div>
     {/if}

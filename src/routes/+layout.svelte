@@ -12,14 +12,10 @@
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
   import { SIZE_UNIT } from "$lib/config/size-ops";
-  import { defineStorage, onEditorPage } from "$lib/tools.svelte";
+  import { defineStorage, canReload } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
-    setStateSource,
-    setObjectSource,
-    setEnumSource,
     getCanonicalRegistry,
-    devicesEnrichedStore,
     getUsedStateIds,
   } from "$lib/stores/devices.svelte";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
@@ -36,6 +32,11 @@
   } from "$lib/stores/pages.svelte.js";
   import { initTemplates } from "$lib/stores/templates.svelte.js";
   import { initLogics } from "$lib/stores/logics.svelte";
+  import { initOverrides } from "$lib/stores/overrides.svelte";
+  import {
+    applyDeviceMigration,
+    dryRunDeviceMigration,
+  } from "$lib/stores/device-migration.svelte";
   import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
@@ -278,15 +279,16 @@
   const ui = $derived(effectiveUi(getSettings()));
 
   // A wall display stays open for days; a periodic reload clears a socket that
-  // died without an event. Visible pages only (a phone in a pocket already
-  // reloads on return) and never while editing (forms live in memory until Save).
-  // Any config write restarts the count, so configuring never meets a reload.
+  // died without an event. Display view mode only: config pages, the layout
+  // editor, dialogs and the cog menu hold in-memory state. Visible pages only
+  // (a phone in a pocket already reloads on return). Any config write restarts
+  // the count, so configuring never meets a reload.
   $effect(() => {
     const minutes = ui.reloadMinutes;
     ioBroker.configChangedAt; // tracked: a config write re-arms the timer
     if (minutes <= 0) return;
     const id = setInterval(() => {
-      if (document.visibilityState === "visible" && !onEditorPage())
+      if (document.visibilityState === "visible" && canReload())
         location.reload();
     }, minutes * 60_000);
     return () => clearInterval(id);
@@ -362,10 +364,6 @@
   // reactive ioBroker.states map directly.
   $effect(() => {
     if (!ioBroker.connected) return;
-    // share the live caches with the device store (no import cycle)
-    setStateSource(ioBroker.states);
-    setObjectSource(ioBroker.objects);
-    setEnumSource(ioBroker.enums);
     void ioBroker.objects.size;
     void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).
@@ -387,6 +385,7 @@
       await initVariables();
       await initTemplates();
       await initLogics();
+      await initOverrides();
       // Migrate from the *canonical* device list — a synchronous snapshot — not
       // from the enriched display store, which polls every 50ms and can still
       // hold the pre-backfill (or empty) device set (review C2). Without devices
@@ -394,6 +393,19 @@
       const canonical = getCanonicalRegistry().devices ?? [];
       if (canonical.length) {
         await migrateLayout(canonical, getTemplateRegistry().templates);
+        // The one-time device → override migration reports what it would do;
+        // its write path (`applyDeviceMigration(true)`) is a user-confirmed
+        // step and is never called from here.
+        await dryRunDeviceMigration();
+        // One-time device → override conversion: backups first, marker last.
+        // Once the marker is set this refuses at once; the device code can then
+        // be removed without touching a migrated installation.
+        const migrated = await applyDeviceMigration(true);
+        if (migrated.status === "ready") {
+          console.info(
+            `[migration] applied: changed=${migrated.changed}, ${migrated.log.length} note(s)`,
+          );
+        }
       }
       // The per-document markers are the durable record; this installation
       // marker stops an older client (whose parse drops them) from making the
@@ -437,6 +449,7 @@
     initVariables();
     initTemplates();
     initLogics();
+    initOverrides();
     // The phone reporter runs on every route: a PWA cold start on the
     // dashboard must register and heartbeat without opening Server & Security.
     initPhone();
@@ -575,6 +588,9 @@
   }
 
   .app-shell.display .app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     max-width: none;
     margin: 0;
     padding: 0;

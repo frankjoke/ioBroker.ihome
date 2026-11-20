@@ -10,6 +10,7 @@ import {
   type SourceLook,
 } from "$lib/config/slot-source";
 import { effectiveCommon } from "$lib/config/state-meta";
+import type { SourceOverride } from "$lib/types/overrides";
 
 /** What a tile's slots resolve to: a control bag shaped like a device, the
  *  tile with pseudo-id sources, and the live sources behind each id. */
@@ -40,14 +41,21 @@ function pseudoControl(
   id: string,
   slot: Slot,
   resolved: ResolvedSource | undefined,
+  overrides?: SourceOverride[],
 ): EnrichedControl {
   const widget =
     slot.kind === "value"
       ? "value"
       : (widgetForKind(slot.kind) ?? resolved?.widget ?? ("value" as Widget));
+  // The rule name is the override's *name* (spec §3.3); its label only displays.
+  const override =
+    resolved?.overrideId && overrides
+      ? overrides.find((o) => o.id === resolved.overrideId)
+      : undefined;
   return {
     id,
     feature:
+      override?.name ??
       resolved?.control?.feature ??
       resolved?.label ??
       resolved?.stateId ??
@@ -60,7 +68,7 @@ function pseudoControl(
     type: resolved?.type,
     states: resolved?.states,
     meta:
-      resolved?.control?.meta ??
+      resolved?.meta ??
       (resolved
         ? effectiveCommon(
             { id: "", feature: "", writable: false } as EnrichedControl,
@@ -72,8 +80,8 @@ function pseudoControl(
     exists: resolved?.available === true,
     object: resolved?.object,
     widget,
-    transform: resolved?.control?.transform,
-    history: resolved?.control?.history,
+    transform: resolved?.transform ?? resolved?.control?.transform,
+    history: resolved?.history ?? resolved?.control?.history,
     rules: resolved?.control?.rules,
     hidden: resolved?.control?.hidden === true,
   };
@@ -113,7 +121,7 @@ export function resolveTile(
     if (slot.kind === "badge" && slot.source.kind === "device") {
       // The badge stays tied to *this* device: its pseudo-control carries the
       // device's availability and the clock key names the rescued state ids.
-      controls.push(pseudoControl(key, slot, resolved));
+      controls.push(pseudoControl(key, slot, resolved, look.overrides));
       slots.push({
         ...slot,
         source: slot.options?.derive === "ago" ? "ago" : "offline",
@@ -122,7 +130,7 @@ export function resolveTile(
       return;
     }
 
-    controls.push(pseudoControl(key, slot, resolved));
+    controls.push(pseudoControl(key, slot, resolved, look.overrides));
     if (slot.kind === "badge" && slot.options?.derive === "ago") {
       slots.push({
         ...slot,

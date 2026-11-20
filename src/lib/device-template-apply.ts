@@ -1,22 +1,17 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-import { DEVICE_TYPES, featureDef, suggestFeature } from "$lib/config/features";
-import { projectDevice } from "$lib/config/project";
 import { ensureStateObject, readStateObject } from "$lib/state-create";
-import { newId } from "$lib/utils/ids";
 import {
   buildDeviceLogic,
   templateStateSpecs,
   validateDeviceTemplate,
 } from "$logic/device-templates";
 import { validateLogicDocument } from "$logic/validate";
-import { normalizeStates, type StateSpec } from "$logic/state-common";
+import type { StateSpec } from "$logic/state-common";
 import type { DeviceTemplateShape, LogicDef, MachineLogic } from "$logic/types";
-import type { Control, Device, DeviceType } from "$lib/types/device";
 
 export interface DeviceTemplatePlan {
   specs: StateSpec[];
   logic: MachineLogic;
-  device?: Device;
 }
 
 /** Is this logic a template-generated machine for `baseState`? */
@@ -44,8 +39,6 @@ export function planDeviceTemplate(
   baseState: string,
   id: string,
   name: string,
-  deviceName?: string,
-  deviceId?: string,
 ): DeviceTemplatePlan {
   const check = validateDeviceTemplate(template);
   if (check.errors.length > 0) throw new Error(check.errors[0]);
@@ -58,50 +51,7 @@ export function planDeviceTemplate(
     throw new Error(`${issues[0].path}: ${issues[0].message}`);
   }
 
-  let device: Device | undefined;
-  const trimmed = deviceName?.trim();
-  if (trimmed) {
-    const requested = template.deviceType;
-    const type: DeviceType = DEVICE_TYPES.includes(requested as DeviceType)
-      ? (requested as DeviceType)
-      : "Custom";
-    const controls: Control[] = template.itemList.map((item, index) => {
-      const spec = specs[index];
-      const object = item.type === "object";
-      const role = object ? "text.json" : item.role;
-      const stateType = object ? "string" : item.type;
-      const suggested =
-        item.feature ??
-        suggestFeature({ common: { role, type: stateType } }, type);
-      const feature =
-        suggested && featureDef(type, suggested) ? suggested : "value";
-      const control: Control = {
-        id: item.name,
-        feature,
-        stateId: spec.id,
-        writable: item.readOnly !== true,
-        label: item.label ?? item.name,
-        type: stateType,
-      };
-      if (role !== undefined) control.role = role;
-      if (item.unit !== undefined) control.unit = item.unit;
-      const states = normalizeStates(item.states);
-      if (states !== undefined) control.states = states;
-      if (item.min !== undefined) control.min = item.min;
-      if (item.max !== undefined) control.max = item.max;
-      if (item.step !== undefined) control.step = item.step;
-      if (item.hidden === true) control.hidden = true;
-      return control;
-    });
-    device = projectDevice({
-      id: deviceId ?? newId(),
-      name: trimmed,
-      type,
-      icon: template.icon,
-      controls,
-    });
-  }
-  return { specs, logic, ...(device ? { device } : {}) };
+  return { specs, logic };
 }
 
 /** Create each missing folder below the namespace, never above it. */

@@ -1,6 +1,5 @@
 <script lang="ts">
   import Icon from "$lib/components/common/Icon.svelte";
-  import { isHtmlIcon } from "$lib/config/icon-html";
 
   /**
    * One badge chip — the tile's corner badge (BadgeRow) and the modal's badge
@@ -55,15 +54,7 @@
   title={title ?? label}
 >
   {#if icon}
-    {#if isHtmlIcon(icon)}
-      <Icon
-        value={icon}
-        size={13}
-        data={{ $value: value, $color: iconColor }}
-      />
-    {:else}
-      <span class="material-symbols-outlined" aria-hidden="true">{icon}</span>
-    {/if}
+    <Icon value={icon} size={13} data={{ $value: value, $color: iconColor }} />
   {/if}
   {#if !labelHidden}<span class="badge-label">{label}</span>{/if}
 </span>
@@ -79,10 +70,6 @@
     font-size: 11px;
     line-height: 1.6;
     white-space: nowrap;
-  }
-
-  .badge .material-symbols-outlined {
-    font-size: 13px;
   }
 
   .badge.info {

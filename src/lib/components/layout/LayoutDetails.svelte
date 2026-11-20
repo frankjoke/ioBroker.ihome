@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { isHexColor } from "$lib/config/appearance";
   import {
     patchPage,
     patchPlacement,
@@ -45,18 +44,28 @@
     setSlotTile,
     slotTileMode,
   } from "$lib/config/tile-ops";
-  import { hasHistory, tileHeadlineSlot } from "$lib/config/tile-parts";
+  import {
+    chartLayout,
+    tileHeadlineSlot,
+    tileSourceControls,
+  } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
   import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
-  import { BADGE_COLORS, ruleScope } from "$lib/config/rule-ops";
+  import {
+    getDerived,
+    getOverrideRegistry,
+    createOverrideEnsurer,
+  } from "$lib/stores/overrides.svelte";
+  import { ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
-  import { getVirtualPool } from "$lib/stores/devices";
+  import { getVirtualPool } from "$lib/stores/state-pool.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
+  import ColorSelect from "$lib/components/common/ColorSelect.svelte";
   import IconPicker from "$lib/components/common/IconPicker.svelte";
   import { iconTitle } from "$lib/config/icon-html";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
@@ -72,7 +81,8 @@
     tileSourceCount,
   } from "$lib/config/tile-template";
   import {
-    materializeTemplateTile,
+    autoFillRoles,
+    materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
   } from "$lib/config/slot-create";
@@ -84,7 +94,6 @@
     isTemplatesWritable,
   } from "$lib/stores/templates.svelte";
   import { newId } from "$lib/utils/ids";
-  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -105,12 +114,11 @@
     TileChartConfig,
     TileConfig,
   } from "$lib/types/display";
-  import type { DeviceType, EnrichedDevice } from "$lib/types/device";
+  import type { DeviceType } from "$lib/types/device";
   import type { Snippet } from "svelte";
 
   let {
     registry,
-    devices,
     selection,
     onChange,
     onAddSlot,
@@ -119,7 +127,6 @@
     onDetailToggle,
   }: {
     registry: PageRegistry;
-    devices: EnrichedDevice[];
     selection: LayoutSelection;
     onChange: (next: PageRegistry) => void;
     /** Add slot: the route owns the picker. `at` inserts there instead of
@@ -187,6 +194,8 @@
   );
   /** The open rule, by slot and rule index. */
   let openRule = $state<{ slot: number; rule: number } | null>(null);
+  /** Which slot's rules help is open, if any. */
+  let rulesHelpFor = $state<number | null>(null);
   let sourcePickerFor = $state<number | null>(null);
   /** The state picker for an HTML slot's document or a frame's URL. */
   let htmlSourceFor = $state<number | null>(null);
@@ -227,19 +236,16 @@
       : undefined,
   );
   const sourceLook = $derived<SourceLook>({
-    devices,
     states: (ioBroker.states ?? new Map()) as Map<string, any>,
     objects: (ioBroker.objects ?? new Map()) as Map<string, any>,
     variables: getVariables(),
+    overrides: getOverrideRegistry().overrides,
+    derived: getDerived,
   });
   /** The tile's synthetic control bag: what its slots read, nothing more. */
   const device = $derived(
     resolveTile(tile?.tile, tile?.title, sourceLook).device,
   );
-
-  /** The device state picker's room filters, as on the Devices page. */
-  const rooms = $derived(roomList(ioBroker.enums));
-  const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
 
   const activeCond = $derived(tile?.tile?.active);
   const activeResolved = $derived(
@@ -297,11 +303,21 @@
   /** How many of them still live on the tile — the guard for A34. */
   const tileVisibleCount = $derived(shownSlots.filter(onTile).length);
 
-  /** The tile's active reading, and the scope the rules' live dots evaluate in. */
+  /** The tile's active reading, and the scope the rules' live dots evaluate in:
+   *  the same list the display builds, so a dot honours an override's name. */
   const tileActive = $derived(evalActive(activeCond, activeValue));
   const scope = $derived.by(() => {
     if (!device) return undefined;
-    const base = ruleScope(device.controls ?? [], getVirtualPool());
+    const controls = tileSourceControls(shownSlots, {
+      device,
+      states: sourceLook.states,
+      objects: sourceLook.objects,
+      variables: getVariables(),
+      overrides: getOverrideRegistry().overrides,
+      derived: getDerived,
+      watchOverrides: tile?.tile?.watchOverrides,
+    });
+    const base = ruleScope(controls, getVirtualPool());
     return { ...base, locals: { ...base.locals, active: tileActive } };
   });
 
@@ -545,8 +561,23 @@
   );
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
-  const chartFull = $derived(
-    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  const chartMode = $derived(chartLayout(tile?.tile?.chart));
+  const CHART_MODES = ["band", "full", "header"] as const;
+  const CHART_GLYPH = {
+    band: "align_vertical_bottom",
+    full: "fullscreen",
+    header: "view_headline",
+  } as const;
+  const CHART_LABEL = {
+    band: "band",
+    full: "full",
+    header: "icon + name",
+  } as const;
+  const nextChartMode = $derived(
+    CHART_MODES[(CHART_MODES.indexOf(chartMode) + 1) % CHART_MODES.length],
+  );
+  const chartTitle = $derived(
+    `Sparkline: ${CHART_LABEL[chartMode]} — click for ${CHART_LABEL[nextChartMode]}`,
   );
   /** The tile actually draws a sparkline: a slot has one enabled and its
    *  reading carries history. */
@@ -568,7 +599,7 @@
     return undefined;
   }
 
-  /** The anchor as the user knows it: a device name or a state's name. */
+  /** The anchor as the user knows it: the state's name. */
   function sourceName(source: SlotSource | undefined): string {
     if (!source) return "the tile's source";
     if (source.kind === "state") {
@@ -577,10 +608,6 @@
       ).trim();
       return label ? `“${label}”` : `“${source.stateId}”`;
     }
-    const device = sourceLook.devices.find(
-      (entry) => entry.id === source.device,
-    );
-    if (device?.name) return `“${device.name}”`;
     return source.kind === "control"
       ? `“${source.control}”`
       : "the tile's source";
@@ -596,17 +623,29 @@
     saveTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
+    const templateRegistry = getTemplateRegistry();
+    const wanted = name.trim().toLowerCase();
+    if (
+      (templateRegistry.templates ?? []).some(
+        (template) =>
+          String(template.name ?? "")
+            .trim()
+            .toLowerCase() === wanted,
+      )
+    ) {
+      saveTemplateError = `A template named “${name}” already exists.`;
+      return;
+    }
     const result = collectTileTemplate(config, {
       id: newId(),
       name,
       type,
       look: sourceLook,
     });
-    if (result.template.features.length === 0) {
-      saveTemplateError = "No slot in this tile maps to a known feature.";
+    if (!result.template.roles?.length) {
+      saveTemplateError = "No slot in this tile could be bound to a role.";
       return;
     }
-    const templateRegistry = getTemplateRegistry();
     const problem = visualTemplateProblem(
       result.template,
       (templateRegistry.templates ?? []).map((template) => template.id),
@@ -631,39 +670,64 @@
     }.`;
   }
 
-  function applyTemplate(template: Template): void {
+  async function applyTemplate(template: Template): Promise<void> {
     applyTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
     const anchor = templateAnchor(config);
-    if (!anchor) {
-      applyTemplateError =
-        "This tile has no state or device to anchor the template.";
+    if (!anchor || anchor.kind !== "state") {
+      applyTemplateError = "This tile has no state to anchor the template.";
       return;
     }
     let materialized;
-    if (anchor.kind === "state") {
+    {
       const resolved = resolveSlotSource(anchor, sourceLook);
       if (!resolved?.stateId || !resolved.object) {
         applyTemplateError = "The tile's source state is gone.";
         return;
       }
-      materialized = materializeTemplateTileFromState(
-        template,
-        {
-          ref: anchor.stateId,
-          stateId: resolved.stateId,
-          object: resolved.object,
-        },
-        sourceLook.objects,
-      );
-    } else {
-      const target = devices.find((entry) => entry.id === anchor.device);
-      if (!target) {
-        applyTemplateError = "The tile's device is gone.";
-        return;
+      const override = resolved.overrideId
+        ? getOverrideRegistry().overrides.find(
+            (entry) => entry.id === resolved.overrideId,
+          )
+        : undefined;
+      const reference = {
+        ref: anchor.stateId,
+        stateId: resolved.stateId,
+        object: resolved.object,
+        ...(override
+          ? { overrideId: override.id, overrideName: override.name }
+          : {}),
+      };
+      if (template.roles?.length) {
+        const ensurer = createOverrideEnsurer();
+        materialized = materializeTemplateTileFromFills(
+          template,
+          autoFillRoles(
+            template,
+            reference,
+            sourceLook.objects,
+            undefined,
+            getOverrideRegistry().overrides,
+          ),
+          reference,
+          (stateId, repair) => ensurer.ensure(stateId, repair),
+        );
+        const saved = await ensurer.save();
+        if (saved === "conflict" || saved === "failed") {
+          applyTemplateError =
+            "The template was not applied — its new overrides could not be saved.";
+          return;
+        }
+      } else {
+        materialized = materializeTemplateTileFromState(
+          template,
+          reference,
+          sourceLook.objects,
+          undefined,
+          getOverrideRegistry().overrides,
+        );
       }
-      materialized = materializeTemplateTile(template, target, allTemplates);
     }
     if (materialized.slots.length === 0) {
       applyTemplateError = `“${template.name}” fits no source on this tile.`;
@@ -781,23 +845,16 @@
   // ------------------------------------------------------------------- slots
 
   /**
-   * A source's own label, for the active-condition line: `Device.Control`,
-   * a state id, or a device name (v2 sources are objects).
+   * A source's own label, for the active-condition line: the state id (with
+   * its override), or a legacy control reference.
    */
   function sourceLabel(source: SlotSource | string): string {
     return slotLabel({ kind: "value", source });
   }
 
-  /** The device a source names, for preselecting it in the source picker. */
-  function sourceDevice(source: SlotSource | string | undefined): string {
-    return source && typeof source !== "string" && source.kind !== "state"
-      ? source.device
-      : "";
-  }
-
   /**
-   * What a slot row shows next to its kind: `Device.Control` for a control
-   * reference, the state id for a raw state, the URL for a frame (S3).
+   * What a slot row shows next to its kind: the state id (with its override)
+   * for a state, a legacy control reference, or the URL for a frame (S3).
    */
   function slotLabel(slot: Slot): string {
     if (slot.kind === "frame") {
@@ -823,12 +880,14 @@
     const source = slot.source;
     if (!source) return "no source";
     if (typeof source === "string") return source; // legacy v1 source
-    if (source.kind === "state") return source.stateId;
-    const device = devices.find((d) => d.id === source.device);
-    if (source.kind === "device") return device?.name || source.device;
-    const control = device?.controls?.find((c) => c.id === source.control);
-    const name = control?.label || control?.feature || source.control;
-    return device ? `${device.name || device.id}.${name}` : name;
+    if (source.kind === "state") {
+      const override = source.override
+        ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+        : undefined;
+      return override ? `${source.stateId} · ${override.name}` : source.stateId;
+    }
+    if (source.kind === "device") return source.device;
+    return `${source.device}.${source.control}`;
   }
 
   /** The state an HTML slot or frame reads from, or the picker's prompt. */
@@ -875,40 +934,19 @@
       // fall back to the tile's own controls), not in the slot source.
       if (source === "ago" || source === "offline") {
         const of = typeof slot.options?.of === "string" ? slot.options.of : "";
-        if (!of) return (device?.controls ?? []).length === 0;
+        if (!of) return true;
         const id = stateIdFor(of, getVariables());
-        return (
-          !sourceLook.objects.get(id) &&
-          !sourceLook.states.get(id) &&
-          !devices.some((d) =>
-            (d.controls ?? []).some(
-              (c) => c.id === of || c.stateId === of || c.feature === of,
-            ),
-          )
-        );
+        return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
       }
       const id = stateIdFor(source, getVariables());
-      return (
-        !devices.some((d) =>
-          (d.controls ?? []).some(
-            (c) =>
-              c.feature === source || c.id === source || c.stateId === source,
-          ),
-        ) &&
-        !sourceLook.objects.get(id) &&
-        !sourceLook.states.get(id)
-      );
+      return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
     }
     if (source.kind === "state") {
       const id = stateIdFor(source.stateId, getVariables());
       return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
     }
-    if (source.kind === "device") {
-      return !devices.some((d) => d.id === source.device);
-    }
-    return !devices
-      .find((d) => d.id === source.device)
-      ?.controls?.some((c) => c.id === source.control);
+    // A legacy control/device source has no device registry to resolve.
+    return true;
   }
 
   /** A rule's live dot: green when `when` evaluates to true, red on error. */
@@ -993,15 +1031,9 @@
     );
   }
 
-  /** A badge's source kind decides what it can show: a control/state reads a
-   *  value or its age, a device reports offline or its age. */
-  function isDeviceBadge(slot: Slot): boolean {
-    return typeof slot.source === "object" && slot.source?.kind === "device";
-  }
-
   function badgeShows(slot: Slot): "value" | "ago" | "offline" {
-    if (slot.options?.derive === "ago") return "ago";
-    return isDeviceBadge(slot) ? "offline" : "value";
+    const derive = slot.options?.derive;
+    return derive === "ago" || derive === "offline" ? derive : "value";
   }
 
   function patchOptions(
@@ -1054,33 +1086,16 @@
   }
 
   /** Does this slot's reading carry history (A63)? Drives the hint and the
-   *  disabled toggle. */
+   *  disabled toggle. A raw state is fed by its override's history. */
   function sparkReady(i: number): boolean {
     const source = shownSlots[i]?.source;
-    if (!source) return false;
-    if (typeof source === "string") {
-      return hasHistory(
-        devices
-          .flatMap((d) => d.controls ?? [])
-          .find(
-            (c) =>
-              c.feature === source || c.id === source || c.stateId === source,
-          ),
-      );
+    if (!source || typeof source === "string" || source.kind !== "state") {
+      return false;
     }
-    if (source.kind !== "control") return false;
-    return hasHistory(
-      devices
-        .find((d) => d.id === source.device)
-        ?.controls?.find((c) => c.id === source.control),
-    );
-  }
-
-  /** The colour select's value: "" (auto), a palette token, or "custom". */
-  function sparkColorValue(slot: Slot): string {
-    const color = slot.spark?.color;
-    if (!color) return "";
-    return Object.values(BADGE_COLORS).includes(color) ? color : "custom";
+    const override = source.override
+      ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+      : undefined;
+    return !!override?.history;
   }
 
   /** The icon's homes cycle both → tile → modal → both (A57); a modal-only
@@ -1170,35 +1185,10 @@
   aria: string,
   set: (v: string | undefined) => void,
 )}
-  <label class="small">
+  <div class="small">
     <span class="label-mono">{label}</span>
-    <select
-      value={isHexColor(value ?? "") ? "custom" : (value ?? "")}
-      onchange={(e) => {
-        const next = e.currentTarget.value;
-        if (next === "custom") {
-          if (!isHexColor(value ?? "")) set("#494bd6");
-          return;
-        }
-        set(next || undefined);
-      }}
-    >
-      <option value="">default</option>
-      {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
-        <option value={token}>{name}</option>
-      {/each}
-      <option value="custom">custom…</option>
-    </select>
-    {#if isHexColor(value ?? "")}
-      <input
-        type="color"
-        class="color-input"
-        aria-label={aria}
-        value={value ?? ""}
-        oninput={(e) => set(e.currentTarget.value)}
-      />
-    {/if}
-  </label>
+    <ColorSelect label={aria} {value} onChange={set} />
+  </div>
 {/snippet}
 
 <div class="details">
@@ -1443,22 +1433,26 @@
           <div class="field">
             <div class="row wrap">
               {#if hasSparkline}
-                <label
-                  class="check"
-                  title="Fill the whole tile face with the sparkline; off gives it a band after the name"
-                >
-                  <input
-                    type="checkbox"
-                    checked={chartFull}
-                    onchange={(e) =>
+                <span class="small">
+                  <span class="label-mono">Sparkline</span>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title={chartTitle}
+                    aria-label={chartTitle}
+                    onclick={() =>
                       patchChart({
-                        full: e.currentTarget.checked ? true : undefined,
+                        mode: nextChartMode,
+                        full: undefined,
                         separate: undefined,
                       })}
-                  />
-                  <span>Sparkline full</span>
-                </label>
-                {#if !chartFull}
+                  >
+                    <span class="material-symbols-outlined"
+                      >{CHART_GLYPH[chartMode]}</span
+                    >
+                  </button>
+                </span>
+                {#if chartMode === "band"}
                   <label class="small">
                     <span class="label-mono">Chart height (px)</span>
                     <input
@@ -2137,49 +2131,11 @@
                         )}
                     />
                   </label>
-                  <label class="small">
-                    <span class="label-mono">Unit</span>
-                    <input
-                      type="text"
-                      class="unit-input"
-                      value={slot.unit ?? ""}
-                      title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
-                      oninput={(e) =>
-                        edit((t) =>
-                          patchSlot(t, i, {
-                            unit: e.currentTarget.value.trim() || undefined,
-                          }),
-                        )}
-                    />
-                  </label>
-                </div>
-                {#if slot.kind === "value"}
-                  <div class="row">
-                    <label class="small">
-                      <span class="label-mono">index</span>
-                      <input
-                        type="number"
-                        class="num-input"
-                        value={String(slot.options?.index ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            index: num(e.currentTarget.value),
-                          })}
-                      />
-                    </label>
-                    <label class="small">
-                      <span class="label-mono">decimals</span>
-                      <input
-                        type="number"
-                        class="num-input"
-                        value={String(slot.options?.decimals ?? "")}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            decimals: num(e.currentTarget.value),
-                          })}
-                      />
-                    </label>
-                    <label class="check" title="Hide the unit to save width">
+                  {#if slot.kind === "value"}
+                    <label
+                      class="check"
+                      title="Show the unit (off saves width)"
+                    >
                       <input
                         type="checkbox"
                         checked={slot.options?.hideUnit !== true}
@@ -2192,7 +2148,96 @@
                       />
                       <span>unit</span>
                     </label>
+                  {/if}
+                  {#if slot.kind !== "value" || slot.options?.hideUnit !== true}
+                    <label class="small">
+                      {#if slot.kind !== "value"}
+                        <span class="label-mono">Unit</span>
+                      {/if}
+                      <input
+                        type="text"
+                        class="unit-input"
+                        aria-label="Unit"
+                        value={slot.unit ?? ""}
+                        title="Display unit. A date/time state also accepts ago, time, date, datetime or a pattern like HH:mm:ss."
+                        oninput={(e) =>
+                          edit((t) =>
+                            patchSlot(t, i, {
+                              unit: e.currentTarget.value.trim() || undefined,
+                            }),
+                          )}
+                      />
+                    </label>
+                  {/if}
+                </div>
+                {#if slot.kind === "value"}
+                  <div class="row">
+                    <label class="small">
+                      <span class="label-mono">decimals</span>
+                      <input
+                        type="number"
+                        class="num-input"
+                        value={String(slot.options?.decimals ?? "")}
+                        oninput={(e) =>
+                          patchOptions(i, {
+                            decimals: num(e.currentTarget.value),
+                          })}
+                      />
+                    </label>
+                    <label
+                      class="check"
+                      title="Off keeps the colour and its homes but draws nothing"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={slot.spark !== undefined &&
+                          slot.spark.enabled !== false}
+                        disabled={!sparkReady(i)}
+                        onchange={(e) =>
+                          e.currentTarget.checked
+                            ? setSpark(i, { enabled: true })
+                            : setSpark(i, { enabled: false })}
+                      />
+                      <span>Sparkline</span>
+                    </label>
+                    {#if slot.spark}
+                      <div class="small">
+                        <span class="label-mono">chart</span>
+                        <ColorSelect
+                          label="Chart colour"
+                          defaultLabel="auto"
+                          value={slot.spark.color}
+                          onChange={(v) => setSpark(i, { color: v })}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        class:on={slot.spark.where !== undefined}
+                        title={sparkWhereTitle(i)}
+                        aria-label={sparkWhereTitle(i)}
+                        onclick={() =>
+                          edit((t) =>
+                            patchSpark(t, i, {
+                              where:
+                                nextSparkWhere(i) === "both"
+                                  ? undefined
+                                  : nextSparkWhere(i),
+                            }),
+                          )}
+                      >
+                        <span class="material-symbols-outlined"
+                          >{WHERE_GLYPH[slot.spark.where ?? "both"]}</span
+                        >
+                      </button>
+                    {/if}
                   </div>
+                  {#if !sparkReady(i)}
+                    <p class="note text-muted">
+                      No history for this source — set it on the state's
+                      override, or in the device editor.
+                    </p>
+                  {/if}
                 {/if}
                 {#if slot.kind === "level"}
                   <div class="row">
@@ -2239,18 +2284,15 @@
                         onchange={(e) =>
                           patchOptions(i, {
                             derive:
-                              e.currentTarget.value === "ago"
-                                ? "ago"
-                                : undefined,
+                              e.currentTarget.value === "value"
+                                ? undefined
+                                : e.currentTarget.value,
                             of: undefined,
                           })}
                       >
-                        {#if isDeviceBadge(slot)}
-                          <option value="offline">offline</option>
-                        {:else}
-                          <option value="value">value</option>
-                        {/if}
+                        <option value="value">value</option>
                         <option value="ago">time since</option>
+                        <option value="offline">offline</option>
                       </select>
                     </label>
                     {#if badgeShows(slot) === "ago"}
@@ -2327,88 +2369,28 @@
                         <option value="bottom">bottom</option>
                       </select>
                     </label>
-                    <label class="small">
+                    <div class="small">
                       <span class="label-mono">colour</span>
-                      <select
-                        value={isHexColor(String(slot.options?.color ?? ""))
-                          ? "custom"
-                          : String(slot.options?.color ?? "")}
-                        onchange={(e) => {
-                          const value = e.currentTarget.value;
-                          if (value === "custom") {
-                            if (
-                              !isHexColor(String(slot.options?.color ?? ""))
-                            ) {
-                              patchOptions(i, { color: "#494bd6" });
-                            }
-                            return;
-                          }
-                          patchOptions(i, { color: value || undefined });
-                        }}
-                      >
-                        <option value="">default</option>
-                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
-                          <option value={name}>{name}</option>
-                        {/each}
-                        <option value="custom">custom…</option>
-                      </select>
-                    </label>
-                    {#if isHexColor(String(slot.options?.color ?? ""))}
-                      <input
-                        type="color"
-                        class="color-input"
-                        aria-label="Badge colour"
-                        value={String(slot.options?.color)}
-                        oninput={(e) =>
-                          patchOptions(i, { color: e.currentTarget.value })}
+                      <ColorSelect
+                        label="Badge colour"
+                        value={typeof slot.options?.color === "string"
+                          ? slot.options.color
+                          : undefined}
+                        onChange={(v) => patchOptions(i, { color: v })}
                       />
-                    {/if}
+                    </div>
                   </div>
                   <div class="row wrap">
-                    <label class="small">
+                    <div class="small">
                       <span class="label-mono">bg</span>
-                      <select
-                        value={isHexColor(
-                          String(slot.options?.background ?? ""),
-                        )
-                          ? "custom"
-                          : String(slot.options?.background ?? "")}
-                        onchange={(e) => {
-                          const value = e.currentTarget.value;
-                          if (value === "custom") {
-                            if (
-                              !isHexColor(
-                                String(slot.options?.background ?? ""),
-                              )
-                            ) {
-                              patchOptions(i, { background: "#1e3a8a" });
-                            }
-                            return;
-                          }
-                          patchOptions(i, {
-                            background: value || undefined,
-                          });
-                        }}
-                      >
-                        <option value="">default</option>
-                        {#each Object.entries(BADGE_COLORS) as [name] (name)}
-                          <option value={name}>{name}</option>
-                        {/each}
-                        <option value="custom">custom…</option>
-                      </select>
-                    </label>
-                    {#if isHexColor(String(slot.options?.background ?? ""))}
-                      <input
-                        type="color"
-                        class="color-input"
-                        aria-label="Badge background"
-                        value={String(slot.options?.background)}
-                        oninput={(e) =>
-                          patchOptions(i, {
-                            background: e.currentTarget.value,
-                          })}
+                      <ColorSelect
+                        label="Badge background"
+                        value={typeof slot.options?.background === "string"
+                          ? slot.options.background
+                          : undefined}
+                        onChange={(v) => patchOptions(i, { background: v })}
                       />
-                    {/if}
+                    </div>
                     <label class="check" title="Use a heavier badge label">
                       <input
                         type="checkbox"
@@ -2520,101 +2502,66 @@
                     </p>
                   {/if}
                 {/if}
-                {#if slot.kind === "value"}
-                  <div class="row">
-                    <label
-                      class="check"
-                      title="Off keeps the colour and its homes but draws nothing"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={slot.spark !== undefined &&
-                          slot.spark.enabled !== false}
-                        disabled={!sparkReady(i)}
-                        onchange={(e) =>
-                          e.currentTarget.checked
-                            ? setSpark(i, { enabled: true })
-                            : setSpark(i, { enabled: false })}
-                      />
-                      <span>Sparkline</span>
-                    </label>
-                    {#if slot.spark}
-                      <label class="small">
-                        <span class="label-mono">colour</span>
-                        <select
-                          value={sparkColorValue(slot)}
-                          onchange={(e) => {
-                            const value = e.currentTarget.value;
-                            if (value === "custom") {
-                              if (!isHexColor(slot.spark?.color ?? "")) {
-                                setSpark(i, { color: "#494bd6" });
-                              }
-                              return;
-                            }
-                            setSpark(i, { color: value || undefined });
-                          }}
-                        >
-                          <option value="">auto</option>
-                          {#each Object.entries(BADGE_COLORS) as [name, token] (name)}
-                            <option value={token}>{name}</option>
-                          {/each}
-                          <option value="custom">custom…</option>
-                        </select>
-                      </label>
-                      {#if isHexColor(slot.spark.color ?? "")}
-                        <input
-                          type="color"
-                          class="color-input"
-                          aria-label="Chart colour"
-                          value={slot.spark.color}
-                          oninput={(e) =>
-                            setSpark(i, { color: e.currentTarget.value })}
-                        />
-                      {/if}
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        class:on={slot.spark.where !== undefined}
-                        title={sparkWhereTitle(i)}
-                        aria-label={sparkWhereTitle(i)}
-                        onclick={() =>
-                          edit((t) =>
-                            patchSpark(t, i, {
-                              where:
-                                nextSparkWhere(i) === "both"
-                                  ? undefined
-                                  : nextSparkWhere(i),
-                            }),
-                          )}
-                      >
-                        <span class="material-symbols-outlined"
-                          >{WHERE_GLYPH[slot.spark.where ?? "both"]}</span
-                        >
-                      </button>
-                    {/if}
-                  </div>
-                  {#if !sparkReady(i)}
-                    <p class="note text-muted">
-                      No history for this control — configure it in the device
-                      editor.
-                    </p>
-                  {/if}
-                {/if}
                 <div class="slot-rules">
                   <div class="row between">
                     <span class="label-mono"
                       >Rules ({slot.rules?.length ?? 0})</span
                     >
-                    <button
-                      type="button"
-                      class="icon-btn"
-                      title="Add rule"
-                      aria-label="Add rule"
-                      onclick={() => addRuleAt(i)}
-                    >
-                      <span class="material-symbols-outlined">add</span>
-                    </button>
+                    <span class="item-actions">
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="How rules work"
+                        aria-label="How rules work"
+                        aria-expanded={rulesHelpFor === i}
+                        onclick={() =>
+                          (rulesHelpFor = rulesHelpFor === i ? null : i)}
+                      >
+                        <span class="material-symbols-outlined">help</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="Add rule"
+                        aria-label="Add rule"
+                        onclick={() => addRuleAt(i)}
+                      >
+                        <span class="material-symbols-outlined">add</span>
+                      </button>
+                    </span>
                   </div>
+                  {#if rulesHelpFor === i}
+                    <div class="rule-help text-muted">
+                      <p>
+                        Each rule has a <code>when</code> expression
+                        (JavaScript, exact <code>true</code> only). Matching
+                        rules apply in order, and the
+                        <strong>last match wins</strong>
+                        for each setting. The dot shows the live result: green = true,
+                        red = error.
+                      </p>
+                      <p>
+                        <strong>icon</strong> replaces the glyph,
+                        <strong>colour</strong> tints it, <strong>glow</strong>
+                        adds the glow, <strong>hidden</strong> hides the slot,
+                        <strong>disabled</strong> makes the control inert,
+                        <strong>background</strong> sets the cell background and
+                        <strong>tone</strong> colours badges.
+                        <strong>only</strong> is a visibility gate: with at
+                        least one <code>only</code> rule the slot shows only while
+                        one of them matches. Use the arrows to reorder.
+                      </p>
+                      <p>
+                        Names are the control's feature or label, lowercased
+                        with
+                        <code>_</code>: a control labelled “Bewegung” is
+                        <code>bewegung</code>. Controls that share a feature get
+                        a suffix (<code>power</code>, <code>power2</code>, …).
+                        Use
+                        <code>get("state.id")</code> for a raw state.
+                      </p>
+                    </div>
+                  {/if}
                   {#each slot.rules ?? [] as rule, ri (ri)}
                     {@const ruleOpen =
                       openRule?.slot === i && openRule.rule === ri}
@@ -2696,11 +2643,21 @@
                           <div class="rule-line">
                             <button
                               type="button"
-                              class="btn btn-sm"
+                              class="btn btn-sm rule-icon"
+                              title={rule.icon
+                                ? `Icon: ${rule.icon}`
+                                : "Choose an icon"}
+                              aria-label={rule.icon
+                                ? "Change rule icon"
+                                : "Choose rule icon"}
                               onclick={() =>
                                 (ruleIconFor = { slot: i, rule: ri })}
                             >
-                              {rule.icon || "icon…"}
+                              {#if rule.icon}
+                                <Icon value={rule.icon} size={16} />
+                              {:else}
+                                icon…
+                              {/if}
                             </button>
                             {#if rule.icon}
                               <button
@@ -2712,20 +2669,17 @@
                                   )}>clear</button
                               >
                             {/if}
-                            <input
-                              type="color"
-                              class="color-input"
-                              aria-label="Rule colour"
-                              value={isHexColor(rule.color)
-                                ? rule.color
-                                : "#000000"}
-                              oninput={(e) =>
-                                edit((t) =>
-                                  patchRule(t, i, ri, {
-                                    color: e.currentTarget.value,
-                                  }),
-                                )}
-                            />
+                            <div class="small">
+                              <span class="label-mono">colour</span>
+                              <ColorSelect
+                                label="Rule colour"
+                                value={rule.color}
+                                onChange={(v) =>
+                                  edit((t) =>
+                                    patchRule(t, i, ri, { color: v }),
+                                  )}
+                              />
+                            </div>
                             {#if rule.color}
                               <button
                                 type="button"
@@ -2797,35 +2751,17 @@
                             </label>
                           </div>
                           <div class="rule-line">
-                            <label class="small grow">
+                            <div class="small grow">
                               <span class="label-mono">background</span>
-                              <input
-                                type="text"
-                                value={rule.background ?? ""}
-                                oninput={(e) =>
+                              <ColorSelect
+                                label="Rule background colour"
+                                value={rule.background}
+                                onChange={(v) =>
                                   edit((t) =>
-                                    patchRule(t, i, ri, {
-                                      background:
-                                        e.currentTarget.value.trim() ||
-                                        undefined,
-                                    }),
+                                    patchRule(t, i, ri, { background: v }),
                                   )}
                               />
-                              <input
-                                type="color"
-                                class="color-input"
-                                aria-label="Rule background colour"
-                                value={isHexColor(rule.background)
-                                  ? rule.background
-                                  : "#000000"}
-                                oninput={(e) =>
-                                  edit((t) =>
-                                    patchRule(t, i, ri, {
-                                      background: e.currentTarget.value,
-                                    }),
-                                  )}
-                              />
-                            </label>
+                            </div>
                             <label class="small">
                               <span class="label-mono">tone</span>
                               <select
@@ -2872,7 +2808,7 @@
       templates={allTemplates}
       error={applyTemplateError}
       warning={applyTemplateWarning}
-      onPick={applyTemplate}
+      onPick={(template) => void applyTemplate(template)}
       onClose={() => (applyTemplateOpen = false)}
     />
   {/if}
@@ -2892,9 +2828,7 @@
     <SourcePicker
       mode="source"
       title="Choose a source"
-      {devices}
       slots={shownSlots}
-      activeDeviceId={sourceDevice(activeCond?.source)}
       currentState={sourceStateId(activeCond?.source)}
       onSource={setActiveSource}
       onClose={() => (activePicker = false)}
@@ -2905,9 +2839,7 @@
     <SourcePicker
       mode="source"
       title="Choose a source"
-      {devices}
       slots={shownSlots}
-      activeDeviceId={sourceDevice(shownSlots[sourcePickerFor]?.source)}
       currentState={sourceStateId(shownSlots[sourcePickerFor]?.source)}
       onSource={(source) => {
         const slotIndex = sourcePickerFor;
@@ -2977,7 +2909,6 @@
   {#if iconPickerFor !== null}
     <IconPicker
       icon={shownSlots[iconPickerFor]?.icon?.glyph}
-      twins
       onPick={(value) => {
         const target = iconPickerFor;
         iconPickerFor = null;
@@ -3280,7 +3211,7 @@
     min-width: 0;
   }
 
-  .grow input {
+  .grow input:not([type="color"]) {
     width: 100%;
   }
 
@@ -3292,13 +3223,24 @@
     width: 3.5rem;
   }
 
-  .color-input {
-    inline-size: 2rem;
-    block-size: 1.5rem;
-    padding: 0;
+  .rule-icon {
+    flex: 0 0 auto;
+    min-inline-size: 2.2rem;
+  }
+
+  .rule-help {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: transparent;
+    border-radius: var(--border-radius);
+    background: var(--surface-container-low);
+    font-size: var(--body-sm);
+  }
+
+  .rule-help p {
+    margin: 0;
   }
 
   .slot-rules {
@@ -3320,6 +3262,7 @@
 
   .rule-line {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     min-width: 0;

@@ -1,13 +1,8 @@
 import { uniqueSlug } from "$lib/config/slug";
 import { parseDuration } from "$logic/duration";
-import {
-  instantiateTemplate,
-  substituteTemplateParams,
-} from "$logic/templates";
+import { instantiateTemplate } from "$logic/templates";
 import { validateLogicDocument } from "$logic/validate";
-import type { Device } from "$lib/types/device";
-import type { Template } from "$lib/types/display";
-import type { TemplateBundle, TemplateDevicePart } from "$lib/types/templates";
+import type { TemplateBundle } from "$lib/types/templates";
 import type { LogicDef, LogicTemplate, TemplateParam } from "$logic/types";
 
 export type ApplyParam = {
@@ -18,34 +13,7 @@ export type ApplyParam = {
   description?: string;
 };
 
-export type ApplyPart = "api" | "device" | "logic";
-
-/** Devices a visual template may be applied to, sorted by name. */
-export function devicesForTemplate(
-  template: Template,
-  devices: Device[],
-): Device[] {
-  return devices
-    .filter((device) => device.type === template.type)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** The target device with the template id, or the reason it cannot be used. */
-export function planDeviceApply(
-  template: Template,
-  device: Device | undefined,
-): { device: Device } | { problem: string } {
-  if (!device) {
-    return { problem: "Choose a device to apply the template to." };
-  }
-  if (device.type !== template.type) {
-    return {
-      problem: `The template is for ${template.type} devices, but ${device.name} is a ${device.type} device.`,
-    };
-  }
-  return { device: { ...device, template: template.id } };
-}
+export type ApplyPart = "api" | "logic";
 
 /** Initial apply-form values for a logic template's params. */
 export function logicApplyDefaults(
@@ -120,36 +88,14 @@ export function planLogicApply(
   }
 }
 
-/** Parts present in a bundle, in apply order. */
+/** Parts present in a bundle, in apply order. A stored device part is a tile
+ *  template, applied from the tile editor; the bundle applies its API/logic
+ *  parts only. */
 export function bundleApplyParts(bundle: TemplateBundle): ApplyPart[] {
   const parts: ApplyPart[] = [];
   if (bundle.api) parts.push("api");
-  if (bundle.device) parts.push("device");
   if (bundle.logic) parts.push("logic");
   return parts;
-}
-
-/** The user visual template a bundle's Device part applies. */
-export function bundleDeviceTemplate(
-  part: TemplateDevicePart,
-  id: string,
-  name: string,
-  params: Record<string, unknown> = {},
-): Template {
-  const substituted = substituteTemplateParams(
-    structuredClone(part),
-    params,
-  ) as TemplateDevicePart;
-  return {
-    id,
-    name,
-    builtin: false,
-    type: substituted.type,
-    ...(substituted.size ? { size: substituted.size } : {}),
-    ...(substituted.background ? { background: substituted.background } : {}),
-    features: structuredClone(substituted.features),
-    slots: structuredClone(substituted.slots),
-  };
 }
 
 const LOGIC_PARAM_TYPES = new Set<ApplyParam["type"]>([
@@ -174,7 +120,7 @@ export function bundleLogicParams(bundle: TemplateBundle): TemplateParam[] {
 }
 
 export function applyPartLabel(part: ApplyPart): string {
-  return part === "api" ? "API" : part === "device" ? "Device" : "Logic";
+  return part === "api" ? "API" : "Logic";
 }
 
 /** Run the parts in order; the first throw stops and names its part. */

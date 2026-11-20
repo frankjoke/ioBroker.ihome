@@ -1,72 +1,6 @@
 import { it, expect } from "vitest";
 import { resolveTile } from "$lib/config/tile-resolve";
-
-it("carries a control's effective metadata into the synthetic bag", () => {
-  const control = {
-    id: "c",
-    feature: "power",
-    stateId: "s",
-    liveValue: 0,
-    writable: false,
-    available: true,
-    exists: true,
-    widget: "value" as const,
-    meta: {
-      states: { "0": "Frei" },
-      role: "value.power",
-      unit: "W",
-    },
-  };
-  const res = resolveTile(
-    {
-      slots: [
-        {
-          kind: "badge",
-          source: { kind: "control", device: "d", control: "c" },
-        },
-      ],
-    } as any,
-    "T",
-    {
-      devices: [{ id: "d", controls: [control] }] as any,
-      states: new Map(),
-      objects: new Map(),
-    },
-  );
-  expect(res.device.controls[0].meta?.states).toEqual({ "0": "Frei" });
-  expect(res.device.controls[0].states).toEqual({ "0": "Frei" });
-});
-
-it("a value slot stays a value even when the control suggests a level", () => {
-  const control = {
-    id: "c",
-    feature: "temperature",
-    stateId: "s",
-    liveValue: 18,
-    writable: false,
-    available: true,
-    exists: true,
-    widget: "level" as const,
-    meta: { type: "number", role: "value.temperature", min: -20, max: 100 },
-  };
-  const res = resolveTile(
-    {
-      slots: [
-        {
-          kind: "value",
-          source: { kind: "control", device: "d", control: "c" },
-        },
-      ],
-    } as any,
-    "T",
-    {
-      devices: [{ id: "d", controls: [control] }] as any,
-      states: new Map(),
-      objects: new Map(),
-    },
-  );
-  expect(res.device.controls[0].widget).toBe("value");
-});
+import { writeControl } from "$lib/utils/control-write";
 
 it("builds a raw state's meta from its object, range included", () => {
   const res = resolveTile(
@@ -75,7 +9,6 @@ it("builds a raw state's meta from its object, range included", () => {
     } as any,
     "T",
     {
-      devices: [],
       states: new Map([["a.0.x", { val: 42 }]]),
       objects: new Map([
         [
@@ -96,4 +29,63 @@ it("builds a raw state's meta from its object, range included", () => {
   expect(res.device.controls[0].meta?.min).toBe(0);
   expect(res.device.controls[0].meta?.max).toBe(255);
   expect(res.device.controls[0].meta?.step).toBe(5);
+});
+
+it("writes a repaired state through its override's write transform", async () => {
+  const transform = {
+    read: {
+      kind: "scale" as const,
+      inMin: 0,
+      inMax: 100,
+      outMin: 0,
+      outMax: 100,
+    },
+    write: {
+      kind: "scale" as const,
+      inMin: 0,
+      inMax: 100,
+      outMin: 0,
+      outMax: 1,
+      clamp: true,
+    },
+  };
+  const res = resolveTile(
+    {
+      slots: [
+        {
+          kind: "level",
+          source: { kind: "state", stateId: "a.0.x", override: "o" },
+        },
+      ],
+    } as any,
+    "T",
+    {
+      states: new Map([["a.0.x", { val: 50 }]]),
+      objects: new Map([
+        ["a.0.x", { common: { type: "number", write: true } }],
+      ]),
+      overrides: [
+        {
+          id: "o",
+          stateId: "a.0.x",
+          kind: "repair",
+          name: "level",
+          type: "number",
+          write: true,
+          transform,
+        },
+      ],
+    },
+  );
+  const control = res.device.controls[0];
+  expect(control.transform).toEqual(transform);
+  const writes: [string, unknown][] = [];
+  writeControl(
+    {
+      setState: async (id: string, value: unknown) => writes.push([id, value]),
+    },
+    control,
+    50,
+  );
+  expect(writes).toEqual([["a.0.x", 0.5]]);
 });

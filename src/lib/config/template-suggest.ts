@@ -9,6 +9,9 @@ export interface FeatureCandidate {
   ref?: string;
   stateId?: string;
   object?: any;
+  /** The override the reference was picked through, when any. */
+  overrideId?: string;
+  overrideName?: string;
   candidates: TemplateReference[];
   ambiguous: boolean;
   /** Two features resolved to the same state; the user must choose one. */
@@ -23,8 +26,13 @@ export interface AutoFillResult {
 
 export interface TemplateSuggestion {
   template: Template;
-  feature: FeatureDef;
+  /** The role (role template) or feature name the state fills. */
+  key: string;
+  /** The row's caption in the suggestion list. */
+  label: string;
   score: number;
+  /** The feature row (legacy templates); role rows carry only `key`. */
+  feature?: FeatureDef;
 }
 
 type Match = "role" | "generic" | "type" | null;
@@ -69,7 +77,8 @@ const INFRASTRUCTURE_LEAVES = new Set([
   "deviceTypeList",
 ]);
 
-function isInfrastructure(entry: TemplateReference): boolean {
+/** A configuration/availability leaf the auto-fill never offers by name. */
+export function isInfrastructure(entry: { stateId?: string }): boolean {
   const leaf =
     String(entry.stateId ?? "")
       .split(".")
@@ -167,7 +176,8 @@ export function groupOfState(
   return parts.slice(0, 2).join(".");
 }
 
-function groupStates(
+/** Every state object directly under a channel/folder/device id. */
+export function groupStates(
   groupId: string,
   objects: Map<string, any>,
 ): TemplateReference[] {
@@ -182,7 +192,7 @@ function groupStates(
 
 /** The nearest device object, else the adapter instance (a channel group's
  *  parent device carries availability/battery states). */
-function deviceGroupOfState(
+export function deviceGroupOfState(
   stateId: string,
   objects: Map<string, any>,
 ): string {
@@ -272,6 +282,8 @@ export function autoFillTemplate(
         ref: main.ref,
         stateId: main.stateId,
         object: main.object,
+        ...(main.overrideId ? { overrideId: main.overrideId } : {}),
+        ...(main.overrideName ? { overrideName: main.overrideName } : {}),
         candidates: [main],
         ambiguous: false,
       };
@@ -351,29 +363,45 @@ export function autoFillTemplate(
   };
 }
 
-/** Templates whose features fit a picked state, best match first. */
+/** Templates whose features or roles fit a picked state, best match first. */
 export function suggestTemplatesForState(
   state: { stateId: string; object: any },
   templates: Template[],
 ): TemplateSuggestion[] {
-  if (
-    isInfrastructure({
-      ref: state.stateId,
-      stateId: state.stateId,
-      object: state.object,
-    })
-  ) {
+  if (isInfrastructure({ stateId: state.stateId })) {
     return [];
   }
+  const stateRole = String(state.object?.common?.role ?? "")
+    .trim()
+    .toLowerCase();
   const scored: TemplateSuggestion[] = [];
   for (const template of templates) {
     let best: TemplateSuggestion | undefined;
-    for (const feature of templateFeatures(template)) {
-      const match = matchFeature(feature, state.object);
-      if (!match) continue;
-      const score = (match === "role" ? 3 : 1) + (feature.primary ? 1 : 0);
-      if (!best || score > best.score) {
-        best = { template, feature, score };
+    if (template.roles?.length) {
+      for (const role of template.roles) {
+        const score = roleSuggestionScore(role, stateRole);
+        if (!score) continue;
+        const slot = template.slots?.find((entry) => entry.source === role);
+        const label =
+          String(slot?.label ?? slot?.repair?.label ?? "").trim() || role;
+        if (!best || score > best.score) {
+          best = { template, key: role, label, score };
+        }
+      }
+    } else {
+      for (const feature of templateFeatures(template)) {
+        const match = matchFeature(feature, state.object);
+        if (!match) continue;
+        const score = (match === "role" ? 3 : 1) + (feature.primary ? 1 : 0);
+        if (!best || score > best.score) {
+          best = {
+            template,
+            key: feature.feature,
+            label: feature.label,
+            score,
+            feature,
+          };
+        }
       }
     }
     if (best) scored.push(best);
@@ -387,4 +415,35 @@ export function suggestTemplatesForState(
         templateFeatures(b.template).length ||
       a.template.name.localeCompare(b.template.name),
   );
+}
+
+/** How well a role fits a state's role: 3 specific, 2 generic/family, 0 none. */
+function roleSuggestionScore(role: string, stateRole: string): number {
+  const wanted = role.trim().toLowerCase();
+  const rank = roleMatchRank(wanted, stateRole);
+  if (!rank) return 0;
+  return rank === 3 &&
+    !GENERIC_HINTS.has(wanted) &&
+    !["switch", "button", "level", "color", "enum"].includes(wanted)
+    ? 3
+    : 2;
+}
+
+/** How well a role fits a state's role: 3 exact/leaf, 2 family, 0 none. */
+export function roleMatchRank(wanted: string, actual: string): number {
+  const a = String(wanted ?? "")
+    .trim()
+    .toLowerCase();
+  const b = String(actual ?? "")
+    .trim()
+    .toLowerCase();
+  if (!a || !b) return 0;
+  if (a === b) return 3;
+  const leafA = a.split(".").pop();
+  const leafB = b.split(".").pop();
+  if (leafA === leafB) return 3;
+  // A family prefix is a weaker signal: `value` fits `value.power`, but an
+  // exact or leaf match always wins over it.
+  if (a.startsWith(`${b}.`) || b.startsWith(`${a}.`)) return 2;
+  return 0;
 }

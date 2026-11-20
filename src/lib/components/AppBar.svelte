@@ -20,7 +20,7 @@
     pages as configPages,
     pageHref,
     requestLayoutConfig,
-    wantsDeviceConfig,
+    wantsTileConfig,
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
@@ -215,7 +215,7 @@
    *  `onclick`, so a plain click would already have pushed the hash before a
    *  bubble handler could say no. */
   function onPageClick(event: MouseEvent, id: string) {
-    if (wantsDeviceConfig(event)) {
+    if (wantsTileConfig(event)) {
       // Also suppresses the browser's open-in-new-tab for this hash link.
       event.preventDefault();
       requestLayoutConfig({ pageId: id });
@@ -262,6 +262,17 @@
       cogMenuOpen = false;
       pageMenuOpen = false;
     }
+  }}
+  onclick={(e) => {
+    if (!cogMenuOpen && !pageMenuOpen) return;
+    const target = e.target as Element | null;
+    if (
+      target?.closest(".cog-menu, .pages-menu, .menu-panel, .menu-backdrop")
+    ) {
+      return;
+    }
+    cogMenuOpen = false;
+    pageMenuOpen = false;
   }}
 />
 
@@ -319,19 +330,16 @@
         aria-expanded={pageMenuOpen}
         aria-controls="pages-menu-panel"
         title="Pages"
-        onclick={() => (pageMenuOpen = !pageMenuOpen)}
+        onclick={() => {
+          pageMenuOpen = !pageMenuOpen;
+          cogMenuOpen = false;
+        }}
       >
         <span class="material-symbols-outlined">menu</span>
       </button>
       <span class="menu-current">{currentPage?.title ?? "Pages"}</span>
 
       {#if pageMenuOpen}
-        <button
-          type="button"
-          class="menu-backdrop"
-          aria-label="Close the pages menu"
-          onclick={() => (pageMenuOpen = false)}
-        ></button>
         <nav id="pages-menu-panel" class="menu-panel" aria-label="Pages">
           {#each treePages as p (p.id)}
             <a
@@ -394,7 +402,10 @@
         aria-haspopup="true"
         aria-expanded={cogMenuOpen}
         aria-controls="cog-menu-panel"
-        onclick={() => (cogMenuOpen = !cogMenuOpen)}
+        onclick={() => {
+          cogMenuOpen = !cogMenuOpen;
+          pageMenuOpen = false;
+        }}
       >
         <span class="material-symbols-outlined">
           {status === "error" ? "construction" : "settings"}
@@ -402,12 +413,6 @@
       </button>
 
       {#if cogMenuOpen}
-        <button
-          type="button"
-          class="menu-backdrop"
-          aria-label="Close the configuration menu"
-          onclick={() => (cogMenuOpen = false)}
-        ></button>
         <nav id="cog-menu-panel" class="menu-panel" aria-label="Configuration">
           <a
             class="menu-item"
@@ -547,6 +552,18 @@
     </div>
   </div>
 </header>
+
+{#if pageMenuOpen || cogMenuOpen}
+  <button
+    type="button"
+    class="menu-backdrop"
+    aria-label="Close the menu"
+    onclick={() => {
+      pageMenuOpen = false;
+      cogMenuOpen = false;
+    }}
+  ></button>
+{/if}
 
 {#if isPinAsked()}
   <PinModal
@@ -742,11 +759,8 @@
   /* Below the bar, so the menu button and the eye stay usable while open. */
   .menu-backdrop {
     position: fixed;
-    top: 44px;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 2;
+    inset: 0;
+    z-index: 40;
     padding: 0;
     border: 0;
     background: transparent;

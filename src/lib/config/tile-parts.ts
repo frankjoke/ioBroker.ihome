@@ -1,13 +1,18 @@
 import type { EnrichedDevice, SlotControl } from "$lib/types/device";
-import type { Slot, SlotKind, Template, TileConfig } from "$lib/types/display";
+import type {
+  Slot,
+  SlotKind,
+  Template,
+  TileConfig,
+  TileChartConfig,
+} from "$lib/types/display";
 import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
-  resolveTemplate,
+  resolveControl,
   slotVisible,
 } from "$lib/config/template-ops";
 import { inDetail, slotTileMode } from "$lib/config/tile-ops";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   resolveBadges,
   resolveStyle,
@@ -16,7 +21,20 @@ import {
   type ResolvedStyle,
   type TimeSource,
 } from "$lib/config/rule-ops";
-import type { PoolEntry } from "$lib/config/virtual-ops";
+import {
+  resolveSlotSource,
+  type ResolvedSource,
+  type SourceLook,
+} from "$lib/config/slot-source";
+import type {
+  LocalControl,
+  PoolEntry,
+  ScopeExtras,
+} from "$lib/config/virtual-ops";
+import type { GlobalVariable } from "$lib/config/variables";
+import { sourceRuleName } from "$lib/config/source-overrides";
+import type { HistorySpec } from "$lib/types/device";
+import type { SourceOverride } from "$lib/types/overrides";
 import { offTwin, onTwin } from "$lib/config/icon-library";
 
 /** One slot of a tile, resolved: what it shows and how it looks right now. */
@@ -25,7 +43,6 @@ export interface SlotRow {
   control?: SlotControl;
   style: ResolvedStyle;
   /** The slot's glyph is the template's own, not a choice (A67). */
-  iconIsTemplate?: boolean;
 }
 
 export interface TileParts {
@@ -48,6 +65,127 @@ export interface TileParts {
   hasModal: boolean;
 }
 
+/** What a tile's rules can name: one local per bound source, or per watch
+ *  override — the name the rule writes and the live value it reads. */
+export interface TileSourceControl extends LocalControl {
+  stateId?: string;
+  /** The override the source binds, when it resolves through one. */
+  overrideId?: string;
+  /** The override's chart feed (spec §4): this entry's rows still chart. */
+  history?: HistorySpec;
+  /** The control's own default rules, as the slot style folds them. */
+  rules?: Rule[];
+}
+
+/** What `tileSourceControls` reads beyond the slots themselves. */
+export interface SourceControlOpts {
+  /** The tile's own control bag: resolved `slot:N` pseudo keys point here. */
+  device?: { controls?: TileControlLike[] };
+  states?: Map<string, any>;
+  objects?: Map<string, any>;
+  variables?: GlobalVariable[];
+  /** The overrides a raw-state source can bind to. */
+  overrides?: SourceOverride[];
+  derived?: SourceLook["derived"];
+  /** Overrides a rule names although no slot binds them (spec §3.3). */
+  watchOverrides?: string[];
+}
+
+/** The control-bag fields a rule local reads. */
+export type TileControlLike = {
+  kind?: "state" | "virtual";
+  feature?: string;
+  label?: string;
+  liveValue?: unknown;
+  stateId?: string;
+  history?: HistorySpec;
+  rules?: Rule[];
+};
+
+/** A control of the tile's own bag as a rule local. */
+function bagControl(control: TileControlLike): TileSourceControl {
+  return {
+    kind: control.kind,
+    feature: control.feature,
+    label: control.label ?? control.feature,
+    liveValue: control.liveValue,
+    stateId: control.stateId,
+    history: control.history,
+    rules: control.rules,
+  };
+}
+
+/**
+ * The tile's rule scope, in slot order (spec §3.3): one local per bound source,
+ * named by the override's **name** (its label stays the display label), then
+ * the watch overrides. `ruleScope` suffixes a repeated name, in this order, so
+ * `power2` keeps meaning what it meant before the migration. A frame/html or
+ * source-less slot binds no reading and contributes nothing.
+ */
+export function tileSourceControls(
+  slots: Slot[],
+  opts: SourceControlOpts = {},
+): TileSourceControl[] {
+  const look: SourceLook = {
+    states: opts.states ?? new Map(),
+    objects: opts.objects ?? new Map(),
+    variables: opts.variables,
+    overrides: opts.overrides,
+    derived: opts.derived,
+  };
+  /** A resolved source as a local; the override's name wins over its label,
+   *  and a raw state is named by its id leaf, not the broker's label. */
+  const control = (
+    resolved: ResolvedSource | undefined,
+  ): TileSourceControl | undefined => {
+    if (!resolved) return undefined;
+    const override = resolved.overrideId
+      ? opts.overrides?.find((o) => o.id === resolved.overrideId)
+      : undefined;
+    const name =
+      sourceRuleName({
+        overrideName: override?.name,
+        controlFeature: resolved.control?.feature,
+        stateId: resolved.stateId,
+      }) ?? resolved.label;
+    if (!name) return undefined;
+    return {
+      feature: name,
+      label: resolved.label ?? name,
+      liveValue: resolved.value,
+      stateId: resolved.stateId,
+      overrideId: resolved.overrideId,
+      history: resolved.history,
+      rules: resolved.control?.rules,
+    };
+  };
+  const out: TileSourceControl[] = [];
+  for (const slot of slots ?? []) {
+    if (slot.kind === "frame" || slot.kind === "html" || !slot.source) continue;
+    const source = slot.source;
+    if (typeof source === "string") {
+      // A v1 string source (or a resolved `slot:N`): the tile's own bag knows it.
+      const found = resolveControl(opts.device?.controls ?? [], source);
+      if (found) out.push(bagControl(found));
+      continue;
+    }
+    const entry = control(resolveSlotSource(source, look));
+    if (entry) out.push(entry);
+  }
+  for (const id of opts.watchOverrides ?? []) {
+    const override = opts.overrides?.find((o) => o.id === id);
+    if (!override) continue;
+    const entry = control(
+      resolveSlotSource(
+        { kind: "state", stateId: override.stateId, override: id },
+        look,
+      ),
+    );
+    if (entry) out.push(entry);
+  }
+  return out;
+}
+
 /**
  * A tile's resolved parts, in one place (A46/A47): the display's `Tile` renders
  * them and the sheet asks the same resolution whether a tile has a detail page
@@ -63,43 +201,51 @@ export interface TileParts {
 export function tileParts(
   device: EnrichedDevice,
   tile: TileConfig | undefined,
-  templates: Template[],
+  _templates: Template[],
   opts?: {
     active?: boolean;
     raw?: (source: string) => SlotControl | undefined;
     pool?: PoolEntry[];
     time?: TimeSource | number;
     now?: number;
+    /** The override look a raw-state slot resolves through (spec §3.3). */
+    overrides?: SourceOverride[];
+    states?: Map<string, any>;
+    objects?: Map<string, any>;
+    variables?: GlobalVariable[];
+    derived?: SourceLook["derived"];
+    /** The tile's one rule list, built by the display from the tile's own
+     *  slots (raw, so a device/derive badge keeps its name) plus the watch
+     *  overrides. Absent → built from `slots`, for a caller holding a raw tile. */
+    controls?: LocalControl[];
+    /** Rule locals beyond the sources: the config's variables. */
+    extras?: ScopeExtras;
   },
 ): TileParts {
   const active = opts?.active === true;
   const raw = opts?.raw;
   const shownControls = (device.controls ?? []).filter((c) => !c.hidden);
   const pool = opts?.pool ?? [];
-  // The tile's own slots once it was materialised; the chain's until then (A18).
-  const chain = resolveTemplate(device, templates);
-  const slots =
-    device.id === BLANK_DEVICE_ID
-      ? (tile?.slots ?? [])
-      : (tile?.slots ?? chain.slots);
+  // The tile's own slots: the renderer's resolution always materialises them.
+  const slots = tile?.slots ?? [];
 
-  /** Does this slot carry the glyph the template gives it (A67)? Such a glyph is
-   *  a type default, not a choice, so the device's found icon may stand in for
-   *  it. Compared by position and kind against the chain's own slots. */
-  const templateGlyph = (slot: Slot): boolean => {
-    const at = slots.indexOf(slot);
-    const via = at < 0 ? undefined : chain.slots[at];
-    return (
-      !!slot.icon?.glyph &&
-      !!via &&
-      via.kind === slot.kind &&
-      via.icon?.glyph === slot.icon?.glyph
-    );
-  };
-
-  // Rule locals are the device's controls plus the pool helpers, and the tile's
-  // own `active` flag wins the name over a control alias of the same name (A30).
-  const baseScope = ruleScope(device.controls ?? [], pool);
+  // Rule locals are the tile's bound sources — overrides and watch overrides
+  // included — plus the pool helpers and the config's variables, and the
+  // tile's own `active` flag wins the name over a source of the same name
+  // (A30). The display hands in its one list so the rows, their badges and the
+  // corner chips cannot disagree on a name or a suffix.
+  const sourceControls =
+    opts?.controls ??
+    tileSourceControls(slots, {
+      device,
+      states: opts?.states,
+      objects: opts?.objects,
+      variables: opts?.variables,
+      overrides: opts?.overrides,
+      derived: opts?.derived,
+      watchOverrides: tile?.watchOverrides,
+    });
+  const baseScope = ruleScope(sourceControls, pool, opts?.extras);
   const scope = { ...baseScope, locals: { ...baseScope.locals, active } };
 
   /** Slot rules first, the control's own defaults last — the last match wins. */
@@ -112,36 +258,57 @@ export function tileParts(
   // A source or hint that matches nothing goes dormant (A20); the slots that
   // actually render are the ones with a reading (a frame needs none) that no
   // rule hides.
-  const rows: SlotRow[] = pickSlotControls<SlotControl>(slots, shownControls, {
-    active,
-    raw,
-  })
+  const resolvedRows: SlotRow[] = pickSlotControls<SlotControl>(
+    slots,
+    shownControls,
+    {
+      active,
+      raw,
+    },
+  )
     .filter(
-      (r) =>
-        (r.slot.kind === "frame" || r.slot.kind === "html" || r.control) &&
-        styleOf(r.slot, r.control).hidden !== true,
+      (r) => r.slot.kind === "frame" || r.slot.kind === "html" || r.control,
     )
     .map((r) => ({
       slot: r.slot,
       control: r.control,
       style: styleOf(r.slot, r.control),
-      iconIsTemplate: templateGlyph(r.slot),
     }));
+  const rows = resolvedRows.filter((r) => r.style.hidden !== true);
 
   // The body is every row that lives on the tile (A59: nothing draws as a
   // layer of its own any more — the chart comes from the rows).
   // The body is every row that draws as a tile body element; a badge-mode
   // slot leaves it for a corner chip (A34).
   const body = rows.filter((r) => slotTileMode(r.slot) === "normal");
-  const modal = rows.filter((r) => inDetail(r.slot));
+  // The detail page is governed by the tile settings alone: the Detail span and
+  // the icon/label/value homes. Rules (visibility, colour, icon) and the
+  // active/inactive gate never reach it. The pick runs on showWhen-free clones
+  // so a face-only slot still gets its row and control.
+  const detailSlots = slots.map((s) =>
+    s.showWhen ? { ...s, showWhen: undefined } : s,
+  );
+  const modal: SlotRow[] = pickSlotControls<SlotControl>(
+    detailSlots,
+    shownControls,
+    { active: true, raw },
+  )
+    .filter(
+      (r) => r.slot.kind === "frame" || r.slot.kind === "html" || r.control,
+    )
+    .map((r) => ({
+      slot: r.slot,
+      control: r.control,
+      style: {},
+    }))
+    .filter((r) => inDetail(r.slot));
 
   const badgeSlots = slots.filter(
     (s) => slotVisible(s, active) && slotTileMode(s) === "badge",
   );
-  // Badges that also live in the modal become its chip strip (A34).
-  const modalBadgeSlots = slots.filter(
-    (s) => s.kind === "badge" && slotVisible(s, active) && inDetail(s),
-  );
+  // The detail header mirrors the tile's corner badges: the same chips, rules
+  // and label behaviour; only their place changes (left to right of the title).
+  const modalBadgeSlots = badgeSlots.filter((s) => inDetail(s));
   const modalBadges = raw
     ? modalBadgeSlots.flatMap((s) =>
         resolveBadges(
@@ -151,6 +318,8 @@ export function tileParts(
           opts?.now ?? Date.now(),
           pool,
           raw,
+          false,
+          sourceControls,
         ),
       )
     : [];
@@ -238,23 +407,21 @@ export function faceGlyph(
   tileIcon?: string,
   slotGlyph?: string,
   defaultGlyph?: string,
-  deviceIcon?: string,
 ): string | undefined {
-  return look.glyph ?? tileIcon ?? slotGlyph ?? defaultGlyph ?? deviceIcon;
+  return look.glyph ?? tileIcon ?? slotGlyph ?? defaultGlyph;
 }
 
 /** The icon before the tile name (detail header): the state's look, then the
- *  tile's own icon, then the headline slot's icon, then the device's face. */
+ *  tile's own icon, then the headline slot's icon. */
 export function headerIcon(
   tileIcon: string | undefined,
   look: StateLook,
   headline?: { glyph: string; color?: string; disabled?: boolean },
-  deviceIcon?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
   if (look.glyph) return { glyph: look.glyph, color: look.color };
   if (tileIcon) return { glyph: tileIcon };
   if (headline) return headline;
-  return deviceIcon ? { glyph: deviceIcon } : undefined;
+  return undefined;
 }
 
 /** The pool default a face may wear: not while the tile has an active condition
@@ -263,10 +430,9 @@ export function headerIcon(
 export function faceDefaultGlyph(args: {
   hasActive: boolean;
   headline?: Slot;
-  deviceOwnIcon?: string;
   poolValue?: string;
 }): string | undefined {
-  if (args.hasActive || args.deviceOwnIcon) return undefined;
+  if (args.hasActive) return undefined;
   if (args.headline?.icon?.enabled === false) return undefined;
   return args.poolValue;
 }
@@ -288,13 +454,11 @@ export function binaryOn(control: SlotControl): boolean | undefined {
 }
 
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
- *  there — the last matching rule's glyph beats the descriptor's, and a glyph the
- *  template gave gives way to the device's own icon (A67). A binary state with a
- *  twin in the library draws the half its value asks for. */
+ *  there — the last matching rule's glyph beats the descriptor's. A binary state
+ *  with a twin in the library draws the half its value asks for. */
 export function rowIcon(
   row: SlotRow,
   home: "tile" | "modal",
-  deviceIcon?: string,
   twins?: Record<string, string>,
   fallback?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
@@ -304,13 +468,7 @@ export function rowIcon(
     const where = icon.where ?? "both";
     if (where !== "both" && where !== home) return undefined;
   }
-  const picked =
-    row.style.icon ??
-    (icon
-      ? row.iconIsTemplate
-        ? (deviceIcon ?? icon.glyph)
-        : icon.glyph
-      : fallback);
+  const picked = row.style.icon ?? (icon ? icon.glyph : fallback);
   if (!picked) return undefined;
   const on = twins && row.control ? binaryOn(row.control) : undefined;
   const glyph =
@@ -319,7 +477,15 @@ export function rowIcon(
       : on === false
         ? (offTwin(twins!, picked) ?? picked)
         : picked;
-  return { glyph, color: row.style.color, disabled: row.style.disabled };
+  // A chip's rule colours are for the corner badge (often text on a filled
+  // background). The detail row is a normal line: reusing that colour there can
+  // paint an icon invisible (white on white).
+  const chip = home === "modal" && slotTileMode(row.slot) === "badge";
+  return {
+    glyph,
+    color: chip ? undefined : row.style.color,
+    disabled: row.style.disabled,
+  };
 }
 
 /** Does the slot's reading/control draw in `home`? `hideValue` turns the body
@@ -355,6 +521,14 @@ export function singleSurface(slots: Slot[]): boolean {
 
 /** The series colours, in assignment order (A61): theme tokens, so the chart
  *  follows the theme like everything else. */
+export type ChartLayout = "band" | "full" | "header";
+
+/** The chart layout, reading the legacy booleans when `mode` is absent. */
+export function chartLayout(config?: TileChartConfig): ChartLayout {
+  if (config?.mode) return config.mode;
+  return config?.full === true || config?.separate === true ? "full" : "band";
+}
+
 export const CHART_PALETTE = [
   "var(--primary-color)",
   "var(--success-color)",

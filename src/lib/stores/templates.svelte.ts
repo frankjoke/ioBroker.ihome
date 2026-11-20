@@ -9,7 +9,7 @@ import {
 } from "$lib/config/template-ops";
 import { listTemplates, syncKind } from "$lib/config/template-files";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { getSettings } from "$lib/stores/settings.svelte";
@@ -97,6 +97,44 @@ export function commitTemplates(next: TemplateRegistry): boolean {
   }
   setTemplateRegistry(next);
   saveTemplates();
+  return true;
+}
+
+/**
+ * The awaited file write for a one-time migration: every template goes to its
+ * file now, stale files are removed, and only a success replaces the in-memory
+ * registry. A failure leaves the registry as it was (a retry rewrites all files).
+ */
+export async function commitTemplatesNow(
+  next: TemplateRegistry,
+): Promise<boolean> {
+  if (!isTemplatesWritable()) {
+    console.error(
+      "templates are not readable (no successful load) — the change was not saved",
+    );
+    return false;
+  }
+  if (!ioBroker.connected) {
+    saveFailed = true;
+    return false;
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const templates = next.templates ?? [];
+  try {
+    await syncKind("device", templates, Object.keys(knownIds));
+  } catch (e) {
+    saveFailed = true;
+    console.error("save templates:", e);
+    return false;
+  }
+  knownIds = Object.fromEntries(
+    templates.map((template) => [template.id, true]),
+  );
+  setTemplateRegistry(next);
+  saveFailed = false;
   return true;
 }
 

@@ -3,7 +3,7 @@
   import type { Group } from "$lib/types/display";
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
-  import { requestLayoutConfig, wantsDeviceConfig } from "$lib/pages.js";
+  import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
   import { openSheetGated } from "$lib/stores/sheet.svelte.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
@@ -49,7 +49,7 @@
   /** Ctrl/Cmd+click the section header → open this section in the layout
    *  editor. A gated entrance: the pencil lock asks for the PIN first. */
   function onTitleClick(event: MouseEvent) {
-    if (!wantsDeviceConfig(event)) return;
+    if (!wantsTileConfig(event)) return;
     event.preventDefault();
     event.stopPropagation();
     requestLayoutConfig({ pageId, sectionId: group.id });

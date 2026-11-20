@@ -15,7 +15,7 @@ import {
 } from "$lib/stores/formulas.svelte.ts";
 import { migrateLibrary, seedLibrary } from "$lib/config/formulas";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 
 /**
  * The formula document and every id its expressions read: a formula is

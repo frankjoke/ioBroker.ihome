@@ -1,12 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import {
-    getCanonicalRegistry,
-    setCanonicalRegistry,
-  } from "$lib/stores/devices.svelte";
-  import { saveRegistry } from "$lib/registry.svelte.js";
-  import { newId } from "$lib/utils/ids";
   import { homeFromSystemConfig } from "$logic/phone-ops";
   import {
     getPhoneFix,
@@ -14,7 +8,6 @@
     initPhone,
     pausePhone,
     phone,
-    phoneDeviceLabel,
     requestPhoneLocation,
     setPhoneEnabled,
     setPhoneHome,
@@ -46,17 +39,6 @@
     location.protocol === "https:" ||
       ["localhost", "127.0.0.1", "::1"].includes(location.hostname),
   );
-  const devicePrefix = $derived(
-    `${ioBroker.namespace}.phone.${phone.deviceId}.`,
-  );
-  const deviceExists = $derived(
-    getCanonicalRegistry().devices.some((device) =>
-      device.controls.some((control) =>
-        control.stateId?.startsWith(devicePrefix),
-      ),
-    ),
-  );
-
   onMount(() => {
     initPhone();
     initPush();
@@ -114,53 +96,6 @@
     } catch (error) {
       pushMessage = error instanceof Error ? error.message : String(error);
     }
-  }
-
-  function createPhoneDevice() {
-    const reg = getCanonicalRegistry();
-    if (
-      reg.devices.some((device) =>
-        device.controls.some((control) =>
-          control.stateId?.startsWith(devicePrefix),
-        ),
-      )
-    ) {
-      return;
-    }
-    const fields = [
-      ["atHome", "At home", "indicator.state", "boolean"],
-      ["online", "Online", "indicator.state", "boolean"],
-      ["connection", "Connection", "text", "string"],
-      ["distance", "Distance", "value", "number"],
-      ["lastSeen", "Last seen", "value.time", "number"],
-      ["locationText", "Location", "text", "string"],
-      ["mapUrl", "Map", "text", "string"],
-    ] as const;
-    const controls = fields.map(([feature, label, role, type]) => ({
-      id: newId(),
-      feature,
-      label,
-      writable: false,
-      stateId: `${devicePrefix}${feature}`,
-      common: { role, type, read: true, write: false },
-    }));
-    setCanonicalRegistry({
-      ...reg,
-      version: (reg.version ?? 0) + 1,
-      updatedAt: Date.now(),
-      devices: [
-        ...reg.devices,
-        {
-          id: newId(),
-          name: phoneDeviceLabel(phone.name),
-          type: "Custom",
-          icon: "smartphone",
-          controls,
-        },
-      ],
-    });
-    saveRegistry();
-    message = "Phone device created — add it to a page in the tile editor.";
   }
 </script>
 
@@ -309,17 +244,6 @@
             Use system location
           </button>
         {/if}
-      </div>
-
-      <div class="phone-actions">
-        <button
-          class="btn btn-primary"
-          type="button"
-          disabled={deviceExists}
-          onclick={createPhoneDevice}
-        >
-          {deviceExists ? "Phone device created" : "Create phone device"}
-        </button>
       </div>
 
       <div class="push-block">

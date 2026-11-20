@@ -141,12 +141,6 @@ async function applyDetectedName(): Promise<void> {
   });
 }
 
-/** Device-list label: no spaces, e.g. Phone-Pixel-7. */
-export function phoneDeviceLabel(name: string): string {
-  const label = name.trim().replace(/\s+/g, "-");
-  return label ? `Phone-${label}` : "Phone";
-}
-
 function saveSettings(): void {
   try {
     localStorage.setItem(
