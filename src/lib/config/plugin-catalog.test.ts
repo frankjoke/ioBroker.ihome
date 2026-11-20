@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { expect, it } from "vitest";
 import { parsePluginFile } from "$adapter/plugin-file";
 import { parsePluginCatalog } from "./plugin-catalog";
@@ -65,7 +66,11 @@ it("ships a valid catalog whose plugin files all parse", () => {
     readFileSync("static/plugins/index.json", "utf8"),
   );
   expect(catalog?.version).toBe(1);
-  expect(catalog?.plugins.length).toBe(2);
+  expect(catalog?.plugins.map((plugin) => plugin.id)).toEqual([
+    "nut.ups",
+    "opencode",
+    "external-access",
+  ]);
   for (const entry of catalog?.plugins ?? []) {
     const parsed = parsePluginFile(
       JSON.parse(readFileSync(`static/plugins/${entry.file}`, "utf8")),
@@ -77,4 +82,29 @@ it("ships a valid catalog whose plugin files all parse", () => {
       expect(parsed.plugin.version).toBe(entry.version);
     }
   }
+});
+
+it("ships a plugin file whose code compiles to a factory", () => {
+  const file = JSON.parse(
+    readFileSync("static/plugins/external-access.json", "utf8"),
+  );
+  const parsed = parsePluginFile(file);
+  expect("problem" in parsed).toBe(false);
+  if (!("plugin" in parsed)) return;
+  const mod = { exports: {} as Record<string, unknown> };
+  new Function("module", "exports", "require", parsed.plugin.code)(
+    mod,
+    mod.exports,
+    createRequire(import.meta.url),
+  );
+  const factory = mod.exports as unknown as (api: unknown) => {
+    call?: unknown;
+  };
+  expect(typeof factory).toBe("function");
+  expect(
+    typeof factory({
+      settings: {},
+      log: { info() {}, warn() {}, error() {}, debug() {} },
+    }).call,
+  ).toBe("function");
 });

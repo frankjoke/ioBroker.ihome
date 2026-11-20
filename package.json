@@ -81,8 +81,9 @@
   "scripts": {
     "dev": "vite dev --open",
     "build:adapter": "tsc -p tsconfig.adapter.json",
+    "build:plugins": "node scripts/build-plugin-catalog.mjs",
     "build:adapter:watch": "tsc -p tsconfig.adapter.json --watch",
-    "build": "npm run build:adapter && vite build",
+    "build": "npm run build:adapter && npm run build:plugins && vite build",
     "pack": "npm run build && npm pack",
     "deploy:www": "node scripts/deploy-www.mjs",
     "preview": "vite preview",
