@@ -81,21 +81,6 @@ it("plans states and a valid machine", () => {
   ).toEqual([]);
 });
 
-it("carries the template icon into the created device", () => {
-  const template = new Function("return (" + SOURCE + ")")();
-  template.icon = "/ihome/icons/fluent/fluent_gate_opened.png";
-  const plan = planDeviceTemplate(
-    template,
-    SOURCE,
-    {},
-    "ihome.0.Variables.Garten",
-    "garden",
-    "Garden",
-    "Garden Tor",
-  );
-  expect(plan.device?.icon).toBe("/ihome/icons/fluent/fluent_gate_opened.png");
-});
-
 it("rejects an invalid template before planning", () => {
   const template = new Function("return (" + SOURCE + ")")();
   const bad = { ...template, itemList: [] };
@@ -135,94 +120,4 @@ it("aborts when a foreign state would be overwritten", async () => {
       "ihome.0.Variables.Garten",
     ),
   ).rejects.toThrow("existing foreign states were not overwritten");
-});
-
-const DEVICE_SOURCE = `({
-  deviceType: "Meter",
-  itemList: [
-    { name: "power", type: "number", role: "value.power", unit: "W",
-      source: "power", readOnly: true },
-    { name: "energy", type: "number", role: "value.energy", unit: "kWh",
-      source: "energy", readOnly: true },
-    { name: "timestamp", type: "string", role: "text",
-      source: "timestamp", readOnly: true, hidden: true },
-  ],
-  readRequest() { return { url: "https://x/status" }; },
-  writeRequest() { return { url: "https://x/set" }; },
-})`;
-
-it("plans a device with controls when a device name is given", () => {
-  const template = new Function("return (" + DEVICE_SOURCE + ")")();
-  const plan = planDeviceTemplate(
-    template,
-    DEVICE_SOURCE,
-    {},
-    "ihome.0.Variables.Meter",
-    "meter",
-    "Meter",
-    "My Meter",
-  );
-  expect(plan.device).toMatchObject({
-    id: expect.any(String),
-    name: "My Meter",
-    type: "Meter",
-  });
-  const kept = planDeviceTemplate(
-    template,
-    DEVICE_SOURCE,
-    {},
-    "ihome.0.Variables.Meter",
-    "meter",
-    "Meter",
-    "My Meter",
-    "existing-id",
-  );
-  expect(kept.device?.id).toBe("existing-id");
-  expect(plan.device?.controls).toHaveLength(3);
-  expect(plan.device?.controls[0]).toMatchObject({
-    id: "power",
-    feature: "power",
-    stateId: "ihome.0.Variables.Meter.power",
-    writable: false,
-    label: "power",
-    unit: "W",
-    role: "value.power",
-    type: "number",
-  });
-  expect(plan.device?.controls[1]).toMatchObject({
-    feature: "energy",
-    stateId: "ihome.0.Variables.Meter.energy",
-  });
-  expect(plan.device?.controls[2]).toMatchObject({
-    feature: "value",
-    hidden: true,
-  });
-});
-
-it("does not create a device for an empty device name", () => {
-  const template = new Function("return (" + DEVICE_SOURCE + ")")();
-  const plan = planDeviceTemplate(
-    template,
-    DEVICE_SOURCE,
-    {},
-    "ihome.0.Variables.Meter",
-    "meter",
-    "Meter",
-    "   ",
-  );
-  expect(plan.device).toBeUndefined();
-});
-
-it("falls back to Custom for an unknown device type", () => {
-  const template = new Function("return (" + DEVICE_SOURCE + ")")();
-  const plan = planDeviceTemplate(
-    { ...template, deviceType: "NoSuchType" },
-    DEVICE_SOURCE,
-    {},
-    "ihome.0.Variables.Meter",
-    "meter",
-    "Meter",
-    "My Meter",
-  );
-  expect(plan.device?.type).toBe("Custom");
 });

@@ -20,7 +20,7 @@
     pages as configPages,
     pageHref,
     requestLayoutConfig,
-    wantsDeviceConfig,
+    wantsTileConfig,
   } from "$lib/pages.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import { adapterIcon, pluginPageIcon } from "$lib/config/icon-ops";
@@ -215,7 +215,7 @@
    *  `onclick`, so a plain click would already have pushed the hash before a
    *  bubble handler could say no. */
   function onPageClick(event: MouseEvent, id: string) {
-    if (wantsDeviceConfig(event)) {
+    if (wantsTileConfig(event)) {
       // Also suppresses the browser's open-in-new-tab for this hash link.
       event.preventDefault();
       requestLayoutConfig({ pageId: id });

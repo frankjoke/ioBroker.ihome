@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { isRegistryWritable } from "$lib/registry.svelte.js";
   import { newId } from "$lib/utils/ids";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -43,8 +42,6 @@
   import LogicDeviceTemplates from "./LogicDeviceTemplates.svelte";
   import BundleEditor from "./BundleEditor.svelte";
   import BundleApplyModal from "./BundleApplyModal.svelte";
-  import DeviceApplyModal from "./DeviceApplyModal.svelte";
-  import DeviceCreateModal from "./DeviceCreateModal.svelte";
   import LogicApplyModal from "./LogicApplyModal.svelte";
   import HelpSection from "./HelpSection.svelte";
   import { exportTemplate } from "$lib/template-export";
@@ -84,8 +81,6 @@
   let askSwitch = $state(false);
   let error = $state("");
   let bundleDraft = $state<TemplateBundle | null>(null);
-  let deviceApplyTemplate = $state<Template | null>(null);
-  let deviceCreateTemplate = $state<Template | null>(null);
   let logicApplyTemplate = $state<LogicTemplate | null>(null);
   let bundleApplyTemplate = $state<TemplateBundle | null>(null);
   let pendingDelete = $state<TemplateEntry | null>(null);
@@ -152,7 +147,6 @@
         ? isTemplateBundlesWritable()
         : isLogicsWritable(),
   );
-  const deviceWritable = $derived(isRegistryWritable());
   const blocked = $derived(
     selected?.kind === "logic" || selected?.kind === "api"
       ? logicBlocked()
@@ -186,25 +180,21 @@
   });
 
   function typeLabel(entry: TemplateEntry): string {
-    const deviceBadge = entry.type ? `Device · ${entry.type}` : "Device";
+    const tileBadge = entry.type ? `Tile · ${entry.type}` : "Tile";
     if (entry.kind === "device") {
       if (entry.roles?.length) {
         return `Tile · ${entry.roles.length} role${
           entry.roles.length === 1 ? "" : "s"
         }`;
       }
-      return deviceBadge;
+      return tileBadge;
     }
     if (entry.kind === "api") return "Logic + Device (API)";
     if (entry.kind === "bundle") {
       return (
         entry.parts
           .map((part) =>
-            part === "device"
-              ? deviceBadge
-              : part === "logic"
-                ? "Logic"
-                : "API",
+            part === "device" ? tileBadge : part === "logic" ? "Logic" : "API",
           )
           .join(" + ") || "Bundle"
       );
@@ -255,16 +245,6 @@
     const definition = definitionFor(entry);
     if (!definition) return;
     exportTemplate(entry.kind, $state.snapshot(definition));
-  }
-
-  function openDeviceApply(entry: TemplateEntry) {
-    const definition = definitionFor(entry);
-    if (definition) deviceApplyTemplate = definition as Template;
-  }
-
-  function openDeviceCreate(entry: TemplateEntry) {
-    const definition = definitionFor(entry);
-    if (definition) deviceCreateTemplate = definition as Template;
   }
 
   function openLogicApply(entry: TemplateEntry) {
@@ -362,11 +342,6 @@
       description: copy.description ?? "",
       search: "",
     });
-  }
-
-  function newDevice() {
-    const source = Object.values(PRESETS)[0];
-    if (source) duplicateDevice(source.id);
   }
 
   function duplicateLogic(id: string) {
@@ -483,10 +458,9 @@
     else if (selected.kind === "bundle") duplicateBundle(selected);
   }
 
-  export function startNew(kind: "device" | "logic" | "api" | "both") {
+  export function startNew(kind: "logic" | "api" | "both") {
     guard(() => {
-      if (kind === "device") newDevice();
-      else if (kind === "logic") newLogic();
+      if (kind === "logic") newLogic();
       else if (kind === "api") newApi();
       else startBoth();
     });
@@ -662,33 +636,6 @@
                     <span class="material-symbols-outlined">play_arrow</span>
                     Apply
                   </button>
-                {:else if entry.kind === "device"}
-                  {#if !entry.roles?.length}
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-sm"
-                      disabled={editorDirty ||
-                        !applyWritable ||
-                        blocked ||
-                        !deviceWritable}
-                      onclick={() => openDeviceCreate(entry)}
-                    >
-                      <span class="material-symbols-outlined">add</span>
-                      New device
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-outline btn-sm"
-                      disabled={editorDirty ||
-                        !applyWritable ||
-                        blocked ||
-                        !deviceWritable}
-                      onclick={() => openDeviceApply(entry)}
-                    >
-                      <span class="material-symbols-outlined">play_arrow</span>
-                      Apply
-                    </button>
-                  {/if}
                 {:else if entry.kind === "logic"}
                   <button
                     type="button"
@@ -811,20 +758,6 @@
     />
   {/if}
 
-  {#if deviceCreateTemplate}
-    <DeviceCreateModal
-      template={deviceCreateTemplate}
-      onClose={() => (deviceCreateTemplate = null)}
-    />
-  {/if}
-
-  {#if deviceApplyTemplate}
-    <DeviceApplyModal
-      template={deviceApplyTemplate}
-      onClose={() => (deviceApplyTemplate = null)}
-    />
-  {/if}
-
   {#if logicApplyTemplate}
     <LogicApplyModal
       template={logicApplyTemplate}
@@ -846,7 +779,7 @@
       onConfirm={confirmDelete}
       onCancel={() => (pendingDelete = null)}
     >
-      <p>Applied copies keep their logic and device.</p>
+      <p>Applied copies keep their logic and states.</p>
     </ConfirmModal>
   {/if}
 </div>

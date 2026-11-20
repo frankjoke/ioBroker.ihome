@@ -14,7 +14,7 @@ import {
   variableStateSpec,
 } from "$lib/config/variables";
 import { ensureStateObject } from "$lib/state-create";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 
 let initPromise = null;
 let saveTimer = null;

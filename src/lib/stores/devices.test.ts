@@ -3,7 +3,6 @@ import {
   DEVICE_LIST_ID,
   getUsedStateIds,
   setCanonicalRegistry,
-  setObjectSource,
 } from "$lib/stores/devices.svelte";
 
 /**
@@ -60,8 +59,7 @@ it("the used set covers a virtual control's expression and the rules", () => {
   expect(used).toContain("0_userdata.0.y");
 });
 
-it("the used set covers a device slot's raw source and its rules", () => {
-  setObjectSource(new Map([["slot.0.raw", {}]]));
+it("the used set covers a legacy document's slot source and its rules", () => {
   setCanonicalRegistry({
     version: 1,
     updatedAt: 0,

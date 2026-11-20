@@ -7,7 +7,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
-  import { registerProgramStateId } from "$lib/stores/devices.svelte";
+  import { registerProgramStateId } from "$lib/stores/program-states.svelte";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
   import {
     evaluateOverride,

@@ -64,7 +64,6 @@ it("counts a tile's distinct source origins", () => {
 });
 
 const look: SourceLook = {
-  devices: [],
   states: new Map(),
   objects: new Map<string, any>([
     [
@@ -220,46 +219,6 @@ it("infers Switch for a power-only tile", () => {
   expect(inferTemplateType(tile, plugLook)).toBe("Switch");
 });
 
-it("maps a device control to its widget role", () => {
-  const devLook: SourceLook = {
-    ...look,
-    devices: [
-      {
-        id: "d1",
-        name: "Lamp",
-        type: "Light",
-        controls: [
-          {
-            id: "c1",
-            feature: "power",
-            stateId: "alias.0.Lamp.SET",
-            available: true,
-            meta: { role: "switch.light", type: "boolean" },
-          },
-        ],
-      } as any,
-    ],
-  };
-  const result = collectTileTemplate(
-    {
-      slots: [
-        {
-          kind: "switch",
-          source: { kind: "control", device: "d1", control: "c1" },
-          label: "Power",
-        },
-      ],
-    },
-    { id: "t2", name: "Device light", type: "Light", look: devLook },
-  );
-  expect(result.template.slots[0].source).toBe("switch_light");
-  expect(result.template.slots[0].repair).toMatchObject({
-    name: "switch_light",
-    label: "Power",
-    role: "switch.light",
-  });
-});
-
 it("keeps the border and padding options", () => {
   const result = collectTileTemplate(
     { ...lamp(), border: false, padding: false },
@@ -284,7 +243,6 @@ it("keeps the border and padding options", () => {
 // A three-role tile: temperature, humidity and a switch, as saved from a
 // weather-ish tile. Roles come from the object roles, else the widget class.
 const roleLook: SourceLook = {
-  devices: [],
   states: new Map(),
   objects: new Map<string, any>([
     [

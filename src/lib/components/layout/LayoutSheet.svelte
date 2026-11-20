@@ -36,17 +36,12 @@
     withPlacementDefaults,
   } from "$lib/config/tile-ops";
   import {
-    templateById,
-    templateDeviceProblem,
-  } from "$lib/config/template-ops";
-  import {
     applyTileSeed,
     autoFillRoles,
-    materializeTemplateTile,
     materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
-    slotFromControl,
+    type MaterializedTile,
     slotFromState,
     slotKindForWidget,
     tileSeed,
@@ -85,11 +80,9 @@
   } from "$lib/stores/overrides.svelte";
   import { isLocalUi } from "$lib/config/locality";
   import { withoutSecured } from "$lib/config/secured";
-  import { devicesEnrichedStore } from "$lib/stores/devices";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
   import type { PageRegistry, Placement, Slot } from "$lib/types/display";
-  import type { Device } from "$lib/types/device";
   import type { Template } from "$lib/types/display";
 
   let {
@@ -139,7 +132,6 @@
   let actionError = $state("");
 
   const registry = $derived(getPageRegistry());
-  const devices = $derived($devicesEnrichedStore);
   const saveFailed = $derived(getLayoutSaveFailed());
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
@@ -439,7 +431,7 @@
   function commitMaterializedTile(
     pageId: string,
     sectionId: string,
-    materialized: ReturnType<typeof materializeTemplateTile>,
+    materialized: MaterializedTile,
     at?: number,
   ): void {
     const tile = materializedTileConfig(materialized);
@@ -456,31 +448,6 @@
     }
     pickerFor = null;
     selection = { kind: "tile", pageId, sectionId, placementId: placement.id };
-  }
-
-  function addMaterializedTile(
-    pageId: string,
-    sectionId: string,
-    template: Template,
-    device: Device,
-    at?: number,
-  ): void {
-    const problem = templateDeviceProblem(template);
-    if (problem) {
-      actionError = problem;
-      pickerFor = null;
-      return;
-    }
-    const materialized = materializeTemplateTile(
-      template,
-      device,
-      getTemplateRegistry().templates ?? [],
-    );
-    if (materialized.slots.length === 0) {
-      const primary = device.controls?.[0];
-      if (primary) materialized.slots = [slotFromControl(device, primary)];
-    }
-    commitMaterializedTile(pageId, sectionId, materialized, at);
   }
 
   /** A tile picked for a state: no device is created, only the tile. Missing
@@ -603,26 +570,14 @@
     at?: number,
   ): void {
     if (!slots.length) return;
-    const source = slots[0]?.source;
-    const device =
-      source && typeof source === "object" && source.kind === "control"
-        ? devices.find((entry) => entry.id === source.device)
-        : undefined;
-    const template = device?.template
-      ? templateById(device.template, getTemplateRegistry().templates ?? [])
-      : undefined;
-    if (device && template) {
-      addMaterializedTile(pageId, sectionId, template, device, at);
-      return;
-    }
     const sectionIn = (reg: PageRegistry) =>
       reg.pages
         .find((p) => p.id === pageId)
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
-    // A new tile takes its name, size and default glyph from its first slot
-    // once (S11) — a frozen offer, not a live device link.
-    const seed = tileSeed(slots, devices, getTemplateRegistry().templates);
+    // A new tile takes its name and default glyph from its first slot once
+    // (S11) — a frozen offer, not a live link.
+    const seed = tileSeed(slots);
     const first =
       seed.icon && !slots[0].icon?.glyph
         ? { ...slots[0], icon: { ...slots[0].icon, glyph: seed.icon } }
@@ -868,7 +823,6 @@
     <div>
       <LayoutDetails
         {registry}
-        {devices}
         selection={{ kind: "page", pageId }}
         onChange={commitLayout}
       />
@@ -950,7 +904,6 @@
       <div>
         <LayoutDetails
           {registry}
-          {devices}
           selection={{ kind: "section", pageId, sectionId }}
           onChange={commitLayout}
         />
@@ -1060,8 +1013,6 @@
     </div>
   {/if}
 
-  <!-- The sheet's body is always the tile editor: the device is a reusable
-       control collection on the Devices page, never a tile's identity. -->
   <!-- The sheet's own hidden Tile: it answers whether there is a detail page
          (A47, via `noteDetail`) and opens that modal for real when the box is
          ticked — only the tile resolves its rows. Non-modal, so it appears over
@@ -1084,7 +1035,6 @@
     <div class="tile-editor">
       <LayoutDetails
         {registry}
-        {devices}
         selection={tileSelection}
         onChange={commitLayout}
         onAddSlot={openSlotPicker}
@@ -1100,7 +1050,6 @@
   {@const target = pickerFor}
   <SourcePicker
     mode="slot"
-    {devices}
     templates={withoutSecured(getTemplateRegistry().templates ?? [], local)}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}

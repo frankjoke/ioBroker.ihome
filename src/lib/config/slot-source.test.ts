@@ -2,44 +2,15 @@ import { it, expect } from "vitest";
 import {
   resolveSlotSource,
   sourceChipKey,
-  sourceStateIds,
   type SourceLook,
 } from "$lib/config/slot-source";
-import type { EnrichedControl, EnrichedDevice } from "$lib/types/device";
+import type { EnrichedDevice } from "$lib/types/device";
 import type { SourceOverride } from "$lib/types/overrides";
 
-const ctl = (
-  id: string,
-  feature: string,
-  stateId: string,
-  liveValue: unknown,
-  over: Partial<EnrichedControl> = {},
-): EnrichedControl => ({
-  id,
-  feature,
-  stateId,
-  liveValue,
-  writable: true,
-  available: true,
-  exists: true,
-  widget: "level",
-  unit: "%",
-  ...over,
-});
-
-const device = (over: Partial<EnrichedDevice> = {}): EnrichedDevice => ({
-  id: "dev",
-  name: "Dev",
-  type: "Light",
-  controls: [],
-  ...over,
-});
-
 const look = (
-  devices: EnrichedDevice[],
+  _devices: EnrichedDevice[],
   extra: { states?: Map<string, any>; objects?: Map<string, any> } = {},
 ): SourceLook => ({
-  devices,
   states: extra.states ?? new Map(),
   objects: extra.objects ?? new Map(),
 });
@@ -57,7 +28,6 @@ const stateLook = (
 ): SourceLook => {
   const id = opts.id ?? "s";
   return {
-    devices: [],
     states: new Map([[id, { val: opts.value }]]),
     objects: opts.object ? new Map([[id, opts.object]]) : new Map(),
     overrides: opts.overrides,
@@ -102,27 +72,6 @@ it("resolves a state source that names a variable to its real state", () => {
     stateId: "0_userdata.0.lamp",
     widget: "switch",
   });
-  expect(
-    sourceStateIds({ kind: "state", stateId: "LampVar" }, [], variables),
-  ).toEqual(["0_userdata.0.lamp"]);
-});
-
-it("resolves a control reference live, through the device alias", () => {
-  const d = device({ controls: [ctl("c1", "brightness", "s1", 42)] });
-  expect(
-    resolveSlotSource(
-      { kind: "control", device: "dev", control: "c1" },
-      look([d]),
-    ),
-  ).toMatchObject({ value: 42, writable: true, available: true });
-  // Re-pointing the control's stateId resolves the new state without touching the slot.
-  const moved = device({ controls: [ctl("c1", "brightness", "s2", 7)] });
-  expect(
-    resolveSlotSource(
-      { kind: "control", device: "dev", control: "c1" },
-      look([moved]),
-    )?.value,
-  ).toBe(7);
 });
 
 it("resolves a raw state and its write flag", () => {
@@ -151,81 +100,6 @@ it("resolves a raw state and its write flag", () => {
       look([], { states, objects: readonly }),
     )?.writable,
   ).toBe(false);
-});
-
-it("marks a missing control/device unavailable", () => {
-  expect(
-    resolveSlotSource(
-      { kind: "control", device: "gone", control: "c1" },
-      look([]),
-    ),
-  ).toMatchObject({ available: false, writable: false });
-  expect(
-    resolveSlotSource(
-      { kind: "control", device: "dev", control: "gone" },
-      look([device()]),
-    ),
-  ).toMatchObject({ available: false, writable: false });
-});
-
-it("a device source is available while one of its controls is", () => {
-  const live = device({
-    controls: [ctl("c1", "power", "s1", true, { available: false })],
-  });
-  expect(
-    resolveSlotSource({ kind: "device", device: "dev" }, look([live])),
-  ).toMatchObject({
-    available: false,
-  });
-  expect(
-    resolveSlotSource(
-      { kind: "device", device: "dev" },
-      look([device({ controls: [ctl("c1", "power", "s1", true)] })]),
-    ),
-  ).toMatchObject({ available: true, writable: false });
-});
-
-it("a control source carries its corrected meta, not the object", () => {
-  const control = {
-    id: "c",
-    feature: "power",
-    stateId: "a.0.x",
-    liveValue: 1,
-    writable: true,
-    available: true,
-    meta: {
-      role: "switch",
-      unit: "",
-      states: { "0": "Aus", "1": "Ein" },
-    },
-    widget: "switch",
-  } as any;
-  const res = resolveSlotSource(
-    { kind: "control", device: "d", control: "c" },
-    {
-      devices: [{ id: "d", controls: [control] }] as any,
-      states: new Map(),
-      objects: new Map(),
-    },
-  );
-  expect(res).toMatchObject({
-    role: "switch",
-    unit: "",
-    states: { "0": "Aus", "1": "Ein" },
-  });
-});
-
-it("sourceStateIds names the state behind a control and a raw state", () => {
-  const d = device({
-    controls: [ctl("c1", "brightness", "0_userdata.0.lamp", 1)],
-  });
-  expect(
-    sourceStateIds({ kind: "control", device: "dev", control: "c1" }, [d]),
-  ).toEqual(["0_userdata.0.lamp"]);
-  expect(
-    sourceStateIds({ kind: "state", stateId: "0_userdata.0.x" }, [d]),
-  ).toEqual(["0_userdata.0.x"]);
-  expect(sourceStateIds({ kind: "device", device: "dev" }, [d])).toEqual([]);
 });
 
 it("a repair override wins over the object", () => {
@@ -415,25 +289,6 @@ it("keys a source chip by its kind and override", () => {
   expect(sourceChipKey({ kind: "device", device: "d" })).toBe("device:d");
 });
 
-it("sourceStateIds subscribes a derived override's inputs", () => {
-  expect(
-    sourceStateIds(
-      { kind: "state", stateId: "s", override: "d" },
-      [],
-      [],
-      [
-        {
-          id: "d",
-          stateId: "s",
-          kind: "derived",
-          name: "dew",
-          inputs: ["s.a", "s.b"],
-        },
-      ],
-    ),
-  ).toEqual(["s", "s.a", "s.b"]);
-});
-
 const variables: SourceLook["variables"] = [
   {
     id: "v1",
@@ -465,23 +320,4 @@ it("applies an override stored under a variable name", () => {
   expect(source?.overrideId).toBe("o");
   expect(source?.unit).toBe("A");
   expect(source?.value).toBe(12);
-});
-
-it("subscribes variable-named derived inputs as their states", () => {
-  expect(
-    sourceStateIds(
-      { kind: "state", stateId: "LampVar", override: "d" },
-      [],
-      variables,
-      [
-        {
-          id: "d",
-          stateId: "LampVar",
-          kind: "derived",
-          name: "sum",
-          inputs: ["OtherVar"],
-        },
-      ],
-    ),
-  ).toEqual(["0_userdata.0.lamp", "0_userdata.0.other"]);
 });

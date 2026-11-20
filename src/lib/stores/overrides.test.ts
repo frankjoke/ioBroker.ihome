@@ -35,7 +35,7 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   },
 }));
 
-vi.mock("$lib/stores/devices.svelte", () => ({
+vi.mock("$lib/stores/program-states.svelte", () => ({
   registerProgramStateId: vi.fn((id: string) => h.registered.push(id)),
 }));
 

@@ -181,13 +181,11 @@ describe("migrateDevices — repairs", () => {
     const states = new Map<string, any>([["hm.0.light.power", { val: 1 }]]);
     const objects = out(["hm.0.light.power"]);
     const resolution = resolveTile(tile, "Flur", {
-      devices: [],
       states,
       objects,
       overrides: migrated.overrides.overrides,
     });
     const parts = tileParts(resolution.device, resolution.tile, [], {
-      devices: [],
       states,
       objects,
       overrides: migrated.overrides.overrides,
@@ -753,7 +751,6 @@ describe("migrateDevices — rules and tiles", () => {
       ["hm.0.light.power", { val: 1, ts: 9_000 }],
     ]);
     const live = resolveTile(tile, "Flur", {
-      devices: [],
       states: online,
       objects: out(["hm.0.light.power"]),
       overrides: res.overrides.overrides,
@@ -767,7 +764,6 @@ describe("migrateDevices — rules and tiles", () => {
     expect(ago[0]?.source).toBe("ago");
 
     const missing = resolveTile(tile, "Flur", {
-      devices: [],
       states: new Map(),
       objects: new Map(),
       overrides: res.overrides.overrides,

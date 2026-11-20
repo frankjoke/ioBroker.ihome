@@ -8,7 +8,7 @@ import {
   DEVICE_LIST_ID,
   getCanonicalRegistry,
   setCanonicalRegistry,
-} from "$lib/stores/devices";
+} from "$lib/stores/devices.svelte";
 import { loadUsedStates } from "$lib/states.svelte.js";
 import { migrateRegistry } from "$lib/config/transform-ops";
 import { backfillEnumFields } from "$lib/config/pages-ops";
@@ -107,24 +107,6 @@ export function saveRegistry() {
       .then(() => console.log("[registry] setState OK"))
       .catch((e) => console.error("save registry:", e));
   }, 250);
-}
-
-/** Insert a device or replace the one with the same id, and persist. The one
- *  write path for the device editors, including the pickers' inline form. */
-export function upsertDevice(device) {
-  if (!isRegistryWritable()) return false;
-  const reg = getCanonicalRegistry();
-  const known = (reg.devices ?? []).some((d) => d.id === device.id);
-  setCanonicalRegistry({
-    ...reg,
-    version: (reg.version ?? 0) + 1,
-    updatedAt: Date.now(),
-    devices: known
-      ? reg.devices.map((d) => (d.id === device.id ? device : d))
-      : [...(reg.devices ?? []), device],
-  });
-  saveRegistry();
-  return true;
 }
 
 export function initRegistry() {

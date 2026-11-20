@@ -1,35 +1,16 @@
 <script lang="ts">
-  import { untrack } from "svelte";
-  import { SvelteMap, SvelteSet } from "svelte/reactivity";
+  import { SvelteSet } from "svelte/reactivity";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import {
-    roomList,
-    roomsOf as roomsOfEnum,
-    enumLabelFromObject,
-  } from "$lib/config/rooms";
-  import { effectiveFunctions, effectiveRoom } from "$lib/config/state-meta";
+  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import StateBrowser from "$lib/components/discovery/StateBrowser.svelte";
-  import DeviceEditorPane from "$lib/components/config/DeviceEditorPane.svelte";
   import { helpLine } from "$lib/config/template-entries";
-  import { upsertDevice } from "$lib/registry.svelte.js";
-  import {
-    preselectedControlIds,
-    slotFromControl,
-    slotFromState,
-    slotKindForWidget,
-    suggestedSlots,
-  } from "$lib/config/slot-create";
+  import { slotFromState, slotKindForWidget } from "$lib/config/slot-create";
   import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
-  import { resolveTemplate } from "$lib/config/template-ops";
   import { sourceChipKey, widgetForState } from "$lib/config/slot-source";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
   import { stateIdFor } from "$lib/config/variables";
   import { localizeName } from "$lib/config/format";
-  import { suggestFeature, stateLabel } from "$lib/config/features";
-  import { defaultUnit } from "$lib/config/units";
-  import { newId } from "$lib/utils/ids";
-  import type { Control, Device, DeviceType } from "$lib/types/device";
   import type { LogicDef } from "$logic/types";
   import type {
     Slot,
@@ -39,28 +20,23 @@
   } from "$lib/types/display";
 
   /** What the caller does with the picked data — the only difference between
-   *  the source selector, slot addition, device controls and Variables. */
-  export type PickerMode = "slot" | "source" | "control" | "state";
+   *  the slot picker (a tile), a source (an active condition or slot) and
+   *  Variables/Logic (a state). */
+  export type PickerMode = "slot" | "source" | "state";
 
   let {
     mode,
     title,
-    devices = [],
     templates = [],
     slots = [],
-    deviceType = "Custom",
-    /** Preselect the device this picker was opened for, so its controls show. */
-    activeDeviceId = "",
     /** The state this item already uses: the tree opens at it. */
     currentState = "",
     /** A new tile starts from values, not badges (the slot part adds those). */
     showBadge = true,
-    single = false,
     suggestTemplates = false,
     onStatePicked,
     onSlots,
     onSource,
-    onControls,
     onState,
     onTemplate,
     onClose,
@@ -69,29 +45,20 @@
   }: {
     mode: PickerMode;
     title: string;
-    devices?: Device[];
     templates?: Template[];
-    /** A tile's slots: its own sources are offered first, then the unused
-     *  controls of the devices those slots name. */
+    /** A tile's slots: its own sources are offered as shortcuts. */
     slots?: Slot[];
-    /** control mode: the feature suggestion type of the device being edited. */
-    deviceType?: DeviceType;
-    /** The device the picker opened for (tile/slot/control). */
-    activeDeviceId?: string;
     /** The state this item already uses: the tree opens at it. */
     currentState?: string;
     /** Show the Badge tab. A new tile starts from values; an added slot may be
      *  a badge. */
     showBadge?: boolean;
-    /** control mode: picking replaces one state instead of adding. */
-    single?: boolean;
     /** New tile: hand a picked state (and its override) back instead of
      *  creating a slot. */
     suggestTemplates?: boolean;
     onStatePicked?: (id: string, object: any, overrideId?: string) => void;
     onSlots?: (slots: Slot[]) => void;
     onSource?: (source: SlotSource) => void;
-    onControls?: (controls: Control[]) => void;
     onState?: (stateId: string, overrideId?: string) => void;
     /** New-tile Templates tab: the chosen tile template. */
     onTemplate?: (template: Template) => void;
@@ -102,25 +69,17 @@
     onClose: () => void;
   } = $props();
 
-  type Tab = "device" | "state" | "template" | "page" | "badge" | "html";
+  type Tab = "state" | "template" | "page" | "badge" | "html";
 
   const TABS: Record<PickerMode, { id: Tab; label: string }[]> = {
     slot: [
-      { id: "device", label: "From device" },
-      { id: "template", label: "Templates" },
       { id: "state", label: "Any state" },
+      { id: "template", label: "Templates" },
       { id: "page", label: "Web page" },
       { id: "badge", label: "Badge" },
       { id: "html", label: "HTML" },
     ],
-    source: [
-      { id: "device", label: "From device" },
-      { id: "state", label: "Any state" },
-    ],
-    control: [
-      { id: "device", label: "From device" },
-      { id: "state", label: "Any state" },
-    ],
+    source: [{ id: "state", label: "Any state" }],
     state: [{ id: "state", label: "Any state" }],
   };
   const tabs = $derived(
@@ -141,142 +100,18 @@
     );
   });
 
-  // An item that already has a state opens where that state lives; a picker
-  // that adds a new source still starts on the device list.
-  let tab = $state<Tab>(
-    untrack(() => (mode === "state" || currentState ? "state" : "device")),
-  );
+  // A picker opens on the state tree: it is the one tab every mode has.
+  let tab = $state<Tab>("state");
   let search = $state("");
-  /** The device the picker opened for, else the first device the tile uses. */
-  function initialDeviceId(): string {
-    if (activeDeviceId) return activeDeviceId;
-    for (const slot of slots) {
-      const source = slot.source;
-      if (source && typeof source !== "string" && source.kind !== "state")
-        return source.device;
-    }
-    return "";
-  }
-  let selectedDeviceId = $state(untrack(initialDeviceId));
-  /** Slot mode: the controls of the shown device, ticked for "Add N slots". */
-  let selectedControls = new SvelteSet<string>();
-  /** Control mode: picked states across the device and the tree. */
-  let pickedStates = new SvelteSet<string>();
-  const pickedControls = new SvelteMap<string, Control>();
   let stateKind = $state<"auto" | SlotKind>("auto");
   let url = $state("");
   let html = $state("");
   let badgeKind = $state<"value" | "ago" | "offline">("value");
-  let badgeControlId = $state("");
-  /** A badge may read any state, not only a control of the chosen device. */
-  let badgeState = $state("");
-  /** The inline device form: a new device (`device: null`) or one being edited. */
-  let deviceForm = $state<{ device: Device | null } | null>(null);
   let root = $state<HTMLElement>();
-  /** The device editors fold out only where a device is picked, not inside the
-   *  device form's own control picker. */
-  const canEditDevices = $derived(mode === "slot" || mode === "source");
-  /** A new device can be created from every device tab. */
-  const canAddDevice = $derived(mode !== "state");
-  /** A device saved in this picker before the store's list caught up. */
-  let createdDevice = $state<Device | null>(null);
 
   const objects = $derived(ioBroker.objects as Map<string, any>);
   const rooms = $derived(roomList(ioBroker.enums));
   const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
-
-  const allDevices = $derived(
-    createdDevice && !devices.some((d) => d.id === createdDevice.id)
-      ? [...devices, createdDevice]
-      : devices,
-  );
-  // The device picker's filters: name/control text, room and function. They
-  // widen the match to the device's controls, so a device is found by what it
-  // actually offers (a 200-device installation needs this).
-  let deviceRoom = $state("");
-  let deviceFunction = $state("");
-  const deviceFunctionOptions = $derived(
-    (ioBroker.enums?.getList?.("functions") ?? []).map((e: any) => ({
-      value: e._id,
-      label: enumLabelFromObject(e),
-    })),
-  );
-  const filtered = $derived.by(() => {
-    const q = search.trim().toLowerCase();
-    return allDevices.filter((d) => {
-      if (q) {
-        const text = [
-          d.name,
-          d.title,
-          d.type,
-          ...(d.controls ?? []).flatMap((c) => [c.label, c.feature, c.stateId]),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!text.includes(q)) return false;
-      }
-      const controls = (d.controls ?? []).filter((c) => !c.hidden);
-      const objectOf = (c: Control) => objectForState(c.stateId ?? "");
-      if (
-        deviceRoom &&
-        !(
-          d.room === deviceRoom ||
-          controls.some(
-            (c) =>
-              effectiveRoom(c, objectOf(c), d.room, ioBroker.enums) ===
-              deviceRoom,
-          )
-        )
-      ) {
-        return false;
-      }
-      if (
-        deviceFunction &&
-        !(
-          d.functions?.includes(deviceFunction) ||
-          controls.some((c) =>
-            effectiveFunctions(
-              c,
-              objectOf(c),
-              d.functions,
-              ioBroker.enums,
-            ).includes(deviceFunction),
-          )
-        )
-      ) {
-        return false;
-      }
-      return true;
-    });
-  });
-  const selectedDevice = $derived(
-    allDevices.find((d) => d.id === selectedDeviceId),
-  );
-  const controls = $derived(
-    (selectedDevice?.controls ?? []).filter((c) => !c.hidden),
-  );
-  const suggestions = $derived(
-    selectedDevice
-      ? suggestedSlots(
-          selectedDevice,
-          resolveTemplate(selectedDevice, templates).slots,
-        )
-      : [],
-  );
-
-  /** What a device starts selected: every control that carries data. */
-  function defaultControlIds(device: Device): string[] {
-    return preselectedControlIds(device);
-  }
-
-  // A picker opened on a device (a slot's own device, a tile's first) starts
-  // with its default controls ticked; the user can untick before adding.
-  untrack(() => {
-    if (!selectedDevice) return;
-    for (const id of defaultControlIds(selectedDevice))
-      selectedControls.add(id);
-  });
 
   /** A tree leaf may be a variable name; its metadata is the real state's
    *  object, while the slot keeps the name (the alias resolves it live). */
@@ -337,113 +172,40 @@
       : { common: own };
   }
 
-  /** Slot sources on this tile first, then the unused controls of the devices
-   *  those slots name — the source picker's shortcut list. */
-  const scopedSources = $derived.by(() => {
-    if ((mode !== "slot" && mode !== "source") || slots.length === 0)
-      return undefined;
+  /** The states this tile already binds — the picker's shortcut chips. */
+  const usedSources = $derived.by(() => {
+    if ((mode !== "slot" && mode !== "source") || slots.length === 0) {
+      return [];
+    }
     const used: {
       key: string;
       label: string;
       title?: string;
       source: SlotSource;
-      kind: SlotKind;
     }[] = [];
     const seen = new SvelteSet<string>();
-    /** The states a chip already shows, so the unused-control list can skip
-     *  them (an override is a different chip, the state is still covered). */
-    const usedStateIds = new SvelteSet<string>();
-    const deviceIds: string[] = [];
-    const addUsed = (
-      source: SlotSource,
-      stateId: string | undefined,
-      label: string,
-      kind: SlotKind,
-      title?: string,
-    ) => {
-      const key = sourceChipKey(source, stateId);
-      if (seen.has(key)) return;
-      seen.add(key);
-      if (stateId) usedStateIds.add(stateId);
-      used.push({ key, label, title: title ?? stateId, source, kind });
-    };
     for (const slot of slots) {
       const source = slot.source;
-      if (!source || typeof source === "string") continue;
-      if (source.kind === "state") {
-        const id = stateIdFor(source.stateId, getVariables());
-        const name = localizeName(objects.get(id)?.common?.name);
-        const override = source.override
-          ? getOverrideRegistry().overrides.find(
-              (o) => o.id === source.override,
-            )
-          : undefined;
-        addUsed(
-          source,
-          id,
-          override?.name ?? (name || id),
-          slot.kind,
-          override ? `${id} · ${override.name}` : id,
-        );
+      if (!source || typeof source === "string" || source.kind !== "state") {
         continue;
       }
-      if (!deviceIds.includes(source.device)) deviceIds.push(source.device);
-      if (source.kind !== "control") continue;
-      const owner = allDevices.find((d) => d.id === source.device);
-      const control = owner?.controls?.find((c) => c.id === source.control);
-      const label = control?.label || control?.feature || source.control;
-      addUsed(
+      const id = stateIdFor(source.stateId, getVariables());
+      const key = sourceChipKey(source, id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const name = localizeName(objects.get(id)?.common?.name);
+      const override = source.override
+        ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+        : undefined;
+      used.push({
+        key,
+        label: override?.name ?? (name || id),
+        title: override ? `${id} · ${override.name}` : id,
         source,
-        control?.stateId,
-        owner ? `${owner.name || owner.id}.${label}` : label,
-        slot.kind,
-      );
+      });
     }
-    const more = deviceIds
-      .map((id) => allDevices.find((d) => d.id === id))
-      .filter((d): d is Device => !!d)
-      .map((d) => ({
-        device: d,
-        controls: (d.controls ?? []).filter(
-          (c) => !c.hidden && !(c.stateId && usedStateIds.has(c.stateId)),
-        ),
-      }))
-      .filter((group) => group.controls.length > 0);
-    return { used, more };
+    return used;
   });
-
-  function chooseDevice(id: string): void {
-    selectedDeviceId = selectedDeviceId === id ? "" : id;
-    selectedControls.clear();
-    badgeControlId = "";
-    const device = allDevices.find((d) => d.id === selectedDeviceId);
-    if (device) {
-      for (const controlId of defaultControlIds(device))
-        selectedControls.add(controlId);
-    }
-  }
-
-  function toggleControl(id: string): void {
-    if (selectedControls.has(id)) selectedControls.delete(id);
-    else selectedControls.add(id);
-  }
-
-  function addControl(c: Control): void {
-    if (!selectedDevice) return;
-    onSlots?.([slotFromControl(selectedDevice, c)]);
-  }
-
-  function addSelected(): void {
-    if (!selectedDevice) return;
-    const list = controls
-      .filter((c) => selectedControls.has(c.id))
-      .map((c) => slotFromControl(selectedDevice!, c));
-    if (list.length) onSlots?.(list);
-  }
-
-  function addSuggested(): void {
-    if (suggestions.length) onSlots?.(suggestions);
-  }
 
   function pickState(id: string, overrideId?: string): void {
     const object = objectForOverride(objectForState(id), overrideId);
@@ -454,8 +216,8 @@
     onSlots?.([slotFromState(id, object, kind, overrideId)]);
   }
 
-  /** One click on a tree leaf: add a slot, set a source, add a control, or
-   *  hand a state to the Variables page. */
+  /** One click on a tree leaf: add a slot, set a source, or hand a state to
+   *  the Variables/Logic page. */
   function pickRawState(id: string, overrideId?: string): void {
     if (mode === "slot") {
       if (suggestTemplates) {
@@ -468,109 +230,28 @@
       }
       pickState(id, overrideId);
     } else if (mode === "source") onSource?.(stateSource(id, overrideId));
-    else if (mode === "state") onState?.(id, overrideId);
-    else togglePickedState(id);
-  }
-
-  /** Control mode: a picked state becomes a control on the edited device. */
-  function controlFromState(id: string): Control {
-    const variable = getVariables().find(
-      (v) => v.kind === "state" && v.name === id,
-    );
-    const realId = variable?.stateId ? String(variable.stateId) : id;
-    const obj =
-      objects.get(realId) ??
-      (variable
-        ? {
-            common: {
-              name: variable.name,
-              type: variable.type,
-              role: variable.role,
-              unit: variable.unit,
-              write: false,
-            },
-          }
-        : undefined);
-    return {
-      id: newId(),
-      feature: suggestFeature(obj, deviceType) ?? "value",
-      stateId: id,
-      writable: !!obj?.common?.write,
-      label: variable ? id : stateLabel(realId, obj),
-      unit: defaultUnit(obj),
-    };
-  }
-
-  function togglePickedState(id: string): void {
-    if (single) {
-      pickedStates.clear();
-      pickedControls.clear();
-    }
-    if (pickedStates.has(id)) {
-      pickedStates.delete(id);
-      pickedControls.delete(id);
-      return;
-    }
-    pickedStates.add(id);
-    pickedControls.delete(id);
-  }
-
-  function toggleDeviceState(c: Control): void {
-    const key = c.stateId ?? c.id;
-    if (single) {
-      pickedStates.clear();
-      pickedControls.clear();
-    }
-    if (pickedStates.has(key)) {
-      pickedStates.delete(key);
-      pickedControls.delete(key);
-      return;
-    }
-    pickedStates.add(key);
-    pickedControls.set(key, { ...c, id: newId() });
-  }
-
-  function addPicked(): void {
-    const list = [...pickedStates].map(
-      (id) => pickedControls.get(id) ?? controlFromState(id),
-    );
-    if (list.length) onControls?.(list);
+    else onState?.(id, overrideId);
   }
 
   /** A scoped chip: the source itself (source mode) or a slot from it. */
-  function useSource(source: SlotSource, kind?: SlotKind): void {
+  function useSource(source: SlotSource): void {
     if (mode === "source") {
       onSource?.(source);
       return;
     }
-    if (mode !== "slot") return;
-    let slot: Slot | null = null;
-    if (source.kind === "state") {
-      const object = objectForOverride(
-        objectForState(source.stateId),
-        source.override,
-      );
-      slot = slotFromState(
+    if (mode !== "slot" || source.kind !== "state") return;
+    const object = objectForOverride(
+      objectForState(source.stateId),
+      source.override,
+    );
+    onSlots?.([
+      slotFromState(
         source.stateId,
         object,
-        kind ?? slotKindForWidget(widgetForState(object)),
+        slotKindForWidget(widgetForState(object)),
         source.override,
-      );
-    } else if (source.kind === "control") {
-      const device = allDevices.find((d) => d.id === source.device);
-      const control = device?.controls?.find((c) => c.id === source.control);
-      if (device && control) {
-        slot = {
-          ...slotFromControl(device, control),
-          ...(kind ? { kind } : {}),
-        };
-      }
-    }
-    if (slot) onSlots?.([slot]);
-  }
-
-  function pickDeviceControl(device: Device, c: Control): void {
-    onSource?.({ kind: "control", device: device.id, control: c.id });
+      ),
+    ]);
   }
 
   /** A frame slot (A38): the page it shows is its whole content. */
@@ -585,19 +266,11 @@
     onSlots?.([{ kind: "html", where: "modal", options: { html: html } }]);
   }
 
-  /** A badge is a value in a corner: it reads the chosen control or state.
-   *  `ago` uses that source's timestamp, `offline` its false/empty value. */
-  function addBadge(): void {
-    const device = selectedDevice;
-    if (!device) return;
-    const stateId = badgeState.trim();
-    const control = controls.find((c) => c.id === badgeControlId);
-    const base = stateId
-      ? slotFromState(stateId, objectForState(stateId), "badge")
-      : control
-        ? slotFromControl(device, control)
-        : undefined;
-    if (!base) return;
+  /** A badge is a value in a corner: it reads the picked state. `ago` uses the
+   *  state's timestamp, `offline` its false/empty value. */
+  function addBadge(id: string, overrideId?: string): void {
+    const object = objectForOverride(objectForState(id), overrideId);
+    const base = slotFromState(id, object, "badge", overrideId);
     const derive =
       badgeKind === "ago"
         ? { derive: "ago", from: "ts" }
@@ -607,27 +280,13 @@
     onSlots?.([
       {
         ...base,
-        kind: "badge",
         ...(derive ? { options: { ...(base.options ?? {}), ...derive } } : {}),
       },
     ]);
   }
 
-  function saveDevice(d: Device): void {
-    const wasNew = deviceForm?.device == null;
-    upsertDevice(d);
-    createdDevice = d;
-    if (wasNew) {
-      selectedDeviceId = d.id;
-      selectedControls.clear();
-      for (const controlId of defaultControlIds(d))
-        selectedControls.add(controlId);
-    }
-    deviceForm = null;
-  }
-
   function onKey(event: KeyboardEvent): void {
-    if (event.key !== "Escape" || deviceForm) return;
+    if (event.key !== "Escape") return;
     // Only the topmost dialog reacts: one Escape closes one layer.
     const dialogs = [...document.querySelectorAll('[role="dialog"]')];
     if (dialogs.length && dialogs[dialogs.length - 1] !== root) return;
@@ -691,33 +350,36 @@
     {/if}
 
     {#if tab === "state"}
-      {#if mode === "control"}
-        <StateBrowser
-          {objects}
-          {roomsOf}
-          {rooms}
-          enums={ioBroker.enums}
-          selection={pickedStates}
-          onToggle={togglePickedState}
-          {currentState}
-          {logics}
-          {logicPick}
-        />
-      {:else}
-        <StateBrowser
-          {objects}
-          {roomsOf}
-          {rooms}
-          enums={ioBroker.enums}
-          onPick={pickRawState}
-          {currentState}
-          {logics}
-          {logicPick}
-          manageOverrides={mode === "slot" || mode === "source"}
-        />
+      {#if usedSources.length}
+        <div class="used-sources">
+          <span class="used-sources-label">Used in this tile</span>
+          <div class="used-sources-list">
+            {#each usedSources as u (u.key)}
+              <button
+                type="button"
+                class="used-source"
+                title={u.title}
+                onclick={() => useSource(u.source)}
+              >
+                {u.label}
+              </button>
+            {/each}
+          </div>
+        </div>
       {/if}
+      <StateBrowser
+        {objects}
+        {roomsOf}
+        {rooms}
+        enums={ioBroker.enums}
+        onPick={pickRawState}
+        {currentState}
+        {logics}
+        {logicPick}
+        manageOverrides={mode === "slot" || mode === "source"}
+      />
     {:else if tab === "template"}
-      <div class="device-pick">
+      <div class="pick">
         <div class="row-input">
           <input
             type="search"
@@ -732,11 +394,11 @@
               : "No tile templates yet — save one from a tile with the floppy in the tile editor."}
           </p>
         {:else}
-          <ul class="list device-list">
+          <ul class="list">
             {#each filteredTemplates as template (template.id)}
               {@const hint =
                 template.description || helpLine(template.help ?? "")}
-              <li class="device-row">
+              <li>
                 <button
                   type="button"
                   class="template-row"
@@ -801,275 +463,45 @@
           >
         </div>
       </div>
-    {:else}
-      {#if tab === "device" && scopedSources}
-        <div class="device-sources">
-          {#if scopedSources.used.length}
-            <span class="device-sources-label">Used in this tile</span>
-            <div class="device-sources-list">
-              {#each scopedSources.used as u (u.key)}
-                <button
-                  type="button"
-                  class="device-source"
-                  title={u.title}
-                  onclick={() => useSource(u.source, u.kind)}
-                >
-                  {u.label}
-                </button>
-              {/each}
-            </div>
-          {/if}
-          {#each scopedSources.more as group (group.device.id)}
-            <span class="device-sources-label"
-              >{group.device.name || group.device.id}</span
-            >
-            <div class="device-sources-list">
-              {#each group.controls as c (c.id)}
-                <button
-                  type="button"
-                  class="device-source"
-                  title={c.stateId ?? c.feature}
-                  onclick={() =>
-                    useSource({
-                      kind: "control",
-                      device: group.device.id,
-                      control: c.id,
-                    })}
-                >
-                  {c.label || c.feature || c.id}
-                </button>
-              {/each}
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="device-pick">
-        <div class="row-input">
-          <input
-            type="search"
-            placeholder="Search name or control…"
-            bind:value={search}
-          />
-          <select bind:value={deviceRoom} title="Room">
-            <option value="">All rooms</option>
-            {#each rooms as r (r.id)}
-              <option value={r.id}>{r.label}</option>
-            {/each}
+    {:else if tab === "badge"}
+      <div class="placeholder">
+        <label class="small">
+          <span class="label-mono">Shows</span>
+          <select bind:value={badgeKind}>
+            <option value="value">value</option>
+            <option value="ago">time since</option>
+            <option value="offline">offline (state false)</option>
           </select>
-          <select bind:value={deviceFunction} title="Function">
-            <option value="">All functions</option>
-            {#each deviceFunctionOptions as f (f.value)}
-              <option value={f.value}>{f.label}</option>
-            {/each}
-          </select>
-        </div>
-        {#if canAddDevice || (canEditDevices && selectedDevice)}
-          <div class="device-tools">
-            {#if canAddDevice}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => (deviceForm = { device: null })}
-              >
-                <span class="material-symbols-outlined">add</span> Add device
-              </button>
-            {/if}
-            {#if canEditDevices && selectedDevice}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => (deviceForm = { device: selectedDevice })}
-              >
-                <span class="material-symbols-outlined">edit</span>
-                Edit {selectedDevice.name || selectedDevice.id}
-              </button>
-            {/if}
-          </div>
-        {/if}
-        <ul class="list device-list">
-          {#each filtered as d (d.id)}
-            <li class="device-row">
-              <button
-                type="button"
-                class="row"
-                class:picked={selectedDeviceId === d.id}
-                onclick={() => chooseDevice(d.id)}
-              >
-                <span class="name">{d.name || d.id}</span>
-                <span class="meta text-muted">{d.type}</span>
-              </button>
-            </li>
-          {/each}
-          {#if filtered.length === 0}
-            <li class="empty text-muted">No device matches.</li>
-          {/if}
-        </ul>
-        {#if deviceForm}
-          <div class="inline-device-form">
-            <DeviceEditorPane
-              device={deviceForm.device}
-              objects={ioBroker.objects}
-              {roomsOf}
-              {rooms}
-              devices={allDevices}
-              autoPick={false}
-              onSave={saveDevice}
-              onCancel={() => (deviceForm = null)}
-            />
-          </div>
-        {/if}
+        </label>
+        <p class="text-muted hint-note">
+          {badgeKind === "offline"
+            ? "Pick the online flag; the badge shows while it is false."
+            : badgeKind === "ago"
+              ? "Pick the state; the badge shows the time since it last reported."
+              : "Pick the state; the badge shows its value in a corner."}
+        </p>
+        <StateBrowser
+          {objects}
+          {roomsOf}
+          {rooms}
+          enums={ioBroker.enums}
+          onPick={(id, overrideId) => addBadge(id, overrideId)}
+          {currentState}
+          manageOverrides={false}
+        />
       </div>
-
-      {#if selectedDevice && tab === "device" && !deviceForm}
-        <div class="results">
-          {#if controls.length === 0}
-            <p class="empty text-muted">
-              This device has no controls to offer.
-            </p>
-          {:else if mode === "source"}
-            <div class="device-sources-list">
-              {#each controls as c (c.id)}
-                <button
-                  type="button"
-                  class="device-source"
-                  title={c.stateId ?? c.feature}
-                  onclick={() => pickDeviceControl(selectedDevice, c)}
-                >
-                  {c.label || c.feature || c.id}
-                </button>
-              {/each}
-            </div>
-          {:else}
-            <ul class="list">
-              {#each controls as c (c.id)}
-                <li>
-                  <label class="row">
-                    <input
-                      type="checkbox"
-                      checked={mode === "slot"
-                        ? selectedControls.has(c.id)
-                        : pickedStates.has(c.stateId ?? c.id)}
-                      onchange={() =>
-                        mode === "slot"
-                          ? toggleControl(c.id)
-                          : toggleDeviceState(c)}
-                    />
-                    <span class="name">{c.label || c.feature || c.id}</span>
-                    <span class="meta text-muted">{c.stateId || c.id}</span>
-                    {#if c.unit}
-                      <span class="meta text-muted">{c.unit}</span>
-                    {/if}
-                  </label>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-        {#if mode === "slot"}
-          <div class="actions">
-            <span class="text-muted">{selectedControls.size} selected</span>
-            <div class="actions-buttons">
-              <button
-                type="button"
-                class="btn"
-                disabled={!suggestions.length}
-                title={suggestions.length
-                  ? "Add the slots this device type suggests"
-                  : "Nothing to suggest for this device"}
-                onclick={addSuggested}
-              >
-                Add suggested{suggestions.length
-                  ? ` (${suggestions.length})`
-                  : ""}
-              </button>
-              <button
-                type="button"
-                class="btn btn-primary"
-                disabled={selectedControls.size === 0}
-                onclick={addSelected}
-              >
-                Add {selectedControls.size || ""}
-                {selectedControls.size === 1 ? "slot" : "slots"}
-              </button>
-            </div>
-          </div>
-        {/if}
-      {:else if selectedDevice && tab === "badge"}
-        <div class="results">
-          <div class="placeholder">
-            <div class="row">
-              <label class="small">
-                <span class="label-mono">Shows</span>
-                <select bind:value={badgeKind}>
-                  <option value="value">value</option>
-                  <option value="ago">time since</option>
-                  <option value="offline">offline (state false)</option>
-                </select>
-              </label>
-              <label class="small grow">
-                <span class="label-mono">Control</span>
-                <select bind:value={badgeControlId}>
-                  <option value="">choose…</option>
-                  {#each controls as c (c.id)}
-                    <option value={c.id}>{c.label || c.feature || c.id}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="small grow">
-                <span class="label-mono">or state</span>
-                <input
-                  type="text"
-                  placeholder="state id or variable"
-                  bind:value={badgeState}
-                />
-              </label>
-            </div>
-            <div class="actions">
-              <span class="text-muted">
-                {badgeKind === "offline"
-                  ? "Shown while that state is false — pick the online flag"
-                  : badgeKind === "ago"
-                    ? "Shown as the time since that state last reported"
-                    : "Shown as that state's value in a corner"}
-              </span>
-              <button
-                type="button"
-                class="btn btn-primary"
-                disabled={!badgeControlId && !badgeState.trim()}
-                onclick={addBadge}>Add badge</button
-              >
-            </div>
-          </div>
-        </div>
-      {/if}
     {/if}
 
     <div class="actions">
       {#if mode === "slot"}
         <span class="text-muted">Adds to this tile</span>
       {:else if mode === "source"}
-        <span class="text-muted">Pick a control or a state</span>
-      {:else if mode === "state"}
         <span class="text-muted">Pick a state</span>
       {:else}
-        <span class="text-muted">{pickedStates.size} selected</span>
+        <span class="text-muted">Pick a state</span>
       {/if}
       <div class="actions-buttons">
         <button type="button" class="btn" onclick={onClose}>Cancel</button>
-        {#if mode === "control"}
-          <button
-            type="button"
-            class="btn btn-primary"
-            disabled={pickedStates.size === 0 ||
-              (single && pickedStates.size !== 1)}
-            onclick={addPicked}
-          >
-            {single
-              ? "Use state"
-              : `Add ${pickedStates.size || ""} ${pickedStates.size === 1 ? "state" : "states"}`}
-          </button>
-        {/if}
       </div>
     </div>
   </div>
@@ -1100,35 +532,6 @@
     gap: 0.75rem;
   }
 
-  /* One device row: the pick target. */
-  .device-row {
-    display: flex;
-    align-items: center;
-    gap: 0.15rem;
-  }
-
-  .device-row .row {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .device-tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-
-  .device-tools .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  /* The shared editor item folds out under the list, inside the picker's scroll. */
-  .inline-device-form {
-    margin-top: 0.35rem;
-  }
-
   .modal-head {
     display: flex;
     align-items: center;
@@ -1154,18 +557,16 @@
     padding: 0.25rem;
   }
 
-  .device-pick {
+  .pick {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
   }
 
-  .device-list {
-    max-height: 9rem;
-    overflow: auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    padding: 0.2rem;
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
   .template-row {
@@ -1205,43 +606,6 @@
     font-size: var(--body-sm);
   }
 
-  .results {
-    overflow: auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm, 4px);
-    padding: 0.35rem;
-    min-height: 9rem;
-  }
-
-  .list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 2px 4px;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .row:hover {
-    background-color: var(--surface-container);
-  }
-
-  .row.picked {
-    background-color: var(--primary-container);
-    color: var(--on-primary-container);
-  }
-
   .name {
     flex: 1 1 auto;
     min-width: 0;
@@ -1276,12 +640,6 @@
     padding: 0.35rem;
   }
 
-  .row-input select {
-    flex: 0 1 9rem;
-    min-width: 0;
-    padding: 0.35rem;
-  }
-
   .hint-note {
     font-size: 0.75rem;
     margin: 0;
@@ -1306,7 +664,7 @@
     min-width: 0;
   }
 
-  .device-sources {
+  .used-sources {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -1314,12 +672,12 @@
     border-bottom: 1px solid var(--border-color);
   }
 
-  .device-sources-label {
+  .used-sources-label {
     font-size: var(--body-sm);
     color: var(--text-muted);
   }
 
-  .device-sources-list {
+  .used-sources-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
@@ -1327,7 +685,7 @@
     overflow: auto;
   }
 
-  .device-source {
+  .used-source {
     border: 1px solid var(--border-color);
     background: var(--surface-color);
     color: var(--text-color);
@@ -1336,7 +694,7 @@
     cursor: pointer;
   }
 
-  .device-source:hover {
+  .used-source:hover {
     border-color: var(--primary-color);
   }
 

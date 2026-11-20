@@ -20,11 +20,7 @@
   } from "$lib/config/size-ops";
   import { effectiveUi, scaledTile } from "$lib/config/ui-settings";
   import { getSettings } from "$lib/stores/settings.svelte";
-  import {
-    effectiveSpan,
-    slotVisible,
-    templateDeviceProblem,
-  } from "$lib/config/template-ops";
+  import { effectiveSpan, slotVisible } from "$lib/config/template-ops";
   import {
     addRule,
     applyPoolIcon,
@@ -50,7 +46,6 @@
   } from "$lib/config/tile-ops";
   import {
     chartLayout,
-    hasHistory,
     tileHeadlineSlot,
     tileSourceControls,
   } from "$lib/config/tile-parts";
@@ -66,7 +61,7 @@
   import { ruleScope } from "$lib/config/rule-ops";
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
-  import { getVirtualPool } from "$lib/stores/devices";
+  import { getVirtualPool } from "$lib/stores/state-pool.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -87,7 +82,6 @@
   } from "$lib/config/tile-template";
   import {
     autoFillRoles,
-    materializeTemplateTile,
     materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
@@ -100,7 +94,6 @@
     isTemplatesWritable,
   } from "$lib/stores/templates.svelte";
   import { newId } from "$lib/utils/ids";
-  import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
   import type {
     ActiveCondition,
     ActiveOp,
@@ -121,12 +114,11 @@
     TileChartConfig,
     TileConfig,
   } from "$lib/types/display";
-  import type { DeviceType, EnrichedDevice } from "$lib/types/device";
+  import type { DeviceType } from "$lib/types/device";
   import type { Snippet } from "svelte";
 
   let {
     registry,
-    devices,
     selection,
     onChange,
     onAddSlot,
@@ -135,7 +127,6 @@
     onDetailToggle,
   }: {
     registry: PageRegistry;
-    devices: EnrichedDevice[];
     selection: LayoutSelection;
     onChange: (next: PageRegistry) => void;
     /** Add slot: the route owns the picker. `at` inserts there instead of
@@ -245,7 +236,6 @@
       : undefined,
   );
   const sourceLook = $derived<SourceLook>({
-    devices,
     states: (ioBroker.states ?? new Map()) as Map<string, any>,
     objects: (ioBroker.objects ?? new Map()) as Map<string, any>,
     variables: getVariables(),
@@ -256,10 +246,6 @@
   const device = $derived(
     resolveTile(tile?.tile, tile?.title, sourceLook).device,
   );
-
-  /** The device state picker's room filters, as on the Devices page. */
-  const rooms = $derived(roomList(ioBroker.enums));
-  const roomsOf = (id: string) => roomsOfEnum(ioBroker.enums, id);
 
   const activeCond = $derived(tile?.tile?.active);
   const activeResolved = $derived(
@@ -324,7 +310,6 @@
     if (!device) return undefined;
     const controls = tileSourceControls(shownSlots, {
       device,
-      devices,
       states: sourceLook.states,
       objects: sourceLook.objects,
       variables: getVariables(),
@@ -614,7 +599,7 @@
     return undefined;
   }
 
-  /** The anchor as the user knows it: a device name or a state's name. */
+  /** The anchor as the user knows it: the state's name. */
   function sourceName(source: SlotSource | undefined): string {
     if (!source) return "the tile's source";
     if (source.kind === "state") {
@@ -623,10 +608,6 @@
       ).trim();
       return label ? `“${label}”` : `“${source.stateId}”`;
     }
-    const device = sourceLook.devices.find(
-      (entry) => entry.id === source.device,
-    );
-    if (device?.name) return `“${device.name}”`;
     return source.kind === "control"
       ? `“${source.control}”`
       : "the tile's source";
@@ -694,13 +675,12 @@
     const config = tile?.tile;
     if (!config) return;
     const anchor = templateAnchor(config);
-    if (!anchor) {
-      applyTemplateError =
-        "This tile has no state or device to anchor the template.";
+    if (!anchor || anchor.kind !== "state") {
+      applyTemplateError = "This tile has no state to anchor the template.";
       return;
     }
     let materialized;
-    if (anchor.kind === "state") {
+    {
       const resolved = resolveSlotSource(anchor, sourceLook);
       if (!resolved?.stateId || !resolved.object) {
         applyTemplateError = "The tile's source state is gone.";
@@ -748,18 +728,6 @@
           getOverrideRegistry().overrides,
         );
       }
-    } else {
-      const target = devices.find((entry) => entry.id === anchor.device);
-      if (!target) {
-        applyTemplateError = "The tile's device is gone.";
-        return;
-      }
-      const problem = templateDeviceProblem(template);
-      if (problem) {
-        applyTemplateError = problem;
-        return;
-      }
-      materialized = materializeTemplateTile(template, target, allTemplates);
     }
     if (materialized.slots.length === 0) {
       applyTemplateError = `“${template.name}” fits no source on this tile.`;
@@ -877,23 +845,16 @@
   // ------------------------------------------------------------------- slots
 
   /**
-   * A source's own label, for the active-condition line: `Device.Control`,
-   * a state id, or a device name (v2 sources are objects).
+   * A source's own label, for the active-condition line: the state id (with
+   * its override), or a legacy control reference.
    */
   function sourceLabel(source: SlotSource | string): string {
     return slotLabel({ kind: "value", source });
   }
 
-  /** The device a source names, for preselecting it in the source picker. */
-  function sourceDevice(source: SlotSource | string | undefined): string {
-    return source && typeof source !== "string" && source.kind !== "state"
-      ? source.device
-      : "";
-  }
-
   /**
-   * What a slot row shows next to its kind: `Device.Control` for a control
-   * reference, the state id for a raw state, the URL for a frame (S3).
+   * What a slot row shows next to its kind: the state id (with its override)
+   * for a state, a legacy control reference, or the URL for a frame (S3).
    */
   function slotLabel(slot: Slot): string {
     if (slot.kind === "frame") {
@@ -925,11 +886,8 @@
         : undefined;
       return override ? `${source.stateId} · ${override.name}` : source.stateId;
     }
-    const device = devices.find((d) => d.id === source.device);
-    if (source.kind === "device") return device?.name || source.device;
-    const control = device?.controls?.find((c) => c.id === source.control);
-    const name = control?.label || control?.feature || source.control;
-    return device ? `${device.name || device.id}.${name}` : name;
+    if (source.kind === "device") return source.device;
+    return `${source.device}.${source.control}`;
   }
 
   /** The state an HTML slot or frame reads from, or the picker's prompt. */
@@ -976,40 +934,19 @@
       // fall back to the tile's own controls), not in the slot source.
       if (source === "ago" || source === "offline") {
         const of = typeof slot.options?.of === "string" ? slot.options.of : "";
-        if (!of) return (device?.controls ?? []).length === 0;
+        if (!of) return true;
         const id = stateIdFor(of, getVariables());
-        return (
-          !sourceLook.objects.get(id) &&
-          !sourceLook.states.get(id) &&
-          !devices.some((d) =>
-            (d.controls ?? []).some(
-              (c) => c.id === of || c.stateId === of || c.feature === of,
-            ),
-          )
-        );
+        return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
       }
       const id = stateIdFor(source, getVariables());
-      return (
-        !devices.some((d) =>
-          (d.controls ?? []).some(
-            (c) =>
-              c.feature === source || c.id === source || c.stateId === source,
-          ),
-        ) &&
-        !sourceLook.objects.get(id) &&
-        !sourceLook.states.get(id)
-      );
+      return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
     }
     if (source.kind === "state") {
       const id = stateIdFor(source.stateId, getVariables());
       return !sourceLook.objects.get(id) && !sourceLook.states.get(id);
     }
-    if (source.kind === "device") {
-      return !devices.some((d) => d.id === source.device);
-    }
-    return !devices
-      .find((d) => d.id === source.device)
-      ?.controls?.some((c) => c.id === source.control);
+    // A legacy control/device source has no device registry to resolve.
+    return true;
   }
 
   /** A rule's live dot: green when `when` evaluates to true, red on error. */
@@ -1094,15 +1031,9 @@
     );
   }
 
-  /** A badge's source kind decides what it can show: a control/state reads a
-   *  value or its age, a device reports offline or its age. */
-  function isDeviceBadge(slot: Slot): boolean {
-    return typeof slot.source === "object" && slot.source?.kind === "device";
-  }
-
   function badgeShows(slot: Slot): "value" | "ago" | "offline" {
-    if (slot.options?.derive === "ago") return "ago";
-    return isDeviceBadge(slot) ? "offline" : "value";
+    const derive = slot.options?.derive;
+    return derive === "ago" || derive === "offline" ? derive : "value";
   }
 
   function patchOptions(
@@ -1158,29 +1089,13 @@
    *  disabled toggle. A raw state is fed by its override's history. */
   function sparkReady(i: number): boolean {
     const source = shownSlots[i]?.source;
-    if (!source) return false;
-    if (typeof source === "string") {
-      return hasHistory(
-        devices
-          .flatMap((d) => d.controls ?? [])
-          .find(
-            (c) =>
-              c.feature === source || c.id === source || c.stateId === source,
-          ),
-      );
+    if (!source || typeof source === "string" || source.kind !== "state") {
+      return false;
     }
-    if (source.kind === "state") {
-      const override = source.override
-        ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
-        : undefined;
-      return !!override?.history;
-    }
-    if (source.kind !== "control") return false;
-    return hasHistory(
-      devices
-        .find((d) => d.id === source.device)
-        ?.controls?.find((c) => c.id === source.control),
-    );
+    const override = source.override
+      ? getOverrideRegistry().overrides.find((o) => o.id === source.override)
+      : undefined;
+    return !!override?.history;
   }
 
   /** The icon's homes cycle both → tile → modal → both (A57); a modal-only
@@ -2369,18 +2284,15 @@
                         onchange={(e) =>
                           patchOptions(i, {
                             derive:
-                              e.currentTarget.value === "ago"
-                                ? "ago"
-                                : undefined,
+                              e.currentTarget.value === "value"
+                                ? undefined
+                                : e.currentTarget.value,
                             of: undefined,
                           })}
                       >
-                        {#if isDeviceBadge(slot)}
-                          <option value="offline">offline</option>
-                        {:else}
-                          <option value="value">value</option>
-                        {/if}
+                        <option value="value">value</option>
                         <option value="ago">time since</option>
+                        <option value="offline">offline</option>
                       </select>
                     </label>
                     {#if badgeShows(slot) === "ago"}
@@ -2916,9 +2828,7 @@
     <SourcePicker
       mode="source"
       title="Choose a source"
-      {devices}
       slots={shownSlots}
-      activeDeviceId={sourceDevice(activeCond?.source)}
       currentState={sourceStateId(activeCond?.source)}
       onSource={setActiveSource}
       onClose={() => (activePicker = false)}
@@ -2929,9 +2839,7 @@
     <SourcePicker
       mode="source"
       title="Choose a source"
-      {devices}
       slots={shownSlots}
-      activeDeviceId={sourceDevice(shownSlots[sourcePickerFor]?.source)}
       currentState={sourceStateId(shownSlots[sourcePickerFor]?.source)}
       onSource={(source) => {
         const slotIndex = sourcePickerFor;

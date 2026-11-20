@@ -2,7 +2,6 @@ import type {
   Control,
   ControlMeta,
   EnrichedControl,
-  EnrichedDevice,
   HistorySpec,
   Transform,
   Widget,
@@ -17,10 +16,9 @@ import {
 import { applyRead } from "$lib/utils/transform";
 import { effectiveCommon, widgetForMeta } from "$lib/config/state-meta";
 
-/** What the resolver reads: the enriched devices, the broker caches and the
- *  source overrides a raw state can bind to. */
+/** What the resolver reads: the broker caches and the source overrides a raw
+ *  state can bind to. */
 export interface SourceLook {
-  devices: EnrichedDevice[];
   states: Map<string, any>;
   objects: Map<string, any>;
   /** A raw-state source may name a variable; the library maps it to its state. */
@@ -106,41 +104,17 @@ function declaredValue(value: unknown, type: string | undefined): unknown {
 }
 
 /**
- * The one way a slot reads: a device control (live, through the device's
- * transform/virtual layer), a raw state — through an override when one is
- * bound — or a device (badges). Absent source or a missing device/control →
- * unavailable, never a throw.
+ * The one way a slot reads: a state — through an override when one is bound.
+ * A legacy control/device source has no device registry to resolve against any
+ * more, so it is unavailable, never a throw.
  */
 export function resolveSlotSource(
   source: SlotSource | undefined,
   look: SourceLook,
 ): ResolvedSource | undefined {
   if (!source) return undefined;
-  if (source.kind === "control") {
-    const device = look.devices.find((d) => d.id === source.device);
-    const control: EnrichedControl | undefined = device?.controls?.find(
-      (c) => c.id === source.control,
-    );
-    if (!control)
-      return { value: undefined, writable: false, available: false };
-    const available = control.available === true;
-    return {
-      value:
-        control.liveValue ??
-        (control.stateId ? look.states.get(control.stateId)?.val : undefined),
-      writable: available && control.writable === true,
-      available,
-      stateId: control.stateId,
-      object: control.object,
-      control,
-      widget: control.widget,
-      unit: control.meta?.unit ?? control.unit,
-      label: control.label ?? control.feature,
-      role: control.meta?.role,
-      type: control.meta?.type,
-      states: control.meta?.states,
-      meta: control.meta,
-    };
+  if (source.kind === "control" || source.kind === "device") {
+    return { value: undefined, writable: false, available: false };
   }
   if (source.kind === "state") {
     const stateId = stateIdFor(source.stateId, look.variables ?? []);
@@ -222,17 +196,7 @@ export function resolveSlotSource(
     }
     return { ...base, error: `unknown override "${wanted}"` };
   }
-  const device = look.devices.find((d) => d.id === source.device);
-  if (!device) return { value: undefined, writable: false, available: false };
-  return {
-    value: undefined,
-    writable: false,
-    available: (device.controls ?? []).some((c) => c.available === true),
-    stateIds: (device.controls ?? [])
-      .map((c) => c.stateId)
-      .filter((id): id is string => !!id),
-    label: device.name,
-  };
+  return { value: undefined, writable: false, available: false };
 }
 
 /** The widget a raw state suggests (a slot may override it). Same inference as
@@ -255,34 +219,4 @@ export function sourceChipKey(
     return `${stateId ?? ""}:control:${source.device}:${source.control}`;
   }
   return `device:${source.device}`;
-}
-
-/** Every state id a source needs subscribed. Control sources resolve through
- *  the device registry; a device source needs none (its controls are watched),
- *  and a derived override subscribes the inputs it reads. */
-export function sourceStateIds(
-  source: SlotSource | undefined,
-  devices: EnrichedDevice[],
-  variables: GlobalVariable[] = [],
-  overrides: SourceOverride[] = [],
-): string[] {
-  if (!source) return [];
-  if (source.kind === "state") {
-    const stateId = stateIdFor(source.stateId, variables);
-    const override = source.override
-      ? overrides.find((o) => o.id === source.override)
-      : undefined;
-    const bound =
-      !!override && stateIdFor(override.stateId, variables) === stateId;
-    const inputs = bound
-      ? (override.inputs ?? []).map((id) => stateIdFor(id, variables))
-      : [];
-    return [...new Set([stateId, ...inputs])];
-  }
-  if (source.kind === "device") return [];
-  const device = devices.find((d) => d.id === source.device);
-  const stateId = device?.controls?.find(
-    (c) => c.id === source.control,
-  )?.stateId;
-  return stateId ? [stateId] : [];
 }

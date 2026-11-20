@@ -28,9 +28,8 @@ import type {
 } from "$lib/types/device";
 import type { Slot, Template, TileConfig, TileLook } from "$lib/types/display";
 import { blankDevice } from "$lib/config/blank-tile";
-import { TEMPERATURE_ICON } from "$lib/config/presets";
 import { resolveTile } from "$lib/config/tile-resolve";
-import { resolveBadges, ruleScope } from "$lib/config/rule-ops";
+import { ruleScope } from "$lib/config/rule-ops";
 import type { SourceOverride } from "$lib/types/overrides";
 
 const control = (
@@ -161,7 +160,6 @@ it("a writable state source yields a switch row", () => {
     { slots: [{ kind: "switch", source: { kind: "state", stateId } }] },
     "Lamp",
     {
-      devices: [],
       states: new Map([[stateId, { val: false }]]),
       objects: new Map([
         [stateId, { common: { name: "Lamp", type: "boolean", write: true } }],
@@ -176,82 +174,6 @@ it("a writable state source yields a switch row", () => {
     stateId,
     liveValue: false,
   });
-});
-
-it("a device badge reports only the device it names", () => {
-  const stateId = "dev.0.state";
-  const make = (available: boolean, derive?: "ago") => {
-    const resolution = resolveTile(
-      {
-        slots: [
-          {
-            kind: "badge",
-            source: { kind: "device", device: "dev" },
-            ...(derive ? { options: { derive } } : {}),
-          },
-        ],
-      },
-      "Dev",
-      {
-        devices: [
-          {
-            id: "dev",
-            name: "Dev",
-            type: "Switch",
-            available,
-            exists: true,
-            controls: [
-              {
-                id: "c1",
-                feature: "power",
-                stateId,
-                writable: true,
-                available,
-                exists: true,
-              },
-            ],
-          } as unknown as EnrichedDevice,
-        ],
-        states: new Map([[stateId, { val: false, ts: 1000 }]]),
-        objects: new Map([[stateId, { common: {} }]]),
-      },
-    );
-    return {
-      resolution,
-      parts: tileParts(resolution.device, resolution.tile, none),
-    };
-  };
-
-  const offline = make(false);
-  expect(offline.parts.badgeSlots[0].source).toBe("offline");
-  expect(offline.parts.badgeSlots[0].options?.of).toBe("slot:0");
-  expect(
-    resolveBadges(
-      offline.parts.badgeSlots,
-      offline.resolution.device,
-      { at: () => undefined },
-      2000,
-    ).map((b) => b.source),
-  ).toEqual(["offline"]);
-
-  const online = make(true);
-  expect(
-    resolveBadges(
-      online.parts.badgeSlots,
-      online.resolution.device,
-      { at: () => undefined },
-      2000,
-    ),
-  ).toEqual([]);
-
-  const ago = make(true, "ago");
-  const badges = resolveBadges(
-    ago.parts.badgeSlots,
-    ago.resolution.device,
-    { at: (source) => (source === "slot:0" ? 1000 : undefined) },
-    2000,
-  );
-  expect(badges.map((b) => b.source)).toEqual(["ago"]);
 });
 
 it("a blank tile does not inherit the preset chain", () => {
@@ -326,19 +248,9 @@ it("a tile-active rule does not remove the detail row", () => {
   expect(tileParts(device(), t, none, { active: true }).hasModal).toBe(true);
 });
 
-it("falls back to the template's own slots when the placement has none", () => {
-  const parts = tileParts(device(), undefined, none);
-  expect(parts.body.length).toBeGreaterThan(0);
-});
-
-it("exposes the very slots its rows carry, chain or materialised (A46/A52)", () => {
+it("exposes the very slots its rows carry (A46/A52)", () => {
   // The headline pick and the row icons compare slot references, so the
-  // resolution must hand out the same objects its rows carry — a second
-  // `resolveTemplate` call would be a different array.
-  const chain = tileParts(device(), undefined, none);
-  expect(chain.slots.length).toBeGreaterThan(0);
-  expect(chain.body[0]?.slot).toBe(chain.slots[0]);
-
+  // resolution must hand out the same objects its rows carry.
   const mine = tile([
     { kind: "value", source: "temperature" },
     { kind: "value", source: "humidity" },
@@ -503,51 +415,6 @@ it("carries the style's colour and dim into the icon", () => {
     color: "var(--warning-color)",
     disabled: true,
   });
-});
-
-it("a found device icon stands in for a template's glyph (A67)", () => {
-  // The chain's own slots: their glyph is the template's, so the device's
-  // found icon takes over…
-  const chain = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    undefined,
-    none,
-  );
-  const head = chain.rows.find((r) => r.slot.icon?.glyph === TEMPERATURE_ICON);
-  expect(head?.iconIsTemplate).toBe(true);
-  expect(rowIcon(head!, "tile", "https://x/dev.png")?.glyph).toBe(
-    "https://x/dev.png",
-  );
-  // …a glyph of the user's own keeps standing…
-  const own = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    tile([
-      { kind: "value", source: "temperature", icon: { glyph: "water_drop" } },
-    ]),
-    none,
-  );
-  expect(own.rows[0].iconIsTemplate).toBe(false);
-  expect(rowIcon(own.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
-    "water_drop",
-  );
-  // …and a rule's icon still wins (A51/A58).
-  const ruled = tileParts(
-    device({ controls: [control("c1", "temperature")] }),
-    tile([
-      {
-        kind: "value",
-        source: "temperature",
-        icon: { glyph: "device_thermostat" },
-        rules: [{ when: "true", icon: "bolt" }],
-      },
-    ]),
-    none,
-  );
-  expect(rowIcon(ruled.rows[0], "tile", "https://x/dev.png")?.glyph).toBe(
-    "bolt",
-  );
-  // With no found icon, the template's own glyph stays.
-  expect(rowIcon(head!, "tile")?.glyph).toBe(TEMPERATURE_ICON);
 });
 
 const withHistory = (id: string, feature: string) =>
@@ -783,18 +650,15 @@ it("the tile icon is separate from the headline slot icon", () => {
   expect(faceGlyph({ glyph: "look" }, "tile", "slot")).toBe("look");
   expect(faceGlyph({}, "tile", "slot")).toBe("tile");
   expect(faceGlyph({}, undefined, "slot")).toBe("slot");
-  // Header: state look → tile icon → headline slot icon → device icon.
-  expect(
-    headerIcon("tile", { glyph: "look" }, { glyph: "slot" }, "device"),
-  ).toEqual({ glyph: "look" });
+  // Header: state look → tile icon → headline slot icon.
+  expect(headerIcon("tile", { glyph: "look" }, { glyph: "slot" })).toEqual({
+    glyph: "look",
+  });
   expect(
     headerIcon(undefined, { glyph: "look", color: "red" }, { glyph: "slot" }),
   ).toEqual({ glyph: "look", color: "red" });
   expect(headerIcon(undefined, {}, { glyph: "slot" })).toEqual({
     glyph: "slot",
-  });
-  expect(headerIcon(undefined, {}, undefined, "device")).toEqual({
-    glyph: "device",
   });
   expect(headerIcon(undefined, {})).toBeUndefined();
 });
@@ -827,52 +691,41 @@ it("switches a row icon with its twin from the row's own state", () => {
     control: { liveValue, meta: { type: "boolean" } },
     style: {},
   });
-  expect(rowIcon(row(true), "tile", undefined, twins)?.glyph).toBe("bulb-on");
-  expect(rowIcon(row(false), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(true), "tile", twins)?.glyph).toBe("bulb-on");
+  expect(rowIcon(row(false), "tile", twins)?.glyph).toBe("bulb-off");
   // the on half is drawn when that is what the document picked
-  expect(rowIcon(row(true, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
-    "bulb-on",
-  );
-  expect(rowIcon(row(false, "bulb-on"), "modal", undefined, twins)?.glyph).toBe(
+  expect(rowIcon(row(true, "bulb-on"), "modal", twins)?.glyph).toBe("bulb-on");
+  expect(rowIcon(row(false, "bulb-on"), "modal", twins)?.glyph).toBe(
     "bulb-off",
   );
   // no twin or no twins map: unchanged
-  expect(rowIcon(row(true), "tile", undefined)?.glyph).toBe("bulb-off");
-  expect(rowIcon(row(1), "tile", undefined, twins)?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(true), "tile")?.glyph).toBe("bulb-off");
+  expect(rowIcon(row(1), "tile", twins)?.glyph).toBe("bulb-off");
 });
 
 it("falls back to a role icon for a bare row, but not for a disabled one", () => {
   const bare: SlotRow = { slot: { kind: "value", source: "s" }, style: {} };
-  expect(rowIcon(bare, "tile", undefined, undefined, "water_drop")?.glyph).toBe(
+  expect(rowIcon(bare, "tile", undefined, "water_drop")?.glyph).toBe(
     "water_drop",
   );
   const on: SlotRow = {
     ...bare,
     control: { liveValue: true, meta: { type: "boolean" } },
   };
-  expect(rowIcon(on, "tile", undefined, { a: "b" }, "a")?.glyph).toBe("b");
+  expect(rowIcon(on, "tile", { a: "b" }, "a")?.glyph).toBe("b");
   const disabled: SlotRow = {
     slot: { kind: "value", source: "s", icon: { glyph: "x", enabled: false } },
     style: {},
   };
-  expect(
-    rowIcon(disabled, "tile", undefined, undefined, "water_drop"),
-  ).toBeUndefined();
+  expect(rowIcon(disabled, "tile", undefined, "water_drop")).toBeUndefined();
 });
 
-it("orders the face: look, tile, slot, default, device", () => {
-  expect(faceGlyph({}, undefined, undefined, "thermostat", "object.png")).toBe(
-    "thermostat",
-  );
-  expect(faceGlyph({}, undefined, undefined, undefined, "object.png")).toBe(
-    "object.png",
-  );
-  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def", "obj")).toBe(
-    "look",
-  );
+it("orders the face: look, tile, slot, default", () => {
+  expect(faceGlyph({}, undefined, undefined, "thermostat")).toBe("thermostat");
+  expect(faceGlyph({ glyph: "look" }, "tile", "slot", "def")).toBe("look");
 });
 
-it("suppresses the face default for an active, disabled or device-owned face", () => {
+it("suppresses the face default for an active or disabled face", () => {
   const headline: Slot = { kind: "value", source: "s" };
   expect(
     faceDefaultGlyph({ hasActive: false, headline, poolValue: "def" }),
@@ -884,14 +737,6 @@ it("suppresses the face default for an active, disabled or device-owned face", (
     faceDefaultGlyph({
       hasActive: false,
       headline: { ...headline, icon: { enabled: false } },
-      poolValue: "def",
-    }),
-  ).toBeUndefined();
-  expect(
-    faceDefaultGlyph({
-      hasActive: false,
-      headline,
-      deviceOwnIcon: "own",
       poolValue: "def",
     }),
   ).toBeUndefined();
@@ -988,24 +833,10 @@ it("names a raw state slot from the id leaf, keeping its label", () => {
   });
 });
 
-it("keeps a control source working until the migration", () => {
+it("resolves a v1 string source through the tile's own control bag", () => {
   const dev = device({
     controls: [{ ...control("c1", "temperature"), liveValue: 21 }],
   });
-  const byControl = tileSourceControls(
-    [
-      {
-        kind: "value",
-        source: { kind: "control", device: "d1", control: "c1" },
-      },
-    ],
-    { devices: [dev] },
-  );
-  expect(byControl[0]).toMatchObject({
-    feature: "temperature",
-    liveValue: 21,
-  });
-  // A v1 string source resolves through the tile's own control bag.
   const byName = tileSourceControls(
     [{ kind: "value", source: "temperature" }],
     { device: dev },
@@ -1105,7 +936,6 @@ it("names a resolved override by its name, not its label", () => {
     },
     "T",
     {
-      devices: [],
       states: new Map([["s", { val: 7 }]]),
       objects: new Map(),
       overrides,
@@ -1136,7 +966,7 @@ it("keeps a watch override in scope without a slot", () => {
       watchOverrides: ["b"],
     },
     "T",
-    { devices: [], states, objects: new Map(), overrides },
+    { states, objects: new Map(), overrides },
   );
   const parts = tileParts(resolution.device, resolution.tile, none, {
     overrides,
@@ -1160,7 +990,6 @@ it("keeps a repaired state charting", () => {
     },
     "T",
     {
-      devices: [],
       states: new Map([["s", { val: 7 }]]),
       objects: new Map(),
       overrides,
@@ -1204,118 +1033,3 @@ it("a badge rule names a slot's override", () => {
 
 // The display builds one rule list from the tile's own slots and hands it to
 // `tileParts`; these pin that the rows and the badged slots read that list.
-
-it("a derive-ago badge keeps its name in the tile scope", () => {
-  const dev = device({
-    controls: [
-      { ...control("c1", "temperature"), liveValue: 21 },
-      { ...control("c2", "connected"), liveValue: "offline" },
-    ],
-  });
-  const slots: Slot[] = [
-    {
-      kind: "value",
-      source: { kind: "control", device: "d1", control: "c1" },
-      rules: [{ when: "!isOnline(connected)", hidden: true }],
-    },
-    {
-      kind: "badge",
-      source: { kind: "control", device: "d1", control: "c2" },
-      options: { derive: "ago" },
-    },
-  ];
-  const resolution = resolveTile({ slots }, "T", {
-    devices: [dev],
-    states: new Map(),
-    objects: new Map(),
-  });
-  const controls = tileSourceControls(slots, {
-    device: resolution.device,
-    devices: [dev],
-  });
-  const parts = tileParts(resolution.device, resolution.tile, none, {
-    controls,
-  });
-  expect(parts.body).toHaveLength(0);
-});
-
-it("suffixes names once, so body and corner badges agree", () => {
-  const dev = device({
-    controls: [
-      {
-        ...control("c1", "power"),
-        label: "Power state",
-        liveValue: "offline",
-      },
-      { ...control("c2", "temperature"), liveValue: 21 },
-    ],
-  });
-  const overrides = [repair("o", "s", "power")];
-  const states = new Map([["s", { val: 7 }]]);
-  const slots: Slot[] = [
-    {
-      kind: "badge",
-      source: { kind: "control", device: "d1", control: "c1" },
-      options: { derive: "ago" },
-    },
-    {
-      kind: "value",
-      source: { kind: "state", stateId: "s", override: "o" },
-      rules: [{ when: "power === 'offline'", hidden: true }],
-    },
-  ];
-  const resolution = resolveTile({ slots }, "T", {
-    devices: [dev],
-    states,
-    objects: new Map(),
-    overrides,
-  });
-  const controls = tileSourceControls(slots, {
-    device: resolution.device,
-    devices: [dev],
-    states,
-    overrides,
-  });
-  // The badge's `power` comes first, so the override's power becomes `power2`.
-  const locals = ruleScope(controls, []).locals;
-  expect(locals.power).toBe("offline");
-  expect(locals.power2).toBe(7);
-  const parts = tileParts(resolution.device, resolution.tile, none, {
-    controls,
-  });
-  expect(parts.body).toHaveLength(0);
-});
-
-it("a device badge's name reaches a detail badge's rule", () => {
-  const bridge = {
-    id: "bridge",
-    name: "bridge",
-    type: "Switch",
-    available: false,
-    exists: true,
-    controls: [{ ...control("c1", "temperature"), available: false }],
-  } as unknown as EnrichedDevice;
-  const slots: Slot[] = [
-    {
-      kind: "badge",
-      source: { kind: "device", device: "bridge" },
-      detail: "full",
-      rules: [{ when: "!isOnline(bridge)", color: "var(--danger-color)" }],
-    },
-  ];
-  const resolution = resolveTile({ slots }, "T", {
-    devices: [bridge],
-    states: new Map([["c1.state", { val: 1 }]]),
-    objects: new Map(),
-  });
-  const controls = tileSourceControls(slots, {
-    device: resolution.device,
-    devices: [bridge],
-  });
-  const parts = tileParts(resolution.device, resolution.tile, none, {
-    controls,
-    raw: noRaw,
-  });
-  expect(parts.modalBadges.map((badge) => badge.source)).toEqual(["offline"]);
-  expect(parts.modalBadges[0].color).toBe("var(--danger-color)");
-});

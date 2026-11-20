@@ -28,7 +28,7 @@
     {
       id: "templates",
       label: "Templates",
-      hint: "Device, logic, both or API templates.",
+      hint: "Tile, logic, both or API templates.",
     },
     {
       id: "icons",
@@ -94,7 +94,7 @@
     startNew: (kind: "formula" | "function") => void;
   } | null>(null);
   let templateRef = $state<{
-    startNew: (kind: "device" | "logic" | "api" | "both") => void;
+    startNew: (kind: "logic" | "api" | "both") => void;
   } | null>(null);
 
   const codeFocus = $derived(
@@ -235,13 +235,6 @@
             <button
               type="button"
               class="btn btn-primary btn-sm"
-              onclick={() => templateRef?.startNew("device")}
-            >
-              + Device
-            </button>
-            <button
-              type="button"
-              class="btn btn-outline btn-sm"
               onclick={() => templateRef?.startNew("logic")}
             >
               + Logic

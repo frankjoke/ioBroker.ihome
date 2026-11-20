@@ -31,10 +31,7 @@ export async function waitForEnumCache(ms = 8000): Promise<void> {
     await ioBroker.wait(200);
   }
 }
-import {
-  registerProgramStateId,
-  getCanonicalRegistry,
-} from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
@@ -89,16 +86,9 @@ function registerSlotStateIds(reg: PageRegistry): void {
           if (raw.kind === "state") {
             const id = stateIdFor(raw.stateId, variables);
             if (id.includes(".")) registerProgramStateId(id);
-          } else if (raw.kind === "control") {
-            const device = getCanonicalRegistry().devices.find(
-              (d) => d.id === raw.device,
-            );
-            const stateId = device?.controls.find(
-              (c) => c.id === raw.control,
-            )?.stateId;
-            const id = stateId ? stateIdFor(stateId, variables) : "";
-            if (id.includes(".")) registerProgramStateId(id);
           }
+          // A legacy control source has no device to resolve against; the
+          // device document's own used-state scan still subscribes its state.
         }
         // The tile's *own* slots carry rules of their own (the editor writes
         // them), and those rules' `get("…")` ids need the same treatment as

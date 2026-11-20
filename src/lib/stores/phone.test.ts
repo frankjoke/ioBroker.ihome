@@ -366,10 +366,3 @@ it("falls back to iPhone for an iOS User-Agent", async () => {
   const { detectPhoneName } = await load();
   await expect(detectPhoneName()).resolves.toBe("iPhone");
 });
-
-it("builds a space-free device label", async () => {
-  const { phoneDeviceLabel } = await load();
-  expect(phoneDeviceLabel("Pixel 7")).toBe("Phone-Pixel-7");
-  expect(phoneDeviceLabel("This phone")).toBe("Phone-This-phone");
-  expect(phoneDeviceLabel("  ")).toBe("Phone");
-});

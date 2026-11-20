@@ -2,7 +2,7 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { appBaseUrl, appOrigin } from "$lib/config/frame-url";
 import { placeholderKeys } from "$lib/config/html-template";
 import { getVariables } from "$lib/stores/variables.svelte";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 
 /**
  * One `{{name}}` value for HTML and frame slots: `{{base}}` / `{{origin}}`,

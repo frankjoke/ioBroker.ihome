@@ -1,7 +1,6 @@
 import { expressionSyntaxProblem } from "$lib/config/code-syntax";
 import { evaluateDeviceTemplate } from "$lib/config/device-templates";
 import { logicTemplateProblem } from "$lib/config/logic-templates";
-import { templateDeviceProblem } from "$lib/config/template-ops";
 import { visualTemplateProblem } from "$lib/config/visual-templates";
 import { validateDeviceTemplate } from "$logic/device-templates";
 import type {
@@ -11,11 +10,9 @@ import type {
   LogicTemplate,
   TemplateParam,
 } from "$logic/types";
-import type { Template } from "$lib/types/display";
 import type {
   TemplateBundle,
   TemplateBundleLibrary,
-  TemplateDevicePart,
   TemplateItem,
   TemplateLogicPart,
 } from "$lib/types/templates";
@@ -285,20 +282,6 @@ export function templateBundleProblem(
     }
   }
   return null;
-}
-
-/** Copy a visual template into a bundle's device part (drop its identity). */
-export function devicePartFromTemplate(template: Template): TemplateDevicePart {
-  const problem = templateDeviceProblem(template);
-  if (problem) throw new Error(problem);
-  const part: TemplateDevicePart = {
-    type: template.type,
-    features: structuredClone(template.features),
-    slots: structuredClone(template.slots),
-  };
-  if (template.size) part.size = template.size;
-  if (template.background) part.background = template.background;
-  return part;
 }
 
 /** Copy a logic template into a bundle's logic part (drop its identity). */

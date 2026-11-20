@@ -51,13 +51,13 @@ it("patches without dropping the other fields", async () => {
 
 it("persists to sessionStorage on flush and reads it back", async () => {
   const first = await import("./page-view");
-  first.patchView("/devices", { openId: "d1", scrollY: 88 });
+  first.patchView("/logic", { openId: "d1", scrollY: 88 });
   first.flushViews();
   expect(storage.getItem("iHome.pageView")).toContain("d1");
 
   vi.resetModules();
   const second = await import("./page-view");
-  expect(second.readView("/devices")).toMatchObject({
+  expect(second.readView("/logic")).toMatchObject({
     openId: "d1",
     scrollY: 88,
   });

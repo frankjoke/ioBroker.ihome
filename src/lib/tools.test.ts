@@ -31,8 +31,8 @@ it("reloads only in the display's view mode", () => {
 });
 
 it("leaves editor pages alone", () => {
-  expect(onEditorPage("/config/devices")).toBe(true);
-  expect(onEditorPage("/ihome/config/devices")).toBe(true);
+  expect(onEditorPage("/config/templates")).toBe(true);
+  expect(onEditorPage("/ihome/config/templates")).toBe(true);
   expect(onEditorPage("/logic")).toBe(true);
   expect(onEditorPage("/ihome/logic")).toBe(true);
   expect(onEditorPage("/p/rooms")).toBe(false);

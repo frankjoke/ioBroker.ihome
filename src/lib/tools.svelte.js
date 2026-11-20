@@ -101,7 +101,6 @@ export function reloadOnReturn(lastVisible, now = Date.now()) {
 const EDITOR_ROUTES = [
   "/config",
   "/logic",
-  "/devices",
   "/templates",
   "/plugins",
   "/server",

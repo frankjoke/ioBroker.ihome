@@ -15,11 +15,7 @@
   import { defineStorage, canReload } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
   import {
-    setStateSource,
-    setObjectSource,
-    setEnumSource,
     getCanonicalRegistry,
-    devicesEnrichedStore,
     getUsedStateIds,
   } from "$lib/stores/devices.svelte";
   import { backfillDeviceEnums, initRegistry } from "$lib/registry.svelte.js";
@@ -368,10 +364,6 @@
   // reactive ioBroker.states map directly.
   $effect(() => {
     if (!ioBroker.connected) return;
-    // share the live caches with the device store (no import cycle)
-    setStateSource(ioBroker.states);
-    setObjectSource(ioBroker.objects);
-    setEnumSource(ioBroker.enums);
     void ioBroker.objects.size;
     void reloadUsedStates(); // Fill any device whose functions/favorites are empty from the broker's own
     // enum membership, once the enums are in (a no-op when nothing changed).

@@ -2,119 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   applyPartLabel,
   bundleApplyParts,
-  bundleDeviceTemplate,
   bundleLogicParams,
-  devicesForTemplate,
   logicApplyDefaults,
-  planDeviceApply,
   planLogicApply,
   resolveTemplateParams,
   runApplyParts,
   type ApplyParam,
 } from "./template-apply";
-import type { Device } from "$lib/types/device";
 import type { TemplateBundle } from "$lib/types/templates";
 import type { LogicTemplate, TemplateParam } from "$logic/types";
-
-it("substitutes shared params in a device part", () => {
-  const template = bundleDeviceTemplate(
-    {
-      type: "Custom",
-      features: [],
-      slots: [
-        {
-          kind: "html",
-          options: { html: '<p data-id="{{wakeDevice}}">{{wakeDevice}}</p>' },
-        },
-      ],
-    },
-    "tpl",
-    "TV",
-    { wakeDevice: "tv" },
-  );
-  expect(template.slots[0].options?.html).toBe('<p data-id="tv">tv</p>');
-});
-
-it("refuses a role device part and writes no template", () => {
-  expect(() =>
-    bundleDeviceTemplate(
-      {
-        type: "Custom",
-        features: [],
-        slots: [
-          {
-            kind: "value",
-            source: "temperature",
-            repair: { kind: "repair", name: "temperature" },
-          },
-        ],
-      },
-      "tpl",
-      "Climate",
-    ),
-  ).toThrow(/role template/i);
-});
-
-it("leaves a device part without placeholders unchanged", () => {
-  const part = { type: "Custom" as const, features: [], slots: [] };
-  expect(bundleDeviceTemplate(part, "tpl", "TV", { wakeDevice: "tv" })).toEqual(
-    {
-      ...part,
-      id: "tpl",
-      name: "TV",
-      builtin: false,
-    },
-  );
-});
-
-const template = {
-  id: "Light",
-  name: "Light",
-  type: "Light" as const,
-  features: [],
-  slots: [],
-};
-const device = (over: Partial<Device> = {}): Device => ({
-  id: "d1",
-  name: "Ceiling",
-  type: "Light",
-  controls: [],
-  slots: [{ kind: "value", source: "power" }],
-  ...over,
-});
-
-describe("planDeviceApply", () => {
-  it("offers only matching devices and sets only template", () => {
-    const light = device();
-    const switchDevice = device({ id: "d2", name: "Switch", type: "Switch" });
-    expect(
-      devicesForTemplate(template, [switchDevice, light]).map((d) => d.id),
-    ).toEqual(["d1"]);
-    const plan = planDeviceApply(template, light);
-    expect("device" in plan && plan.device.template).toBe("Light");
-    expect("device" in plan && plan.device.slots).toEqual(light.slots);
-    expect("device" in plan && plan.device.controls).toEqual(light.controls);
-  });
-
-  it("refuses a missing device and a type mismatch", () => {
-    expect(planDeviceApply(template, undefined)).toMatchObject({
-      problem: expect.stringMatching(/choose/i),
-    });
-    expect(planDeviceApply(template, device({ type: "Switch" }))).toMatchObject(
-      { problem: expect.stringMatching(/type|Light|Switch/i) },
-    );
-  });
-
-  it("refuses a role template and leaves the device untouched", () => {
-    const light = device();
-    const before = structuredClone(light);
-    const plan = planDeviceApply({ ...template, roles: ["switch"] }, light);
-    expect(plan).toMatchObject({
-      problem: expect.stringMatching(/role template/i),
-    });
-    expect(light).toEqual(before);
-  });
-});
 
 describe("logicApplyDefaults", () => {
   it("uses defaults and per-type fallbacks", () => {
@@ -273,41 +169,12 @@ const bundle = {
   api: { source: "({})" },
 } as TemplateBundle;
 
-it("orders the present parts API, Device, Logic", () => {
-  expect(bundleApplyParts(bundle)).toEqual(["api", "device", "logic"]);
+it("orders the present parts API, Logic", () => {
+  expect(bundleApplyParts(bundle)).toEqual(["api", "logic"]);
   expect(bundleApplyParts({ id: "x", name: "X", logic: bundle.logic })).toEqual(
     ["logic"],
   );
   expect(applyPartLabel("api")).toBe("API");
-});
-
-it("builds a user visual template from a device part", () => {
-  const template = bundleDeviceTemplate(
-    {
-      type: "Custom",
-      features: [
-        {
-          feature: "power",
-          label: "Power",
-          widget: "switch",
-          roleHints: [],
-        },
-      ],
-      slots: [{ kind: "value", source: "power" }],
-      size: { w: 2, h: 2 },
-    },
-    "new-id",
-    "TV",
-  );
-  expect(template).toMatchObject({
-    id: "new-id",
-    name: "TV",
-    type: "Custom",
-    builtin: false,
-    size: { w: 2, h: 2 },
-  });
-  expect(template.features).toHaveLength(1);
-  expect(template.slots).toHaveLength(1);
 });
 
 it("keeps logic params and drops string/description", () => {
@@ -325,10 +192,10 @@ it("keeps logic params and drops string/description", () => {
 it("stops at the first failing part and names it", async () => {
   const calls: string[] = [];
   expect(
-    await runApplyParts(["api", "device", "logic"], async (part) => {
+    await runApplyParts(["api", "logic"], async (part) => {
       calls.push(part);
-      if (part === "device") throw new Error("bad target");
+      if (part === "logic") throw new Error("bad target");
     }),
-  ).toEqual({ part: "device", error: "bad target" });
-  expect(calls).toEqual(["api", "device"]);
+  ).toEqual({ part: "logic", error: "bad target" });
+  expect(calls).toEqual(["api", "logic"]);
 });

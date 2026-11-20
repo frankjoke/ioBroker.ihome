@@ -2,7 +2,6 @@
   import { tick } from "svelte";
   import { goto } from "$app/navigation";
   import { getLogicDocument, commitLogics } from "$lib/stores/logics.svelte";
-  import { upsertDevice } from "$lib/registry.svelte.js";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { isLocalUi } from "$lib/config/locality";
   import { withoutSecured } from "$lib/config/secured";
@@ -20,8 +19,7 @@
     createTemplateStates,
     isGeneratedForBase,
   } from "$lib/device-template-apply";
-  import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
-  import { requestDeviceConfig, requestLogicConfig } from "$lib/pages.js";
+  import { requestLogicConfig } from "$lib/pages.js";
   import { parseDuration } from "$logic/duration";
   import { stateIdFor, validStateId } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -75,7 +73,6 @@
   let applySource = $state("");
   let applyParams = $state<Record<string, string | number | boolean>>({});
   let baseState = $state("");
-  let deviceName = $state("");
   let applyError = $state("");
   let applying = $state(false);
   let sourceEl = $state<HTMLTextAreaElement>();
@@ -149,7 +146,6 @@
     applyError = "";
     applyParams = {};
     applying = false;
-    deviceName = "";
     baseState = `${ioBroker.namespace}.Variables.${slug(selected.name)}`;
   });
 
@@ -208,14 +204,6 @@
         applyError = "Base state needs adapter.instance.path.";
         return;
       }
-      const trimmedName = deviceName.trim();
-      const devices = getCanonicalRegistry().devices ?? [];
-      const existing = trimmedName
-        ? devices.find(
-            (device) =>
-              device.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-          )
-        : undefined;
       const values = { ...applyParams };
       for (const param of evaluated.params ?? []) {
         if (param.type === "duration") {
@@ -235,8 +223,8 @@
       }
       const suffix = baseState.split(".").pop() ?? "device";
       const base = `${selected.id}-${suffix}`;
-      // One generated machine per base state, with or without a device: a
-      // re-apply replaces it instead of stacking a second poller on the states.
+      // One generated machine per base state: a re-apply replaces it instead of
+      // stacking a second poller on the states.
       const baseLogics = doc.logics.filter(
         (logic) => !isGeneratedForBase(logic, baseState),
       );
@@ -251,8 +239,6 @@
         baseState,
         id,
         selected.name,
-        deviceName,
-        existing?.id,
       );
       await createTemplateStates(plan.specs, baseState);
       const nextDoc = {
@@ -266,17 +252,6 @@
         applyError = `${issues[0].path}: ${issues[0].message}`;
         return;
       }
-      if (plan.device) {
-        const device = existing
-          ? {
-              ...existing,
-              name: plan.device.name,
-              type: plan.device.type,
-              controls: plan.device.controls,
-            }
-          : plan.device;
-        upsertDevice(device);
-      }
       if (!commitLogics(nextDoc)) {
         applyError = "The logic document could not be saved.";
         return;
@@ -286,13 +261,8 @@
       // The apply dialog is the only feedback so far: close it and open the
       // thing that was just generated, so a second click cannot make a copy.
       applyOpen = false;
-      if (plan.device) {
-        requestDeviceConfig(plan.device.id);
-        void goto("#/devices");
-      } else {
-        requestLogicConfig(plan.logic.id);
-        void goto("#/logic");
-      }
+      requestLogicConfig(plan.logic.id);
+      void goto("#/logic");
     } catch (e) {
       applyError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -512,19 +482,6 @@
           <input type="text" bind:value={baseState} aria-label="Base state" />
           <span class="param-help text-muted"
             >Folder for the generated states; must start with {ioBroker.namespace}.</span
-          >
-        </label>
-        <label class="field">
-          <span class="label-mono">Device name (optional)</span>
-          <input
-            type="text"
-            bind:value={deviceName}
-            placeholder="Leave empty for no device"
-            aria-label="Device name"
-          />
-          <span class="param-help text-muted"
-            >Optional; creates a device with the generated controls. Leave empty
-            to create only the states and machine.</span
           >
         </label>
         {#each evaluated.params ?? [] as param (param.name)}

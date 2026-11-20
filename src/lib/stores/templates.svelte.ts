@@ -9,7 +9,7 @@ import {
 } from "$lib/config/template-ops";
 import { listTemplates, syncKind } from "$lib/config/template-files";
 import { stateIdsInExpression } from "$lib/config/rule-ops";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { getSettings } from "$lib/stores/settings.svelte";

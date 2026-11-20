@@ -168,10 +168,9 @@ export function resolveTemplate(
 }
 
 /**
- * The name a tile shows. Device names default to `Room.Type` (see
- * `suggestDeviceName`), so the type suffix is redundant *on a tile that is already
- * shaped by its type* — "Garten-Pool.Light" reads as "Garten-Pool". An explicit
- * `Device.title` (set in the device config) always wins.
+ * The name a tile shows. Migrated device names read as `Room.Type`, so the type
+ * suffix is redundant *on a tile that is already shaped by its type* —
+ * "Garten-Pool.Light" reads as "Garten-Pool". An explicit title always wins.
  */
 export function tileTitle(device: {
   name?: string;

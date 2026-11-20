@@ -3,7 +3,6 @@
   import {
     applyPartLabel,
     bundleApplyParts,
-    bundleDeviceTemplate,
     bundleLogicParams,
     logicApplyDefaults,
     planLogicApply,
@@ -21,25 +20,16 @@
     planDeviceTemplate,
   } from "$lib/device-template-apply";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { upsertDevice } from "$lib/registry.svelte.js";
-  import { getCanonicalRegistry } from "$lib/stores/devices.svelte";
   import {
     commitLogics,
     getLogicDocument,
     isLogicsWritable,
     logicBlocked,
   } from "$lib/stores/logics.svelte";
-  import {
-    commitTemplates,
-    getTemplateRegistry,
-    isTemplatesWritable,
-  } from "$lib/stores/templates.svelte.js";
   import { getTemplateBundles } from "$lib/stores/template-bundles.svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
-  import { newId } from "$lib/utils/ids";
   import { validateDeviceTemplate } from "$logic/device-templates";
   import { validateLogicDocument } from "$logic/validate";
-  import type { Device } from "$lib/types/device";
   import type { TemplateBundle } from "$lib/types/templates";
   import type { DeviceTemplateShape, LogicTemplate } from "$logic/types";
   import HelpSection from "./HelpSection.svelte";
@@ -55,13 +45,8 @@
 
   const parts = $derived(bundleApplyParts(bundle));
   const doc = $derived(getLogicDocument());
-  const registry = $derived(getTemplateRegistry());
   const needsLogic = $derived(!!(bundle.api || bundle.logic));
-  const needsTemplates = $derived(!!bundle.device);
-  const writable = $derived(
-    (!needsLogic || isLogicsWritable()) &&
-      (!needsTemplates || isTemplatesWritable()),
-  );
+  const writable = $derived(!needsLogic || isLogicsWritable());
   const blocked = $derived(needsLogic ? logicBlocked() : false);
   // svelte-ignore state_referenced_locally
   let values = $state(logicApplyDefaults(bundle.params ?? []));
@@ -69,33 +54,11 @@
   let baseState = $state(
     `${ioBroker.namespace}.Variables.${slugify(bundle.name) || "device"}`,
   );
-  let deviceName = $state("");
-  let targetId = $state("");
   let apiShape = $state<DeviceTemplateShape | null>(null);
   let apiProblem = $state("");
   let preflightProblem = $state<string | null>(null);
   let error = $state("");
   let applying = $state(false);
-
-  const targetCandidates = $derived.by(() => {
-    const part = bundle.device;
-    if (!part) return [];
-    return (getCanonicalRegistry().devices ?? [])
-      .filter((device) => device.type === part.type)
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name));
-  });
-
-  $effect(() => {
-    // Keep a chosen device valid when the list changes, but leave the empty
-    // “use the API-created device / none” option selectable.
-    if (
-      targetId &&
-      !targetCandidates.some((device) => device.id === targetId)
-    ) {
-      targetId = "";
-    }
-  });
 
   let loadedBundleId = "";
   $effect(() => {
@@ -167,7 +130,6 @@
 
     applying = true;
     let logicDoc = doc;
-    let apiDevice: Device | undefined;
     const failure = await runApplyParts(parts, async (part) => {
       if (part === "api") {
         if (!bundle.api || !apiShape) {
@@ -188,7 +150,6 @@
           baseState,
           id,
           bundle.name,
-          deviceName,
         );
         await createTemplateStates(plan.specs, baseState);
         const nextDoc = {
@@ -205,44 +166,6 @@
           throw new Error("The logic document could not be saved.");
         }
         logicDoc = nextDoc;
-        if (plan.device) {
-          upsertDevice(plan.device);
-          apiDevice = plan.device;
-        }
-        return;
-      }
-
-      if (part === "device") {
-        const devicePart = bundle.device;
-        if (!devicePart) throw new Error("The bundle has no device part.");
-        const target =
-          apiDevice && apiDevice.type === devicePart.type
-            ? apiDevice
-            : (getCanonicalRegistry().devices ?? []).find(
-                (device) => device.id === targetId,
-              );
-        if (!target) {
-          throw new Error("Choose a target device for the device part.");
-        }
-        if (target.type !== devicePart.type) {
-          throw new Error(
-            `The device part is for ${devicePart.type} devices, but ${target.name} is a ${target.type} device.`,
-          );
-        }
-        const template = bundleDeviceTemplate(
-          $state.snapshot(devicePart),
-          newId(),
-          bundle.name,
-          resolved.values,
-        );
-        const nextRegistry = {
-          ...registry,
-          templates: [...(registry.templates ?? []), template],
-        };
-        if (!commitTemplates(nextRegistry)) {
-          throw new Error("The device template document could not be saved.");
-        }
-        upsertDevice({ ...target, template: template.id });
         return;
       }
 
@@ -301,34 +224,6 @@
             >Folder for the API-created states; must start with {ioBroker.namespace}.</span
           >
         </label>
-        <label class="field">
-          <span class="label-mono">Device name (optional)</span>
-          <input
-            type="text"
-            bind:value={deviceName}
-            aria-label="Device name"
-            placeholder="Creates a device from the API states"
-          />
-          <span class="hint text-muted"
-            >Creates the device with the API-created controls. Leave empty to
-            create only the states and machine.</span
-          >
-        </label>
-      {/if}
-      {#if bundle.device}
-        <label class="field">
-          <span class="label-mono">Target device</span>
-          <select bind:value={targetId} aria-label="Target device">
-            <option value="">— use the API-created device / none —</option>
-            {#each targetCandidates as device (device.id)}
-              <option value={device.id}>{device.name}</option>
-            {/each}
-          </select>
-        </label>
-        <p class="hint text-muted">
-          Used for the Device part when the API part does not create a matching
-          device.
-        </p>
       {/if}
       {#if preflightProblem}
         <p class="text-danger hint">{preflightProblem}</p>
@@ -338,8 +233,7 @@
       {/if}
       {#if !writable}
         <p class="text-danger hint">
-          The logic or template document could not be loaded — applying is
-          disabled.
+          The logic document could not be loaded — applying is disabled.
         </p>
       {:else if blocked}
         <p class="text-danger hint">

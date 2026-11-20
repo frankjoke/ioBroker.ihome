@@ -10,11 +10,9 @@ import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
   resolveControl,
-  resolveTemplate,
   slotVisible,
 } from "$lib/config/template-ops";
 import { inDetail, slotTileMode } from "$lib/config/tile-ops";
-import { BLANK_DEVICE_ID } from "$lib/config/blank-tile";
 import {
   resolveBadges,
   resolveStyle,
@@ -45,7 +43,6 @@ export interface SlotRow {
   control?: SlotControl;
   style: ResolvedStyle;
   /** The slot's glyph is the template's own, not a choice (A67). */
-  iconIsTemplate?: boolean;
 }
 
 export interface TileParts {
@@ -82,10 +79,8 @@ export interface TileSourceControl extends LocalControl {
 
 /** What `tileSourceControls` reads beyond the slots themselves. */
 export interface SourceControlOpts {
-  /** The tile's own control bag: legacy string sources resolve here. */
+  /** The tile's own control bag: resolved `slot:N` pseudo keys point here. */
   device?: { controls?: TileControlLike[] };
-  /** A control source names its own device (legacy until the migration). */
-  devices?: EnrichedDevice[];
   states?: Map<string, any>;
   objects?: Map<string, any>;
   variables?: GlobalVariable[];
@@ -132,7 +127,6 @@ export function tileSourceControls(
   opts: SourceControlOpts = {},
 ): TileSourceControl[] {
   const look: SourceLook = {
-    devices: opts.devices ?? [],
     states: opts.states ?? new Map(),
     objects: opts.objects ?? new Map(),
     variables: opts.variables,
@@ -207,7 +201,7 @@ export function tileSourceControls(
 export function tileParts(
   device: EnrichedDevice,
   tile: TileConfig | undefined,
-  templates: Template[],
+  _templates: Template[],
   opts?: {
     active?: boolean;
     raw?: (source: string) => SlotControl | undefined;
@@ -216,7 +210,6 @@ export function tileParts(
     now?: number;
     /** The override look a raw-state slot resolves through (spec §3.3). */
     overrides?: SourceOverride[];
-    devices?: EnrichedDevice[];
     states?: Map<string, any>;
     objects?: Map<string, any>;
     variables?: GlobalVariable[];
@@ -233,26 +226,8 @@ export function tileParts(
   const raw = opts?.raw;
   const shownControls = (device.controls ?? []).filter((c) => !c.hidden);
   const pool = opts?.pool ?? [];
-  // The tile's own slots once it was materialised; the chain's until then (A18).
-  const chain = resolveTemplate(device, templates);
-  const slots =
-    device.id === BLANK_DEVICE_ID
-      ? (tile?.slots ?? [])
-      : (tile?.slots ?? chain.slots);
-
-  /** Does this slot carry the glyph the template gives it (A67)? Such a glyph is
-   *  a type default, not a choice, so the device's found icon may stand in for
-   *  it. Compared by position and kind against the chain's own slots. */
-  const templateGlyph = (slot: Slot): boolean => {
-    const at = slots.indexOf(slot);
-    const via = at < 0 ? undefined : chain.slots[at];
-    return (
-      !!slot.icon?.glyph &&
-      !!via &&
-      via.kind === slot.kind &&
-      via.icon?.glyph === slot.icon?.glyph
-    );
-  };
+  // The tile's own slots: the renderer's resolution always materialises them.
+  const slots = tile?.slots ?? [];
 
   // Rule locals are the tile's bound sources — overrides and watch overrides
   // included — plus the pool helpers and the config's variables, and the
@@ -263,7 +238,6 @@ export function tileParts(
     opts?.controls ??
     tileSourceControls(slots, {
       device,
-      devices: opts?.devices,
       states: opts?.states,
       objects: opts?.objects,
       variables: opts?.variables,
@@ -299,7 +273,6 @@ export function tileParts(
       slot: r.slot,
       control: r.control,
       style: styleOf(r.slot, r.control),
-      iconIsTemplate: templateGlyph(r.slot),
     }));
   const rows = resolvedRows.filter((r) => r.style.hidden !== true);
 
@@ -327,7 +300,6 @@ export function tileParts(
       slot: r.slot,
       control: r.control,
       style: {},
-      iconIsTemplate: false,
     }))
     .filter((r) => inDetail(r.slot));
 
@@ -435,23 +407,21 @@ export function faceGlyph(
   tileIcon?: string,
   slotGlyph?: string,
   defaultGlyph?: string,
-  deviceIcon?: string,
 ): string | undefined {
-  return look.glyph ?? tileIcon ?? slotGlyph ?? defaultGlyph ?? deviceIcon;
+  return look.glyph ?? tileIcon ?? slotGlyph ?? defaultGlyph;
 }
 
 /** The icon before the tile name (detail header): the state's look, then the
- *  tile's own icon, then the headline slot's icon, then the device's face. */
+ *  tile's own icon, then the headline slot's icon. */
 export function headerIcon(
   tileIcon: string | undefined,
   look: StateLook,
   headline?: { glyph: string; color?: string; disabled?: boolean },
-  deviceIcon?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
   if (look.glyph) return { glyph: look.glyph, color: look.color };
   if (tileIcon) return { glyph: tileIcon };
   if (headline) return headline;
-  return deviceIcon ? { glyph: deviceIcon } : undefined;
+  return undefined;
 }
 
 /** The pool default a face may wear: not while the tile has an active condition
@@ -460,10 +430,9 @@ export function headerIcon(
 export function faceDefaultGlyph(args: {
   hasActive: boolean;
   headline?: Slot;
-  deviceOwnIcon?: string;
   poolValue?: string;
 }): string | undefined {
-  if (args.hasActive || args.deviceOwnIcon) return undefined;
+  if (args.hasActive) return undefined;
   if (args.headline?.icon?.enabled === false) return undefined;
   return args.poolValue;
 }
@@ -485,13 +454,11 @@ export function binaryOn(control: SlotControl): boolean | undefined {
 }
 
 /** The icon a resolved row shows in `home` (A51/A54): enabled, glyphed, allowed
- *  there — the last matching rule's glyph beats the descriptor's, and a glyph the
- *  template gave gives way to the device's own icon (A67). A binary state with a
- *  twin in the library draws the half its value asks for. */
+ *  there — the last matching rule's glyph beats the descriptor's. A binary state
+ *  with a twin in the library draws the half its value asks for. */
 export function rowIcon(
   row: SlotRow,
   home: "tile" | "modal",
-  deviceIcon?: string,
   twins?: Record<string, string>,
   fallback?: string,
 ): { glyph: string; color?: string; disabled?: boolean } | undefined {
@@ -501,13 +468,7 @@ export function rowIcon(
     const where = icon.where ?? "both";
     if (where !== "both" && where !== home) return undefined;
   }
-  const picked =
-    row.style.icon ??
-    (icon
-      ? row.iconIsTemplate
-        ? (deviceIcon ?? icon.glyph)
-        : icon.glyph
-      : fallback);
+  const picked = row.style.icon ?? (icon ? icon.glyph : fallback);
   if (!picked) return undefined;
   const on = twins && row.control ? binaryOn(row.control) : undefined;
   const glyph =

@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { TemplateBundle } from "$lib/types/templates";
-import type { Template } from "$lib/types/display";
 import { evaluateDeviceTemplate } from "./device-templates";
 import { NETWORK_DEVICE_BUNDLE } from "./builtin-bundles";
 import {
   bundleApiSource,
   compileTemplateItems,
-  devicePartFromTemplate,
   evaluateBundleApi,
   logicPartFromTemplate,
   migrateTemplateBundleLibrary,
@@ -210,18 +208,6 @@ describe("templateBundleProblem", () => {
 });
 
 describe("part helpers", () => {
-  it("copies a visual template into a device part", () => {
-    const part = devicePartFromTemplate({
-      id: "x",
-      name: "X",
-      type: "Light",
-      features: [],
-      slots: [],
-      builtin: true,
-    });
-    expect(part).toEqual({ type: "Light", features: [], slots: [] });
-  });
-
   it("copies a logic template into a logic part", () => {
     const body = {
       id: "l",
@@ -237,23 +223,6 @@ describe("part helpers", () => {
   });
 
   it("refuses a role template as a device part", () => {
-    const roleTemplate = {
-      id: "r",
-      name: "Climate",
-      type: "Custom",
-      features: [],
-      roles: ["temperature", "switch"],
-      slots: [
-        {
-          kind: "value",
-          source: "temperature",
-          repair: { kind: "repair", name: "temperature" },
-        },
-      ],
-    } as unknown as Template;
-    expect(() => devicePartFromTemplate(roleTemplate)).toThrow(
-      /role template/i,
-    );
     // A bundle document edited by hand or imported keeps its old value: the
     // problem is reported before anything is written.
     const problem = templateBundleProblem(

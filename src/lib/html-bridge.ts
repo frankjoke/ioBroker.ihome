@@ -4,7 +4,7 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { callPlugin } from "$lib/config/plugin-call";
 import { appBaseUrl, appOrigin } from "$lib/config/frame-url";
 import { getVariables, upsertVariable } from "$lib/stores/variables.svelte";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { saveVariables } from "$lib/variables.svelte.js";
 import type { GlobalVariable } from "$lib/config/variables";
 

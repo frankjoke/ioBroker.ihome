@@ -11,7 +11,7 @@ import {
   overrideById,
   overrideGroup,
 } from "$lib/config/source-overrides";
-import { registerProgramStateId } from "$lib/stores/devices.svelte";
+import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { getVariables } from "$lib/stores/variables.svelte";
 import { stateIdFor } from "$lib/config/variables";
 import type {

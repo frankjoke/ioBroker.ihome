@@ -1,9 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { PRESETS } from "$lib/config/presets";
-  import { templateDeviceProblem } from "$lib/config/template-ops";
   import {
-    devicePartFromTemplate,
     logicPartFromTemplate,
     templateBundleProblem,
   } from "$lib/config/template-bundles";
@@ -18,11 +15,9 @@
     isTemplateBundlesWritable,
     templateBundleSaveFailed,
   } from "$lib/stores/template-bundles.svelte";
-  import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { getLogicDocument } from "$lib/stores/logics.svelte";
   import { BUILTIN_TEMPLATES } from "$logic/templates";
   import type { LogicTemplate } from "$logic/types";
-  import type { Template } from "$lib/types/display";
   import type {
     TemplateBundle,
     TemplateItem,
@@ -45,9 +40,7 @@
 
   // svelte-ignore state_referenced_locally
   let draft = $state<TemplateBundle>(structuredClone($state.snapshot(bundle)));
-  let deviceJson = $state("");
   let logicJson = $state("");
-  let loadedDevice = "";
   let loadedLogic = "";
   let saveError = $state("");
 
@@ -59,12 +52,6 @@
   const writable = $derived(isTemplateBundlesWritable());
   const saveFailed = $derived(templateBundleSaveFailed());
   const local = isLocalUi();
-  const deviceChoices = $derived(
-    withoutSecured(
-      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
-      local,
-    ).filter((template) => !template.roles?.length),
-  );
   const logicChoices = $derived(
     withoutSecured(
       [...BUILTIN_TEMPLATES, ...(getLogicDocument().templates ?? [])],
@@ -83,8 +70,6 @@
     !builtin &&
       (isNew ||
         JSON.stringify(draft) !== JSON.stringify(bundle) ||
-        deviceJson !==
-          (draft.device ? JSON.stringify(draft.device, null, 2) : "") ||
         logicJson !==
           (draft.logic ? JSON.stringify(draft.logic, null, 2) : "")),
   );
@@ -93,13 +78,6 @@
     if (draft.id !== bundle.id) {
       draft = structuredClone($state.snapshot(bundle));
       saveError = "";
-    }
-  });
-  $effect(() => {
-    const next = draft.device ? JSON.stringify(draft.device, null, 2) : "";
-    if (next !== loadedDevice) {
-      deviceJson = next;
-      loadedDevice = next;
     }
   });
   $effect(() => {
@@ -176,18 +154,6 @@
     draft.items = (draft.items ?? []).filter((_, i) => i !== index);
   }
 
-  function pickDevice(event: Event) {
-    const id = (event.currentTarget as HTMLSelectElement).value;
-    const template = deviceChoices.find((entry) => entry.id === id);
-    if (!template) return;
-    const problem = templateDeviceProblem(template);
-    if (problem) {
-      saveError = problem;
-      return;
-    }
-    draft.device = devicePartFromTemplate($state.snapshot(template));
-  }
-
   function pickLogic(event: Event) {
     const id = (event.currentTarget as HTMLSelectElement).value;
     const template = logicChoices.find((entry) => entry.id === id);
@@ -203,12 +169,7 @@
     saveError = "";
     if (!writable) return;
     const next = structuredClone($state.snapshot(draft));
-    try {
-      next.device = deviceJson.trim() ? JSON.parse(deviceJson) : undefined;
-    } catch (e) {
-      saveError = `Device part: ${e instanceof Error ? e.message : String(e)}`;
-      return;
-    }
+    delete next.device;
     try {
       next.logic = logicJson.trim() ? JSON.parse(logicJson) : undefined;
     } catch (e) {
@@ -478,48 +439,6 @@
         {/if}
       </div>
     {/each}
-  </section>
-
-  <section class="section">
-    <div class="section-head">
-      <h4>Device part</h4>
-      {#if !builtin}
-        <button
-          type="button"
-          class="btn btn-sm"
-          onclick={() =>
-            (draft.device = { type: "Custom", features: [], slots: [] })}
-        >
-          <span class="material-symbols-outlined">add</span> Add device part
-        </button>
-      {/if}
-    </div>
-    <div class="row-grid">
-      <label class="field"
-        ><span class="label-mono">Start from</span>
-        <select value="" onchange={pickDevice} disabled={builtin}>
-          <option value="">— choose —</option>
-          {#each deviceChoices as template (template.id)}
-            <option value={template.id}>{template.name}</option>
-          {/each}
-        </select></label
-      >
-      {#if draft.device && !builtin}
-        <IconButton
-          icon="close"
-          label="Clear device part"
-          onclick={() => (draft.device = undefined)}
-        />
-      {/if}
-    </div>
-    <textarea
-      class="json"
-      rows="10"
-      spellcheck="false"
-      readonly={builtin}
-      bind:value={deviceJson}
-      aria-label="Device part JSON"
-    ></textarea>
   </section>
 
   <section class="section">
