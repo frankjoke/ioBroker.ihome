@@ -1023,6 +1023,10 @@ class IHome extends utils.Adapter {
     if (data.name !== undefined) {
       if (!name) throw new Error("invalid phone name");
       await write("name", name);
+      // The object tree label must follow a rename; the folder exists already.
+      await this.extendObjectAsync(`phone.${deviceId}`, {
+        common: { name },
+      });
     }
     if (data.enabled !== undefined) {
       if (typeof data.enabled !== "boolean") throw new Error("invalid enabled");
