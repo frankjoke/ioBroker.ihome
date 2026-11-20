@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   resolveSlotSource,
   sourceChipKey,
+  sourceKey,
   type SourceLook,
 } from "$lib/config/slot-source";
 import type { EnrichedDevice } from "$lib/types/device";
@@ -320,4 +321,16 @@ it("applies an override stored under a variable name", () => {
   expect(source?.overrideId).toBe("o");
   expect(source?.unit).toBe("A");
   expect(source?.value).toBe(12);
+});
+
+it("compares sources by identity, legacy strings included", () => {
+  expect(sourceKey("s")).toBe(sourceKey({ kind: "state", stateId: "s" }));
+  expect(sourceKey({ kind: "state", stateId: "s", override: "o" })).not.toBe(
+    sourceKey({ kind: "state", stateId: "s" }),
+  );
+  expect(sourceKey({ kind: "control", device: "d", control: "c" })).toBe(
+    "control:d:c",
+  );
+  expect(sourceKey({ kind: "device", device: "d" })).toBe("device:d");
+  expect(sourceKey(undefined)).toBe("");
 });

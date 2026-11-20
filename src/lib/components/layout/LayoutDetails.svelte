@@ -50,7 +50,11 @@
     tileSourceControls,
   } from "$lib/config/tile-parts";
   import { resolveTile } from "$lib/config/tile-resolve";
-  import { resolveSlotSource, type SourceLook } from "$lib/config/slot-source";
+  import {
+    resolveSlotSource,
+    sourceKey,
+    type SourceLook,
+  } from "$lib/config/slot-source";
   import { stateIdFor } from "$lib/config/variables";
   import { getVariables } from "$lib/stores/variables.svelte";
   import {
@@ -287,6 +291,16 @@
   /** The headline slot: the first value slot, whose icon is the tile's big glyph. */
   const mainSlotIndex = $derived(
     shownSlots.findIndex((slot) => slot.kind === "value"),
+  );
+
+  /** The tile's face source: the one-click default for the active condition. */
+  const mainSource = $derived(tileHeadlineSlot(shownSlots)?.source);
+  const mainUsable = $derived(
+    !!mainSource &&
+      (typeof mainSource === "string" || mainSource.kind === "state"),
+  );
+  const usesMainState = $derived(
+    mainUsable && sourceKey(activeCond?.source) === sourceKey(mainSource),
   );
 
   /** The states the look block edits (A71): the inactive one is also the
@@ -818,6 +832,12 @@
 
   function clearActive(): void {
     edit((t) => ({ ...t, active: undefined }));
+  }
+
+  /** The checkbox shortcut: use the tile's main state, or clear the condition. */
+  function toggleMainState(useMain: boolean): void {
+    if (useMain && mainSource) setActiveSource(mainSource);
+    else clearActive();
   }
 
   /** One state's look field (A71): `undefined` clears it. */
@@ -1368,29 +1388,33 @@
 
         {#if id === "view"}
           <div class="field">
-            <div class="row">
-              <span
-                class="source-name"
-                title={activeCond?.source
-                  ? sourceLabel(activeCond.source)
-                  : "No active source"}
-                >{activeCond?.source
-                  ? sourceLabel(activeCond.source)
-                  : "not set"}</span
+            <div class="row wrap">
+              <label
+                class="check"
+                title="Use the tile's main state as the active condition."
               >
+                <input
+                  type="checkbox"
+                  checked={usesMainState}
+                  disabled={!mainUsable}
+                  onchange={(e) => toggleMainState(e.currentTarget.checked)}
+                />
+                <span>Main state</span>
+              </label>
               <button
                 type="button"
                 class="icon-btn"
-                title={activeCond
-                  ? "Change the active source"
-                  : "Set the active source"}
-                aria-label={activeCond
-                  ? "Change the active source"
-                  : "Set the active source"}
+                title="Choose another active source"
+                aria-label="Choose another active source"
                 onclick={() => (activePicker = true)}
               >
                 <span class="material-symbols-outlined">edit</span>
               </button>
+              {#if activeCond?.source && !usesMainState}
+                <span class="source-name" title={sourceLabel(activeCond.source)}
+                  >{sourceLabel(activeCond.source)}</span
+                >
+              {/if}
               {#if activeCond}
                 <select
                   aria-label="Active operator"

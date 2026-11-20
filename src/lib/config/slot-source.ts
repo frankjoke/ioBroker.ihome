@@ -220,3 +220,17 @@ export function sourceChipKey(
   }
   return `device:${source.device}`;
 }
+
+/** A stable identity for equality — unlike `sourceChipKey`, a legacy string and
+ *  a state source with the same id match; an override stays part of it. */
+export function sourceKey(source: SlotSource | string | undefined): string {
+  if (!source) return "";
+  if (typeof source === "string") return `state:${source}`;
+  if (source.kind === "state") {
+    return `state:${source.stateId}${source.override ? `#${source.override}` : ""}`;
+  }
+  if (source.kind === "control") {
+    return `control:${source.device}:${source.control}`;
+  }
+  return `device:${source.device}`;
+}
