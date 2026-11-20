@@ -109,7 +109,9 @@
             Built-in settings · Timeout {plugin.timeoutMs ?? 5000} ms ·
             {Object.keys(plugin.settings ?? {}).length} settings · no code
           {:else}
-            Timeout {plugin.timeoutMs ?? 5000} ms · Code {plugin.code.length}
+            API {plugin.api ?? 1}{#if plugin.version}
+              · v{plugin.version}{/if} · Timeout {plugin.timeoutMs ?? 5000} ms · Code
+            {plugin.code.length}
             bytes · {plugin.settingsSchema?.length ?? 0} settings fields ·
             {plugin.help ? "help" : "no help"} · {plugin.usage
               ? "usage"

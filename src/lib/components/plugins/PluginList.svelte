@@ -13,6 +13,7 @@
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { adapterIcon } from "$lib/config/icon-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import ioPackage from "../../../../io-package.json";
   import type { PluginView } from "$adapter/plugin-admin";
 
   let {
@@ -39,6 +40,17 @@
   const homeIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, homeAdapter),
   );
+
+  /** `built-in:<id>` / `user:<id>` — the row's kind tooltip. */
+  const kindLabel = (plugin: PluginView): string =>
+    `${plugin.builtin ? "built-in" : "user"}:${plugin.id}`;
+  /** User manifests carry their own version; built-ins ship with iHome. */
+  const versionLabel = (plugin: PluginView): string =>
+    plugin.version
+      ? `v${plugin.version}`
+      : plugin.builtin
+        ? `v${ioPackage.common.version}`
+        : "";
 
   let selectedId = $state(
     untrack(() =>
@@ -152,25 +164,30 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="item-line" onclick={(event) => onLineClick(event, plugin)}>
-        {#if plugin.builtin && homeIcon}
-          <Icon value={homeIcon.value} owner={homeIcon.owner} size={18} />
-        {:else}
-          <Icon value="extension" size={18} />
-        {/if}
+        <span class="plugin-icon" title={kindLabel(plugin)}>
+          {#if plugin.builtin && homeIcon}
+            <Icon value={homeIcon.value} owner={homeIcon.owner} size={18} />
+          {:else}
+            <Icon value="extension" size={18} />
+          {/if}
+        </span>
         <button
           type="button"
           class="name"
+          title={kindLabel(plugin)}
           aria-expanded={open}
           onclick={() => edit(plugin)}
         >
           {plugin.name}
         </button>
         <span class="mono hint text-muted">{plugin.id}</span>
-        <span class="badge">{plugin.builtin ? "built-in" : "user"}</span>
-        <span class="badge status-{plugin.status}"
-          >{statusLabel(plugin.status)}</span
-        >
+        {#if versionLabel(plugin)}
+          <span class="badge">{versionLabel(plugin)}</span>
+        {/if}
         <span class="item-actions">
+          <span class="badge status-{plugin.status}"
+            >{statusLabel(plugin.status)}</span
+          >
           <label class="switch">
             <input
               type="checkbox"
@@ -214,7 +231,15 @@
               <span class="material-symbols-outlined">check</span> Save
             </button>
           {/if}
-          {#if !plugin.builtin}
+          {#if plugin.builtin}
+            <span
+              class="builtin-marker"
+              title="Built-in — part of iHome"
+              aria-hidden="true"
+            >
+              <Icon value="extension" size={18} />
+            </span>
+          {:else}
             <IconButton
               icon="delete"
               danger
@@ -333,6 +358,21 @@
   .restart {
     flex: 1 1 100%;
     margin: 0;
+  }
+
+  .plugin-icon {
+    display: inline-flex;
+  }
+
+  /* Built-ins cannot be deleted: a muted plugin glyph fills the bin's slot. */
+  .builtin-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    color: var(--text-muted);
+    opacity: 0.45;
   }
 
   .restart {
