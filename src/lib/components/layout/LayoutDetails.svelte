@@ -1319,6 +1319,7 @@
         tiles={resolveSection(section)}
         {bp}
         pageId={page?.id ?? ""}
+        preview
       />
     </div>
   {:else if selection.kind === "tile" && tile}
