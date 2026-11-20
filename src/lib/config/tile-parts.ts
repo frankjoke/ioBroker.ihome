@@ -1,5 +1,11 @@
 import type { EnrichedDevice, SlotControl } from "$lib/types/device";
-import type { Slot, SlotKind, Template, TileConfig } from "$lib/types/display";
+import type {
+  Slot,
+  SlotKind,
+  Template,
+  TileConfig,
+  TileChartConfig,
+} from "$lib/types/display";
 import type { Rule, StateLook } from "$lib/types/display";
 import {
   pickSlotControls,
@@ -554,6 +560,14 @@ export function singleSurface(slots: Slot[]): boolean {
 
 /** The series colours, in assignment order (A61): theme tokens, so the chart
  *  follows the theme like everything else. */
+export type ChartLayout = "band" | "full" | "header";
+
+/** The chart layout, reading the legacy booleans when `mode` is absent. */
+export function chartLayout(config?: TileChartConfig): ChartLayout {
+  if (config?.mode) return config.mode;
+  return config?.full === true || config?.separate === true ? "full" : "band";
+}
+
 export const CHART_PALETTE = [
   "var(--primary-color)",
   "var(--success-color)",

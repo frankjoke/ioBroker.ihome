@@ -28,6 +28,7 @@
     tileParts,
     tileSeries,
     tileSourceControls,
+    chartLayout,
     type SlotRow,
   } from "$lib/config/tile-parts";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
@@ -439,10 +440,16 @@
   );
   /** A lone frame/html slot is the whole face: no name, no padding. */
   const surfaceOnly = $derived(singleSurface(bodySlots.map((row) => row.slot)));
-  /** Sparkline layout: a band after the name, or the whole tile face. */
+  /** Sparkline layout: a band after the name, the whole content area, or only
+   *  behind the icon and name. */
   const chartConfig = $derived(workingTile?.chart);
-  const chartFull = $derived(
-    chartConfig?.full ?? chartConfig?.separate === true,
+  const chartMode = $derived(chartLayout(chartConfig));
+  const chartFull = $derived(chartMode === "full");
+  const chartHeader = $derived(
+    chartMode === "header" && (!!faceRow || !!tileName),
+  );
+  const chartBand = $derived(
+    chartMode === "band" || (chartMode === "header" && !chartHeader),
   );
   const chartHeight = $derived(chartConfig?.height ?? 56);
   const chartArea = $derived(chartConfig?.area === true);
@@ -812,21 +819,38 @@
       />
     </div>
   {/if}
-  {#if faceRow && !surfaceOnly}
-    {#if faceIcon}
-      <SlotRenderer
-        slot={faceRow.slot}
-        {device}
-        control={faceRow.control}
-        style={faceRow.style}
-        icon={faceIcon}
-        onPrimary={faceAction}
-        face
-      />
-    {/if}
+  {#if (faceRow && !surfaceOnly) || (tileName && !surfaceOnly)}
+    <div class="tile-head">
+      {#if chartHeader && chart.length}
+        <div class="tile-chart-header">
+          <TileChart
+            series={chart}
+            wide
+            area={chartArea}
+            decimals={chartConfig?.decimals}
+          />
+        </div>
+      {/if}
+      <div class="tile-head-content">
+        {#if faceRow && !surfaceOnly}
+          {#if faceIcon}
+            <SlotRenderer
+              slot={faceRow.slot}
+              {device}
+              control={faceRow.control}
+              style={faceRow.style}
+              icon={faceIcon}
+              onPrimary={faceAction}
+              face
+            />
+          {/if}
+        {/if}
+        {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span
+          >{/if}
+      </div>
+    </div>
   {/if}
-  {#if tileName && !surfaceOnly}<span class="tile-name">{tileName}</span>{/if}
-  {#if !chartFull && chart.length}
+  {#if chartBand && chart.length}
     <div class="tile-chart" style:--chart-height={`${chartHeight}px`}>
       <TileChart
         series={chart}
@@ -949,6 +973,40 @@
 
   /* Sparkline full: one layer across the tile's content area, behind the name,
      icon and rows. The content is lifted above it below. */
+  .tile-head {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .tile-head-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .tile-chart-header {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .tile-chart-header :global(.chart) {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+  }
+
   .tile-chart-full {
     position: absolute;
     top: calc(8px + var(--badge-inset-top, 0px));

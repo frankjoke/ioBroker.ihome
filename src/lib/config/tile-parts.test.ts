@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import {
   CHART_PALETTE,
+  chartLayout,
   binaryOn,
   hasHistory,
   faceDefaultGlyph,
@@ -1080,6 +1081,14 @@ it("a slot rule can name another slot's override", () => {
     },
   );
   expect(parts.body).toHaveLength(0);
+});
+
+it("reads the chart layout, legacy booleans included", () => {
+  expect(chartLayout(undefined)).toBe("band");
+  expect(chartLayout({})).toBe("band");
+  expect(chartLayout({ mode: "header" })).toBe("header");
+  expect(chartLayout({ full: true })).toBe("full");
+  expect(chartLayout({ separate: true })).toBe("full");
 });
 
 it("names a resolved override by its name, not its label", () => {

@@ -49,6 +49,7 @@
     slotTileMode,
   } from "$lib/config/tile-ops";
   import {
+    chartLayout,
     hasHistory,
     tileHeadlineSlot,
     tileSourceControls,
@@ -575,8 +576,23 @@
   );
   const tileTemplateType = $derived(inferTemplateType(tile?.tile, sourceLook));
   const tileTemplateName = $derived(`${tileTemplateType} template`);
-  const chartFull = $derived(
-    tile?.tile?.chart?.full ?? tile?.tile?.chart?.separate === true,
+  const chartMode = $derived(chartLayout(tile?.tile?.chart));
+  const CHART_MODES = ["band", "full", "header"] as const;
+  const CHART_GLYPH = {
+    band: "align_vertical_bottom",
+    full: "fullscreen",
+    header: "view_headline",
+  } as const;
+  const CHART_LABEL = {
+    band: "band",
+    full: "full",
+    header: "icon + name",
+  } as const;
+  const nextChartMode = $derived(
+    CHART_MODES[(CHART_MODES.indexOf(chartMode) + 1) % CHART_MODES.length],
+  );
+  const chartTitle = $derived(
+    `Sparkline: ${CHART_LABEL[chartMode]} — click for ${CHART_LABEL[nextChartMode]}`,
   );
   /** The tile actually draws a sparkline: a slot has one enabled and its
    *  reading carries history. */
@@ -1502,22 +1518,26 @@
           <div class="field">
             <div class="row wrap">
               {#if hasSparkline}
-                <label
-                  class="check"
-                  title="Fill the whole tile face with the sparkline; off gives it a band after the name"
-                >
-                  <input
-                    type="checkbox"
-                    checked={chartFull}
-                    onchange={(e) =>
+                <span class="small">
+                  <span class="label-mono">Sparkline</span>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title={chartTitle}
+                    aria-label={chartTitle}
+                    onclick={() =>
                       patchChart({
-                        full: e.currentTarget.checked ? true : undefined,
+                        mode: nextChartMode,
+                        full: undefined,
                         separate: undefined,
                       })}
-                  />
-                  <span>Sparkline full</span>
-                </label>
-                {#if !chartFull}
+                  >
+                    <span class="material-symbols-outlined"
+                      >{CHART_GLYPH[chartMode]}</span
+                    >
+                  </button>
+                </span>
+                {#if chartMode === "band"}
                   <label class="small">
                     <span class="label-mono">Chart height (px)</span>
                     <input

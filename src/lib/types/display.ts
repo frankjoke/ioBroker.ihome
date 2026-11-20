@@ -100,11 +100,14 @@ export interface SectionAppearance {
  */
 /** Tile chart layout: a band after the tile name, or the whole tile face. */
 export interface TileChartConfig {
-  /** Fill the tile's content area instead of a band after the name. */
+  /** Where the chart sits: a band after the header, the whole content area, or
+   *  only behind the icon and name. */
+  mode?: "band" | "full" | "header";
+  /** Legacy: fill the content area (reads as `mode: "full"`). */
   full?: boolean;
   /** Legacy name for `full`; read when `full` is absent. */
   separate?: boolean;
-  /** Band height in px; absent → 56. Ignored when `full` is set. */
+  /** Band height in px; absent → 56. Ignored unless `mode` is `band`. */
   height?: number;
   /** Precision of the min/max labels; absent → the slot's decimals, else 1. */
   decimals?: number;
