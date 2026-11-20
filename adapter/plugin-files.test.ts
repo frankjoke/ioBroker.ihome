@@ -1,5 +1,6 @@
 import { it, expect, vi } from "vitest";
 import {
+  adoptFilePlugin,
   ensurePluginFiles,
   listPluginFolders,
   mergePlugin,
@@ -324,4 +325,142 @@ it("refuses a newer api or a bad version in a folder", async () => {
   expect(await readPluginFiles(badVersion, "clock")).toMatchObject({
     problem: expect.stringContaining("version"),
   });
+});
+
+it("adopts a retired built-in as a file plugin and keeps the runtime flags", async () => {
+  const store: Record<string, string> = {};
+  const h: PluginWriteHost = {
+    async readDirAsync() {
+      return [];
+    },
+    async readFileAsync(_adapter, path) {
+      const key = `ihome.meta/${path}`;
+      if (!(key in store)) throw new Error("Not exists");
+      return store[key];
+    },
+    async writeFileAsync(_adapter, path, text) {
+      store[`ihome.meta/${path}`] = text;
+    },
+  };
+  const result = await adoptFilePlugin(
+    h,
+    {
+      id: "external-access",
+      name: "External access (Caddy)",
+      enabled: true,
+      builtin: true,
+      timeoutMs: 20_000,
+      debug: false,
+      secured: true,
+    },
+    {
+      id: "external-access",
+      name: "External access (Caddy)",
+      api: 1,
+      version: "1.0.0",
+      code: "module.exports = () => ({ call() {} });",
+    },
+  );
+  expect(result).toEqual({
+    entry: {
+      id: "external-access",
+      name: "External access (Caddy)",
+      enabled: true,
+      timeoutMs: 20_000,
+      debug: false,
+    },
+  });
+  const manifest = JSON.parse(
+    store["ihome.meta/plugins/external-access/plugin.json"],
+  );
+  expect(manifest).toMatchObject({
+    id: "external-access",
+    api: 1,
+    version: "1.0.0",
+  });
+  expect(store["ihome.meta/plugins/external-access/index.js"]).toContain(
+    "module.exports",
+  );
+});
+
+it("leaves an existing valid folder alone when adopting", async () => {
+  const store: Record<string, string> = {
+    "ihome.meta/plugins/external-access/plugin.json": JSON.stringify({
+      id: "external-access",
+      name: "External access (Caddy)",
+      api: 1,
+      version: "1.0.0",
+    }),
+    "ihome.meta/plugins/external-access/index.js": "module.exports = () => 1",
+  };
+  let writes = 0;
+  const h: PluginWriteHost = {
+    async readDirAsync() {
+      return [{ file: "external-access", isDir: true }];
+    },
+    async readFileAsync(_adapter, path) {
+      const key = `ihome.meta/${path}`;
+      if (!(key in store)) throw new Error("Not exists");
+      return store[key];
+    },
+    async writeFileAsync() {
+      writes += 1;
+    },
+  };
+  const result = await adoptFilePlugin(
+    h,
+    {
+      id: "external-access",
+      name: "External access (Caddy)",
+      enabled: false,
+      builtin: true,
+      timeoutMs: 20_000,
+      debug: true,
+    },
+    {
+      id: "external-access",
+      name: "External access (Caddy)",
+      api: 1,
+      version: "1.0.0",
+      code: "module.exports = () => 1",
+    },
+  );
+  expect(writes).toBe(0);
+  expect(result).toMatchObject({ entry: { enabled: false, debug: true } });
+  expect((result as { entry: { builtin?: boolean } }).entry.builtin).toBe(
+    undefined,
+  );
+});
+
+it("reports a failed adoption so the caller keeps the built-in", async () => {
+  const h: PluginWriteHost = {
+    async readDirAsync() {
+      return [];
+    },
+    async readFileAsync() {
+      throw new Error("Not exists");
+    },
+    async writeFileAsync() {
+      throw new Error("storage offline");
+    },
+  };
+  expect(
+    await adoptFilePlugin(
+      h,
+      {
+        id: "external-access",
+        name: "External access (Caddy)",
+        enabled: true,
+        builtin: true,
+        timeoutMs: 20_000,
+        debug: false,
+      },
+      {
+        id: "external-access",
+        name: "External access (Caddy)",
+        api: 1,
+        code: "module.exports = () => 1",
+      },
+    ),
+  ).toEqual({ problem: "Error: storage offline" });
 });

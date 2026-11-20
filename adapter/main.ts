@@ -1,4 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import * as SunCalc from "suncalc";
 import webpush from "web-push";
 import {
@@ -49,6 +51,7 @@ import {
 } from "./plugin-file";
 import { createPluginHost, type PluginHost } from "./plugin-host";
 import {
+  adoptFilePlugin,
   ensurePluginFiles,
   listPluginFolders,
   mergePlugin,
@@ -1245,6 +1248,48 @@ class IHome extends utils.Adapter {
     }
   }
 
+  /** Write the retired built-in out as a file plugin once. A failed artifact
+   *  or file write leaves the built-in entry, which still starts. */
+  private async migrateExternalAccessToFile(): Promise<void> {
+    const index = this.pluginConfig.findIndex(
+      (plugin) => plugin.id === "external-access" && plugin.builtin === true,
+    );
+    if (index < 0) return;
+    let artifact: ImportedPlugin;
+    try {
+      const raw = await readFile(
+        join(__dirname, "plugin-catalog", "external-access.json"),
+        "utf8",
+      );
+      const parsed = parsePluginFile(JSON.parse(raw));
+      if ("problem" in parsed) throw new Error(parsed.problem);
+      artifact = parsed.plugin;
+    } catch (error) {
+      this.log.warn(
+        `external-access: cannot read the plugin artifact: ${String(error)}`,
+      );
+      return;
+    }
+    const adopted = await adoptFilePlugin(
+      this as unknown as PluginWriteHost,
+      this.pluginConfig[index],
+      artifact,
+    );
+    if ("problem" in adopted) {
+      this.log.warn(`external-access: migration failed: ${adopted.problem}`);
+      return;
+    }
+    const next = [...this.pluginConfig];
+    next[index] = adopted.entry;
+    this.pluginConfig = next;
+    try {
+      await this.updateConfig({ plugins: next });
+    } catch (error) {
+      this.log.warn(`cannot store the plugin list: ${String(error)}`);
+    }
+    this.log.info("plugin external-access: code moved to ihome.meta");
+  }
+
   /** File-backed user plugins override what the config still carries. */
   private async mergePluginFiles(
     list: AdapterPlugin[],
@@ -2341,6 +2386,7 @@ class IHome extends utils.Adapter {
     // holds the runtime flags. Move any code still in config out once, then
     // merge what the files say.
     await this.migratePluginCodeToFiles();
+    await this.migrateExternalAccessToFile();
     this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
     if (!updateFailed) {
       // File-backed plugins belong in the settings document too, or the next

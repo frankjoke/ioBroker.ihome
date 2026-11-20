@@ -17,6 +17,7 @@ import {
   type PluginBundle,
   type PluginSettingDef,
 } from "./plugin-ops";
+import type { ImportedPlugin } from "./plugin-file";
 
 export interface PluginManifest {
   id: string;
@@ -290,6 +291,39 @@ export function pluginManifestOf(
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+  };
+}
+
+/**
+ * Adopt a retired built-in entry as a file plugin: write the artifact into
+ * `ihome.meta/plugins/<id>/` (an existing valid folder stays untouched) and
+ * return the runtime entry without `builtin`. A failed write reports a problem
+ * so the caller can keep the built-in fallback.
+ */
+export async function adoptFilePlugin(
+  host: PluginWriteHost,
+  entry: AdapterPlugin,
+  artifact: ImportedPlugin,
+): Promise<{ entry: AdapterPlugin } | { problem: string }> {
+  const ensured = await ensurePluginFiles(host, {
+    ...runtimeOnly({ ...entry, builtin: false }),
+    name: artifact.name,
+    ...(artifact.api !== undefined ? { api: artifact.api } : {}),
+    ...(artifact.version ? { version: artifact.version } : {}),
+    ...(artifact.help ? { help: artifact.help } : {}),
+    ...(artifact.usage ? { usage: artifact.usage } : {}),
+    ...(artifact.settingsSchema
+      ? { settingsSchema: artifact.settingsSchema }
+      : {}),
+    ...(artifact.bundle ? { bundle: artifact.bundle } : {}),
+    code: artifact.code,
+  });
+  if ("problem" in ensured) return { problem: ensured.problem };
+  return {
+    entry: {
+      ...runtimeOnly({ ...entry, builtin: false }),
+      name: artifact.name,
+    },
   };
 }
 
