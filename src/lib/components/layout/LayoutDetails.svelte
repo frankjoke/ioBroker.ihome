@@ -2267,7 +2267,7 @@
                     </label>
                     {#if slot.spark}
                       <div class="small">
-                        <span class="label-mono">colour</span>
+                        <span class="label-mono">chart</span>
                         <ColorSelect
                           label="Chart colour"
                           defaultLabel="auto"
