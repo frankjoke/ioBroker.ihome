@@ -125,7 +125,8 @@ export function validPushPayload(value: unknown): PushPayload | null {
   };
 }
 
-export function normalizePushPayload(value: unknown): PushPayload {  const record = isRecord(value) ? value : {};
+export function normalizePushPayload(value: unknown): PushPayload {
+  const record = isRecord(value) ? value : {};
   const title =
     (typeof record.title === "string" ? record.title.trim() : "").slice(
       0,

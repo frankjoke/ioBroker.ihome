@@ -271,7 +271,14 @@ export async function ensurePluginFiles(
 export function pluginManifestOf(
   plugin: Pick<
     AdapterPlugin,
-    "id" | "name" | "api" | "version" | "help" | "usage" | "settingsSchema" | "bundle"
+    | "id"
+    | "name"
+    | "api"
+    | "version"
+    | "help"
+    | "usage"
+    | "settingsSchema"
+    | "bundle"
   >,
 ): PluginManifest {
   return {
