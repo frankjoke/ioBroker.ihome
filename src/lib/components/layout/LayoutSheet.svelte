@@ -78,7 +78,7 @@
     getOverrideRegistry,
     type OverrideEnsurer,
   } from "$lib/stores/overrides.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { sheet } from "$lib/stores/sheet.svelte";
   import { readLastLayout, writeLastLayout } from "$lib/stores/last-layout";
@@ -136,7 +136,7 @@
   // No document has been read (or it is unreadable): every write is refused, so
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   /** A secured tile is local-only, in the sheet as on the display. */
   const visibleTile = (placement: Placement) =>
     local || placement.tile?.secured !== true;

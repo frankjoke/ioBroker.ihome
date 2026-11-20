@@ -9,7 +9,7 @@
   } from "$lib/config/layout-ops";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { resolveSection } from "$lib/config/pages-ops";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     BREAKPOINTS,
@@ -172,8 +172,8 @@
     label: "Security",
     hint: "Hide this tile from the UI outside the local network.",
   } as const;
-  const local = isLocalUi();
-  const tileTabs = local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS;
+  const local = $derived(isLocalUi());
+  const tileTabs = $derived(local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS);
 
   let width = $state(1400);
   onMount(() => {

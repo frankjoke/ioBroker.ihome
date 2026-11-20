@@ -7,7 +7,7 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import { PLUGIN_GUIDE } from "$lib/config/plugin-guide";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     getPlugins,

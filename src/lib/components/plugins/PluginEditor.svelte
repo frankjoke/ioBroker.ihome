@@ -3,7 +3,7 @@
   import PluginSettingsForm from "./PluginSettingsForm.svelte";
   import { reloadPlugin, savePlugin } from "$lib/stores/plugins.svelte";
   import { savePluginManifest } from "$lib/config/plugin-storage";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import {
     META_ADAPTER,
     readMetaText,
@@ -35,7 +35,7 @@
   let usage = $state(plugin.usage ?? "");
   // svelte-ignore state_referenced_locally
   let secured = $state(plugin.secured === true);
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   // svelte-ignore state_referenced_locally
   let settings = $state<Record<string, unknown>>({
     ...defaults(plugin.settingsSchema, plugin.settings),

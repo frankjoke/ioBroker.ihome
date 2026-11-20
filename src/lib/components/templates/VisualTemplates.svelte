@@ -7,7 +7,7 @@
   import TemplateControlsEditor from "./TemplateControlsEditor.svelte";
   import { PRESETS } from "$lib/config/presets";
   import { parseTemplateRegistry } from "$lib/config/template-ops";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import { visualTemplateProblem } from "$lib/config/visual-templates";
   import {
@@ -27,7 +27,7 @@
   const registry = $derived(getTemplateRegistry());
   const writable = $derived(isTemplatesWritable());
   const saveFailed = $derived(getTemplateSaveFailed());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   const presets = Object.values(PRESETS);
   const presetIds = new Set(presets.map((template) => template.id));
   const allTemplates = $derived([...presets, ...(registry.templates ?? [])]);

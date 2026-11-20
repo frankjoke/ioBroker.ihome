@@ -6,7 +6,7 @@
   } from "$lib/config/template-bundles";
   import { insertAtCaret } from "$lib/components/logic/code-field";
   import IconButton from "$lib/components/common/IconButton.svelte";
-  import { isLocalUi } from "$lib/config/locality";
+  import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import SnippetInput from "$lib/components/templates/SnippetInput.svelte";
   import SnippetSelect from "$lib/components/templates/SnippetSelect.svelte";
@@ -51,7 +51,7 @@
 
   const writable = $derived(isTemplateBundlesWritable());
   const saveFailed = $derived(templateBundleSaveFailed());
-  const local = isLocalUi();
+  const local = $derived(isLocalUi());
   const logicChoices = $derived(
     withoutSecured(
       [...BUILTIN_TEMPLATES, ...(getLogicDocument().templates ?? [])],
