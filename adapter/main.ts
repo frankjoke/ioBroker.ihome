@@ -1295,6 +1295,8 @@ class IHome extends utils.Adapter {
           {
             id: imported.id,
             name: imported.name,
+            ...(imported.api !== undefined ? { api: imported.api } : {}),
+            ...(imported.version ? { version: imported.version } : {}),
             enabled: false,
             builtin: false,
             timeoutMs: imported.timeoutMs ?? DEFAULT_PLUGIN_TIMEOUT_MS,

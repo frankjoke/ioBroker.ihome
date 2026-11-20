@@ -6,6 +6,7 @@ import {
   MAX_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_USAGE,
   MIN_PLUGIN_TIMEOUT_MS,
+  SUPPORTED_PLUGIN_API,
   pluginBundleOf,
   pluginSettings,
   pluginSettingsSchema,
@@ -23,6 +24,10 @@ import {
 export interface ImportedPlugin {
   id: string;
   name: string;
+  /** Plugin API the code needs; absent means 1. */
+  api?: number;
+  /** Display version; informational. */
+  version?: string;
   builtin?: true;
   timeoutMs?: number;
   help?: string;
@@ -195,11 +200,30 @@ export function parsePluginFile(
     typeof plugin.usage === "string" && plugin.usage.trim()
       ? plugin.usage.trim()
       : undefined;
+  const api = plugin.api === undefined ? 1 : plugin.api;
+  if (typeof api !== "number" || !Number.isInteger(api) || api < 1) {
+    return problem("The plugin API version must be a positive integer.");
+  }
+  if (api > SUPPORTED_PLUGIN_API) {
+    return problem(`This plugin needs iHome plugin API ${api}; update iHome.`);
+  }
+  let version: string | undefined;
+  if (plugin.version !== undefined) {
+    if (typeof plugin.version !== "string") {
+      return problem("The plugin version must be text.");
+    }
+    version = plugin.version.trim();
+    if (!version || version.length > 32) {
+      return problem("The plugin version must be 1 to 32 characters.");
+    }
+  }
 
   return {
     plugin: {
       id: plugin.id,
       name,
+      api,
+      ...(version ? { version } : {}),
       code,
       timeoutMs,
       ...(help ? { help } : {}),

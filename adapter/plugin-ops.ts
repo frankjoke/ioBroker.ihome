@@ -1,7 +1,14 @@
 /** One configured adapter-side plugin, stored under `native.plugins`. */
+/** The plugin API this adapter hosts; a file needing a newer one is refused. */
+export const SUPPORTED_PLUGIN_API = 1;
+
 export interface AdapterPlugin {
   id: string;
   name: string;
+  /** Plugin API the code needs; absent means 1. */
+  api?: number;
+  /** Display version from the manifest. */
+  version?: string;
   enabled: boolean;
   builtin?: boolean;
   timeoutMs: number;

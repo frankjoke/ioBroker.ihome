@@ -288,3 +288,11 @@ describe("parsePluginsCommand", () => {
     });
   });
 });
+
+it("exposes the plugin api and version", () => {
+  const view = pluginView(
+    userPlugin("u", true, "x", { api: 1, version: "1.2.3" }),
+    { status: "running", hotSettings: false, restartRequired: false },
+  );
+  expect(view).toMatchObject({ api: 1, version: "1.2.3" });
+});

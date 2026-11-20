@@ -296,3 +296,11 @@ it("splits a config plugin into manifest and runtime", () => {
     debug: false,
   });
 });
+
+it("carries the manifest api and version into the plugin", () => {
+  const files = {
+    manifest: { id: "clock", name: "Clock", api: 1, version: "2.0.0" },
+    code: "module.exports = {}",
+  };
+  expect(mergePlugin(files)).toMatchObject({ api: 1, version: "2.0.0" });
+});
