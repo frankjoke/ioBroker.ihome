@@ -366,6 +366,53 @@ describe("seedBuiltinPlugins", () => {
       kept.find((plugin) => plugin.id === "external-access"),
     ).toMatchObject({ builtin: true, secured: false });
   });
+
+  it("keeps a retired built-in through startup validation until migrated", () => {
+    const legacy = [
+      {
+        id: "external-access",
+        name: "External access (Caddy)",
+        enabled: true,
+        builtin: true,
+        timeoutMs: 20_000,
+        debug: false,
+        secured: true,
+      },
+    ];
+    const logs: string[] = [];
+    const seeded = seedBuiltinPlugins(legacy, undefined, (message) =>
+      logs.push(message),
+    );
+    expect(
+      seeded.find((plugin) => plugin.id === "external-access"),
+    ).toMatchObject({
+      id: "external-access",
+      builtin: true,
+      enabled: true,
+      timeoutMs: 20_000,
+      secured: true,
+    });
+    expect(logs).toEqual([]);
+
+    const user = [
+      {
+        id: "external-access",
+        name: "External access (Caddy)",
+        enabled: false,
+        timeoutMs: 20_000,
+        debug: false,
+      },
+    ];
+    expect(validAdapterPlugins(user)).toMatchObject([
+      { id: "external-access", builtin: false, enabled: false },
+    ]);
+    expect(
+      validAdapterPlugins(user, [
+        ...BUILTIN_PLUGINS,
+        ...LEGACY_BUILTIN_PLUGINS,
+      ]),
+    ).toMatchObject([{ id: "external-access", builtin: false }]);
+  });
 });
 
 describe("parsePluginMessage", () => {

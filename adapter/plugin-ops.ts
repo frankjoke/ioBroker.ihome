@@ -620,26 +620,28 @@ function validEntry(
   const builtin = builtinDef(id, builtins);
   const settings = pluginSettings(value.settings);
   if (value.builtin === true) {
-    if (!builtin) return null;
+    // A retired built-in keeps validating until the migration turns it into a
+    // file plugin; a user entry must not use a shipped built-in id.
+    const def = builtin ?? builtinDef(id, LEGACY_BUILTIN_PLUGINS);
+    if (!def) return null;
     return {
       id,
-      name: builtin.name,
+      name: def.name,
       enabled: value.enabled !== false,
       builtin: true,
       timeoutMs: timeoutOf(value.timeoutMs),
       debug: value.debug === true,
       ...(typeof value.secured === "boolean" ? { secured: value.secured } : {}),
-      ...(builtin.help ? { help: builtin.help } : {}),
-      ...(builtin.usage ? { usage: builtin.usage } : {}),
-      ...(builtin.settingsSchema
-        ? { settingsSchema: builtin.settingsSchema }
-        : {}),
+      ...(def.help ? { help: def.help } : {}),
+      ...(def.usage ? { usage: def.usage } : {}),
+      ...(def.settingsSchema ? { settingsSchema: def.settingsSchema } : {}),
       ...(settings ? { settings } : {}),
       code: undefined,
     };
   }
-  // A builtin id is reserved for the shipped implementation.
-  if (builtin) return null;
+  // A shipped builtin id is reserved for its implementation; a retired one
+  // becomes an ordinary file plugin after the migration.
+  if (builtin && !builtinDef(id, LEGACY_BUILTIN_PLUGINS)) return null;
 
   // Code may live in `ihome.meta/plugins/<id>/index.js`; the config entry
   // then carries only the runtime flags.
