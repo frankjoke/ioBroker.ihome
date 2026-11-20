@@ -24,6 +24,7 @@
     onToggleOverrides = undefined,
     onAddOverride = undefined,
     onEditOverride = undefined,
+    onDeleteOverride = undefined,
   }: {
     nodes: StateNode[];
     selection: Set<string>;
@@ -45,6 +46,11 @@
     /** Offer "add override" on the row; the browser opens its modal. */
     onAddOverride?: (stateId: string, object: any) => void;
     onEditOverride?: (
+      stateId: string,
+      object: any,
+      override: SourceOverride,
+    ) => void;
+    onDeleteOverride?: (
       stateId: string,
       object: any,
       override: SourceOverride,
@@ -180,6 +186,15 @@
                       icon="edit"
                       label={`Edit override ${entry.name}`}
                       onclick={() => onEditOverride?.(realId, node.obj, entry)}
+                    />
+                  {/if}
+                  {#if onDeleteOverride}
+                    <IconButton
+                      icon="delete"
+                      danger
+                      label={`Delete override ${entry.name}`}
+                      onclick={() =>
+                        onDeleteOverride?.(realId, node.obj, entry)}
                     />
                   {/if}
                 </li>

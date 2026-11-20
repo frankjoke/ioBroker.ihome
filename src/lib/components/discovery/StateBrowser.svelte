@@ -21,7 +21,9 @@
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import StateTree from "./StateTree.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
+  import { deleteTitle } from "$lib/utils/delete-title";
   import { enumsOfState, enumLabelFromObject } from "$lib/config/rooms";
   import { variableMatches, stateIdFor } from "$lib/config/variables";
   import { removeOverride, upsertOverride } from "$lib/config/source-overrides";
@@ -83,6 +85,9 @@
     object: any;
     override?: SourceOverride;
   } | null>(null);
+  /** The override whose row trash was clicked; the confirm modal is open. */
+  let pendingOverrideDelete = $state<SourceOverride | null>(null);
+  let deleteError = $state("");
   const canManageOverrides = $derived(manageOverrides && !!onPick);
 
   const allStates = $derived(collectStates(objects));
@@ -252,6 +257,17 @@
     overrideForm = null;
   }
 
+  async function confirmOverrideDelete(): Promise<void> {
+    if (!pendingOverrideDelete) return;
+    deleteError = "";
+    try {
+      await deleteOverride(pendingOverrideDelete.id);
+      pendingOverrideDelete = null;
+    } catch (error) {
+      deleteError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   /** Alias link: reveal the original state whatever filters were set. */
   function goToAlias(base: string) {
     pickerFilters.adapter = "";
@@ -399,6 +415,9 @@
         onToggleOverrides={canManageOverrides ? toggleOverrides : undefined}
         onAddOverride={canManageOverrides ? addOverride : undefined}
         onEditOverride={canManageOverrides ? editOverride : undefined}
+        onDeleteOverride={canManageOverrides
+          ? (_stateId, _object, override) => (pendingOverrideDelete = override)
+          : undefined}
       />
     {/if}
   </div>
@@ -427,6 +446,9 @@
         onToggleOverrides={canManageOverrides ? toggleOverrides : undefined}
         onAddOverride={canManageOverrides ? addOverride : undefined}
         onEditOverride={canManageOverrides ? editOverride : undefined}
+        onDeleteOverride={canManageOverrides
+          ? (_stateId, _object, override) => (pendingOverrideDelete = override)
+          : undefined}
       />
     {/if}
   </div>
@@ -471,6 +493,26 @@
     onDelete={deleteOverride}
     onClose={() => (overrideForm = null)}
   />
+{/if}
+
+{#if pendingOverrideDelete}
+  <ConfirmModal
+    title={deleteTitle("override", pendingOverrideDelete.name)}
+    confirmLabel="Delete"
+    onConfirm={confirmOverrideDelete}
+    onCancel={() => {
+      pendingOverrideDelete = null;
+      deleteError = "";
+    }}
+  >
+    <p class="text-muted">
+      Slots bound to it fall back to the raw state; rules naming it lose the
+      local.
+    </p>
+    {#if deleteError}
+      <p class="error">{deleteError}</p>
+    {/if}
+  </ConfirmModal>
 {/if}
 
 <style>
