@@ -4,7 +4,7 @@
   import type { ResolvedTile } from "$lib/config/pages-ops";
   import type { Breakpoint } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
-  import { openSheetGated } from "$lib/stores/sheet.svelte.js";
+  import { openSheetGated, sheet } from "$lib/stores/sheet.svelte.js";
   import Icon from "$lib/components/common/Icon.svelte";
   import Tile from "./Tile.svelte";
 
@@ -15,6 +15,7 @@
     bp,
     pageId,
     bare = false,
+    preview = false,
   }: {
     group: Group;
     tiles: ResolvedTile[];
@@ -24,7 +25,18 @@
     pageId: string;
     /** The page has one populated section: render its tiles without chrome. */
     bare?: boolean;
+    /** Preview only: never paints the editor's selection outline. */
+    preview?: boolean;
   } = $props();
+
+  /** The layout editor's selected section: `app.css` paints the marching outline. */
+  const editingTarget = $derived(
+    sheet.open &&
+      !preview &&
+      sheet.selection?.kind === "section" &&
+      sheet.selection.pageId === pageId &&
+      sheet.selection.sectionId === group.id,
+  );
 
   /**
    * The section is exactly as wide as its tiles need (the pass decided), plus
@@ -63,6 +75,7 @@
   class:new-line={group.newLine === true}
   class:phone={bp === "phone"}
   class:bare
+  class:editing-target={editingTarget}
   style="{background} {width}"
 >
   {#if group.title && !bare}
@@ -97,6 +110,7 @@
         limit={modules}
         newLine={t.placement.newLine === true}
         anchor={{ pageId, sectionId: group.id, placementId: t.placement.id }}
+        {preview}
       />
     {/each}
   </div>
@@ -119,6 +133,8 @@
     padding: 4px 6px 6px;
     border: 1px solid transparent;
     border-radius: var(--border-radius-md, 12px);
+    /* The editor's marching outline sits just outside this box. */
+    --editing-offset: 4px;
     /* A User Interface default (ui-settings.ts); an explicit background is
        inline and wins. */
     background-color: var(--ui-section-bg, transparent);

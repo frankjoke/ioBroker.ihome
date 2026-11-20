@@ -60,7 +60,7 @@
     type Breakpoint,
   } from "$lib/config/size-ops";
   import { requestLayoutConfig, wantsTileConfig } from "$lib/pages.js";
-  import { openSheetGated } from "$lib/stores/sheet.svelte.js";
+  import { openSheetGated, sheet } from "$lib/stores/sheet.svelte.js";
   import { tileNeedsPin } from "$lib/config/pin.svelte";
   import SlotRenderer from "./SlotRenderer.svelte";
   import TileChart from "./TileChart.svelte";
@@ -86,6 +86,8 @@
     openModal = null,
     onModalClose,
     onDetail,
+    /** The layout editor's own preview: no editing outline. */
+    preview = false,
   }: {
     /** The placement this tile is: its title and own config. */
     placement?: Placement;
@@ -109,7 +111,19 @@
     /** Whether anything lives in the detail page — the resolution above, handed
      *  out so the sheet's Detail Page checkbox asks the tile's own answer (A47). */
     onDetail?: (hasModal: boolean) => void;
+    /** Preview only: never paints the editor's selection outline. */
+    preview?: boolean;
   } = $props();
+
+  /** The layout editor's selected tile: `app.css` paints the marching outline. */
+  const editingTarget = $derived(
+    sheet.open &&
+      !preview &&
+      !!anchor &&
+      sheet.selection?.kind === "tile" &&
+      sheet.selection.placementId === anchor.placementId &&
+      sheet.selection.pageId === anchor.pageId,
+  );
 
   const sourceLook = $derived<SourceLook>({
     states: ioBroker.states as Map<string, any>,
@@ -376,7 +390,9 @@
       accentColor ?? "transparent"
     }; --tile-glow-color: ${
       look.glow ?? accentColor ?? "transparent"
-    }; --tile-glow: ${glowing ? 1 : 0};${
+    }; --tile-glow: ${glowing ? 1 : 0}; --editing-offset: ${
+      glowing ? "16px" : "4px"
+    };${
       tileStyle.background ? ` background-color: ${tileStyle.background};` : ""
     }${look.background ? ` ${backgroundCss(look.background)}` : ""}`,
   );
@@ -745,6 +761,7 @@
   class:single-surface={surfaceOnly}
   class:no-border={workingTile?.border === false}
   class:no-padding={workingTile?.padding === false}
+  class:editing-target={editingTarget}
   data-page-id={anchor?.pageId}
   data-section-id={anchor?.sectionId}
   data-placement-id={anchor?.placementId}

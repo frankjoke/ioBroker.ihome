@@ -1026,6 +1026,7 @@
         openModal={modalShown ? modalRequest : null}
         onModalClose={() => (modalShown = false)}
         onDetail={noteDetail}
+        preview
       />
     </div>
   {/if}
