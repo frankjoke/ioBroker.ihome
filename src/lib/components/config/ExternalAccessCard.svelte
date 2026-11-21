@@ -19,7 +19,6 @@
     removeExternalService,
     removeExternalUser,
     rotateWebhookToken,
-    setExternalServiceEnabled,
     setExternalUserEnabled,
     updateExternalService,
     validateExternalCaddy,
@@ -39,6 +38,8 @@
   } from "$lib/stores/plugins.svelte";
   import type { PluginView } from "$adapter/plugin-admin";
   import { externalSessionSettings } from "$lib/config/locality";
+  import { servicesSchema } from "$lib/config/caddy-services-schema";
+  import type { ArrayHooks } from "$lib/config/schema-values";
   import {
     getSettings,
     initSettings,
@@ -79,12 +80,10 @@
     JSON.stringify(settingsDraft) !== settingsInitial,
   );
 
-  let openId = $state<string | null>(null);
-  let draft = $state<ExternalServiceView | null>(null);
-  let initial = $state("");
-  let pendingAction: (() => void) | null = null;
-  let askDiscard = $state(false);
   let pendingDelete = $state<ExternalServiceView | null>(null);
+  let deleteResolve: (() => void) | null = null;
+  let deleteReject: ((error: Error) => void) | null = null;
+  let servicesValid = $state(true);
   let copied = $state("");
   let addServiceOpen = $state(false);
   let addKind = $state<"webhook" | "proxy">("webhook");
@@ -176,6 +175,9 @@
         ),
     ),
   );
+  const servicesValues = $derived({
+    services: services.map((service) => ({ ...service })),
+  });
 
   function generate(): void {
     const bytes = new Uint8Array(12);
@@ -291,86 +293,6 @@
     return token ? webhookLink(origin, service.path, token) : "";
   }
 
-  function maskToken(token: string): string {
-    return token.length > 8
-      ? `${token.slice(0, 4)}…${token.slice(-4)}`
-      : "••••";
-  }
-
-  function serviceDirty(): boolean {
-    return !!draft && JSON.stringify(draft) !== initial;
-  }
-
-  function begin(service: ExternalServiceView): void {
-    openId = service.id;
-    draft = { ...service };
-    initial = JSON.stringify(draft);
-  }
-
-  function closeDraft(): void {
-    openId = null;
-    draft = null;
-    initial = "";
-  }
-
-  function guard(action: () => void): void {
-    if (openId && serviceDirty()) {
-      pendingAction = action;
-      askDiscard = true;
-      return;
-    }
-    action();
-  }
-
-  function toggleService(service: ExternalServiceView): void {
-    guard(() => {
-      if (openId === service.id) closeDraft();
-      else begin(service);
-    });
-  }
-
-  function onServiceLine(
-    event: MouseEvent,
-    service: ExternalServiceView,
-  ): void {
-    const target = event.target as HTMLElement;
-    if (target.closest("button, input, select, textarea, a, label")) return;
-    toggleService(service);
-  }
-
-  async function saveService(): Promise<void> {
-    if (!draft) return;
-    working = `save:${draft.id}`;
-    try {
-      await updateExternalService(
-        $state.snapshot(draft) as ExternalServiceView,
-      );
-      initial = JSON.stringify(draft);
-    } catch {
-      /* problem */
-    } finally {
-      working = "";
-    }
-  }
-
-  async function toggleServiceEnabled(
-    service: ExternalServiceView,
-    enabled: boolean,
-  ): Promise<void> {
-    if (openId === service.id && draft) {
-      draft.enabled = enabled;
-      return;
-    }
-    working = `toggle:${service.id}`;
-    try {
-      await setExternalServiceEnabled(service.id, enabled);
-    } catch {
-      /* problem */
-    } finally {
-      working = "";
-    }
-  }
-
   async function rotateToken(service: ExternalServiceView): Promise<void> {
     if (!service.endpoint) return;
     working = `token:${service.id}`;
@@ -399,19 +321,33 @@
     }
   }
 
-  async function deleteService(): Promise<void> {
+  async function confirmDelete(): Promise<void> {
     const service = pendingDelete;
     pendingDelete = null;
-    if (!service) return;
+    if (!service) {
+      deleteResolve?.();
+      deleteResolve = null;
+      deleteReject = null;
+      return;
+    }
     working = `delete:${service.id}`;
     try {
       await removeExternalService(service.id);
-      if (openId === service.id) closeDraft();
-    } catch {
-      /* problem */
+      deleteResolve?.();
+    } catch (error) {
+      deleteReject?.(error instanceof Error ? error : new Error(String(error)));
     } finally {
+      deleteResolve = null;
+      deleteReject = null;
       working = "";
     }
+  }
+
+  function cancelDelete(): void {
+    pendingDelete = null;
+    deleteResolve?.();
+    deleteResolve = null;
+    deleteReject = null;
   }
 
   function serviceId(path: string): string {
@@ -447,27 +383,6 @@
       addUpstream = `127.0.0.1:${endpoint.port ?? httpView.defaultPort}`;
   }
 
-  function draftEndpointChanged(): void {
-    if (!draft) return;
-    const endpoint = httpView.endpoints.find(
-      (row) => row.path === draft?.endpoint,
-    );
-    if (endpoint) draft.path = endpoint.path;
-  }
-
-  function endpointChoices(service: ExternalServiceView) {
-    return httpView.endpoints.filter(
-      (endpoint) =>
-        endpoint.path === service.endpoint ||
-        !services.some(
-          (other) =>
-            other.id !== service.id &&
-            other.kind === "webhook" &&
-            other.endpoint === endpoint.path,
-        ),
-    );
-  }
-
   async function createService(): Promise<void> {
     if (!addPath.trim() || !addUpstream.trim()) return;
     const service: ExternalServiceView = {
@@ -494,6 +409,86 @@
       working = "";
     }
   }
+
+  function asService(row: Record<string, unknown>): ExternalServiceView {
+    return row as unknown as ExternalServiceView;
+  }
+
+  const serviceHooks: Record<string, ArrayHooks> = {
+    services: {
+      managed: true,
+      createRow: () => {
+        startService();
+        return null;
+      },
+      saveRow: async (row) => {
+        const service = asService(row);
+        const next: ExternalServiceView = {
+          ...service,
+          path:
+            service.kind === "webhook"
+              ? (service.endpoint ?? service.path)
+              : service.path,
+        };
+        if (service.kind === "webhook") delete next.stripPrefix;
+        else delete next.endpoint;
+        await updateExternalService(
+          $state.snapshot(next) as ExternalServiceView,
+        );
+      },
+      removeRow: (row) =>
+        new Promise<void>((resolve, reject) => {
+          pendingDelete = asService(row);
+          deleteResolve = resolve;
+          deleteReject = reject;
+        }),
+      rowNote: (row) => {
+        const service = asService(row);
+        if (service.kind !== "webhook") return "";
+        const source = tokenFor(service).source;
+        return source === "none"
+          ? "no token"
+          : source === "global"
+            ? "global token"
+            : "endpoint token";
+      },
+      rowActions: (row) => {
+        const service = asService(row);
+        const link = linkFor(service);
+        return [
+          ...(service.endpoint
+            ? [
+                {
+                  icon: "key",
+                  label: `Rotate the token for ${service.path}`,
+                  title: "Rotate token",
+                  disabled: working !== "",
+                  onclick: () => void rotateToken(service),
+                },
+              ]
+            : []),
+          {
+            icon: "content_copy",
+            label: `Copy link for ${service.path}`,
+            title: copied === service.id ? "Copied." : "Copy link",
+            disabled: !link,
+            onclick: () => void copyLink(service),
+          },
+        ];
+      },
+      validateItem: (row) => {
+        const service = asService(row);
+        if (!service.upstream?.trim()) return "Upstream is required.";
+        if (service.kind === "proxy" && !service.path?.trim()) {
+          return "Path is required.";
+        }
+        if (service.kind === "webhook" && !service.endpoint) {
+          return "Choose an http.in endpoint.";
+        }
+        return null;
+      },
+    },
+  };
 </script>
 
 <section class="external">
@@ -666,161 +661,14 @@
 
   {#if tab === "services"}
     <div class="services section-panel">
-      <div class="section-head">
-        <span class="label-mono">Services ({services.length})</span>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          disabled={addServiceOpen}
-          onclick={startService}>+ Service</button
-        >
-      </div>
-
-      {#each services as service (service.id)}
-        {@const open = openId === service.id}
-        {@const link = linkFor(service)}
-        {@const token = tokenFor(service)}
-        <div class="item" class:open>
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="item-line" onclick={(e) => onServiceLine(e, service)}>
-            <span class="badge badge-secondary">{service.kind}</span>
-            <button
-              type="button"
-              class="name"
-              aria-expanded={open}
-              onclick={() => toggleService(service)}>{service.path}</button
-            >
-            <span class="mono upstream">{service.upstream}</span>
-            <span class="badge">{service.auth}</span>
-            {#if service.kind === "webhook"}
-              <span
-                class="badge"
-                class:badge-warning={token.source === "none"}
-                title="http.in token"
-                >{token.source === "none"
-                  ? "no token"
-                  : token.source === "global"
-                    ? "global token"
-                    : "endpoint token"}</span
-              >
-            {/if}
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={open && draft ? draft.enabled : service.enabled}
-                disabled={working === `toggle:${service.id}`}
-                onchange={(e) =>
-                  void toggleServiceEnabled(service, e.currentTarget.checked)}
-              />
-              <span>enabled</span>
-            </label>
-            <span class="item-actions">
-              <IconButton
-                icon="content_copy"
-                label={`Copy link for ${service.path}`}
-                title={copied === service.id ? "Copied." : "Copy link"}
-                disabled={!link}
-                onclick={() => void copyLink(service)}
-              />
-              <IconButton
-                icon="delete"
-                label={deleteTitle("service", service.path)}
-                danger
-                disabled={working === `delete:${service.id}`}
-                onclick={() => (pendingDelete = service)}
-              />
-              {#if open}
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  disabled={!serviceDirty() || working === `save:${service.id}`}
-                  onclick={() => void saveService()}>Save</button
-                >
-              {/if}
-            </span>
-          </div>
-          {#if copied === service.id}
-            <p class="hint text-muted">Copied.</p>
-          {/if}
-
-          {#if open && draft}
-            <div class="item-editor service-editor">
-              <div class="fields">
-                {#if draft.kind === "webhook"}
-                  <label class="field">
-                    <span class="label-mono">http.in endpoint</span>
-                    <select
-                      bind:value={draft.endpoint}
-                      onchange={draftEndpointChanged}
-                    >
-                      {#each endpointChoices(draft) as endpoint (endpoint.path)}
-                        <option value={endpoint.path}>{endpoint.path}</option>
-                      {/each}
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span class="label-mono">Path</span>
-                    <input value={draft.path} readonly tabindex="-1" />
-                  </label>
-                {:else}
-                  <label class="field">
-                    <span class="label-mono">Path</span>
-                    <input type="text" bind:value={draft.path} />
-                  </label>
-                {/if}
-                <label class="field">
-                  <span class="label-mono">Upstream</span>
-                  <input type="text" bind:value={draft.upstream} />
-                </label>
-                {#if draft.kind === "proxy"}
-                  <label class="check">
-                    <input type="checkbox" bind:checked={draft.stripPrefix} />
-                    <span>strip prefix</span>
-                  </label>
-                {/if}
-              </div>
-
-              {#if draft.kind === "webhook"}
-                <div class="token-line">
-                  <span class="label-mono">Token</span>
-                  {#if token.source === "none"}
-                    <span class="badge badge-warning">no token</span>
-                    <span class="hint text-danger"
-                      >This route is public until you set a token.</span
-                    >
-                  {:else}
-                    <code>{maskToken(token.token)}</code>
-                    <span class="badge"
-                      >{token.source === "endpoint"
-                        ? "endpoint"
-                        : "global token"}</span
-                    >
-                  {/if}
-                  <IconButton
-                    icon="key"
-                    label={`Rotate the token for ${draft.path}`}
-                    title="Rotate token"
-                    disabled={working === `token:${draft.id}`}
-                    onclick={() => void rotateToken(draft!)}
-                  />
-                  <span class="token-link">
-                    {#if link}<code>{link}</code>{:else}
-                      <span class="hint text-muted">No token — no link.</span>
-                    {/if}
-                  </span>
-                </div>
-              {:else}
-                <p class="hint text-muted">
-                  Basic Auth · <code>{linkFor(draft)}</code>
-                </p>
-              {/if}
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <p class="hint text-muted">No services yet.</p>
-      {/each}
+      <SchemaSettingsEditor
+        schema={servicesSchema(
+          httpView.endpoints.map((endpoint) => endpoint.path),
+        )}
+        values={servicesValues}
+        bind:valid={servicesValid}
+        hooks={serviceHooks}
+      />
 
       {#if addServiceOpen}
         <div class="card form-card service-form">
@@ -989,26 +837,6 @@
   </p>
 </section>
 
-{#if askDiscard}
-  <ConfirmModal
-    title="Discard changes?"
-    confirmLabel="Discard"
-    onConfirm={() => {
-      const action = pendingAction;
-      pendingAction = null;
-      askDiscard = false;
-      closeDraft();
-      action?.();
-    }}
-    onCancel={() => {
-      pendingAction = null;
-      askDiscard = false;
-    }}
-  >
-    The service has unsaved changes. Closing discards them.
-  </ConfirmModal>
-{/if}
-
 {#if pendingRemove}
   <ConfirmModal
     title={deleteTitle("login", pendingRemove)}
@@ -1025,8 +853,8 @@
   <ConfirmModal
     title={deleteTitle("service", pendingDelete.path)}
     confirmLabel="Delete"
-    onConfirm={() => void deleteService()}
-    onCancel={() => (pendingDelete = null)}
+    onConfirm={() => void confirmDelete()}
+    onCancel={cancelDelete}
   >
     The route is removed from the snippet on the next write; reload Caddy to
     close it.
@@ -1085,15 +913,6 @@
   .user-actions {
     margin-left: auto;
   }
-  .upstream {
-    font-size: var(--body-sm);
-    overflow-wrap: anywhere;
-  }
-  .service-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
   .fields {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
@@ -1104,22 +923,6 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    min-width: 0;
-  }
-  .token-line {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    min-width: 0;
-  }
-  .token-line code {
-    font-family: var(--font-code);
-    font-size: var(--body-sm);
-    overflow-wrap: anywhere;
-  }
-  .token-link {
-    flex: 1 1 14rem;
     min-width: 0;
   }
   .add-form {

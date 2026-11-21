@@ -192,25 +192,28 @@
 <div class="schema-rows">
   {#if parsedProblem}
     <p class="hint text-danger">{parsedProblem}</p>
-    <textarea
-      class="json"
-      rows="6"
-      spellcheck="false"
-      value={jsonText}
-      oninput={(event) => applyJson(event.currentTarget.value)}
-    ></textarea>
-    {#if jsonError}<span class="hint text-danger">{jsonError}</span>{/if}
+    {#if !hooks?.managed}
+      <textarea
+        class="json"
+        rows="6"
+        spellcheck="false"
+        value={jsonText}
+        oninput={(event) => applyJson(event.currentTarget.value)}
+      ></textarea>
+      {#if jsonError}<span class="hint text-danger">{jsonError}</span>{/if}
+    {/if}
   {:else if objectItem}
     {#each items as row, index (index)}
       {@const record = row as Record<string, unknown>}
       {@const openRow = open === index}
+      {@const note = hooks?.rowNote?.(record) ?? ""}
       <div class="item" class:open={openRow}>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="item-line" onclick={(event) => onLine(event, index)}>
           <span class="mono summary">{labelFor(index)}</span>
-          {#if hooks?.rowNote}
-            <span class="badge">{hooks.rowNote(record)}</span>
+          {#if note}
+            <span class="badge">{note}</span>
           {/if}
           <span class="item-actions">
             {#each hooks?.rowActions?.(record) ?? [] as action (action.label)}
@@ -296,17 +299,22 @@
         >+ Add</button
       >
       {#if objectItem}
-        <details ontoggle={(event) => event.currentTarget.open && resetJson()}>
-          <summary class="hint text-muted">Edit as JSON</summary>
-          <textarea
-            class="json"
-            rows="6"
-            spellcheck="false"
-            value={jsonText}
-            oninput={(event) => applyJson(event.currentTarget.value)}
-          ></textarea>
-          {#if jsonError}<span class="hint text-danger">{jsonError}</span>{/if}
-        </details>
+        {#if !hooks?.managed}
+          <details
+            ontoggle={(event) => event.currentTarget.open && resetJson()}
+          >
+            <summary class="hint text-muted">Edit as JSON</summary>
+            <textarea
+              class="json"
+              rows="6"
+              spellcheck="false"
+              value={jsonText}
+              oninput={(event) => applyJson(event.currentTarget.value)}
+            ></textarea>
+            {#if jsonError}<span class="hint text-danger">{jsonError}</span
+              >{/if}
+          </details>
+        {/if}
       {/if}
     </div>
   {/if}
