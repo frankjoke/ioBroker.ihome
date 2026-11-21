@@ -10,6 +10,11 @@
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import { resolveSection } from "$lib/config/pages-ops";
   import { isLocalUi } from "$lib/config/session-locality.svelte";
+  import {
+    ensurePluginContributions,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { getPluginsVersion } from "$lib/stores/plugins.svelte";
   import { withoutSecured } from "$lib/config/secured";
   import {
     BREAKPOINTS,
@@ -177,6 +182,18 @@
     hint: "Hide this tile from the UI outside the local network.",
   } as const;
   const local = $derived(isLocalUi());
+
+  $effect(() => {
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
+  const pluginTiles = $derived(
+    getPluginContributions().tiles.map((entry) => ({
+      ...entry.value,
+      name: `${entry.value.name} — ${entry.plugin.name}`,
+    })),
+  );
   const tileTabs = $derived(local ? [...TILE_TABS, SECURITY_TAB] : TILE_TABS);
 
   let width = $state(1400);
@@ -569,7 +586,11 @@
 
   const allTemplates = $derived(
     withoutSecured(
-      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      [
+        ...Object.values(PRESETS),
+        ...(getTemplateRegistry().templates ?? []),
+        ...pluginTiles,
+      ],
       local,
     ),
   );

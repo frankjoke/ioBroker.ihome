@@ -74,6 +74,11 @@
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import {
+    ensurePluginContributions,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { getPluginsVersion } from "$lib/stores/plugins.svelte";
+  import {
     createOverrideEnsurer,
     getOverrideRegistry,
     type OverrideEnsurer,
@@ -137,12 +142,29 @@
   // the editor says so rather than looking like it works.
   const writable = $derived(isLayoutWritable());
   const local = $derived(isLocalUi());
+
+  $effect(() => {
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
+  /** Plugin tiles carry their plugin name so the picker's label is clear. */
+  const pluginTiles = $derived(
+    getPluginContributions().tiles.map((entry) => ({
+      ...entry.value,
+      name: `${entry.value.name} — ${entry.plugin.name}`,
+    })),
+  );
   /** A secured tile is local-only, in the sheet as on the display. */
   const visibleTile = (placement: Placement) =>
     local || placement.tile?.secured !== true;
   const allTemplates = $derived(
     withoutSecured(
-      [...Object.values(PRESETS), ...(getTemplateRegistry().templates ?? [])],
+      [
+        ...Object.values(PRESETS),
+        ...(getTemplateRegistry().templates ?? []),
+        ...pluginTiles,
+      ],
       local,
     ),
   );
@@ -1052,7 +1074,10 @@
   {@const target = pickerFor}
   <SourcePicker
     mode="slot"
-    templates={withoutSecured(getTemplateRegistry().templates ?? [], local)}
+    templates={withoutSecured(
+      [...(getTemplateRegistry().templates ?? []), ...pluginTiles],
+      local,
+    )}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
     showBadge={target.kind !== "newTile"}

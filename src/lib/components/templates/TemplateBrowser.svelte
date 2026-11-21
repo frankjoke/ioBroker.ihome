@@ -16,7 +16,14 @@
     helpLine,
     templateEntries,
     type TemplateEntry,
+    type TemplateSource,
   } from "$lib/config/template-entries";
+  import {
+    ensurePluginContributions,
+    getPluginContribution,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { getPluginsVersion } from "$lib/stores/plugins.svelte";
   import {
     commitTemplates,
     getTemplateRegistry,
@@ -71,7 +78,14 @@
   let lastFocus = "";
   const local = $derived(isLocalUi());
 
+  $effect(() => {
+    // The plugin list version changes when a plugin is installed or enabled.
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
   let selected = $state<TemplateEntry | null>(null);
+  let sourceFilter = $state<TemplateSource>("all");
   let editorDirty = $state(false);
   let editorRef = $state<{
     save: () => void;
@@ -88,6 +102,7 @@
   const registry = $derived(getTemplateRegistry());
   const doc = $derived(getLogicDocument());
   const bundles = $derived(getTemplateBundles());
+  const pluginSet = $derived(getPluginContributions());
   const entries = $derived(
     withoutSecured(
       [
@@ -100,6 +115,9 @@
           apiUser: doc.deviceTemplates ?? [],
           bundleBuiltins: BUILTIN_BUNDLES,
           bundleUser: bundles,
+          pluginTiles: pluginSet.tiles,
+          pluginBundles: pluginSet.bundles,
+          pluginLogic: pluginSet.logic,
         }),
         ...(bundleDraft
           ? [
@@ -119,11 +137,13 @@
       local,
     ),
   );
-  const shown = $derived(filterTemplateEntries(entries, search, sortDir));
+  const shown = $derived(
+    filterTemplateEntries(entries, search, sortDir, sourceFilter),
+  );
   const rows = $derived.by(() => {
     if (!selected) return shown;
     const exists = shown.some(
-      (entry) => entry.kind === selected.kind && entry.id === selected.id,
+      (entry) => entryKey(entry) === entryKey(selected),
     );
     // Use the current entry (a save may have renamed it); the snapshot is only
     // needed to keep a draft or filtered-out row visible.
@@ -132,12 +152,16 @@
   const bundleSaveFailed = $derived(templateBundleSaveFailed());
   const selectedBundle = $derived(
     selected?.kind === "bundle"
-      ? bundleDraft?.id === selected.id
-        ? bundleDraft
-        : selected.builtin
-          ? BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id)
-          : (bundles.find((bundle) => bundle.id === selected.id) ??
-            BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
+      ? selected.plugin
+        ? (getPluginContribution(selected.key ?? selected.id)?.value as
+            | TemplateBundle
+            | undefined)
+        : bundleDraft?.id === selected.id
+          ? bundleDraft
+          : selected.builtin
+            ? BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id)
+            : (bundles.find((bundle) => bundle.id === selected.id) ??
+              BUILTIN_BUNDLES.find((bundle) => bundle.id === selected.id))
       : undefined,
   );
   const writable = $derived(
@@ -165,8 +189,12 @@
     );
   });
 
+  function entryKey(entry: TemplateEntry): string {
+    return entry.key ?? `${entry.kind}:${entry.id}`;
+  }
+
   function isOpen(entry: TemplateEntry) {
-    return selected?.kind === entry.kind && selected?.id === entry.id;
+    return !!selected && entryKey(selected) === entryKey(entry);
   }
 
   function onLineClick(event: MouseEvent, entry: TemplateEntry) {
@@ -209,7 +237,11 @@
     return "layers";
   }
 
-  function definitionFor(entry: TemplateEntry) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function definitionFor(entry: TemplateEntry): any {
+    if (entry.plugin) {
+      return getPluginContribution(entry.key ?? entry.id)?.value;
+    }
     if (entry.kind === "device") {
       return (
         Object.values(PRESETS).find((template) => template.id === entry.id) ??
@@ -254,10 +286,7 @@
 
   function openBundleApply(entry: TemplateEntry) {
     if (bundleDraft?.id === entry.id) return;
-    const bundle = entry.builtin
-      ? BUILTIN_BUNDLES.find((item) => item.id === entry.id)
-      : (bundles.find((item) => item.id === entry.id) ??
-        BUILTIN_BUNDLES.find((item) => item.id === entry.id));
+    const bundle = definitionFor(entry) as TemplateBundle | undefined;
     if (bundle) bundleApplyTemplate = bundle;
   }
 
@@ -282,11 +311,11 @@
     selected = entry;
     editorDirty = false;
     error = "";
-    onselect?.({ kind: entry.kind, id: entry.id });
+    onselect?.({ kind: entry.kind, id: entry.key ?? entry.id });
   }
 
   function open(entry: TemplateEntry) {
-    if (selected?.id === entry.id && selected?.kind === entry.kind) {
+    if (selected && entryKey(selected) === entryKey(entry)) {
       guard(closeNow);
       return;
     }
@@ -301,7 +330,9 @@
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
     const entry = entries.find(
-      (item) => item.kind === focus.kind && item.id === focus.id,
+      (item) =>
+        item.kind === focus.kind &&
+        (item.key === focus.id || item.id === focus.id),
     );
     if (!entry) return;
     lastFocus = key;
@@ -450,8 +481,101 @@
     });
   }
 
+  function duplicatePluginDevice(source: Template) {
+    const copy = {
+      ...structuredClone($state.snapshot(source)),
+      id: newId(),
+      name: `${source.name} copy`,
+      builtin: false,
+      help: "",
+      basedOn: source.basedOn ?? source.type,
+    };
+    if (
+      !commitTemplates({
+        ...registry,
+        templates: [...(registry.templates ?? []), copy],
+      })
+    ) {
+      error = "The device template document could not be saved.";
+      return;
+    }
+    start({
+      id: copy.id,
+      name: copy.name,
+      kind: "device",
+      parts: ["device"],
+      builtin: false,
+      help: "",
+      description: copy.description ?? "",
+      search: "",
+    });
+  }
+
+  function duplicatePluginLogic(source: LogicTemplate) {
+    const copy = {
+      ...structuredClone($state.snapshot(source)),
+      id: newId(),
+      name: `${source.name} copy`,
+    };
+    if (
+      !commitLogics({ ...doc, templates: [...(doc.templates ?? []), copy] })
+    ) {
+      error = "The logic document could not be saved.";
+      return;
+    }
+    if (logicBlocked()) {
+      error = "Not saved — fix the logic errors in the document.";
+      return;
+    }
+    start({
+      id: copy.id,
+      name: copy.name,
+      kind: "logic",
+      parts: ["logic"],
+      builtin: false,
+      help: "",
+      description: copy.description ?? "",
+      search: "",
+    });
+  }
+
+  function duplicatePluginBundle(source: TemplateBundle) {
+    const copy = {
+      ...structuredClone($state.snapshot(source)),
+      id: newId(),
+      name: `${source.name} copy`,
+    };
+    if (!upsertTemplateBundle(copy)) {
+      error = "Combined templates could not be saved.";
+      return;
+    }
+    saveTemplateBundles();
+    start({
+      id: copy.id,
+      name: copy.name,
+      kind: "bundle",
+      parts: bundleParts(copy),
+      builtin: false,
+      help: "",
+      description: copy.description ?? "",
+      search: "",
+    });
+  }
+
   function duplicateSelected() {
     if (!selected) return;
+    if (selected.plugin) {
+      const raw = getPluginContribution(selected.key ?? selected.id)?.value;
+      if (!raw) return;
+      if (selected.kind === "device") {
+        duplicatePluginDevice(raw as Template);
+      } else if (selected.kind === "logic") {
+        duplicatePluginLogic(raw as LogicTemplate);
+      } else if (selected.kind === "bundle") {
+        duplicatePluginBundle(raw as TemplateBundle);
+      }
+      return;
+    }
     if (selected.kind === "device") duplicateDevice(selected.id);
     else if (selected.kind === "logic") duplicateLogic(selected.id);
     else if (selected.kind === "api") duplicateApi(selected.id);
@@ -591,13 +715,25 @@
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
   {/if}
 
+  <div class="template-filter">
+    <label class="filter">
+      <span class="label-mono">Source</span>
+      <select bind:value={sourceFilter}>
+        <option value="all">All</option>
+        <option value="builtin">Built-in</option>
+        <option value="mine">Mine</option>
+        <option value="plugins">Plugins</option>
+      </select>
+    </label>
+  </div>
+
   {#if rows.length === 0}
     <div class="card empty-state">
       <p class="text-muted">No templates match the search.</p>
     </div>
   {:else}
     <div class="template-list">
-      {#each rows as entry (`${entry.kind}:${entry.id}:${entry.builtin ? "builtin" : "user"}`)}
+      {#each rows as entry (entryKey(entry))}
         <div class="item" class:open={isOpen(entry)}>
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -660,7 +796,7 @@
                     Apply
                   </button>
                 {/if}
-                {#if !entry.builtin}
+                {#if !entry.builtin && !entry.readonly}
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
@@ -680,7 +816,9 @@
               {#if entry.roles?.length}
                 <span class="badge">{entry.roles.length} roles</span>
               {/if}
-              {#if entry.builtin}
+              {#if entry.plugin}
+                <span class="badge">{entry.plugin.name}</span>
+              {:else if entry.builtin}
                 <span class="badge">built-in</span>
               {:else}
                 <IconButton
@@ -696,7 +834,13 @@
           {#if isOpen(entry)}
             <div class="item-editor">
               <HelpSection help={helpFor(entry)} />
-              {#if entry.kind === "device"}
+              {#if entry.plugin}
+                <p class="hint text-muted">
+                  Provided by plugin <strong>{entry.plugin.name}</strong>.
+                  Applying creates your own copy; the plugin must stay
+                  installed and enabled for it to appear again.
+                </p>
+              {:else if entry.kind === "device"}
                 <VisualTemplates
                   bind:this={editorRef}
                   embedded
@@ -797,6 +941,21 @@
   .hint {
     margin: 0;
     font-size: var(--body-sm);
+  }
+
+  .template-filter {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .filter select {
+    min-width: 8rem;
   }
 
   .template-list {

@@ -227,15 +227,21 @@ export function templateEntries(input: {
   ];
 }
 
+export type TemplateSource = "all" | "builtin" | "mine" | "plugins";
+
 export function filterTemplateEntries(
   entries: TemplateEntry[],
   query: string,
   dir: "asc" | "desc",
+  source: TemplateSource = "all",
 ): TemplateEntry[] {
   const q = query.trim().toLowerCase();
-  const list = q
-    ? entries.filter((entry) => entry.search.includes(q))
-    : [...entries];
+  const list = entries.filter((entry) => {
+    if (source === "builtin" && !entry.builtin) return false;
+    if (source === "mine" && (entry.builtin || entry.plugin)) return false;
+    if (source === "plugins" && !entry.plugin) return false;
+    return !q || entry.search.includes(q);
+  });
   const direction = dir === "asc" ? 1 : -1;
   return list.sort((a, b) => direction * a.name.localeCompare(b.name));
 }

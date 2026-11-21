@@ -85,6 +85,37 @@ describe("templateEntries", () => {
     });
   });
 
+  it("filters by built-in, mine and plugins", () => {
+    const plugin = { id: "ext", name: "Ext", enabled: true };
+    const entries = templateEntries({
+      presets: [],
+      visual: [device],
+      logicBuiltins: [],
+      logicUser: [logic],
+      apiBuiltins: [],
+      apiUser: [],
+      bundleBuiltins: [],
+      bundleUser: [bundle],
+      pluginTiles: [
+        { key: "plugin:ext:tiles:d", plugin, value: device },
+      ],
+    });
+    expect(
+      filterTemplateEntries(entries, "", "asc", "plugins").every(
+        (entry) => entry.plugin,
+      ),
+    ).toBe(true);
+    expect(
+      filterTemplateEntries(entries, "", "asc", "mine").some(
+        (entry) => entry.plugin || entry.builtin,
+      ),
+    ).toBe(false);
+    expect(filterTemplateEntries(entries, "", "asc", "builtin")).toEqual([]);
+    expect(filterTemplateEntries(entries, "", "asc", "all")).toHaveLength(
+      entries.length,
+    );
+  });
+
   it("aggregates the four kinds with part badges", () => {
     const entries = templateEntries({
       presets: [],
