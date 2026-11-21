@@ -10,11 +10,13 @@ import {
   pluginBundleOf,
   pluginSettings,
   pluginSettingsSchema,
+  parseSettingsTabs,
   settingsProblem,
   validPluginId,
   type BuiltinPluginDef,
   type PluginBundle,
   type PluginSettingDef,
+  type SettingsTabDef,
 } from "./plugin-ops";
 
 /**
@@ -34,6 +36,7 @@ export interface ImportedPlugin {
   usage?: string;
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
   bundle?: PluginBundle;
   code: string;
 }
@@ -179,6 +182,15 @@ export function parsePluginFile(
   }
   const settingsError = settingsProblem(settingsSchema, settings);
   if (settingsError) return problem(settingsError);
+  const settingsTabs =
+    plugin.settingsTabs === undefined
+      ? undefined
+      : settingsSchema
+        ? parseSettingsTabs(plugin.settingsTabs, settingsSchema)
+        : undefined;
+  if (plugin.settingsTabs !== undefined && !settingsTabs) {
+    return problem("The settings tabs are invalid.");
+  }
   const bundle =
     plugin.bundle !== undefined ? pluginBundleOf(plugin.bundle) : undefined;
   if (plugin.bundle !== undefined && !bundle) {
@@ -230,6 +242,7 @@ export function parsePluginFile(
       ...(usage ? { usage } : {}),
       ...(settings ? { settings } : {}),
       ...(settingsSchema ? { settingsSchema } : {}),
+      ...(settingsTabs ? { settingsTabs } : {}),
       ...(bundle ? { bundle } : {}),
     },
   };

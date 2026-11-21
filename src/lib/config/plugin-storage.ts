@@ -5,7 +5,11 @@
 // they travel through the adapter's plugin commands.
 
 import { pluginManifestOf } from "$adapter/plugin-files";
-import type { PluginBundle, PluginSettingDef } from "$adapter/plugin-ops";
+import type {
+  PluginBundle,
+  PluginSettingDef,
+  SettingsTabDef,
+} from "$adapter/plugin-ops";
 import type { ImportedPlugin } from "$adapter/plugin-file";
 import {
   META_ADAPTER,
@@ -42,6 +46,7 @@ interface StoredManifest {
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
   bundle?: PluginBundle;
 }
 
@@ -72,6 +77,7 @@ export async function savePluginManifest(
     ...(current.settingsSchema
       ? { settingsSchema: current.settingsSchema }
       : {}),
+    ...(current.settingsTabs ? { settingsTabs: current.settingsTabs } : {}),
     ...(current.bundle ? { bundle: current.bundle } : {}),
   });
   await verifiedWrite(META_ADAPTER, path, JSON.stringify(manifest, null, 2));

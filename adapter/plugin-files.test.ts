@@ -467,3 +467,41 @@ it("reports a failed adoption so the caller keeps the built-in", async () => {
     ),
   ).toEqual({ problem: "Error: storage offline" });
 });
+
+it("keeps settings tabs through the folder manifest", async () => {
+  const tabs = [{ id: "rows", label: "Rows", fields: ["rows"] }];
+  const manifest = JSON.stringify({
+    id: "clock",
+    name: "Clock",
+    settingsSchema: [
+      { name: "rows", label: "Rows", type: "array", item: "string" },
+    ],
+    settingsTabs: tabs,
+  });
+  const h = host({
+    "ihome.meta/plugins/clock/plugin.json": manifest,
+    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
+  });
+  const read = await readPluginFiles(h, "clock");
+  if ("problem" in read) throw new Error(read.problem);
+  const files = read.files;
+  expect(files.manifest.settingsTabs).toEqual(tabs);
+  const merged = mergePlugin(files, { enabled: true });
+  expect(merged.settingsTabs).toEqual(tabs);
+  expect(pluginManifestOf(merged).settingsTabs).toEqual(tabs);
+
+  const bad = host({
+    "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
+      id: "clock",
+      name: "Clock",
+      settingsSchema: [
+        { name: "rows", label: "Rows", type: "array", item: "string" },
+      ],
+      settingsTabs: [{ id: "x", label: "X", fields: ["missing"] }],
+    }),
+    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
+  });
+  expect(await readPluginFiles(bad, "clock")).toMatchObject({
+    problem: expect.stringContaining("tab"),
+  });
+});

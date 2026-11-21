@@ -299,3 +299,26 @@ it("keeps the previous settings of an active plugin that lost them", () => {
     settings: { dir: "/data", caddyConfig: "/etc/caddy/Caddyfile" },
   });
 });
+
+it("keeps settings tabs in the document, the merged entry and a staged import", () => {
+  const tabs = [{ id: "rows", label: "Rows", fields: ["rows"] }];
+  const tabSchema: PluginSettingDef[] = [
+    { name: "rows", label: "Rows", type: "array", item: "string" },
+  ];
+  const doc = pluginSettingsDoc([
+    plugin("a", { settingsSchema: tabSchema, settingsTabs: tabs }),
+  ]);
+  expect(doc.settings.a.settingsTabs).toEqual(tabs);
+  const merged = mergePluginSettings([plugin("a")], doc);
+  expect(merged[0].settingsTabs).toEqual(tabs);
+  expect(normalizeSettingsDoc(doc)?.settings.a.settingsTabs).toEqual(tabs);
+  expect(
+    stagedSettingsEntry({
+      id: "b",
+      name: "B",
+      code: "x",
+      settingsSchema: tabSchema,
+      settingsTabs: tabs,
+    }).settingsTabs,
+  ).toEqual(tabs);
+});

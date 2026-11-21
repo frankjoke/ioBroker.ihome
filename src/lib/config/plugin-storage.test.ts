@@ -62,6 +62,7 @@ it("rewrites name, help and usage but keeps schema and bundle", async () => {
       name: "Clock",
       help: "old",
       settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
+      settingsTabs: [{ id: "zone", label: "Zone", fields: ["tz"] }],
       bundle: { version: 1, device: { controls: [] } },
     }),
   });
@@ -75,6 +76,7 @@ it("rewrites name, help and usage but keeps schema and bundle", async () => {
     name: "Big clock",
     usage: "call it",
     settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
+    settingsTabs: [{ id: "zone", label: "Zone", fields: ["tz"] }],
     bundle: { version: 1, device: { controls: [] } },
   });
   setMetaTransport(null);

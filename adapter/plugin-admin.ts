@@ -11,6 +11,7 @@ import {
   type AdapterPlugin,
   type PluginBundle,
   type PluginSettingDef,
+  type SettingsTabDef,
 } from "./plugin-ops";
 
 export interface PluginPatch {
@@ -45,6 +46,7 @@ export interface PluginView {
   usage?: string;
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
   /** Declarative device the UI creates when the plugin is enabled. */
   bundle?: PluginBundle;
   status: PluginViewStatus;
@@ -220,6 +222,7 @@ export function pluginView(
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
+    ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
     ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
     ...(opts.problem ? { problem: opts.problem } : {}),
     status: opts.status,

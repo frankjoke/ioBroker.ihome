@@ -20,6 +20,7 @@ const plugin = {
   ...(def.help ? { help: def.help } : {}),
   ...(def.usage ? { usage: def.usage } : {}),
   ...(def.settingsSchema ? { settingsSchema: def.settingsSchema } : {}),
+  ...(def.settingsTabs ? { settingsTabs: def.settingsTabs } : {}),
   code,
 };
 const file = `${JSON.stringify({ format: "ihome-plugin", version: 1, plugin }, null, 2)}\n`;

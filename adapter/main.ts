@@ -1363,6 +1363,9 @@ class IHome extends utils.Adapter {
             ...(imported.settingsSchema
               ? { settingsSchema: imported.settingsSchema }
               : {}),
+            ...(imported.settingsTabs
+              ? { settingsTabs: imported.settingsTabs }
+              : {}),
             ...(imported.bundle ? { bundle: imported.bundle } : {}),
             code: imported.code,
           },
@@ -1442,6 +1445,7 @@ class IHome extends utils.Adapter {
           ...(entry.settingsSchema
             ? { settingsSchema: entry.settingsSchema }
             : {}),
+          ...(entry.settingsTabs ? { settingsTabs: entry.settingsTabs } : {}),
           code: entry.code,
         }));
         const patched = applyPluginPatches(temporary, stagedPatches, [
@@ -1463,6 +1467,7 @@ class IHome extends utils.Adapter {
           ...(entry.settingsSchema
             ? { settingsSchema: entry.settingsSchema }
             : {}),
+          ...(entry.settingsTabs ? { settingsTabs: entry.settingsTabs } : {}),
           code: entry.code ?? "",
         }));
       }
@@ -1590,6 +1595,7 @@ class IHome extends utils.Adapter {
           ...(plugin.settingsSchema
             ? { settingsSchema: plugin.settingsSchema }
             : {}),
+          ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
           ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
           code: plugin.code ?? "",
         }),
@@ -2348,6 +2354,9 @@ class IHome extends utils.Adapter {
         ...(imported.usage ? { usage: imported.usage } : {}),
         ...(imported.settingsSchema
           ? { settingsSchema: imported.settingsSchema }
+          : {}),
+        ...(imported.settingsTabs
+          ? { settingsTabs: imported.settingsTabs }
           : {}),
         ...(imported.bundle ? { bundle: imported.bundle } : {}),
       };

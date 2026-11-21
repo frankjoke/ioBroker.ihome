@@ -269,3 +269,33 @@ it("accepts the retired external-access id as a user plugin", () => {
   });
   expect(parsed).toMatchObject({ plugin: { id: "external-access" } });
 });
+
+it("round-trips settings tabs", () => {
+  const tabs = [{ id: "endpoints", label: "Endpoints", fields: ["endpoints"] }];
+  const settingsSchema = [
+    { name: "endpoints", label: "Endpoints", type: "array", item: "string" },
+  ];
+  const parsed = parsePluginFile({
+    ...base,
+    plugin: { ...base.plugin, settingsSchema, settingsTabs: tabs },
+  });
+  expect(parsed).toMatchObject({ plugin: { settingsTabs: tabs } });
+  if (!("plugin" in parsed)) return;
+  expect(pluginFile(parsed.plugin).plugin.settingsTabs).toEqual(tabs);
+  expect(
+    parsePluginFile({
+      ...base,
+      plugin: { ...base.plugin, settingsTabs: tabs },
+    }),
+  ).toMatchObject({ problem: expect.stringContaining("tab") });
+  expect(
+    parsePluginFile({
+      ...base,
+      plugin: {
+        ...base.plugin,
+        settingsSchema,
+        settingsTabs: [{ id: "x", label: "X", fields: ["missing"] }],
+      },
+    }),
+  ).toMatchObject({ problem: expect.stringContaining("tab") });
+});

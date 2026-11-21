@@ -11,11 +11,13 @@ import {
   MAX_PLUGIN_USAGE,
   SUPPORTED_PLUGIN_API,
   pluginBundleOf,
+  parseSettingsTabs,
   pluginSettingsSchema,
   validPluginId,
   type AdapterPlugin,
   type PluginBundle,
   type PluginSettingDef,
+  type SettingsTabDef,
 } from "./plugin-ops";
 import type { ImportedPlugin } from "./plugin-file";
 
@@ -29,6 +31,7 @@ export interface PluginManifest {
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
   bundle?: PluginBundle;
 }
 
@@ -187,6 +190,17 @@ export async function readPluginFiles(
       problem: `plugins/${pluginId}/plugin.json has an invalid settings schema.`,
     };
   }
+  const settingsTabs =
+    raw.settingsTabs === undefined
+      ? undefined
+      : settingsSchema
+        ? parseSettingsTabs(raw.settingsTabs, settingsSchema)
+        : undefined;
+  if (raw.settingsTabs !== undefined && !settingsTabs) {
+    return {
+      problem: `plugins/${pluginId}/plugin.json has invalid settings tabs.`,
+    };
+  }
   const bundle =
     raw.bundle === undefined ? undefined : pluginBundleOf(raw.bundle);
   if (raw.bundle !== undefined && !bundle) {
@@ -207,6 +221,7 @@ export async function readPluginFiles(
       ? { usage: text(raw.usage, MAX_PLUGIN_USAGE) }
       : {}),
     ...(settingsSchema ? { settingsSchema } : {}),
+    ...(settingsTabs ? { settingsTabs } : {}),
     ...(bundle ? { bundle } : {}),
   };
   return { files: { manifest, code } };
@@ -238,6 +253,7 @@ export function mergePlugin(
     ...(manifest.settingsSchema
       ? { settingsSchema: manifest.settingsSchema }
       : {}),
+    ...(manifest.settingsTabs ? { settingsTabs: manifest.settingsTabs } : {}),
     ...(manifest.bundle ? { bundle: manifest.bundle } : {}),
     code,
   };
@@ -281,6 +297,7 @@ export function pluginManifestOf(
     | "help"
     | "usage"
     | "settingsSchema"
+    | "settingsTabs"
     | "bundle"
   >,
 ): PluginManifest {
@@ -292,6 +309,7 @@ export function pluginManifestOf(
     ...(plugin.help ? { help: plugin.help } : {}),
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
+    ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
     ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
   };
 }
@@ -320,6 +338,7 @@ export async function adoptFilePlugin(
     ...(artifact.settingsSchema
       ? { settingsSchema: artifact.settingsSchema }
       : {}),
+    ...(artifact.settingsTabs ? { settingsTabs: artifact.settingsTabs } : {}),
     ...(artifact.bundle ? { bundle: artifact.bundle } : {}),
     code: artifact.code,
   });

@@ -296,3 +296,15 @@ it("exposes the plugin api and version", () => {
   );
   expect(view).toMatchObject({ api: 1, version: "1.2.3" });
 });
+
+it("carries settings tabs into the view", () => {
+  const tabs = [{ id: "rows", label: "Rows", fields: ["port"] }];
+  const view = pluginView(
+    userPlugin("u", true, "x", {
+      settingsSchema: schema(),
+      settingsTabs: tabs,
+    }),
+    { status: "running", hotSettings: true, restartRequired: false },
+  );
+  expect(view.settingsTabs).toEqual(tabs);
+});

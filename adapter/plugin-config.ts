@@ -4,10 +4,12 @@ import {
   MAX_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_USAGE,
   MIN_PLUGIN_TIMEOUT_MS,
+  parseSettingsTabs,
   pluginSettings,
   pluginSettingsSchema,
   type AdapterPlugin,
   type PluginSettingDef,
+  type SettingsTabDef,
 } from "./plugin-ops";
 import { parsePluginFile, type ImportedPlugin } from "./plugin-file";
 
@@ -22,6 +24,7 @@ export interface PluginSettingsEntry {
   usage?: string;
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
 }
 
 export interface PluginSettingsDocument {
@@ -88,6 +91,7 @@ export function pluginSettingsDoc(
       ...(plugin.settingsSchema
         ? { settingsSchema: plugin.settingsSchema }
         : {}),
+      ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
     };
   }
   return { version: 1, settings, staged: [], removals: [] };
@@ -116,6 +120,8 @@ export function mergePluginSettings(
       else delete next.usage;
       if (entry.settingsSchema) next.settingsSchema = entry.settingsSchema;
       else delete next.settingsSchema;
+      if (entry.settingsTabs) next.settingsTabs = entry.settingsTabs;
+      else delete next.settingsTabs;
     }
     if (entry.settings) next.settings = entry.settings;
     else delete next.settings;
@@ -150,10 +156,15 @@ export function normalizeSettingsDoc(
       const usage = text(raw.usage, MAX_PLUGIN_USAGE);
       const values = pluginSettings(raw.settings);
       const schema = pluginSettingsSchema(raw.settingsSchema);
+      const tabs =
+        schema && raw.settingsTabs !== undefined
+          ? parseSettingsTabs(raw.settingsTabs, schema)
+          : undefined;
       if (help) entry.help = help;
       if (usage) entry.usage = usage;
       if (values) entry.settings = values;
       if (schema) entry.settingsSchema = schema;
+      if (tabs) entry.settingsTabs = tabs;
       settings[id] = entry;
     }
   }
@@ -197,6 +208,7 @@ export function stagedSettingsEntry(
     ...(imported.settingsSchema
       ? { settingsSchema: imported.settingsSchema }
       : {}),
+    ...(imported.settingsTabs ? { settingsTabs: imported.settingsTabs } : {}),
     ...(settings ? { settings } : {}),
   };
 }

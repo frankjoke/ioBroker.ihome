@@ -2,8 +2,8 @@
 /** The plugin API this adapter hosts; a file needing a newer one is refused. */
 export const SUPPORTED_PLUGIN_API = 1;
 
-import type { PluginSettingDef } from "./settings-schema";
-import { pluginSettingsSchema } from "./settings-schema";
+import type { PluginSettingDef, SettingsTabDef } from "./settings-schema";
+import { parseSettingsTabs, pluginSettingsSchema } from "./settings-schema";
 export {
   MAX_SETTING_FIELDS,
   MAX_SETTINGS_DEPTH,
@@ -45,6 +45,8 @@ export interface AdapterPlugin {
   settings?: Record<string, unknown>;
   /** Optional form schema for the Plugins page. */
   settingsSchema?: PluginSettingDef[];
+  /** Optional tab layout over the settings schema. */
+  settingsTabs?: SettingsTabDef[];
   /** Declarative device the UI creates when the plugin is enabled. */
   bundle?: PluginBundle;
   code?: string;
@@ -86,6 +88,7 @@ export interface BuiltinPluginDef {
   help?: string;
   usage?: string;
   settingsSchema?: PluginSettingDef[];
+  settingsTabs?: SettingsTabDef[];
 }
 
 export type PluginReply =
@@ -562,6 +565,7 @@ function validEntry(
       ...(def.help ? { help: def.help } : {}),
       ...(def.usage ? { usage: def.usage } : {}),
       ...(def.settingsSchema ? { settingsSchema: def.settingsSchema } : {}),
+      ...(def.settingsTabs ? { settingsTabs: def.settingsTabs } : {}),
       ...(settings ? { settings } : {}),
       code: undefined,
     };
@@ -581,6 +585,13 @@ function validEntry(
   const help = textOf(value.help, MAX_PLUGIN_HELP);
   const usage = textOf(value.usage, MAX_PLUGIN_USAGE);
   const settingsSchema = pluginSettingsSchema(value.settingsSchema);
+  const settingsTabs =
+    value.settingsTabs === undefined
+      ? undefined
+      : settingsSchema
+        ? parseSettingsTabs(value.settingsTabs, settingsSchema)
+        : undefined;
+  if (value.settingsTabs !== undefined && !settingsTabs) return null;
   const bundle =
     value.bundle === undefined ? undefined : pluginBundleOf(value.bundle);
   if (value.bundle !== undefined && !bundle) return null;
@@ -596,6 +607,7 @@ function validEntry(
     ...(usage ? { usage } : {}),
     ...(settings ? { settings } : {}),
     ...(settingsSchema ? { settingsSchema } : {}),
+    ...(settingsTabs ? { settingsTabs } : {}),
     ...(bundle ? { bundle } : {}),
     ...(code ? { code } : {}),
   };
@@ -658,6 +670,7 @@ export function seedBuiltinPlugins(
       ...(builtin.settingsSchema
         ? { settingsSchema: builtin.settingsSchema }
         : {}),
+      ...(builtin.settingsTabs ? { settingsTabs: builtin.settingsTabs } : {}),
       code: undefined,
     });
   }
