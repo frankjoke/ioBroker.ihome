@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const replies: Record<string, unknown> = {};
+  const pluginViews: { id: string; settings?: Record<string, unknown> }[] = [];
+  const savePlugin = vi.fn(async (_patch: unknown) => {});
   const send = vi.fn(
     async (_ns: string, _cmd: string, payload: unknown): Promise<unknown> => {
       const action = (payload as { payload?: { action?: string } } | undefined)
@@ -12,15 +14,23 @@ const h = vi.hoisted(() => {
       };
     },
   );
-  return { replies, send };
+  return { replies, pluginViews, savePlugin, send };
 });
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: { namespace: "ihome.0", sendTo: h.send },
 }));
 
+vi.mock("$lib/stores/plugins.svelte", () => ({
+  getPlugins: () => h.pluginViews,
+  loadPlugins: async () => {},
+  savePlugin: h.savePlugin,
+}));
+
 beforeEach(() => {
   for (const key of Object.keys(h.replies)) delete h.replies[key];
+  h.pluginViews.length = 0;
+  h.savePlugin.mockClear();
   h.send.mockClear();
   vi.resetModules();
 });
@@ -149,4 +159,47 @@ it("maps service mutations and refreshes the status", async () => {
     id: "external-access",
     payload: { action: "services.remove", id: "a" },
   });
+});
+
+it("rotates an http.in endpoint token explicitly", async () => {
+  h.pluginViews.push({
+    id: "http.in",
+    settings: {
+      endpoints: JSON.stringify([
+        { path: "phone-event", method: "GET", token: "old", reply: "ok" },
+      ]),
+      token: "global",
+      port: 3000,
+    },
+  });
+  const s = await store();
+  const token = await s.rotateWebhookToken("/phone-event");
+  expect(token).toMatch(/^[0-9a-f]{32}$/);
+  const patch = h.savePlugin.mock.calls[0][0] as {
+    settings: Record<string, unknown>;
+  };
+  const endpoints = JSON.parse(String(patch.settings.endpoints));
+  expect(endpoints[0]).toMatchObject({
+    path: "phone-event",
+    token,
+    reply: "ok",
+  });
+  expect(h.savePlugin).toHaveBeenCalledWith({
+    id: "http.in",
+    settings: {
+      endpoints: JSON.stringify(endpoints),
+      token: "global",
+      port: 3000,
+    },
+  });
+});
+
+it("builds public links with the right shape", async () => {
+  const s = await store();
+  expect(
+    s.webhookLink("https://home.example.net/", "/phone-event", "abc"),
+  ).toBe("https://home.example.net/phone-event?token=abc");
+  expect(s.proxyLink("https://home.example.net/", "/opencode")).toBe(
+    "https://home.example.net/opencode/",
+  );
 });

@@ -4,6 +4,17 @@
 
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { callPlugin } from "$lib/config/plugin-call";
+import {
+  endpointArray,
+  normalizeHttpInPath,
+  parseHttpInSettings,
+  type HttpInEndpoint,
+} from "$lib/config/http-in-endpoints";
+import {
+  getPlugins,
+  loadPlugins,
+  savePlugin,
+} from "$lib/stores/plugins.svelte";
 
 export interface ExternalUserView {
   user: string;
@@ -169,6 +180,70 @@ export async function removeExternalService(id: string): Promise<void> {
 
 export async function writeExternalServicesSnippet(): Promise<unknown> {
   return call("services.write");
+}
+
+/** Endpoints of the installed `http.in` plugin (empty when it is absent). */
+export function getHttpInEndpoints(): HttpInEndpoint[] {
+  const view = getPlugins().find((plugin) => plugin.id === "http.in");
+  return parseHttpInSettings(view?.settings).endpoints;
+}
+
+function randomToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
+/**
+ * Write an explicit token onto an `http.in` endpoint. The endpoint otherwise
+ * falls back to the global plugin token, which the card must not pretend is
+ * its own; writing it here also survives a later global-token change.
+ */
+export async function rotateWebhookToken(
+  endpointPath: string,
+): Promise<string> {
+  if (getPlugins().length === 0) await loadPlugins();
+  const view = getPlugins().find((plugin) => plugin.id === "http.in");
+  if (!view) throw new Error("The http.in plugin is not installed.");
+  const settings = view.settings ?? {};
+  const endpoints = endpointArray(settings.endpoints);
+  const wanted = normalizeHttpInPath(endpointPath);
+  let found: Record<string, unknown> | undefined;
+  for (const entry of endpoints) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const path = typeof row.path === "string" ? row.path : "";
+    if (path && normalizeHttpInPath(path) === wanted) {
+      found = row;
+      break;
+    }
+  }
+  if (!found) throw new Error(`Unknown http.in endpoint: ${endpointPath}`);
+  const token = randomToken();
+  found.token = token;
+  await savePlugin({
+    id: "http.in",
+    settings: { ...settings, endpoints: JSON.stringify(endpoints) },
+  });
+  return token;
+}
+
+function publicBase(publicUrl: string): string {
+  return publicUrl.trim().replace(/\/+$/, "");
+}
+
+export function webhookLink(
+  publicUrl: string,
+  path: string,
+  token: string,
+): string {
+  return `${publicBase(publicUrl)}${path}?token=${encodeURIComponent(token)}`;
+}
+
+export function proxyLink(publicUrl: string, path: string): string {
+  return `${publicBase(publicUrl)}${path}/`;
 }
 
 export async function writeExternalSnippet(): Promise<void> {
