@@ -227,7 +227,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "",
       "**Advanced**",
       "",
-      "The settings value is the endpoint array itself. The editor has an *Edit as JSON* fallback for recovery and for replies that are not text; JSON is never required.",
+      "The settings value is the endpoint array itself. The editor has an *Edit as JSON* fallback for recovery. `reply` is preserved as stored (text or JSON) and edited there; JSON is never required.",
       "",
       "**Debug**",
       "",
@@ -301,13 +301,6 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
               type: "string",
               description:
                 "Overrides the default token; empty uses the default.",
-            },
-            {
-              name: "reply",
-              label: "Reply",
-              type: "string",
-              description:
-                "Text sent on success. A JSON reply is preserved but edited only as JSON.",
             },
             {
               name: "target",

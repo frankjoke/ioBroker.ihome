@@ -248,7 +248,6 @@
               value={editorValue(index)}
               onchange={(name, next) => change(index, name, next)}
             />
-            {#if problem}<p class="hint text-danger">{problem}</p>{/if}
           </div>
         {/if}
       </div>
@@ -291,6 +290,10 @@
         />
       </div>
     {/each}
+  {/if}
+
+  {#if problem}
+    <p class="hint text-danger">{problem}</p>
   {/if}
 
   {#if !parsedProblem}

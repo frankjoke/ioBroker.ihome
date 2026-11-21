@@ -83,7 +83,6 @@
   let pendingDelete = $state<ExternalServiceView | null>(null);
   let deleteResolve: (() => void) | null = null;
   let deleteReject: ((error: Error) => void) | null = null;
-  let servicesValid = $state(true);
   let copied = $state("");
   let addServiceOpen = $state(false);
   let addKind = $state<"webhook" | "proxy">("webhook");
@@ -666,7 +665,6 @@
           httpView.endpoints.map((endpoint) => endpoint.path),
         )}
         values={servicesValues}
-        bind:valid={servicesValid}
         hooks={serviceHooks}
       />
 

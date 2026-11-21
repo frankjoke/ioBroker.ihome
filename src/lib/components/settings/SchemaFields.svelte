@@ -57,6 +57,11 @@
     const parsed = structuredValue(field, value[field.name]);
     return "value" in parsed ? parsed.value : value[field.name];
   }
+
+  function objectValue(field: SettingsField): Record<string, unknown> {
+    const parsed = structuredValue(field, value[field.name]);
+    return "value" in parsed ? asRecord(parsed.value) : {};
+  }
 </script>
 
 <div class="schema-fields">
@@ -115,9 +120,9 @@
         <div class="section-panel nested">
           <SchemaFields
             schema={field.fields ?? []}
-            value={asRecord(value[field.name])}
+            value={objectValue(field)}
             onchange={(name, next) =>
-              set(field.name, { ...asRecord(value[field.name]), [name]: next })}
+              set(field.name, { ...objectValue(field), [name]: next })}
             {hooks}
           />
         </div>

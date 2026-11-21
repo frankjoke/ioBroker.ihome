@@ -492,4 +492,17 @@ describe("http.in settings definition", () => {
       exactlyOne: ["target", "targets"],
     });
   });
+
+  it("keeps a JSON reply valid but out of the row fields", () => {
+    const def = BUILTIN_PLUGINS.find((plugin) => plugin.id === "http.in")!;
+    const schema = pluginSettingsSchema(def.settingsSchema)!;
+    const endpoints = schema.find((field) => field.name === "endpoints");
+    const item = endpoints?.item as { fields: { name: string }[] };
+    expect(item.fields.some((field) => field.name === "reply")).toBe(false);
+    expect(
+      settingsProblem(schema, {
+        endpoints: [{ path: "/x", target: "a.b", reply: { ok: "hook" } }],
+      }),
+    ).toBeNull();
+  });
 });
