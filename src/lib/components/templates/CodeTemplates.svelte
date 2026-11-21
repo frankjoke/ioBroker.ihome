@@ -27,6 +27,12 @@
     upsertFunction,
   } from "$lib/stores/functions.svelte";
   import { saveFunctions } from "$lib/functions.svelte.js";
+  import {
+    ensurePluginContributions,
+    getPluginContribution,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { getPluginsVersion } from "$lib/stores/plugins.svelte";
   import FormulaEditor from "./FormulaEditor.svelte";
   import FunctionEditor from "./FunctionEditor.svelte";
   import { exportTemplate } from "$lib/template-export";
@@ -71,18 +77,31 @@
   const writable = $derived(
     draftKind === "formula" ? isFormulasWritable() : isFunctionsWritable(),
   );
+
+  $effect(() => {
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
+  const pluginSet = $derived(getPluginContributions());
   const entries = $derived(
     codeEntries(
       formulas,
       formulaOnly ? [] : functions,
       formulaOnly ? [] : BUILTIN_FUNCTIONS,
+      pluginSet.formulas,
+      formulaOnly ? [] : pluginSet.functions,
     ),
   );
   const shown = $derived(filterCodeEntries(entries, search, sortDir));
+  function entryKey(entry: CodeEntry): string {
+    return entry.key ?? `${entry.kind}:${entry.id}`;
+  }
+
   const rows = $derived.by(() => {
     if (!selected) return shown;
     const exists = shown.some(
-      (entry) => entry.kind === selected.kind && entry.id === selected.id,
+      (entry) => entryKey(entry) === entryKey(selected),
     );
     // Use the current entry (a save may have renamed it); the snapshot is only
     // needed to keep a draft or filtered-out row visible.
@@ -90,14 +109,18 @@
   });
 
   function isOpen(entry: CodeEntry) {
-    return selected?.kind === entry.kind && selected?.id === entry.id;
+    return !!selected && entryKey(selected) === entryKey(entry);
   }
 
   function typeIcon(entry: CodeEntry): string {
     return entry.kind === "formula" ? "functions" : "code";
   }
 
-  function definitionFor(entry: CodeEntry) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function definitionFor(entry: CodeEntry): any {
+    if (entry.plugin) {
+      return getPluginContribution(entry.key ?? entry.id)?.value;
+    }
     return entry.kind === "formula"
       ? formulas.find((template) => template.id === entry.id)
       : (functions.find((template) => template.id === entry.id) ??
@@ -148,6 +171,14 @@
   }
 
   function start(entry: CodeEntry) {
+    if (entry.plugin) {
+      selected = entry;
+      draft = null;
+      editorDirty = false;
+      editorProblem = null;
+      onselect?.({ kind: entry.kind, id: entry.key ?? entry.id });
+      return;
+    }
     if (entry.kind === "formula") {
       const template = formulas.find((item) => item.id === entry.id);
       if (!template) return;
@@ -166,11 +197,11 @@
     selected = entry;
     editorDirty = false;
     editorProblem = null;
-    onselect?.({ kind: entry.kind, id: entry.id });
+    onselect?.({ kind: entry.kind, id: entry.key ?? entry.id });
   }
 
   function open(entry: CodeEntry) {
-    if (selected?.id === entry.id && selected?.kind === entry.kind) {
+    if (selected && entryKey(selected) === entryKey(entry)) {
       guard(closeNow);
       return;
     }
@@ -185,7 +216,9 @@
     const key = `${focus.kind}:${focus.id}`;
     if (key === lastFocus) return;
     const entry = entries.find(
-      (item) => item.kind === focus.kind && item.id === focus.id,
+      (item) =>
+        item.kind === focus.kind &&
+        (item.key === focus.id || item.id === focus.id),
     );
     if (!entry) return;
     lastFocus = key;
@@ -255,6 +288,61 @@
       saveFunctions();
     }
     closeNow();
+  }
+
+  function savePluginEntry(entry: CodeEntry): void {
+    const raw = definitionFor(entry);
+    if (!raw) return;
+    if (entry.kind === "formula") {
+      if (!isFormulasWritable()) {
+        error = "Formula templates could not be loaded — the copy was not saved.";
+        return;
+      }
+      const copy: FormulaTemplate = {
+        ...structuredClone($state.snapshot(raw)),
+        id: newId(),
+        name: `${raw.name} copy`,
+      };
+      upsertFormula(copy);
+      saveFormulas();
+      draftKind = "formula";
+      draft = copy;
+      selected = {
+        kind: "formula",
+        id: copy.id,
+        name: copy.name,
+        description: copy.notes ?? "",
+        preview: copy.expr,
+        builtin: false,
+        search: "",
+      };
+    } else {
+      if (!isFunctionsWritable()) {
+        error = "Function templates could not be loaded — the copy was not saved.";
+        return;
+      }
+      const copy: FunctionTemplate = {
+        ...structuredClone($state.snapshot(raw)),
+        id: newId(),
+        name: `${raw.name} copy`,
+      };
+      upsertFunction(copy);
+      saveFunctions();
+      draftKind = "function";
+      draft = copy;
+      selected = {
+        kind: "function",
+        id: copy.id,
+        name: copy.name,
+        description: copy.description ?? "",
+        preview: copy.code,
+        builtin: false,
+        search: "",
+      };
+    }
+    editorDirty = false;
+    editorProblem = null;
+    onselect?.({ kind: selected.kind, id: selected.id });
   }
 
   function confirmDelete() {
@@ -365,7 +453,7 @@
       </div>
     {:else}
       <div class="code-list">
-        {#each rows as entry (`${entry.kind}:${entry.id}`)}
+        {#each rows as entry (entryKey(entry))}
           <div class="item" class:open={isOpen(entry)}>
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -400,16 +488,25 @@
                     disabled={!definitionFor(entry)}
                     onclick={() => exportEntry(entry)}
                   />
-                  <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    disabled={!editorDirty || !!editorProblem || !writable}
-                    onclick={() => editorRef?.save()}
-                  >
-                    <span class="material-symbols-outlined">check</span> Save
-                  </button>
+                  {#if !entry.plugin}
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      disabled={!editorDirty || !!editorProblem || !writable}
+                      onclick={() => editorRef?.save()}
+                    >
+                      <span class="material-symbols-outlined">check</span> Save
+                    </button>
+                  {/if}
                 {/if}
-                {#if entry.builtin}
+                {#if entry.plugin}
+                  <span class="badge">{entry.plugin.name}</span>
+                  <IconButton
+                    icon="content_copy"
+                    label={`Save ${entry.name} to my templates`}
+                    onclick={() => savePluginEntry(entry)}
+                  />
+                {:else if entry.builtin}
                   <span class="badge">built-in</span>
                 {:else}
                   <IconButton
@@ -423,7 +520,21 @@
             </div>
             {#if isOpen(entry)}
               <div class="item-editor">
-                {#if draftKind === "formula"}
+                {#if entry.plugin}
+                  <p class="hint text-muted">
+                    Provided by plugin <strong>{entry.plugin.name}</strong>.
+                    Selecting it in a code field inserts its code; save a copy
+                    here to edit it.
+                  </p>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() => savePluginEntry(entry)}
+                  >
+                    <span class="material-symbols-outlined">content_copy</span>
+                    Save to my {entry.kind === "formula" ? "formulas" : "functions"}
+                  </button>
+                {:else if draftKind === "formula"}
                   <FormulaEditor
                     template={draft as FormulaTemplate}
                     {isNew}

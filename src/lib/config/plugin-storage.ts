@@ -59,7 +59,7 @@ export async function savePluginManifest(
     name: string;
     help: string;
     usage: string;
-    contributions?: PluginContributions;
+    contributions?: PluginContributions | null;
   },
 ): Promise<void> {
   const path = `${folder(id)}/plugin.json`;
@@ -74,7 +74,10 @@ export async function savePluginManifest(
   if (!current || typeof current !== "object") {
     throw new Error(`${path} must be an object.`);
   }
-  const contributions = patch.contributions ?? current.contributions;
+  const contributions =
+    patch.contributions === null
+      ? undefined
+      : (patch.contributions ?? current.contributions);
   const manifest = pluginManifestOf({
     id,
     name: patch.name,

@@ -2,7 +2,16 @@
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import SchemaSettingsEditor from "$lib/components/settings/SchemaSettingsEditor.svelte";
-  import { reloadPlugin, savePlugin } from "$lib/stores/plugins.svelte";
+  import {
+    getPluginsVersion,
+    reloadPlugin,
+    savePlugin,
+  } from "$lib/stores/plugins.svelte";
+  import {
+    ensurePluginContributions,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { pluginEditorTabs } from "$lib/config/plugin-editor";
   import { savePluginManifest } from "$lib/config/plugin-storage";
   import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { objectProblem } from "$lib/config/schema-values";
@@ -12,6 +21,7 @@
     verifiedWrite,
   } from "$lib/config/meta-files";
   import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
+  import type { PluginContributions } from "$adapter/plugin-ops";
 
   let {
     plugin,
@@ -49,6 +59,11 @@
   // The code file is read when the editor opens; null means not loaded yet.
   let code = $state("");
   let initialCode = $state<string | null>(null);
+  // The manifest's contributions are read once per plugin as JSON text.
+  let contributionsText = $state("");
+  let initialContributions = $state<string | null>(null);
+  let contributionsError = $state("");
+  let copiedSnippet = $state("");
   // The code is read once per plugin; a list refresh must not replace a draft.
   let readFor = "";
 
@@ -65,20 +80,7 @@
       (field) => !ownedElsewhere.has(field.name),
     ),
   );
-  const tabs = $derived([
-    { id: "settings", label: "Settings", hint: "Runtime and plugin settings" },
-    ...declaredTabs
-      .filter((tab) => tab.id !== "settings")
-      .map((tab) => ({
-        id: tab.id,
-        label: tab.label,
-        hint: `${tab.label} settings`,
-      })),
-    { id: "help", label: "Help", hint: "Setup, usage and examples" },
-    ...(plugin.builtin
-      ? []
-      : [{ id: "code", label: "Code", hint: "Plugin code and file state" }]),
-  ]);
+  const tabs = $derived(pluginEditorTabs(plugin));
   const schemaProblem = $derived(
     plugin.settingsSchema?.length
       ? objectProblem({ fields: plugin.settingsSchema }, settings)
@@ -86,7 +88,7 @@
   );
 
   $effect(() => {
-    valid = editorValid && !schemaProblem;
+    valid = editorValid && !schemaProblem && !contributionsError;
   });
 
   $effect(() => {
@@ -105,6 +107,58 @@
     };
   });
 
+  let contributionsFor = "";
+  $effect(() => {
+    if (plugin.builtin || contributionsFor === plugin.id) return;
+    contributionsFor = plugin.id;
+    let live = true;
+    void readMetaText(META_ADAPTER, `plugins/${plugin.id}/plugin.json`).then(
+      (text) => {
+        if (!live) return;
+        let value = "";
+        try {
+          const raw = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+          if (raw.contributions && typeof raw.contributions === "object") {
+            value = JSON.stringify(raw.contributions, null, 2);
+          }
+        } catch {
+          value = "";
+        }
+        contributionsText = value;
+        initialContributions = value;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  });
+
+  $effect(() => {
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
+  const snippets = $derived(
+    getPluginContributions(true).snippets.filter(
+      (entry) => entry.plugin.id === plugin.id,
+    ),
+  );
+
+  $effect(() => {
+    if (initialContributions === null) return;
+    const text = contributionsText.trim();
+    if (!text || contributionsText === initialContributions) {
+      contributionsError = "";
+      return;
+    }
+    try {
+      JSON.parse(text);
+      contributionsError = "";
+    } catch {
+      contributionsError = "Contributions must be valid JSON.";
+    }
+  });
+
   // One snapshot for the dirty check; the form never updates it.
   const initial = (() => ({
     name,
@@ -121,7 +175,9 @@
       usage !== initial.usage ||
       secured !== initial.secured ||
       JSON.stringify(settings) !== initial.settings ||
-      (initialCode !== null && code !== initialCode),
+      (initialCode !== null && code !== initialCode) ||
+      (initialContributions !== null &&
+        contributionsText !== initialContributions),
   );
   $effect(() => {
     dirty = changed;
@@ -138,6 +194,18 @@
     return { ...next, ...(values ?? {}) };
   }
 
+  async function copySnippet(code: string, key: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(code);
+      copiedSnippet = key;
+      setTimeout(() => {
+        if (copiedSnippet === key) copiedSnippet = "";
+      }, 1500);
+    } catch {
+      /* the clipboard may be blocked on plain http */
+    }
+  }
+
   /** Save lives on the item's line while open, so the list calls this. */
   export async function save(): Promise<void> {
     error = "";
@@ -147,16 +215,36 @@
       error = "A plugin needs a name.";
       return;
     }
+    const contributionsChanged =
+      !plugin.builtin &&
+      initialContributions !== null &&
+      contributionsText !== initialContributions;
+    let contributions: PluginContributions | null | undefined;
+    if (contributionsChanged) {
+      const text = contributionsText.trim();
+      if (!text) {
+        contributions = null;
+      } else {
+        try {
+          contributions = JSON.parse(text) as PluginContributions;
+        } catch {
+          error = "Contributions must be valid JSON.";
+          return;
+        }
+      }
+    }
     busy = true;
     const manifestChanged =
       !plugin.builtin &&
       (nextName !== initial.name ||
         help.trim() !== initial.help ||
-        usage.trim() !== initial.usage);
+        usage.trim() !== initial.usage ||
+        contributionsChanged);
     const codeChanged =
       !plugin.builtin && initialCode !== null && code !== initialCode;
     if (codeChanged && !code.trim()) {
       error = "A plugin needs code.";
+      busy = false;
       return;
     }
     const patch: PluginPatch = {
@@ -178,6 +266,7 @@
           name: nextName,
           help: help.trim(),
           usage: usage.trim(),
+          ...(contributionsChanged ? { contributions } : {}),
         });
       }
       if (codeChanged) {
@@ -234,14 +323,16 @@
           <input type="text" bind:value={name} />
         </label>
       {/if}
-      <label class="field">
-        <span class="label-mono">Default timeout (ms)</span>
-        <input type="number" min="100" max="30000" bind:value={timeoutMs} />
-        <span class="hint text-muted"
-          >Maximum time a plugin call may take. Some plugins accept their own
-          timeout option.</span
-        >
-      </label>
+      {#if plugin.hasCode}
+        <label class="field">
+          <span class="label-mono">Default timeout (ms)</span>
+          <input type="number" min="100" max="30000" bind:value={timeoutMs} />
+          <span class="hint text-muted"
+            >Maximum time a plugin call may take. Some plugins accept their own
+            timeout option.</span
+          >
+        </label>
+      {/if}
       {#if local}
         <label
           class="check"
@@ -303,6 +394,46 @@
       <span class="label-mono">Call it from an HTML tile</span>
       <pre><code>{`await ihome.call("${plugin.id}", options);`}</code></pre>
     </div>
+    {#if snippets.length}
+      <div class="call-examples">
+        <span class="label-mono">Examples from this plugin</span>
+        {#each snippets as snippet (snippet.key)}
+          <p class="hint text-muted">
+            <strong>{snippet.value.name}</strong>
+            {#if snippet.value.description}
+              — {snippet.value.description}
+            {/if}
+          </p>
+          <pre><code>{snippet.value.code}</code></pre>
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => void copySnippet(snippet.value.code, snippet.key)}
+          >
+            <span class="material-symbols-outlined">content_copy</span>
+            {copiedSnippet === snippet.key ? "Copied." : "Copy"}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  {:else if activeTab === "contributions"}
+    <label class="field">
+      <span class="label-mono">Contributions (JSON)</span>
+      <textarea
+        class="mono plugin-code"
+        rows="12"
+        spellcheck="false"
+        bind:value={contributionsText}
+      ></textarea>
+    </label>
+    {#if contributionsError}
+      <p class="text-danger hint">{contributionsError}</p>
+    {/if}
+    <p class="hint text-muted">
+      Tiles, bundles, logic, formulas, functions and copyable snippets this
+      plugin offers. The adapter validates ids, sizes and the envelope when you
+      save; applying a template creates your own copy.
+    </p>
   {:else if activeTab === "code" && !plugin.builtin}
     <label class="field">
       <span class="label-mono">Code (JavaScript)</span>

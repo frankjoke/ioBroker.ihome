@@ -2,6 +2,11 @@
   import { codeTemplateChoices, type SnippetMode } from "$lib/config/snippets";
   import { getFunctions } from "$lib/stores/functions.svelte";
   import { getFormulas } from "$lib/stores/formulas.svelte";
+  import {
+    ensurePluginContributions,
+    getPluginContributions,
+  } from "$lib/stores/plugin-contributions.svelte";
+  import { getPluginsVersion } from "$lib/stores/plugins.svelte";
 
   let {
     mode = "both",
@@ -15,8 +20,20 @@
     label?: string;
   } = $props();
 
+  $effect(() => {
+    getPluginsVersion();
+    void ensurePluginContributions();
+  });
+
+  const pluginSet = $derived(getPluginContributions());
   const choices = $derived(
-    codeTemplateChoices(getFunctions(), getFormulas(), mode),
+    codeTemplateChoices(
+      getFunctions(),
+      getFormulas(),
+      mode,
+      pluginSet.functions,
+      pluginSet.formulas,
+    ),
   );
   const byId = $derived(new Map(choices.map((entry) => [entry.id, entry])));
 </script>

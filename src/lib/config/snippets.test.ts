@@ -19,6 +19,49 @@ describe("codeTemplateChoices", () => {
   });
 });
 
+describe("plugin code templates", () => {
+  const plugin = { id: "ext", name: "Ext", enabled: true };
+  const fn = {
+    id: "fn",
+    name: "Fn",
+    mode: "statements" as const,
+    code: "x",
+  };
+  const formula = { id: "f", name: "F", expr: "1 + 1" };
+
+  it("adds plugin functions to statements with a composite key and label", () => {
+    const choices = codeTemplateChoices(
+      [],
+      [],
+      "statements",
+      [{ key: "plugin:ext:functions:fn", plugin, value: fn }],
+      [],
+    );
+    expect(choices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "plugin:ext:functions:fn",
+          name: expect.stringContaining("Ext"),
+          code: "x",
+        }),
+      ]),
+    );
+  });
+
+  it("adds plugin formulas to expressions only", () => {
+    const source = [
+      { key: "plugin:ext:formulas:f", plugin, value: formula },
+    ];
+    const expressions = codeTemplateChoices([], [], "expression", [], source);
+    expect(expressions.some((entry) => entry.id === source[0].key)).toBe(true);
+    expect(
+      codeTemplateChoices([], [], "statements", [], source).some((entry) =>
+        entry.id.startsWith("plugin:ext:formulas:"),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("snippetChoices", () => {
   it("filters by mode and puts built-ins first", () => {
     const user = [

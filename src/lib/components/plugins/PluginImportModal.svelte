@@ -19,10 +19,19 @@
   let plugin = $state<ImportedPlugin | null>(null);
   let fileName = $state("");
   let error = $state("");
+  let warnings = $state<string[]>([]);
   let busy = $state(false);
+
+  function contributionCount(value: ImportedPlugin): number {
+    return Object.values(value.contributions ?? {}).reduce(
+      (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
+      0,
+    );
+  }
 
   async function choose(event: Event): Promise<void> {
     error = "";
+    warnings = [];
     plugin = null;
     const file = (event.currentTarget as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -33,10 +42,12 @@
       return;
     }
     plugin = parsed.plugin;
+    warnings = parsed.warnings ?? [];
   }
 
   function loadExample(): void {
     error = "";
+    warnings = [];
     fileName = "NUT UPS example";
     plugin = NUT_EXAMPLE;
   }
@@ -98,6 +109,10 @@
       <p class="text-danger hint">{error}</p>
     {/if}
 
+    {#if warnings.length}
+      <p class="warning-banner">{warnings.join(" ")}</p>
+    {/if}
+
     {#if plugin}
       <div class="preview">
         <p>
@@ -110,14 +125,17 @@
             {Object.keys(plugin.settings ?? {}).length} settings · no code
           {:else}
             API {plugin.api ?? 1}{#if plugin.version}
-              · v{plugin.version}{/if} · Timeout {plugin.timeoutMs ?? 5000} ms · Code
-            {plugin.code.length}
-            bytes · {plugin.settingsSchema?.length ?? 0} settings fields ·
+              · v{plugin.version}{/if} · Timeout {plugin.timeoutMs ?? 5000} ms ·
+            {#if plugin.code?.trim()}
+              Code {plugin.code.length} bytes
+            {:else}
+              no code
+            {/if}
+            · {plugin.settingsSchema?.length ?? 0} settings fields ·
             {plugin.help ? "help" : "no help"} · {plugin.usage
               ? "usage"
-              : "no usage"}{#if plugin.bundle}
-              · device template ({plugin.bundle.device.controls.length}
-              controls){/if}
+              : "no usage"}{#if contributionCount(plugin) > 0}
+              · {contributionCount(plugin)} contribution items{/if}
           {/if}
         </p>
       </div>
@@ -127,6 +145,14 @@
       <p class="warning-banner">
         The imported plugin is added switched off. Enable it here when you are
         ready; the code is written to the iHome file space.
+      </p>
+    {/if}
+
+    {#if plugin && contributionCount(plugin) > 0}
+      <p class="warning-banner">
+        This plugin adds {contributionCount(plugin)} template or example items.
+        Applying one runs its logic or HTML in your pages; the plugin must stay
+        installed for its entries to remain available.
       </p>
     {/if}
 
