@@ -880,6 +880,9 @@ export function createExternalAccessPlugins(): Record<string, PluginFactory> {
   return {
     "external-access": (api) => ({
       call: (payload: unknown) => handle(api, payload),
+      // Settings are read per call (api.settings), so a save hot-applies. The
+      // hook tells the host not to flag a pending restart.
+      reload: () => undefined,
     }),
   };
 }

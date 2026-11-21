@@ -640,3 +640,9 @@ it("refuses to add a service when services.json is gone but the snippet is live"
   expect(snippet).toContain("handle /a");
   expect(snippet).not.toContain("handle /b");
 });
+
+it("applies settings without an adapter restart", () => {
+  const mod = plugin();
+  expect(typeof mod.reload).toBe("function");
+  expect(mod.reload!()).toBeUndefined();
+});
