@@ -178,7 +178,12 @@ it("rotates an http.in endpoint token explicitly", async () => {
   const patch = h.savePlugin.mock.calls[0][0] as {
     settings: Record<string, unknown>;
   };
-  const endpoints = JSON.parse(String(patch.settings.endpoints));
+  expect(Array.isArray(patch.settings.endpoints)).toBe(true);
+  const endpoints = patch.settings.endpoints as {
+    path: string;
+    token: string;
+    reply?: string;
+  }[];
   expect(endpoints[0]).toMatchObject({
     path: "phone-event",
     token,
@@ -186,11 +191,7 @@ it("rotates an http.in endpoint token explicitly", async () => {
   });
   expect(h.savePlugin).toHaveBeenCalledWith({
     id: "http.in",
-    settings: {
-      endpoints: JSON.stringify(endpoints),
-      token: "global",
-      port: 3000,
-    },
+    settings: { endpoints, token: "global", port: 3000 },
   });
 });
 

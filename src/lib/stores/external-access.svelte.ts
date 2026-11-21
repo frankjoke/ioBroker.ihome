@@ -225,7 +225,7 @@ export async function rotateWebhookToken(
   found.token = token;
   await savePlugin({
     id: "http.in",
-    settings: { ...settings, endpoints: JSON.stringify(endpoints) },
+    settings: { ...settings, endpoints },
   });
   return token;
 }

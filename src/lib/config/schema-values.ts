@@ -54,6 +54,9 @@ export function structuredValue(
   if (field.type !== "array" && field.type !== "object") {
     return { value };
   }
+  if (value === undefined || value === null) {
+    return { value: field.type === "array" ? [] : {} };
+  }
   const parsed = parseLegacy(value);
   if (field.type === "array") {
     return Array.isArray(parsed)
@@ -185,6 +188,7 @@ export function rowSummary(
   const parts: string[] = [];
   for (const field of fields) {
     if (field.type === "object" || field.type === "array") continue;
+    if (field.name === "token") continue;
     const value = row[field.name];
     if (!isSet(value) || typeof value === "object") continue;
     parts.push(String(value));

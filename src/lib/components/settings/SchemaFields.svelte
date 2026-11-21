@@ -76,11 +76,21 @@
         <label class="check">
           <input
             type="checkbox"
-            checked={value[field.name] === true}
+            checked={value[field.name] === undefined
+              ? field.default === true
+              : value[field.name] === true}
             disabled={field.readonly}
             onchange={(event) => set(field.name, event.currentTarget.checked)}
           />
-          <span>{value[field.name] === true ? "on" : "off"}</span>
+          <span
+            >{value[field.name] === undefined
+              ? field.default === true
+                ? "on"
+                : "off"
+              : value[field.name] === true
+                ? "on"
+                : "off"}</span
+          >
         </label>
       {:else if field.type === "select"}
         <select

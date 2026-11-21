@@ -23,6 +23,7 @@ it("reads legacy JSON strings and reports broken ones", () => {
     value: ["a", "b"],
   });
   expect(structuredValue(arrayField, ["a"])).toEqual({ value: ["a"] });
+  expect(structuredValue(arrayField, undefined)).toEqual({ value: [] });
   expect(structuredValue(arrayField, "nope")).toMatchObject({
     problem: /JSON/,
   });
@@ -88,4 +89,13 @@ it("defaults new rows and filters hidden fields", () => {
       { path: "/a", upstream: "127.0.0.1:1" },
     ),
   ).toBe("/a · 127.0.0.1:1");
+  expect(
+    rowSummary(
+      [
+        { name: "path", label: "Path", type: "string" },
+        { name: "token", label: "Token", type: "string" },
+      ],
+      { path: "/a", token: "secret" },
+    ),
+  ).toBe("/a");
 });

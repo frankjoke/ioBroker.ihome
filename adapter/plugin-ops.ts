@@ -515,6 +515,11 @@ function jsonValue(value: unknown): boolean {
   }
   if (typeof value === "number") return Number.isFinite(value);
   if (Array.isArray(value)) return value.every(jsonValue);
+  if (record(value)) {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return false;
+    return Object.values(value).every(jsonValue);
+  }
   return false;
 }
 

@@ -7,6 +7,7 @@ import {
   MAX_PLUGIN_USAGE,
   parsePluginMessage,
   pluginConfigWithBuiltins,
+  pluginSettings,
   pluginSettingsSchema,
   pluginError,
   pluginReply,
@@ -90,7 +91,7 @@ describe("validAdapterPlugins", () => {
     expect(loose.secured).toBeUndefined();
   });
 
-  it("drops nested settings values instead of the plugin", () => {
+  it("keeps nested settings values", () => {
     const [plugin] = validAdapterPlugins([
       {
         id: "my.plugin",
@@ -100,7 +101,7 @@ describe("validAdapterPlugins", () => {
       },
     ]);
     expect(plugin.id).toBe("my.plugin");
-    expect(plugin.settings).toBeUndefined();
+    expect(plugin.settings).toEqual({ nested: { a: 1 } });
   });
 
   it("drops invalid optional metadata instead of the plugin", () => {
@@ -504,5 +505,19 @@ describe("http.in settings definition", () => {
         endpoints: [{ path: "/x", target: "a.b", reply: { ok: "hook" } }],
       }),
     ).toBeNull();
+  });
+});
+
+describe("pluginSettings", () => {
+  it("accepts nested arrays and objects and rejects non-JSON values", () => {
+    expect(
+      pluginSettings({
+        endpoints: [{ path: "/x", targets: [{ state: "a.b", enabled: true }] }],
+      }),
+    ).toEqual({
+      endpoints: [{ path: "/x", targets: [{ state: "a.b", enabled: true }] }],
+    });
+    expect(pluginSettings({ when: new Date() })).toBeUndefined();
+    expect(pluginSettings({ fn: () => undefined })).toBeUndefined();
   });
 });
