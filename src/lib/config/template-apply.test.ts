@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPartLabel,
   bundleApplyParts,
+  bundleDeviceTemplate,
   bundleLogicParams,
   logicApplyDefaults,
   planLogicApply,
@@ -175,6 +176,17 @@ it("orders the present parts API, Logic", () => {
     ["logic"],
   );
   expect(applyPartLabel("api")).toBe("API");
+});
+
+it("turns a bundle device part into a tile template with a free id", () => {
+  expect(bundleDeviceTemplate(bundle, [])).toMatchObject({
+    id: "tv",
+    name: "TV",
+    basedOn: "tv",
+    type: "Custom",
+  });
+  expect(bundleDeviceTemplate(bundle, ["tv"])?.id).toBe("tv-2");
+  expect(bundleDeviceTemplate({ id: "x", name: "X" }, [])).toBeNull();
 });
 
 it("keeps logic params and drops string/description", () => {

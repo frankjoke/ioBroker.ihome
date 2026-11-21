@@ -2,6 +2,7 @@ import { uniqueSlug } from "$lib/config/slug";
 import { parseDuration } from "$logic/duration";
 import { instantiateTemplate } from "$logic/templates";
 import { validateLogicDocument } from "$logic/validate";
+import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
 import type { LogicDef, LogicTemplate, TemplateParam } from "$logic/types";
 
@@ -96,6 +97,21 @@ export function bundleApplyParts(bundle: TemplateBundle): ApplyPart[] {
   if (bundle.api) parts.push("api");
   if (bundle.logic) parts.push("logic");
   return parts;
+}
+
+/** The bundle's device part as a reusable user tile template. */
+export function bundleDeviceTemplate(
+  bundle: TemplateBundle,
+  takenIds: Iterable<string>,
+): Template | null {
+  if (!bundle.device) return null;
+  return {
+    ...bundle.device,
+    id: uniqueSlug(bundle.id, takenIds),
+    name: bundle.name,
+    type: bundle.device.type ?? "Custom",
+    basedOn: bundle.id,
+  };
 }
 
 const LOGIC_PARAM_TYPES = new Set<ApplyParam["type"]>([

@@ -3,6 +3,7 @@
   import {
     applyPartLabel,
     bundleApplyParts,
+    bundleDeviceTemplate,
     bundleLogicParams,
     logicApplyDefaults,
     planLogicApply,
@@ -27,6 +28,10 @@
     logicBlocked,
   } from "$lib/stores/logics.svelte";
   import { getTemplateBundles } from "$lib/stores/template-bundles.svelte";
+  import {
+    commitTemplates,
+    getTemplateRegistry,
+  } from "$lib/stores/templates.svelte";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { validateDeviceTemplate } from "$logic/device-templates";
   import { validateLogicDocument } from "$logic/validate";
@@ -58,6 +63,7 @@
   let apiProblem = $state("");
   let preflightProblem = $state<string | null>(null);
   let error = $state("");
+  let notice = $state("");
   let applying = $state(false);
 
   let loadedBundleId = "";
@@ -194,6 +200,30 @@
       error = `${applyPartLabel(failure.part)}: ${failure.error}`;
       return;
     }
+    if (bundle.device) {
+      const registry = getTemplateRegistry();
+      const already = (registry.templates ?? []).some(
+        (template) => template.basedOn === bundle.id,
+      );
+      if (!already) {
+        const template = bundleDeviceTemplate(
+          bundle,
+          (registry.templates ?? []).map((entry) => entry.id),
+        );
+        if (
+          !template ||
+          !commitTemplates({
+            ...registry,
+            templates: [...(registry.templates ?? []), template],
+          })
+        ) {
+          error = "The device template could not be saved.";
+          return;
+        }
+        notice = `Device template “${template.name}” added — apply it in the tile editor.`;
+        return;
+      }
+    }
     onClose();
   }
 </script>
@@ -243,9 +273,14 @@
       {#if error}
         <p class="text-danger hint">{error}</p>
       {/if}
+      {#if notice}
+        <p class="hint text-muted">{notice}</p>
+      {/if}
     </div>
     <div class="actions">
-      <button type="button" class="btn" onclick={onClose}>Cancel</button>
+      <button type="button" class="btn" onclick={onClose}
+        >{notice ? "Close" : "Cancel"}</button
+      >
       <button
         type="button"
         class="btn btn-primary"
@@ -253,7 +288,8 @@
           !!preflightProblem ||
           !!apiProblem ||
           !writable ||
-          blocked}
+          blocked ||
+          !!notice}
         onclick={apply}
       >
         Apply
