@@ -7,6 +7,7 @@ import {
   MAX_PLUGIN_USAGE,
   parsePluginMessage,
   pluginConfigWithBuiltins,
+  pluginSettingsSchema,
   pluginError,
   pluginReply,
   seedBuiltinPlugins,
@@ -345,6 +346,7 @@ describe("seedBuiltinPlugins", () => {
         help: BUILTIN_PLUGINS[2].help,
         usage: BUILTIN_PLUGINS[2].usage,
         settingsSchema: BUILTIN_PLUGINS[2].settingsSchema,
+        settingsTabs: BUILTIN_PLUGINS[2].settingsTabs,
         code: undefined,
       },
     ]);
@@ -468,5 +470,26 @@ describe("external-access legacy definition", () => {
       (entry) => entry.id === "external-access",
     );
     expect(def?.timeoutMs).toBe(20_000);
+  });
+});
+
+describe("http.in settings definition", () => {
+  it("defines the http.in endpoints tab", () => {
+    const def = BUILTIN_PLUGINS.find((plugin) => plugin.id === "http.in")!;
+    const schema = pluginSettingsSchema(def.settingsSchema);
+    expect(schema?.map((field) => field.name)).toEqual([
+      "bind",
+      "port",
+      "token",
+      "endpoints",
+    ]);
+    expect(def.settingsTabs).toEqual([
+      { id: "settings", label: "Settings", fields: ["bind", "port", "token"] },
+      { id: "endpoints", label: "Endpoints", fields: ["endpoints"] },
+    ]);
+    const endpoints = schema?.find((field) => field.name === "endpoints");
+    expect(endpoints?.item).toMatchObject({
+      exactlyOne: ["target", "targets"],
+    });
   });
 });

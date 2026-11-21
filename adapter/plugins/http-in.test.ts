@@ -338,3 +338,12 @@ describe("processHttpRequest", () => {
     expect(call("/off", "global-token")).toBe(404);
   });
 });
+
+it("accepts endpoints as a structured array", () => {
+  const parsed = parseHttpSettings({
+    endpoints: [{ path: "/x", method: "GET", target: "a.b" }],
+  });
+  expect(parsed.endpoints).toEqual([
+    { path: "/x", method: "GET", target: "a.b" },
+  ]);
+});
