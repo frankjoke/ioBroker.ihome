@@ -452,7 +452,7 @@ describe("plugin replies", () => {
 });
 
 describe("external-access legacy definition", () => {
-  it("is defined with its four settings", () => {
+  it("is defined with its five settings", () => {
     const def = LEGACY_BUILTIN_PLUGINS.find(
       (entry) => entry.id === "external-access",
     );
@@ -462,7 +462,13 @@ describe("external-access legacy definition", () => {
       "caddyConfig",
       "reloadCommand",
       "publicUrl",
+      "opencodePasswordFile",
     ]);
+    expect(
+      def?.settingsSchema?.find(
+        (setting) => setting.name === "opencodePasswordFile",
+      )?.default,
+    ).toBe("/opt/iobroker/opencode-password");
     expect(def?.usage).toContain("basic_auth");
   });
 

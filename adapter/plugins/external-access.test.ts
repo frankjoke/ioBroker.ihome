@@ -1,5 +1,7 @@
 import { beforeEach, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PluginApi } from "../plugin-api";
@@ -669,6 +671,122 @@ it("validates site services and rejects duplicate ports", () => {
       serializeServices([site, { ...site, id: "other", port: 8444 }]),
     ),
   ).toBeNull();
+});
+
+it("creates one-time pairing links and reports failures without the password", async () => {
+  let mode: "ok" | "404" | "nocode" = "ok";
+  let seenAuth = "";
+  let pairCalls = 0;
+  let port = 0;
+  const server = createServer((req, res) => {
+    seenAuth = String(req.headers.authorization ?? "");
+    if (req.method === "POST" && req.url === "/api/pair") {
+      pairCalls += 1;
+      if (mode === "404") {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify(
+          mode === "nocode" ? { expires_in: 300 } : { code: "ABC", expires_in: 300 },
+        ),
+      );
+      return;
+    }
+    if (req.method === "GET" && req.url === "/api/info") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          urls: [
+            `http://127.0.0.1:${port}`,
+            `http://192.168.1.5:${port}`,
+          ],
+        }),
+      );
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((resolve) =>
+    server.listen(0, "127.0.0.1", resolve),
+  );
+  port = (server.address() as AddressInfo).port;
+  const passwordFile = join(dir, "opencode-password");
+  await writeFile(passwordFile, "secret\n");
+  const site = {
+    id: "site-8444",
+    kind: "site" as const,
+    port: 8444,
+    upstream: `127.0.0.1:${port}`,
+    auth: "none" as const,
+    enabled: true,
+  };
+  await writeFile(
+    join(dir, "services.json"),
+    serializeServices([site]),
+  );
+  try {
+    const mod = plugin({
+      publicUrl: "https://home.example.net/ihome/",
+      opencodePasswordFile: passwordFile,
+    });
+    await expect(
+      mod.call!({ action: "site.pair", id: "site-8444" }),
+    ).resolves.toEqual({
+      external: "https://home.example.net:8444/auth/connect/ABC",
+      internal: `http://192.168.1.5:${port}/auth/connect/ABC`,
+      expiresIn: 300,
+    });
+    expect(seenAuth).toBe(
+      `Basic ${Buffer.from("opencode:secret").toString("base64")}`,
+    );
+    expect(pairCalls).toBe(1);
+
+    await expect(
+      plugin({ opencodePasswordFile: passwordFile }).call!({
+        action: "site.pair",
+        id: "site-8444",
+      }),
+    ).rejects.toThrow(/public URL/i);
+
+    await expect(
+      mod.call!({ action: "site.pair", id: "missing" }),
+    ).rejects.toThrow(/site/i);
+
+    await writeFile(
+      join(dir, "services.json"),
+      serializeServices([{ ...site, upstream: "192.168.1.9:49374" }]),
+    );
+    await expect(
+      mod.call!({ action: "site.pair", id: "site-8444" }),
+    ).rejects.toThrow(/loopback/i);
+    await writeFile(join(dir, "services.json"), serializeServices([site]));
+
+    const broken = plugin({
+      publicUrl: "https://home.example.net/ihome/",
+      opencodePasswordFile: join(dir, "missing-password"),
+    });
+    await expect(
+      broken.call!({ action: "site.pair", id: "site-8444" }),
+    ).rejects.toThrow(/password/i);
+
+    mode = "404";
+    await expect(
+      mod.call!({ action: "site.pair", id: "site-8444" }),
+    ).rejects.toThrow(/404/);
+
+    mode = "nocode";
+    const failure = await mod
+      .call!({ action: "site.pair", id: "site-8444" })
+      .catch((error) => String(error));
+    expect(failure).toMatch(/code/i);
+    expect(failure).not.toContain("secret");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 it("generates site blocks sorted by port, Basic Auth only when asked", () => {

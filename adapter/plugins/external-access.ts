@@ -408,8 +408,45 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function record(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
 function quote(value: string): string {
   return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function loopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+}
+
+function upstreamParts(upstream: string): { host: string; port: number } {
+  const at = upstream.lastIndexOf(":");
+  return {
+    host: upstream.slice(0, at),
+    port: Number(upstream.slice(at + 1)),
+  };
+}
+
+async function fetchJson(
+  url: string,
+  init: RequestInit,
+): Promise<{ status: number; body: unknown }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const body = await response.text();
+    let parsed: unknown = null;
+    try {
+      parsed = body ? JSON.parse(body) : null;
+    } catch {
+      parsed = null;
+    }
+    return { status: response.status, body: parsed };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function folder(api: PluginApi): string {
@@ -979,6 +1016,84 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
         ...servicesSnippet,
         changed: servicesSnippet.changed || sitesSnippet.changed,
         sites: sitesSnippet,
+      };
+    }
+    case "site.pair": {
+      const id = text(request.id);
+      const services = await readServices(dir);
+      const service = services.find((entry) => entry.id === id);
+      if (!service || service.kind !== "site") {
+        throw new Error(`Unknown site service: ${id || "(none)"}`);
+      }
+      const upstream = upstreamParts(service.upstream);
+      if (!loopbackHost(upstream.host)) {
+        throw new Error(
+          "Pairing needs a loopback upstream (127.0.0.1, localhost or [::1]).",
+        );
+      }
+      const host = siteHost(api);
+      if (!host) throw new Error("Set the public URL before pairing.");
+      if (!service.port) throw new Error("The site has no port.");
+      const passwordFile =
+        text(api.settings.opencodePasswordFile) ||
+        "/opt/iobroker/opencode-password";
+      let password = "";
+      try {
+        password = (await readFile(passwordFile, "utf8")).trim();
+      } catch {
+        throw new Error(`Read the OpenCode password from ${passwordFile}.`);
+      }
+      if (!password) {
+        throw new Error(`The OpenCode password file ${passwordFile} is empty.`);
+      }
+      const auth = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`;
+      const base = `http://${upstream.host}:${upstream.port}`;
+      const pair = await fetchJson(`${base}/api/pair`, {
+        method: "POST",
+        headers: { authorization: auth },
+      });
+      if (pair.status < 200 || pair.status >= 300) {
+        throw new Error(
+          `The OpenCode server at ${service.upstream} did not return a pairing code (HTTP ${pair.status}).`,
+        );
+      }
+      const code =
+        record(pair.body) && typeof pair.body.code === "string"
+          ? pair.body.code
+          : "";
+      if (!code) {
+        throw new Error("The OpenCode server did not return a pairing code.");
+      }
+      const expiresIn =
+        record(pair.body) && typeof pair.body.expires_in === "number"
+          ? pair.body.expires_in
+          : 300;
+      let internal: string | undefined;
+      try {
+        const info = await fetchJson(`${base}/api/info`, {
+          headers: { authorization: auth },
+        });
+        if (info.status >= 200 && info.status < 300 && record(info.body)) {
+          const urls = Array.isArray(info.body.urls) ? info.body.urls : [];
+          const lan = urls.find((url): url is string => {
+            if (typeof url !== "string") return false;
+            try {
+              return !loopbackHost(new URL(url).hostname);
+            } catch {
+              return false;
+            }
+          });
+          if (lan) {
+            internal = `${lan.replace(/\/+$/, "")}/auth/connect/${encodeURIComponent(code)}`;
+          }
+        }
+      } catch {
+        /* the internal link is optional */
+      }
+      return {
+        external: `https://${host}:${service.port}/auth/connect/${encodeURIComponent(code)}`,
+        ...(internal ? { internal } : {}),
+        expiresIn,
       };
     }
     case "snippet.write": {

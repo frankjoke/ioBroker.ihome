@@ -491,6 +491,14 @@ export const LEGACY_BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
         description:
           "Checked for status only, e.g. https://home.example.com/ihome/",
       },
+      {
+        name: "opencodePasswordFile",
+        label: "OpenCode password file",
+        type: "string",
+        default: "/opt/iobroker/opencode-password",
+        description:
+          "Used by the Pair device action; read from disk and never returned.",
+      },
     ],
   },
 ];
