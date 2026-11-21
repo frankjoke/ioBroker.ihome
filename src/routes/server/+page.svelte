@@ -315,7 +315,7 @@
                 type="button"
                 class="name"
                 aria-expanded={openSection === "caddy"}
-                onclick={() => toggle("caddy")}>Caddy users</button
+                onclick={() => toggle("caddy")}>Caddy services</button
               >
               <span class="item-actions"
                 ><span class="badge badge-secondary">Caddy</span></span
