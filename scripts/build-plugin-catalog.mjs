@@ -10,17 +10,21 @@ const code = `${source}\nmodule.exports = module.exports.createExternalAccessPlu
 const { LEGACY_BUILTIN_PLUGINS } = require("../build/plugin-ops.js");
 const def = LEGACY_BUILTIN_PLUGINS.find((p) => p.id === "external-access");
 if (!def) throw new Error("external-access definition missing");
+const mod = require("../build/plugins/external-access.js");
+const contributions = mod.EXTERNAL_ACCESS_CONTRIBUTIONS;
+if (!contributions) throw new Error("external-access contributions missing");
 const plugin = {
   id: def.id,
   name: def.name,
   api: 1,
-  version: "1.2.0",
+  version: "1.3.0",
   timeoutMs: def.timeoutMs ?? 20000,
   ...(def.secured ? { secured: true } : {}),
   ...(def.help ? { help: def.help } : {}),
   ...(def.usage ? { usage: def.usage } : {}),
   ...(def.settingsSchema ? { settingsSchema: def.settingsSchema } : {}),
   ...(def.settingsTabs ? { settingsTabs: def.settingsTabs } : {}),
+  contributions,
   code,
 };
 const file = `${JSON.stringify({ format: "ihome-plugin", version: 1, plugin }, null, 2)}\n`;

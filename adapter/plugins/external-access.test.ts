@@ -9,6 +9,7 @@ import {
   caddyServicesSnippet,
   caddySitesSnippet,
   caddySnippet,
+  EXTERNAL_ACCESS_CONTRIBUTIONS,
   createExternalAccessPlugins,
   parseServices,
   parseUsers,
@@ -642,6 +643,13 @@ it("refuses to add a service when services.json is gone but the snippet is live"
   const snippet = await readFile(join(dir, "caddy-services.conf"), "utf8");
   expect(snippet).toContain("handle /a");
   expect(snippet).not.toContain("handle /b");
+});
+
+it("offers the pairing tile and the sendTo snippet", () => {
+  expect(EXTERNAL_ACCESS_CONTRIBUTIONS.tiles?.[0]?.id).toBe("opencode-pair");
+  expect(EXTERNAL_ACCESS_CONTRIBUTIONS.snippets?.[0]?.code).toContain(
+    'sendTo("ihome.0", "plugin"',
+  );
 });
 
 it("applies settings without an adapter restart", () => {

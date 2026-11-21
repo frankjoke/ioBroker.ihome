@@ -3,10 +3,12 @@ import type { FormulaTemplate, FunctionTemplate } from "$lib/types/device";
 import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
 import { BUILTIN_TEMPLATES } from "$logic/templates";
+import catalog from "../../../static/plugins/external-access.json";
 import {
   contributionKey,
   readPluginContributions,
 } from "./plugin-contributions";
+import { visualTemplateProblem } from "./visual-templates";
 
 const tile = {
   id: "pair",
@@ -140,6 +142,27 @@ describe("readPluginContributions", () => {
       ],
     });
     expect(set.problems[0]).toContain("plugin.json is missing");
+  });
+
+  it("ships the OpenCode pairing tile and snippet in the catalog", () => {
+    const plugin = (catalog as { plugin: Record<string, any> }).plugin;
+    expect(plugin.version).toBe("1.3.0");
+    const contributions = plugin.contributions as {
+      tiles: any[];
+      snippets: any[];
+    };
+    expect(contributions.tiles).toHaveLength(1);
+    expect(contributions.snippets).toHaveLength(1);
+    const tile = contributions.tiles[0];
+    expect(visualTemplateProblem(tile, [], tile.id)).toBeNull();
+    const html = tile.slots[0].options.html as string;
+    expect(html).toContain("services.list");
+    expect(html).toContain("site.pair");
+    expect(html).toContain("execCommand");
+    expect(html).not.toContain("window.open");
+    expect(contributions.snippets[0].code).toContain(
+      'sendTo("ihome.0", "plugin"',
+    );
   });
 
   it("does not throw on a malformed reply", () => {

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import bcrypt from "bcryptjs";
 import type { PluginApi } from "../plugin-api";
 import type { PluginFactory } from "../plugin-host";
+import type { PluginContributions } from "../plugin-ops";
 
 export interface ExternalUser {
   user: string;
@@ -1205,6 +1206,150 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       throw new Error(`Unknown action: ${action || "(none)"}`);
   }
 }
+
+const OPENCODE_PAIR_HTML = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --text: #ddd; --muted: #999; --surface: #222; --border: #444; --primary: #4a9eff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 8px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; }
+  .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  select, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+  button.primary { background: var(--primary); color: #fff; border-color: var(--primary); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .link { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .link input { flex: 1; min-width: 0; font: 11px/1.3 ui-monospace, monospace; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 3px 5px; }
+  .note { color: var(--muted); font-size: 11px; margin: 4px 0 0; }
+  .error { color: #e55353; font-size: 12px; margin: 4px 0 0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <select id="site" aria-label="Caddy site"></select>
+    <button id="generate" class="primary" type="button">Generate</button>
+  </div>
+  <div id="out" class="hidden">
+    <div class="link"><input id="external" readonly /><button data-copy="external" type="button">Copy</button></div>
+    <div class="link hidden" id="lan-row"><input id="internal" readonly /><button data-copy="internal" type="button">Copy</button></div>
+    <p class="note">One-time link; expires in 5 minutes. Open it on the other device. LAN is plain HTTP.</p>
+  </div>
+  <p id="status" class="note">Loading sites…</p>
+<script>
+  (function () {
+    var $ = function (id) { return document.getElementById(id); };
+    function syncTheme() {
+      try {
+        var s = parent.getComputedStyle(parent.document.documentElement);
+        var root = document.documentElement.style;
+        root.setProperty("--text", s.getPropertyValue("--text-color") || "#ddd");
+        root.setProperty("--muted", s.getPropertyValue("--text-muted") || "#999");
+        root.setProperty("--surface", s.getPropertyValue("--surface-color") || "#222");
+        root.setProperty("--border", s.getPropertyValue("--border-color") || "#444");
+        root.setProperty("--primary", s.getPropertyValue("--primary-color") || "#4a9eff");
+      } catch (e) {}
+    }
+    syncTheme();
+    try {
+      new MutationObserver(syncTheme).observe(parent.document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    } catch (e) {}
+    function copy(text, button) {
+      function done() { var old = button.textContent; button.textContent = "Copied"; setTimeout(function () { button.textContent = old; }, 1200); }
+      function fallback() {
+        var input = button.previousElementSibling;
+        input.focus();
+        input.select();
+        try { if (document.execCommand("copy")) done(); } catch (e) {}
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+    document.querySelectorAll("[data-copy]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var input = $(button.getAttribute("data-copy"));
+        if (input && input.value) copy(input.value, button);
+      });
+    });
+    function show(text, error) {
+      $("status").textContent = text;
+      $("status").className = error ? "error" : "note";
+    }
+    $("generate").addEventListener("click", function () {
+      var id = $("site").value;
+      if (!id) { show("Choose a site first.", true); return; }
+      $("generate").disabled = true;
+      show("Generating…", false);
+      ihome.call("external-access", { action: "site.pair", id: id }).then(function (result) {
+        $("external").value = result.external;
+        $("lan-row").classList.toggle("hidden", !result.internal);
+        if (result.internal) $("internal").value = result.internal;
+        $("out").classList.remove("hidden");
+        var minutes = Math.max(1, Math.round((result.expiresIn || 300) / 60));
+        show("One-time link; expires in " + minutes + " minutes.", false);
+      }).catch(function (error) {
+        show(String(error && error.message ? error.message : error), true);
+        $("out").classList.add("hidden");
+      }).then(function () { $("generate").disabled = false; });
+    });
+    ihome.call("external-access", { action: "services.list" }).then(function (result) {
+      var sites = (result.services || []).filter(function (service) { return service.kind === "site"; });
+      var select = $("site");
+      select.innerHTML = "";
+      sites.forEach(function (service) {
+        var option = document.createElement("option");
+        option.value = service.id;
+        option.textContent = service.id + " :" + service.port;
+        select.appendChild(option);
+      });
+      if (sites.some(function (service) { return service.id === "site-8444"; })) select.value = "site-8444";
+      if (!sites.length) { show("No site services configured.", true); $("generate").disabled = true; return; }
+      show("", false);
+    }).catch(function (error) {
+      show(String(error && error.message ? error.message : error), true);
+    });
+  })();
+</script>
+</body>
+</html>`;
+
+export const EXTERNAL_ACCESS_CONTRIBUTIONS: PluginContributions = {
+  tiles: [
+    {
+      id: "opencode-pair",
+      name: "OpenCode pairing",
+      description: "Generate a one-time OpenCode pairing link for a Caddy site.",
+      help: `Generates a one-time OpenCode pairing link for one of the site services in Caddy services.
+
+**Before applying:** install and enable the Caddy services plugin, and configure the OpenCode site (for example \`site-8444\`). The plugin must stay installed and enabled for this tile to answer.
+
+The tile offers the external (HTTPS) link and, when OpenCode reports a LAN address, the local plain-HTTP link. Each link works once and expires after five minutes.`,
+      type: "Custom",
+      size: { w: 2, h: 2 },
+      features: [],
+      slots: [{ kind: "html", options: { html: OPENCODE_PAIR_HTML } }],
+    },
+  ],
+  snippets: [
+    {
+      id: "opencode-pair-link",
+      name: "Create an OpenCode pairing link",
+      description:
+        "Run from an ioBroker script; the reply carries the external and LAN links.",
+      language: "js",
+      code: `const reply = await sendTo("ihome.0", "plugin", {
+  id: "external-access",
+  payload: { action: "site.pair", id: "site-8444" },
+});
+if (!reply.ok) throw new Error(reply.error);
+const { external, internal } = reply.result;`,
+    },
+  ],
+};
 
 export function createExternalAccessPlugins(): Record<string, PluginFactory> {
   return {
