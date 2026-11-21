@@ -87,6 +87,30 @@ describe("createPluginHost", () => {
     expect(await host.call("demo", 1)).toEqual({ ok: true, result: 42 });
   });
 
+  it("keeps a content-only plugin active without a factory", async () => {
+    let apiCalls = 0;
+    const host = createPluginHost(
+      [plugin("tiles", undefined)],
+      (_plugin, _runtime) => {
+        apiCalls += 1;
+        return fakeApi();
+      },
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(apiCalls).toBe(0);
+    expect(host.has("tiles")).toBe(false);
+    expect(host.status("tiles")).toBe("running");
+
+    await host.setEnabled({ ...plugin("tiles", undefined), enabled: false });
+    expect(host.status("tiles")).toBe("disabled");
+
+    await host.setEnabled(plugin("tiles", undefined));
+    expect(host.status("tiles")).toBe("running");
+    expect(apiCalls).toBe(0);
+  });
+
   it("serializes two calls and runs start before the first call", async () => {
     const order: string[] = [];
     const gates = new Map<string, () => void>();

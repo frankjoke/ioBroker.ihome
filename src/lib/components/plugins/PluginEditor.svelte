@@ -220,13 +220,6 @@
   />
 
   {#if activeTab === "settings"}
-    {#if plugin.bundle}
-      <p class="hint text-muted">
-        Includes a device template ({plugin.bundle.device.controls.length}
-        controls). Enabling creates it, or asks before updating an existing one.
-      </p>
-    {/if}
-
     {#if plugin.restartRequired}
       <p class="restart hint">
         Restart iHome in Admin to apply this change.

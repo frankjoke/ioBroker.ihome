@@ -7,6 +7,7 @@ import {
 } from "./plugin-ops";
 import {
   applyPluginPatches,
+  contributionsReply,
   parsePluginsCommand,
   pluginView,
 } from "./plugin-admin";
@@ -184,19 +185,39 @@ describe("pluginView", () => {
     ).toBeUndefined();
   });
 
-  it("exposes a bundled device template", () => {
-    const bundle = {
-      version: 1 as const,
-      device: {
-        controls: [{ state: "charge", feature: "value" }],
-      },
+  it("exposes contribution counts and warnings, not the retired bundle", () => {
+    const contributions = {
+      tiles: [
+        { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+      ],
     };
-    const view = pluginView(userPlugin("u", true, "abcd", { bundle }), {
-      status: "running",
-      hotSettings: false,
-      restartRequired: false,
-    });
-    expect(view.bundle).toEqual(bundle);
+    const view = pluginView(
+      userPlugin("u", true, "abcd", {
+        contributions,
+        warnings: ["bundle retired"],
+      }),
+      {
+        status: "running",
+        hotSettings: false,
+        restartRequired: false,
+      },
+    );
+    expect(view.contributions).toEqual({ counts: { tiles: 1 }, total: 1 });
+    expect(view.warnings).toEqual(["bundle retired"]);
+    expect(view).not.toHaveProperty("bundle");
+  });
+
+  it("reports a content-only plugin as having no code", () => {
+    const view = pluginView(
+      userPlugin("u", true, "", {
+        contributions: {
+          snippets: [{ id: "s", name: "S", code: "sendTo()" }],
+        },
+      }),
+      { status: "running", hotSettings: false, restartRequired: false },
+    );
+    expect(view.hasCode).toBe(false);
+    expect(view.codeLength).toBe(0);
   });
 
   it("carries the secured flag", () => {
@@ -206,6 +227,33 @@ describe("pluginView", () => {
       restartRequired: false,
     });
     expect(view.secured).toBe(true);
+  });
+});
+
+describe("contributionsReply", () => {
+  it("returns every installed plugin with its envelope and problem", () => {
+    const contributions = {
+      tiles: [
+        { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+      ],
+    };
+    const reply = contributionsReply(
+      [
+        userPlugin("a", true, "", { contributions }),
+        userPlugin("b", false, "x"),
+      ],
+      new Map([["a", "broken tile"]]),
+    );
+    expect(reply.plugins).toEqual([
+      {
+        id: "a",
+        name: "a",
+        enabled: true,
+        contributions,
+        problem: "broken tile",
+      },
+      { id: "b", name: "b", enabled: false, contributions: {} },
+    ]);
   });
 });
 

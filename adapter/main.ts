@@ -26,6 +26,7 @@ import { validNetworkDevices } from "./logic/network-ops";
 import { createPluginApi } from "./plugin-api";
 import {
   applyPluginPatches,
+  contributionsReply,
   parsePluginsCommand,
   pluginView as makePluginView,
   type PluginView,
@@ -1366,8 +1367,10 @@ class IHome extends utils.Adapter {
             ...(imported.settingsTabs
               ? { settingsTabs: imported.settingsTabs }
               : {}),
-            ...(imported.bundle ? { bundle: imported.bundle } : {}),
-            code: imported.code,
+            ...(imported.contributions
+              ? { contributions: imported.contributions }
+              : {}),
+            ...(imported.code ? { code: imported.code } : {}),
           },
           {
             status: "restart-required",
@@ -1412,6 +1415,12 @@ class IHome extends utils.Adapter {
       return pluginReply({ plugins: this.pluginViews() });
     }
 
+    if (command.action === "contributions") {
+      return pluginReply(
+        contributionsReply(this.pluginConfig, this.pluginProblems),
+      );
+    }
+
     if (command.action === "save") {
       const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
       const stagedIds = new Set(
@@ -1446,7 +1455,10 @@ class IHome extends utils.Adapter {
             ? { settingsSchema: entry.settingsSchema }
             : {}),
           ...(entry.settingsTabs ? { settingsTabs: entry.settingsTabs } : {}),
-          code: entry.code,
+          ...(entry.contributions
+            ? { contributions: entry.contributions }
+            : {}),
+          ...(entry.code ? { code: entry.code } : {}),
         }));
         const patched = applyPluginPatches(temporary, stagedPatches, [
           ...BUILTIN_PLUGINS,
@@ -1468,7 +1480,10 @@ class IHome extends utils.Adapter {
             ? { settingsSchema: entry.settingsSchema }
             : {}),
           ...(entry.settingsTabs ? { settingsTabs: entry.settingsTabs } : {}),
-          code: entry.code ?? "",
+          ...(entry.contributions
+            ? { contributions: entry.contributions }
+            : {}),
+          ...(entry.code?.trim() ? { code: entry.code } : {}),
         }));
       }
 
@@ -1596,8 +1611,10 @@ class IHome extends utils.Adapter {
             ? { settingsSchema: plugin.settingsSchema }
             : {}),
           ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
-          ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
-          code: plugin.code ?? "",
+          ...(plugin.contributions
+            ? { contributions: plugin.contributions }
+            : {}),
+          ...(plugin.code?.trim() ? { code: plugin.code } : {}),
         }),
       );
     }

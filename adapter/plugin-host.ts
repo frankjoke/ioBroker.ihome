@@ -112,6 +112,7 @@ export function createPluginHost(
   const records = new Map<string, Loaded>();
   const failed = new Set<string>();
   const disabled = new Set<string>();
+  const contentOnly = new Set<string>();
   const settingsRestart = new Set<string>();
   const snapshot = new Map<string, string | undefined>(
     plugins.map((plugin) => [plugin.id, plugin.code]),
@@ -160,7 +161,7 @@ export function createPluginHost(
     },
 
     status(id) {
-      if (records.has(id)) return "running";
+      if (records.has(id) || contentOnly.has(id)) return "running";
       if (failed.has(id)) return "failed";
       return "disabled";
     },
@@ -219,6 +220,7 @@ export function createPluginHost(
           records.delete(id);
         }
         failed.delete(id);
+        contentOnly.delete(id);
         disabled.add(id);
         settingsRestart.delete(id);
         return pluginReply(undefined);
@@ -227,6 +229,14 @@ export function createPluginHost(
       if (!snapshot.has(id) || snapshot.get(id) !== entry.code) {
         return pluginError(`plugin ${id} needs an adapter restart`);
       }
+      if (!entry.builtin && !entry.code?.trim()) {
+        contentOnly.add(id);
+        failed.delete(id);
+        disabled.delete(id);
+        settingsRestart.delete(id);
+        return pluginReply(undefined);
+      }
+      contentOnly.delete(id);
       try {
         const loaded = await startPlugin({
           ...entry,
@@ -257,10 +267,16 @@ export function createPluginHost(
         records.delete(id);
       }
       failed.delete(id);
+      contentOnly.delete(id);
       settingsRestart.delete(id);
       snapshot.set(id, entry.code);
       if (!entry.enabled) {
         disabled.add(id);
+        return pluginReply(undefined);
+      }
+      if (!entry.builtin && !entry.code?.trim()) {
+        contentOnly.add(id);
+        disabled.delete(id);
         return pluginReply(undefined);
       }
       try {
@@ -279,10 +295,15 @@ export function createPluginHost(
       records.clear();
       failed.clear();
       disabled.clear();
+      contentOnly.clear();
       settingsRestart.clear();
       for (const plugin of plugins) {
         if (!plugin.enabled) {
           disabled.add(plugin.id);
+          continue;
+        }
+        if (!plugin.builtin && !plugin.code?.trim()) {
+          contentOnly.add(plugin.id);
           continue;
         }
         try {
@@ -335,6 +356,7 @@ export function createPluginHost(
       records.clear();
       failed.clear();
       disabled.clear();
+      contentOnly.clear();
       settingsRestart.clear();
     },
   };

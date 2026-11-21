@@ -5,11 +5,13 @@ import {
   MAX_PLUGIN_TIMEOUT_MS,
   MAX_PLUGIN_USAGE,
   MIN_PLUGIN_TIMEOUT_MS,
+  contributionSummary,
   pluginSettings,
   settingsProblem,
   validPluginId,
   type AdapterPlugin,
-  type PluginBundle,
+  type ContributionSummary,
+  type PluginContributions,
   type PluginSettingDef,
   type SettingsTabDef,
 } from "./plugin-ops";
@@ -47,8 +49,10 @@ export interface PluginView {
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
   settingsTabs?: SettingsTabDef[];
-  /** Declarative device the UI creates when the plugin is enabled. */
-  bundle?: PluginBundle;
+  /** Counts of the templates and snippets the plugin offers. */
+  contributions?: ContributionSummary;
+  /** Non-fatal manifest notes, e.g. a retired bundle field. */
+  warnings?: string[];
   status: PluginViewStatus;
   hotSettings: boolean;
   hasCode: boolean;
@@ -64,6 +68,7 @@ export interface PluginView {
 
 export type PluginsCommand =
   | { action: "list" }
+  | { action: "contributions" }
   | { action: "save"; patches: PluginPatch[] }
   | { action: "import"; plugin: ImportedPlugin }
   | { action: "export"; id: string }
@@ -223,15 +228,45 @@ export function pluginView(
     ...(plugin.settings ? { settings: { ...plugin.settings } } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
-    ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+    ...(plugin.contributions
+      ? { contributions: contributionSummary(plugin.contributions) }
+      : {}),
+    ...(plugin.warnings ? { warnings: plugin.warnings } : {}),
     ...(opts.problem ? { problem: opts.problem } : {}),
     status: opts.status,
     hotSettings: opts.hotSettings,
-    hasCode: typeof plugin.code === "string",
+    hasCode: !!plugin.code?.trim(),
     codeLength: plugin.code?.length ?? 0,
     restartRequired: opts.restartRequired,
     staged: opts.staged === true,
     removalPending: opts.removalPending === true,
+  };
+}
+
+/** The full contribution bodies for the SPA; the plugin list keeps counts. */
+export function contributionsReply(
+  plugins: AdapterPlugin[],
+  problems: Map<string, string>,
+): {
+  plugins: Array<{
+    id: string;
+    name: string;
+    enabled: boolean;
+    contributions: PluginContributions;
+    problem?: string;
+  }>;
+} {
+  return {
+    plugins: plugins.map((plugin) => {
+      const problem = problems.get(plugin.id);
+      return {
+        id: plugin.id,
+        name: plugin.name,
+        enabled: plugin.enabled,
+        contributions: plugin.contributions ?? {},
+        ...(problem ? { problem } : {}),
+      };
+    }),
   };
 }
 
@@ -278,6 +313,9 @@ export function parsePluginsCommand(
   if (!record(value)) return { problem: "invalid plugins command" };
   const action = value.action;
   if (action === "list") return { command: { action: "list" } };
+  if (action === "contributions") {
+    return { command: { action: "contributions" } };
+  }
   if (action === "save") {
     if (!Array.isArray(value.patches)) {
       return { problem: "save needs a patches array" };
