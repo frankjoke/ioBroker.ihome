@@ -1,0 +1,60 @@
+{
+  "format": "ihome-plugin",
+  "version": 1,
+  "plugin": {
+    "id": "demo.contributions",
+    "name": "Contribution demo",
+    "api": 1,
+    "version": "1.0.0",
+    "help": "A content-only plugin: no index.js, only contributions. Enable it on the Plugins page, then use its tile in Templates → Plugins, its function/formula in a code field and its snippet on this page.",
+    "usage": "This plugin exists to test the contribution model. It creates no states and runs no adapter code.",
+    "contributions": {
+      "tiles": [
+        {
+          "id": "hello",
+          "name": "Plugin hello",
+          "description": "A small HTML tile from a content-only plugin.",
+          "help": "Apply this tile after enabling the plugin. It needs no state.",
+          "type": "Custom",
+          "bindings": "none",
+          "size": { "w": 4, "h": 2 },
+          "features": [],
+          "slots": [
+            {
+              "kind": "html",
+              "options": {
+                "html": "<!doctype html><html><head><meta charset=\"utf-8\"><style>body{margin:0;padding:10px;font:14px/1.4 system-ui,sans-serif;color:#ddd;background:transparent}.t{font-weight:600;margin-bottom:4px}</style></head><body><div class=\"t\">Contribution demo</div><div>This tile came from a content-only plugin: no index.js, just manifest content.</div></body></html>"
+              }
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "id": "double",
+          "name": "Double",
+          "expr": "$.value * 2",
+          "notes": "Doubles the value from a plugin-provided formula."
+        }
+      ],
+      "functions": [
+        {
+          "id": "double-function",
+          "name": "Double the value",
+          "description": "A plugin-provided code-field expression.",
+          "mode": "expression",
+          "code": "value * 2"
+        }
+      ],
+      "snippets": [
+        {
+          "id": "hello",
+          "name": "Contribution demo",
+          "description": "Copyable example from a content-only plugin.",
+          "language": "js",
+          "code": "// This plugin works from contributions alone:\n// a tile, a formula, a function and this snippet."
+        }
+      ]
+    }
+  }
+}
