@@ -1,6 +1,7 @@
 import type { DeviceTemplate, LogicTemplate } from "$logic/types";
 import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
+import type { PluginRef, Sourced } from "./plugin-contributions";
 
 export type TemplatePart = "device" | "logic" | "api";
 
@@ -21,6 +22,10 @@ export interface TemplateEntry {
   roles?: string[];
   /** Hidden outside the local network; absent = not secured. */
   secured?: boolean;
+  /** Plugin-owned entries: selection identity, provenance and read-only. */
+  key?: string;
+  plugin?: PluginRef;
+  readonly?: boolean;
 }
 
 function entry(
@@ -59,6 +64,37 @@ export function bundleParts(bundle: TemplateBundle): TemplatePart[] {
   return parts;
 }
 
+function sourcedEntry<T>(
+  kind: TemplateEntry["kind"],
+  source: Sourced<T>,
+  parts: TemplatePart[],
+  type?: string,
+): TemplateEntry {
+  const value = source.value as {
+    id: string;
+    name: string;
+    description?: string;
+    help?: string;
+    secured?: boolean;
+  };
+  return {
+    ...entry(
+      kind,
+      value.id,
+      value.name,
+      value.description ?? "",
+      value.help ?? "",
+      parts,
+      false,
+      type,
+      value.secured === true,
+    ),
+    key: source.key,
+    plugin: source.plugin,
+    readonly: true,
+  };
+}
+
 export function templateEntries(input: {
   presets: Template[];
   visual: Template[];
@@ -68,6 +104,9 @@ export function templateEntries(input: {
   apiUser: DeviceTemplate[];
   bundleBuiltins: TemplateBundle[];
   bundleUser: TemplateBundle[];
+  pluginTiles?: Sourced<Template>[];
+  pluginBundles?: Sourced<TemplateBundle>[];
+  pluginLogic?: Sourced<LogicTemplate>[];
 }): TemplateEntry[] {
   return [
     ...input.presets.map((template) =>
@@ -169,6 +208,20 @@ export function templateEntries(input: {
         false,
         bundle.device?.type,
         bundle.secured === true,
+      ),
+    ),
+    ...(input.pluginTiles ?? []).map((source) =>
+      sourcedEntry("device", source, ["device"], source.value.type),
+    ),
+    ...(input.pluginLogic ?? []).map((source) =>
+      sourcedEntry("logic", source, ["logic"]),
+    ),
+    ...(input.pluginBundles ?? []).map((source) =>
+      sourcedEntry(
+        "bundle",
+        source,
+        bundleParts(source.value),
+        source.value.device?.type,
       ),
     ),
   ];

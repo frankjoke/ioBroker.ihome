@@ -43,6 +43,48 @@ const bundle = {
 } as unknown as TemplateBundle;
 
 describe("templateEntries", () => {
+  it("sources plugin tiles, logic and bundles as read-only entries", () => {
+    const plugin = { id: "ext", name: "Ext", enabled: true };
+    const entries = templateEntries({
+      presets: [],
+      visual: [],
+      logicBuiltins: [],
+      logicUser: [],
+      apiBuiltins: [],
+      apiUser: [],
+      bundleBuiltins: [],
+      bundleUser: [],
+      pluginTiles: [
+        { key: "plugin:ext:tiles:d", plugin, value: device },
+      ],
+      pluginLogic: [
+        { key: "plugin:ext:logic:l", plugin, value: logic },
+      ],
+      pluginBundles: [
+        { key: "plugin:ext:bundles:b", plugin, value: bundle },
+      ],
+    });
+    expect(entries.map((entry) => entry.kind)).toEqual([
+      "device",
+      "logic",
+      "bundle",
+    ]);
+    expect(entries[0]).toMatchObject({
+      id: "d",
+      name: "Lamp",
+      key: "plugin:ext:tiles:d",
+      plugin,
+      readonly: true,
+    });
+    expect(entries[1].key).toBe("plugin:ext:logic:l");
+    expect(entries[2]).toMatchObject({
+      key: "plugin:ext:bundles:b",
+      parts: ["device", "logic"],
+      type: "Custom",
+      readonly: true,
+    });
+  });
+
   it("aggregates the four kinds with part badges", () => {
     const entries = templateEntries({
       presets: [],

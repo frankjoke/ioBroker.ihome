@@ -1,4 +1,5 @@
 import type { FormulaTemplate, FunctionTemplate } from "$lib/types/device";
+import type { PluginRef, Sourced } from "./plugin-contributions";
 
 export interface CodeEntry {
   kind: "formula" | "function";
@@ -9,6 +10,8 @@ export interface CodeEntry {
   preview: string;
   builtin: boolean;
   search: string;
+  key?: string;
+  plugin?: PluginRef;
 }
 
 function entry(
@@ -30,10 +33,34 @@ function entry(
   };
 }
 
+function sourcedEntry<T extends { id: string; name: string }>(
+  kind: CodeEntry["kind"],
+  source: Sourced<T>,
+  description: string,
+  preview: string,
+): CodeEntry {
+  const base = entry(
+    kind,
+    source.value.id,
+    source.value.name,
+    description,
+    preview,
+    false,
+  );
+  return {
+    ...base,
+    search: `${base.search} ${source.plugin.name.toLowerCase()}`,
+    key: source.key,
+    plugin: source.plugin,
+  };
+}
+
 export function codeEntries(
   formulas: FormulaTemplate[],
   userFunctions: FunctionTemplate[],
   builtinFunctions: FunctionTemplate[],
+  pluginFormulas: Sourced<FormulaTemplate>[] = [],
+  pluginFunctions: Sourced<FunctionTemplate>[] = [],
 ): CodeEntry[] {
   return [
     ...formulas.map((template) =>
@@ -64,6 +91,22 @@ export function codeEntries(
         template.description ?? "",
         template.code,
         true,
+      ),
+    ),
+    ...pluginFormulas.map((source) =>
+      sourcedEntry(
+        "formula",
+        source,
+        source.value.notes ?? "",
+        source.value.expr,
+      ),
+    ),
+    ...pluginFunctions.map((source) =>
+      sourcedEntry(
+        "function",
+        source,
+        source.value.description ?? "",
+        source.value.code,
       ),
     ),
   ];
