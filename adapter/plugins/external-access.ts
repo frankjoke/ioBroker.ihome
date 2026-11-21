@@ -34,6 +34,8 @@ const MIN_PASSWORD = 8;
 const HASH_COST = 10;
 const USERS_FILE = "users.json";
 const SNIPPET_FILE = "caddy-users.conf";
+const SERVICES_FILE = "services.json";
+const SERVICES_SNIPPET_FILE = "caddy-services.conf";
 const SERVICE_ID = /^[A-Za-z0-9._-]{1,32}$/;
 const SERVICE_PATH = /^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/;
 const MAX_SERVICE_PATH = 64;
@@ -379,9 +381,9 @@ async function atomicWrite(path: string, content: string): Promise<void> {
   }
 }
 
-async function usersFileExists(dir: string): Promise<boolean> {
+async function fileExists(path: string): Promise<boolean> {
   try {
-    await readFile(join(dir, USERS_FILE), "utf8");
+    await readFile(path, "utf8");
     return true;
   } catch {
     return false;
@@ -411,7 +413,71 @@ async function writeUsers(dir: string, users: ExternalUser[]): Promise<void> {
   await atomicWrite(join(dir, USERS_FILE), serializeUsers(users));
 }
 
-interface RunResult {
+/** Read services; a missing file is an empty list, a broken file is an error. */
+async function readServices(dir: string): Promise<ExternalService[]> {
+  let raw: string;
+  try {
+    raw = await readFile(join(dir, SERVICES_FILE), "utf8");
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") return [];
+    throw error;
+  }
+  const parsed = parseServices(raw);
+  if (!parsed) {
+    throw new Error(
+      `${SERVICES_FILE} is unreadable — fix or remove it before editing the list.`,
+    );
+  }
+  return parsed.services;
+}
+
+async function writeServices(
+  dir: string,
+  services: ExternalService[],
+): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  await atomicWrite(join(dir, SERVICES_FILE), serializeServices(services));
+}
+
+interface SnippetWrite {
+  path: string;
+  blocks: number;
+  changed: boolean;
+}
+
+async function writeServicesSnippet(
+  dir: string,
+  services: ExternalService[],
+): Promise<SnippetWrite> {
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, SERVICES_SNIPPET_FILE);
+  const content = caddyServicesSnippet(services, join(dir, SNIPPET_FILE));
+  let previous = "";
+  try {
+    previous = await readFile(path, "utf8");
+  } catch {
+    previous = "";
+  }
+  if (previous !== content) await atomicWrite(path, content);
+  return {
+    path,
+    blocks: services.filter((service) => service.enabled).length,
+    changed: previous !== content,
+  };
+}
+
+/** Run validate first; a failed check never reaches reload. */
+export async function validateThenReload(
+  run: (command: string) => Promise<RunResult>,
+  validate: string,
+  reload: string,
+): Promise<RunResult> {
+  const check = await run(validate);
+  if (!check.ok) return check;
+  return run(reload);
+}
+
+export interface RunResult {
   ok: boolean;
   command: string;
   code: number | string;
@@ -451,10 +517,18 @@ async function status(api: PluginApi): Promise<unknown> {
           "Set the data folder in the plugin settings (Advanced → Plugins → External access).",
       },
       snippet: { path: "", exists: false, current: false, users: 0 },
+      services: {
+        count: 0,
+        enabled: 0,
+        problem:
+          "Set the data folder in the plugin settings (Advanced → Plugins → External access).",
+      },
+      servicesSnippet: { path: "", exists: false, current: false, blocks: 0 },
       caddy: {
         config: caddyConfig(api),
         validateCommand: validateCommand(api),
         reloadCommand: reloadCommand(api),
+        importsSnippet: null,
       },
       publicUrl: {},
     };
@@ -484,6 +558,36 @@ async function status(api: PluginApi): Promise<unknown> {
     snippetText = null;
   }
   const expected = caddySnippet(users);
+
+  let services: ExternalService[] = [];
+  let servicesProblem: string | undefined;
+  let servicesReadable = true;
+  try {
+    services = await readServices(dir);
+  } catch (error) {
+    servicesReadable = false;
+    servicesProblem = error instanceof Error ? error.message : String(error);
+  }
+  let servicesSnippetText: string | null = null;
+  try {
+    servicesSnippetText = await readFile(
+      join(dir, SERVICES_SNIPPET_FILE),
+      "utf8",
+    );
+  } catch {
+    servicesSnippetText = null;
+  }
+  const servicesExpected = servicesReadable
+    ? caddyServicesSnippet(services, join(dir, SNIPPET_FILE))
+    : null;
+  let importsSnippet: boolean | null = null;
+  try {
+    importsSnippet = (await readFile(caddyConfig(api), "utf8")).includes(
+      join(dir, SERVICES_SNIPPET_FILE),
+    );
+  } catch {
+    importsSnippet = null;
+  }
 
   const url = text(api.settings.publicUrl);
   let publicUrl: Record<string, unknown> = { url };
@@ -525,13 +629,46 @@ async function status(api: PluginApi): Promise<unknown> {
       current: snippetText === expected,
       users: expected ? expected.trimEnd().split("\n").length : 0,
     },
+    services: {
+      count: services.length,
+      enabled: services.filter((service) => service.enabled).length,
+      ...(servicesProblem ? { problem: servicesProblem } : {}),
+    },
+    servicesSnippet: {
+      path: join(dir, SERVICES_SNIPPET_FILE),
+      exists: servicesSnippetText !== null,
+      current:
+        servicesExpected !== null && servicesSnippetText === servicesExpected,
+      blocks: services.filter((service) => service.enabled).length,
+    },
     caddy: {
       config: caddyConfig(api),
       validateCommand: validateCommand(api),
       reloadCommand: reloadCommand(api),
+      importsSnippet,
     },
     publicUrl,
   };
+}
+
+function conflictProblem(
+  services: ExternalService[],
+  service: ExternalService,
+  ignoreId?: string,
+): string | null {
+  for (const other of services) {
+    if (other.id === ignoreId) continue;
+    if (other.id === service.id) {
+      return `A service with the id ${service.id} already exists.`;
+    }
+    if (other.path === service.path) {
+      return `The path ${service.path} is already used.`;
+    }
+    if (pathsConflict(other.path, service.path)) {
+      return `The path ${service.path} overlaps the service ${other.path}.`;
+    }
+  }
+  return null;
 }
 
 async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
@@ -592,8 +729,65 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       await writeUsers(dir, next);
       return { users: publicUsers(next) };
     }
+    case "services.list": {
+      const services = await readServices(dir);
+      return { services };
+    }
+    case "services.add": {
+      const read = readService(request.service);
+      if ("problem" in read) throw new Error(read.problem);
+      const services = await readServices(dir);
+      const conflict = conflictProblem(services, read.service);
+      if (conflict) throw new Error(conflict);
+      const next = [...services, read.service];
+      await writeServices(dir, next);
+      return { services: next, snippet: await writeServicesSnippet(dir, next) };
+    }
+    case "services.update": {
+      const read = readService(request.service);
+      if ("problem" in read) throw new Error(read.problem);
+      const services = await readServices(dir);
+      const index = services.findIndex((entry) => entry.id === read.service.id);
+      if (index < 0) throw new Error(`Unknown service: ${read.service.id}`);
+      const conflict = conflictProblem(services, read.service, read.service.id);
+      if (conflict) throw new Error(conflict);
+      const next = services.map((entry, at) =>
+        at === index ? read.service : entry,
+      );
+      await writeServices(dir, next);
+      return { services: next, snippet: await writeServicesSnippet(dir, next) };
+    }
+    case "services.remove": {
+      const id = text(request.id);
+      const services = await readServices(dir);
+      if (!services.some((entry) => entry.id === id)) {
+        throw new Error(`Unknown service: ${id || "(none)"}`);
+      }
+      const next = services.filter((entry) => entry.id !== id);
+      await writeServices(dir, next);
+      return { services: next, snippet: await writeServicesSnippet(dir, next) };
+    }
+    case "services.write": {
+      const exists = await fileExists(join(dir, SERVICES_FILE));
+      const services = exists ? await readServices(dir) : [];
+      let previous = "";
+      try {
+        previous = await readFile(join(dir, SERVICES_SNIPPET_FILE), "utf8");
+      } catch {
+        previous = "";
+      }
+      const live = previous
+        .split("\n")
+        .some((line) => line.trim() && !line.startsWith("#"));
+      if (!exists && live) {
+        throw new Error(
+          `${SERVICES_FILE} is missing — refusing to empty the live Caddy services snippet.`,
+        );
+      }
+      return writeServicesSnippet(dir, services);
+    }
     case "snippet.write": {
-      const exists = await usersFileExists(dir);
+      const exists = await fileExists(join(dir, USERS_FILE));
       const users = exists ? await readUsers(dir) : [];
       const content = caddySnippet(users);
       const path = join(dir, SNIPPET_FILE);
@@ -618,21 +812,48 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
     case "caddy.validate":
       return run(validateCommand(api), dir);
     case "caddy.reload": {
-      const expected = caddySnippet(await readUsers(dir));
-      let current = "";
+      const expectedUsers = caddySnippet(await readUsers(dir));
+      let currentUsers = "";
       try {
-        current = await readFile(join(dir, SNIPPET_FILE), "utf8");
+        currentUsers = await readFile(join(dir, SNIPPET_FILE), "utf8");
       } catch {
-        current = "";
+        currentUsers = "";
       }
-      if (!current)
-        throw new Error("Write the snippet before reloading Caddy.");
-      if (current !== expected) {
+      if (!currentUsers)
+        throw new Error("Write the users snippet before reloading Caddy.");
+      if (currentUsers !== expectedUsers) {
         throw new Error(
-          "The snippet is stale — press Write snippet before reloading Caddy.",
+          "The users snippet is stale — press Write users snippet before reloading Caddy.",
         );
       }
-      return run(reloadCommand(api), dir);
+      if (await fileExists(join(dir, SERVICES_FILE))) {
+        const expectedServices = caddyServicesSnippet(
+          await readServices(dir),
+          join(dir, SNIPPET_FILE),
+        );
+        let currentServices = "";
+        try {
+          currentServices = await readFile(
+            join(dir, SERVICES_SNIPPET_FILE),
+            "utf8",
+          );
+        } catch {
+          currentServices = "";
+        }
+        if (!currentServices) {
+          throw new Error("Write the services snippet before reloading Caddy.");
+        }
+        if (currentServices !== expectedServices) {
+          throw new Error(
+            "The services snippet is stale — press Write services snippet before reloading Caddy.",
+          );
+        }
+      }
+      return validateThenReload(
+        (command) => run(command, dir),
+        validateCommand(api),
+        reloadCommand(api),
+      );
     }
     case "status":
       return status(api);
