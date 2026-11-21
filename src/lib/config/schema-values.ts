@@ -8,6 +8,25 @@ import type {
   SettingsObjectSchema,
 } from "$adapter/settings-schema";
 
+export interface ArrayRowAction {
+  icon: string;
+  label: string;
+  title?: string;
+  disabled?: boolean;
+  onclick: () => void;
+}
+
+export interface ArrayHooks {
+  /** Host owns persistence; rows save/delete through these hooks. */
+  managed?: boolean;
+  createRow?: () => Record<string, unknown> | null;
+  saveRow?: (row: Record<string, unknown>) => Promise<void>;
+  removeRow?: (row: Record<string, unknown>) => Promise<void> | void;
+  rowActions?: (row: Record<string, unknown>) => ArrayRowAction[];
+  rowNote?: (row: Record<string, unknown>) => string;
+  validateItem?: (row: Record<string, unknown>) => string | null;
+}
+
 function parseLegacy(value: unknown): unknown {
   if (typeof value !== "string") return value;
   try {
