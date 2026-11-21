@@ -273,7 +273,9 @@
     if (!cogMenuOpen && !pageMenuOpen) return;
     const target = e.target as Element | null;
     if (
-      target?.closest(".cog-menu, .pages-menu, .menu-panel, .menu-backdrop")
+      target?.closest(
+        ".cog-menu, .pages-menu, .menu-panel, .menu-backdrop, .config-menu",
+      )
     ) {
       return;
     }
