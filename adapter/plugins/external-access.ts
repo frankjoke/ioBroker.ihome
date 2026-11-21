@@ -34,6 +34,31 @@ const MIN_PASSWORD = 8;
 const HASH_COST = 10;
 const USERS_FILE = "users.json";
 const SNIPPET_FILE = "caddy-users.conf";
+const SERVICE_ID = /^[A-Za-z0-9._-]{1,32}$/;
+const SERVICE_PATH = /^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/;
+const MAX_SERVICE_PATH = 64;
+
+export type ServiceKind = "webhook" | "proxy";
+
+export interface ExternalService {
+  id: string;
+  kind: ServiceKind;
+  /** Base path: no trailing slash, no wildcard. */
+  path: string;
+  /** http.in endpoint path (webhook only), normalized with a leading slash. */
+  endpoint?: string;
+  /** host:port on loopback or a private address. */
+  upstream: string;
+  /** Proxy only: strip the service path before proxying. */
+  stripPrefix?: boolean;
+  auth: "token" | "basic";
+  enabled: boolean;
+}
+
+export interface ServicesFile {
+  version: 1;
+  services: ExternalService[];
+}
 
 export function validateUsername(value: unknown): value is string {
   return typeof value === "string" && USER_NAME.test(value);
@@ -90,6 +115,169 @@ function publicUsers(users: ExternalUser[]): PublicUser[] {
     ...(user.note ? { note: user.note } : {}),
     enabled: user.enabled,
   }));
+}
+
+export function validateServiceId(value: unknown): value is string {
+  return typeof value === "string" && SERVICE_ID.test(value);
+}
+
+export function validateServicePath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > MAX_SERVICE_PATH)
+    return false;
+  if (!SERVICE_PATH.test(value)) return false;
+  return !value.split("/").some((part) => part === "." || part === "..");
+}
+
+function privateIpv4(host: string): boolean {
+  const parts = host.split(".");
+  if (parts.length !== 4) return false;
+  const octets: number[] = [];
+  for (const part of parts) {
+    if (!/^(?:0|[1-9]\d{0,2})$/.test(part)) return false;
+    const value = Number(part);
+    if (value > 255) return false;
+    octets.push(value);
+  }
+  return (
+    octets[0] === 10 ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168)
+  );
+}
+
+export function validateServiceUpstream(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const at = value.lastIndexOf(":");
+  if (at <= 0) return false;
+  const host = value.slice(0, at);
+  const portText = value.slice(at + 1);
+  if (!/^\d{1,5}$/.test(portText)) return false;
+  const port = Number(portText);
+  if (port < 1 || port > 65_535) return false;
+  if (host === "localhost" || host === "[::1]" || host === "127.0.0.1") {
+    return true;
+  }
+  return privateIpv4(host);
+}
+
+export function pathsConflict(a: string, b: string): boolean {
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+}
+
+/** Validates one service; returns the normalized row or the first problem. */
+export function readService(
+  value: unknown,
+): { service: ExternalService } | { problem: string } {
+  if (!value || typeof value !== "object") {
+    return { problem: "A service must be an object." };
+  }
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id.trim() : "";
+  if (!validateServiceId(id)) {
+    return {
+      problem: "The service id is not valid (letters, digits, . _ -, max 32).",
+    };
+  }
+  const kind = record.kind;
+  if (kind !== "webhook" && kind !== "proxy") {
+    return { problem: `Unknown service kind: ${String(kind)}` };
+  }
+  const path = typeof record.path === "string" ? record.path.trim() : "";
+  if (!validateServicePath(path)) {
+    return {
+      problem:
+        "The service path must start with / and have no spaces, *, .. or trailing slash.",
+    };
+  }
+  const upstream =
+    typeof record.upstream === "string" ? record.upstream.trim() : "";
+  if (!validateServiceUpstream(upstream)) {
+    return {
+      problem:
+        "The upstream must be host:port on 127.0.0.1, localhost, [::1] or a private IPv4 address.",
+    };
+  }
+  const enabled = record.enabled !== false;
+  if (kind === "webhook") {
+    const text =
+      typeof record.endpoint === "string" ? record.endpoint.trim() : "";
+    const endpoint = text && !text.startsWith("/") ? `/${text}` : text;
+    if (!validateServicePath(endpoint)) {
+      return { problem: "A webhook needs an http.in endpoint path." };
+    }
+    if (record.auth !== "token") {
+      return { problem: "A webhook must use auth token." };
+    }
+    if (record.stripPrefix === true) {
+      return { problem: "A webhook cannot strip a prefix." };
+    }
+    return {
+      service: { id, kind, path, endpoint, upstream, auth: "token", enabled },
+    };
+  }
+  const endpoint =
+    typeof record.endpoint === "string" ? record.endpoint.trim() : "";
+  if (endpoint) {
+    return { problem: "A proxy must not have an endpoint." };
+  }
+  if (record.auth !== "basic") {
+    return { problem: "A proxy must use auth basic." };
+  }
+  if (
+    record.stripPrefix !== undefined &&
+    typeof record.stripPrefix !== "boolean"
+  ) {
+    return { problem: "stripPrefix must be true or false." };
+  }
+  return {
+    service: {
+      id,
+      kind,
+      path,
+      upstream,
+      ...(record.stripPrefix === true ? { stripPrefix: true } : {}),
+      auth: "basic",
+      enabled,
+    },
+  };
+}
+
+export function serviceProblem(value: unknown): string | null {
+  const read = readService(value);
+  return "problem" in read ? read.problem : null;
+}
+
+/** Null for anything that is not a valid v1 services document. */
+export function parseServices(text: string): ServicesFile | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (record.version !== 1 || !Array.isArray(record.services)) return null;
+  const services: ExternalService[] = [];
+  for (const entry of record.services) {
+    const read = readService(entry);
+    if ("problem" in read) return null;
+    const row = read.service;
+    if (
+      services.some(
+        (service) =>
+          service.id === row.id || pathsConflict(service.path, row.path),
+      )
+    ) {
+      return null;
+    }
+    services.push(row);
+  }
+  return { version: 1, services };
+}
+
+export function serializeServices(services: ExternalService[]): string {
+  return `${JSON.stringify({ version: 1, services }, null, 2)}\n`;
 }
 
 function text(value: unknown): string {

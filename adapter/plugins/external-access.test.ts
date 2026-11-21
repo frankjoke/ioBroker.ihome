@@ -6,10 +6,17 @@ import type { PluginApi } from "../plugin-api";
 import {
   caddySnippet,
   createExternalAccessPlugins,
+  parseServices,
   parseUsers,
+  serializeServices,
   serializeUsers,
+  serviceProblem,
   validatePassword,
+  validateServiceId,
+  validateServicePath,
+  validateServiceUpstream,
   validateUsername,
+  type ExternalService,
 } from "./external-access";
 
 it("rejects unsafe usernames and short passwords", () => {
@@ -177,4 +184,114 @@ it("requires a real boolean for the enabled flag", async () => {
   await expect(
     mod.call!({ action: "users.setEnabled", user: "alice", enabled: "false" }),
   ).rejects.toThrow(/true or false/);
+});
+
+it("validates service ids, paths and upstreams", () => {
+  expect(validateServiceId("phone-event")).toBe(true);
+  expect(validateServiceId("a b")).toBe(false);
+  expect(validateServicePath("/phone-event")).toBe(true);
+  expect(validateServicePath("/a/b")).toBe(true);
+  expect(validateServicePath("phone-event")).toBe(false);
+  expect(validateServicePath("/a/")).toBe(false);
+  expect(validateServicePath("/a/*")).toBe(false);
+  expect(validateServicePath("/a/../b")).toBe(false);
+  expect(validateServiceUpstream("127.0.0.1:3000")).toBe(true);
+  expect(validateServiceUpstream("localhost:3000")).toBe(true);
+  expect(validateServiceUpstream("[::1]:3000")).toBe(true);
+  expect(validateServiceUpstream("192.168.178.9:8082")).toBe(true);
+  expect(validateServiceUpstream("172.16.0.5:80")).toBe(true);
+  expect(validateServiceUpstream("example.com:443")).toBe(false);
+  expect(validateServiceUpstream("http://127.0.0.1:3000")).toBe(false);
+  expect(validateServiceUpstream("8.8.8.8:53")).toBe(false);
+  expect(validateServiceUpstream("127.0.0.1:0")).toBe(false);
+});
+
+it("requires the kind, auth and endpoint combinations", () => {
+  expect(
+    serviceProblem({
+      id: "w",
+      kind: "webhook",
+      path: "/w",
+      endpoint: "/w",
+      upstream: "127.0.0.1:3000",
+      auth: "basic",
+      enabled: true,
+    }),
+  ).toMatch(/token/);
+  expect(
+    serviceProblem({
+      id: "w",
+      kind: "webhook",
+      path: "/w",
+      endpoint: "w",
+      upstream: "127.0.0.1:3000",
+      auth: "token",
+      enabled: true,
+    }),
+  ).toBeNull();
+  expect(
+    serviceProblem({
+      id: "p",
+      kind: "proxy",
+      path: "/p",
+      endpoint: "/p",
+      upstream: "127.0.0.1:3000",
+      auth: "basic",
+      enabled: true,
+    }),
+  ).toMatch(/endpoint/);
+  expect(
+    serviceProblem({
+      id: "p",
+      kind: "proxy",
+      path: "/p",
+      upstream: "127.0.0.1:3000",
+      auth: "basic",
+      enabled: true,
+    }),
+  ).toBeNull();
+});
+
+it("round-trips services and rejects id, path and prefix conflicts", () => {
+  const proxy: ExternalService = {
+    id: "opencode",
+    kind: "proxy",
+    path: "/opencode",
+    upstream: "127.0.0.1:49374",
+    stripPrefix: true,
+    auth: "basic",
+    enabled: false,
+  };
+  const webhook: ExternalService = {
+    id: "phone-event",
+    kind: "webhook",
+    path: "/phone-event",
+    endpoint: "/phone-event",
+    upstream: "127.0.0.1:3000",
+    auth: "token",
+    enabled: true,
+  };
+  expect(parseServices(serializeServices([webhook, proxy]))).toEqual({
+    version: 1,
+    services: [webhook, proxy],
+  });
+  expect(parseServices('{"version":2,"services":[]}')).toBeNull();
+  expect(
+    parseServices(
+      serializeServices([webhook, { ...proxy, id: "phone-event" }]),
+    ),
+  ).toBeNull();
+  expect(
+    parseServices(
+      serializeServices([
+        proxy,
+        { ...proxy, id: "sub", path: "/opencode/events" },
+      ]),
+    ),
+  ).toBeNull();
+  expect(
+    parseServices(
+      serializeServices([proxy, { ...proxy, id: "other", path: "/opencodex" }]),
+    )?.services,
+  ).toHaveLength(2);
 });
