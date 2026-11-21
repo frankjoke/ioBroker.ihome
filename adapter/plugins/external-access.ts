@@ -1338,7 +1338,7 @@ export const EXTERNAL_ACCESS_CONTRIBUTIONS: PluginContributions = {
 The tile offers the external (HTTPS) link and, when OpenCode reports a LAN address, the local plain-HTTP link. Each link works once and expires after five minutes.`,
       type: "Custom",
       bindings: "none",
-      size: { w: 2, h: 2 },
+      size: { w: 14, h: 4 },
       features: [],
       slots: [{ kind: "html", options: { html: OPENCODE_PAIR_HTML } }],
     },
