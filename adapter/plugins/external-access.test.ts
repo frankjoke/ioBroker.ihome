@@ -297,6 +297,11 @@ it("round-trips services and rejects id, path and prefix conflicts", () => {
       serializeServices([proxy, { ...proxy, id: "other", path: "/opencodex" }]),
     )?.services,
   ).toHaveLength(2);
+  expect(
+    parseServices(
+      serializeServices([proxy, { ...proxy, id: "upper", path: "/OpenCode" }]),
+    ),
+  ).toBeNull();
 });
 
 it("generates webhook and proxy blocks in a stable order", () => {
@@ -602,4 +607,36 @@ it("validates before reloading and aborts on failure", async () => {
     command: "reload",
   });
   expect(calls).toEqual(["validate", "reload"]);
+});
+
+it("refuses to add a service when services.json is gone but the snippet is live", async () => {
+  const mod = plugin();
+  await mod.call!({
+    action: "services.add",
+    service: {
+      id: "a",
+      kind: "proxy",
+      path: "/a",
+      upstream: "127.0.0.1:1",
+      auth: "basic",
+      enabled: true,
+    },
+  });
+  await rm(join(dir, "services.json"));
+  await expect(
+    mod.call!({
+      action: "services.add",
+      service: {
+        id: "b",
+        kind: "proxy",
+        path: "/b",
+        upstream: "127.0.0.1:2",
+        auth: "basic",
+        enabled: true,
+      },
+    }),
+  ).rejects.toThrow(/missing/);
+  const snippet = await readFile(join(dir, "caddy-services.conf"), "utf8");
+  expect(snippet).toContain("handle /a");
+  expect(snippet).not.toContain("handle /b");
 });

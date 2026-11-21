@@ -206,7 +206,15 @@ export function validateServiceUpstream(value: unknown): value is string {
 }
 
 export function pathsConflict(a: string, b: string): boolean {
-  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+  // Caddy path matchers are case-insensitive; compare folded so /Foo and /foo
+  // cannot silently shadow each other.
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  return (
+    left === right ||
+    left.startsWith(`${right}/`) ||
+    right.startsWith(`${left}/`)
+  );
 }
 
 /** Validates one service; returns the normalized row or the first problem. */
@@ -437,6 +445,25 @@ async function writeServices(
 ): Promise<void> {
   await mkdir(dir, { recursive: true });
   await atomicWrite(join(dir, SERVICES_FILE), serializeServices(services));
+}
+
+/** A missing services.json must not replace a snippet that still routes traffic. */
+async function ensureLiveServices(dir: string): Promise<void> {
+  if (await fileExists(join(dir, SERVICES_FILE))) return;
+  let previous = "";
+  try {
+    previous = await readFile(join(dir, SERVICES_SNIPPET_FILE), "utf8");
+  } catch {
+    previous = "";
+  }
+  const live = previous
+    .split("\n")
+    .some((line) => line.trim() && !line.startsWith("#"));
+  if (live) {
+    throw new Error(
+      `${SERVICES_FILE} is missing — refusing to empty the live Caddy services snippet.`,
+    );
+  }
 }
 
 interface SnippetWrite {
@@ -734,6 +761,7 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       return { services };
     }
     case "services.add": {
+      await ensureLiveServices(dir);
       const read = readService(request.service);
       if ("problem" in read) throw new Error(read.problem);
       const services = await readServices(dir);
@@ -768,22 +796,8 @@ async function handle(api: PluginApi, payload: unknown): Promise<unknown> {
       return { services: next, snippet: await writeServicesSnippet(dir, next) };
     }
     case "services.write": {
-      const exists = await fileExists(join(dir, SERVICES_FILE));
-      const services = exists ? await readServices(dir) : [];
-      let previous = "";
-      try {
-        previous = await readFile(join(dir, SERVICES_SNIPPET_FILE), "utf8");
-      } catch {
-        previous = "";
-      }
-      const live = previous
-        .split("\n")
-        .some((line) => line.trim() && !line.startsWith("#"));
-      if (!exists && live) {
-        throw new Error(
-          `${SERVICES_FILE} is missing — refusing to empty the live Caddy services snippet.`,
-        );
-      }
+      await ensureLiveServices(dir);
+      const services = await readServices(dir);
       return writeServicesSnippet(dir, services);
     }
     case "snippet.write": {

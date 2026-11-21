@@ -627,7 +627,7 @@
           <label class="check">
             <input
               type="checkbox"
-              checked={service.enabled}
+              checked={open && draft ? draft.enabled : service.enabled}
               disabled={working === `toggle:${service.id}`}
               onchange={(e) =>
                 void toggleServiceEnabled(service, e.currentTarget.checked)}
