@@ -49,9 +49,7 @@ describe("plugin code templates", () => {
   });
 
   it("adds plugin formulas to expressions only", () => {
-    const source = [
-      { key: "plugin:ext:formulas:f", plugin, value: formula },
-    ];
+    const source = [{ key: "plugin:ext:formulas:f", plugin, value: formula }];
     const expressions = codeTemplateChoices([], [], "expression", [], source);
     expect(expressions.some((entry) => entry.id === source[0].key)).toBe(true);
     expect(

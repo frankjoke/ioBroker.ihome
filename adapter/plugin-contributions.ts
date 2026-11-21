@@ -2,12 +2,7 @@
 // ids and size; the SPA validates the individual templates.
 
 export type ContributionKind =
-  | "tiles"
-  | "bundles"
-  | "logic"
-  | "formulas"
-  | "functions"
-  | "snippets";
+  "tiles" | "bundles" | "logic" | "formulas" | "functions" | "snippets";
 
 export interface PluginSnippet {
   id: string;

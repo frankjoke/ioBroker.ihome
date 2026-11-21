@@ -20,8 +20,8 @@
     {
       "id": "external-access",
       "name": "Caddy services",
-      "description": "Caddy logins and public routes: users, services.json, webhook/proxy services, root site services, validate and reload.",
-      "version": "1.2.0",
+      "description": "Caddy logins and public routes: users, services.json, webhook/proxy services, root site services, validate and reload, and OpenCode pairing links.",
+      "version": "1.3.0",
       "api": 1,
       "file": "external-access.json"
     }

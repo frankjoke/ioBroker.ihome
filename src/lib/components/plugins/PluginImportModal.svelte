@@ -150,9 +150,9 @@
 
     {#if plugin && contributionCount(plugin) > 0}
       <p class="warning-banner">
-        This plugin adds {contributionCount(plugin)} template or example items.
-        Applying one runs its logic or HTML in your pages; the plugin must stay
-        installed for its entries to remain available.
+        This plugin adds {contributionCount(plugin)} template or example items. Applying
+        one runs its logic or HTML in your pages; the plugin must stay installed for
+        its entries to remain available.
       </p>
     {/if}
 

@@ -154,8 +154,7 @@
     selected?.kind === "bundle"
       ? selected.plugin
         ? (getPluginContribution(selected.key ?? selected.id)?.value as
-            | TemplateBundle
-            | undefined)
+            TemplateBundle | undefined)
         : bundleDraft?.id === selected.id
           ? bundleDraft
           : selected.builtin
@@ -237,7 +236,6 @@
     return "layers";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function definitionFor(entry: TemplateEntry): any {
     if (entry.plugin) {
       return getPluginContribution(entry.key ?? entry.id)?.value;
@@ -837,8 +835,8 @@
               {#if entry.plugin}
                 <p class="hint text-muted">
                   Provided by plugin <strong>{entry.plugin.name}</strong>.
-                  Applying creates your own copy; the plugin must stay
-                  installed and enabled for it to appear again.
+                  Applying creates your own copy; the plugin must stay installed
+                  and enabled for it to appear again.
                 </p>
               {:else if entry.kind === "device"}
                 <VisualTemplates

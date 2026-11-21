@@ -34,8 +34,9 @@ export const NUT_EXAMPLE: ImportedPlugin = {
     "Read-only: the example uses no credentials. The NUT server must allow",
     "`LIST VAR` (normal on the LAN). Beeper and load commands are not included.",
     "",
-    "Enabling the plugin creates a **NUT UPS** device from its bundled template;",
-    "if the device already exists, iHome asks before updating it.",
+    "After enabling, apply the **NUT UPS** tile from Templates → Templates (or",
+    "the tile picker). Its default sources use the `ihome.0.plugins.nut.ups`",
+    "base; edit the slot sources if your instance or `base` setting differs.",
   ].join("\n"),
   settingsSchema: [
     {
@@ -82,85 +83,90 @@ export const NUT_EXAMPLE: ImportedPlugin = {
     base: "plugins.nut.ups",
     interval: 30,
   },
-  bundle: {
-    version: 1,
-    device: {
-      name: "NUT UPS",
-      type: "Custom",
-      icon: "battery_charging_full",
-      size: { w: 4, h: 2 },
-      controls: [
-        {
-          state: "battery.charge",
-          feature: "value",
-          label: "Battery",
-          unit: "%",
-          role: "value.battery",
-          type: "number",
-        },
-        {
-          state: "battery.runtime",
-          feature: "value",
-          label: "Runtime",
-          unit: "min",
-          role: "value.interval",
-          type: "number",
-          transform: { read: { kind: "formula", expr: "x / 60" } },
-        },
-        {
-          state: "ups.load",
-          feature: "value",
-          label: "Load",
-          unit: "%",
-          role: "value",
-          type: "number",
-        },
-        {
-          state: "ups.status",
-          feature: "value",
-          label: "Status",
-          role: "text",
-          type: "string",
-        },
-        {
-          state: "output.voltage",
-          feature: "value",
-          label: "Output voltage",
-          unit: "V",
-          role: "value.voltage",
-          type: "number",
-        },
-        {
-          state: "device.model",
-          feature: "value",
-          label: "Model",
-          role: "text",
-          type: "string",
-        },
-        {
-          state: "connected",
-          feature: "value",
-          label: "Connected",
-          role: "indicator.connected",
-          type: "boolean",
-        },
-        {
-          state: "onBattery",
-          feature: "value",
-          label: "On battery",
-          role: "indicator.alarm",
-          type: "boolean",
-        },
-        {
-          state: "lastUpdate",
-          feature: "value",
-          label: "Last update",
-          unit: "ago",
-          role: "date.start",
-          type: "string",
-        },
-      ],
-    },
+  contributions: {
+    tiles: [
+      {
+        id: "nut-ups",
+        name: "NUT UPS",
+        description:
+          "Battery, runtime, load and status of a Network UPS Tools UPS.",
+        help: `Apply this tile after enabling the plugin. The default sources use the \`ihome.0.plugins.nut.ups\` base; edit the slot sources if your instance or \`base\` setting differs.`,
+        type: "Custom",
+        size: { w: 4, h: 2 },
+        features: [],
+        slots: [
+          {
+            kind: "value",
+            label: "Battery",
+            unit: "%",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.battery.charge",
+            },
+            icon: { glyph: "battery_charging_full" },
+          },
+          {
+            kind: "value",
+            label: "Runtime",
+            unit: "min",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.battery.runtime",
+            },
+          },
+          {
+            kind: "value",
+            label: "Load",
+            unit: "%",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.ups.load",
+            },
+          },
+          {
+            kind: "value",
+            label: "Status",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.ups.status",
+            },
+          },
+          {
+            kind: "value",
+            label: "Output voltage",
+            unit: "V",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.output.voltage",
+            },
+          },
+          {
+            kind: "value",
+            label: "Model",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.device.model",
+            },
+          },
+          {
+            kind: "badge",
+            label: "Connected",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.connected",
+            },
+          },
+          {
+            kind: "badge",
+            label: "On battery",
+            source: {
+              kind: "state",
+              stateId: "ihome.0.plugins.nut.ups.onBattery",
+            },
+          },
+        ],
+      },
+    ],
   },
   code: nutCode,
 };

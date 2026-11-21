@@ -91,7 +91,7 @@ describe("createPluginHost", () => {
     let apiCalls = 0;
     const host = createPluginHost(
       [plugin("tiles", undefined)],
-      (_plugin, _runtime) => {
+      () => {
         apiCalls += 1;
         return fakeApi();
       },

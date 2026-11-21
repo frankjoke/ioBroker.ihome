@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.4.2",
+    "version": "0.5.0",
     "news": {
       "0.4.2": {
         "en": "Per-logic reload: saving a logic now restarts only that logic, while unchanged logics keep their memory, states and timers. Shared state and timer maps, one timer per schedule, richer logic inputs ($value/$previous/$input/$source, statements, state collections, timer inputs), page memory for scroll/open row/tab, template descriptions with type tooltips, and device creation from a template on the Devices page.",

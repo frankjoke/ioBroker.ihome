@@ -101,9 +101,7 @@ function snippetProblem(value: unknown): string | null {
  * Validate and source a `plugins contributions` reply. Invalid items are
  * hidden with a message; a malformed reply is empty, never an exception.
  */
-export function readPluginContributions(
-  reply: unknown,
-): PluginContributionSet {
+export function readPluginContributions(reply: unknown): PluginContributionSet {
   const set = emptyPluginContributions();
   if (!record(reply)) {
     set.problems.push("The plugin contributions reply is not an object.");
@@ -154,7 +152,12 @@ export function readPluginContributions(
         if (kind === "tiles") {
           problem = visualTemplateProblem(item, [], id);
         } else if (kind === "bundles") {
-          problem = templateBundleProblem(item as unknown as TemplateBundle, [], [], id);
+          problem = templateBundleProblem(
+            item as unknown as TemplateBundle,
+            [],
+            [],
+            id,
+          );
         } else if (kind === "logic") {
           problem = logicTemplateProblem(item, [], [], id);
         } else if (kind === "formulas") {
@@ -177,9 +180,7 @@ export function readPluginContributions(
             source("bundles", id, item as unknown as TemplateBundle),
           );
         } else if (kind === "logic") {
-          set.logic.push(
-            source("logic", id, item as unknown as LogicTemplate),
-          );
+          set.logic.push(source("logic", id, item as unknown as LogicTemplate));
         } else if (kind === "formulas") {
           set.formulas.push(
             source("formulas", id, item as unknown as FormulaTemplate),

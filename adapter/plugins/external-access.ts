@@ -429,9 +429,14 @@ function upstreamParts(upstream: string): { host: string; port: number } {
   };
 }
 
+interface FetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+}
+
 async function fetchJson(
   url: string,
-  init: RequestInit,
+  init: FetchInit,
 ): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
@@ -1322,7 +1327,8 @@ export const EXTERNAL_ACCESS_CONTRIBUTIONS: PluginContributions = {
     {
       id: "opencode-pair",
       name: "OpenCode pairing",
-      description: "Generate a one-time OpenCode pairing link for a Caddy site.",
+      description:
+        "Generate a one-time OpenCode pairing link for a Caddy site.",
       help: `Generates a one-time OpenCode pairing link for one of the site services in Caddy services.
 
 **Before applying:** install and enable the Caddy services plugin, and configure the OpenCode site (for example \`site-8444\`). The plugin must stay installed and enabled for this tile to answer.

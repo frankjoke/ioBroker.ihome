@@ -116,7 +116,6 @@
     return entry.kind === "formula" ? "functions" : "code";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function definitionFor(entry: CodeEntry): any {
     if (entry.plugin) {
       return getPluginContribution(entry.key ?? entry.id)?.value;
@@ -295,7 +294,8 @@
     if (!raw) return;
     if (entry.kind === "formula") {
       if (!isFormulasWritable()) {
-        error = "Formula templates could not be loaded — the copy was not saved.";
+        error =
+          "Formula templates could not be loaded — the copy was not saved.";
         return;
       }
       const copy: FormulaTemplate = {
@@ -318,7 +318,8 @@
       };
     } else {
       if (!isFunctionsWritable()) {
-        error = "Function templates could not be loaded — the copy was not saved.";
+        error =
+          "Function templates could not be loaded — the copy was not saved.";
         return;
       }
       const copy: FunctionTemplate = {
@@ -532,7 +533,9 @@
                     onclick={() => savePluginEntry(entry)}
                   >
                     <span class="material-symbols-outlined">content_copy</span>
-                    Save to my {entry.kind === "formula" ? "formulas" : "functions"}
+                    Save to my {entry.kind === "formula"
+                      ? "formulas"
+                      : "functions"}
                   </button>
                 {:else if draftKind === "formula"}
                   <FormulaEditor

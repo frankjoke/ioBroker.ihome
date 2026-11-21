@@ -71,14 +71,36 @@ the iHome namespace — for example \`ihome.0.plugins.nut.ups.*\`. Use
 want the data elsewhere. \`http.in\` is the exception: it writes exactly the
 \`target\` or \`targets\` you configure.
 
-## Device template
+## Contributions
 
-A plugin file may carry a \`bundle.device\` preset. When the plugin is enabled,
-the UI creates that device from the preset; if a generated device already
-exists and the template changed, it asks before updating. Control \`state\`
-paths are relative to \`plugins.<plugin-id>\` or the plugin's \`base\` setting.
-The device is tagged with \`plugin:<id>\` and the bundle hash; disabling or
-removing the plugin leaves it in place.
+A plugin may carry code, contributions, or both. A content-only plugin has no
+\`index.js\`; it only offers templates and examples. The manifest accepts six
+kinds:
+
+\`\`\`json
+"contributions": {
+  "tiles": [],
+  "bundles": [],
+  "logic": [],
+  "formulas": [],
+  "functions": [],
+  "snippets": []
+}
+\`\`\`
+
+- \`tiles\` are device/tile templates; \`bundles\` combine a device, logic and API
+  part with parameters.
+- \`logic\`, \`formulas\` and \`functions\` are the same templates the library shows.
+- \`snippets\` are copyable examples shown on the plugin page. They are not
+  inserted into code fields; use \`functions\` for that.
+
+Contributions are plugin-owned and live: the pickers show them while the plugin
+is installed and enabled, and **Duplicate** writes an editable user copy.
+Disabling or removing the plugin hides its entries; devices, logics and pages
+already created from them stay.
+
+The old \`bundle.device\` field is retired. Old files import with a warning and
+the field is ignored; use a tile or bundle contribution instead.
 
 ## Install and run
 

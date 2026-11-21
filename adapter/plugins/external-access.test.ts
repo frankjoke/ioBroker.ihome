@@ -698,7 +698,9 @@ it("creates one-time pairing links and reports failures without the password", a
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify(
-          mode === "nocode" ? { expires_in: 300 } : { code: "ABC", expires_in: 300 },
+          mode === "nocode"
+            ? { expires_in: 300 }
+            : { code: "ABC", expires_in: 300 },
         ),
       );
       return;
@@ -707,10 +709,7 @@ it("creates one-time pairing links and reports failures without the password", a
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
-          urls: [
-            `http://127.0.0.1:${port}`,
-            `http://192.168.1.5:${port}`,
-          ],
+          urls: [`http://127.0.0.1:${port}`, `http://192.168.1.5:${port}`],
         }),
       );
       return;
@@ -718,9 +717,7 @@ it("creates one-time pairing links and reports failures without the password", a
     res.writeHead(404);
     res.end();
   });
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", resolve),
-  );
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   port = (server.address() as AddressInfo).port;
   const passwordFile = join(dir, "opencode-password");
   await writeFile(passwordFile, "secret\n");
@@ -732,10 +729,7 @@ it("creates one-time pairing links and reports failures without the password", a
     auth: "none" as const,
     enabled: true,
   };
-  await writeFile(
-    join(dir, "services.json"),
-    serializeServices([site]),
-  );
+  await writeFile(join(dir, "services.json"), serializeServices([site]));
   try {
     const mod = plugin({
       publicUrl: "https://home.example.net/ihome/",
@@ -787,9 +781,10 @@ it("creates one-time pairing links and reports failures without the password", a
     ).rejects.toThrow(/404/);
 
     mode = "nocode";
-    const failure = await mod
-      .call!({ action: "site.pair", id: "site-8444" })
-      .catch((error) => String(error));
+    const failure = await mod.call!({
+      action: "site.pair",
+      id: "site-8444",
+    }).catch((error) => String(error));
     expect(failure).toMatch(/code/i);
     expect(failure).not.toContain("secret");
   } finally {

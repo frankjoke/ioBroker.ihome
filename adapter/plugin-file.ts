@@ -207,8 +207,7 @@ export function parsePluginFile(
   if (!code.trim() && !contributions) {
     return problem("The plugin needs code or contributions.");
   }
-  const warnings =
-    plugin.bundle !== undefined ? [BUNDLE_WARNING] : [];
+  const warnings = plugin.bundle !== undefined ? [BUNDLE_WARNING] : [];
 
   const timeoutMs =
     typeof plugin.timeoutMs === "number"

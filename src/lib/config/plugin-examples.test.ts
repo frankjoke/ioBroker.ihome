@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { parsePluginFile, pluginFile } from "$adapter/plugin-file";
 import { NUT_EXAMPLE } from "./plugin-examples";
+import { visualTemplateProblem } from "./visual-templates";
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -104,6 +105,10 @@ describe("NUT example", () => {
     expect(result.plugin.settings?.ups).toBe("ups");
     expect(result.plugin.code).toContain('require("node:net")');
     expect(result.plugin.code.length).toBeGreaterThan(1000);
+    expect(result.plugin.bundle).toBeUndefined();
+    const tile = NUT_EXAMPLE.contributions?.tiles?.[0];
+    expect(tile?.id).toBe("nut-ups");
+    if (tile) expect(visualTemplateProblem(tile, [], tile.id)).toBeNull();
   });
 
   it("compiles to a plugin module", () => {

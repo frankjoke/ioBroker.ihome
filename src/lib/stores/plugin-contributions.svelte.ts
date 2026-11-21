@@ -18,9 +18,7 @@ export function pluginContributionsProblem(): string {
 }
 
 /** Load once per plugin-list version; force reloads even when unchanged. */
-export async function ensurePluginContributions(
-  force = false,
-): Promise<void> {
+export async function ensurePluginContributions(force = false): Promise<void> {
   const version = getPluginsVersion();
   if (!force && loadedVersion === version) return;
   if (loading) return loading;

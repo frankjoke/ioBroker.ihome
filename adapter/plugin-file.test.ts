@@ -100,8 +100,9 @@ describe("parsePluginFile", () => {
     });
     expect("plugin" in result && result.plugin.bundle).toBeUndefined();
     expect("plugin" in result && result.warnings?.[0]).toMatch(/bundle/i);
-    expect(parsePluginFile({ ...base, plugin: { ...base.plugin, bundle: {} } }))
-      .toMatchObject({ warnings: [expect.stringMatching(/bundle/i)] });
+    expect(
+      parsePluginFile({ ...base, plugin: { ...base.plugin, bundle: {} } }),
+    ).toMatchObject({ warnings: [expect.stringMatching(/bundle/i)] });
   });
 
   it("parses a content-only plugin with a contribution", () => {
@@ -127,7 +128,8 @@ describe("parsePluginFile", () => {
   });
 
   it("rejects a plugin with neither code nor contributions", () => {
-    const { code: _code, ...withoutCode } = base.plugin;
+    const withoutCode = { ...base.plugin } as Record<string, unknown>;
+    delete withoutCode.code;
     expect(parsePluginFile({ ...base, plugin: withoutCode })).toMatchObject({
       problem: expect.stringMatching(/code or contributions/i),
     });

@@ -27,7 +27,9 @@ describe("pluginContributionsOf", () => {
       bundles: [{ id: "b", name: "Bundle" }],
       logic: [{ id: "l", name: "Logic" }],
       formulas: [{ id: "f", name: "Formula", expr: "1" }],
-      functions: [{ id: "fn", name: "Function", mode: "statements", code: "x" }],
+      functions: [
+        { id: "fn", name: "Function", mode: "statements", code: "x" },
+      ],
       snippets: [{ id: "s", name: "Snippet", code: "sendTo()" }],
     };
     const result = pluginContributionsOf(value);
@@ -67,9 +69,7 @@ describe("pluginContributionsOf", () => {
       id: `t${index}`,
       html: "x".repeat(40_000),
     }));
-    expect(
-      problem({ tiles: many }),
-    ).toMatch(/large|size/i);
+    expect(problem({ tiles: many })).toMatch(/large|size/i);
     expect(MAX_PLUGIN_CONTRIBUTIONS).toBeGreaterThan(0);
   });
 });

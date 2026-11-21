@@ -184,7 +184,13 @@ it("reads a content-only plugin folder and warns about a retired bundle", async 
         bundle: { device: {} },
         contributions: {
           tiles: [
-            { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+            {
+              id: "pair",
+              name: "Pair",
+              type: "Custom",
+              features: [],
+              slots: [],
+            },
           ],
         },
       }),

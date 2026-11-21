@@ -54,15 +54,9 @@ describe("templateEntries", () => {
       apiUser: [],
       bundleBuiltins: [],
       bundleUser: [],
-      pluginTiles: [
-        { key: "plugin:ext:tiles:d", plugin, value: device },
-      ],
-      pluginLogic: [
-        { key: "plugin:ext:logic:l", plugin, value: logic },
-      ],
-      pluginBundles: [
-        { key: "plugin:ext:bundles:b", plugin, value: bundle },
-      ],
+      pluginTiles: [{ key: "plugin:ext:tiles:d", plugin, value: device }],
+      pluginLogic: [{ key: "plugin:ext:logic:l", plugin, value: logic }],
+      pluginBundles: [{ key: "plugin:ext:bundles:b", plugin, value: bundle }],
     });
     expect(entries.map((entry) => entry.kind)).toEqual([
       "device",
@@ -96,9 +90,7 @@ describe("templateEntries", () => {
       apiUser: [],
       bundleBuiltins: [],
       bundleUser: [bundle],
-      pluginTiles: [
-        { key: "plugin:ext:tiles:d", plugin, value: device },
-      ],
+      pluginTiles: [{ key: "plugin:ext:tiles:d", plugin, value: device }],
     });
     expect(
       filterTemplateEntries(entries, "", "asc", "plugins").every(

@@ -31,9 +31,9 @@ describe("pluginEditorTabs", () => {
   });
 
   it("shows Code only when the plugin has code", () => {
-    expect(pluginEditorTabs(view({ hasCode: true })).map((tab) => tab.id)).toEqual(
-      ["settings", "help", "contributions", "code"],
-    );
+    expect(
+      pluginEditorTabs(view({ hasCode: true })).map((tab) => tab.id),
+    ).toEqual(["settings", "help", "contributions", "code"]);
   });
 
   it("keeps built-ins to Settings and Help", () => {
@@ -48,9 +48,7 @@ describe("pluginEditorTabs", () => {
     expect(
       pluginEditorTabs(
         view({
-          settingsTabs: [
-            { id: "zone", label: "Zone", fields: [] },
-          ],
+          settingsTabs: [{ id: "zone", label: "Zone", fields: [] }],
         }),
       ).map((tab) => tab.id),
     ).toEqual(["settings", "zone", "help", "contributions"]);
