@@ -34,7 +34,7 @@
     logics?: LogicDef[];
     onCreate: (
       fills: Map<string, TemplateReference>,
-      main: TemplateReference,
+      main: TemplateReference | undefined,
     ) => void;
     onClose: () => void;
   } = $props();
@@ -131,7 +131,11 @@
   }
 
   function create(): void {
-    const main = primary ? fills.get(primary.key) : undefined;
+    if (!primary) {
+      onCreate(new Map(), undefined);
+      return;
+    }
+    const main = fills.get(primary.key);
     if (!main) return;
     onCreate(fills, main);
   }
@@ -162,62 +166,70 @@
       </button>
     </div>
 
-    <p class="hint text-muted">
-      {#if roleBased}
-        Pick the main role's state first; the others fill from the same device
-        or parent when the role, unit or name is clear. Missing overrides are
-        created on the picked states. Unset roles are not added to the tile.
-      {:else}
-        Pick the main feature's state first; the others fill from the same
-        device or parent when the match is clear. Unset features are not added
-        to the tile.
-      {/if}
-    </p>
+    {#if rows.length === 0}
+      <p class="hint text-muted">
+        This template needs no state; it creates an HTML tile.
+      </p>
+    {:else}
+      <p class="hint text-muted">
+        {#if roleBased}
+          Pick the main role's state first; the others fill from the same device
+          or parent when the role, unit or name is clear. Missing overrides are
+          created on the picked states. Unset roles are not added to the tile.
+        {:else}
+          Pick the main feature's state first; the others fill from the same
+          device or parent when the match is clear. Unset features are not added
+          to the tile.
+        {/if}
+      </p>
+    {/if}
     {#if error}
       <p class="text-danger hint">{error}</p>
     {/if}
 
-    <ul class="features">
-      {#each rows as row (row.key)}
-        {@const bound = fills.get(row.key)}
-        {@const main = row.key === primary?.key}
-        <li class="feature-row">
-          <span class="feature-name">
-            {row.label}
-            {#if main}<span class="main-badge">main</span>{/if}
-          </span>
-          <span class="source" title={bound?.stateId ?? ""}>
-            {bound
-              ? `${sourceName(bound)}${bound.overrideName ? ` · ${bound.overrideName}` : ""}`
-              : "not set"}
-          </span>
-          {#if bound}
-            <IconButton
-              icon="delete"
-              danger
-              label={`Clear the ${row.label} assignment`}
-              onclick={() => clear(row.key)}
-            />
-          {/if}
-          <button
-            type="button"
-            class="icon-btn"
-            title={`Choose the ${row.label} state`}
-            aria-label={`Choose the ${row.label} state`}
-            onclick={() => (picking = row.key)}
-          >
-            <span class="material-symbols-outlined">edit</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+    {#if rows.length > 0}
+      <ul class="features">
+        {#each rows as row (row.key)}
+          {@const bound = fills.get(row.key)}
+          {@const main = row.key === primary?.key}
+          <li class="feature-row">
+            <span class="feature-name">
+              {row.label}
+              {#if main}<span class="main-badge">main</span>{/if}
+            </span>
+            <span class="source" title={bound?.stateId ?? ""}>
+              {bound
+                ? `${sourceName(bound)}${bound.overrideName ? ` · ${bound.overrideName}` : ""}`
+                : "not set"}
+            </span>
+            {#if bound}
+              <IconButton
+                icon="delete"
+                danger
+                label={`Clear the ${row.label} assignment`}
+                onclick={() => clear(row.key)}
+              />
+            {/if}
+            <button
+              type="button"
+              class="icon-btn"
+              title={`Choose the ${row.label} state`}
+              aria-label={`Choose the ${row.label} state`}
+              onclick={() => (picking = row.key)}
+            >
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
     <div class="actions">
       <button type="button" class="btn" onclick={onClose}>Cancel</button>
       <button
         type="button"
         class="btn btn-primary"
-        disabled={!primary || !fills.get(primary.key)}
+        disabled={rows.length > 0 && (!primary || !fills.get(primary.key))}
         onclick={create}>Create tile</button
       >
     </div>

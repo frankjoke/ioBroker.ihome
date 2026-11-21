@@ -344,6 +344,8 @@ export interface Template {
   /** Role-based tile templates: one role per bound source, in slot order
    *  (spec §3.4). Absent on legacy feature templates. */
   roles?: string[];
+  /** An HTML-only template: it binds no state and needs no anchor. */
+  bindings?: "none";
   size?: Size;
   /** The template's CSS background, applied with the tile's (A19). */
   background?: Background;

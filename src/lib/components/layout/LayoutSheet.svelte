@@ -1114,7 +1114,17 @@
   <TemplateTileModal
     template={target.template}
     logics={getLogicDocument().logics}
-    onCreate={(fills, main) =>
+    onCreate={(fills, main) => {
+      if (!main) {
+        addTileWith(
+          target.pageId,
+          target.sectionId,
+          target.template.slots,
+          target.at,
+        );
+        pendingTemplate = null;
+        return;
+      }
       void addTemplateTile(
         target.pageId,
         target.sectionId,
@@ -1122,7 +1132,8 @@
         fills,
         main,
         target.at,
-      )}
+      );
+    }}
     onClose={() => (pendingTemplate = null)}
   />
 {/if}

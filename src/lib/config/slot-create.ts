@@ -204,6 +204,7 @@ export interface TemplateBindingRow {
  *  plus the primary. A template whose slots carry no feature hint offers its
  *  whole feature list. Role templates list their roles instead. */
 export function templateBindingRows(template: Template): TemplateBindingRow[] {
+  if (template.bindings === "none") return [];
   if (template.roles?.length) {
     const active =
       typeof template.active?.source === "string" ? template.active.source : "";

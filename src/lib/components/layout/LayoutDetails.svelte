@@ -94,6 +94,7 @@
     materializeTemplateTileFromFills,
     materializeTemplateTileFromState,
     materializedTileConfig,
+    templateBindingRows,
   } from "$lib/config/slot-create";
   import { PRESETS } from "$lib/config/presets";
   import { visualTemplateProblem } from "$lib/config/visual-templates";
@@ -709,6 +710,23 @@
     applyTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
+    if (templateBindingRows(template).length === 0) {
+      edit(() => ({
+        ...config,
+        slots: structuredClone($state.snapshot(template.slots)),
+        ...(template.size ? { size: template.size } : {}),
+        ...(template.background ? { background: template.background } : {}),
+        ...(template.active ? { active: template.active } : {}),
+        ...(template.look ? { look: template.look } : {}),
+        ...(template.border !== undefined ? { border: template.border } : {}),
+        ...(template.padding !== undefined
+          ? { padding: template.padding }
+          : {}),
+        template: template.id,
+      }));
+      applyTemplateOpen = false;
+      return;
+    }
     const anchor = templateAnchor(config);
     if (!anchor || anchor.kind !== "state") {
       applyTemplateError = "This tile has no state to anchor the template.";

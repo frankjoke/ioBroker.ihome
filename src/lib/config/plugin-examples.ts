@@ -92,6 +92,7 @@ export const NUT_EXAMPLE: ImportedPlugin = {
           "Battery, runtime, load and status of a Network UPS Tools UPS.",
         help: `Apply this tile after enabling the plugin. The default sources use the \`ihome.0.plugins.nut.ups\` base; edit the slot sources if your instance or \`base\` setting differs.`,
         type: "Custom",
+        bindings: "none",
         size: { w: 4, h: 2 },
         features: [],
         slots: [

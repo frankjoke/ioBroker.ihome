@@ -347,6 +347,18 @@ it("lists only the features the template binds, plus the primary", () => {
   );
 });
 
+it("returns no bindings for an anchorless HTML template", () => {
+  const t = {
+    id: "html-only",
+    name: "HTML only",
+    type: "Custom",
+    bindings: "none",
+    features: [],
+    slots: [{ kind: "html", options: { html: "<p>x</p>" } }],
+  } as unknown as Template;
+  expect(templateBindingRows(t)).toEqual([]);
+});
+
 it("takes unambiguous auto-fills and lets manual choices win", () => {
   const { main } = lampFixture();
   const power = PRESETS.Light.features.find((f) => f.feature === "power")!;

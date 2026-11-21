@@ -106,6 +106,9 @@ export function visualTemplateProblem(
       return "roles must be an array of non-empty strings.";
     }
   }
+  if (template.bindings !== undefined && template.bindings !== "none") {
+    return 'bindings must be "none" when present.';
+  }
   if (!Array.isArray(template.slots)) {
     return "slots must be an array.";
   }

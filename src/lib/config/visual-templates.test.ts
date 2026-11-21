@@ -26,6 +26,22 @@ describe("visualTemplateProblem", () => {
     );
   });
 
+  it("accepts an anchorless HTML template", () => {
+    expect(
+      visualTemplateProblem(
+        {
+          ...valid,
+          bindings: "none",
+          slots: [{ kind: "html", options: { html: "<p>x</p>" } }],
+        },
+        [],
+      ),
+    ).toBeNull();
+    expect(visualTemplateProblem({ ...valid, bindings: "other" }, [])).toMatch(
+      /bindings/,
+    );
+  });
+
   it("rejects duplicate ids unless it is the current template", () => {
     expect(visualTemplateProblem(valid, ["custom-light"])).toMatch(/already/);
     expect(
