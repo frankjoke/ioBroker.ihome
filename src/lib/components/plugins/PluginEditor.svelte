@@ -10,8 +10,12 @@
   import {
     ensurePluginContributions,
     getPluginContributions,
+    pluginContributionsProblem,
   } from "$lib/stores/plugin-contributions.svelte";
-  import { pluginEditorTabs } from "$lib/config/plugin-editor";
+  import {
+    pluginEditorTabs,
+    pluginShowsTimeout,
+  } from "$lib/config/plugin-editor";
   import { savePluginManifest } from "$lib/config/plugin-storage";
   import { isLocalUi } from "$lib/config/session-locality.svelte";
   import { objectProblem } from "$lib/config/schema-values";
@@ -21,7 +25,10 @@
     verifiedWrite,
   } from "$lib/config/meta-files";
   import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
-  import type { PluginContributions } from "$adapter/plugin-ops";
+  import {
+    pluginContributionsOf,
+    type PluginContributions,
+  } from "$adapter/plugin-ops";
 
   let {
     plugin,
@@ -143,6 +150,12 @@
       (entry) => entry.plugin.id === plugin.id,
     ),
   );
+  const contributionProblems = $derived(
+    [
+      pluginContributionsProblem(),
+      ...getPluginContributions(true).problems,
+    ].filter(Boolean),
+  );
 
   $effect(() => {
     if (initialContributions === null) return;
@@ -152,8 +165,10 @@
       return;
     }
     try {
-      JSON.parse(text);
-      contributionsError = "";
+      const parsed = JSON.parse(text) as unknown;
+      const check = pluginContributionsOf(parsed);
+      contributionsError =
+        "problem" in check ? `Contributions are invalid: ${check.problem}` : "";
     } catch {
       contributionsError = "Contributions must be valid JSON.";
     }
@@ -315,6 +330,9 @@
         <a href="#/admin">Open Admin</a>.
       </p>
     {/if}
+    {#if plugin.warnings?.length}
+      <p class="hint text-warning">{plugin.warnings.join(" ")}</p>
+    {/if}
 
     <div class="fields">
       {#if !plugin.builtin}
@@ -323,7 +341,7 @@
           <input type="text" bind:value={name} />
         </label>
       {/if}
-      {#if plugin.hasCode}
+      {#if pluginShowsTimeout(plugin)}
         <label class="field">
           <span class="label-mono">Default timeout (ms)</span>
           <input type="number" min="100" max="30000" bind:value={timeoutMs} />
@@ -400,6 +418,9 @@
         {#each snippets as snippet (snippet.key)}
           <p class="hint text-muted">
             <strong>{snippet.value.name}</strong>
+            {#if snippet.value.language}
+              <span class="badge">{snippet.value.language}</span>
+            {/if}
             {#if snippet.value.description}
               — {snippet.value.description}
             {/if}
@@ -417,6 +438,22 @@
       </div>
     {/if}
   {:else if activeTab === "contributions"}
+    {#if plugin.contributions}
+      <p class="hint text-muted">
+        {plugin.contributions.total} contributed item(s):
+        {Object.entries(plugin.contributions.counts)
+          .map(([kind, count]) => `${count} ${kind}`)
+          .join(", ")}.
+      </p>
+    {/if}
+    <p class="hint text-muted">
+      <a href={`#/templates?plugin=${encodeURIComponent(plugin.id)}`}
+        >View in Templates</a
+      >
+    </p>
+    {#if contributionProblems.length}
+      <p class="text-danger hint">{contributionProblems.join(" ")}</p>
+    {/if}
     <label class="field">
       <span class="label-mono">Contributions (JSON)</span>
       <textarea

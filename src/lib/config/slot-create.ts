@@ -677,6 +677,10 @@ export interface TileSeed {
   active?: ActiveCondition;
   look?: TileLook;
   background?: Background;
+  border?: boolean;
+  padding?: boolean;
+  /** The template this seed came from. */
+  template?: string;
 }
 
 /** A brand-new tile's frozen offer from its first slot: its name. Size, icon
@@ -685,6 +689,20 @@ export function tileSeed(slots: Slot[]): TileSeed {
   const first = slots[0];
   if (!first || first.kind === "frame") return {};
   return first.label ? { title: first.label } : {};
+}
+
+/** The template's own defaults for a freshly created tile. */
+export function templateTileSeed(template: Template): TileSeed {
+  return {
+    title: template.name,
+    ...(template.size ? { size: template.size } : {}),
+    ...(template.active ? { active: template.active } : {}),
+    ...(template.look ? { look: template.look } : {}),
+    ...(template.background ? { background: template.background } : {}),
+    ...(template.border !== undefined ? { border: template.border } : {}),
+    ...(template.padding !== undefined ? { padding: template.padding } : {}),
+    template: template.id,
+  };
 }
 
 /** Merge a template's tile defaults into a new placement. */
@@ -709,7 +727,14 @@ export function applyTileSeed(tile: TileConfig, seed: TileSeed): TileConfig {
       : seed.background
         ? { background: seed.background }
         : {}),
+    ...(tile.border === undefined && seed.border !== undefined
+      ? { border: seed.border }
+      : {}),
+    ...(tile.padding === undefined && seed.padding !== undefined
+      ? { padding: seed.padding }
+      : {}),
     ...(tile.active ? {} : seed.active ? { active: seed.active } : {}),
     ...(look ? { look } : {}),
+    ...(seed.template ? { template: seed.template } : {}),
   };
 }

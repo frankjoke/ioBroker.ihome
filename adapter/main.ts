@@ -1335,6 +1335,19 @@ class IHome extends utils.Adapter {
       if (index >= 0) next[index] = merged;
       else next.push(merged);
     }
+    for (const plugin of next) {
+      if (
+        !plugin.builtin &&
+        !plugin.code?.trim() &&
+        !plugin.contributions &&
+        !this.pluginProblems.has(plugin.id)
+      ) {
+        this.pluginProblems.set(
+          plugin.id,
+          "No code or contributions found; the plugin folder is missing or unreadable.",
+        );
+      }
+    }
     return next;
   }
 

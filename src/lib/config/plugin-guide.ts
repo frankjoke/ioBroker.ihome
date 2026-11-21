@@ -79,14 +79,21 @@ kinds:
 
 \`\`\`json
 "contributions": {
-  "tiles": [],
-  "bundles": [],
-  "logic": [],
-  "formulas": [],
-  "functions": [],
-  "snippets": []
+  "tiles": [
+    {
+      "id": "pair",
+      "name": "Pair",
+      "type": "Custom",
+      "bindings": "none",
+      "features": [],
+      "slots": []
+    }
+  ]
 }
 \`\`\`
+
+Omit the kinds you do not use. An empty array is rejected; every item needs
+an id and a name.
 
 - \`tiles\` are device/tile templates; \`bundles\` combine a device, logic and API
   part with parameters.

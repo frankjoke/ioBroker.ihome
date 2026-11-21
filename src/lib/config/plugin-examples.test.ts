@@ -109,6 +109,11 @@ describe("NUT example", () => {
     const tile = NUT_EXAMPLE.contributions?.tiles?.[0];
     expect(tile?.id).toBe("nut-ups");
     if (tile) expect(visualTemplateProblem(tile, [], tile.id)).toBeNull();
+    const slots = tile?.slots as
+      { label?: string; unit?: string }[] | undefined;
+    expect(slots?.find((slot) => slot.label?.startsWith("Runtime"))?.unit).toBe(
+      "s",
+    );
   });
 
   it("compiles to a plugin module", () => {

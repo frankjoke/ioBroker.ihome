@@ -5,10 +5,11 @@
 // they travel through the adapter's plugin commands.
 
 import { pluginManifestOf } from "$adapter/plugin-files";
-import type {
-  PluginContributions,
-  PluginSettingDef,
-  SettingsTabDef,
+import {
+  pluginContributionsOf,
+  type PluginContributions,
+  type PluginSettingDef,
+  type SettingsTabDef,
 } from "$adapter/plugin-ops";
 import type { ImportedPlugin } from "$adapter/plugin-file";
 import {
@@ -24,8 +25,17 @@ function folder(id: string): string {
   return `${PLUGINS}/${id}`;
 }
 
+function checkContributions(value: PluginContributions | undefined): void {
+  if (!value) return;
+  const parsed = pluginContributionsOf(value);
+  if ("problem" in parsed) {
+    throw new Error(`Contributions are invalid: ${parsed.problem}`);
+  }
+}
+
 /** Write a plugin's folder; both files are verified by a read-back. */
 export async function writePluginFiles(plugin: ImportedPlugin): Promise<void> {
+  checkContributions(plugin.contributions);
   const manifest = pluginManifestOf(plugin);
   await verifiedWrite(
     META_ADAPTER,
@@ -78,6 +88,7 @@ export async function savePluginManifest(
     patch.contributions === null
       ? undefined
       : (patch.contributions ?? current.contributions);
+  checkContributions(contributions);
   const manifest = pluginManifestOf({
     id,
     name: patch.name,

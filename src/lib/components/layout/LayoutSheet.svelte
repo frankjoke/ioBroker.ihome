@@ -44,6 +44,7 @@
     type MaterializedTile,
     slotFromState,
     slotKindForWidget,
+    templateTileSeed,
     tileSeed,
   } from "$lib/config/slot-create";
   import { widgetForState } from "$lib/config/slot-source";
@@ -76,6 +77,7 @@
   import {
     ensurePluginContributions,
     getPluginContributions,
+    pluginContributionsProblem,
   } from "$lib/stores/plugin-contributions.svelte";
   import { getPluginsVersion } from "$lib/stores/plugins.svelte";
   import {
@@ -154,6 +156,11 @@
       ...entry.value,
       name: `${entry.value.name} — ${entry.plugin.name}`,
     })),
+  );
+  const pluginProblems = $derived(
+    [pluginContributionsProblem(), ...getPluginContributions().problems]
+      .filter(Boolean)
+      .join(" "),
   );
   /** A secured tile is local-only, in the sheet as on the display. */
   const visibleTile = (placement: Placement) =>
@@ -591,6 +598,7 @@
     sectionId: string,
     slots: Slot[],
     at?: number,
+    template?: Template,
   ): void {
     if (!slots.length) return;
     const sectionIn = (reg: PageRegistry) =>
@@ -599,8 +607,10 @@
         ?.groups.find((g) => g.id === sectionId);
     const before = new Set((sectionIn(registry)?.tiles ?? []).map((t) => t.id));
     // A new tile takes its name and default glyph from its first slot once
-    // (S11) — a frozen offer, not a live link.
-    const seed = tileSeed(slots);
+    // (S11) — a frozen offer, not a live link. A template's own defaults win.
+    const seed = template
+      ? { ...tileSeed(slots), ...templateTileSeed(template) }
+      : tileSeed(slots);
     const first =
       seed.icon && !slots[0].icon?.glyph
         ? { ...slots[0], icon: { ...slots[0].icon, glyph: seed.icon } }
@@ -1078,6 +1088,7 @@
       [...(getTemplateRegistry().templates ?? []), ...pluginTiles],
       local,
     )}
+    warning={pluginProblems}
     slots={target.kind === "slot" ? (currentTile?.tile?.slots ?? []) : []}
     title={target.kind === "newTile" ? "Add a tile" : "Add a slot"}
     showBadge={target.kind !== "newTile"}
@@ -1121,6 +1132,7 @@
           target.sectionId,
           target.template.slots,
           target.at,
+          target.template,
         );
         pendingTemplate = null;
         return;

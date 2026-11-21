@@ -108,8 +108,8 @@ export const NUT_EXAMPLE: ImportedPlugin = {
           },
           {
             kind: "value",
-            label: "Runtime",
-            unit: "min",
+            label: "Runtime (s)",
+            unit: "s",
             source: {
               kind: "state",
               stateId: "ihome.0.plugins.nut.ups.battery.runtime",

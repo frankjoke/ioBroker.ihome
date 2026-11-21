@@ -22,6 +22,7 @@
     ensurePluginContributions,
     getPluginContribution,
     getPluginContributions,
+    pluginContributionsProblem,
   } from "$lib/stores/plugin-contributions.svelte";
   import { getPluginsVersion } from "$lib/stores/plugins.svelte";
   import {
@@ -84,8 +85,20 @@
     void ensurePluginContributions();
   });
 
+  $effect(() => {
+    // The plugin editor links here with ?plugin=<id> after the hash.
+    const hash = location.hash;
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const plugin = new URLSearchParams(query).get("plugin");
+    if (plugin) {
+      pluginFilter = plugin;
+      sourceFilter = "plugins";
+    }
+  });
+
   let selected = $state<TemplateEntry | null>(null);
   let sourceFilter = $state<TemplateSource>("all");
+  let pluginFilter = $state("");
   let editorDirty = $state(false);
   let editorRef = $state<{
     save: () => void;
@@ -137,8 +150,13 @@
       local,
     ),
   );
+  const filteredEntries = $derived(
+    pluginFilter
+      ? entries.filter((entry) => entry.plugin?.id === pluginFilter)
+      : entries,
+  );
   const shown = $derived(
-    filterTemplateEntries(entries, search, sortDir, sourceFilter),
+    filterTemplateEntries(filteredEntries, search, sortDir, sourceFilter),
   );
   const rows = $derived.by(() => {
     if (!selected) return shown;
@@ -711,6 +729,13 @@
   {/if}
   {#if bundleSaveFailed}
     <p class="text-danger hint">Not saved — ioBroker unreachable.</p>
+  {/if}
+
+  {#if pluginContributionsProblem()}
+    <p class="text-danger hint">{pluginContributionsProblem()}</p>
+  {/if}
+  {#if pluginSet.problems.length}
+    <p class="text-danger hint">{pluginSet.problems.join(" ")}</p>
   {/if}
 
   <div class="template-filter">

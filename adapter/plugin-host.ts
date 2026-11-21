@@ -103,6 +103,11 @@ function runtimeOf(plugin: AdapterPlugin): PluginRuntime {
   };
 }
 
+/** Only a manifest with contributions is content-only; a broken folder is not. */
+function contentOnlyPlugin(plugin: AdapterPlugin): boolean {
+  return !plugin.builtin && !plugin.code?.trim() && !!plugin.contributions;
+}
+
 export function createPluginHost(
   plugins: AdapterPlugin[],
   createApi: (plugin: AdapterPlugin, runtime: PluginRuntime) => PluginApi,
@@ -229,7 +234,7 @@ export function createPluginHost(
       if (!snapshot.has(id) || snapshot.get(id) !== entry.code) {
         return pluginError(`plugin ${id} needs an adapter restart`);
       }
-      if (!entry.builtin && !entry.code?.trim()) {
+      if (contentOnlyPlugin(entry)) {
         contentOnly.add(id);
         failed.delete(id);
         disabled.delete(id);
@@ -274,7 +279,7 @@ export function createPluginHost(
         disabled.add(id);
         return pluginReply(undefined);
       }
-      if (!entry.builtin && !entry.code?.trim()) {
+      if (contentOnlyPlugin(entry)) {
         contentOnly.add(id);
         disabled.delete(id);
         return pluginReply(undefined);
@@ -302,7 +307,7 @@ export function createPluginHost(
           disabled.add(plugin.id);
           continue;
         }
-        if (!plugin.builtin && !plugin.code?.trim()) {
+        if (contentOnlyPlugin(plugin)) {
           contentOnly.add(plugin.id);
           continue;
         }

@@ -42,6 +42,7 @@
     onClose,
     logics = [],
     logicPick = undefined,
+    warning = "",
   }: {
     mode: PickerMode;
     title: string;
@@ -66,6 +67,8 @@
     logics?: LogicDef[];
     /** What a logic selection means: an event trigger or its output state. */
     logicPick?: "trigger" | "state";
+    /** A note about unavailable plugin entries, shown above the tabs. */
+    warning?: string;
     onClose: () => void;
   } = $props();
 
@@ -315,6 +318,10 @@
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
+
+    {#if warning}
+      <p class="text-danger hint">{warning}</p>
+    {/if}
 
     {#if tabs.length > 1}
       <div class="option-tabs" role="tablist" aria-label="Pick from">

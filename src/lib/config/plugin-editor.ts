@@ -6,6 +6,11 @@ export interface PluginEditorTab {
   hint: string;
 }
 
+/** Built-ins keep their call timeout; content-only plugins have no calls. */
+export function pluginShowsTimeout(plugin: PluginView): boolean {
+  return plugin.builtin || plugin.hasCode;
+}
+
 /** The tabs the plugin editor shows for this plugin. */
 export function pluginEditorTabs(plugin: PluginView): PluginEditorTab[] {
   const declared = (plugin.settingsTabs ?? [])

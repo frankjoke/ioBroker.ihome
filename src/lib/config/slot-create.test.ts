@@ -10,11 +10,12 @@ import {
   slotFromState,
   slotKindForWidget,
   templateBindingRows,
+  templateTileSeed,
 } from "$lib/config/slot-create";
 import { PRESETS } from "$lib/config/presets";
 import { labelShown } from "$lib/config/tile-parts";
 import type { Control, Device } from "$lib/types/device";
-import type { Template } from "$lib/types/display";
+import type { Template, TileConfig } from "$lib/types/display";
 
 const ctl = (
   id: string,
@@ -357,6 +358,28 @@ it("returns no bindings for an anchorless HTML template", () => {
     slots: [{ kind: "html", options: { html: "<p>x</p>" } }],
   } as unknown as Template;
   expect(templateBindingRows(t)).toEqual([]);
+});
+
+it("seeds a new tile from the template defaults", () => {
+  const template = {
+    id: "html-only",
+    name: "HTML only",
+    type: "Custom",
+    bindings: "none",
+    size: { w: 3, h: 2 },
+    border: false,
+    padding: false,
+    features: [],
+    slots: [{ kind: "html", label: "Body" }],
+  } as unknown as Template;
+  const seed = templateTileSeed(template);
+  expect(seed.title).toBe("HTML only");
+  expect(applyTileSeed({} as TileConfig, seed)).toMatchObject({
+    size: { w: 3, h: 2 },
+    border: false,
+    padding: false,
+    template: "html-only",
+  });
 });
 
 it("takes unambiguous auto-fills and lets manual choices win", () => {

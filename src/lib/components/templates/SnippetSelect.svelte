@@ -5,6 +5,7 @@
   import {
     ensurePluginContributions,
     getPluginContributions,
+    pluginContributionsProblem,
   } from "$lib/stores/plugin-contributions.svelte";
   import { getPluginsVersion } from "$lib/stores/plugins.svelte";
 
@@ -55,3 +56,9 @@
     <option value={choice.id}>{choice.name}</option>
   {/each}
 </select>
+
+{#if pluginContributionsProblem() || pluginSet.problems.length}
+  <p class="hint text-danger">
+    {pluginContributionsProblem() || pluginSet.problems.join(" ")}
+  </p>
+{/if}

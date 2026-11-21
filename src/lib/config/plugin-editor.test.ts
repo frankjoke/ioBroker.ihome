@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PluginView } from "$adapter/plugin-admin";
-import { pluginEditorTabs } from "./plugin-editor";
+import { pluginEditorTabs, pluginShowsTimeout } from "./plugin-editor";
 
 function view(extra: Partial<PluginView> = {}): PluginView {
   return {
@@ -20,6 +20,14 @@ function view(extra: Partial<PluginView> = {}): PluginView {
     ...extra,
   } as PluginView;
 }
+
+describe("pluginShowsTimeout", () => {
+  it("shows it for built-ins and code plugins, not content-only ones", () => {
+    expect(pluginShowsTimeout(view({ builtin: true }))).toBe(true);
+    expect(pluginShowsTimeout(view({ hasCode: true }))).toBe(true);
+    expect(pluginShowsTimeout(view())).toBe(false);
+  });
+});
 
 describe("pluginEditorTabs", () => {
   it("shows Contributions for a content-only user plugin, no Code", () => {

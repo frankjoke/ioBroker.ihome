@@ -89,8 +89,14 @@ describe("createPluginHost", () => {
 
   it("keeps a content-only plugin active without a factory", async () => {
     let apiCalls = 0;
+    const content = () =>
+      plugin("tiles", undefined, 5000, {
+        contributions: {
+          snippets: [{ id: "s", name: "Snippet", code: "x" }],
+        },
+      });
     const host = createPluginHost(
-      [plugin("tiles", undefined)],
+      [content()],
       () => {
         apiCalls += 1;
         return fakeApi();
@@ -103,12 +109,24 @@ describe("createPluginHost", () => {
     expect(host.has("tiles")).toBe(false);
     expect(host.status("tiles")).toBe("running");
 
-    await host.setEnabled({ ...plugin("tiles", undefined), enabled: false });
+    await host.setEnabled({ ...content(), enabled: false });
     expect(host.status("tiles")).toBe("disabled");
 
-    await host.setEnabled(plugin("tiles", undefined));
+    await host.setEnabled(content());
     expect(host.status("tiles")).toBe("running");
     expect(apiCalls).toBe(0);
+  });
+
+  it("fails a code-less plugin without contributions", async () => {
+    const host = createPluginHost(
+      [plugin("broken", undefined)],
+      () => fakeApi(),
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(host.status("broken")).toBe("failed");
+    expect(host.has("broken")).toBe(false);
   });
 
   it("serializes two calls and runs start before the first call", async () => {

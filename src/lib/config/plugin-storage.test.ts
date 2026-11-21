@@ -104,6 +104,32 @@ it("writes a content-only plugin without an index.js", async () => {
   setMetaTransport(null);
 });
 
+it("refuses an invalid contributions envelope before writing", async () => {
+  const { files } = memory({
+    "plugins/clock/plugin.json": JSON.stringify({
+      id: "clock",
+      name: "Clock",
+    }),
+  });
+  await expect(
+    savePluginManifest("clock", {
+      name: "Clock",
+      help: "",
+      usage: "",
+      contributions: { tiles: [] },
+    }),
+  ).rejects.toThrow(/contributions/i);
+  expect(JSON.parse(files["plugins/clock/plugin.json"]).name).toBe("Clock");
+  await expect(
+    writePluginFiles({
+      id: "tiles",
+      name: "Tiles",
+      contributions: { tiles: [] },
+    }),
+  ).rejects.toThrow(/contributions/i);
+  setMetaTransport(null);
+});
+
 it("reports a broken manifest instead of overwriting it", async () => {
   memory({ "plugins/clock/plugin.json": "{oops" });
   await expect(

@@ -264,6 +264,11 @@
         {#if plugin.problem}
           <p class="row-error text-danger hint">{plugin.problem}</p>
         {/if}
+        {#if plugin.warnings?.length}
+          <p class="row-error text-warning hint">
+            {plugin.warnings.join(" ")}
+          </p>
+        {/if}
       </div>
       {#if open}
         <div class="item-editor">
