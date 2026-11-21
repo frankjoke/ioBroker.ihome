@@ -2,6 +2,26 @@
 /** The plugin API this adapter hosts; a file needing a newer one is refused. */
 export const SUPPORTED_PLUGIN_API = 1;
 
+import type { PluginSettingDef } from "./settings-schema";
+import { pluginSettingsSchema } from "./settings-schema";
+export {
+  MAX_SETTING_FIELDS,
+  MAX_SETTINGS_DEPTH,
+  MAX_SETTINGS_FIELDS_TOTAL,
+  parseSettingsSchema,
+  parseSettingsTabs,
+  pluginSettingsSchema,
+  settingsProblem,
+} from "./settings-schema";
+export type {
+  SettingsArrayItem,
+  SettingsField,
+  SettingsFieldType,
+  SettingsObjectSchema,
+  SettingsTabDef,
+} from "./settings-schema";
+export type { PluginSettingDef } from "./settings-schema";
+
 export interface AdapterPlugin {
   id: string;
   name: string;
@@ -53,15 +73,6 @@ export interface PluginBundleDevice {
 export interface PluginBundle {
   version: 1;
   device: PluginBundleDevice;
-}
-
-export interface PluginSettingDef {
-  name: string;
-  label: string;
-  type: "string" | "number" | "boolean" | "select" | "json";
-  default?: string | number | boolean;
-  description?: string;
-  options?: string[];
 }
 
 export interface BuiltinPluginDef {
@@ -356,16 +367,8 @@ export const MAX_PLUGIN_CODE = 200_000;
 export const MAX_PLUGIN_HELP = 20_000;
 export const MAX_PLUGIN_USAGE = 20_000;
 export const MAX_PLUGIN_SETTINGS = 20_000;
-export const MAX_SETTING_FIELDS = 40;
 
 const ID = /^[a-z][a-z0-9._-]{0,63}$/;
-const SETTING_TYPES = [
-  "string",
-  "number",
-  "boolean",
-  "select",
-  "json",
-] as const;
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -425,103 +428,6 @@ export function pluginSettings(
   } catch {
     return undefined;
   }
-}
-
-function settingDef(value: unknown): PluginSettingDef | null {
-  if (!record(value)) return null;
-  const name = textOf(value.name, 64);
-  const label = textOf(value.label, 80);
-  const type = SETTING_TYPES.find((candidate) => candidate === value.type);
-  if (!name || !label || !type) return null;
-  const def: PluginSettingDef = { name, label, type };
-  if (value.description !== undefined) {
-    const description = textOf(value.description, 500);
-    if (!description) return null;
-    def.description = description;
-  }
-  if (value.default !== undefined) {
-    if (
-      typeof value.default !== "string" &&
-      typeof value.default !== "number" &&
-      typeof value.default !== "boolean"
-    ) {
-      return null;
-    }
-    def.default = value.default;
-  }
-  if (type === "select") {
-    if (
-      !Array.isArray(value.options) ||
-      value.options.length === 0 ||
-      value.options.length > 50 ||
-      !value.options.every((option) => textOf(option, 80))
-    ) {
-      return null;
-    }
-    def.options = value.options as string[];
-  }
-  if (type === "json" && value.default !== undefined) {
-    if (typeof value.default !== "string") return null;
-  }
-  return def;
-}
-
-export function pluginSettingsSchema(
-  value: unknown,
-): PluginSettingDef[] | undefined {
-  const parsed = jsonish(value);
-  if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
-  if (parsed.length > MAX_SETTING_FIELDS) return undefined;
-  const schema: PluginSettingDef[] = [];
-  for (const entry of parsed) {
-    const def = settingDef(entry);
-    if (!def) return undefined;
-    schema.push(def);
-  }
-  return schema;
-}
-
-/** Strict check used when a page/import writes settings. */
-export function settingsProblem(
-  schema: PluginSettingDef[] | undefined,
-  settings: Record<string, unknown> | undefined,
-): string | null {
-  if (!settings) return null;
-  if (!record(settings)) return "settings must be an object";
-  if (!schema) return null;
-  for (const def of schema) {
-    const value = settings[def.name];
-    if (value === undefined) continue;
-    if (def.type === "string" && typeof value !== "string") {
-      return `settings.${def.name} must be a string`;
-    }
-    if (
-      def.type === "number" &&
-      (typeof value !== "number" || !Number.isFinite(value))
-    ) {
-      return `settings.${def.name} must be a number`;
-    }
-    if (def.type === "boolean" && typeof value !== "boolean") {
-      return `settings.${def.name} must be a boolean`;
-    }
-    if (
-      def.type === "select" &&
-      (typeof value !== "string" || !def.options?.includes(value))
-    ) {
-      return `settings.${def.name} must be one of ${def.options?.join(", ")}`;
-    }
-    if (def.type === "json") {
-      if (typeof value !== "string") {
-        return `settings.${def.name} must be a JSON string`;
-      }
-      try {
-        JSON.parse(value);
-      } catch {
-        return `settings.${def.name} must be valid JSON`;
-      }
-    }
-  }
-  return null;
 }
 
 export const MAX_PLUGIN_BUNDLE = 50_000;
