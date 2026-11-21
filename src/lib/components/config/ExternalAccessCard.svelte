@@ -1,6 +1,9 @@
 <script lang="ts">
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import SchemaSettingsEditor from "$lib/components/settings/SchemaSettingsEditor.svelte";
+  import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import {
     addExternalService,
@@ -29,7 +32,12 @@
     endpointToken,
     parseHttpInSettings,
   } from "$lib/config/http-in-endpoints";
-  import { getPlugins, loadPlugins } from "$lib/stores/plugins.svelte";
+  import {
+    getPlugins,
+    loadPlugins,
+    savePlugin,
+  } from "$lib/stores/plugins.svelte";
+  import type { PluginView } from "$adapter/plugin-admin";
   import { externalSessionSettings } from "$lib/config/locality";
   import {
     getSettings,
@@ -48,6 +56,28 @@
   let pendingRemove = $state<string | null>(null);
   let working = $state("");
   let externalNote = $state("");
+  const tabs = [
+    { id: "services", label: "Services", hint: "Public webhooks and proxies" },
+    { id: "users", label: "Users", hint: "Basic-Auth logins" },
+    {
+      id: "settings",
+      label: "Settings",
+      hint: "Folder, Caddyfile and public URL",
+    },
+    { id: "help", label: "Help", hint: "Setup guide" },
+  ];
+  let tab = $state("services");
+  let settingsDraft = $state<Record<string, unknown>>({});
+  let settingsInitial = $state("{}");
+  let settingsValid = $state(true);
+  let settingsSaving = $state(false);
+  let settingsError = $state("");
+  const pluginView = $derived(
+    getPlugins().find((plugin) => plugin.id === "external-access"),
+  );
+  const settingsDirty = $derived(
+    JSON.stringify(settingsDraft) !== settingsInitial,
+  );
 
   let openId = $state<string | null>(null);
   let draft = $state<ExternalServiceView | null>(null);
@@ -67,6 +97,42 @@
     void loadExternalAccess();
     if (getPlugins().length === 0) void loadPlugins();
   });
+
+  function settingsOf(view: PluginView): Record<string, unknown> {
+    const next: Record<string, unknown> = {};
+    for (const def of view.settingsSchema ?? []) {
+      if (def.default !== undefined) next[def.name] = def.default;
+    }
+    return { ...next, ...(view.settings ?? {}) };
+  }
+
+  $effect(() => {
+    const view = pluginView;
+    if (!view) return;
+    const next = settingsOf(view);
+    const text = JSON.stringify(next);
+    if (text === settingsInitial || settingsDirty) return;
+    settingsDraft = next;
+    settingsInitial = text;
+  });
+
+  async function saveSettings(): Promise<void> {
+    settingsError = "";
+    settingsSaving = true;
+    try {
+      await savePlugin({
+        id: "external-access",
+        settings: $state.snapshot(settingsDraft) as Record<string, unknown>,
+      });
+      await loadExternalAccess();
+      settingsInitial = JSON.stringify(settingsDraft);
+    } catch (failure) {
+      settingsError =
+        failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      settingsSaving = false;
+    }
+  }
 
   const users = $derived(getExternalUsers());
   const services = $derived(getExternalServices());
@@ -498,318 +564,378 @@
     </p>
   {/if}
 
-  <div class="users section-panel">
-    <div class="section-head">
-      <span class="label-mono">Users ({users.length})</span>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        onclick={() => (addOpen = true)}>New login</button
-      >
-    </div>
-    {#each users as row (row.user)}
-      <div class="user-row">
-        <span class="user-name">{row.user}</span>
-        {#if row.note}<span class="user-note text-muted">{row.note}</span>{/if}
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={row.enabled}
-            disabled={working === row.user}
-            onchange={(e) => void toggleUser(row.user, e.currentTarget.checked)}
-          />
-          <span>enabled</span>
-        </label>
-        <span class="user-actions">
-          <IconButton
-            icon="delete"
-            label={deleteTitle("login", row.user)}
-            danger
-            disabled={working === row.user}
-            onclick={() => (pendingRemove = row.user)}
-          />
-        </span>
+  <OptionTabs
+    bind:value={tab}
+    label="Caddy services"
+    {tabs}
+    collapsible={false}
+    showHint={false}
+  />
+
+  {#if tab === "users"}
+    <div class="users section-panel">
+      <div class="section-head">
+        <span class="label-mono">Users ({users.length})</span>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          onclick={() => (addOpen = true)}>New login</button
+        >
       </div>
-    {:else}
-      <p class="hint text-muted">No external logins yet.</p>
-    {/each}
-
-    {#if addOpen}
-      <div class="add-form">
-        <label class="field">
-          <span class="label-mono">User</span>
-          <input type="text" bind:value={name} autocomplete="off" />
-        </label>
-        <label class="field">
-          <span class="label-mono">Password</span>
-          <input
-            type="password"
-            bind:value={password}
-            autocomplete="new-password"
-          />
-        </label>
-        <label class="field">
-          <span class="label-mono">Note</span>
-          <input type="text" bind:value={note} placeholder="optional" />
-        </label>
-        <div class="add-actions">
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={generate}>Generate</button
-          >
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={working === "add" || !name.trim() || password.length < 8}
-            onclick={() => void add()}>Add</button
-          >
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => {
-              addOpen = false;
-              password = "";
-            }}>Cancel</button
-          >
-        </div>
-      </div>
-    {/if}
-
-    {#if added}
-      <p class="hint added">
-        Created. The password is shown once — copy it now:
-        <code>{added}</code>
-      </p>
-    {/if}
-  </div>
-
-  <div class="services section-panel">
-    <div class="section-head">
-      <span class="label-mono">Services ({services.length})</span>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        disabled={addServiceOpen}
-        onclick={startService}>+ Service</button
-      >
-    </div>
-
-    {#each services as service (service.id)}
-      {@const open = openId === service.id}
-      {@const link = linkFor(service)}
-      {@const token = tokenFor(service)}
-      <div class="item" class:open>
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="item-line" onclick={(e) => onServiceLine(e, service)}>
-          <span class="badge badge-secondary">{service.kind}</span>
-          <button
-            type="button"
-            class="name"
-            aria-expanded={open}
-            onclick={() => toggleService(service)}>{service.path}</button
-          >
-          <span class="mono upstream">{service.upstream}</span>
-          <span class="badge">{service.auth}</span>
-          {#if service.kind === "webhook"}
-            <span
-              class="badge"
-              class:badge-warning={token.source === "none"}
-              title="http.in token"
-              >{token.source === "none"
-                ? "no token"
-                : token.source === "global"
-                  ? "global token"
-                  : "endpoint token"}</span
-            >
-          {/if}
+      {#each users as row (row.user)}
+        <div class="user-row">
+          <span class="user-name">{row.user}</span>
+          {#if row.note}<span class="user-note text-muted">{row.note}</span
+            >{/if}
           <label class="check">
             <input
               type="checkbox"
-              checked={open && draft ? draft.enabled : service.enabled}
-              disabled={working === `toggle:${service.id}`}
+              checked={row.enabled}
+              disabled={working === row.user}
               onchange={(e) =>
-                void toggleServiceEnabled(service, e.currentTarget.checked)}
+                void toggleUser(row.user, e.currentTarget.checked)}
             />
             <span>enabled</span>
           </label>
-          <span class="item-actions">
-            <IconButton
-              icon="content_copy"
-              label={`Copy link for ${service.path}`}
-              title={copied === service.id ? "Copied." : "Copy link"}
-              disabled={!link}
-              onclick={() => void copyLink(service)}
-            />
+          <span class="user-actions">
             <IconButton
               icon="delete"
-              label={deleteTitle("service", service.path)}
+              label={deleteTitle("login", row.user)}
               danger
-              disabled={working === `delete:${service.id}`}
-              onclick={() => (pendingDelete = service)}
+              disabled={working === row.user}
+              onclick={() => (pendingRemove = row.user)}
             />
-            {#if open}
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                disabled={!serviceDirty() || working === `save:${service.id}`}
-                onclick={() => void saveService()}>Save</button
-              >
-            {/if}
           </span>
         </div>
-        {#if copied === service.id}
-          <p class="hint text-muted">Copied.</p>
-        {/if}
+      {:else}
+        <p class="hint text-muted">No external logins yet.</p>
+      {/each}
 
-        {#if open && draft}
-          <div class="item-editor service-editor">
-            <div class="fields">
-              {#if draft.kind === "webhook"}
-                <label class="field">
-                  <span class="label-mono">http.in endpoint</span>
-                  <select
-                    bind:value={draft.endpoint}
-                    onchange={draftEndpointChanged}
-                  >
-                    {#each endpointChoices(draft) as endpoint (endpoint.path)}
-                      <option value={endpoint.path}>{endpoint.path}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="field">
-                  <span class="label-mono">Path</span>
-                  <input value={draft.path} readonly tabindex="-1" />
-                </label>
-              {:else}
-                <label class="field">
-                  <span class="label-mono">Path</span>
-                  <input type="text" bind:value={draft.path} />
-                </label>
-              {/if}
-              <label class="field">
-                <span class="label-mono">Upstream</span>
-                <input type="text" bind:value={draft.upstream} />
-              </label>
-              {#if draft.kind === "proxy"}
-                <label class="check">
-                  <input type="checkbox" bind:checked={draft.stripPrefix} />
-                  <span>strip prefix</span>
-                </label>
-              {/if}
-            </div>
-
-            {#if draft.kind === "webhook"}
-              <div class="token-line">
-                <span class="label-mono">Token</span>
-                {#if token.source === "none"}
-                  <span class="badge badge-warning">no token</span>
-                  <span class="hint text-danger"
-                    >This route is public until you set a token.</span
-                  >
-                {:else}
-                  <code>{maskToken(token.token)}</code>
-                  <span class="badge"
-                    >{token.source === "endpoint"
-                      ? "endpoint"
-                      : "global token"}</span
-                  >
-                {/if}
-                <IconButton
-                  icon="key"
-                  label={`Rotate the token for ${draft.path}`}
-                  title="Rotate token"
-                  disabled={working === `token:${draft.id}`}
-                  onclick={() => void rotateToken(draft!)}
-                />
-                <span class="token-link">
-                  {#if link}<code>{link}</code>{:else}
-                    <span class="hint text-muted">No token — no link.</span>
-                  {/if}
-                </span>
-              </div>
-            {:else}
-              <p class="hint text-muted">
-                Basic Auth · <code>{linkFor(draft)}</code>
-              </p>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    {:else}
-      <p class="hint text-muted">No services yet.</p>
-    {/each}
-
-    {#if addServiceOpen}
-      <div class="card form-card service-form">
-        <div class="fields">
+      {#if addOpen}
+        <div class="add-form">
           <label class="field">
-            <span class="label-mono">Kind</span>
-            <select bind:value={addKind}>
-              <option value="webhook">webhook</option>
-              <option value="proxy">proxy</option>
-            </select>
+            <span class="label-mono">User</span>
+            <input type="text" bind:value={name} autocomplete="off" />
           </label>
-          {#if addKind === "webhook"}
-            <label class="field">
-              <span class="label-mono">http.in endpoint</span>
-              <select bind:value={addEndpoint} onchange={endpointChanged}>
-                <option value="">choose…</option>
-                {#each availableEndpoints as endpoint (endpoint.path)}
-                  <option value={endpoint.path}>{endpoint.path}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="field">
-              <span class="label-mono">Path</span>
-              <input value={addPath} readonly tabindex="-1" />
-            </label>
-            {#if availableEndpoints.length === 0}
-              <p class="hint text-muted">
-                Every http.in endpoint is already exposed.
-              </p>
-            {/if}
-          {:else}
-            <label class="field">
-              <span class="label-mono">Path</span>
-              <input type="text" bind:value={addPath} placeholder="/opencode" />
-            </label>
-          {/if}
           <label class="field">
-            <span class="label-mono">Upstream</span>
+            <span class="label-mono">Password</span>
             <input
-              type="text"
-              bind:value={addUpstream}
-              placeholder="127.0.0.1:49374"
+              type="password"
+              bind:value={password}
+              autocomplete="new-password"
             />
           </label>
-          {#if addKind === "proxy"}
+          <label class="field">
+            <span class="label-mono">Note</span>
+            <input type="text" bind:value={note} placeholder="optional" />
+          </label>
+          <div class="add-actions">
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={generate}>Generate</button
+            >
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={working === "add" ||
+                !name.trim() ||
+                password.length < 8}
+              onclick={() => void add()}>Add</button
+            >
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => {
+                addOpen = false;
+                password = "";
+              }}>Cancel</button
+            >
+          </div>
+        </div>
+      {/if}
+
+      {#if added}
+        <p class="hint added">
+          Created. The password is shown once — copy it now:
+          <code>{added}</code>
+        </p>
+      {/if}
+    </div>
+  {/if}
+
+  {#if tab === "services"}
+    <div class="services section-panel">
+      <div class="section-head">
+        <span class="label-mono">Services ({services.length})</span>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          disabled={addServiceOpen}
+          onclick={startService}>+ Service</button
+        >
+      </div>
+
+      {#each services as service (service.id)}
+        {@const open = openId === service.id}
+        {@const link = linkFor(service)}
+        {@const token = tokenFor(service)}
+        <div class="item" class:open>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="item-line" onclick={(e) => onServiceLine(e, service)}>
+            <span class="badge badge-secondary">{service.kind}</span>
+            <button
+              type="button"
+              class="name"
+              aria-expanded={open}
+              onclick={() => toggleService(service)}>{service.path}</button
+            >
+            <span class="mono upstream">{service.upstream}</span>
+            <span class="badge">{service.auth}</span>
+            {#if service.kind === "webhook"}
+              <span
+                class="badge"
+                class:badge-warning={token.source === "none"}
+                title="http.in token"
+                >{token.source === "none"
+                  ? "no token"
+                  : token.source === "global"
+                    ? "global token"
+                    : "endpoint token"}</span
+              >
+            {/if}
             <label class="check">
-              <input type="checkbox" bind:checked={addStrip} />
-              <span>strip prefix</span>
+              <input
+                type="checkbox"
+                checked={open && draft ? draft.enabled : service.enabled}
+                disabled={working === `toggle:${service.id}`}
+                onchange={(e) =>
+                  void toggleServiceEnabled(service, e.currentTarget.checked)}
+              />
+              <span>enabled</span>
             </label>
+            <span class="item-actions">
+              <IconButton
+                icon="content_copy"
+                label={`Copy link for ${service.path}`}
+                title={copied === service.id ? "Copied." : "Copy link"}
+                disabled={!link}
+                onclick={() => void copyLink(service)}
+              />
+              <IconButton
+                icon="delete"
+                label={deleteTitle("service", service.path)}
+                danger
+                disabled={working === `delete:${service.id}`}
+                onclick={() => (pendingDelete = service)}
+              />
+              {#if open}
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={!serviceDirty() || working === `save:${service.id}`}
+                  onclick={() => void saveService()}>Save</button
+                >
+              {/if}
+            </span>
+          </div>
+          {#if copied === service.id}
+            <p class="hint text-muted">Copied.</p>
+          {/if}
+
+          {#if open && draft}
+            <div class="item-editor service-editor">
+              <div class="fields">
+                {#if draft.kind === "webhook"}
+                  <label class="field">
+                    <span class="label-mono">http.in endpoint</span>
+                    <select
+                      bind:value={draft.endpoint}
+                      onchange={draftEndpointChanged}
+                    >
+                      {#each endpointChoices(draft) as endpoint (endpoint.path)}
+                        <option value={endpoint.path}>{endpoint.path}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="label-mono">Path</span>
+                    <input value={draft.path} readonly tabindex="-1" />
+                  </label>
+                {:else}
+                  <label class="field">
+                    <span class="label-mono">Path</span>
+                    <input type="text" bind:value={draft.path} />
+                  </label>
+                {/if}
+                <label class="field">
+                  <span class="label-mono">Upstream</span>
+                  <input type="text" bind:value={draft.upstream} />
+                </label>
+                {#if draft.kind === "proxy"}
+                  <label class="check">
+                    <input type="checkbox" bind:checked={draft.stripPrefix} />
+                    <span>strip prefix</span>
+                  </label>
+                {/if}
+              </div>
+
+              {#if draft.kind === "webhook"}
+                <div class="token-line">
+                  <span class="label-mono">Token</span>
+                  {#if token.source === "none"}
+                    <span class="badge badge-warning">no token</span>
+                    <span class="hint text-danger"
+                      >This route is public until you set a token.</span
+                    >
+                  {:else}
+                    <code>{maskToken(token.token)}</code>
+                    <span class="badge"
+                      >{token.source === "endpoint"
+                        ? "endpoint"
+                        : "global token"}</span
+                    >
+                  {/if}
+                  <IconButton
+                    icon="key"
+                    label={`Rotate the token for ${draft.path}`}
+                    title="Rotate token"
+                    disabled={working === `token:${draft.id}`}
+                    onclick={() => void rotateToken(draft!)}
+                  />
+                  <span class="token-link">
+                    {#if link}<code>{link}</code>{:else}
+                      <span class="hint text-muted">No token — no link.</span>
+                    {/if}
+                  </span>
+                </div>
+              {:else}
+                <p class="hint text-muted">
+                  Basic Auth · <code>{linkFor(draft)}</code>
+                </p>
+              {/if}
+            </div>
           {/if}
         </div>
-        <div class="add-actions">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={working === "add-service" ||
-              !addPath.trim() ||
-              !addUpstream.trim() ||
-              (addKind === "webhook" && !addEndpoint)}
-            onclick={() => void createService()}>Add</button
-          >
-          <button
-            type="button"
-            class="btn btn-outline btn-sm"
-            onclick={() => (addServiceOpen = false)}>Cancel</button
-          >
+      {:else}
+        <p class="hint text-muted">No services yet.</p>
+      {/each}
+
+      {#if addServiceOpen}
+        <div class="card form-card service-form">
+          <div class="fields">
+            <label class="field">
+              <span class="label-mono">Kind</span>
+              <select bind:value={addKind}>
+                <option value="webhook">webhook</option>
+                <option value="proxy">proxy</option>
+              </select>
+            </label>
+            {#if addKind === "webhook"}
+              <label class="field">
+                <span class="label-mono">http.in endpoint</span>
+                <select bind:value={addEndpoint} onchange={endpointChanged}>
+                  <option value="">choose…</option>
+                  {#each availableEndpoints as endpoint (endpoint.path)}
+                    <option value={endpoint.path}>{endpoint.path}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="field">
+                <span class="label-mono">Path</span>
+                <input value={addPath} readonly tabindex="-1" />
+              </label>
+              {#if availableEndpoints.length === 0}
+                <p class="hint text-muted">
+                  Every http.in endpoint is already exposed.
+                </p>
+              {/if}
+            {:else}
+              <label class="field">
+                <span class="label-mono">Path</span>
+                <input
+                  type="text"
+                  bind:value={addPath}
+                  placeholder="/opencode"
+                />
+              </label>
+            {/if}
+            <label class="field">
+              <span class="label-mono">Upstream</span>
+              <input
+                type="text"
+                bind:value={addUpstream}
+                placeholder="127.0.0.1:49374"
+              />
+            </label>
+            {#if addKind === "proxy"}
+              <label class="check">
+                <input type="checkbox" bind:checked={addStrip} />
+                <span>strip prefix</span>
+              </label>
+            {/if}
+          </div>
+          <div class="add-actions">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={working === "add-service" ||
+                !addPath.trim() ||
+                !addUpstream.trim() ||
+                (addKind === "webhook" && !addEndpoint)}
+              onclick={() => void createService()}>Add</button
+            >
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onclick={() => (addServiceOpen = false)}>Cancel</button
+            >
+          </div>
         </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if tab === "settings"}
+    {#if pluginView}
+      {#if pluginView.settingsSchema?.length}
+        <SchemaSettingsEditor
+          schema={pluginView.settingsSchema}
+          bind:values={settingsDraft}
+          bind:valid={settingsValid}
+        />
+      {:else}
+        <p class="hint text-muted">This plugin has no settings.</p>
+      {/if}
+      {#if settingsError}
+        <p class="hint text-danger">{settingsError}</p>
+      {/if}
+      <div class="actions">
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          disabled={!settingsDirty || !settingsValid || settingsSaving}
+          onclick={() => void saveSettings()}
+          >{settingsSaving ? "Saving…" : "Save settings"}</button
+        >
       </div>
+    {:else}
+      <p class="hint text-muted">Plugin settings are not loaded yet.</p>
     {/if}
-  </div>
+  {/if}
+
+  {#if tab === "help"}
+    {#if pluginView?.usage}
+      <HelpSection help={pluginView.usage} static plain />
+    {:else}
+      <p class="hint text-muted">No setup guide is stored for this plugin.</p>
+    {/if}
+    <p class="hint text-muted">
+      Technical settings and import/export:
+      <a href="{base}/#/plugins">Advanced → Plugins → Caddy services</a>.
+    </p>
+  {/if}
 
   <div class="actions">
     <button
