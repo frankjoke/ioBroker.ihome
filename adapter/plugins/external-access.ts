@@ -337,7 +337,7 @@ function folder(api: PluginApi): string {
   const dir = text(api.settings.dir);
   if (!dir) {
     throw new Error(
-      "Set the data folder in the plugin settings first (Advanced → Plugins → External access).",
+      "Set the data folder in the plugin settings first (Advanced → Plugins → Caddy services).",
     );
   }
   return dir;
@@ -514,14 +514,14 @@ async function status(api: PluginApi): Promise<unknown> {
         count: 0,
         enabled: 0,
         problem:
-          "Set the data folder in the plugin settings (Advanced → Plugins → External access).",
+          "Set the data folder in the plugin settings (Advanced → Plugins → Caddy services).",
       },
       snippet: { path: "", exists: false, current: false, users: 0 },
       services: {
         count: 0,
         enabled: 0,
         problem:
-          "Set the data folder in the plugin settings (Advanced → Plugins → External access).",
+          "Set the data folder in the plugin settings (Advanced → Plugins → Caddy services).",
       },
       servicesSnippet: { path: "", exists: false, current: false, blocks: 0 },
       caddy: {

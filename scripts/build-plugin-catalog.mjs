@@ -14,7 +14,7 @@ const plugin = {
   id: def.id,
   name: def.name,
   api: 1,
-  version: "1.0.0",
+  version: "1.1.0",
   timeoutMs: def.timeoutMs ?? 20000,
   ...(def.secured ? { secured: true } : {}),
   ...(def.help ? { help: def.help } : {}),
