@@ -90,3 +90,63 @@ it("refreshes the status after a toggle or removal", async () => {
   });
   expect(s.getExternalStatus()).toMatchObject({ snippet: { current: false } });
 });
+
+it("loads services with status and users", async () => {
+  h.replies["services.list"] = {
+    services: [
+      {
+        id: "a",
+        kind: "proxy",
+        path: "/a",
+        upstream: "127.0.0.1:1",
+        auth: "basic",
+        enabled: true,
+      },
+    ],
+  };
+  const s = await store();
+  await s.loadExternalAccess();
+  expect(h.send).toHaveBeenCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "services.list" },
+  });
+  expect(s.getExternalServices().map((row) => row.path)).toEqual(["/a"]);
+});
+
+it("maps service mutations and refreshes the status", async () => {
+  const service = {
+    id: "a",
+    kind: "proxy" as const,
+    path: "/a",
+    upstream: "127.0.0.1:1",
+    auth: "basic" as const,
+    enabled: true,
+  };
+  h.replies["services.add"] = {
+    services: [service],
+    snippet: { changed: true },
+  };
+  const s = await store();
+  await s.addExternalService(service);
+  expect(h.send).toHaveBeenCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "services.add", service },
+  });
+  await s.setExternalServiceEnabled("a", false);
+  expect(h.send).toHaveBeenCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: {
+      action: "services.update",
+      service: { ...service, enabled: false },
+    },
+  });
+  expect(h.send).toHaveBeenLastCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "status" },
+  });
+  await s.removeExternalService("a");
+  expect(h.send).toHaveBeenCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "services.remove", id: "a" },
+  });
+});

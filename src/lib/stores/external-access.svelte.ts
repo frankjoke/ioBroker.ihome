@@ -11,15 +11,31 @@ export interface ExternalUserView {
   enabled: boolean;
 }
 
+export interface ExternalServiceView {
+  id: string;
+  kind: "webhook" | "proxy";
+  path: string;
+  endpoint?: string;
+  upstream: string;
+  stripPrefix?: boolean;
+  auth: "token" | "basic";
+  enabled: boolean;
+}
+
 const PLUGIN = "external-access";
 
 let users = $state<ExternalUserView[]>([]);
+let services = $state<ExternalServiceView[]>([]);
 let status = $state<Record<string, unknown> | null>(null);
 let snippet = $state<Record<string, unknown> | null>(null);
 let problem = $state("");
 
 export function getExternalUsers(): ExternalUserView[] {
   return users;
+}
+
+export function getExternalServices(): ExternalServiceView[] {
+  return services;
 }
 
 export function getExternalStatus(): Record<string, unknown> | null {
@@ -68,11 +84,24 @@ function applyUsers(reply: unknown): void {
   );
 }
 
-/** Status first, then the list; a failure leaves the previous data alone. */
+function applyServices(reply: unknown): void {
+  if (!reply || typeof reply !== "object") return;
+  const rows = (reply as { services?: unknown }).services;
+  if (!Array.isArray(rows)) return;
+  services = rows.filter(
+    (row): row is ExternalServiceView =>
+      !!row &&
+      typeof row === "object" &&
+      typeof (row as { id?: unknown }).id === "string",
+  );
+}
+
+/** Status first, then the lists; a failure leaves the previous data alone. */
 export async function loadExternalAccess(): Promise<void> {
   try {
     await refreshStatus();
     applyUsers(await call("users.list"));
+    applyServices(await call("services.list"));
   } catch {
     /* problem already set */
   }
@@ -108,6 +137,38 @@ export async function setExternalUserEnabled(
 export async function removeExternalUser(user: string): Promise<void> {
   applyUsers(await call("users.remove", { user }));
   await refreshStatus();
+}
+
+export async function addExternalService(
+  service: ExternalServiceView,
+): Promise<void> {
+  applyServices(await call("services.add", { service }));
+  await refreshStatus();
+}
+
+export async function updateExternalService(
+  service: ExternalServiceView,
+): Promise<void> {
+  applyServices(await call("services.update", { service }));
+  await refreshStatus();
+}
+
+export async function setExternalServiceEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<void> {
+  const service = services.find((row) => row.id === id);
+  if (!service) throw new Error(`Unknown service: ${id}`);
+  await updateExternalService({ ...service, enabled });
+}
+
+export async function removeExternalService(id: string): Promise<void> {
+  applyServices(await call("services.remove", { id }));
+  await refreshStatus();
+}
+
+export async function writeExternalServicesSnippet(): Promise<unknown> {
+  return call("services.write");
 }
 
 export async function writeExternalSnippet(): Promise<void> {
