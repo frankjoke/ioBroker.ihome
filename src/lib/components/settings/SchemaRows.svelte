@@ -142,6 +142,7 @@
     if (hooks?.removeRow) {
       try {
         await hooks.removeRow(row);
+        if (open === index) closeNow();
       } catch (error) {
         problem = error instanceof Error ? error.message : String(error);
       }
