@@ -10,16 +10,17 @@ import {
   MAX_PLUGIN_HELP,
   MAX_PLUGIN_USAGE,
   SUPPORTED_PLUGIN_API,
-  pluginBundleOf,
   parseSettingsTabs,
+  pluginContributionsOf,
   pluginSettingsSchema,
   validPluginId,
   type AdapterPlugin,
   type PluginBundle,
+  type PluginContributions,
   type PluginSettingDef,
   type SettingsTabDef,
 } from "./plugin-ops";
-import type { ImportedPlugin } from "./plugin-file";
+import { BUNDLE_WARNING, type ImportedPlugin } from "./plugin-file";
 
 export interface PluginManifest {
   id: string;
@@ -32,7 +33,9 @@ export interface PluginManifest {
   usage?: string;
   settingsSchema?: PluginSettingDef[];
   settingsTabs?: SettingsTabDef[];
+  /** Retired: accepted from old folders and ignored. */
   bundle?: PluginBundle;
+  contributions?: PluginContributions;
 }
 
 export interface PluginRuntime {
@@ -45,7 +48,9 @@ export interface PluginRuntime {
 
 export interface PluginFiles {
   manifest: PluginManifest;
-  code: string;
+  code?: string;
+  contributions?: PluginContributions;
+  warnings?: string[];
 }
 
 /** The file requests this module needs; the adapter class provides them. */
@@ -173,11 +178,9 @@ export async function readPluginFiles(
     }
   }
 
-  const code = await readText(host, `${PLUGIN_DIR}/${pluginId}/index.js`);
-  if (code === null || !code.trim()) {
-    return { problem: `plugins/${pluginId}/index.js is missing.` };
-  }
-  if (code.length > MAX_PLUGIN_CODE) {
+  const codeText = await readText(host, `${PLUGIN_DIR}/${pluginId}/index.js`);
+  const code = codeText?.trim() ? codeText : undefined;
+  if (code && code.length > MAX_PLUGIN_CODE) {
     return { problem: `plugins/${pluginId}/index.js is too large.` };
   }
 
@@ -201,13 +204,20 @@ export async function readPluginFiles(
       problem: `plugins/${pluginId}/plugin.json has invalid settings tabs.`,
     };
   }
-  const bundle =
-    raw.bundle === undefined ? undefined : pluginBundleOf(raw.bundle);
-  if (raw.bundle !== undefined && !bundle) {
-    return {
-      problem: `plugins/${pluginId}/plugin.json has an invalid device bundle.`,
-    };
+  let contributions: PluginContributions | undefined;
+  if (raw.contributions !== undefined) {
+    const parsed = pluginContributionsOf(raw.contributions);
+    if ("problem" in parsed) {
+      return {
+        problem: `plugins/${pluginId}/plugin.json has invalid contributions: ${parsed.problem}`,
+      };
+    }
+    contributions = parsed.contributions;
   }
+  if (!code && !contributions) {
+    return { problem: `plugins/${pluginId}/index.js is missing.` };
+  }
+  const warnings = raw.bundle !== undefined ? [BUNDLE_WARNING] : [];
 
   const manifest: PluginManifest = {
     id: pluginId,
@@ -222,9 +232,16 @@ export async function readPluginFiles(
       : {}),
     ...(settingsSchema ? { settingsSchema } : {}),
     ...(settingsTabs ? { settingsTabs } : {}),
-    ...(bundle ? { bundle } : {}),
+    ...(contributions ? { contributions } : {}),
   };
-  return { files: { manifest, code } };
+  return {
+    files: {
+      manifest,
+      ...(code ? { code } : {}),
+      ...(contributions ? { contributions } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    },
+  };
 }
 
 /** File content plus the config's runtime flags → the shape the host starts. */
@@ -254,8 +271,11 @@ export function mergePlugin(
       ? { settingsSchema: manifest.settingsSchema }
       : {}),
     ...(manifest.settingsTabs ? { settingsTabs: manifest.settingsTabs } : {}),
-    ...(manifest.bundle ? { bundle: manifest.bundle } : {}),
-    code,
+    ...(manifest.contributions
+      ? { contributions: manifest.contributions }
+      : {}),
+    ...(files.warnings ? { warnings: files.warnings } : {}),
+    ...(code ? { code } : {}),
   };
 }
 
@@ -267,18 +287,22 @@ export async function ensurePluginFiles(
 ): Promise<{ ok: true } | { problem: string }> {
   const existing = await readPluginFiles(host, plugin.id);
   if (!("problem" in existing)) return { ok: true };
-  if (!plugin.code?.trim()) return { problem: existing.problem };
+  if (!plugin.code?.trim() && !plugin.contributions) {
+    return { problem: existing.problem };
+  }
   try {
     await host.writeFileAsync(
       META_ADAPTER,
       `${PLUGIN_DIR}/${plugin.id}/plugin.json`,
       JSON.stringify(pluginManifestOf(plugin), null, 2),
     );
-    await host.writeFileAsync(
-      META_ADAPTER,
-      `${PLUGIN_DIR}/${plugin.id}/index.js`,
-      plugin.code,
-    );
+    if (plugin.code?.trim()) {
+      await host.writeFileAsync(
+        META_ADAPTER,
+        `${PLUGIN_DIR}/${plugin.id}/index.js`,
+        plugin.code,
+      );
+    }
   } catch (error) {
     return { problem: String(error) };
   }
@@ -298,7 +322,7 @@ export function pluginManifestOf(
     | "usage"
     | "settingsSchema"
     | "settingsTabs"
-    | "bundle"
+    | "contributions"
   >,
 ): PluginManifest {
   return {
@@ -310,7 +334,7 @@ export function pluginManifestOf(
     ...(plugin.usage ? { usage: plugin.usage } : {}),
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
-    ...(plugin.bundle ? { bundle: plugin.bundle } : {}),
+    ...(plugin.contributions ? { contributions: plugin.contributions } : {}),
   };
 }
 
@@ -339,8 +363,10 @@ export async function adoptFilePlugin(
       ? { settingsSchema: artifact.settingsSchema }
       : {}),
     ...(artifact.settingsTabs ? { settingsTabs: artifact.settingsTabs } : {}),
-    ...(artifact.bundle ? { bundle: artifact.bundle } : {}),
-    code: artifact.code,
+    ...(artifact.contributions
+      ? { contributions: artifact.contributions }
+      : {}),
+    ...(artifact.code ? { code: artifact.code } : {}),
   });
   if ("problem" in ensured) return { problem: ensured.problem };
   return { entry: runtime };

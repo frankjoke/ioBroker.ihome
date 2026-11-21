@@ -159,14 +159,11 @@ it("reports a folder that cannot be listed", async () => {
   expect(logs[0]).toContain("not a meta object");
 });
 
-it("rejects an invalid settings schema or bundle", async () => {
-  const base = {
-    "ihome.meta/plugins/clock/index.js": "module.exports = {}",
-  };
+it("rejects an invalid settings schema", async () => {
   expect(
     await readPluginFiles(
       host({
-        ...base,
+        "ihome.meta/plugins/clock/index.js": "module.exports = {}",
         "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
           id: "clock",
           name: "Clock",
@@ -176,19 +173,29 @@ it("rejects an invalid settings schema or bundle", async () => {
       "clock",
     ),
   ).toMatchObject({ problem: expect.stringMatching(/settings schema/) });
-  expect(
-    await readPluginFiles(
-      host({
-        ...base,
-        "ihome.meta/plugins/clock/plugin.json": JSON.stringify({
-          id: "clock",
-          name: "Clock",
-          bundle: { device: {} },
-        }),
+});
+
+it("reads a content-only plugin folder and warns about a retired bundle", async () => {
+  const result = await readPluginFiles(
+    host({
+      "ihome.meta/plugins/tiles/plugin.json": JSON.stringify({
+        id: "tiles",
+        name: "Tiles",
+        bundle: { device: {} },
+        contributions: {
+          tiles: [
+            { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+          ],
+        },
       }),
-      "clock",
-    ),
-  ).toMatchObject({ problem: expect.stringMatching(/bundle/) });
+    }),
+    "tiles",
+  );
+  expect("files" in result).toBe(true);
+  if (!("files" in result)) return;
+  expect(result.files.code).toBeUndefined();
+  expect(result.files.contributions?.tiles).toHaveLength(1);
+  expect(result.files.warnings?.[0]).toMatch(/bundle/i);
 });
 
 it("reads the controller's { file, mimeType } result", async () => {
@@ -282,6 +289,11 @@ it("splits a config plugin into manifest and runtime", () => {
     usage: "u",
     settingsSchema: [{ name: "tz", label: "Zone", type: "string" as const }],
     settings: { tz: "UTC" },
+    contributions: {
+      tiles: [
+        { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+      ],
+    },
     code: "code",
   };
   expect(pluginManifestOf(plugin)).toEqual({
@@ -290,6 +302,7 @@ it("splits a config plugin into manifest and runtime", () => {
     help: "h",
     usage: "u",
     settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
+    contributions: plugin.contributions,
   });
   expect(runtimeOnly(plugin)).toEqual({
     id: "clock",
@@ -306,6 +319,21 @@ it("carries the manifest api and version into the plugin", () => {
     code: "module.exports = {}",
   };
   expect(mergePlugin(files)).toMatchObject({ api: 1, version: "2.0.0" });
+});
+
+it("carries contributions and warnings into a content-only plugin", () => {
+  const contributions = {
+    tiles: [
+      { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+    ],
+  };
+  const merged = mergePlugin({
+    manifest: { id: "tiles", name: "Tiles", contributions },
+    warnings: ["bundle is retired"],
+  });
+  expect(merged.contributions).toEqual(contributions);
+  expect(merged.warnings?.[0]).toMatch(/bundle/i);
+  expect(merged.code).toBeUndefined();
 });
 
 it("refuses a newer api or a bad version in a folder", async () => {

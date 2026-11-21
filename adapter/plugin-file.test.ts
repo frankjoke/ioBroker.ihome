@@ -78,7 +78,7 @@ describe("parsePluginFile", () => {
     ).toMatchObject({ problem: expect.any(String) });
   });
 
-  it("keeps a device template bundle", () => {
+  it("accepts a retired device bundle with a warning and drops it", () => {
     const bundle = {
       version: 1 as const,
       device: {
@@ -94,43 +94,43 @@ describe("parsePluginFile", () => {
         ],
       },
     };
+    const result = parsePluginFile({
+      ...base,
+      plugin: { ...base.plugin, bundle },
+    });
+    expect("plugin" in result && result.plugin.bundle).toBeUndefined();
+    expect("plugin" in result && result.warnings?.[0]).toMatch(/bundle/i);
+    expect(parsePluginFile({ ...base, plugin: { ...base.plugin, bundle: {} } }))
+      .toMatchObject({ warnings: [expect.stringMatching(/bundle/i)] });
+  });
+
+  it("parses a content-only plugin with a contribution", () => {
+    const contributions = {
+      tiles: [
+        { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+      ],
+    };
     expect(
       parsePluginFile({
         ...base,
-        plugin: { ...base.plugin, bundle },
+        plugin: { id: "demo.tiles", name: "Tiles", contributions },
       }),
     ).toEqual({
-      plugin: { ...base.plugin, api: 1, timeoutMs: 5000, bundle },
+      plugin: {
+        id: "demo.tiles",
+        name: "Tiles",
+        api: 1,
+        timeoutMs: 5000,
+        contributions,
+      },
     });
   });
 
-  it("rejects invalid device templates", () => {
-    const withBundle = (bundle: unknown) =>
-      parsePluginFile({
-        ...base,
-        plugin: { ...base.plugin, bundle },
-      });
-    expect(withBundle({ version: 2, device: { controls: [] } })).toMatchObject({
-      problem: expect.any(String),
+  it("rejects a plugin with neither code nor contributions", () => {
+    const { code: _code, ...withoutCode } = base.plugin;
+    expect(parsePluginFile({ ...base, plugin: withoutCode })).toMatchObject({
+      problem: expect.stringMatching(/code or contributions/i),
     });
-    expect(withBundle({ version: 1, device: { controls: [] } })).toMatchObject({
-      problem: expect.any(String),
-    });
-    expect(
-      withBundle({
-        version: 1,
-        device: { controls: [{ state: "x" }] },
-      }),
-    ).toMatchObject({ problem: expect.any(String) });
-    expect(
-      withBundle({
-        version: 1,
-        device: {
-          controls: [{ state: "x", feature: "value" }],
-          size: { w: 0, h: 1 },
-        },
-      }),
-    ).toMatchObject({ problem: expect.any(String) });
   });
 
   it("parses a built-in settings file without code", () => {

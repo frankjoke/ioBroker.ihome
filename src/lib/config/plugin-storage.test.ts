@@ -55,7 +55,12 @@ it("writes the manifest without runtime flags and the code beside it", async () 
   setMetaTransport(null);
 });
 
-it("rewrites name, help and usage but keeps schema and bundle", async () => {
+it("rewrites name, help and usage but keeps schema and contributions", async () => {
+  const contributions = {
+    tiles: [
+      { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+    ],
+  };
   const { files } = memory({
     "plugins/clock/plugin.json": JSON.stringify({
       id: "clock",
@@ -63,7 +68,7 @@ it("rewrites name, help and usage but keeps schema and bundle", async () => {
       help: "old",
       settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
       settingsTabs: [{ id: "zone", label: "Zone", fields: ["tz"] }],
-      bundle: { version: 1, device: { controls: [] } },
+      contributions,
     }),
   });
   await savePluginManifest("clock", {
@@ -77,8 +82,25 @@ it("rewrites name, help and usage but keeps schema and bundle", async () => {
     usage: "call it",
     settingsSchema: [{ name: "tz", label: "Zone", type: "string" }],
     settingsTabs: [{ id: "zone", label: "Zone", fields: ["tz"] }],
-    bundle: { version: 1, device: { controls: [] } },
+    contributions,
   });
+  setMetaTransport(null);
+});
+
+it("writes a content-only plugin without an index.js", async () => {
+  const { files } = memory({});
+  const contributions = {
+    tiles: [
+      { id: "pair", name: "Pair", type: "Custom", features: [], slots: [] },
+    ],
+  };
+  await writePluginFiles({ id: "tiles", name: "Tiles", contributions });
+  expect(JSON.parse(files["plugins/tiles/plugin.json"])).toEqual({
+    id: "tiles",
+    name: "Tiles",
+    contributions,
+  });
+  expect(files["plugins/tiles/index.js"]).toBeUndefined();
   setMetaTransport(null);
 });
 

@@ -6,7 +6,7 @@
 
 import { pluginManifestOf } from "$adapter/plugin-files";
 import type {
-  PluginBundle,
+  PluginContributions,
   PluginSettingDef,
   SettingsTabDef,
 } from "$adapter/plugin-ops";
@@ -32,11 +32,13 @@ export async function writePluginFiles(plugin: ImportedPlugin): Promise<void> {
     `${folder(plugin.id)}/plugin.json`,
     JSON.stringify(manifest, null, 2),
   );
-  await verifiedWrite(
-    META_ADAPTER,
-    `${folder(plugin.id)}/index.js`,
-    plugin.code,
-  );
+  if (plugin.code?.trim()) {
+    await verifiedWrite(
+      META_ADAPTER,
+      `${folder(plugin.id)}/index.js`,
+      plugin.code,
+    );
+  }
 }
 
 interface StoredManifest {
@@ -47,13 +49,18 @@ interface StoredManifest {
   usage?: string;
   settingsSchema?: PluginSettingDef[];
   settingsTabs?: SettingsTabDef[];
-  bundle?: PluginBundle;
+  contributions?: PluginContributions;
 }
 
-/** Rewrite the manifest fields the editor owns; code and bundle stay. */
+/** Rewrite the manifest fields the editor owns; code and contributions stay. */
 export async function savePluginManifest(
   id: string,
-  patch: { name: string; help: string; usage: string },
+  patch: {
+    name: string;
+    help: string;
+    usage: string;
+    contributions?: PluginContributions;
+  },
 ): Promise<void> {
   const path = `${folder(id)}/plugin.json`;
   const text = await readMetaText(META_ADAPTER, path);
@@ -67,6 +74,7 @@ export async function savePluginManifest(
   if (!current || typeof current !== "object") {
     throw new Error(`${path} must be an object.`);
   }
+  const contributions = patch.contributions ?? current.contributions;
   const manifest = pluginManifestOf({
     id,
     name: patch.name,
@@ -78,7 +86,7 @@ export async function savePluginManifest(
       ? { settingsSchema: current.settingsSchema }
       : {}),
     ...(current.settingsTabs ? { settingsTabs: current.settingsTabs } : {}),
-    ...(current.bundle ? { bundle: current.bundle } : {}),
+    ...(contributions ? { contributions } : {}),
   });
   await verifiedWrite(META_ADAPTER, path, JSON.stringify(manifest, null, 2));
 }

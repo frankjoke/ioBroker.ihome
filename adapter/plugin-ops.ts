@@ -4,6 +4,22 @@ export const SUPPORTED_PLUGIN_API = 1;
 
 import type { PluginSettingDef, SettingsTabDef } from "./settings-schema";
 import { parseSettingsTabs, pluginSettingsSchema } from "./settings-schema";
+import type { PluginContributions } from "./plugin-contributions";
+
+export type {
+  ContributionItem,
+  ContributionKind,
+  ContributionSummary,
+  PluginContributions,
+  PluginSnippet,
+} from "./plugin-contributions";
+export {
+  MAX_CONTRIBUTION,
+  MAX_CONTRIBUTIONS_PER_KIND,
+  MAX_PLUGIN_CONTRIBUTIONS,
+  contributionSummary,
+  pluginContributionsOf,
+} from "./plugin-contributions";
 export {
   MAX_SETTING_FIELDS,
   MAX_SETTINGS_DEPTH,
@@ -47,8 +63,12 @@ export interface AdapterPlugin {
   settingsSchema?: PluginSettingDef[];
   /** Optional tab layout over the settings schema. */
   settingsTabs?: SettingsTabDef[];
-  /** Declarative device the UI creates when the plugin is enabled. */
+  /** Retired: accepted from old manifests and ignored. */
   bundle?: PluginBundle;
+  /** Templates and snippets the plugin owns while installed and enabled. */
+  contributions?: PluginContributions;
+  /** Non-fatal manifest notes, e.g. a retired bundle field. */
+  warnings?: string[];
   code?: string;
 }
 

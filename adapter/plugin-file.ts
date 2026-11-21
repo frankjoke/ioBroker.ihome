@@ -7,7 +7,7 @@ import {
   MAX_PLUGIN_USAGE,
   MIN_PLUGIN_TIMEOUT_MS,
   SUPPORTED_PLUGIN_API,
-  pluginBundleOf,
+  pluginContributionsOf,
   pluginSettings,
   pluginSettingsSchema,
   parseSettingsTabs,
@@ -15,6 +15,7 @@ import {
   validPluginId,
   type BuiltinPluginDef,
   type PluginBundle,
+  type PluginContributions,
   type PluginSettingDef,
   type SettingsTabDef,
 } from "./plugin-ops";
@@ -37,8 +38,10 @@ export interface ImportedPlugin {
   settings?: Record<string, unknown>;
   settingsSchema?: PluginSettingDef[];
   settingsTabs?: SettingsTabDef[];
+  /** Retired: accepted from old files and ignored. */
   bundle?: PluginBundle;
-  code: string;
+  contributions?: PluginContributions;
+  code?: string;
 }
 
 export interface PluginFile {
@@ -49,6 +52,8 @@ export interface PluginFile {
 
 export const PLUGIN_FILE_FORMAT = "ihome-plugin";
 export const PLUGIN_FILE_VERSION = 1;
+export const BUNDLE_WARNING =
+  "The device bundle field is retired and was ignored; use contributions instead.";
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -62,7 +67,7 @@ function problem(message: string): { problem: string } {
 export function parsePluginFile(
   raw: unknown,
   builtins: readonly BuiltinPluginDef[] = BUILTIN_PLUGINS,
-): { plugin: ImportedPlugin } | { problem: string } {
+): { plugin: ImportedPlugin; warnings?: string[] } | { problem: string } {
   let value = raw;
   if (typeof value === "string") {
     try {
@@ -124,6 +129,7 @@ export function parsePluginFile(
         ...(settings ? { settings } : {}),
         code: "",
       },
+      ...(plugin.bundle !== undefined ? { warnings: [BUNDLE_WARNING] } : {}),
     };
   }
   if (plugin.builtin === true) {
@@ -134,7 +140,6 @@ export function parsePluginFile(
     return problem("The plugin name must be 1 to 64 characters.");
   }
   const code = typeof plugin.code === "string" ? plugin.code : "";
-  if (!code.trim()) return problem("The plugin needs non-empty code.");
   if (code.length > MAX_PLUGIN_CODE) {
     return problem(
       `The plugin code must be at most ${MAX_PLUGIN_CODE} characters.`,
@@ -191,11 +196,19 @@ export function parsePluginFile(
   if (plugin.settingsTabs !== undefined && !settingsTabs) {
     return problem("The settings tabs are invalid.");
   }
-  const bundle =
-    plugin.bundle !== undefined ? pluginBundleOf(plugin.bundle) : undefined;
-  if (plugin.bundle !== undefined && !bundle) {
-    return problem("The device template is invalid.");
+  let contributions: PluginContributions | undefined;
+  if (plugin.contributions !== undefined) {
+    const parsed = pluginContributionsOf(plugin.contributions);
+    if ("problem" in parsed) {
+      return problem(`The contributions are invalid: ${parsed.problem}`);
+    }
+    contributions = parsed.contributions;
   }
+  if (!code.trim() && !contributions) {
+    return problem("The plugin needs code or contributions.");
+  }
+  const warnings =
+    plugin.bundle !== undefined ? [BUNDLE_WARNING] : [];
 
   const timeoutMs =
     typeof plugin.timeoutMs === "number"
@@ -236,15 +249,16 @@ export function parsePluginFile(
       name,
       api,
       ...(version ? { version } : {}),
-      code,
+      ...(code.trim() ? { code } : {}),
       timeoutMs,
       ...(help ? { help } : {}),
       ...(usage ? { usage } : {}),
       ...(settings ? { settings } : {}),
       ...(settingsSchema ? { settingsSchema } : {}),
       ...(settingsTabs ? { settingsTabs } : {}),
-      ...(bundle ? { bundle } : {}),
+      ...(contributions ? { contributions } : {}),
     },
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }
 
