@@ -189,6 +189,9 @@
   const servicesValues = $derived({
     services: services.map((service) => ({ ...service })),
   });
+  const siteServices = $derived(
+    services.filter((service) => service.kind === "site"),
+  );
 
   function generate(): void {
     const bytes = new Uint8Array(12);
@@ -760,6 +763,13 @@
         values={servicesValues}
         hooks={serviceHooks}
       />
+
+      {#each siteServices as site (site.id)}
+        <p class="hint text-muted">
+          Site {site.port}: <code>{linkFor(site) || "set the public URL"}</code>
+          · forward this port in the router.
+        </p>
+      {/each}
 
       {#if addServiceOpen}
         <div class="card form-card service-form">
