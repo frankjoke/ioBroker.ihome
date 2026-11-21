@@ -146,7 +146,7 @@ export function objectProblem(
   schema: SettingsObjectSchema,
   value: Record<string, unknown>,
 ): string | null {
-  for (const field of schema.fields) {
+  for (const field of visibleFields(schema.fields, value)) {
     const problem = valueProblem(field, value[field.name]);
     if (problem) return problem;
   }

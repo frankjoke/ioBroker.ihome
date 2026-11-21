@@ -92,7 +92,7 @@ it("ships a plugin file whose code compiles to a factory", () => {
   expect("problem" in parsed).toBe(false);
   if (!("plugin" in parsed)) return;
   expect(parsed.plugin.api).toBe(1);
-  expect(parsed.plugin.version).toBe("1.1.0");
+  expect(parsed.plugin.version).toBe("1.2.0");
   const mod = { exports: {} as Record<string, unknown> };
   new Function("module", "exports", "require", parsed.plugin.code)(
     mod,

@@ -99,3 +99,20 @@ it("defaults new rows and filters hidden fields", () => {
     ),
   ).toBe("/a");
 });
+
+it("skips required fields that are hidden for the current kind", () => {
+  const schema: SettingsObjectSchema = {
+    fields: [
+      { name: "kind", label: "Kind", type: "string" },
+      {
+        name: "path",
+        label: "Path",
+        type: "string",
+        required: true,
+        visibleWhen: { field: "kind", equals: "proxy" },
+      },
+    ],
+  };
+  expect(objectProblem(schema, { kind: "site" })).toBeNull();
+  expect(objectProblem(schema, { kind: "proxy" })).toMatch(/required/);
+});

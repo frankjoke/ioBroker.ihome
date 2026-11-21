@@ -21,7 +21,7 @@
       "id": "external-access",
       "name": "Caddy services",
       "description": "Caddy logins and public webhook/proxy services: users, services.json, snippet, validate and reload.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "api": 1,
       "file": "external-access.json"
     }

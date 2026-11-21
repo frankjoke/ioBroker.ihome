@@ -24,12 +24,13 @@ export interface ExternalUserView {
 
 export interface ExternalServiceView {
   id: string;
-  kind: "webhook" | "proxy";
-  path: string;
+  kind: "webhook" | "proxy" | "site";
+  path?: string;
+  port?: number;
   endpoint?: string;
   upstream: string;
   stripPrefix?: boolean;
-  auth: "token" | "basic";
+  auth: "token" | "basic" | "none";
   enabled: boolean;
 }
 

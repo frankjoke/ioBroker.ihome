@@ -17,4 +17,13 @@ it("maps the endpoint options and kind-specific fields", () => {
     equals: "proxy",
   });
   expect(fields.find((field) => field.name === "kind")?.readonly).toBe(true);
+  expect(fields.find((field) => field.name === "port")?.visibleWhen).toEqual({
+    field: "kind",
+    equals: "site",
+  });
+  expect(fields.find((field) => field.name === "auth")?.options).toEqual([
+    "token",
+    "basic",
+    "none",
+  ]);
 });

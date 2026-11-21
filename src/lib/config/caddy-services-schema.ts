@@ -20,6 +20,15 @@ export function servicesSchema(endpoints: string[]): SettingsField[] {
             description: "Public base path; a webhook uses its endpoint path.",
           },
           {
+            name: "port",
+            label: "Port",
+            type: "number",
+            required: true,
+            visibleWhen: { field: "kind", equals: "site" },
+            description:
+              "Caddy listen port for this root site (forward it in the router).",
+          },
+          {
             name: "upstream",
             label: "Upstream",
             type: "string",
@@ -30,14 +39,14 @@ export function servicesSchema(endpoints: string[]): SettingsField[] {
             name: "kind",
             label: "Kind",
             type: "select",
-            options: ["webhook", "proxy"],
+            options: ["webhook", "proxy", "site"],
             readonly: true,
           },
           {
             name: "auth",
             label: "Auth",
             type: "select",
-            options: ["token", "basic"],
+            options: ["token", "basic", "none"],
             readonly: true,
           },
           {

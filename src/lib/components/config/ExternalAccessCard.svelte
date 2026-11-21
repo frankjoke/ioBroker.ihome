@@ -85,9 +85,11 @@
   let deleteReject: ((error: Error) => void) | null = null;
   let copied = $state("");
   let addServiceOpen = $state(false);
-  let addKind = $state<"webhook" | "proxy">("webhook");
+  let addKind = $state<"webhook" | "proxy" | "site">("webhook");
   let addEndpoint = $state("");
   let addPath = $state("");
+  let addPort = $state(8444);
+  let addAuth = $state<"basic" | "none">("basic");
   let addUpstream = $state("");
   let addStrip = $state(true);
 
@@ -155,9 +157,19 @@
       | { exists?: boolean; current?: boolean; path?: string; blocks?: number }
       | undefined) ?? {},
   );
+  const sitesSnippet = $derived(
+    (status?.sitesSnippet as
+      | { exists?: boolean; current?: boolean; path?: string; blocks?: number }
+      | undefined) ?? {},
+  );
   const caddy = $derived(
     (status?.caddy as
-      { importsSnippet?: boolean | null; config?: string } | undefined) ?? {},
+      | {
+          importsSnippet?: boolean | null;
+          importsSites?: boolean | null;
+          config?: string;
+        }
+      | undefined) ?? {},
   );
   const publicUrl = $derived(
     (status?.publicUrl as
@@ -285,11 +297,37 @@
     return endpointToken(endpointFor(service), httpView.globalToken);
   }
 
+  function publicHost(): string {
+    const url = publicUrl.url;
+    if (!url) return "";
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return "";
+    }
+  }
+
   function linkFor(service: ExternalServiceView): string {
+    if (service.kind === "site") {
+      const host = publicHost();
+      return host && service.port ? `https://${host}:${service.port}/` : "";
+    }
     const origin = publicUrl.url || location.origin;
+    if (!service.path) return "";
     if (service.kind === "proxy") return proxyLink(origin, service.path);
     const token = tokenFor(service).token;
     return token ? webhookLink(origin, service.path, token) : "";
+  }
+
+  function sitePortValid(): boolean {
+    const port = Number(addPort);
+    return (
+      Number.isInteger(port) &&
+      port >= 1 &&
+      port <= 65_535 &&
+      port !== 80 &&
+      port !== 443
+    );
   }
 
   async function rotateToken(service: ExternalServiceView): Promise<void> {
@@ -369,6 +407,8 @@
     const first = availableEndpoints[0];
     addEndpoint = first?.path ?? "";
     addPath = first?.path ?? "";
+    addPort = 8444;
+    addAuth = "basic";
     addUpstream = first
       ? `127.0.0.1:${first.port ?? httpView.defaultPort}`
       : "";
@@ -383,20 +423,33 @@
   }
 
   async function createService(): Promise<void> {
-    if (!addPath.trim() || !addUpstream.trim()) return;
-    const service: ExternalServiceView = {
-      id: serviceId(addPath.trim()),
-      kind: addKind,
-      path: addPath.trim(),
-      upstream: addUpstream.trim(),
-      auth: addKind === "webhook" ? "token" : "basic",
-      enabled: true,
-      ...(addKind === "webhook"
-        ? { endpoint: addEndpoint }
-        : addStrip
-          ? { stripPrefix: true }
-          : {}),
-    };
+    if (!addUpstream.trim()) return;
+    if (addKind === "site" && !sitePortValid()) return;
+    if (addKind !== "site" && !addPath.trim()) return;
+    if (addKind === "webhook" && !addEndpoint) return;
+    const service: ExternalServiceView =
+      addKind === "site"
+        ? {
+            id: serviceId(`site-${addPort}`),
+            kind: "site",
+            port: Number(addPort),
+            upstream: addUpstream.trim(),
+            auth: addAuth,
+            enabled: true,
+          }
+        : {
+            id: serviceId(addPath.trim()),
+            kind: addKind,
+            path: addPath.trim(),
+            upstream: addUpstream.trim(),
+            auth: addKind === "webhook" ? "token" : "basic",
+            enabled: true,
+            ...(addKind === "webhook"
+              ? { endpoint: addEndpoint }
+              : addStrip
+                ? { stripPrefix: true }
+                : {}),
+          };
     working = "add-service";
     outputs = "";
     try {
@@ -422,15 +475,17 @@
       },
       saveRow: async (row) => {
         const service = asService(row);
-        const next: ExternalServiceView = {
-          ...service,
-          path:
-            service.kind === "webhook"
-              ? (service.endpoint ?? service.path)
-              : service.path,
-        };
-        if (service.kind === "webhook") delete next.stripPrefix;
-        else delete next.endpoint;
+        const next: ExternalServiceView = { ...service };
+        if (service.kind === "site") {
+          delete next.path;
+          delete next.endpoint;
+          delete next.stripPrefix;
+        } else if (service.kind === "webhook") {
+          next.path = service.endpoint ?? service.path;
+          delete next.stripPrefix;
+        } else {
+          delete next.endpoint;
+        }
         await updateExternalService(
           $state.snapshot(next) as ExternalServiceView,
         );
@@ -443,6 +498,9 @@
         }),
       rowNote: (row) => {
         const service = asService(row);
+        if (service.kind === "site") {
+          return service.auth === "basic" ? "Basic Auth" : "upstream auth";
+        }
         if (service.kind !== "webhook") return "";
         const source = tokenFor(service).source;
         return source === "none"
@@ -455,11 +513,11 @@
         const service = asService(row);
         const link = linkFor(service);
         return [
-          ...(service.endpoint
+          ...(service.kind === "webhook" && service.endpoint
             ? [
                 {
                   icon: "key",
-                  label: `Rotate the token for ${service.path}`,
+                  label: `Rotate the token for ${service.path ?? ""}`,
                   title: "Rotate token",
                   disabled: working !== "",
                   onclick: () => void rotateToken(service),
@@ -468,7 +526,7 @@
             : []),
           {
             icon: "content_copy",
-            label: `Copy link for ${service.path}`,
+            label: `Copy link for ${service.path ?? `site ${service.port ?? ""}`}`,
             title: copied === service.id ? "Copied." : "Copy link",
             disabled: !link,
             onclick: () => void copyLink(service),
@@ -478,6 +536,22 @@
       validateItem: (row) => {
         const service = asService(row);
         if (!service.upstream?.trim()) return "Upstream is required.";
+        if (service.kind === "site") {
+          const port = service.port;
+          if (
+            !Number.isInteger(port) ||
+            (port ?? 0) < 1 ||
+            (port ?? 0) > 65_535 ||
+            port === 80 ||
+            port === 443
+          ) {
+            return "The port must be 1-65535 (not 80 or 443).";
+          }
+          if (service.auth !== "basic" && service.auth !== "none") {
+            return "Choose Basic Auth or upstream auth.";
+          }
+          return null;
+        }
         if (service.kind === "proxy" && !service.path?.trim()) {
           return "Path is required.";
         }
@@ -520,7 +594,14 @@
       class:badge-warning={!servicesSnippet.current}
       >{servicesSnippet.current ? "current" : "stale"}</span
     >
-    <span class="label-mono">Import</span>
+    <span class="label-mono">Sites snippet</span>
+    <span
+      class="badge"
+      class:badge-success={sitesSnippet.current}
+      class:badge-warning={!sitesSnippet.current}
+      >{sitesSnippet.current ? "current" : "stale"}</span
+    >
+    <span class="label-mono">Services import</span>
     <span
       class="badge"
       class:badge-success={caddy.importsSnippet === true}
@@ -529,6 +610,18 @@
       >{caddy.importsSnippet === true
         ? "current"
         : caddy.importsSnippet === false
+          ? "missing"
+          : "unknown"}</span
+    >
+    <span class="label-mono">Sites import</span>
+    <span
+      class="badge"
+      class:badge-success={caddy.importsSites === true}
+      class:badge-warning={caddy.importsSites === false}
+      class:badge-secondary={caddy.importsSites == null}
+      >{caddy.importsSites === true
+        ? "current"
+        : caddy.importsSites === false
           ? "missing"
           : "unknown"}</span
     >
@@ -676,6 +769,7 @@
               <select bind:value={addKind}>
                 <option value="webhook">webhook</option>
                 <option value="proxy">proxy</option>
+                <option value="site">site</option>
               </select>
             </label>
             {#if addKind === "webhook"}
@@ -697,7 +791,7 @@
                   Every http.in endpoint is already exposed.
                 </p>
               {/if}
-            {:else}
+            {:else if addKind === "proxy"}
               <label class="field">
                 <span class="label-mono">Path</span>
                 <input
@@ -705,6 +799,18 @@
                   bind:value={addPath}
                   placeholder="/opencode"
                 />
+              </label>
+            {:else}
+              <label class="field">
+                <span class="label-mono">Port</span>
+                <input type="number" min="1" max="65535" bind:value={addPort} />
+              </label>
+              <label class="field">
+                <span class="label-mono">Auth</span>
+                <select bind:value={addAuth}>
+                  <option value="basic">Basic Auth</option>
+                  <option value="none">upstream auth</option>
+                </select>
               </label>
             {/if}
             <label class="field">
@@ -727,8 +833,9 @@
               type="button"
               class="btn btn-primary btn-sm"
               disabled={working === "add-service" ||
-                !addPath.trim() ||
                 !addUpstream.trim() ||
+                (addKind === "site" && !sitePortValid()) ||
+                (addKind !== "site" && !addPath.trim()) ||
                 (addKind === "webhook" && !addEndpoint)}
               onclick={() => void createService()}>Add</button
             >
@@ -816,10 +923,15 @@
 
   {#if outputs}<pre class="output">{outputs}</pre>{/if}
   {#if problem}<p class="text-danger hint">{problem}</p>{/if}
-  {#if servicesSnippet.path}
+  {#if servicesSnippet.path || sitesSnippet.path}
     <p class="hint text-muted">
       Caddyfile imports:
-      <code>{`import ${servicesSnippet.path}`}</code>
+      {#if servicesSnippet.path}
+        <code>{`import ${servicesSnippet.path}`}</code> (inside the site)
+      {/if}
+      {#if sitesSnippet.path}
+        <code>{`import ${sitesSnippet.path}`}</code> (top level)
+      {/if}
     </p>
   {/if}
   {#if snippet?.path ?? snippetState.path}
