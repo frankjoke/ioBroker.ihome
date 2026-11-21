@@ -2,19 +2,23 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const replies: Record<string, unknown> = {};
+  const errors: Record<string, string> = {};
   const pluginViews: { id: string; settings?: Record<string, unknown> }[] = [];
   const savePlugin = vi.fn(async (patch?: unknown) => patch);
   const send = vi.fn(
     async (_ns: string, _cmd: string, payload: unknown): Promise<unknown> => {
       const action = (payload as { payload?: { action?: string } } | undefined)
         ?.payload?.action;
+      if (errors[action ?? ""]) {
+        return { ok: false, error: errors[action ?? ""] };
+      }
       return {
         ok: true,
         result: replies[action ?? ""] ?? { users: [] },
       };
     },
   );
-  return { replies, pluginViews, savePlugin, send };
+  return { replies, errors, pluginViews, savePlugin, send };
 });
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
@@ -29,6 +33,7 @@ vi.mock("$lib/stores/plugins.svelte", () => ({
 
 beforeEach(() => {
   for (const key of Object.keys(h.replies)) delete h.replies[key];
+  for (const key of Object.keys(h.errors)) delete h.errors[key];
   h.pluginViews.length = 0;
   h.savePlugin.mockClear();
   h.send.mockClear();
@@ -193,6 +198,31 @@ it("rotates an http.in endpoint token explicitly", async () => {
     id: "http.in",
     settings: { endpoints, token: "global", port: 3000 },
   });
+});
+
+it("creates a site pairing through the plugin action", async () => {
+  h.replies["site.pair"] = {
+    external: "https://home.example.net:8444/auth/connect/ABC",
+    internal: "http://192.168.1.5:49374/auth/connect/ABC",
+    expiresIn: 300,
+  };
+  const s = await store();
+  await expect(s.createSitePairing("site-8444")).resolves.toEqual(
+    h.replies["site.pair"],
+  );
+  expect(h.send).toHaveBeenLastCalledWith("ihome.0", "plugin", {
+    id: "external-access",
+    payload: { action: "site.pair", id: "site-8444" },
+  });
+});
+
+it("surfaces a pairing failure as the card problem", async () => {
+  h.errors["site.pair"] = "Read the OpenCode password from /x.";
+  const s = await store();
+  await expect(s.createSitePairing("site-8444")).rejects.toThrow(
+    /OpenCode password/,
+  );
+  expect(s.getExternalProblem()).toMatch(/OpenCode password/);
 });
 
 it("builds public links with the right shape", async () => {

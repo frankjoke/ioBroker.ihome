@@ -197,6 +197,30 @@ function randomToken(): string {
   );
 }
 
+export interface SitePairing {
+  external: string;
+  internal?: string;
+  expiresIn: number;
+}
+
+/** One-time OpenCode pairing links for a Caddy site service. */
+export async function createSitePairing(id: string): Promise<SitePairing> {
+  const result = (await call("site.pair", { id })) as
+    | Partial<SitePairing>
+    | undefined;
+  if (!result || typeof result.external !== "string" || !result.external) {
+    throw new Error("The pairing reply is invalid.");
+  }
+  return {
+    external: result.external,
+    ...(typeof result.internal === "string"
+      ? { internal: result.internal }
+      : {}),
+    expiresIn:
+      typeof result.expiresIn === "number" ? result.expiresIn : 300,
+  };
+}
+
 /**
  * Write an explicit token onto an `http.in` endpoint. The endpoint otherwise
  * falls back to the global plugin token, which the card must not pretend is

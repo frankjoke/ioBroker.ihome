@@ -8,6 +8,7 @@
   import {
     addExternalService,
     addExternalUser,
+    createSitePairing,
     getExternalProblem,
     getExternalServices,
     getExternalSnippet,
@@ -26,6 +27,7 @@
     writeExternalServicesSnippet,
     writeExternalSnippet,
     type ExternalServiceView,
+    type SitePairing,
   } from "$lib/stores/external-access.svelte";
   import {
     endpointToken,
@@ -84,6 +86,7 @@
   let deleteResolve: (() => void) | null = null;
   let deleteReject: ((error: Error) => void) | null = null;
   let copied = $state("");
+  let pairing = $state<({ id: string } & SitePairing) | null>(null);
   let addServiceOpen = $state(false);
   let addKind = $state<"webhook" | "proxy" | "site">("webhook");
   let addEndpoint = $state("");
@@ -361,6 +364,30 @@
     }
   }
 
+  async function pairDevice(service: ExternalServiceView): Promise<void> {
+    working = `pair:${service.id}`;
+    pairing = null;
+    try {
+      pairing = { id: service.id, ...(await createSitePairing(service.id)) };
+    } catch {
+      /* problem */
+    } finally {
+      working = "";
+    }
+  }
+
+  async function copyText(text: string, key: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = key;
+      setTimeout(() => {
+        if (copied === key) copied = "";
+      }, 1500);
+    } catch {
+      /* clipboard may be blocked on plain http */
+    }
+  }
+
   async function confirmDelete(): Promise<void> {
     const service = pendingDelete;
     pendingDelete = null;
@@ -524,6 +551,17 @@
                   title: "Rotate token",
                   disabled: working !== "",
                   onclick: () => void rotateToken(service),
+                },
+              ]
+            : []),
+          ...(service.kind === "site"
+            ? [
+                {
+                  icon: "key",
+                  label: `Pair a device with ${service.id}`,
+                  title: "Pair device",
+                  disabled: working !== "",
+                  onclick: () => void pairDevice(service),
                 },
               ]
             : []),
@@ -770,6 +808,37 @@
           · forward this port in the router.
         </p>
       {/each}
+
+      {#if pairing}
+        {@const external = pairing.external}
+        {@const internal = pairing.internal}
+        <p class="hint text-muted">
+          Pairing link for {pairing.id} — one-time, expires in {Math.max(
+            1,
+            Math.round(pairing.expiresIn / 60),
+          )} minutes.
+        </p>
+        <p class="hint text-muted">
+          <code>{external}</code>
+          <IconButton
+            icon="content_copy"
+            label="Copy external pairing link"
+            title={copied === "pair:external" ? "Copied." : "Copy link"}
+            onclick={() => void copyText(external, "pair:external")}
+          />
+        </p>
+        {#if internal}
+          <p class="hint text-muted">
+            LAN (plain HTTP): <code>{internal}</code>
+            <IconButton
+              icon="content_copy"
+              label="Copy LAN pairing link"
+              title={copied === "pair:internal" ? "Copied." : "Copy link"}
+              onclick={() => void copyText(internal, "pair:internal")}
+            />
+          </p>
+        {/if}
+      {/if}
 
       {#if addServiceOpen}
         <div class="card form-card service-form">
