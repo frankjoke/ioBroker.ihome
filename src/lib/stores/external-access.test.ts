@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => {
   const replies: Record<string, unknown> = {};
   const pluginViews: { id: string; settings?: Record<string, unknown> }[] = [];
-  const savePlugin = vi.fn(async (_patch: unknown) => {});
+  const savePlugin = vi.fn(async (patch?: unknown) => patch);
   const send = vi.fn(
     async (_ns: string, _cmd: string, payload: unknown): Promise<unknown> => {
       const action = (payload as { payload?: { action?: string } } | undefined)
