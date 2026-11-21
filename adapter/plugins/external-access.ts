@@ -1220,6 +1220,7 @@ const OPENCODE_PAIR_HTML = `<!doctype html>
   :root { --text: #ddd; --muted: #999; --surface: #222; --border: #444; --primary: #4a9eff; }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 8px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; }
+  .title { font-weight: 600; margin: 0 0 6px; }
   .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
   select, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
   button.primary { background: var(--primary); color: #fff; border-color: var(--primary); cursor: pointer; }
@@ -1232,6 +1233,7 @@ const OPENCODE_PAIR_HTML = `<!doctype html>
 </style>
 </head>
 <body>
+  <div class="title">OpenCode pairing</div>
   <div class="row">
     <select id="site" aria-label="Caddy site"></select>
     <button id="generate" class="primary" type="button">Generate</button>
