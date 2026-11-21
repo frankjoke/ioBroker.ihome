@@ -5,7 +5,7 @@
     "id": "demo.contributions",
     "name": "Contribution demo",
     "api": 1,
-    "version": "1.0.0",
+    "version": "1.0.1",
     "help": "A content-only plugin: no index.js, only contributions. Enable it on the Plugins page, then use its tile in Templates → Plugins, its function/formula in a code field and its snippet on this page.",
     "usage": "This plugin exists to test the contribution model. It creates no states and runs no adapter code.",
     "contributions": {
@@ -41,9 +41,16 @@
         {
           "id": "double-function",
           "name": "Double the value",
-          "description": "A plugin-provided code-field expression.",
+          "description": "A plugin-provided expression for expression fields.",
           "mode": "expression",
           "code": "value * 2"
+        },
+        {
+          "id": "log-function",
+          "name": "Log the demo",
+          "description": "A plugin-provided statement for action fields.",
+          "mode": "statements",
+          "code": "log(\"Contribution demo\")"
         }
       ],
       "snippets": [
