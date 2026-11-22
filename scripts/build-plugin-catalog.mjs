@@ -42,7 +42,7 @@ const pvPlugin = {
   id: "pvforecast",
   name: "PV forecast",
   api: 1,
-  version: "1.0.1",
+  version: "1.0.2",
   timeoutMs: 30000,
   help: pv.PVFORECAST_HELP,
   usage: pv.PVFORECAST_USAGE,

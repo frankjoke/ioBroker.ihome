@@ -29,7 +29,7 @@
       "id": "pvforecast",
       "name": "PV forecast",
       "description": "forecast.solar PV forecast per configured string: one JSON state, today's kWh and peak hour, a chart tile and an hourly logic.",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "api": 1,
       "file": "pvforecast.json"
     }

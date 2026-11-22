@@ -180,7 +180,7 @@ it("fetches every site, combines power and energy and writes one state", async (
   const first = fake.fetches[0];
   expect(first.pathname).toBe("/estimate/48.1123/16.6931/40/-100/1.365");
   expect(first.searchParams.get("damping")).toBe("0,1");
-  expect(first.searchParams.get("time")).toBe("utc");
+  expect(first.searchParams.get("time")).toBe("local");
   expect(fake.fetches[1].pathname).toBe(
     "/estimate/48.1123/16.6931/40/80/1.365",
   );
@@ -194,6 +194,25 @@ it("fetches every site, combines power and energy and writes one state", async (
     energy: 1,
   });
   expect(doc.hours[0].sites.Ost).toEqual({ power: 1, energy: 0.5 });
+});
+
+it("reports the peak in the forecast's local wall time", async () => {
+  const now = new Date();
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const fake = api(
+    { sites: [SITE] },
+    {
+      [STATE]: forecast([
+        { time: `${day} 11:00:00`, power: 1, energy: 1, sites: {} },
+        { time: `${day} 12:00:00`, power: 3, energy: 2, sites: {} },
+      ]),
+    },
+  );
+  const mod = createPvForecastPlugin()(fake.api);
+  expect(await mod.call!({ action: "peak" })).toMatchObject({
+    hour: "12:00",
+    power: 3,
+  });
 });
 
 it("keeps the other sites when one fetch fails", async () => {

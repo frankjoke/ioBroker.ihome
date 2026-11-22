@@ -635,7 +635,7 @@ export class PvForecastPlugin {
         "damping",
         `${site.dampingMorning},${site.dampingEvening}`,
       );
-      url.searchParams.set("time", "utc");
+      url.searchParams.set("time", "local");
       try {
         const body = await fetchJson(url);
         if (!body.result) {
