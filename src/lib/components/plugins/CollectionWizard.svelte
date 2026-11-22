@@ -13,6 +13,7 @@
   import { unwrapPluginReply } from "$lib/config/plugin-call";
   import { installPlugin, applyCollection } from "$lib/stores/plugins.svelte";
   import CollectionConflicts from "./CollectionConflicts.svelte";
+  import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { validPluginId } from "$adapter/plugin-ops";
   import {
     collectionTileDefinition,
@@ -52,7 +53,7 @@
   let stateIds = $state<string[]>([]);
   let tileIds = $state<string[]>([]);
   let existingTiles = $state<Template[]>([]);
-  let extraState = $state("");
+  let statePickerOpen = $state(false);
   let error = $state("");
   let busy = $state(false);
   let conflicts = $state<CollectionConflict[]>([]);
@@ -125,14 +126,8 @@
       : [...tileIds, tileId];
   }
 
-  function addState(): void {
-    const value = extraState.trim();
-    if (!value || !value.includes(".") || value.includes(" ")) {
-      error = "Enter a full state id, for example 0_userdata.0.pv.total.";
-      return;
-    }
-    if (!stateIds.includes(value)) stateIds = [...stateIds, value];
-    extraState = "";
+  function addState(stateId: string): void {
+    if (!stateIds.includes(stateId)) stateIds = [...stateIds, stateId];
     error = "";
   }
 
@@ -385,17 +380,14 @@
         </div>
       {/if}
       <div class="add-row">
-        <input
-          class="mono"
-          bind:value={extraState}
-          placeholder="0_userdata.0.extra.state"
-          onkeydown={(event) => {
-            if (event.key === "Enter") addState();
-          }}
-        />
-        <button type="button" class="btn btn-sm" onclick={addState}
-          >Add state</button
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => (statePickerOpen = true)}
         >
+          <span class="material-symbols-outlined">search</span>
+          Choose state
+        </button>
       </div>
       {#if extraStates.length}
         <div class="added-states">
@@ -528,6 +520,20 @@
   />
 {/if}
 
+{#if statePickerOpen}
+  <SourcePicker
+    mode="state"
+    title="Add an external state"
+    {logics}
+    logicPick="state"
+    onState={(stateId) => {
+      addState(stateId);
+      statePickerOpen = false;
+    }}
+    onClose={() => (statePickerOpen = false)}
+  />
+{/if}
+
 <style>
   .modal {
     position: fixed;
@@ -605,10 +611,6 @@
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
-  }
-
-  .add-row input {
-    flex: 1 1 auto;
   }
 
   .added-states {
