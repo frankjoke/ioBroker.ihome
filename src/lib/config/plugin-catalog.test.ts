@@ -70,6 +70,7 @@ it("ships a valid catalog whose plugin files all parse", () => {
     "nut.ups",
     "opencode",
     "external-access",
+    "pvforecast",
   ]);
   for (const entry of catalog?.plugins ?? []) {
     const parsed = parsePluginFile(

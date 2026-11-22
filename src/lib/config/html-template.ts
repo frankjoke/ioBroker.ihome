@@ -32,6 +32,7 @@ export function renderHtmlTemplate(
 const BRIDGE = `<script>
 (function () {
   var api = {
+    namespace: parent.__IHOME__.namespace,
     baseUrl: parent.__IHOME__.baseUrl,
     origin: parent.__IHOME__.origin,
     setState: function (id, value) { return parent.__IHOME__.setState(id, value); },
