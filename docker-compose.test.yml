@@ -1,0 +1,27 @@
+# A standalone ioBroker test broker for iHome, independent of any VS Code
+# devcontainer. It uses its own volume, so the old test broker is untouched.
+#
+#   docker compose -f docker-compose.test.yml up -d
+#
+# Admin:  http://localhost:18083/
+# iHome:  http://localhost:18084/ihome/  (after the web adapter is installed)
+#
+# Change the dns entry to your router if it is not a FritzBox at .1.
+services:
+  iobroker:
+    image: iobroker/iobroker:latest
+    container_name: ihome-dev
+    restart: unless-stopped
+    ports:
+      - "18083:8081" # Admin
+      - "18084:8082" # web adapter, serves /ihome/
+    volumes:
+      - ihome-dev-data:/opt/iobroker
+    environment:
+      TZ: Europe/Vienna
+    # Resolve LAN names such as Franz24U.fritz.box inside the container.
+    dns:
+      - 192.168.178.1
+
+volumes:
+  ihome-dev-data:
