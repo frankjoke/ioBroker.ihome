@@ -51,6 +51,8 @@ export interface PluginView {
   settingsTabs?: SettingsTabDef[];
   /** Counts of the templates and snippets the plugin offers. */
   contributions?: ContributionSummary;
+  /** Counts of the items the plugin owns; bodies stay in the manifest. */
+  collection?: { states: number; logics: number; tiles: number; uses: number };
   /** Non-fatal manifest notes, e.g. a retired bundle field. */
   warnings?: string[];
   status: PluginViewStatus;
@@ -230,6 +232,16 @@ export function pluginView(
     ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
     ...(plugin.contributions
       ? { contributions: contributionSummary(plugin.contributions) }
+      : {}),
+    ...(plugin.collection
+      ? {
+          collection: {
+            states: plugin.collection.states.length,
+            logics: plugin.collection.logics.length,
+            tiles: plugin.contributions?.tiles?.length ?? 0,
+            uses: plugin.collection.uses?.length ?? 0,
+          },
+        }
       : {}),
     ...(plugin.warnings ? { warnings: plugin.warnings } : {}),
     ...(opts.problem ? { problem: opts.problem } : {}),

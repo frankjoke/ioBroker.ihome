@@ -87,6 +87,40 @@ describe("createPluginHost", () => {
     expect(await host.call("demo", 1)).toEqual({ ok: true, result: 42 });
   });
 
+  it("marks a code-less collection plugin running while enabled", async () => {
+    const collection = {
+      version: 1 as const,
+      states: [
+        {
+          id: "0_userdata.0.pv.total",
+          type: "state" as const,
+          common: { name: "Total", type: "number" },
+        },
+      ],
+      logics: [
+        {
+          id: "calc",
+          name: "Calc",
+          kind: "function" as const,
+          expr: { code: "1" },
+        },
+      ],
+    };
+    const host = createPluginHost(
+      [
+        plugin("col.test", undefined, 5000, {
+          name: "C",
+          collection,
+        }),
+      ],
+      fakeApi,
+      {},
+      () => {},
+    );
+    await host.start();
+    expect(host.status("col.test")).toBe("running");
+  });
+
   it("keeps a content-only plugin active without a factory", async () => {
     let apiCalls = 0;
     const content = () =>

@@ -103,9 +103,14 @@ function runtimeOf(plugin: AdapterPlugin): PluginRuntime {
   };
 }
 
-/** Only a manifest with contributions is content-only; a broken folder is not. */
+/** Only a manifest with contributions or a collection is content-only; a
+ *  broken folder is not. */
 function contentOnlyPlugin(plugin: AdapterPlugin): boolean {
-  return !plugin.builtin && !plugin.code?.trim() && !!plugin.contributions;
+  return (
+    !plugin.builtin &&
+    !plugin.code?.trim() &&
+    !!(plugin.contributions || plugin.collection)
+  );
 }
 
 export function createPluginHost(

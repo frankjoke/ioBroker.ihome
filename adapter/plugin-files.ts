@@ -21,6 +21,7 @@ import {
   type SettingsTabDef,
 } from "./plugin-ops";
 import { BUNDLE_WARNING, type ImportedPlugin } from "./plugin-file";
+import { collectionOf, type PluginCollection } from "./plugin-collection";
 
 export interface PluginManifest {
   id: string;
@@ -36,6 +37,8 @@ export interface PluginManifest {
   /** Retired: accepted from old folders and ignored. */
   bundle?: PluginBundle;
   contributions?: PluginContributions;
+  /** State declarations and logics the plugin owns while installed. */
+  collection?: PluginCollection;
 }
 
 export interface PluginRuntime {
@@ -214,7 +217,22 @@ export async function readPluginFiles(
     }
     contributions = parsed.contributions;
   }
-  if (!code && !contributions) {
+  let collection: PluginCollection | undefined;
+  if (raw.collection !== undefined) {
+    const parsed = collectionOf(raw.collection);
+    if ("problem" in parsed) {
+      return {
+        problem: `plugins/${pluginId}/plugin.json has an invalid collection: ${parsed.problem}`,
+      };
+    }
+    collection = parsed.collection;
+  }
+  if (collection && !version) {
+    return {
+      problem: `plugins/${pluginId}/plugin.json needs a version for its collection.`,
+    };
+  }
+  if (!code && !contributions && !collection) {
     return { problem: `plugins/${pluginId}/index.js is missing.` };
   }
   const warnings = raw.bundle !== undefined ? [BUNDLE_WARNING] : [];
@@ -233,6 +251,7 @@ export async function readPluginFiles(
     ...(settingsSchema ? { settingsSchema } : {}),
     ...(settingsTabs ? { settingsTabs } : {}),
     ...(contributions ? { contributions } : {}),
+    ...(collection ? { collection } : {}),
   };
   return {
     files: {
@@ -274,6 +293,7 @@ export function mergePlugin(
     ...(manifest.contributions
       ? { contributions: manifest.contributions }
       : {}),
+    ...(manifest.collection ? { collection: manifest.collection } : {}),
     ...(files.warnings ? { warnings: files.warnings } : {}),
     ...(code ? { code } : {}),
   };
@@ -287,7 +307,7 @@ export async function ensurePluginFiles(
 ): Promise<{ ok: true } | { problem: string }> {
   const existing = await readPluginFiles(host, plugin.id);
   if (!("problem" in existing)) return { ok: true };
-  if (!plugin.code?.trim() && !plugin.contributions) {
+  if (!plugin.code?.trim() && !plugin.contributions && !plugin.collection) {
     return { problem: existing.problem };
   }
   try {
@@ -323,6 +343,7 @@ export function pluginManifestOf(
     | "settingsSchema"
     | "settingsTabs"
     | "contributions"
+    | "collection"
   >,
 ): PluginManifest {
   return {
@@ -335,6 +356,7 @@ export function pluginManifestOf(
     ...(plugin.settingsSchema ? { settingsSchema: plugin.settingsSchema } : {}),
     ...(plugin.settingsTabs ? { settingsTabs: plugin.settingsTabs } : {}),
     ...(plugin.contributions ? { contributions: plugin.contributions } : {}),
+    ...(plugin.collection ? { collection: plugin.collection } : {}),
   };
 }
 

@@ -20,6 +20,24 @@ const base = {
   },
 };
 
+const collectionState = {
+  id: "0_userdata.0.pv.total",
+  type: "state" as const,
+  common: {
+    name: "Total",
+    type: "number",
+    role: "value",
+    read: true,
+    write: false,
+  },
+};
+const collectionLogic = {
+  id: "calc",
+  name: "Calc",
+  kind: "function" as const,
+  expr: { code: "1" },
+};
+
 describe("parsePluginFile", () => {
   it("parses a valid file and defaults the timeout", () => {
     expect(parsePluginFile(base)).toEqual({
@@ -127,11 +145,49 @@ describe("parsePluginFile", () => {
     });
   });
 
+  it("accepts a code-less collection plugin", () => {
+    const parsed = parsePluginFile({
+      format: "ihome-plugin",
+      version: 1,
+      plugin: {
+        id: "col.test",
+        name: "Collection",
+        version: "1.0.0",
+        collection: {
+          version: 1,
+          states: [collectionState],
+          logics: [collectionLogic],
+        },
+      },
+    });
+    expect("problem" in parsed).toBe(false);
+    if (!("plugin" in parsed)) return;
+    expect(parsed.plugin.collection?.logics).toHaveLength(1);
+  });
+
+  it("rejects a collection without a plugin version", () => {
+    expect(
+      parsePluginFile({
+        format: "ihome-plugin",
+        version: 1,
+        plugin: {
+          id: "col.test",
+          name: "C",
+          collection: {
+            version: 1,
+            states: [collectionState],
+            logics: [collectionLogic],
+          },
+        },
+      }),
+    ).toHaveProperty("problem");
+  });
+
   it("rejects a plugin with neither code nor contributions", () => {
     const withoutCode = { ...base.plugin } as Record<string, unknown>;
     delete withoutCode.code;
     expect(parsePluginFile({ ...base, plugin: withoutCode })).toMatchObject({
-      problem: expect.stringMatching(/code or contributions/i),
+      problem: expect.stringMatching(/code, contributions or a collection/i),
     });
   });
 

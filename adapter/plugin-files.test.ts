@@ -342,6 +342,62 @@ it("carries contributions and warnings into a content-only plugin", () => {
   expect(merged.code).toBeUndefined();
 });
 
+it("carries a collection through the folder manifest", async () => {
+  const collection = {
+    version: 1 as const,
+    states: [
+      {
+        id: "0_userdata.0.pv.total",
+        type: "state" as const,
+        common: { name: "Total", type: "number", role: "value" },
+      },
+    ],
+    logics: [
+      {
+        id: "calc",
+        name: "Calc",
+        kind: "function" as const,
+        expr: { code: "1" },
+      },
+    ],
+    uses: ["0_userdata.0.pv.power"],
+  };
+  const read = await readPluginFiles(
+    host({
+      "ihome.meta/plugins/col.test/plugin.json": JSON.stringify({
+        id: "col.test",
+        name: "Collection",
+        version: "1.0.0",
+        collection,
+      }),
+    }),
+    "col.test",
+  );
+  expect("problem" in read).toBe(false);
+  if ("problem" in read) return;
+  expect(read.files.manifest.collection).toEqual(collection);
+  const merged = mergePlugin(read.files, { enabled: true });
+  expect(merged.collection).toEqual(collection);
+  expect(pluginManifestOf(merged).collection).toEqual(collection);
+});
+
+it("refuses a folder with an invalid collection", async () => {
+  const read = await readPluginFiles(
+    host({
+      "ihome.meta/plugins/col.test/plugin.json": JSON.stringify({
+        id: "col.test",
+        name: "Collection",
+        version: "1.0.0",
+        collection: { version: 1, states: [], logics: [] },
+      }),
+    }),
+    "col.test",
+  );
+  expect(read).toMatchObject({
+    problem: expect.stringContaining("collection"),
+  });
+});
+
 it("refuses a newer api or a bad version in a folder", async () => {
   const base = { id: "clock", name: "Clock" };
   const newer = host({

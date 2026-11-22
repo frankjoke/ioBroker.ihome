@@ -207,6 +207,40 @@ describe("pluginView", () => {
     expect(view).not.toHaveProperty("bundle");
   });
 
+  it("summarises an owned collection without its bodies", () => {
+    const view = pluginView(
+      userPlugin("col.test", true, "", {
+        collection: {
+          version: 1,
+          states: [
+            {
+              id: "0_userdata.0.pv.total",
+              type: "state",
+              common: { name: "Total", type: "number" },
+            },
+          ],
+          logics: [
+            { id: "calc", name: "Calc", kind: "function", expr: { code: "1" } },
+          ],
+          uses: ["0_userdata.0.pv.power"],
+        },
+        contributions: {
+          tiles: [
+            { id: "t", name: "T", type: "Custom", features: [], slots: [] },
+          ],
+        },
+      }),
+      { status: "running", hotSettings: false, restartRequired: false },
+    );
+    expect(view.collection).toEqual({
+      states: 1,
+      logics: 1,
+      tiles: 1,
+      uses: 1,
+    });
+    expect(JSON.stringify(view)).not.toContain("0_userdata");
+  });
+
   it("reports a content-only plugin as having no code", () => {
     const view = pluginView(
       userPlugin("u", true, "", {

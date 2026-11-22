@@ -19,6 +19,7 @@ import {
   type PluginSettingDef,
   type SettingsTabDef,
 } from "./plugin-ops";
+import { collectionOf, type PluginCollection } from "./plugin-collection";
 
 /**
  * The portable plugin shape: no `enabled`, code included. A `builtin: true`
@@ -41,6 +42,8 @@ export interface ImportedPlugin {
   /** Retired: accepted from old files and ignored. */
   bundle?: PluginBundle;
   contributions?: PluginContributions;
+  /** State declarations and logics the plugin owns while installed. */
+  collection?: PluginCollection;
   code?: string;
 }
 
@@ -204,8 +207,16 @@ export function parsePluginFile(
     }
     contributions = parsed.contributions;
   }
-  if (!code.trim() && !contributions) {
-    return problem("The plugin needs code or contributions.");
+  let collection: PluginCollection | undefined;
+  if (plugin.collection !== undefined) {
+    const parsed = collectionOf(plugin.collection);
+    if ("problem" in parsed) {
+      return problem(`The collection is invalid: ${parsed.problem}`);
+    }
+    collection = parsed.collection;
+  }
+  if (!code.trim() && !contributions && !collection) {
+    return problem("The plugin needs code, contributions or a collection.");
   }
   const warnings = plugin.bundle !== undefined ? [BUNDLE_WARNING] : [];
 
@@ -241,6 +252,9 @@ export function parsePluginFile(
       return problem("The plugin version must be 1 to 32 characters.");
     }
   }
+  if (collection && !version) {
+    return problem("A collection plugin needs a version.");
+  }
 
   return {
     plugin: {
@@ -256,6 +270,7 @@ export function parsePluginFile(
       ...(settingsSchema ? { settingsSchema } : {}),
       ...(settingsTabs ? { settingsTabs } : {}),
       ...(contributions ? { contributions } : {}),
+      ...(collection ? { collection } : {}),
     },
     ...(warnings.length > 0 ? { warnings } : {}),
   };
