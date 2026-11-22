@@ -414,9 +414,13 @@
                   <option value="$self">$self (target state)</option>
                   <option value="$start">$start (after all logics)</option>
                   <option value="$always">$always (any event)</option>
-                  {#each eventInputs as input (input)}
-                    <option value={input}>{input}</option>
-                  {/each}
+                  {#if eventInputs.length}
+                    <optgroup label="Local variables & events">
+                      {#each eventInputs as input (input)}
+                        <option value={input}>{input}</option>
+                      {/each}
+                    </optgroup>
+                  {/if}
                   {#if sourceLogics.length}
                     <optgroup label="Logics">
                       {#each sourceLogics as source (source.id)}

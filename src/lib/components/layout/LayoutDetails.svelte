@@ -1814,16 +1814,11 @@
           <button
             type="button"
             class="icon-btn"
-            title="Save this tile as a template"
-            aria-label="Save this tile as a template"
-            disabled={!tile?.tile?.slots?.length}
-            onclick={() => {
-              saveTemplateError = "";
-              saveTemplateNote = "";
-              saveTemplateOpen = true;
-            }}
+            title="Add slot"
+            aria-label="Add slot"
+            onclick={() => requestAddSlot()}
           >
-            <span class="material-symbols-outlined">save</span>
+            <span class="material-symbols-outlined">add</span>
           </button>
           <button
             type="button"
@@ -1862,11 +1857,16 @@
           <button
             type="button"
             class="icon-btn"
-            title="Add slot"
-            aria-label="Add slot"
-            onclick={() => requestAddSlot()}
+            title="Save this tile as a template"
+            aria-label="Save this tile as a template"
+            disabled={!tile?.tile?.slots?.length}
+            onclick={() => {
+              saveTemplateError = "";
+              saveTemplateNote = "";
+              saveTemplateOpen = true;
+            }}
           >
-            <span class="material-symbols-outlined">add</span>
+            <span class="material-symbols-outlined">save</span>
           </button>
         </span>
       </div>
