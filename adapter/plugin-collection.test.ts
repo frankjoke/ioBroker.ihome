@@ -24,6 +24,15 @@ it("accepts one state and one logic", () => {
   expect("collection" in parsed && parsed.collection.logics[0].id).toBe("calc");
 });
 
+it("accepts the mixed-case logic ids the editor allows", () => {
+  const parsed = collectionOf({
+    version: 1,
+    states: [state],
+    logics: [{ ...logic, id: "TestAction" }],
+  });
+  expect("collection" in parsed).toBe(true);
+});
+
 it("rejects empty ownership, unknown keys, bad version and duplicate ids", () => {
   expect(collectionOf({ version: 1, states: [], logics: [] })).toHaveProperty(
     "problem",

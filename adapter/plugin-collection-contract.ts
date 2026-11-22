@@ -18,7 +18,7 @@ export type CollectionParse =
 
 const COLLECTION_KEYS = new Set(["version", "states", "logics", "uses"]);
 const STATE_ID = /^[A-Za-z0-9_-]+\.[0-9]+\..+/;
-const LOGIC_ID = /^[a-z0-9-]{1,64}$/;
+const LOGIC_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function plainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
