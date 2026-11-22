@@ -183,6 +183,8 @@ describe("readPluginContributions", () => {
     expect(html).toContain("pvforecast.json");
     expect(html).toContain('action: "total"');
     expect(html).toContain('action: "peak"');
+    expect(html).toContain('id="age"');
+    expect(html).toContain("setAge(doc.generatedAt)");
 
     expect(contributions.logic).toHaveLength(1);
     expect(logicTemplateProblem(contributions.logic[0], [], [])).toBeNull();

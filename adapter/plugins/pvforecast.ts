@@ -54,6 +54,9 @@ interface EstimateResponse {
 const SERVICE = "https://api.forecast.solar/estimate";
 const FETCH_TIMEOUT = 5000;
 const DAYLIGHT_MARGIN = 30 * 60 * 1000;
+/** A stored forecast younger than this is reused instead of fetched again:
+ *  the free service allows 12 calls per hour per IP and every site is a call. */
+const FRESH_FOR = 55 * 60 * 1000;
 
 const PVFORECAST_SITES: Site[] = [
   {
@@ -159,8 +162,8 @@ export const PVFORECAST_DEFAULT_SETTINGS = {
 export const PVFORECAST_HELP = `Fetches the free [forecast.solar](https://forecast.solar) estimate for every site in the table and keeps one JSON state.
 
 - The location is read from ioBroker's system settings (\`system.config\`); do not duplicate latitude/longitude here.
-- The plugin fetches once on start, then the **PV forecast hourly** logic triggers it. Fetch skips HTTP outside dawn−30 … dusk+30.
-- The free service is rate-limited (12 requests/hour per IP): the default five sites use ten of them per hour. If the old \`pvforecast.0\` adapter also polls the same service, stop one of them.
+- The plugin reuses a stored forecast younger than ~55 minutes and otherwise fetches once on start, then the **PV forecast hourly** logic triggers it. Fetch skips HTTP outside dawn−30 … dusk+30.
+- The free service is rate-limited (12 requests/hour per IP) and every site is one request: the default five sites use 5 per hourly run, and a restart adds a round only when the stored forecast is older than ~55 minutes. If the old \`pvforecast.0\` adapter also polls the same service, stop one of them.
 
 **State** — \`ihome.<instance>.plugins.pvforecast.json\`: generated timestamp, resolved location, sites, hourly power (kW) and energy (kWh), and per-site errors.
 
@@ -197,6 +200,8 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
   body { margin: 0; padding: 10px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; }
   .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
   .title { font-weight: 600; }
+  .age { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 6px; white-space: nowrap; }
+  .age.stale { color: #e5a33a; }
   .summary { color: var(--muted); font-size: 12px; text-align: right; }
   .summary b { color: var(--text); font-weight: 600; }
   .chart { width: 100%; height: 140px; display: block; }
@@ -212,10 +217,11 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
 </head>
 <body>
   <div class="head">
-    <span class="title">PV forecast</span>
+    <span class="title">PV forecast<span class="age" id="age"></span></span>
     <span class="summary" id="summary">—</span>
   </div>
-  <div id="plot"><p class="empty" id="empty">Waiting for the first forecast…</p></div>
+  <div id="plot"></div>
+  <p class="empty" id="empty">Waiting for the first forecast…</p>
   <p class="note hidden" id="note"></p>
   <p class="error hidden" id="error"></p>
 <script>
@@ -224,10 +230,14 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
     var $ = function (id) { return document.getElementById(id); };
     function show(id, text) {
       var el = $(id);
+      if (!el) return;
       el.textContent = text;
       el.classList.remove("hidden");
     }
-    function hide(id) { $(id).classList.add("hidden"); }
+    function hide(id) {
+      var el = $(id);
+      if (el) el.classList.add("hidden");
+    }
     function syncTheme() {
       try {
         var s = parent.getComputedStyle(parent.document.documentElement);
@@ -249,6 +259,21 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
     function hhmm(iso) {
       var d = new Date(iso);
       return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    }
+    function setAge(iso) {
+      var el = $("age");
+      var at = new Date(iso).getTime();
+      if (isNaN(at)) {
+        el.textContent = "";
+        el.title = "";
+        el.classList.remove("stale");
+        return;
+      }
+      var minutes = Math.max(0, Math.floor((Date.now() - at) / 60000));
+      var text = minutes < 1 ? "just now" : minutes < 60 ? minutes + "m ago" : Math.floor(minutes / 60) < 24 ? Math.floor(minutes / 60) + "h ago" : Math.floor(minutes / 1440) + "d ago";
+      el.textContent = " · updated " + text;
+      el.title = new Date(at).toLocaleString();
+      el.classList.toggle("stale", Date.now() - at > 2 * 3600000);
     }
     function draw(doc) {
       var plot = $("plot");
@@ -294,6 +319,7 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
         var doc = typeof raw === "string" ? JSON.parse(raw) : raw;
         if (!doc || !Array.isArray(doc.hours)) throw new Error("No forecast data yet.");
         draw(doc);
+        setAge(doc.generatedAt);
         if (doc.errors && doc.errors.length) {
           show("note", "Failed: " + doc.errors.map(function (e) { return e.site; }).join(", "));
         } else {
@@ -316,6 +342,7 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
         show("empty", "Waiting for the first forecast…");
         show("error", String(error && error.message ? error.message : error));
         $("summary").textContent = "—";
+        $("age").textContent = "";
       });
       return job;
     }
@@ -352,10 +379,11 @@ export const PVFORECAST_CONTRIBUTIONS: PluginContributions = {
     {
       id: "pvforecast-chart",
       name: "PV forecast",
-      description: "Today's PV power curve with the day total and peak hour.",
+      description:
+        "Today's PV power curve with the day total, peak hour and update age.",
       help: `Apply this tile after installing and enabling the PV forecast plugin and applying the **PV forecast hourly** logic.
 
-It reads the plugin's JSON state and calls the \`total\` and \`peak\` actions. The location comes from ioBroker system settings.`,
+It reads \`ihome.<instance>.plugins.pvforecast.json\` through the HTML bridge and calls the \`total\` and \`peak\` actions every minute. That state holds the generated time, resolved location, sites and the hourly power/energy; the tile is not a bound value slot because an HTML slot's source means "this state holds the HTML document". The location comes from ioBroker system settings.`,
       type: "Custom",
       bindings: "none",
       size: { w: 10, h: 4 },
@@ -716,7 +744,27 @@ export class PvForecastPlugin {
     };
   }
 
+  private async fresh(): Promise<boolean> {
+    try {
+      const doc = await this.readDoc();
+      const at = Date.parse(doc.generatedAt);
+      return (
+        doc.hours.length > 0 &&
+        Number.isFinite(at) &&
+        Date.now() - at < FRESH_FOR
+      );
+    } catch {
+      return false;
+    }
+  }
+
   async start(): Promise<void> {
+    if (await this.fresh()) {
+      this.api.log.debug(
+        "PV forecast: the stored forecast is fresh; not fetching",
+      );
+      return;
+    }
     void this.fetchForecast(true).catch((error) => {
       this.api.log.warn(`PV forecast start: ${errorText(error)}`);
     });

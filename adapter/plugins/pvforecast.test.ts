@@ -248,6 +248,25 @@ it("keeps the last good forecast when every site fails", async () => {
   });
 });
 
+it("does not fetch on start when the stored forecast is fresh", async () => {
+  const fake = api(
+    { sites: [SITE] },
+    {
+      [STATE]: forecast([
+        { time: todayAt(10), power: 2, energy: 1, sites: {} },
+      ]),
+    },
+  );
+  let calls = 0;
+  vi.stubGlobal("fetch", async () => {
+    calls += 1;
+    throw new Error("must not fetch");
+  });
+  const mod = createPvForecastPlugin()(fake.api);
+  await mod.start!();
+  expect(calls).toBe(0);
+});
+
 it("refuses to fetch without an ioBroker location", async () => {
   const fake = api({ sites: [SITE] }, {}, { "system.config": { common: {} } });
   const mod = createPvForecastPlugin()(fake.api);
@@ -298,6 +317,8 @@ it("ships the chart tile, hourly logic and read snippet", () => {
   )[0].options.html;
   expect(html).toContain(".plugins.pvforecast.json");
   expect(html).toContain("ihome.call");
+  expect(html).toContain('id="age"');
+  expect(html).toContain("setAge(doc.generatedAt)");
   const logic = PVFORECAST_CONTRIBUTIONS.logic?.[0] as {
     logic: {
       inputs: { tick: { from: { spec: unknown } } };
