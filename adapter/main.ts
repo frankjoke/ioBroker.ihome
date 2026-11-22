@@ -1817,9 +1817,9 @@ class IHome extends utils.Adapter {
         staged: this.pluginSettings.staged.filter(
           (entry) => entry.id !== command.id,
         ),
-        removals: this.pluginSettings.removals.filter(
-          (id) => id !== command.id,
-        ),
+        // The native list is cleaned at the next start: rewriting it now would
+        // restart the adapter and interrupt every other plugin.
+        removals: [...new Set([...this.pluginSettings.removals, command.id])],
       };
       if (keep) {
         this.pluginSettings.settings[command.id] = {
@@ -1828,18 +1828,6 @@ class IHome extends utils.Adapter {
         };
       }
       await this.savePluginSettings();
-      try {
-        await this.updateConfig({
-          plugins: removeNativePlugin(
-            pluginConfigWithBuiltins(
-              (this.config as { plugins?: unknown }).plugins,
-            ),
-            command.id,
-          ),
-        });
-      } catch (error) {
-        this.log.warn(`cannot store the plugin list: ${String(error)}`);
-      }
       if (removedCollection) await this.loadLogics();
       return pluginReply({ plugins: this.pluginViews() });
     }
