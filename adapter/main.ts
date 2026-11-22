@@ -1602,6 +1602,9 @@ class IHome extends utils.Adapter {
                     .join(", ")}`,
                 );
               }
+              if (this.pluginProblems.get(entry.id)?.startsWith("collection")) {
+                this.pluginProblems.delete(entry.id);
+              }
               if (result.changed) await this.loadLogics();
             }
           }
@@ -1762,6 +1765,8 @@ class IHome extends utils.Adapter {
         if (applied.conflicts.length > 0) {
           const ids = applied.conflicts.map((item) => item.id).join(", ");
           this.pluginProblems.set(merged.id, `collection conflicts: ${ids}`);
+        } else if (this.pluginProblems.get(merged.id)?.startsWith("collection")) {
+          this.pluginProblems.delete(merged.id);
         }
         collection = { id: merged.id, conflicts: applied.conflicts };
       }

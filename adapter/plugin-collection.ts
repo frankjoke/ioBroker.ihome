@@ -96,7 +96,7 @@ function stateContent(value: Record<string, unknown>): Record<string, unknown> {
   const native = plainObject(value.native) ? { ...value.native } : {};
   delete native.ihomeCollection;
   return {
-    id: value.id,
+    id: value.id ?? value._id,
     type: value.type,
     common: value.common,
     ...(Object.keys(native).length ? { native } : {}),

@@ -271,6 +271,16 @@ it("deletes states only when removal is explicit", async () => {
   expect(host.objects[state.id]).toBeUndefined();
 });
 
+it("treats a live object's _id like the manifest id", async () => {
+  const host = fakeHost();
+  await applyCollection(host, plugin(), { enabled: false, mode: "reconcile" });
+  const live = host.objects[state.id];
+  const broker = { ...live, _id: state.id };
+  delete (broker as { id?: unknown }).id;
+  host.objects[state.id] = broker;
+  expect((await classifyCollection(host, plugin())).conflicts).toEqual([]);
+});
+
 it("creates the parent folders of a state before the state", async () => {
   const host = fakeHost();
   await applyCollection(host, plugin(), { enabled: false, mode: "reconcile" });
