@@ -21,7 +21,8 @@ import {
   type SettingsTabDef,
 } from "./plugin-ops";
 import { BUNDLE_WARNING, type ImportedPlugin } from "./plugin-file";
-import { collectionOf, type PluginCollection } from "./plugin-collection";
+import { collectionOf } from "./plugin-collection-contract";
+import type { PluginCollection } from "./plugin-collection-types";
 
 export interface PluginManifest {
   id: string;

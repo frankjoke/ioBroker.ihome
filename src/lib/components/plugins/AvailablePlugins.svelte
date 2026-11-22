@@ -18,7 +18,7 @@
     loadPlugins,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
-  import type { CollectionConflict } from "$adapter/plugin-collection";
+  import type { CollectionConflict } from "$adapter/plugin-collection-types";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   let entries = $state<PluginCatalogEntry[]>([]);

@@ -18,7 +18,7 @@
     suggestCollectionStates,
   } from "$lib/config/collection-capture";
   import type { PluginView } from "$adapter/plugin-admin";
-  import type { CollectionConflict } from "$adapter/plugin-collection";
+  import type { CollectionConflict } from "$adapter/plugin-collection-types";
   import type { Template } from "$lib/types/display";
   import type { LogicDef } from "$logic/types";
 

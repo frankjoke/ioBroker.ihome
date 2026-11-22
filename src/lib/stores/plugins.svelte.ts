@@ -2,7 +2,7 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { unwrapPluginReply } from "$lib/config/plugin-call";
 import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 import type { ImportedPlugin, PluginFile } from "$adapter/plugin-file";
-import type { CollectionConflict } from "$adapter/plugin-collection";
+import type { CollectionConflict } from "$adapter/plugin-collection-types";
 
 interface PluginsResult {
   plugins: PluginView[];

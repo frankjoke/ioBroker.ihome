@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CollectionConflict } from "$adapter/plugin-collection";
+  import type { CollectionConflict } from "$adapter/plugin-collection-types";
 
   let {
     conflicts,

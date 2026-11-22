@@ -7,7 +7,7 @@
     savePlugin,
   } from "$lib/stores/plugins.svelte";
   import CollectionConflicts from "./CollectionConflicts.svelte";
-  import type { CollectionConflict } from "$adapter/plugin-collection";
+  import type { CollectionConflict } from "$adapter/plugin-collection-types";
   import { writePluginFiles } from "$lib/config/plugin-storage";
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { NUT_EXAMPLE } from "$lib/config/plugin-examples";

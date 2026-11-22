@@ -1,5 +1,8 @@
 import type { ImportedPlugin } from "./plugin-file";
-import type { CaptureRequest, CollectionConflict } from "./plugin-collection";
+import type {
+  CaptureRequest,
+  CollectionConflict,
+} from "./plugin-collection-types";
 import {
   BUILTIN_PLUGINS,
   MAX_PLUGIN_HELP,

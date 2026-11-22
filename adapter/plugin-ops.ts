@@ -5,7 +5,7 @@ export const SUPPORTED_PLUGIN_API = 1;
 import type { PluginSettingDef, SettingsTabDef } from "./settings-schema";
 import { parseSettingsTabs, pluginSettingsSchema } from "./settings-schema";
 import type { PluginContributions } from "./plugin-contributions";
-import type { PluginCollection } from "./plugin-collection";
+import type { PluginCollection } from "./plugin-collection-types";
 
 export type {
   ContributionItem,

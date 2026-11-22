@@ -19,7 +19,8 @@ import {
   type PluginSettingDef,
   type SettingsTabDef,
 } from "./plugin-ops";
-import { collectionOf, type PluginCollection } from "./plugin-collection";
+import { collectionOf } from "./plugin-collection-contract";
+import type { PluginCollection } from "./plugin-collection-types";
 
 /**
  * The portable plugin shape: no `enabled`, code included. A `builtin: true`
