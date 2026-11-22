@@ -133,28 +133,33 @@
     return typeof label === "string" && label ? ` · ${label}` : "";
   }
 
-  function validate(): string {
+  function basicsProblem(): string {
     if (!validPluginId(id))
       return "Use a-z, 0-9, dot, dash or underscore for the id.";
     if (!name.trim()) return "The plugin needs a name.";
     if (!/^[0-9A-Za-z._-]{1,32}$/.test(version.trim())) {
       return "The version must be 1 to 32 characters.";
     }
+    return "";
+  }
+
+  function validate(): string {
+    const basics = basicsProblem();
+    if (basics) return basics;
     if (logicIds.length === 0) return "Select at least one logic or action.";
     return "";
   }
 
-  function stepValid(next: number): boolean {
-    if (next === 0) {
-      error = "";
-      const problem = validate();
-      if (problem) {
-        error = problem;
-        return false;
-      }
-    }
-    if (next === 1 && logicIds.length === 0) {
-      error = "Select at least one logic or action.";
+  function stepValid(current: number): boolean {
+    error = "";
+    const problem =
+      current === 0
+        ? basicsProblem()
+        : current === 1 && logicIds.length === 0
+          ? "Select at least one logic or action."
+          : "";
+    if (problem) {
+      error = problem;
       return false;
     }
     return true;
