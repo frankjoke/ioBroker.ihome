@@ -79,9 +79,10 @@
       dragValue = null;
     }
   });
-  /** A read-only level is a reading, not a disabled slider. */
+  /** A read-only level or multistate is a reading, not a disabled input. */
   const widget = $derived(
-    widgetOverride === "level" && control.writable !== true
+    (widgetOverride === "level" || widgetOverride === "enum") &&
+      control.writable !== true
       ? "value"
       : (widgetOverride ??
           (control.writable === true &&

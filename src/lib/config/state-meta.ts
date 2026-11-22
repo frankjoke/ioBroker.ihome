@@ -194,5 +194,7 @@ export function effectiveWidget(
   widget: Widget | undefined,
   writable: boolean,
 ): Widget | undefined {
-  return widget === "level" && !writable ? "value" : widget;
+  return (widget === "level" || widget === "enum") && !writable
+    ? "value"
+    : widget;
 }

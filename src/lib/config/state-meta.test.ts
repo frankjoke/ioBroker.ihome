@@ -17,6 +17,8 @@ const control = (patch: Partial<Control> = {}): Control =>
 it("turns a read-only level into a value", () => {
   expect(effectiveWidget("level", false)).toBe("value");
   expect(effectiveWidget("level", true)).toBe("level");
+  expect(effectiveWidget("enum", false)).toBe("value");
+  expect(effectiveWidget("enum", true)).toBe("enum");
   expect(effectiveWidget("switch", false)).toBe("switch");
   expect(effectiveWidget(undefined, false)).toBeUndefined();
 });
