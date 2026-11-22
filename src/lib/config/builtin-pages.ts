@@ -25,23 +25,6 @@ export const BUILTIN_PAGES: readonly BuiltinPage[] = [
     glyph: "settings_applications",
     secured: true,
   },
-  {
-    id: "objects",
-    title: "Objects",
-    tab: "objects",
-    meta: "/admin/#tab-objects",
-    glyph: "account_tree",
-    secured: true,
-  },
-  {
-    id: "enums",
-    title: "Enums",
-    tab: "enums",
-    meta: "/admin/#tab-enums",
-    glyph: "category",
-    svg: ENUMS_ICON,
-    secured: true,
-  },
 ];
 
 /** Admin opens at `overview`; the other tabs carry `?tab=` in the hash. */
