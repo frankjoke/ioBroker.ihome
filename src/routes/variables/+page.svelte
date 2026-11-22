@@ -483,7 +483,7 @@
     {/if}
   </div>
 
-  {#if variables.length === 0}
+  {#if variables.length === 0 && !editing}
     <div class="card empty-state">
       <p class="text-muted">No variables yet — add one to get started.</p>
     </div>
@@ -516,7 +516,7 @@
       </div>
     </div>
 
-    {#if shown.length === 0}
+    {#if shown.length === 0 && !editing}
       <div class="card empty-state">
         <p class="text-muted">No variables match the search.</p>
       </div>
