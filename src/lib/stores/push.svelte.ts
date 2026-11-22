@@ -1,7 +1,7 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 import { phone } from "$lib/stores/phone.svelte";
-import { base64ToUint8Array } from "$lib/push-ops";
+import { base64ToUint8Array, pushKeyMatches } from "$lib/push-ops";
 
 const PUBLIC_KEY_STATE = "info.pushPublicKey";
 
@@ -76,9 +76,14 @@ export function initPush(): void {
   if (!push.supported) return;
   void serviceWorker()
     .then(async (reg) => {
+      const key = publicKey();
       const subscription = await reg.pushManager.getSubscription();
-      push.subscribed = Boolean(subscription);
-      if (subscription && Notification.permission === "granted") {
+      const matches =
+        !!subscription &&
+        !!key &&
+        pushKeyMatches(subscription.options?.applicationServerKey, key);
+      push.subscribed = matches;
+      if (matches && Notification.permission === "granted") {
         // Reconcile: the adapter may have lost the record or the browser may
         // have rotated the endpoint while the app was closed.
         await registerSubscription(subscription);
@@ -113,12 +118,17 @@ export async function enablePush(): Promise<void> {
     }
     const reg = await serviceWorker();
     const existing = await reg.pushManager.getSubscription();
-    const subscription =
-      existing ??
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64ToUint8Array(key),
-      }));
+    const usable =
+      existing && pushKeyMatches(existing.options?.applicationServerKey, key);
+    // A key rotation leaves a subscription bound to the old VAPID key; the
+    // browser cannot reuse it, so drop it and create one with the new key.
+    if (existing && !usable) await existing.unsubscribe();
+    const subscription = usable
+      ? existing
+      : await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64ToUint8Array(key),
+        });
     await registerSubscription(subscription);
     push.subscribed = true;
   } catch (error) {
@@ -142,6 +152,28 @@ export async function disablePush(): Promise<void> {
     push.subscribed = false;
   } catch (error) {
     push.error = errorText(error);
+  } finally {
+    push.busy = false;
+  }
+}
+
+/** Ask the adapter for a new VAPID pair. Every existing subscription becomes
+ *  invalid; the adapter stores the keys and restarts once. */
+export async function regeneratePushKeys(): Promise<void> {
+  push.busy = true;
+  push.error = "";
+  try {
+    const result = (await ioBroker.sendTo(ioBroker.namespace, "push", {
+      action: "regenerate",
+      confirm: true,
+    })) as { ok?: boolean; error?: string } | undefined;
+    if (!result?.ok) {
+      throw new Error(result?.error ?? "The adapter rejected the request.");
+    }
+    push.subscribed = false;
+  } catch (error) {
+    push.error = errorText(error);
+    throw error;
   } finally {
     push.busy = false;
   }

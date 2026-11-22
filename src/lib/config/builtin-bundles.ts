@@ -92,7 +92,7 @@ export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
     "A Samsung TV remote. Configure the TV under the Network device info plugin's Settings (Endpoints: host and MAC) and set its id here; the remote reads the host and wakes the TV through the adapter plugin.",
   help: `A Samsung TV remote: a presence tile plus a full remote in a modal.
 
-**Before applying:** add the TV under the adapter's *Network devices* with its host and MAC address (the MAC is needed for Wake-on-LAN), then set that device's id here.
+**Before applying:** add the TV under the Network device info plugin's *Settings → Endpoints* with its host and MAC address (the MAC is needed for Wake-on-LAN), then set that device's id here.
 
 **Using it:** *Verbinden* opens the WebSocket to the TV; the TV may ask you to allow the remote once. *Power* sends standby when connected and wakes the TV over the network when it is off. While disconnected, only Power and Verbinden are enabled.`,
   params: [

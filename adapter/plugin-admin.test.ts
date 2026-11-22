@@ -68,18 +68,18 @@ describe("applyPluginPatches", () => {
   });
 
   it("rejects built-in name/help edits and unknown ids", () => {
-    const current = [builtin("network.wake")];
+    const current = [builtin("network.info")];
     expect(
       applyPluginPatches(
         current,
-        [{ id: "network.wake", name: "X" }],
+        [{ id: "network.info", name: "X" }],
         BUILTIN_PLUGINS,
       ).problems,
     ).not.toEqual([]);
     expect(
       applyPluginPatches(
         current,
-        [{ id: "network.wake", help: "X" }],
+        [{ id: "network.info", help: "X" }],
         BUILTIN_PLUGINS,
       ).problems,
     ).not.toEqual([]);
@@ -134,16 +134,16 @@ describe("applyPluginPatches", () => {
   });
 
   it("clamps timeout and keeps built-in metadata", () => {
-    const current = [builtin("network.wake")];
+    const current = [builtin("network.info")];
     const { plugins, problems } = applyPluginPatches(
       current,
-      [{ id: "network.wake", timeoutMs: 99_999, enabled: false }],
+      [{ id: "network.info", timeoutMs: 99_999, enabled: false }],
       BUILTIN_PLUGINS,
     );
     expect(problems).toEqual([]);
     expect(plugins[0].timeoutMs).toBe(30_000);
     expect(plugins[0].enabled).toBe(false);
-    expect(plugins[0].name).toBe(BUILTIN_PLUGINS[1].name);
+    expect(plugins[0].name).toBe(BUILTIN_PLUGINS[0].name);
   });
 });
 

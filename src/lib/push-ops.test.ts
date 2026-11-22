@@ -5,6 +5,7 @@ import {
   notificationTarget,
   notificationTitle,
   parsePushMessage,
+  pushKeyMatches,
 } from "./push-ops";
 
 it("parses a push payload and builds notification options", () => {
@@ -41,4 +42,14 @@ it("resolves click targets inside the app and rejects other origins", () => {
 
 it("decodes a VAPID key", () => {
   expect(base64ToUint8Array("AQID")).toEqual(new Uint8Array([1, 2, 3]));
+});
+
+it("compares a subscription's VAPID key", () => {
+  const key = "AQID"; // [1, 2, 3]
+  expect(pushKeyMatches(new Uint8Array([1, 2, 3]), key)).toBe(true);
+  expect(pushKeyMatches(new Uint8Array([1, 2, 3]).buffer, key)).toBe(true);
+  expect(pushKeyMatches(new Uint8Array([1, 2, 4]), key)).toBe(false);
+  expect(pushKeyMatches(new Uint8Array([1, 2]), key)).toBe(false);
+  // An older browser does not expose the applied key: keep reconciling.
+  expect(pushKeyMatches(undefined, key)).toBe(true);
 });

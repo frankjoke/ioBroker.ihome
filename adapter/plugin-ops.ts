@@ -126,7 +126,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "network.info",
     name: "Network device info",
-    help: "Shows the network devices iHome knows about — configured under this plugin's Settings — or one device by its id.",
+    help: "Shows the network devices iHome knows about — configured under this plugin's Settings — or one device by its id, and wakes a device by id or MAC.",
     usage: [
       "**From a logic**",
       "",
@@ -143,12 +143,27 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "{ id?: string } // optional: omit to list all network devices",
       "```",
       "",
-      "Add the endpoints under **Settings → Endpoints**. They replace the Admin Network devices list.",
+      "Add the endpoints under **Settings → Endpoints**.",
+      "",
+      '**Wake a device** — `wake: true` (or `action: "wake"`) switches to Wake-on-LAN:',
+      "",
+      "```js",
+      'call("network.info", { id: "WZ_TV", wake: true }, (data, error) => {',
+      "  if (error) log(error);",
+      "});",
+      "",
+      'call("network.info", { wake: true, mac: "CC:CD:11:12:80:88", ip: "192.168.178.23" }, (data, error) => {',
+      "  if (error) log(error);",
+      "});",
+      "```",
+      "",
+      "A tracked id uses its host and MAC. Direct options: `mac` (required), `ip`/`host`, `broadcast`, `port` (default 9), `timeout` (ms). An IP cannot find the MAC of a switched-off device; WoL needs the MAC. The old `network.wake` calls still work as aliases.",
       "",
       "**From an HTML tile**",
       "",
       "```js",
       'const tv = await ihome.call("network.info", { id: "WZ_TV" });',
+      'await ihome.call("network.info", { id: "WZ_TV", wake: true });',
       "```",
       "",
       "Without an `id` it returns `{ devices: [...] }`.",
@@ -159,7 +174,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
         label: "Endpoints",
         type: "array",
         description:
-          "Devices to track on the local network. These entries replace the Admin Network devices list; an empty list tracks nothing.",
+          "Devices to track on the local network; an empty list tracks nothing.",
         item: {
           fields: [
             {
@@ -168,7 +183,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
               type: "string",
               required: true,
               description:
-                "Short id used by network.info and network.wake, e.g. tv.",
+                "Short id used by network.info and the network.wake alias, e.g. tv.",
             },
             {
               name: "name",
@@ -188,7 +203,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
               name: "mac",
               label: "MAC (optional)",
               type: "string",
-              description: "Needed by network.wake for Wake-on-LAN.",
+              description: "Needed to wake the device with Wake-on-LAN.",
             },
             {
               name: "interval",
@@ -215,58 +230,6 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
         },
       },
     ],
-  },
-  {
-    id: "network.wake",
-    name: "Wake-on-LAN",
-    help: "Try to switch a device on using the Wake-on-LAN protocol. The MAC address of the device is required; it can come from Network devices or be passed directly.",
-    usage: [
-      "**From a logic**",
-      "",
-      "```js",
-      'call("network.wake", options, (data, error) => {',
-      "  if (error) log(error);",
-      "});",
-      "```",
-      "",
-      "**Options**",
-      "",
-      "```ts",
-      "{",
-      "  mac: string,        // required: six two-digit hex numbers separated by ':'",
-      "                      // e.g. 'CC:CD:11:12:80:88'",
-      "  ip?: string,        // optional: device IPv4 address, used for the directed",
-      "                      // broadcast (alias: host)",
-      "  broadcast?: string, // optional: explicit IPv4 broadcast address",
-      "  port?: number,      // optional: UDP port, default 9",
-      "  timeout?: number,   // optional: send timeout in ms, 100-10000, default 2000",
-      "}",
-      "```",
-      "",
-      "**By Network device** — `{ id }` is still valid and uses the host and MAC from Network devices:",
-      "",
-      "```js",
-      'call("network.wake", { id: "WZ_TV" }, (data, error) => {',
-      "  if (error) log(error);",
-      "});",
-      "```",
-      "",
-      "**Directly by MAC** — for a device that is not in Network devices:",
-      "",
-      "```js",
-      'call("network.wake", { mac: "CC:CD:11:12:80:88", ip: "192.168.178.23" }, (data, error) => {',
-      "  if (error) log(error);",
-      "});",
-      "```",
-      "",
-      "**From an HTML tile**",
-      "",
-      "```js",
-      'await ihome.call("network.wake", { mac: "CC:CD:11:12:80:88", ip: "192.168.178.23" });',
-      "```",
-      "",
-      "An IP address cannot find the MAC of a switched-off device; WoL needs the MAC. `ip` only chooses the broadcast target.",
-    ].join("\n"),
   },
   {
     id: "http.in",
@@ -448,6 +411,10 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
     ],
   },
 ];
+
+/** Ids kept only as call aliases (`network.wake` → `network.info`); a user
+ *  plugin must not take them. */
+const RETIRED_PLUGIN_IDS = new Set(["network.wake"]);
 
 /** Retired built-ins: valid for an existing config entry (migration
  *  fallback) but never seeded for new installs. */
@@ -753,6 +720,7 @@ function validEntry(
   if (!record(value)) return null;
   const id = typeof value.id === "string" ? value.id : "";
   if (!validPluginId(id)) return null;
+  if (RETIRED_PLUGIN_IDS.has(id)) return null;
   const name = typeof value.name === "string" ? value.name.trim() : "";
   if (!name || name.length > 64) return null;
   if (value.enabled !== undefined && typeof value.enabled !== "boolean") {

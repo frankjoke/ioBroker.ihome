@@ -55,7 +55,7 @@ describe("parsePluginFile", () => {
     expect(
       parsePluginFile({
         ...base,
-        plugin: { ...base.plugin, id: "network.wake" },
+        plugin: { ...base.plugin, id: "network.info" },
       }),
     ).toEqual({ problem: expect.stringContaining("built-in") });
   });

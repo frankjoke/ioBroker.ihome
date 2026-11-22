@@ -778,8 +778,7 @@ class IHome extends utils.Adapter {
       },
       resolveVariable,
       callPlugin: (id: string, payload: unknown) =>
-        this.pluginHost?.call(id, payload) ??
-        Promise.resolve(pluginError("plugins are not available")),
+        this.callPlugin(id, payload),
       nextAstro: (event: AstroEvent, offset: number, from: number) =>
         this.nextAstro(event, offset, from),
     };
@@ -1146,6 +1145,19 @@ class IHome extends utils.Adapter {
     await write("updatedAt", now);
   }
 
+  /** Resolve a plugin call, keeping `network.wake` as an alias. */
+  private callPlugin(id: string, payload: unknown): Promise<PluginReply> {
+    const host = this.pluginHost;
+    if (!host) return Promise.resolve(pluginError("plugins are not available"));
+    if (id === "network.wake") {
+      return host.call("network.info", {
+        ...(isRecord(payload) ? payload : {}),
+        wake: true,
+      });
+    }
+    return host.call(id, payload);
+  }
+
   private async onPluginMessage(obj: ioBroker.Message): Promise<void> {
     if (obj.command !== "plugin") return;
     const reply = (result: PluginReply): void => {
@@ -1156,9 +1168,7 @@ class IHome extends utils.Adapter {
     if (!parsed.ok) return reply(pluginError(parsed.error));
     if (!this.pluginHost)
       return reply(pluginError("plugins are not available"));
-    reply(
-      await this.pluginHost.call(parsed.message.id, parsed.message.payload),
-    );
+    reply(await this.callPlugin(parsed.message.id, parsed.message.payload));
   }
 
   private pluginSettingsStateId(): string {
@@ -2083,6 +2093,40 @@ class IHome extends utils.Adapter {
     try {
       if (!isRecord(obj.message)) {
         reply({ ok: false, error: "invalid payload" });
+        return;
+      }
+      if (obj.message.action === "regenerate") {
+        if (obj.message.confirm !== true) {
+          reply({ ok: false, error: "confirmation required" });
+          return;
+        }
+        const keys = webpush.generateVAPIDKeys();
+        this.pushPublicKey = keys.publicKey;
+        this.pushPrivateKey = keys.privateKey;
+        webpush.setVapidDetails(
+          "mailto:ihome@localhost",
+          keys.publicKey,
+          keys.privateKey,
+        );
+        await this.setStateAsync("info.pushPublicKey", {
+          val: keys.publicKey,
+          ack: true,
+        });
+        // Old endpoints are bound to the old key: keep none of them.
+        this.pushSubscriptions = [];
+        await this.writePushSubscriptions();
+        reply({ ok: true, publicKey: keys.publicKey });
+        // Reply first, then store the pair; storing restarts the instance.
+        setTimeout(() => {
+          void this.updateConfig({
+            vapidPublicKey: keys.publicKey,
+            vapidPrivateKey: keys.privateKey,
+          }).catch((error) =>
+            this.log.warn(
+              `cannot store generated Web Push keys: ${String(error)}`,
+            ),
+          );
+        }, 300);
         return;
       }
       const deviceId = validDeviceId(obj.message.deviceId);

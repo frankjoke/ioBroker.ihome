@@ -60,7 +60,7 @@ module.exports = (api) => {
 - \`log\` — \`debug\`, \`info\`, \`warn\`, \`error\`. Debug is off until the plugin's Debug switch is on.
 - \`state.get\` / \`state.set\` / \`state.getForeign\` / \`state.setForeign\`.
 - \`objects.get\` / \`objects.getForeign\`.
-- \`network.list\` / \`network.get\` — the adapter's configured network devices.
+- \`network.list\` / \`network.get\` — the endpoints configured in the network.info plugin settings.
 - \`sendTo(instance, command, payload)\`.
 
 ## State folder

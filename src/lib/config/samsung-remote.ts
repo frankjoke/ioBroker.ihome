@@ -222,7 +222,7 @@ export const SAMSUNG_REMOTE_HTML = `<!doctype html>
     try {
       await ihome.call("network.wake", { id: WAKE_DEVICE });
     } catch (error) {
-      return setStatus("Einschalten braucht das network.wake Plugin: " + error.message, "bad");
+      return setStatus("Einschalten braucht das Network device info Plugin: " + error.message, "bad");
     }
     for (let i = 1; i <= 12; i++) {
       setStatus(\`TV bootet … \${i * 3}s\`);

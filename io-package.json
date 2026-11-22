@@ -119,9 +119,7 @@
     "compact": false,
     "logTransporter": true,
     "singleton": true,
-    "adminUI": {
-      "config": "json"
-    },
+    "noConfig": true,
     "localLinks": {
       "ihome": {
         "link": "%web_protocol%://%ip%:%web_port%/ihome/index.html",

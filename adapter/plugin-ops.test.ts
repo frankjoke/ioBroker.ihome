@@ -158,9 +158,7 @@ describe("validAdapterPlugins", () => {
   });
 
   it("parses the network.info endpoint schema", () => {
-    const def = BUILTIN_PLUGINS.find(
-      (entry) => entry.id === "network.info",
-    );
+    const def = BUILTIN_PLUGINS.find((entry) => entry.id === "network.info");
     const schema = pluginSettingsSchema(def?.settingsSchema);
     expect(schema).not.toBeNull();
     expect(schema?.[0]).toMatchObject({ name: "endpoints", type: "array" });
@@ -342,7 +340,7 @@ describe("seedBuiltinPlugins", () => {
         code: "x",
       },
       {
-        id: "network.wake",
+        id: "http.in",
         name: BUILTIN_PLUGINS[1].name,
         enabled: true,
         builtin: true,
@@ -350,19 +348,8 @@ describe("seedBuiltinPlugins", () => {
         debug: false,
         help: BUILTIN_PLUGINS[1].help,
         usage: BUILTIN_PLUGINS[1].usage,
-        code: undefined,
-      },
-      {
-        id: "http.in",
-        name: BUILTIN_PLUGINS[2].name,
-        enabled: true,
-        builtin: true,
-        timeoutMs: DEFAULT_PLUGIN_TIMEOUT_MS,
-        debug: false,
-        help: BUILTIN_PLUGINS[2].help,
-        usage: BUILTIN_PLUGINS[2].usage,
-        settingsSchema: BUILTIN_PLUGINS[2].settingsSchema,
-        settingsTabs: BUILTIN_PLUGINS[2].settingsTabs,
+        settingsSchema: BUILTIN_PLUGINS[1].settingsSchema,
+        settingsTabs: BUILTIN_PLUGINS[1].settingsTabs,
         code: undefined,
       },
     ]);

@@ -63,7 +63,7 @@ describe("createNetworkPlugins", () => {
       ],
     });
     await expect(
-      plugins["network.info"](api).call!({ id: "missing" }),
+      plugins["network.info"](api).call!({ id: "missing", wake: true }),
     ).rejects.toThrow("unknown network device");
   });
 
@@ -75,15 +75,18 @@ describe("createNetworkPlugins", () => {
     });
     const api = fakeNetworkApi();
     expect(
-      await plugins["network.wake"](api).call!({ id: "tv" }),
+      await plugins["network.info"](api).call!({ id: "tv", wake: true }),
     ).toMatchObject({ sent: true });
     expect(sent).toEqual([
       { host: "192.168.1.2", mac: "aa:bb:cc:dd:ee:ff", port: undefined },
     ]);
-    await expect(plugins["network.wake"](api).call!({})).rejects.toThrow("id");
     await expect(
-      plugins["network.wake"](fakeNetworkApi({ ...tv, mac: undefined })).call!({
+      plugins["network.info"](api).call!({ wake: true }),
+    ).rejects.toThrow("id");
+    await expect(
+      plugins["network.info"](fakeNetworkApi({ ...tv, mac: undefined })).call!({
         id: "tv",
+        wake: true,
       }),
     ).rejects.toThrow("MAC");
   });
@@ -95,7 +98,8 @@ describe("createNetworkPlugins", () => {
       return { sent: true };
     });
     const api = fakeNetworkApi();
-    await plugins["network.wake"](api).call!({
+    await plugins["network.info"](api).call!({
+      wake: true,
       mac: "aa:bb:cc:dd:ee:ff",
       host: "192.168.1.3",
       port: 7,
@@ -107,7 +111,8 @@ describe("createNetworkPlugins", () => {
       port: 7,
       timeout: 500,
     });
-    await plugins["network.wake"](api).call!({
+    await plugins["network.info"](api).call!({
+      wake: true,
       mac: "aa:bb:cc:dd:ee:ff",
       broadcast: "192.168.1.255",
     });
@@ -116,18 +121,24 @@ describe("createNetworkPlugins", () => {
       mac: "aa:bb:cc:dd:ee:ff",
       broadcast: "192.168.1.255",
     });
-    await plugins["network.wake"](api).call!({
+    await plugins["network.info"](api).call!({
+      wake: true,
       mac: "aa:bb:cc:dd:ee:ff",
       ip: "192.168.1.4",
     });
     expect(sent[2]).toMatchObject({ host: "192.168.1.4" });
-    await expect(plugins["network.wake"](api).call!({})).rejects.toThrow("MAC");
+    await expect(
+      plugins["network.info"](api).call!({ wake: true }),
+    ).rejects.toThrow("MAC");
   });
 
   it("rejects a missing network device", async () => {
     const plugins = createNetworkPlugins(async () => ({ ok: true }));
     await expect(
-      plugins["network.wake"](fakeNetworkApi()).call!({ id: "missing" }),
+      plugins["network.info"](fakeNetworkApi()).call!({
+        id: "missing",
+        wake: true,
+      }),
     ).rejects.toThrow("unknown network device");
   });
 });

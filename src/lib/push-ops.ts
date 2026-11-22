@@ -88,3 +88,20 @@ export function base64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   }
   return bytes;
 }
+
+/** Whether a browser subscription was created with this base64 VAPID key.
+ *  Unknown keys count as matching, so an older browser still reconciles. */
+export function pushKeyMatches(
+  applied: ArrayBuffer | Uint8Array | null | undefined,
+  key: string,
+): boolean {
+  if (!applied) return true;
+  const expected = base64ToUint8Array(key);
+  const bytes =
+    applied instanceof Uint8Array ? applied : new Uint8Array(applied);
+  if (bytes.length !== expected.length) return false;
+  for (let index = 0; index < bytes.length; index += 1) {
+    if (bytes[index] !== expected[index]) return false;
+  }
+  return true;
+}

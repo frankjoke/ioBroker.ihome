@@ -145,6 +145,38 @@ it("re-registers an existing subscription with the adapter", async () => {
   ]);
 });
 
+it("replaces a subscription bound to an old VAPID key", async () => {
+  installSupport();
+  const existing = {
+    ...h.subscription,
+    options: { applicationServerKey: new Uint8Array([9, 9, 9]) },
+  };
+  h.pushManager.getSubscription.mockResolvedValue(existing);
+  const { enablePush, initPush } = await load();
+  initPush();
+  await Promise.resolve();
+
+  await enablePush();
+
+  expect(existing.unsubscribe).toHaveBeenCalled();
+  expect(h.pushManager.subscribe).toHaveBeenCalled();
+});
+
+it("regenerates the push keys and drops the local subscription state", async () => {
+  installSupport();
+  const { regeneratePushKeys, push } = await load();
+  push.subscribed = true;
+
+  await regeneratePushKeys();
+
+  expect(h.sent).toContainEqual({
+    command: "push",
+    payload: { action: "regenerate", confirm: true },
+  });
+  expect(push.subscribed).toBe(false);
+  expect(push.error).toBe("");
+});
+
 it("disables push and removes the subscription", async () => {
   installSupport();
   h.pushManager.getSubscription.mockResolvedValue(h.subscription);

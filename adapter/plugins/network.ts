@@ -1,4 +1,5 @@
 import type { PluginFactory } from "../plugin-host";
+import type { PluginApi } from "../plugin-api";
 import { sendWake, type WakeOptions } from "../wake-on-lan";
 
 /** What the plugin factory injects; tests replace the UDP sender. */
@@ -33,13 +34,53 @@ function timeoutOf(payload: unknown): number | undefined {
     : undefined;
 }
 
-/** The shipped `network.info` and `network.wake` plugins. */
+/** Wake a tracked device (id) or a direct MAC payload. */
+async function wakePayload(
+  api: PluginApi,
+  wake: WakeFn,
+  payload: Record<string, unknown>,
+): Promise<unknown> {
+  const id = deviceId(payload);
+  if (id) {
+    const device = api.network.get(id);
+    if (!device) throw new Error(`unknown network device: ${id}`);
+    if (!device.mac) {
+      throw new Error(`network device ${id} has no MAC`);
+    }
+    return wake({
+      host: device.host,
+      mac: device.mac,
+      port: portOf(payload),
+    });
+  }
+  const mac = textOf(payload, "mac");
+  if (!mac) {
+    throw new Error("network.info wake needs a network device id or a MAC");
+  }
+  const broadcast = textOf(payload, "broadcast");
+  const timeout = timeoutOf(payload);
+  return wake({
+    host: textOf(payload, "ip") ?? textOf(payload, "host") ?? "255.255.255.255",
+    mac,
+    port: portOf(payload),
+    ...(broadcast ? { broadcast } : {}),
+    ...(timeout !== undefined ? { timeout } : {}),
+  });
+}
+
+/** The shipped `network.info` plugin: device info and Wake-on-LAN. */
 export function createNetworkPlugins(
   wake: WakeFn = sendWake,
 ): Record<string, PluginFactory> {
   return {
     "network.info": (api) => ({
       async call(payload) {
+        if (
+          record(payload) &&
+          (payload.wake === true || payload.action === "wake")
+        ) {
+          return wakePayload(api, wake, payload);
+        }
         const id = deviceId(payload);
         if (id) {
           const device = api.network.get(id);
@@ -47,41 +88,6 @@ export function createNetworkPlugins(
           return device;
         }
         return { devices: api.network.list() };
-      },
-    }),
-    "network.wake": (api) => ({
-      async call(payload) {
-        const id = deviceId(payload);
-        if (id) {
-          const device = api.network.get(id);
-          if (!device) throw new Error(`unknown network device: ${id}`);
-          if (!device.mac) {
-            throw new Error(`network device ${id} has no MAC`);
-          }
-          return wake({
-            host: device.host,
-            mac: device.mac,
-            port: portOf(payload),
-          });
-        }
-        const mac = textOf(payload, "mac");
-        if (!mac) {
-          throw new Error(
-            "network.wake needs a network device id or a MAC address",
-          );
-        }
-        const broadcast = textOf(payload, "broadcast");
-        const timeout = timeoutOf(payload);
-        return wake({
-          host:
-            textOf(payload, "ip") ??
-            textOf(payload, "host") ??
-            "255.255.255.255",
-          mac,
-          port: portOf(payload),
-          ...(broadcast ? { broadcast } : {}),
-          ...(timeout !== undefined ? { timeout } : {}),
-        });
       },
     }),
   };

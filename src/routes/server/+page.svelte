@@ -2,6 +2,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import {
     effectivePin,
@@ -18,6 +19,7 @@
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
   import ExternalSessionsCard from "$lib/components/config/ExternalSessionsCard.svelte";
   import { getPlugins, loadPlugins } from "$lib/stores/plugins.svelte";
+  import { push, regeneratePushKeys } from "$lib/stores/push.svelte";
   import { sessionClass } from "$lib/config/session-locality.svelte";
   import { showsExternalPolicyCard } from "$lib/config/locality";
 
@@ -88,6 +90,9 @@
   let askingPin = $state(false);
   /** The change flow: current PIN first, then the new one. */
   let pinStep = $state<"off" | "verify" | "new">("off");
+  /** Push keys: rotate only after an explicit confirmation. */
+  let askRegenerate = $state(false);
+  let pushMessage = $state("");
 
   /** True while the shipped default (or a missing/malformed value) is in force. */
   const pinIsDefault = $derived(isDefaultPin(storage.pin));
@@ -280,6 +285,43 @@
         {/if}
       </div>
 
+      <div class="item" class:open={openSection === "push"}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="item-line" onclick={(e) => onLineClick(e, "push")}>
+          <Icon value="notifications" size={18} />
+          <button
+            type="button"
+            class="name"
+            aria-expanded={openSection === "push"}
+            onclick={() => toggle("push")}>Push notifications</button
+          >
+        </div>
+        {#if openSection === "push"}
+          <div class="item-editor settings-card-body">
+            <p class="text-muted hint">
+              The adapter generates the VAPID key pair once and stores the
+              private key encrypted. Regenerating it invalidates every current
+              subscription: each phone must enable push again. The adapter
+              restarts once.
+            </p>
+            {#if pushMessage}
+              <p class="hint text-muted">{pushMessage}</p>
+            {/if}
+            <button
+              class="btn btn-primary"
+              disabled={push.busy}
+              onclick={() => {
+                pushMessage = "";
+                askRegenerate = true;
+              }}
+            >
+              Regenerate keys
+            </button>
+          </div>
+        {/if}
+      </div>
+
       {#if showExternalCard}
         <div class="item" class:open={openSection === "external"}>
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -398,6 +440,31 @@
         }}
         onCancel={() => (pinStep = "off")}
       />
+    {/if}
+
+    {#if askRegenerate}
+      <ConfirmModal
+        title="Regenerate push keys?"
+        confirmLabel="Regenerate"
+        onConfirm={() => {
+          askRegenerate = false;
+          void regeneratePushKeys()
+            .then(() => {
+              pushMessage =
+                "New keys stored. The adapter restarts; enable push again on every phone.";
+            })
+            .catch((error) => {
+              pushMessage =
+                error instanceof Error ? error.message : String(error);
+            });
+        }}
+        onCancel={() => (askRegenerate = false)}
+      >
+        <p class="text-muted">
+          Every current push subscription stops working. After the adapter
+          restarts, each phone must enable push again.
+        </p>
+      </ConfirmModal>
     {/if}
   </fieldset>
 
