@@ -197,16 +197,18 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
 <style>
   :root { --text: #ddd; --muted: #999; --surface: #222; --border: #444; --primary: #4a9eff; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 10px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; }
-  .head { margin-bottom: 2px; }
+  html, body { height: 100%; }
+  body { margin: 0; padding: 10px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; display: flex; flex-direction: column; overflow: hidden; }
+  .head { margin-bottom: 2px; flex: 0 0 auto; }
   .title { font-weight: 600; }
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; flex: 0 0 auto; }
   .badge { border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; font-size: 11px; color: var(--muted); white-space: nowrap; }
   .badge.total { color: var(--text); border-color: var(--primary); }
   .badge.stale { color: #e5a33a; border-color: #e5a33a; }
-  .chart { width: 100%; height: 130px; display: block; }
-  .empty, .note { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
-  .error { color: #e55353; font-size: 12px; margin: 2px 0 0; }
+  #plot { flex: 1 1 auto; min-height: 0; }
+  .chart { width: 100%; height: 100%; display: block; }
+  .empty, .note { color: var(--muted); font-size: 12px; margin: 2px 0 0; flex: 0 0 auto; }
+  .error { color: #e55353; font-size: 12px; margin: 2px 0 0; flex: 0 0 auto; }
   .hidden { display: none; }
   .axis { stroke: var(--border); stroke-width: 1; }
   .grid { stroke: var(--border); stroke-width: 1; opacity: .35; }
@@ -279,7 +281,9 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
       el.classList.remove("hidden");
       el.classList.toggle("stale", Date.now() - at > 2 * 3600000);
     }
+    var lastDoc = null;
     function draw(doc) {
+      lastDoc = doc;
       var plot = $("plot");
       var today = dayKey(new Date());
       var hours = (doc.hours || []).filter(function (h) { return dayKey(new Date(h.time)) === today; });
@@ -291,7 +295,7 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
       }
       var max = Math.max.apply(null, hours.map(function (h) { return h.power || 0; }));
       max = Math.max(max, 0.1);
-      var W = Math.max(280, plot.clientWidth || 600), H = 150, L = 34, R = 8, T = 8, B = 22;
+      var W = Math.max(280, plot.clientWidth || 600), H = Math.max(80, plot.clientHeight || 150), L = 34, R = 8, T = 8, B = 22;
       var w = W - L - R, h = H - T - B;
       var points = hours.map(function (row, i) {
         var x = L + (hours.length === 1 ? w / 2 : (i / (hours.length - 1)) * w);
@@ -360,6 +364,10 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
     }
     refresh();
     setInterval(refresh, 60000);
+    try {
+      new ResizeObserver(function () { if (lastDoc) draw(lastDoc); }).observe($("plot"));
+    } catch (e) {}
+    window.addEventListener("resize", function () { if (lastDoc) draw(lastDoc); });
   })();
 </script>
 </body>
@@ -398,7 +406,7 @@ export const PVFORECAST_CONTRIBUTIONS: PluginContributions = {
 It reads \`ihome.<instance>.plugins.pvforecast.json\` through the HTML bridge and calls the \`total\` and \`peak\` actions every minute. That state holds the generated time, resolved location, sites and the hourly power/energy; the tile is not a bound value slot because an HTML slot's source means "this state holds the HTML document". The location comes from ioBroker system settings.`,
       type: "Custom",
       bindings: "none",
-      size: { w: 10, h: 4 },
+      size: { w: 12, h: 5 },
       features: [],
       slots: [{ kind: "html", options: { html: PVFORECAST_TILE_HTML } }],
     },
