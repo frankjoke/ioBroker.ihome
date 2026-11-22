@@ -55,6 +55,47 @@ it("migrates a v1 document in memory", () => {
   expect(parsed?.logics[0]).toMatchObject({ expr: { code: 'get("a") + 1' } });
 });
 
+it("accepts a managed marker", () => {
+  const managedDoc = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        expr: { code: "1" },
+        managed: {
+          plugin: "col.test",
+          version: "1.0.0",
+          baseline: "a".repeat(64),
+        },
+      },
+    ],
+  } as LogicDocument;
+  expect(
+    validateLogicDocument(managedDoc).filter((i) => i.severity === "error"),
+  ).toEqual([]);
+});
+
+it("rejects a malformed managed marker", () => {
+  const bad = { plugin: "Bad Id", version: "", baseline: "xyz" };
+  const badDoc = {
+    version: 3,
+    logics: [
+      {
+        id: "a",
+        name: "A",
+        kind: "function",
+        expr: { code: "1" },
+        managed: bad,
+      },
+    ],
+  } as unknown as LogicDocument;
+  expect(
+    validateLogicDocument(badDoc).some((i) => i.path === "logics.a.managed"),
+  ).toBe(true);
+});
+
 it("accepts the valid document", () => {
   expect(validateLogicDocument(doc)).toEqual([]);
 });

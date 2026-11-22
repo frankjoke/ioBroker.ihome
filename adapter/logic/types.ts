@@ -176,6 +176,13 @@ export interface Init {
   run?: boolean;
 }
 
+/** Who owns a logic definition: a collection plugin and the hash it captured. */
+export interface CollectionMarker {
+  plugin: string;
+  version: string;
+  baseline: string;
+}
+
 export interface LogicBase {
   /** Stable and unique: [a-z0-9-]. */
   id: string;
@@ -192,6 +199,8 @@ export interface LogicBase {
   /** Enum overrides (`enum.rooms.*`, `enum.functions.*`). Empty inherits from the
    *  output state's own members. */
   enums?: string[];
+  /** Present when a collection plugin owns and versions this definition. */
+  managed?: CollectionMarker;
 }
 
 export interface FunctionLogic extends LogicBase {

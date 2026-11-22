@@ -201,6 +201,24 @@ export function validateLogicDocument(doc: LogicDocument): Issue[] {
     if (seenIds.has(id)) add(id, "id", "duplicate logic id");
     seenIds.add(id);
 
+    if (logic.managed !== undefined) {
+      const marker = logic.managed;
+      const valid =
+        isRecord(marker) &&
+        Object.keys(marker).length === 3 &&
+        typeof marker.plugin === "string" &&
+        /^[a-z0-9][a-z0-9._-]*$/.test(marker.plugin) &&
+        marker.plugin.length <= 64 &&
+        typeof marker.version === "string" &&
+        marker.version.length >= 1 &&
+        marker.version.length <= 32 &&
+        typeof marker.baseline === "string" &&
+        /^[0-9a-f]{64}$/.test(marker.baseline);
+      if (!valid) {
+        add(id, `logics.${id}.managed`, "invalid collection marker");
+      }
+    }
+
     const inputs = (logic.inputs ?? {}) as Record<string, Input>;
     const inputNames = new Set(Object.keys(inputs));
     for (const [name, input] of Object.entries(inputs)) {
