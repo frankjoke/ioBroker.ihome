@@ -77,7 +77,10 @@
     states: string[];
     logics: string[];
     tiles: string[];
+    uses: string[];
   } | null>(null);
+  let collectionLoading = $state(false);
+  let collectionFor = "";
   // The code is read once per plugin; a list refresh must not replace a draft.
   let readFor = "";
 
@@ -135,35 +138,6 @@
           if (raw.contributions && typeof raw.contributions === "object") {
             value = JSON.stringify(raw.contributions, null, 2);
           }
-          const owned = raw.collection as
-            | {
-                states?: { id?: unknown }[];
-                logics?: { id?: unknown }[];
-              }
-            | undefined;
-          collectionItems = owned
-            ? {
-                states: (owned.states ?? [])
-                  .map((entry) => String(entry.id ?? ""))
-                  .filter(Boolean),
-                logics: (owned.logics ?? [])
-                  .map((entry) => String(entry.id ?? ""))
-                  .filter(Boolean),
-                tiles: Array.isArray(
-                  (
-                    raw.contributions as
-                      { tiles?: { id?: unknown }[] } | undefined
-                  )?.tiles,
-                )
-                  ? (
-                      (raw.contributions as { tiles?: { id?: unknown }[] })
-                        .tiles ?? []
-                    )
-                      .map((entry) => String(entry.id ?? ""))
-                      .filter(Boolean)
-                  : [],
-              }
-            : null;
         } catch {
           value = "";
         }
@@ -179,6 +153,63 @@
   $effect(() => {
     getPluginsVersion();
     void ensurePluginContributions();
+  });
+
+  /** The Collection tab reads its ids from the manifest on each activation: a
+   *  page round-trip (Open Logic and back) must not leave a stale/empty list. */
+  async function loadCollectionItems(): Promise<void> {
+    collectionLoading = true;
+    try {
+      const text = await readMetaText(
+        META_ADAPTER,
+        `plugins/${plugin.id}/plugin.json`,
+      );
+      const raw = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+      const owned = raw.collection as
+        | {
+            states?: { id?: unknown }[];
+            logics?: { id?: unknown }[];
+            uses?: unknown[];
+          }
+        | undefined;
+      const tiles = Array.isArray(
+        (raw.contributions as { tiles?: { id?: unknown }[] } | undefined)
+          ?.tiles,
+      )
+        ? ((raw.contributions as { tiles?: { id?: unknown }[] }).tiles ?? [])
+            .map((entry) => String(entry.id ?? ""))
+            .filter(Boolean)
+        : [];
+      collectionItems = owned
+        ? {
+            states: (owned.states ?? [])
+              .map((entry) => String(entry.id ?? ""))
+              .filter(Boolean),
+            logics: (owned.logics ?? [])
+              .map((entry) => String(entry.id ?? ""))
+              .filter(Boolean),
+            tiles,
+            uses: (owned.uses ?? [])
+              .map((entry) => String(entry))
+              .filter(Boolean),
+          }
+        : null;
+    } catch {
+      collectionItems = null;
+    } finally {
+      collectionLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (activeTab !== "collection" || plugin.builtin) {
+      collectionFor = "";
+      return;
+    }
+    const key = `${plugin.id}@${plugin.version ?? ""}`;
+    if (collectionFor === key) return;
+    collectionFor = key;
+    void loadCollectionItems();
   });
 
   const snippets = $derived(
@@ -510,11 +541,14 @@
   {:else if activeTab === "collection"}
     <p class="hint text-muted">
       This plugin owns {plugin.collection?.states ?? 0} state(s),
-      {plugin.collection?.logics ?? 0} logic and
-      {plugin.collection?.tiles ?? 0} tile(s). The plugin lifecycle enables and disables
-      the owned logic; state values are never captured.
+      {plugin.collection?.logics ?? 0} logic,
+      {plugin.collection?.tiles ?? 0} tile(s) and uses
+      {plugin.collection?.uses ?? 0} external state(s). The plugin lifecycle enables
+      and disables the owned logic; state values are never captured.
     </p>
-    {#if collectionItems}
+    {#if collectionLoading && !collectionItems}
+      <p class="hint text-muted">Loading collection…</p>
+    {:else if collectionItems}
       {#if collectionItems.states.length}
         <p class="label-mono">States</p>
         <p class="hint text-muted mono">{collectionItems.states.join(", ")}</p>
@@ -522,6 +556,10 @@
       {#if collectionItems.logics.length}
         <p class="label-mono">Logic</p>
         <p class="hint text-muted mono">{collectionItems.logics.join(", ")}</p>
+      {/if}
+      {#if collectionItems.uses.length}
+        <p class="label-mono">Uses</p>
+        <p class="hint text-muted mono">{collectionItems.uses.join(", ")}</p>
       {/if}
       {#if collectionItems.tiles.length}
         <p class="label-mono">Tiles</p>
