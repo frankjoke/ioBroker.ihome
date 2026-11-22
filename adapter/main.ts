@@ -1364,13 +1364,16 @@ class IHome extends utils.Adapter {
 
   private collectionHost(): CollectionHost {
     return {
+      // Collection items may live in any adapter's namespace, so this is the
+      // foreign-object path, not the adapter-local one.
       getObject: async (id) =>
-        ((await this.getObjectAsync(id)) ?? undefined) as unknown as
-          Record<string, unknown> | undefined,
+        ((await this.getForeignObjectAsync(id)) ?? undefined) as unknown as
+          | Record<string, unknown>
+          | undefined,
       setObject: async (id, object) => {
-        await this.setObjectAsync(id, object as ioBroker.SettableObject);
+        await this.setForeignObjectAsync(id, object as ioBroker.SettableObject);
       },
-      deleteObject: (id) => this.delObjectAsync(id),
+      deleteObject: (id) => this.delForeignObjectAsync(id),
       readLogicDocument: async () =>
         parseLogicDocument(
           (await this.getStateAsync(`${CONFIG_FOLDER}.logicList`))?.val,
