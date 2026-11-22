@@ -72,13 +72,28 @@ export function suggestCollectionStates(
   return [...rows.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** A tile copy without the provenance that only the live template has. */
-export function collectionTileDefinition(template: Template): Template {
+/** A tile copy without the provenance that only the live template has.
+ *  `origins` maps a lower-cased item name to the owned state id, so the
+ *  contributed template can pre-bind the plugin's own states on install. */
+export function collectionTileDefinition(
+  template: Template,
+  origins: Map<string, string> = new Map(),
+): Template {
   const copy = JSON.parse(JSON.stringify(template)) as Template & {
     builtin?: boolean;
     basedOn?: string;
   };
   delete copy.builtin;
   delete copy.basedOn;
+  if (origins.size) {
+    copy.slots = (copy.slots ?? []).map((slot) => {
+      if (slot.origin) return slot;
+      const label = String(slot.label ?? slot.repair?.label ?? "")
+        .trim()
+        .toLowerCase();
+      const origin = label ? origins.get(label) : undefined;
+      return origin ? { ...slot, origin } : slot;
+    });
+  }
   return copy;
 }

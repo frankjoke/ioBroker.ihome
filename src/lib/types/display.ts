@@ -327,6 +327,9 @@ export interface Slot {
   /** Template-only: the repair this slot's state used, so an apply can
    *  recreate it on the picked state. Never written to a tile. */
   repair?: TemplateRepair;
+  /** Template-only: the state this role was captured from. Applying the
+   *  template pre-binds the row when that state still exists. */
+  origin?: string;
 }
 
 export interface Template {

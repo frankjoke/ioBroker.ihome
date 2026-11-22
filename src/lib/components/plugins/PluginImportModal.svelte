@@ -11,6 +11,8 @@
   import CollectionConflicts from "./CollectionConflicts.svelte";
   import type { CollectionConflict } from "$adapter/plugin-collection-types";
   import { writePluginFiles } from "$lib/config/plugin-storage";
+  import { importCollectionVariables } from "$lib/config/collection-variables";
+  import { reloadLogics } from "$lib/stores/logics.svelte";
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { NUT_EXAMPLE } from "$lib/config/plugin-examples";
 
@@ -93,6 +95,8 @@
           conflicts = { id: value.id, list: installedConflicts };
           return;
         }
+        importCollectionVariables(value.collection);
+        await reloadLogics();
         if (value.settings || value.timeoutMs !== undefined) {
           await savePlugin({
             id: value.id,
@@ -244,6 +248,10 @@
       conflicts = null;
       if (!id) return;
       void applyCollection(id, true)
+        .then(() => {
+          importCollectionVariables(plugin?.collection);
+          return reloadLogics();
+        })
         .then(() => loadPlugins())
         .then(() => onImported())
         .catch((failure) => {

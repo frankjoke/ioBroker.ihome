@@ -18,6 +18,10 @@
     pluginsLoading,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
+  import { readMetaText, META_ADAPTER } from "$lib/config/meta-files";
+  import { importCollectionVariables } from "$lib/config/collection-variables";
+  import { reloadLogics } from "$lib/stores/logics.svelte";
+  import type { PluginCollection } from "$adapter/plugin-collection-types";
   import type { PluginView } from "$adapter/plugin-admin";
   import { patchView, readView } from "$lib/stores/page-view";
 
@@ -99,6 +103,26 @@
     busy = true;
     try {
       await savePlugin({ id: plugin.id, [field]: value });
+      if (field === "enabled" && value && !plugin.builtin) {
+        // A plugin installed before its states had aliases: enabling adds the
+        // missing variable entries, then the SPA sees the adapter's logics.
+        const text = await readMetaText(
+          META_ADAPTER,
+          `plugins/${plugin.id}/plugin.json`,
+        );
+        if (!text) return;
+        try {
+          const { collection } = JSON.parse(text) as {
+            collection?: PluginCollection;
+          };
+          if (collection) {
+            importCollectionVariables(collection);
+            await reloadLogics();
+          }
+        } catch {
+          // A broken manifest is reported by the plugin list itself.
+        }
+      }
     } catch {
       // The store exposes the message.
     } finally {

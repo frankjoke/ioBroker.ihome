@@ -6,6 +6,7 @@ import {
   materializeTemplateTileFromFills,
   materializeTemplateTileFromState,
   materializedTileConfig,
+  originFills,
   slotFromControl,
   slotFromState,
   slotKindForWidget,
@@ -657,4 +658,46 @@ it("marks the frozen template icon as automatic", () => {
   const tile = materializedTileConfig({ slots: [], icon: "ac_unit" });
   expect(tile.icon).toBe("ac_unit");
   expect(tile.iconAuto).toBe(true);
+});
+
+it("pre-binds roles whose captured origin still exists", () => {
+  const template = {
+    id: "o1",
+    name: "Origins",
+    type: "Custom",
+    roles: ["level", "level_state"],
+    features: [],
+    slots: [
+      {
+        kind: "level",
+        source: "level",
+        label: "Level",
+        origin: "0_userdata.0.lamp.brightness",
+        repair: { kind: "repair", name: "level" },
+      },
+      {
+        kind: "level",
+        source: "level_state",
+        label: "State",
+        origin: "0_userdata.0.lamp.missing",
+        repair: { kind: "repair", name: "level_state" },
+      },
+    ],
+  } as Template;
+  const objects = new Map<string, any>([
+    [
+      "0_userdata.0.lamp.brightness",
+      { type: "state", common: { name: "Brightness", type: "number" } },
+    ],
+  ]);
+  const fills = originFills(template, objects, []);
+  expect([...fills.keys()]).toEqual(["level"]);
+  expect(fills.get("level")?.stateId).toBe("0_userdata.0.lamp.brightness");
+  const tile = materializeTemplateTileFromFills(
+    template,
+    fills,
+    fills.get("level")!,
+  );
+  // The capture-only hint never reaches the tile.
+  expect(tile.slots.every((slot) => slot.origin === undefined)).toBe(true);
 });

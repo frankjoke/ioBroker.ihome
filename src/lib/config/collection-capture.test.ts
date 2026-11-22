@@ -93,3 +93,29 @@ it("resolves variables and strips tile provenance", () => {
   expect(collectionTileDefinition(tile)).not.toHaveProperty("builtin");
   expect(collectionTileDefinition(tile)).not.toHaveProperty("basedOn");
 });
+
+it("pre-binds a contributed tile's slots to owned states by name", () => {
+  const tile = {
+    id: "t2",
+    name: "T",
+    type: "Custom",
+    features: [],
+    slots: [
+      { kind: "level", source: "level", label: "TestVariable" },
+      { kind: "enum", source: "level_state2", label: "TestLogic" },
+      { kind: "value", source: "value", label: "Unknown" },
+    ],
+  } as unknown as Template;
+  const defined = collectionTileDefinition(
+    tile,
+    new Map([
+      ["testvariable", "ihome.0.Variables.TestState"],
+      ["testlogic", "ihome.0.Logic.TestLogic"],
+    ]),
+  );
+  expect(defined.slots.map((slot) => slot.origin)).toEqual([
+    "ihome.0.Variables.TestState",
+    "ihome.0.Logic.TestLogic",
+    undefined,
+  ]);
+});

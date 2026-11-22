@@ -183,6 +183,8 @@ it("maps state sources to roles with their repaired fields", () => {
     role: "switch.light",
     type: "boolean",
   });
+  // The captured state rides along so the apply can pre-bind it.
+  expect(result.template.slots[0].origin).toBe("alias.0.Lamp.SET");
   const ago = result.template.slots.find((slot) => slot.source === "ago");
   expect(ago?.options).toMatchObject({ of: "switch_light", from: "lc" });
   const availability = result.template.slots[4];

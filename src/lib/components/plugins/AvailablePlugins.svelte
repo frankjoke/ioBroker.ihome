@@ -7,6 +7,9 @@
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { BUILTIN_PLUGINS } from "$adapter/plugin-ops";
   import { writePluginFiles } from "$lib/config/plugin-storage";
+  import { importCollectionVariables } from "$lib/config/collection-variables";
+  import { reloadLogics } from "$lib/stores/logics.svelte";
+  import type { PluginCollection } from "$adapter/plugin-collection-types";
   import {
     parsePluginCatalog,
     type PluginCatalogEntry,
@@ -34,6 +37,7 @@
     entry: PluginCatalogEntry;
     ids: string[];
   } | null>(null);
+  let conflictCollection = $state<PluginCollection | undefined>(undefined);
 
   function missingStates(plugin: ImportedPlugin): string[] {
     return (plugin.collection?.states ?? [])
@@ -112,9 +116,12 @@
       await writePluginFiles(plugin);
       const installedConflicts = await installPlugin(plugin.id);
       if (installedConflicts.length > 0) {
+        conflictCollection = plugin.collection;
         conflicts = { id: plugin.id, list: installedConflicts };
         return;
       }
+      importCollectionVariables(plugin.collection);
+      await reloadLogics();
       if (plugin.settings || plugin.timeoutMs !== undefined) {
         await savePlugin({
           id: plugin.id,
@@ -213,6 +220,10 @@
       conflicts = null;
       if (!id) return;
       void applyCollection(id, true)
+        .then(() => {
+          importCollectionVariables(conflictCollection);
+          return reloadLogics();
+        })
         .then(() => loadPlugins())
         .catch((failure) => {
           error = failure instanceof Error ? failure.message : String(failure);

@@ -15,7 +15,9 @@ import {
 } from "$lib/config/template-suggest";
 import { sanitizeLabel, newLocalTaken } from "$lib/config/virtual-ops";
 import { matchingOverride, sourceRuleName } from "$lib/config/source-overrides";
+import { resolveTemplateReference } from "$lib/config/template-reference";
 import type { TemplateReference } from "$lib/config/template-reference";
+import type { GlobalVariable } from "$lib/config/variables";
 import type { Control, Device, Widget } from "$lib/types/device";
 import type { EnsuredOverride, SourceOverride } from "$lib/types/overrides";
 import type {
@@ -29,6 +31,14 @@ import type {
   TileConfig,
   TileLook,
 } from "$lib/types/display";
+
+/** The slot without the template-only capture fields. */
+function slotPresentation(slot: Slot): Slot {
+  const copy = { ...slot };
+  delete copy.repair;
+  delete copy.origin;
+  return copy;
+}
 
 /** The slot kinds that render a control widget: the live state's shape wins
  *  over a recipe's kind for these. */
@@ -396,6 +406,25 @@ function withOverride(
     : reference;
 }
 
+/** Roles whose captured origin still exists here, so applying a template from
+ *  this instance needs no pick. */
+export function originFills(
+  template: Template,
+  objects: Map<string, any>,
+  variables: GlobalVariable[],
+): Map<string, TemplateReference> {
+  const out = new Map<string, TemplateReference>();
+  for (const slot of template.slots ?? []) {
+    const role = typeof slot.source === "string" ? slot.source : "";
+    if (!role || !slot.origin || out.has(role)) continue;
+    if (!objects.has(slot.origin)) continue;
+    const resolved = resolveTemplateReference(slot.origin, objects, variables);
+    if ("problem" in resolved) continue;
+    out.set(role, resolved.reference);
+  }
+  return out;
+}
+
 /** A complete tile from a template and an explicit role/feature → source map.
  *  Unbound roles/features are left out; raw (frame/HTML) and `ago` slots stay.
  *  Role templates recreate their repair through `ensureOverride`, which the
@@ -445,9 +474,10 @@ function materializeFeatureTile(
     for (const [key, value] of Object.entries(slot.options ?? {})) {
       if (key !== "pick" && value !== undefined) options[key] = value;
     }
+    const presentation = slotPresentation(slot);
     slots.push({
       ...base,
-      ...slot,
+      ...presentation,
       kind,
       source: base.source,
       // Same caption the device tile gets: the recipe's, else the feature's.
@@ -514,7 +544,8 @@ function materializeRoleTile(
   const bound: { slot: Slot; role: string; override?: EnsuredOverride }[] = [];
 
   for (const slot of template.slots ?? []) {
-    const { repair, ...presentation } = slot;
+    const repair = slot.repair;
+    const presentation = slotPresentation(slot);
     const role = typeof slot.source === "string" ? slot.source : "";
     if (!role || !roles.has(role)) {
       bound.push({ slot: presentation, role: "" });

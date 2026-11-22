@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getLogicDocument, initLogics } from "$lib/stores/logics.svelte";
   import {
@@ -180,6 +181,44 @@
     step = Math.max(0, Math.min(steps.length - 1, next));
   }
 
+  /** Owned items by lower-cased name; a duplicate name is left unbound. */
+  function ownedOrigins(): Map<string, string> {
+    const byName = new SvelteMap<string, string | null>();
+    const add = (id: string, name: string): void => {
+      const key = name.trim().toLowerCase();
+      if (!key) return;
+      const known = byName.get(key);
+      byName.set(key, known === undefined || known === id ? id : null);
+    };
+    for (const stateId of stateIds) {
+      add(
+        stateId,
+        String(
+          (ioBroker.objects as Map<string, any>).get(stateId)?.common?.name ??
+            "",
+        ),
+      );
+    }
+    const logics = getLogicDocument().logics;
+    for (const logicId of logicIds) {
+      const outputId = `${ioBroker.namespace}.Logic.${logicId}`;
+      const named =
+        logics.find((logic) => logic.id === logicId)?.name ?? logicId;
+      add(
+        outputId,
+        String(
+          (ioBroker.objects as Map<string, any>).get(outputId)?.common?.name ??
+            named,
+        ),
+      );
+    }
+    return new SvelteMap(
+      [...byName].filter(
+        (entry): entry is [string, string] => entry[1] !== null,
+      ),
+    );
+  }
+
   async function save(): Promise<void> {
     if (busy) return;
     const problem = validate();
@@ -191,6 +230,7 @@
     busy = true;
     error = "";
     try {
+      const origins = ownedOrigins();
       const chosen = tileIds
         .map(
           (tileId) =>
@@ -198,7 +238,7 @@
             existingTiles.find((tile) => tile.id === tileId),
         )
         .filter((tile): tile is Template => !!tile)
-        .map((tile) => collectionTileDefinition(tile));
+        .map((tile) => collectionTileDefinition(tile, origins));
       const reply = await ioBroker.sendTo(ioBroker.namespace, "plugins", {
         action: "collection.capture",
         request: {

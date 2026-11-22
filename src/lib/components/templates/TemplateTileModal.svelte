@@ -7,6 +7,7 @@
   import {
     autoFillRoles,
     boundFills,
+    originFills,
     templateBindingRows,
   } from "$lib/config/slot-create";
   import { matchingOverride } from "$lib/config/source-overrides";
@@ -139,6 +140,22 @@
     if (!main) return;
     onCreate(fills, main);
   }
+
+  // A template captured here records where each role came from. When those
+  // states still exist (a plugin's own states), bind them without a pick.
+  untrack(() => {
+    const seeded = originFills(
+      template,
+      ioBroker.objects as Map<string, any>,
+      getVariables(),
+    );
+    for (const [role, fill] of seeded) {
+      manualFills.set(role, fill);
+      fills.set(role, fill);
+    }
+    const main = primary ? seeded.get(primary.key) : undefined;
+    if (primary && main) pick(primary.key, main.stateId);
+  });
 </script>
 
 <svelte:window
@@ -174,7 +191,8 @@
       <p class="hint text-muted">
         {#if roleBased}
           Pick the main role's state first; the others fill from the same device
-          or parent when the role, unit or name is clear. Missing overrides are
+          or parent when the role, unit or name is clear. States recorded when
+          the template was captured are already bound. Missing overrides are
           created on the picked states. Unset roles are not added to the tile.
         {:else}
           Pick the main feature's state first; the others fill from the same

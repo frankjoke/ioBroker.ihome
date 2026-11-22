@@ -179,3 +179,13 @@ export function initLogics(): Promise<void> {
   }
   return initPromise;
 }
+
+/** Re-read the document after the adapter writes it (e.g. a collection install). */
+export async function reloadLogics(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  initPromise = null;
+  await initLogics();
+}

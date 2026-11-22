@@ -246,6 +246,11 @@ export function collectTileTemplate(
     delete slotOptions.pick;
     const rest = { ...slot };
     delete rest.from;
+    const origin =
+      typeof source === "object"
+        ? (resolved?.stateId ??
+          (source.kind === "state" ? source.stateId : undefined))
+        : undefined;
     parts.push({
       kind: "bound",
       slot: {
@@ -253,6 +258,7 @@ export function collectTileTemplate(
         source: role,
         ...(Object.keys(slotOptions).length ? { options: slotOptions } : {}),
         repair,
+        ...(origin ? { origin } : {}),
       },
       role,
       ...(typeof source === "object" && source.kind === "state"
