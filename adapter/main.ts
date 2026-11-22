@@ -1368,8 +1368,7 @@ class IHome extends utils.Adapter {
       // foreign-object path, not the adapter-local one.
       getObject: async (id) =>
         ((await this.getForeignObjectAsync(id)) ?? undefined) as unknown as
-          | Record<string, unknown>
-          | undefined,
+          Record<string, unknown> | undefined,
       setObject: async (id, object) => {
         await this.setForeignObjectAsync(id, object as ioBroker.SettableObject);
       },
@@ -1765,7 +1764,9 @@ class IHome extends utils.Adapter {
         if (applied.conflicts.length > 0) {
           const ids = applied.conflicts.map((item) => item.id).join(", ");
           this.pluginProblems.set(merged.id, `collection conflicts: ${ids}`);
-        } else if (this.pluginProblems.get(merged.id)?.startsWith("collection")) {
+        } else if (
+          this.pluginProblems.get(merged.id)?.startsWith("collection")
+        ) {
           this.pluginProblems.delete(merged.id);
         }
         collection = { id: merged.id, conflicts: applied.conflicts };
