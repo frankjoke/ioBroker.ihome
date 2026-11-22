@@ -351,6 +351,25 @@ it("reads a row's icon from the descriptor, the rule icon winning", () => {
   expect(rowIcon(bare.body[0], "tile")).toBeUndefined();
 });
 
+it("exposes the slot's own live value as self", () => {
+  const lamp = (liveValue: boolean): EnrichedControl =>
+    ({ ...control("c1", "lamp"), liveValue }) as EnrichedControl;
+  const ruled = (liveValue: boolean) =>
+    tileParts(
+      device({ controls: [lamp(liveValue)] }),
+      tile([
+        {
+          kind: "value",
+          source: "lamp",
+          rules: [{ when: "self === true", icon: "on" }],
+        },
+      ]),
+      none,
+    );
+  expect(rowIcon(ruled(true).body[0], "tile")?.glyph).toBe("on");
+  expect(rowIcon(ruled(false).body[0], "tile")).toBeUndefined();
+});
+
 it("honours enabled and the icon's own homes", () => {
   const row = (slot: Slot) => tileParts(device(), tile([slot]), none).body[0];
 

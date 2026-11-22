@@ -1009,9 +1009,24 @@
   }
 
   /** A rule's live dot: green when `when` evaluates to true, red on error. */
-  function ruleDot(when: string): "true" | "error" | "idle" {
+  function ruleDot(when: string, slotIndex: number): "true" | "error" | "idle" {
     if (!when.trim() || !scope) return "idle";
-    const result = evaluateVirtual(when, scope);
+    const slot = shownSlots[slotIndex];
+    const own =
+      device && slot
+        ? tileSourceControls([slot], {
+            device,
+            states: sourceLook.states,
+            objects: sourceLook.objects,
+            variables: getVariables(),
+            overrides: getOverrideRegistry().overrides,
+            derived: getDerived,
+          })[0]?.liveValue
+        : undefined;
+    const result = evaluateVirtual(when, {
+      ...scope,
+      locals: { ...scope.locals, self: own },
+    });
     if (result.error) return "error";
     return result.value === true ? "true" : "idle";
   }
@@ -2621,7 +2636,10 @@
                         <code>_</code>: a control labelled “Bewegung” is
                         <code>bewegung</code>. Controls that share a feature get
                         a suffix (<code>power</code>, <code>power2</code>, …).
-                        Use
+                        <code>self</code> is this slot's own value, so a lamp
+                        slot can react to
+                        <code>self === true</code>; <code>active</code> is the
+                        tile's active condition. Use
                         <code>get("state.id")</code> for a raw state.
                       </p>
                     </div>
@@ -2638,8 +2656,8 @@
                       >
                         <span
                           class="dot"
-                          class:true={ruleDot(rule.when) === "true"}
-                          class:error={ruleDot(rule.when) === "error"}
+                          class:true={ruleDot(rule.when, i) === "true"}
+                          class:error={ruleDot(rule.when, i) === "error"}
                           title="Live result of this expression"
                         ></span>
                         <button

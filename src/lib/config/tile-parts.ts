@@ -252,8 +252,20 @@ export function tileParts(
   const styleOf = (
     slot: Slot,
     control?: SlotControl & { rules?: Rule[] },
-  ): ResolvedStyle =>
-    resolveStyle([...(slot.rules ?? []), ...(control?.rules ?? [])], scope);
+  ): ResolvedStyle => {
+    const self =
+      control && "liveValue" in control
+        ? (control as { liveValue?: unknown }).liveValue
+        : undefined;
+    const slotScope = {
+      ...scope,
+      locals: { ...scope.locals, self },
+    };
+    return resolveStyle(
+      [...(slot.rules ?? []), ...(control?.rules ?? [])],
+      slotScope,
+    );
+  };
 
   // A source or hint that matches nothing goes dormant (A20); the slots that
   // actually render are the ones with a reading (a frame needs none) that no

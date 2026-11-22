@@ -232,9 +232,14 @@
 
   /** Slot rules first, the control's own defaults last — the last match wins. */
   function slotStyle(slot: Slot, control?: SlotControl & { rules?: Rule[] }) {
+    const self =
+      control && "liveValue" in control
+        ? (control as { liveValue?: unknown }).liveValue
+        : undefined;
+    const slotScope = { ...scope, locals: { ...scope.locals, self } };
     return resolveStyle(
       [...(slot.rules ?? []), ...(control?.rules ?? [])],
-      scope,
+      slotScope,
     );
   }
 
