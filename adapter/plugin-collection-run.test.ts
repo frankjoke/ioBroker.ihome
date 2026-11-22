@@ -2,12 +2,17 @@ import { expect, it } from "vitest";
 import {
   applyCollection,
   baselineOf,
+  captureCollection,
   classifyCollection,
+  collectionOf,
   collectionPluginOf,
+  mergeCapturedPlugin,
   removeCollection,
+  type CaptureRequest,
   type CollectionHost,
   type CollectionPlugin,
 } from "./plugin-collection";
+import { pluginContributionsOf } from "./plugin-contributions";
 import type { LogicDocument, LogicDef } from "./logic/types";
 
 const state = {
@@ -287,4 +292,187 @@ it("returns undefined for a plugin without a version", () => {
       collection: plugin().collection,
     }),
   ).toBeUndefined();
+});
+
+function captureHost(
+  extraLogics: LogicDef[] = [],
+  objects: Record<string, Record<string, unknown>> = {},
+): FakeHost {
+  const doc: LogicDocument = {
+    version: 3,
+    logics: [
+      {
+        id: "calc",
+        name: "Calc",
+        kind: "function",
+        enabled: true,
+        inputs: {
+          sensor: {
+            from: { type: "state", ref: "0_userdata.0.sensor" },
+            kind: "event",
+          },
+        },
+        output: { scope: "state", ref: state.id, type: "number" },
+        expr: { code: 'get("0_userdata.0.helper")' },
+      },
+      ...extraLogics,
+    ],
+  };
+  return fakeHost(doc, {
+    [state.id]: {
+      id: state.id,
+      type: "state",
+      common: structuredClone(state.common),
+    },
+    ...objects,
+  });
+}
+
+function request(overrides: Partial<CaptureRequest> = {}): CaptureRequest {
+  return {
+    id: "col.test",
+    name: "Collection",
+    version: "2.0.0",
+    logicIds: ["calc"],
+    stateIds: [state.id],
+    tiles: [],
+    ...overrides,
+  };
+}
+
+it("captures live items, strips lifecycle fields and builds uses", async () => {
+  const host = captureHost();
+  const result = await captureCollection(host, request());
+  expect(result.uses).toEqual(["0_userdata.0.helper", "0_userdata.0.sensor"]);
+  expect("problem" in collectionOf(result.collection)).toBe(false);
+  expect(result.collection.logics[0].enabled).toBeUndefined();
+  expect(result.collection.logics[0].managed).toBeUndefined();
+  expect(result.collection.states[0].id).toBe(state.id);
+  const live = host.doc.logics[0];
+  expect(live.enabled).toBe(true);
+  expect(live.managed?.baseline).toBe(
+    baselineOf(result.collection.logics[0], "logic"),
+  );
+  expect(host.objects[state.id].native).toMatchObject({
+    ihomeCollection: {
+      plugin: "col.test",
+      version: "2.0.0",
+      baseline: baselineOf(result.collection.states[0], "state"),
+    },
+  });
+});
+
+it("resolves a variable ref into uses", async () => {
+  const host = captureHost([
+    {
+      id: "varuse",
+      name: "Var",
+      kind: "function",
+      expr: { code: 'get("totalVar")' },
+    },
+  ]);
+  host.resolveVariable = (name) =>
+    name === "totalVar" ? "0_userdata.0.pv.other" : undefined;
+  const result = await captureCollection(
+    host,
+    request({ logicIds: ["varuse"], stateIds: [] }),
+  );
+  expect(result.uses).toContain("0_userdata.0.pv.other");
+});
+
+it("refuses another plugin's item and reports a missing id", async () => {
+  const host = captureHost([
+    {
+      id: "foreign",
+      name: "Foreign",
+      kind: "function",
+      expr: { code: "1" },
+      managed: {
+        plugin: "other.plugin",
+        version: "1.0.0",
+        baseline: "0".repeat(64),
+      },
+    },
+  ]);
+  await expect(
+    captureCollection(host, request({ logicIds: ["foreign"], stateIds: [] })),
+  ).rejects.toThrow(/another plugin/);
+  await expect(
+    captureCollection(host, request({ logicIds: ["nope"], stateIds: [] })),
+  ).rejects.toThrow(/nope/);
+  await expect(
+    captureCollection(
+      host,
+      request({ logicIds: [], stateIds: ["0_userdata.0.nope"] }),
+    ),
+  ).rejects.toThrow(/0_userdata\.0\.nope/);
+});
+
+it("copies selected tiles without their builtin reference", async () => {
+  const host = captureHost();
+  const result = await captureCollection(
+    host,
+    request({
+      tiles: [
+        {
+          id: "t",
+          name: "T",
+          type: "Custom",
+          builtin: true,
+          basedOn: ["pairing"],
+          features: [],
+          slots: [],
+        },
+      ],
+    }),
+  );
+  const tiles = result.contributions?.tiles ?? [];
+  expect(tiles[0]).not.toHaveProperty("builtin");
+  expect(tiles[0]).not.toHaveProperty("basedOn");
+  expect("problem" in pluginContributionsOf({ tiles })).toBe(false);
+});
+
+it("merges a capture into an existing manifest", () => {
+  const existing = {
+    id: "col.test",
+    name: "Old",
+    api: 1,
+    version: "1.0.0",
+    help: "help",
+    usage: "usage",
+    settings: { port: 1 },
+    settingsSchema: [{ name: "port", label: "Port", type: "number" }],
+    settingsTabs: [{ id: "main", label: "Main", fields: [] }],
+    code: "module.exports = {}",
+    contributions: {
+      snippets: [{ id: "s", name: "S", code: "x" }],
+      tiles: [{ id: "old", name: "Old", type: "Custom" }],
+    },
+  };
+  const capture = {
+    collection: plugin().collection,
+    contributions: {
+      tiles: [{ id: "new", name: "New", type: "Custom" }],
+    },
+    uses: [],
+  };
+  const merged = mergeCapturedPlugin(existing, request(), capture);
+  expect(merged).toMatchObject({
+    id: "col.test",
+    name: "Collection",
+    version: "2.0.0",
+    api: 1,
+    help: "help",
+    usage: "usage",
+    settings: { port: 1 },
+    code: "module.exports = {}",
+  });
+  expect(merged.settingsTabs).toEqual(existing.settingsTabs);
+  expect(merged.contributions?.snippets).toEqual(
+    existing.contributions.snippets,
+  );
+  expect(merged.contributions?.tiles).toEqual([
+    { id: "new", name: "New", type: "Custom" },
+  ]);
+  expect(merged.collection).toEqual(capture.collection);
 });

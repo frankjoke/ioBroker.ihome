@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { validateLogicDocument } from "./logic/validate";
+import { extractRefCalls } from "./logic/expr-code";
+import { collectRefs } from "./logic/subscriptions";
+import {
+  pluginContributionsOf,
+  type PluginContributions,
+} from "./plugin-contributions";
 import type { LogicDef, LogicDocument } from "./logic/types";
 import type { AdapterPlugin } from "./plugin-ops";
+import type { ImportedPlugin } from "./plugin-file";
 
 export const MAX_COLLECTION_STATES = 200;
 export const MAX_COLLECTION_LOGICS = 100;
@@ -561,4 +568,188 @@ export async function removeCollection(
     await host.writeLogicDocument({ ...doc, logics });
   }
   return { changed };
+}
+
+export interface CaptureRequest {
+  id: string;
+  name: string;
+  version: string;
+  logicIds: string[];
+  stateIds: string[];
+  tiles: unknown[];
+}
+
+export interface CaptureResult {
+  collection: PluginCollection;
+  contributions?: PluginContributions;
+  uses: string[];
+}
+
+function collectCode(value: unknown, out: string[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectCode(item, out);
+  } else if (plainObject(value)) {
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "code" && typeof item === "string") out.push(item);
+      else collectCode(item, out);
+    }
+  }
+}
+
+/**
+ * Turn selected live items into a manifest snapshot and stamp the live copies
+ * with this plugin's ownership marker. The manifest is written by the caller.
+ */
+export async function captureCollection(
+  host: CollectionHost,
+  request: CaptureRequest,
+): Promise<CaptureResult> {
+  const doc = await host.readLogicDocument();
+  if (!doc) throw new Error("logic document unreadable");
+
+  const logics: LogicDef[] = [];
+  for (const id of request.logicIds) {
+    const live = (doc.logics ?? []).find((entry) => entry.id === id);
+    if (!live) throw new Error(`missing logic: ${id}`);
+    if (live.managed && live.managed.plugin !== request.id) {
+      throw new Error(`logic ${id} is owned by another plugin`);
+    }
+    const def = { ...live } as LogicDef;
+    delete def.managed;
+    delete def.enabled;
+    logics.push(def);
+  }
+
+  const states: PluginStateDecl[] = [];
+  for (const id of request.stateIds) {
+    const live = await host.getObject(id);
+    if (!live) throw new Error(`missing state: ${id}`);
+    const marker = stateMarker(live);
+    if (marker && marker.plugin !== request.id) {
+      throw new Error(`state ${id} is owned by another plugin`);
+    }
+    const native = plainObject(live.native) ? { ...live.native } : {};
+    delete native.ihomeCollection;
+    if (live.type !== "state" && live.type !== "folder") {
+      throw new Error(`state ${id} has no valid type`);
+    }
+    states.push({
+      id,
+      type: live.type,
+      common: (live.common ?? {}) as Record<string, unknown>,
+      ...(Object.keys(native).length ? { native } : {}),
+    });
+  }
+
+  const owned = new Set([...request.logicIds, ...request.stateIds]);
+  const refs: string[] = [];
+  const code: string[] = [];
+  for (const def of logics) {
+    collectRefs(def, refs);
+    collectCode(def, code);
+  }
+  for (const snippet of code) {
+    for (const call of extractRefCalls(snippet)) refs.push(call.name);
+  }
+  const uses = [
+    ...new Set(
+      refs
+        .map((ref) => (ref.includes(".") ? ref : host.resolveVariable(ref)))
+        .filter((ref): ref is string => !!ref && ref.includes(".")),
+    ),
+  ]
+    .filter((id) => !id.startsWith("$") && !owned.has(id))
+    .sort();
+
+  const parsed = collectionOf({
+    version: 1,
+    states,
+    logics,
+    ...(uses.length ? { uses } : {}),
+  });
+  if ("problem" in parsed) {
+    throw new Error(`invalid collection: ${parsed.problem}`);
+  }
+
+  let contributions: PluginContributions | undefined;
+  if (request.tiles.length) {
+    const tiles = request.tiles.map((tile) => {
+      if (!plainObject(tile)) throw new Error("a tile must be an object");
+      const copy = { ...tile };
+      delete copy.builtin;
+      delete copy.basedOn;
+      return copy;
+    });
+    const checked = pluginContributionsOf({ tiles });
+    if ("problem" in checked) {
+      throw new Error(`invalid tiles: ${checked.problem}`);
+    }
+    contributions = checked.contributions;
+  }
+
+  for (const decl of parsed.collection.logics) {
+    const index = (doc.logics ?? []).findIndex((entry) => entry.id === decl.id);
+    if (index < 0) continue;
+    doc.logics[index] = {
+      ...doc.logics[index],
+      managed: {
+        plugin: request.id,
+        version: request.version,
+        baseline: baselineOf(decl, "logic"),
+      },
+    };
+  }
+  for (const decl of parsed.collection.states) {
+    const live = await host.getObject(decl.id);
+    if (!live) continue;
+    await host.setObject(decl.id, {
+      ...live,
+      native: {
+        ...(plainObject(live.native) ? live.native : {}),
+        ihomeCollection: {
+          plugin: request.id,
+          version: request.version,
+          baseline: baselineOf(decl, "state"),
+        },
+      },
+    });
+  }
+  await host.writeLogicDocument(doc);
+
+  return {
+    collection: parsed.collection,
+    ...(contributions ? { contributions } : {}),
+    uses,
+  };
+}
+
+/** Keep the existing manifest's code/settings and replace its collection. */
+export function mergeCapturedPlugin(
+  existing: ImportedPlugin | undefined,
+  request: CaptureRequest,
+  capture: CaptureResult,
+): ImportedPlugin {
+  const base = existing ?? { id: request.id, name: request.name };
+  return {
+    ...base,
+    id: request.id,
+    name: request.name,
+    version: request.version,
+    ...(existing?.api ? { api: existing.api } : {}),
+    ...(existing?.help ? { help: existing.help } : {}),
+    ...(existing?.usage ? { usage: existing.usage } : {}),
+    ...(existing?.settings ? { settings: existing.settings } : {}),
+    ...(existing?.settingsSchema
+      ? { settingsSchema: existing.settingsSchema }
+      : {}),
+    ...(existing?.settingsTabs ? { settingsTabs: existing.settingsTabs } : {}),
+    ...(existing?.code ? { code: existing.code } : {}),
+    contributions: {
+      ...existing?.contributions,
+      ...(capture.contributions?.tiles
+        ? { tiles: capture.contributions.tiles }
+        : {}),
+    },
+    collection: capture.collection,
+  };
 }
