@@ -664,7 +664,11 @@
     return `This tile reads more than one source. Applying a template keeps ${sourceName(templateAnchor(config))} as the anchor and replaces the other bindings.`;
   });
 
-  function saveTileTemplate(name: string, type: DeviceType): void {
+  function saveTileTemplate(
+    name: string,
+    type: DeviceType,
+    hint: string,
+  ): void {
     saveTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
@@ -687,6 +691,7 @@
       type,
       look: sourceLook,
     });
+    if (hint) result.template.stateHint = hint;
     if (!result.template.roles?.length) {
       saveTemplateError = "No slot in this tile could be bound to a role.";
       return;

@@ -12,7 +12,7 @@
     suggestedName?: string;
     suggestedType?: DeviceType;
     error?: string;
-    onSave: (name: string, type: DeviceType) => void;
+    onSave: (name: string, type: DeviceType, hint: string) => void;
     onClose: () => void;
   } = $props();
 
@@ -20,6 +20,7 @@
   let name = $state(suggestedName);
   // svelte-ignore state_referenced_locally
   let type = $state<DeviceType>(suggestedType);
+  let hint = $state("");
   // svelte-ignore state_referenced_locally
   let nameTouched = $state(suggestedName !== `${suggestedType} template`);
   let localError = $state("");
@@ -33,7 +34,7 @@
     e.preventDefault();
     const next = name.trim();
     localError = next ? "" : "Give the template a name.";
-    if (!localError) onSave(next, type);
+    if (!localError) onSave(next, type, hint.trim());
   }
 </script>
 
@@ -75,6 +76,19 @@
           <option value={deviceType}>{deviceType}</option>
         {/each}
       </select>
+    </label>
+    <label class="field">
+      <span class="label-mono">State hint (optional)</span>
+      <textarea
+        bind:value={hint}
+        rows="2"
+        maxlength="300"
+        placeholder="Please pick the on/off state that switches the lamp."
+      ></textarea>
+      <span class="hint text-muted"
+        >Shown above the state picker when someone adds a tile from this
+        template — name the state the tile needs.</span
+      >
     </label>
     {#if localError || error}
       <p class="text-danger error">{localError || error}</p>
@@ -125,9 +139,13 @@
   }
 
   .field input,
-  .field select {
+  .field select,
+  .field textarea {
     width: 100%;
     box-sizing: border-box;
+    font-family: var(--font-family);
+    font-size: var(--body-sm);
+    resize: vertical;
   }
 
   .hint {

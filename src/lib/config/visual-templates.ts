@@ -123,6 +123,13 @@ export function visualTemplateProblem(
   if (template.basedOn !== undefined && typeof template.basedOn !== "string") {
     return "basedOn must be a string.";
   }
+  if (
+    template.stateHint !== undefined &&
+    (typeof template.stateHint !== "string" ||
+      template.stateHint.trim().length > 300)
+  ) {
+    return "stateHint must be a string of at most 300 characters.";
+  }
   if (template.builtin !== undefined && typeof template.builtin !== "boolean") {
     return "builtin must be a boolean.";
   }

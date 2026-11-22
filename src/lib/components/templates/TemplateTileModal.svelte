@@ -183,6 +183,10 @@
       </button>
     </div>
 
+    {#if template.stateHint}
+      <p class="state-hint">{template.stateHint}</p>
+    {/if}
+
     {#if rows.length === 0}
       <p class="hint text-muted">
         This template needs no state; it creates an HTML tile.
@@ -260,6 +264,7 @@
     title={`Choose ${rows.find((row) => row.key === picking)?.label ?? "the source"}`}
     {logics}
     logicPick="state"
+    hint={picking === primary?.key ? (template.stateHint ?? "") : ""}
     currentState={picking ? (fills.get(picking)?.stateId ?? "") : ""}
     onState={(stateId, overrideId) => pick(picking!, stateId, overrideId)}
     onClose={() => (picking = null)}
@@ -298,6 +303,14 @@
     gap: 0.5rem;
   }
 
+  .state-hint {
+    margin: 0.25rem 0;
+    padding: 0.45rem 0.6rem;
+    border-left: 3px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: var(--surface-container-low);
+    font-size: var(--body-sm);
+  }
   .modal-head h3 {
     margin: 0;
   }

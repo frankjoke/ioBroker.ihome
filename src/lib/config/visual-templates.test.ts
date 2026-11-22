@@ -17,6 +17,21 @@ describe("visualTemplateProblem", () => {
     expect(visualTemplateProblem(valid, [])).toBeNull();
   });
 
+  it("accepts a state hint and rejects an overlong one", () => {
+    expect(
+      visualTemplateProblem(
+        { ...valid, stateHint: "Pick the on/off state." },
+        [],
+      ),
+    ).toBeNull();
+    expect(visualTemplateProblem({ ...valid, stateHint: 3 }, [])).toMatch(
+      /stateHint/i,
+    );
+    expect(
+      visualTemplateProblem({ ...valid, stateHint: "x".repeat(301) }, []),
+    ).toMatch(/stateHint/i);
+  });
+
   it("requires an id, name, type and known type", () => {
     expect(visualTemplateProblem({ ...valid, id: "" }, [])).toMatch(/id/i);
     expect(visualTemplateProblem({ ...valid, name: " " }, [])).toMatch(/name/i);

@@ -342,6 +342,9 @@ export interface Template {
   description?: string;
   /** Long-form Markdown help shown in the browser and apply dialog. */
   help?: string;
+  /** One sentence shown above the main-state picker when a tile is created
+   *  from this template, e.g. which state the tile needs. */
+  stateHint?: string;
   builtin?: boolean;
   basedOn?: string; // preset id this was copied from
   /** Hidden outside the local network; absent = not secured. */

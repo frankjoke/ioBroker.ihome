@@ -43,6 +43,7 @@
     logics = [],
     logicPick = undefined,
     warning = "",
+    hint = "",
   }: {
     mode: PickerMode;
     title: string;
@@ -69,6 +70,8 @@
     logicPick?: "trigger" | "state";
     /** A note about unavailable plugin entries, shown above the tabs. */
     warning?: string;
+    /** What to pick, from the template that opened this picker. */
+    hint?: string;
     onClose: () => void;
   } = $props();
 
@@ -322,6 +325,9 @@
     {#if warning}
       <p class="text-danger hint">{warning}</p>
     {/if}
+    {#if hint}
+      <p class="picker-hint">{hint}</p>
+    {/if}
 
     {#if tabs.length > 1}
       <div class="option-tabs" role="tablist" aria-label="Pick from">
@@ -538,6 +544,15 @@
     flex-direction: column;
     padding: 1rem;
     gap: 0.75rem;
+  }
+
+  .picker-hint {
+    margin: 0;
+    padding: 0.45rem 0.6rem;
+    border-left: 3px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: var(--surface-container-low);
+    font-size: var(--body-sm);
   }
 
   .modal-head {
