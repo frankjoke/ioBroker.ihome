@@ -25,8 +25,10 @@ import { NetworkPresenceService } from "./network-presence";
 import {
   networkEndpoints,
   validNetworkDevices,
+  validNetworkHost,
   type NetworkDevice,
 } from "./logic/network-ops";
+import { discoverMac } from "./network-mac";
 import { createPluginApi } from "./plugin-api";
 import {
   applyPluginPatches,
@@ -1566,6 +1568,12 @@ class IHome extends utils.Adapter {
           this.namespace,
         ),
       );
+    }
+
+    if (command.action === "lookupMac") {
+      const target = validNetworkHost(command.host);
+      if (!target) return pluginError("invalid host");
+      return pluginReply({ mac: (await discoverMac(target)) ?? null });
     }
 
     if (command.action === "save") {

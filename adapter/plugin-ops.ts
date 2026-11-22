@@ -203,6 +203,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
               name: "mac",
               label: "MAC (optional)",
               type: "string",
+              lookup: "mac",
               description: "Needed to wake the device with Wake-on-LAN.",
             },
             {

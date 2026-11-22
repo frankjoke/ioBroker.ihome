@@ -125,3 +125,9 @@ export async function exportPlugin(id: string): Promise<ImportedPlugin> {
   const file = await command<PluginFile>("export", { id });
   return file.plugin;
 }
+
+/** Ask the adapter for a host's MAC from the local neighbour table. */
+export async function lookupMac(host: string): Promise<string | undefined> {
+  const result = await command<{ mac?: string | null }>("lookupMac", { host });
+  return result.mac ?? undefined;
+}

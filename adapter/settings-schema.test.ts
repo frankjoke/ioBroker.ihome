@@ -123,3 +123,21 @@ it("validates nested settings and exactlyOne", () => {
   ).toBeNull(); // legacy JSON string
   expect(settingsProblem(schema, { endpoints: "not json" })).toMatch(/JSON/);
 });
+
+it("accepts a mac lookup only on a string field", () => {
+  expect(
+    parseSettingsSchema([
+      { name: "mac", label: "MAC", type: "string", lookup: "mac" },
+    ])?.[0],
+  ).toMatchObject({ lookup: "mac" });
+  expect(
+    parseSettingsSchema([
+      { name: "mac", label: "MAC", type: "number", lookup: "mac" },
+    ]),
+  ).toBeUndefined();
+  expect(
+    parseSettingsSchema([
+      { name: "mac", label: "MAC", type: "string", lookup: "other" },
+    ]),
+  ).toBeUndefined();
+});

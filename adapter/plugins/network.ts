@@ -1,5 +1,6 @@
 import type { PluginFactory } from "../plugin-host";
 import type { PluginApi } from "../plugin-api";
+import { discoverMac } from "../network-mac";
 import { sendWake, type WakeOptions } from "../wake-on-lan";
 
 /** What the plugin factory injects; tests replace the UDP sender. */
@@ -38,18 +39,22 @@ function timeoutOf(payload: unknown): number | undefined {
 async function wakePayload(
   api: PluginApi,
   wake: WakeFn,
+  findMac: (host: string) => Promise<string | undefined>,
   payload: Record<string, unknown>,
 ): Promise<unknown> {
   const id = deviceId(payload);
   if (id) {
     const device = api.network.get(id);
     if (!device) throw new Error(`unknown network device: ${id}`);
-    if (!device.mac) {
-      throw new Error(`network device ${id} has no MAC`);
+    const mac = device.mac ?? (await findMac(device.host));
+    if (!mac) {
+      throw new Error(
+        `network device ${id} has no MAC and the neighbour table has no entry`,
+      );
     }
     return wake({
       host: device.host,
-      mac: device.mac,
+      mac,
       port: portOf(payload),
     });
   }
@@ -71,6 +76,7 @@ async function wakePayload(
 /** The shipped `network.info` plugin: device info and Wake-on-LAN. */
 export function createNetworkPlugins(
   wake: WakeFn = sendWake,
+  findMac: (host: string) => Promise<string | undefined> = discoverMac,
 ): Record<string, PluginFactory> {
   return {
     "network.info": (api) => ({
@@ -79,7 +85,7 @@ export function createNetworkPlugins(
           record(payload) &&
           (payload.wake === true || payload.action === "wake")
         ) {
-          return wakePayload(api, wake, payload);
+          return wakePayload(api, wake, findMac, payload);
         }
         const id = deviceId(payload);
         if (id) {

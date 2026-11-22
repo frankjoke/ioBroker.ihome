@@ -84,6 +84,7 @@ export type PluginsCommand =
   | { action: "install"; id: string }
   | { action: "collection.capture"; request: CaptureRequest }
   | { action: "collection.apply"; id: string; overwrite?: boolean }
+  | { action: "lookupMac"; host: string }
   | { action: "remove"; id: string; removeCollectionStates?: boolean };
 
 /** The collection part of an install/apply reply. */
@@ -413,6 +414,12 @@ export function parsePluginsCommand(
       return { problem: `${action} needs a plugin id` };
     }
     return { command: { action, id: value.id.trim() } };
+  }
+  if (action === "lookupMac") {
+    if (typeof value.host !== "string" || !value.host.trim()) {
+      return { problem: "lookupMac needs a host" };
+    }
+    return { command: { action: "lookupMac", host: value.host.trim() } };
   }
   if (action === "remove") {
     if (typeof value.id !== "string" || !value.id.trim()) {

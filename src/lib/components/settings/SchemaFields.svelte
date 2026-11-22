@@ -8,6 +8,8 @@
   } from "$lib/config/schema-values";
   import SchemaFields from "./SchemaFields.svelte";
   import SchemaRows from "./SchemaRows.svelte";
+  import { lookupMac } from "$lib/stores/plugins.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
 
   let {
     schema,
@@ -31,6 +33,32 @@
     return value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  }
+
+  let lookupBusy = $state("");
+  let lookupError = $state("");
+
+  /** Fill a `lookup: "mac"` field from the same object's host. */
+  async function findMac(field: SettingsField): Promise<void> {
+    const host = String(value.host ?? "").trim();
+    if (!host) {
+      lookupError = "Enter the host first.";
+      return;
+    }
+    lookupBusy = field.name;
+    lookupError = "";
+    try {
+      const mac = await lookupMac(host);
+      if (!mac) {
+        lookupError = "No MAC in the neighbour table — is the device online?";
+        return;
+      }
+      set(field.name, mac);
+    } catch (error) {
+      lookupError = error instanceof Error ? error.message : String(error);
+    } finally {
+      lookupBusy = "";
+    }
   }
 
   function selectOptions(field: SettingsField): string[] {
@@ -144,13 +172,27 @@
           hooks={hooks?.[field.name]}
         />
       {:else}
-        <input
-          type="text"
-          value={String(value[field.name] ?? "")}
-          placeholder={field.placeholder}
-          disabled={field.readonly}
-          oninput={(event) => set(field.name, event.currentTarget.value)}
-        />
+        <div class="lookup-row">
+          <input
+            type="text"
+            value={String(value[field.name] ?? "")}
+            placeholder={field.placeholder}
+            disabled={field.readonly}
+            oninput={(event) => set(field.name, event.currentTarget.value)}
+          />
+          {#if field.lookup === "mac"}
+            <IconButton
+              icon="search"
+              label="Find the MAC for this host"
+              title="Read the MAC from the local neighbour table"
+              disabled={lookupBusy === field.name || field.readonly}
+              onclick={() => void findMac(field)}
+            />
+          {/if}
+        </div>
+        {#if field.lookup === "mac" && lookupError}
+          <span class="hint text-danger">{lookupError}</span>
+        {/if}
       {/if}
       {#if field.description}
         <span class="hint text-muted">{field.description}</span>
@@ -186,6 +228,15 @@
   }
   .nested {
     padding: 0.5rem;
+  }
+  .lookup-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .lookup-row input {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .json {
     width: 100%;

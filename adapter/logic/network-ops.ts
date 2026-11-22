@@ -45,6 +45,15 @@ function numberIn(
   return Math.min(max, Math.max(min, Math.round(number)));
 }
 
+/** A safe IPv4/IPv6 literal or hostname; no shell metacharacters. */
+export function validNetworkHost(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const host = value.trim();
+  if (!host || host.length > 253) return undefined;
+  if (isIP(host) === 0 && !HOST.test(host)) return undefined;
+  return host;
+}
+
 /** A safe device entry, or null. Values are clamped to their bounds. */
 export function validNetworkDevice(value: unknown): NetworkDevice | null {
   if (!record(value)) return null;
@@ -52,9 +61,8 @@ export function validNetworkDevice(value: unknown): NetworkDevice | null {
   if (!ID.test(id)) return null;
   const name = typeof value.name === "string" ? value.name.trim() : "";
   if (!name || name.length > 64) return null;
-  const host = typeof value.host === "string" ? value.host.trim() : "";
-  if (!host || host.length > 253) return null;
-  if (isIP(host) === 0 && !HOST.test(host)) return null;
+  const host = validNetworkHost(value.host);
+  if (!host) return null;
   let mac: string | undefined;
   if (value.mac !== undefined && value.mac !== "") {
     if (typeof value.mac !== "string" || !MAC.test(value.mac)) return null;

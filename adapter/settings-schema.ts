@@ -17,6 +17,9 @@ export interface SettingsField {
   readonly?: boolean;
   /** Show only when a sibling field has this value. */
   visibleWhen?: { field: string; equals: string | number | boolean };
+  /** Optional server-side lookup that fills this string field from the same
+   *  object's `host` value. */
+  lookup?: "mac";
   /** type: object */
   fields?: SettingsField[];
   /** type: object: at least one, at most one, of these nested fields. */
@@ -155,6 +158,10 @@ function fieldOf(
   if (value.readonly !== undefined) {
     if (typeof value.readonly !== "boolean") return null;
     def.readonly = value.readonly;
+  }
+  if (value.lookup !== undefined) {
+    if (value.lookup !== "mac" || type !== "string") return null;
+    def.lookup = "mac";
   }
   if (value.options !== undefined) {
     if (type !== "select") return null;

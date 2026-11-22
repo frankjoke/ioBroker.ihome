@@ -69,10 +69,13 @@ describe("createNetworkPlugins", () => {
 
   it("wakes a configured device and rejects missing MAC or id", async () => {
     const sent: unknown[] = [];
-    const plugins = createNetworkPlugins(async (options) => {
-      sent.push(options);
-      return { sent: true };
-    });
+    const plugins = createNetworkPlugins(
+      async (options) => {
+        sent.push(options);
+        return { sent: true };
+      },
+      async () => undefined,
+    );
     const api = fakeNetworkApi();
     expect(
       await plugins["network.info"](api).call!({ id: "tv", wake: true }),
@@ -89,6 +92,27 @@ describe("createNetworkPlugins", () => {
         wake: true,
       }),
     ).rejects.toThrow("MAC");
+  });
+
+  it("finds a missing MAC in the neighbour table", async () => {
+    const sent: unknown[] = [];
+    const plugins = createNetworkPlugins(
+      async (options) => {
+        sent.push(options);
+        return { sent: true };
+      },
+      async (host) => {
+        expect(host).toBe("192.168.1.2");
+        return "aa:bb:cc:dd:ee:ff";
+      },
+    );
+    const api = fakeNetworkApi({ ...tv, mac: undefined });
+    await plugins["network.info"](api).call!({ id: "tv", wake: true });
+    expect(sent[0]).toEqual({
+      host: "192.168.1.2",
+      mac: "aa:bb:cc:dd:ee:ff",
+      port: undefined,
+    });
   });
 
   it("wakes a device directly by MAC, host, broadcast, port and timeout", async () => {
