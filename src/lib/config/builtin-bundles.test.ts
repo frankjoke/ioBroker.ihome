@@ -32,4 +32,22 @@ describe("built-in bundles", () => {
     const shape = evaluateBundleApi(bundle);
     expect(validateDeviceTemplate(shape).errors).toEqual([]);
   });
+
+  it("network device + wake adds a wake button to the detail page", () => {
+    const bundle = BUILTIN_BUNDLES.find(
+      (entry) => entry.id === "network-device-wake",
+    )!;
+    expect(bundle).toBeDefined();
+    expect(templateBundleProblem(bundle, [], [], bundle.id)).toBeNull();
+    expect(bundle.params?.map((param) => param.name)).toEqual([
+      "source",
+      "wakeDevice",
+    ]);
+    const html = bundle.device?.slots.find((slot) => slot.kind === "html");
+    expect(html?.where).toBe("modal");
+    expect(String(html?.options?.html)).toContain("network.info");
+    expect(String(html?.options?.html)).toContain("{{wakeDevice}}");
+    const shape = evaluateBundleApi(bundle);
+    expect(validateDeviceTemplate(shape).errors).toEqual([]);
+  });
 });
