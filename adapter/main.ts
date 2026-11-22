@@ -1498,7 +1498,11 @@ class IHome extends utils.Adapter {
 
     if (command.action === "contributions") {
       return pluginReply(
-        contributionsReply(this.pluginConfig, this.pluginProblems),
+        contributionsReply(
+          this.pluginConfig,
+          this.pluginProblems,
+          this.namespace,
+        ),
       );
     }
 

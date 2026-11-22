@@ -289,6 +289,49 @@ describe("contributionsReply", () => {
       { id: "b", name: "b", enabled: false, contributions: {} },
     ]);
   });
+
+  it("lists the owned states and logic outputs a tile may bind", () => {
+    const reply = contributionsReply(
+      [
+        userPlugin("a", true, "", {
+          collection: {
+            version: 1,
+            states: [
+              {
+                id: "ihome.0.Variables.TestState",
+                type: "state",
+                common: { name: "TestVariable" },
+              },
+            ],
+            logics: [
+              {
+                id: "TestLogic",
+                name: "TestLogic",
+                kind: "function",
+                mode: "statements",
+                expr: { code: "" },
+                output: { scope: "logic", type: "multistate" },
+              },
+              {
+                id: "calc",
+                name: "Calc",
+                kind: "function",
+                mode: "statements",
+                expr: { code: "" },
+                output: { scope: "state", ref: "x", type: "number" },
+              },
+            ],
+          } as unknown as NonNullable<AdapterPlugin["collection"]>,
+        }),
+      ],
+      new Map(),
+      "ihome.0",
+    );
+    expect(reply.plugins[0].owned).toEqual({
+      states: [{ id: "ihome.0.Variables.TestState", name: "TestVariable" }],
+      logics: [{ id: "ihome.0.Logic.TestLogic", name: "TestLogic" }],
+    });
+  });
 });
 
 describe("secured patches", () => {

@@ -64,6 +64,40 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Give a plugin's tile the state ids its slots name, so applying it needs no
+ *  pick. Only the plugin's own states and logic outputs are candidates. */
+function tileWithOrigins(
+  item: Record<string, unknown>,
+  owned: unknown,
+): Template {
+  const byName = new Map<string, string | null>();
+  if (record(owned)) {
+    for (const kind of ["states", "logics"] as const) {
+      const list = owned[kind];
+      if (!Array.isArray(list)) continue;
+      for (const entry of list) {
+        if (!record(entry)) continue;
+        const id = text(entry.id);
+        const name = text(entry.name).toLowerCase();
+        if (!id || !name) continue;
+        const known = byName.get(name);
+        byName.set(name, known === undefined || known === id ? id : null);
+      }
+    }
+  }
+  if (!byName.size || !Array.isArray(item.slots)) {
+    return item as unknown as Template;
+  }
+  const slots = item.slots.map((slot) => {
+    if (!record(slot)) return slot;
+    const repair = record(slot.repair) ? slot.repair : undefined;
+    const label = (text(slot.label) || text(repair?.label) || "").toLowerCase();
+    const origin = label ? byName.get(label) : null;
+    return origin ? { ...slot, origin } : slot;
+  });
+  return { ...item, slots } as Template;
+}
+
 function formulaProblem(value: unknown): string | null {
   if (!record(value)) return "a formula must be an object.";
   if (!text(value.id)) return "a formula needs an id.";
@@ -174,7 +208,7 @@ export function readPluginContributions(reply: unknown): PluginContributionSet {
           continue;
         }
         if (kind === "tiles") {
-          set.tiles.push(source("tiles", id, item as unknown as Template));
+          set.tiles.push(source("tiles", id, tileWithOrigins(item, raw.owned)));
         } else if (kind === "bundles") {
           set.bundles.push(
             source("bundles", id, item as unknown as TemplateBundle),

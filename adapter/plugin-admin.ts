@@ -2,6 +2,7 @@ import type { ImportedPlugin } from "./plugin-file";
 import type {
   CaptureRequest,
   CollectionConflict,
+  PluginCollection,
 } from "./plugin-collection-types";
 import {
   BUILTIN_PLUGINS,
@@ -268,26 +269,65 @@ export function pluginView(
 }
 
 /** The full contribution bodies for the SPA; the plugin list keeps counts. */
+/** The names a collection's tiles may bind: its own states and logic outputs. */
+function ownedItems(
+  collection: PluginCollection | undefined,
+  namespace: string,
+):
+  | {
+      states: Array<{ id: string; name: string }>;
+      logics: Array<{ id: string; name: string }>;
+    }
+  | undefined {
+  if (!collection) return undefined;
+  const states = collection.states
+    .filter((state) => state.type === "state")
+    .map((state) => ({
+      id: state.id,
+      name:
+        String(state.common?.name ?? "").trim() ||
+        state.id.split(".").pop() ||
+        state.id,
+    }));
+  const logics = namespace
+    ? collection.logics
+        .filter((logic) => logic.output?.scope === "logic")
+        .map((logic) => ({
+          id: `${namespace}.Logic.${logic.id}`,
+          name: logic.name || logic.id,
+        }))
+    : [];
+  return states.length || logics.length ? { states, logics } : undefined;
+}
+
 export function contributionsReply(
   plugins: AdapterPlugin[],
   problems: Map<string, string>,
+  namespace = "",
 ): {
   plugins: Array<{
     id: string;
     name: string;
     enabled: boolean;
     contributions: PluginContributions;
+    /** Tiles pre-bind these; ids are already installed on this instance. */
+    owned?: {
+      states: Array<{ id: string; name: string }>;
+      logics: Array<{ id: string; name: string }>;
+    };
     problem?: string;
   }>;
 } {
   return {
     plugins: plugins.map((plugin) => {
       const problem = problems.get(plugin.id);
+      const owned = ownedItems(plugin.collection, namespace);
       return {
         id: plugin.id,
         name: plugin.name,
         enabled: plugin.enabled,
         contributions: plugin.contributions ?? {},
+        ...(owned ? { owned } : {}),
         ...(problem ? { problem } : {}),
       };
     }),

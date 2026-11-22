@@ -87,6 +87,43 @@ describe("readPluginContributions", () => {
     expect(set.problems).toEqual([]);
   });
 
+  it("pre-binds a contributed tile's slots to its plugin's owned items", () => {
+    const ownedTile = {
+      id: "plug-tile",
+      name: "Plug tile",
+      type: "Custom",
+      roles: ["level", "level_state2"],
+      features: [],
+      slots: [
+        { kind: "level", source: "level", label: "TestVariable" },
+        { kind: "enum", source: "level_state2", label: "TestLogic" },
+        { kind: "value", source: "other", label: "Else" },
+      ],
+    } as unknown as Template;
+    const set = readPluginContributions({
+      plugins: [
+        {
+          id: "plug",
+          name: "Plug",
+          enabled: true,
+          owned: {
+            states: [
+              { id: "ihome.0.Variables.TestState", name: "TestVariable" },
+            ],
+            logics: [{ id: "ihome.0.Logic.TestLogic", name: "TestLogic" }],
+          },
+          contributions: { tiles: [ownedTile] },
+        },
+      ],
+    });
+    expect(set.problems).toEqual([]);
+    expect(set.tiles[0].value.slots?.map((slot) => slot.origin)).toEqual([
+      "ihome.0.Variables.TestState",
+      "ihome.0.Logic.TestLogic",
+      undefined,
+    ]);
+  });
+
   it("hides an invalid item and keeps its siblings", () => {
     const set = readPluginContributions({
       plugins: [
