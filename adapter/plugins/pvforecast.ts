@@ -198,13 +198,13 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
   :root { --text: #ddd; --muted: #999; --surface: #222; --border: #444; --primary: #4a9eff; }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 10px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: transparent; }
-  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .head { margin-bottom: 2px; }
   .title { font-weight: 600; }
-  .age { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 6px; white-space: nowrap; }
-  .age.stale { color: #e5a33a; }
-  .summary { color: var(--muted); font-size: 12px; text-align: right; }
-  .summary b { color: var(--text); font-weight: 600; }
-  .chart { width: 100%; height: 140px; display: block; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .badge { border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .badge.total { color: var(--text); border-color: var(--primary); }
+  .badge.stale { color: #e5a33a; border-color: #e5a33a; }
+  .chart { width: 100%; height: 130px; display: block; }
   .empty, .note { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
   .error { color: #e55353; font-size: 12px; margin: 2px 0 0; }
   .hidden { display: none; }
@@ -216,9 +216,11 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
 </style>
 </head>
 <body>
-  <div class="head">
-    <span class="title">PV forecast<span class="age" id="age"></span></span>
-    <span class="summary" id="summary">—</span>
+  <div class="head"><span class="title">PV forecast</span></div>
+  <div class="badges">
+    <span class="badge hidden" id="age"></span>
+    <span class="badge total" id="total">—</span>
+    <span class="badge hidden" id="peak"></span>
   </div>
   <div id="plot"></div>
   <p class="empty" id="empty">Waiting for the first forecast…</p>
@@ -267,12 +269,14 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
         el.textContent = "";
         el.title = "";
         el.classList.remove("stale");
+        el.classList.add("hidden");
         return;
       }
       var minutes = Math.max(0, Math.floor((Date.now() - at) / 60000));
       var text = minutes < 1 ? "just now" : minutes < 60 ? minutes + "m ago" : Math.floor(minutes / 60) < 24 ? Math.floor(minutes / 60) + "h ago" : Math.floor(minutes / 1440) + "d ago";
-      el.textContent = " · updated " + text;
+      el.textContent = "updated " + text;
       el.title = new Date(at).toLocaleString();
+      el.classList.remove("hidden");
       el.classList.toggle("stale", Date.now() - at > 2 * 3600000);
     }
     function draw(doc) {
@@ -331,18 +335,26 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
         ]).then(function (values) {
           var total = values[0] && values[0].total;
           var peak = values[1] && values[1];
-          var text = total === undefined ? "—" : "<b>" + total + "</b> kWh today";
-          if (peak && peak.hour) text += " · peak " + peak.hour + " (" + peak.power + " kW)";
-          $("summary").innerHTML = text;
+          $("total").textContent = total === undefined ? "—" : total + " kWh today";
+          if (peak && peak.hour) {
+            $("peak").textContent = "peak " + peak.hour + " · " + peak.power + " kW";
+            $("peak").classList.remove("hidden");
+          } else {
+            $("peak").textContent = "";
+            $("peak").classList.add("hidden");
+          }
         }).catch(function () {
-          $("summary").textContent = "Plugin not answering";
+          $("total").textContent = "Plugin not answering";
+          $("peak").classList.add("hidden");
         });
       }).catch(function (error) {
         $("plot").innerHTML = "";
         show("empty", "Waiting for the first forecast…");
         show("error", String(error && error.message ? error.message : error));
-        $("summary").textContent = "—";
+        $("total").textContent = "—";
         $("age").textContent = "";
+        $("age").classList.add("hidden");
+        $("peak").classList.add("hidden");
       });
       return job;
     }

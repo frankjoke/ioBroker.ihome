@@ -184,6 +184,8 @@ describe("readPluginContributions", () => {
     expect(html).toContain('action: "total"');
     expect(html).toContain('action: "peak"');
     expect(html).toContain('id="age"');
+    expect(html).toContain('id="total"');
+    expect(html).toContain('id="peak"');
     expect(html).toContain("setAge(doc.generatedAt)");
 
     expect(contributions.logic).toHaveLength(1);

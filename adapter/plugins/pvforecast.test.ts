@@ -318,6 +318,8 @@ it("ships the chart tile, hourly logic and read snippet", () => {
   expect(html).toContain(".plugins.pvforecast.json");
   expect(html).toContain("ihome.call");
   expect(html).toContain('id="age"');
+  expect(html).toContain('id="total"');
+  expect(html).toContain('id="peak"');
   expect(html).toContain("setAge(doc.generatedAt)");
   const logic = PVFORECAST_CONTRIBUTIONS.logic?.[0] as {
     logic: {
