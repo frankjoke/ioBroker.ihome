@@ -353,6 +353,50 @@ describe("parsePluginsCommand", () => {
     expect(parsePluginsCommand({ action: "remove", id: "u" })).toEqual({
       command: { action: "remove", id: "u" },
     });
+    expect(
+      parsePluginsCommand({
+        action: "remove",
+        id: "u",
+        removeCollectionStates: true,
+      }),
+    ).toEqual({
+      command: {
+        action: "remove",
+        id: "u",
+        removeCollectionStates: true,
+      },
+    });
+    expect(
+      parsePluginsCommand({ action: "collection.apply", id: "col.test" }),
+    ).toEqual({ command: { action: "collection.apply", id: "col.test" } });
+    expect(
+      parsePluginsCommand({
+        action: "collection.apply",
+        id: "col.test",
+        overwrite: true,
+      }),
+    ).toEqual({
+      command: { action: "collection.apply", id: "col.test", overwrite: true },
+    });
+    expect(
+      parsePluginsCommand({
+        action: "collection.capture",
+        request: {
+          id: "col.test",
+          name: "C",
+          version: "1.0.0",
+          logicIds: ["a"],
+          stateIds: [],
+          tiles: [],
+        },
+      }),
+    ).toHaveProperty("command");
+    expect(
+      parsePluginsCommand({
+        action: "collection.capture",
+        request: { id: "col.test" },
+      }),
+    ).toHaveProperty("problem");
   });
 
   it("rejects invalid commands", () => {

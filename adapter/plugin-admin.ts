@@ -1,4 +1,5 @@
 import type { ImportedPlugin } from "./plugin-file";
+import type { CaptureRequest, CollectionConflict } from "./plugin-collection";
 import {
   BUILTIN_PLUGINS,
   MAX_PLUGIN_HELP,
@@ -77,7 +78,15 @@ export type PluginsCommand =
   | { action: "delete"; id: string }
   | { action: "reload"; id: string }
   | { action: "install"; id: string }
-  | { action: "remove"; id: string };
+  | { action: "collection.capture"; request: CaptureRequest }
+  | { action: "collection.apply"; id: string; overwrite?: boolean }
+  | { action: "remove"; id: string; removeCollectionStates?: boolean };
+
+/** The collection part of an install/apply reply. */
+export interface CollectionReply {
+  id: string;
+  conflicts: CollectionConflict[];
+}
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -355,13 +364,89 @@ export function parsePluginsCommand(
     action === "export" ||
     action === "delete" ||
     action === "reload" ||
-    action === "install" ||
-    action === "remove"
+    action === "install"
   ) {
     if (typeof value.id !== "string" || !value.id.trim()) {
       return { problem: `${action} needs a plugin id` };
     }
     return { command: { action, id: value.id.trim() } };
+  }
+  if (action === "remove") {
+    if (typeof value.id !== "string" || !value.id.trim()) {
+      return { problem: "remove needs a plugin id" };
+    }
+    if (
+      value.removeCollectionStates !== undefined &&
+      typeof value.removeCollectionStates !== "boolean"
+    ) {
+      return { problem: "removeCollectionStates must be true or false" };
+    }
+    return {
+      command: {
+        action: "remove",
+        id: value.id.trim(),
+        ...(value.removeCollectionStates === true
+          ? { removeCollectionStates: true }
+          : {}),
+      },
+    };
+  }
+  if (action === "collection.apply") {
+    if (typeof value.id !== "string" || !value.id.trim()) {
+      return { problem: "collection.apply needs a plugin id" };
+    }
+    if (value.overwrite !== undefined && typeof value.overwrite !== "boolean") {
+      return { problem: "overwrite must be true or false" };
+    }
+    return {
+      command: {
+        action: "collection.apply",
+        id: value.id.trim(),
+        ...(value.overwrite === true ? { overwrite: true } : {}),
+      },
+    };
+  }
+  if (action === "collection.capture") {
+    if (!record(value.request)) {
+      return { problem: "collection.capture needs a request" };
+    }
+    const source = value.request;
+    const id = typeof source.id === "string" ? source.id.trim() : "";
+    if (!validPluginId(id)) {
+      return { problem: "the collection plugin id is invalid" };
+    }
+    const name = text(source.name, 64);
+    if (!name) return { problem: "the collection plugin needs a name" };
+    const version = text(source.version, 32);
+    if (!version) return { problem: "the collection plugin needs a version" };
+    const strings = (list: unknown): string[] | undefined => {
+      if (!Array.isArray(list)) return undefined;
+      if (list.some((item) => typeof item !== "string" || !item.trim())) {
+        return undefined;
+      }
+      return list.map((item) => (item as string).trim());
+    };
+    const logicIds = strings(source.logicIds);
+    const stateIds = strings(source.stateIds);
+    if (!logicIds || !stateIds) {
+      return { problem: "logicIds and stateIds must be id arrays" };
+    }
+    if (!Array.isArray(source.tiles)) {
+      return { problem: "tiles must be an array" };
+    }
+    return {
+      command: {
+        action: "collection.capture",
+        request: {
+          id,
+          name,
+          version,
+          logicIds,
+          stateIds,
+          tiles: source.tiles,
+        },
+      },
+    };
   }
   return { problem: "unknown plugins command" };
 }

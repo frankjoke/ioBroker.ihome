@@ -1716,6 +1716,13 @@ class IHome extends utils.Adapter {
       return pluginReply({ plugins: this.pluginViews() });
     }
 
+    if (
+      command.action === "collection.capture" ||
+      command.action === "collection.apply"
+    ) {
+      return pluginError("collection commands are not wired yet");
+    }
+
     const stagedPlugin = this.pluginSettings.staged.find(
       (entry) => entry.id === command.id,
     );
