@@ -1,5 +1,6 @@
 <script lang="ts">
   import { suggestTemplatesForState } from "$lib/config/template-suggest";
+  import { templateBindingRows } from "$lib/config/slot-create";
   import type { Template } from "$lib/types/display";
 
   let {
@@ -22,6 +23,8 @@
     String(state.object?.common?.name ?? state.stateId),
   );
   const role = $derived(String(state.object?.common?.role ?? ""));
+  const bindingCount = (template: Template): number =>
+    template.roles?.length ?? templateBindingRows(template).length;
 </script>
 
 <div class="modal" role="dialog" aria-modal="true" aria-label="Fits this state">
@@ -33,11 +36,16 @@
         <span class="mono">{state.stateId}</span>
         {#if role}<span class="badge">{role}</span>{/if}
       </p>
+      <p class="hint text-muted">
+        A template may also bind related states from the same device. To show
+        only this state, choose “Just this state”.
+      </p>
       {#if suggestions.length === 0}
         <p class="hint text-muted">No template matches this state.</p>
       {:else}
         <div class="suggestions">
           {#each suggestions as suggestion (suggestion.template.id)}
+            {@const count = bindingCount(suggestion.template)}
             <button
               type="button"
               class="suggestion"
@@ -45,6 +53,11 @@
             >
               <span class="suggestion-name">{suggestion.template.name}</span>
               <span class="badge">{suggestion.template.type}</span>
+              {#if count > 1}
+                <span class="badge" title="States this template can bind"
+                  >{count} states</span
+                >
+              {/if}
               <span class="hint text-muted">{suggestion.label}</span>
             </button>
           {/each}
@@ -53,8 +66,8 @@
     </div>
     <div class="actions">
       <button type="button" class="btn" onclick={onClose}>Cancel</button>
-      <button type="button" class="btn btn-outline" onclick={onBlank}>
-        Blank tile
+      <button type="button" class="btn btn-primary" onclick={onBlank}>
+        Just this state
       </button>
     </div>
   </div>
