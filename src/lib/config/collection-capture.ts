@@ -59,7 +59,7 @@ export function suggestCollectionStates(
 
 /** A tile copy without the provenance that only the live template has. */
 export function collectionTileDefinition(template: Template): Template {
-  const copy = structuredClone(template) as Template & {
+  const copy = JSON.parse(JSON.stringify(template)) as Template & {
     builtin?: boolean;
     basedOn?: string;
   };
