@@ -56,11 +56,21 @@ import {
   ensurePluginFiles,
   listPluginFolders,
   mergePlugin,
+  pluginManifestOf,
   readPluginFiles,
   runtimeOnly,
   type PluginFileHost,
   type PluginWriteHost,
 } from "./plugin-files";
+import {
+  applyCollection,
+  captureCollection,
+  collectionPluginOf,
+  mergeCapturedPlugin,
+  removeCollection,
+  type CollectionConflict,
+  type CollectionHost,
+} from "./plugin-collection";
 import {
   BUILTIN_PLUGINS,
   DEFAULT_PLUGIN_TIMEOUT_MS,
@@ -1340,6 +1350,7 @@ class IHome extends utils.Adapter {
         !plugin.builtin &&
         !plugin.code?.trim() &&
         !plugin.contributions &&
+        !plugin.collection &&
         !this.pluginProblems.has(plugin.id)
       ) {
         this.pluginProblems.set(
@@ -1349,6 +1360,60 @@ class IHome extends utils.Adapter {
       }
     }
     return next;
+  }
+
+  private collectionHost(): CollectionHost {
+    return {
+      getObject: async (id) =>
+        ((await this.getObjectAsync(id)) ?? undefined) as unknown as
+          Record<string, unknown> | undefined,
+      setObject: async (id, object) => {
+        await this.setObjectAsync(id, object as ioBroker.SettableObject);
+      },
+      deleteObject: (id) => this.delObjectAsync(id),
+      readLogicDocument: async () =>
+        parseLogicDocument(
+          (await this.getStateAsync(`${CONFIG_FOLDER}.logicList`))?.val,
+        ),
+      writeLogicDocument: async (doc) => {
+        await this.setStateAsync(`${CONFIG_FOLDER}.logicList`, {
+          val: JSON.stringify(doc),
+          ack: true,
+        });
+      },
+      resolveVariable: (name) => this.variables.states[name]?.stateId,
+      log: (level, message) => this.log[level](message),
+    };
+  }
+
+  /** Create/update every collection at start and follow the plugin's enabled flag. */
+  private async syncCollections(): Promise<boolean> {
+    const host = this.collectionHost();
+    let changed = false;
+    for (const entry of this.pluginConfig) {
+      const plugin = collectionPluginOf(entry);
+      if (!plugin) continue;
+      try {
+        const result = await applyCollection(host, plugin, {
+          enabled: entry.enabled,
+          mode: "reconcile",
+        });
+        changed = changed || result.changed;
+        if (result.conflicts.length > 0) {
+          const ids = result.conflicts.map((item) => item.id).join(", ");
+          this.pluginProblems.set(entry.id, `collection conflicts: ${ids}`);
+          this.log.warn(`plugin ${entry.id}: collection conflicts: ${ids}`);
+        } else if (
+          this.pluginProblems.get(entry.id)?.startsWith("collection")
+        ) {
+          this.pluginProblems.delete(entry.id);
+        }
+      } catch (error) {
+        this.pluginProblems.set(entry.id, `collection: ${String(error)}`);
+        this.log.warn(`plugin ${entry.id}: ${String(error)}`);
+      }
+    }
+    return changed;
   }
 
   private pluginViews(): PluginView[] {
@@ -1383,6 +1448,7 @@ class IHome extends utils.Adapter {
             ...(imported.contributions
               ? { contributions: imported.contributions }
               : {}),
+            ...(imported.collection ? { collection: imported.collection } : {}),
             ...(imported.code ? { code: imported.code } : {}),
           },
           {
@@ -1471,6 +1537,7 @@ class IHome extends utils.Adapter {
           ...(entry.contributions
             ? { contributions: entry.contributions }
             : {}),
+          ...(entry.collection ? { collection: entry.collection } : {}),
           ...(entry.code ? { code: entry.code } : {}),
         }));
         const patched = applyPluginPatches(temporary, stagedPatches, [
@@ -1496,6 +1563,7 @@ class IHome extends utils.Adapter {
           ...(entry.contributions
             ? { contributions: entry.contributions }
             : {}),
+          ...(entry.collection ? { collection: entry.collection } : {}),
           ...(entry.code?.trim() ? { code: entry.code } : {}),
         }));
       }
@@ -1515,7 +1583,25 @@ class IHome extends utils.Adapter {
           const entry = active.find((plugin) => plugin.id === patch.id);
           const before = previous.find((plugin) => plugin.id === patch.id);
           if (!entry) continue;
-          if (patch.enabled !== undefined) await host.setEnabled(entry);
+          if (patch.enabled !== undefined) {
+            await host.setEnabled(entry);
+            const owned = collectionPluginOf(entry);
+            if (owned) {
+              const result = await applyCollection(
+                this.collectionHost(),
+                owned,
+                { enabled: entry.enabled, mode: "sync" },
+              );
+              if (!result.applied) {
+                return pluginError(
+                  `collection conflicts: ${result.conflicts
+                    .map((item) => item.id)
+                    .join(", ")}`,
+                );
+              }
+              if (result.changed) await this.loadLogics();
+            }
+          }
           if (
             patch.settings !== undefined &&
             pluginSettingsChanged(before?.settings, entry.settings)
@@ -1627,6 +1713,7 @@ class IHome extends utils.Adapter {
           ...(plugin.contributions
             ? { contributions: plugin.contributions }
             : {}),
+          ...(plugin.collection ? { collection: plugin.collection } : {}),
           ...(plugin.code?.trim() ? { code: plugin.code } : {}),
         }),
       );
@@ -1660,6 +1747,21 @@ class IHome extends utils.Adapter {
           )
         : [...this.pluginConfig, merged];
       await host.restart(merged);
+      let collection:
+        { id: string; conflicts: CollectionConflict[] } | undefined;
+      const owned = collectionPluginOf(merged);
+      if (owned) {
+        const applied = await applyCollection(this.collectionHost(), owned, {
+          enabled: merged.enabled,
+          mode: "reconcile",
+        });
+        if (applied.changed) await this.loadLogics();
+        if (applied.conflicts.length > 0) {
+          const ids = applied.conflicts.map((item) => item.id).join(", ");
+          this.pluginProblems.set(merged.id, `collection conflicts: ${ids}`);
+        }
+        collection = { id: merged.id, conflicts: applied.conflicts };
+      }
       this.pluginSettings = {
         ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
         staged: this.pluginSettings.staged.filter(
@@ -1668,7 +1770,11 @@ class IHome extends utils.Adapter {
         removals: this.pluginSettings.removals.filter((id) => id !== merged.id),
       };
       await this.savePluginSettings();
-      return pluginReply({ plugins: this.pluginViews(), restartRequired: [] });
+      return pluginReply({
+        plugins: this.pluginViews(),
+        restartRequired: [],
+        ...(collection ? { collection } : {}),
+      });
     }
 
     if (command.action === "remove") {
@@ -1680,6 +1786,14 @@ class IHome extends utils.Adapter {
         );
       }
       await host.setEnabled({ ...old, enabled: false });
+      let removedCollection = false;
+      const owned = collectionPluginOf(old);
+      if (owned) {
+        const removed = await removeCollection(this.collectionHost(), owned, {
+          removeStates: command.removeCollectionStates === true,
+        });
+        removedCollection = removed.changed;
+      }
       // Runtime flags stay in the document so a re-install keeps them.
       const keep = this.pluginSettings.settings[command.id];
       this.pluginConfig = this.pluginConfig.filter(
@@ -1713,14 +1827,89 @@ class IHome extends utils.Adapter {
       } catch (error) {
         this.log.warn(`cannot store the plugin list: ${String(error)}`);
       }
+      if (removedCollection) await this.loadLogics();
       return pluginReply({ plugins: this.pluginViews() });
     }
 
-    if (
-      command.action === "collection.capture" ||
-      command.action === "collection.apply"
-    ) {
-      return pluginError("collection commands are not wired yet");
+    if (command.action === "collection.capture") {
+      const request = command.request;
+      const current = this.pluginConfig.find(
+        (entry) => entry.id === request.id,
+      );
+      if (current?.builtin) {
+        return pluginError(
+          `plugin ${request.id} is built-in and cannot be captured`,
+        );
+      }
+      try {
+        const capture = await captureCollection(this.collectionHost(), request);
+        const previous: ImportedPlugin | undefined = current
+          ? {
+              id: current.id,
+              name: current.name,
+              ...(current.api !== undefined ? { api: current.api } : {}),
+              ...(current.version ? { version: current.version } : {}),
+              ...(current.help ? { help: current.help } : {}),
+              ...(current.usage ? { usage: current.usage } : {}),
+              ...(current.settings ? { settings: current.settings } : {}),
+              ...(current.settingsSchema
+                ? { settingsSchema: current.settingsSchema }
+                : {}),
+              ...(current.settingsTabs
+                ? { settingsTabs: current.settingsTabs }
+                : {}),
+              ...(current.contributions
+                ? { contributions: current.contributions }
+                : {}),
+              ...(current.collection ? { collection: current.collection } : {}),
+              ...(current.code?.trim() ? { code: current.code } : {}),
+            }
+          : undefined;
+        const manifest = mergeCapturedPlugin(previous, request, capture);
+        await (this as unknown as PluginWriteHost).writeFileAsync(
+          "ihome.meta",
+          `plugins/${request.id}/plugin.json`,
+          `${JSON.stringify(pluginManifestOf(manifest), null, 2)}\n`,
+        );
+        return pluginReply({
+          plugin: manifest,
+          collection: {
+            states: capture.collection.states.length,
+            logics: capture.collection.logics.length,
+            tiles: capture.contributions?.tiles?.length ?? 0,
+            uses: capture.uses.length,
+          },
+        });
+      } catch (error) {
+        return pluginError(error);
+      }
+    }
+
+    if (command.action === "collection.apply") {
+      const entry = this.pluginConfig.find((item) => item.id === command.id);
+      if (!entry) return pluginError(`unknown plugin: ${command.id}`);
+      const plugin = collectionPluginOf(entry);
+      if (!plugin) {
+        return pluginError(`plugin ${command.id} has no collection`);
+      }
+      const result = await applyCollection(this.collectionHost(), plugin, {
+        enabled: entry.enabled,
+        mode: "reconcile",
+        overwrite: command.overwrite === true,
+      });
+      if (!result.applied) {
+        const ids = result.conflicts.map((item) => item.id).join(", ");
+        this.pluginProblems.set(entry.id, `collection conflicts: ${ids}`);
+        return pluginError(`collection conflicts: ${ids}`);
+      }
+      if (this.pluginProblems.get(entry.id)?.startsWith("collection")) {
+        this.pluginProblems.delete(entry.id);
+      }
+      if (result.changed) await this.loadLogics();
+      return pluginReply({
+        plugins: this.pluginViews(),
+        collection: { id: command.id, conflicts: result.conflicts },
+      });
     }
 
     const stagedPlugin = this.pluginSettings.staged.find(
@@ -2445,6 +2634,7 @@ class IHome extends utils.Adapter {
     await this.migratePluginCodeToFiles();
     await this.migrateExternalAccessToFile();
     this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
+    await this.syncCollections();
     if (!updateFailed) {
       // File-backed plugins belong in the settings document too, or the next
       // start would lose their enabled flag.
