@@ -4,6 +4,7 @@
   import PluginList from "$lib/components/plugins/PluginList.svelte";
   import PluginPagesList from "$lib/components/plugins/PluginPagesList.svelte";
   import PluginImportModal from "$lib/components/plugins/PluginImportModal.svelte";
+  import CollectionWizard from "$lib/components/plugins/CollectionWizard.svelte";
   import AvailablePlugins from "$lib/components/plugins/AvailablePlugins.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
@@ -56,6 +57,8 @@
   let pagesCanCreate = $state(false);
   let busy = $state(false);
   let importOpen = $state(false);
+  let wizardOpen = $state(false);
+  let wizardPlugin = $state<PluginView | undefined>(undefined);
   const plugins = $derived(withoutSecured(getPlugins(), isLocalUi()));
   const loading = $derived(pluginsLoading());
   const error = $derived(pluginsError());
@@ -123,6 +126,15 @@
       </div>
       {#if view === "plugins"}
         <div class="page-actions">
+          <IconButton
+            icon="add"
+            label="Create plugin"
+            disabled={busy || !ioBroker.connected}
+            onclick={() => {
+              wizardPlugin = undefined;
+              wizardOpen = true;
+            }}
+          />
           <IconButton
             icon="upload"
             label="Import plugin"
@@ -198,6 +210,17 @@
     onClose={() => (importOpen = false)}
     onImported={() => {
       importOpen = false;
+      void refresh();
+    }}
+  />
+{/if}
+
+{#if wizardOpen}
+  <CollectionWizard
+    plugin={wizardPlugin}
+    onClose={() => (wizardOpen = false)}
+    onSaved={() => {
+      wizardOpen = false;
       void refresh();
     }}
   />
