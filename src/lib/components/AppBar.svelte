@@ -132,10 +132,12 @@
   /** The cog menu is the configuration navigation on every screen size. */
   let cogMenuOpen = $state(false);
   let pageMenuOpen = $state(false);
+  let pluginMenuOpen = $state(false);
   $effect(() => {
     routeId;
     cogMenuOpen = false;
     pageMenuOpen = false;
+    pluginMenuOpen = false;
   });
 
   const treePages = $derived(getPageRegistry().pages ?? []);
@@ -267,20 +269,22 @@
     if (e.key === "Escape") {
       cogMenuOpen = false;
       pageMenuOpen = false;
+      pluginMenuOpen = false;
     }
   }}
   onclick={(e) => {
-    if (!cogMenuOpen && !pageMenuOpen) return;
+    if (!cogMenuOpen && !pageMenuOpen && !pluginMenuOpen) return;
     const target = e.target as Element | null;
     if (
       target?.closest(
-        ".cog-menu, .pages-menu, .menu-panel, .menu-backdrop, .config-menu",
+        ".cog-menu, .pages-menu, .menu-panel, .menu-backdrop, .config-menu, .plugin-tab",
       )
     ) {
       return;
     }
     cogMenuOpen = false;
     pageMenuOpen = false;
+    pluginMenuOpen = false;
   }}
 />
 
@@ -324,6 +328,137 @@
           >
         {/if}
         <span class="menu-current">{currentLabel}</span>
+      </div>
+      <div class="config-tabs" role="navigation" aria-label="Configuration">
+        {#each configPages.filter((p) => p.id !== "/admin") as p (p.id)}
+          {#if p.id === "/plugins"}
+            <div class="plugin-tab">
+              <a
+                class="tab"
+                class:active={routeId === p.id ||
+                  routeId === "/plugin/[id]" ||
+                  routeId === "/admin"}
+                href={pageHref(p.id, base)}
+                aria-current={routeId === p.id ? "page" : undefined}
+              >
+                {#if pluginsIcon}
+                  <Icon
+                    value={pluginsIcon.value}
+                    owner={pluginsIcon.owner}
+                    size={18}
+                  />
+                {:else}
+                  <span class="material-symbols-outlined" aria-hidden="true"
+                    >{p.icon}</span
+                  >
+                {/if}
+                <span class="tab-label">{p.label}</span>
+              </a>
+              <button
+                type="button"
+                class="icon-btn plugin-chev"
+                title="Plugin pages"
+                aria-label="Plugin pages"
+                aria-haspopup="true"
+                aria-expanded={pluginMenuOpen}
+                onclick={() => {
+                  pluginMenuOpen = !pluginMenuOpen;
+                  cogMenuOpen = false;
+                  pageMenuOpen = false;
+                }}
+              >
+                <span class="material-symbols-outlined">expand_more</span>
+              </button>
+              {#if pluginMenuOpen}
+                <nav class="menu-panel plugin-panel" aria-label="Plugin pages">
+                  {#if adminPage}
+                    {#each builtinPages as entry (entry.id)}
+                      {@const active =
+                        routeId === "/admin" && adminTab === entry.tab}
+                      <a
+                        class="menu-item"
+                        class:active
+                        href={adminPageHref(entry.tab, base)}
+                        aria-current={active ? "page" : undefined}
+                        onclick={() => (pluginMenuOpen = false)}
+                      >
+                        {#if entry.id === "admin" && adminIcon}
+                          <Icon
+                            value={adminIcon.value}
+                            owner={adminIcon.owner}
+                            size={18}
+                          />
+                        {:else if entry.svg}
+                          <Icon
+                            value={entry.svg}
+                            data={{ $color: "var(--text-color)" }}
+                            size={18}
+                          />
+                        {:else}
+                          <span
+                            class="material-symbols-outlined"
+                            aria-hidden="true">{entry.glyph}</span
+                          >
+                        {/if}
+                        <span>{entry.title}</span>
+                      </a>
+                    {/each}
+                    <div class="menu-sep"></div>
+                  {/if}
+                  {#each pluginPageList as page (page.id)}
+                    {@const pageIcon = pageMenuIcon(page)}
+                    {@const active =
+                      routeId === "/plugin/[id]" &&
+                      route.params?.id === page.id}
+                    {#if page.open === "tab"}
+                      <a
+                        class="menu-item"
+                        href={page.url}
+                        target="_blank"
+                        rel="noopener"
+                        onclick={() => (pluginMenuOpen = false)}
+                      >
+                        <Icon
+                          value={pageIcon?.value ?? "web_asset"}
+                          owner={pageIcon?.owner}
+                          size={18}
+                        />
+                        <span>{page.title}</span>
+                      </a>
+                    {:else}
+                      <a
+                        class="menu-item"
+                        class:active
+                        href={pluginPageHref(page.id, base)}
+                        aria-current={active ? "page" : undefined}
+                        onclick={() => (pluginMenuOpen = false)}
+                      >
+                        <Icon
+                          value={pageIcon?.value ?? "web_asset"}
+                          owner={pageIcon?.owner}
+                          size={18}
+                        />
+                        <span>{page.title}</span>
+                      </a>
+                    {/if}
+                  {/each}
+                </nav>
+              {/if}
+            </div>
+          {:else}
+            <a
+              class="tab"
+              class:active={routeId === p.id}
+              href={pageHref(p.id, base)}
+              aria-current={routeId === p.id ? "page" : undefined}
+            >
+              <span class="material-symbols-outlined" aria-hidden="true"
+                >{p.icon}</span
+              >
+              <span class="tab-label">{p.label}</span>
+            </a>
+          {/if}
+        {/each}
       </div>
     {/if}
   </nav>
@@ -759,6 +894,57 @@
   .menu-item.sub {
     padding-left: 2.1rem;
     font-weight: 400;
+  }
+
+  /* The configuration pages as folder tabs on tablet/desktop; phones keep the
+     current-page label and the cog menu. */
+  .config-tabs {
+    display: none;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .plugin-tab {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+  }
+
+  .plugin-chev {
+    align-self: center;
+    margin-bottom: 2px;
+  }
+
+  .plugin-panel {
+    left: 0;
+    right: auto;
+    top: calc(100% + 0.35rem);
+  }
+
+  @media (min-width: 768px) {
+    .bar.config .current-page {
+      display: none;
+    }
+    .bar.config .tabs {
+      overflow: visible;
+    }
+    .bar.config .config-tabs {
+      display: flex;
+    }
+    .bar.config .tab.active {
+      background-color: var(--config-bg);
+      border-bottom-color: var(--config-bg);
+    }
+  }
+
+  /* Icons cost the width the labels need on a portrait tablet. */
+  @media (max-width: 1023px) {
+    .config-tabs .tab :global(.material-symbols-outlined) {
+      display: none;
+    }
   }
 
   /* ------------------------------------------------- config menu (small) */

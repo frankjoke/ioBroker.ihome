@@ -559,38 +559,28 @@
     {#if collectionLoading && !collectionItems}
       <p class="hint text-muted">Loading collection…</p>
     {:else if collectionItems}
-      {#if collectionItems.states.length}
-        <p class="label-mono">States</p>
-        <div class="collection-badges">
-          {#each collectionItems.states as stateId (stateId)}
-            <span class="badge mono" title={stateId}>{stateId}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if collectionItems.logics.length}
-        <p class="label-mono">Logic</p>
-        <div class="collection-badges">
-          {#each collectionItems.logics as logicId (logicId)}
-            <span class="badge mono" title={logicId}>{logicId}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if collectionItems.uses.length}
-        <p class="label-mono">Uses</p>
-        <div class="collection-badges">
-          {#each collectionItems.uses as stateId (stateId)}
-            <span class="badge mono" title={stateId}>{stateId}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if collectionItems.tiles.length}
-        <p class="label-mono">Tiles</p>
-        <div class="collection-badges">
-          {#each collectionItems.tiles as tile (tile.id)}
-            <span class="badge" title={tile.id}>{tile.name || tile.id}</span>
-          {/each}
-        </div>
-      {/if}
+      <div class="collection-badges">
+        {#each collectionItems.states as stateId (stateId)}
+          <span class="badge mono state" title={`State · ${stateId}`}
+            >{stateId}</span
+          >
+        {/each}
+        {#each collectionItems.logics as logicId (logicId)}
+          <span class="badge mono logic" title={`Logic · ${logicId}`}
+            >{logicId}</span
+          >
+        {/each}
+        {#each collectionItems.uses as stateId (stateId)}
+          <span class="badge mono use" title={`Uses · ${stateId}`}
+            >{stateId}</span
+          >
+        {/each}
+        {#each collectionItems.tiles as tile (tile.id)}
+          <span class="badge tile" title={`Tile · ${tile.id}`}
+            >{tile.name || tile.id}</span
+          >
+        {/each}
+      </div>
     {:else}
       <p class="hint text-muted">The plugin manifest is unreadable.</p>
     {/if}
@@ -693,12 +683,33 @@
   .collection-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .collection-badges .badge {
     max-width: 100%;
+    padding: 0.12rem 0.4rem;
+    border-left: 3px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--surface-container);
+    font-size: var(--body-sm);
     overflow-wrap: anywhere;
+  }
+
+  .collection-badges .badge.state {
+    border-left-color: var(--primary-color);
+  }
+
+  .collection-badges .badge.logic {
+    border-left-color: var(--secondary-color);
+  }
+
+  .collection-badges .badge.use {
+    border-left-color: var(--info-color);
+  }
+
+  .collection-badges .badge.tile {
+    border-left-color: var(--tertiary);
   }
 
   .restart a {

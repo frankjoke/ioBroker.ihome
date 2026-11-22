@@ -407,41 +407,29 @@
         <p>
           {logicIds.length} logic · {stateIds.length} states · {tileIds.length} tiles
         </p>
-        {#if logicIds.length}
-          <div class="summary-badges">
-            <span class="label-mono">Logic</span>
-            {#each logicIds as logicId (logicId)}
-              <span class="badge" title={logicId}
-                >{logics.find((logic) => logic.id === logicId)?.name ??
-                  logicId}</span
-              >
-            {/each}
-          </div>
-        {/if}
-        {#if stateIds.length}
-          <div class="summary-badges">
-            <span class="label-mono">States</span>
-            {#each stateIds as stateId (stateId)}
-              <span class="badge mono" title={stateId}>{stateId}</span>
-            {/each}
-          </div>
-        {/if}
-        {#if uses.length}
-          <div class="summary-badges">
-            <span class="label-mono">Uses</span>
-            {#each uses as stateId (stateId)}
-              <span class="badge mono" title={stateId}>{stateId}</span>
-            {/each}
-          </div>
-        {/if}
-        {#if selectedTiles.length}
-          <div class="summary-badges">
-            <span class="label-mono">Tiles</span>
-            {#each selectedTiles as tile (tile.id)}
-              <span class="badge" title={tile.id}>{tile.name}</span>
-            {/each}
-          </div>
-        {/if}
+        <div class="summary-badges">
+          {#each logicIds as logicId (logicId)}
+            <span class="badge summary-logic" title={`Logic · ${logicId}`}
+              >{logics.find((logic) => logic.id === logicId)?.name ??
+                logicId}</span
+            >
+          {/each}
+          {#each stateIds as stateId (stateId)}
+            <span class="badge mono summary-state" title={`State · ${stateId}`}
+              >{stateId}</span
+            >
+          {/each}
+          {#each uses as stateId (stateId)}
+            <span class="badge mono summary-use" title={`Uses · ${stateId}`}
+              >{stateId}</span
+            >
+          {/each}
+          {#each selectedTiles as tile (tile.id)}
+            <span class="badge summary-tile" title={`Tile · ${tile.id}`}
+              >{tile.name}</span
+            >
+          {/each}
+        </div>
         <p class="warning-banner">
           Saving claims the selected items for this plugin. Logic runs while the
           plugin is enabled.
@@ -629,13 +617,33 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 0.2rem;
     margin: 0.25rem 0;
   }
 
   .summary-badges .badge {
     max-width: 100%;
+    padding: 0.12rem 0.4rem;
+    border-left: 3px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: var(--body-sm);
     overflow-wrap: anywhere;
+  }
+
+  .summary-badges .summary-logic {
+    border-left-color: var(--secondary-color);
+  }
+
+  .summary-badges .summary-state {
+    border-left-color: var(--primary-color);
+  }
+
+  .summary-badges .summary-use {
+    border-left-color: var(--info-color);
+  }
+
+  .summary-badges .summary-tile {
+    border-left-color: var(--tertiary);
   }
 
   .review p {
