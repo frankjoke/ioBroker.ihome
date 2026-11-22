@@ -33,6 +33,16 @@ describe("renderHelp", () => {
     expect(html).not.toContain("<a ");
   });
 
+  it("renders a pipe table", async () => {
+    const html = await renderHelp(
+      "| Device | Better |\n| --- | --- |\n| Router | ICMP |\n| Phone | TCP |",
+    );
+    expect(html).toContain('<table class="table">');
+    expect(html).toContain("<th>Device</th>");
+    expect(html).toContain("<td>Phone</td>");
+    expect(html).toContain("<td>TCP</td>");
+  });
+
   it("renders headings and lists", async () => {
     const html = await renderHelp(
       "## Setup\n\n- one\n- **two**\n\n1. first\n2. second",

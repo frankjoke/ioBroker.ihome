@@ -56,6 +56,16 @@ function renderBlocks(source: string): string {
     paragraph = [];
   };
 
+  const cells = (line: string): string[] =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim());
+  const separator = (line: string): boolean =>
+    /^\s*\|?[\s:|-]+\|?\s*$/.test(line) && line.includes("-");
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) {
@@ -67,6 +77,28 @@ function renderBlocks(source: string): string {
       flush();
       const level = heading[1].length;
       blocks.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      continue;
+    }
+    if (line.includes("|") && i + 1 < lines.length && separator(lines[i + 1])) {
+      flush();
+      const header = cells(line);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+        rows.push(cells(lines[i]));
+        i++;
+      }
+      i--;
+      const head = header.map((cell) => `<th>${inline(cell)}</th>`).join("");
+      const body = rows
+        .map(
+          (row) =>
+            `<tr>${row.map((cell) => `<td>${inline(cell)}</td>`).join("")}</tr>`,
+        )
+        .join("");
+      blocks.push(
+        `<div class="table-responsive"><table class="table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`,
+      );
       continue;
     }
     if (/^```/.test(line)) {
