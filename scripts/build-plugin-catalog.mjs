@@ -33,3 +33,24 @@ writeFileSync("build/plugin-catalog/external-access.json", file);
 mkdirSync("static/plugins", { recursive: true });
 writeFileSync("static/plugins/external-access.json", file);
 console.log("external-access catalog:", code.length, "bytes");
+
+// pvforecast ships the same way: compiled factory + manifest metadata.
+const pvSource = readFileSync("build/plugins/pvforecast.js", "utf8");
+const pvCode = `${pvSource}\nmodule.exports = module.exports.createPvForecastPlugin();\n`;
+const pv = require("../build/plugins/pvforecast.js");
+const pvPlugin = {
+  id: "pvforecast",
+  name: "PV forecast",
+  api: 1,
+  version: "1.0.0",
+  timeoutMs: 30000,
+  help: pv.PVFORECAST_HELP,
+  usage: pv.PVFORECAST_USAGE,
+  settingsSchema: pv.PVFORECAST_SETTINGS_SCHEMA,
+  settings: pv.PVFORECAST_DEFAULT_SETTINGS,
+  contributions: pv.PVFORECAST_CONTRIBUTIONS,
+  code: pvCode,
+};
+const pvFile = `${JSON.stringify({ format: "ihome-plugin", version: 1, plugin: pvPlugin }, null, 2)}\n`;
+writeFileSync("static/plugins/pvforecast.json", pvFile);
+console.log("pvforecast catalog:", pvCode.length, "bytes");

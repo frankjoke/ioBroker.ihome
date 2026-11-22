@@ -4,6 +4,8 @@ import type { Template } from "$lib/types/display";
 import type { TemplateBundle } from "$lib/types/templates";
 import { BUILTIN_TEMPLATES } from "$logic/templates";
 import catalog from "../../../static/plugins/external-access.json";
+import pvCatalog from "../../../static/plugins/pvforecast.json";
+import { logicTemplateProblem } from "./logic-templates";
 import {
   contributionKey,
   readPluginContributions,
@@ -162,6 +164,33 @@ describe("readPluginContributions", () => {
     expect(html).not.toContain("window.open");
     expect(contributions.snippets[0].code).toContain(
       'sendTo("ihome.0", "plugin"',
+    );
+  });
+
+  it("ships a valid PV forecast tile, hourly logic and snippets", () => {
+    const plugin = (pvCatalog as { plugin: Record<string, any> }).plugin;
+    expect(plugin.id).toBe("pvforecast");
+    expect(plugin.version).toBe("1.0.0");
+    const contributions = plugin.contributions as {
+      tiles: any[];
+      logic: any[];
+      snippets: any[];
+    };
+    expect(contributions.tiles).toHaveLength(1);
+    const tile = contributions.tiles[0];
+    expect(visualTemplateProblem(tile, [], tile.id)).toBeNull();
+    const html = tile.slots[0].options.html as string;
+    expect(html).toContain("pvforecast.json");
+    expect(html).toContain('action: "total"');
+    expect(html).toContain('action: "peak"');
+
+    expect(contributions.logic).toHaveLength(1);
+    expect(logicTemplateProblem(contributions.logic[0], [], [])).toBeNull();
+    expect(contributions.logic[0].logic.expr.code).toContain('action: "fetch"');
+    expect(contributions.snippets).toHaveLength(2);
+    expect(contributions.snippets[0].code).toContain('ihome.call("pvforecast"');
+    expect(contributions.snippets[1].code).toContain(
+      'call("pvforecast", { action: "fetch" }',
     );
   });
 

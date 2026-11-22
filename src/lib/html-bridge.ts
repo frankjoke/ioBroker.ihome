@@ -19,6 +19,8 @@ function findVariable(name: string): GlobalVariable | undefined {
  * variables; the broker's ACL still applies to the state writes.
  */
 export const htmlBridge = {
+  /** The iHome instance handling this page, e.g. `ihome.0`. */
+  namespace: ioBroker.namespace,
   /** The web adapter base for this view (relative in production, absolute in
    *  dev). Local links built from it work locally and through ioBroker Pro. */
   baseUrl: appBaseUrl({
