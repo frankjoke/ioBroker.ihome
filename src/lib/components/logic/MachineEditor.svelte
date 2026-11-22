@@ -52,25 +52,33 @@
   let openRow = $state<number | null>(null);
   /** The state's options tab: enter, exit or the timeout. */
   let stateTab = $state<"enter" | "exit" | "timeout" | null>("enter");
-  /** The Options tab: $init today, $all and more later. */
-  /** The state's own blocks, always one open. */
-  const STATE_TABS = [
-    {
-      id: "enter",
-      label: "Enter",
-      hint: "What runs when the machine enters this state.",
-    },
-    {
-      id: "exit",
-      label: "Exit",
-      hint: "What runs when the machine leaves this state.",
-    },
-    {
-      id: "timeout",
-      label: "Timeout",
-      hint: "What happens if the state stays active too long.",
-    },
-  ] as const;
+  /** The state's own blocks, always one open; the timeout names its duration. */
+  function stateTabs(state: StateDef): readonly {
+    id: "enter" | "exit" | "timeout";
+    label: string;
+    hint: string;
+  }[] {
+    const after = String(state.after?.time ?? "").trim();
+    return [
+      {
+        id: "enter",
+        label: "Enter",
+        hint: "What runs when the machine enters this state.",
+      },
+      {
+        id: "exit",
+        label: "Exit",
+        hint: "What runs when the machine leaves this state.",
+      },
+      {
+        id: "timeout",
+        label: after ? `Timeout (${after})` : "Timeout",
+        hint: after
+          ? `Goes to ${state.after?.goto || "another state"} after ${after}.`
+          : "What happens if the state stays active too long.",
+      },
+    ];
+  }
 
   /** The Options strip: what the machine does on start, and the shared rows. */
   const optionTabs = $derived([
@@ -764,7 +772,7 @@
               <OptionTabs
                 bind:value={stateTab}
                 label="State options"
-                tabs={STATE_TABS}
+                tabs={stateTabs(state)}
                 collapsible={false}
               >
                 {#snippet children(id)}
