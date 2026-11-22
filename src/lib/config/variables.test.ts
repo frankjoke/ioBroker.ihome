@@ -86,6 +86,60 @@ describe("initialValue", () => {
     expect(initialValue("number")).toBe(0);
     expect(initialValue("boolean")).toBe(false);
     expect(initialValue("string")).toBe("");
+    expect(initialValue("multistate")).toBe(0);
+    expect(initialValue("json")).toBe("{}");
+    expect(initialValue("mixed")).toBeNull();
+    expect(initialValue("object")).toEqual({});
+    expect(initialValue("array")).toEqual([]);
+  });
+});
+
+describe("variableStateSpec", () => {
+  const variable = (over: Partial<GlobalVariable>): GlobalVariable => ({
+    id: "v",
+    name: "Mode",
+    kind: "state",
+    type: "string",
+    stateId: "ihome.0.Variables.Mode",
+    ...over,
+  });
+
+  it("writes multistate labels and a numeric default", () => {
+    const spec = variableStateSpec(
+      variable({
+        type: "multistate",
+        states: { "0": "Off", "1": "On", "": "ignored" },
+      }),
+    );
+    expect(spec).toMatchObject({
+      id: "ihome.0.Variables.Mode",
+      common: {
+        type: "multistate",
+        role: "state",
+        def: 0,
+        states: { "0": "Off", "1": "On" },
+      },
+      initial: 0,
+    });
+  });
+
+  it("maps json to a JSON string state", () => {
+    expect(variableStateSpec(variable({ type: "json" }))).toMatchObject({
+      common: { type: "string", role: "json", def: "{}" },
+      initial: "{}",
+    });
+  });
+
+  it("keeps only the common keys when updating an existing state", () => {
+    const spec = variableStateSpec(
+      variable({ type: "multistate", states: { "0": "Off" }, unit: "x" }),
+      false,
+    );
+    expect(spec).toMatchObject({
+      common: { type: "multistate", unit: "x", states: { "0": "Off" } },
+    });
+    expect(spec).not.toHaveProperty("initial");
+    expect(spec?.common).not.toHaveProperty("name");
   });
 });
 
@@ -367,6 +421,32 @@ describe("migrateVariables", () => {
       stateId: "ihome.0.Variables.x",
     });
   });
+  it("keeps multistate labels and the json type", () => {
+    const lib = migrateVariables({
+      variables: [
+        {
+          id: "m",
+          name: "Mode",
+          kind: "state",
+          type: "multistate",
+          stateId: "ihome.0.Variables.mode",
+          states: { "0": "Off", "1": "On", "": "ignored", "2": 7 },
+        },
+        {
+          id: "j",
+          name: "Payload",
+          kind: "state",
+          type: "json",
+          stateId: "ihome.0.Variables.payload",
+        },
+      ],
+    });
+    expect(lib.variables[0]).toMatchObject({
+      type: "multistate",
+      states: { "0": "Off", "1": "On" },
+    });
+    expect(lib.variables[1].type).toBe("json");
+  });
   it("survives junk", () => {
     expect(migrateVariables("not json").variables).toEqual([]);
     expect(migrateVariables(null).variables).toEqual([]);
@@ -494,7 +574,7 @@ describe("variableStateSpec", () => {
         id: "3",
         name: "Text",
         kind: "state",
-        type: "mixed",
+        type: "weird",
         stateId: "ihome.0.Variables.text",
       }),
     ).toMatchObject({ common: { type: "string", role: "value" } });

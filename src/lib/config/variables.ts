@@ -8,8 +8,8 @@ export interface GlobalVariable {
   id: string;
   name: string;
   kind: "constant" | "state";
-  /** string | number | boolean for constants and new states; a picked state
-   *  keeps its object's own type, name, role and read/write flags. */
+  /** ioBroker common.type plus the editor's `json` shorthand (a JSON string
+   *  state with role `json`) and `multistate` (values with labels). */
   type: string;
   /** Constant value, kept as text so the form round-trips exactly. */
   value?: string;
@@ -20,6 +20,8 @@ export interface GlobalVariable {
   /** The created state's object settings — read only when the state is created
    *  (an existing state keeps its own; nothing is ever overwritten). */
   role?: string;
+  /** Multistate value → label map, written to `common.states`. */
+  states?: Record<string, string>;
   /** Enum ids (`enum.rooms.*`, `enum.functions.*`) the created state joins. */
   enums?: string[];
   min?: number;
@@ -297,8 +299,12 @@ export function convertValue(
 
 /** The value a newly created state starts with. */
 export function initialValue(type: string): unknown {
-  if (type === "number") return 0;
+  if (type === "number" || type === "multistate") return 0;
   if (type === "boolean") return false;
+  if (type === "json") return "{}";
+  if (type === "object") return {};
+  if (type === "array") return [];
+  if (type === "mixed") return null;
   return "";
 }
 
@@ -308,14 +314,26 @@ export function variableStateSpec(
   creating = true,
 ): StateSpec | undefined {
   if (v.kind !== "state" || !v.stateId) return undefined;
-  const type = ["string", "number", "boolean"].includes(v.type)
-    ? v.type
-    : "string";
+  const known = [
+    "string",
+    "number",
+    "boolean",
+    "multistate",
+    "json",
+    "mixed",
+    "object",
+    "array",
+  ];
+  const type = known.includes(v.type) ? v.type : "string";
+  // `json` is the editor's shorthand for a JSON string state with role `json`.
+  const commonType = type === "json" ? "string" : type;
   const initial = initialValue(type);
-  const common: Record<string, unknown> = { type };
+  const common: Record<string, unknown> = { type: commonType };
   if (creating) {
     common.name = v.name || v.stateId;
-    common.role = String(v.role ?? "").trim() || "value";
+    common.role =
+      String(v.role ?? "").trim() ||
+      (type === "json" ? "json" : type === "multistate" ? "state" : "value");
     common.read = true;
     common.write = true;
     common.unit = String(v.unit ?? "");
@@ -323,6 +341,14 @@ export function variableStateSpec(
   } else {
     if (String(v.role ?? "").trim()) common.role = String(v.role).trim();
     common.unit = String(v.unit ?? "");
+  }
+  if (type === "multistate" && v.states) {
+    const states = Object.fromEntries(
+      Object.entries(v.states)
+        .map(([value, label]) => [String(value).trim(), String(label)])
+        .filter(([value, label]) => value !== "" && label !== ""),
+    );
+    if (Object.keys(states).length) common.states = states;
   }
   if (type === "number") {
     if (typeof v.min === "number" && Number.isFinite(v.min)) common.min = v.min;
@@ -404,6 +430,19 @@ export function migrateVariables(raw: unknown): VariableLibrary {
             unit: v.unit ? String(v.unit) : undefined,
             notes: v.notes ? String(v.notes) : undefined,
             role: v.role ? String(v.role) : undefined,
+            states:
+              v.states &&
+              typeof v.states === "object" &&
+              !Array.isArray(v.states)
+                ? Object.fromEntries(
+                    Object.entries(v.states)
+                      .filter(
+                        ([key, label]) =>
+                          key.trim() !== "" && typeof label === "string",
+                      )
+                      .map(([key, label]) => [key, label as string]),
+                  )
+                : undefined,
             enums: enums?.length ? enums : undefined,
             min: Number.isFinite(v.min) ? Number(v.min) : undefined,
             max: Number.isFinite(v.max) ? Number(v.max) : undefined,

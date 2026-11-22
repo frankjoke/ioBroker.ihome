@@ -23,6 +23,7 @@
     type GlobalVariable,
   } from "$lib/config/variables";
   import { formatValue } from "$lib/config/format";
+  import { normalizeStates } from "$lib/config/state-meta";
   import { collectStates } from "$lib/config/state-tree";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
@@ -184,7 +185,27 @@
   const previewId = $derived(buildStateId(namespace, effectiveRelative));
   const previewExists = $derived(!!previewId && objects.has(previewId));
 
-  const VALUE_TYPES = ["string", "number", "boolean"];
+  const VALUE_TYPES = [
+    "string",
+    "number",
+    "boolean",
+    "multistate",
+    "json",
+    "mixed",
+    "object",
+    "array",
+  ];
+
+  /** The editor's type for a broker object: JSON strings become `json`, and an
+   *  unknown/legacy type is shown as mixed. */
+  function variableTypeOf(common: any): string {
+    const type = String(common?.type ?? "mixed");
+    if (type === "multistate") return "multistate";
+    if (type === "string" && /json/i.test(String(common?.role ?? ""))) {
+      return "json";
+    }
+    return VALUE_TYPES.includes(type) ? type : "mixed";
+  }
 
   /** Known to exist: the object cache holds it, or its value was fetched. A
    *  state outside `ihome.0` may never enter the object cache. */
@@ -198,7 +219,11 @@
     if (!stateExists(v.stateId)) return "missing";
     const st: any = ioBroker.states.get(v.stateId);
     if (!st) return "…";
-    const unit = v.unit || objects.get(v.stateId)?.common?.unit;
+    const common = objects.get(v.stateId)?.common;
+    const states = normalizeStates(v.states ?? common?.states);
+    const label = states?.[String(st.value)];
+    if (label) return label;
+    const unit = v.unit || common?.unit;
     return formatValue(st.value, unit);
   }
 
@@ -285,6 +310,13 @@
     editing = { ...v };
     formError = "";
     leafTouched = true;
+    const common = v.stateId ? objects.get(v.stateId)?.common : undefined;
+    if (common) {
+      editing.type = variableTypeOf(common);
+      if (editing.type === "multistate") {
+        editing.states = normalizeStates(common.states) ?? editing.states;
+      }
+    }
     if (v.kind === "state" && stateExists(v.stateId)) {
       stateMode = "existing";
     } else {
@@ -309,9 +341,13 @@
   function pickState(id: string) {
     if (!editing || !id) return;
     editing.stateId = id;
-    editing.type = String(objects.get(id)?.common?.type ?? "mixed");
-    if (!editing.unit)
-      editing.unit = String(objects.get(id)?.common?.unit ?? "");
+    const common = objects.get(id)?.common;
+    editing.type = variableTypeOf(common);
+    editing.states =
+      editing.type === "multistate"
+        ? normalizeStates(common?.states)
+        : undefined;
+    if (!editing.unit) editing.unit = String(common?.unit ?? "");
     stateMode = "existing";
     picking = false;
   }
@@ -323,6 +359,28 @@
       leaf = editing.name;
       leafTouched = false;
     }
+  }
+
+  let newStateValue = $state("");
+  let newStateLabel = $state("");
+
+  function setStateLabel(value: string, label: string): void {
+    if (!editing) return;
+    editing.states = { ...(editing.states ?? {}), [value]: label };
+  }
+
+  function removeStateLabel(value: string): void {
+    if (!editing) return;
+    const next = { ...(editing.states ?? {}) };
+    delete next[value];
+    editing.states = Object.keys(next).length ? next : undefined;
+  }
+
+  function addStateLabel(): void {
+    if (!editing || !newStateValue.trim()) return;
+    setStateLabel(newStateValue.trim(), newStateLabel);
+    newStateValue = "";
+    newStateLabel = "";
   }
 
   async function save() {
@@ -700,6 +758,11 @@
                       <option value="string">Text</option>
                       <option value="number">Number</option>
                       <option value="boolean">True / false</option>
+                      <option value="multistate">Multistate</option>
+                      <option value="json">JSON</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="object">Object</option>
+                      <option value="array">Array</option>
                     </select></label
                   >
 
@@ -759,6 +822,66 @@
                       <code>0_userdata.0</code>) to keep it.
                     {/if}
                   </p>
+                {/if}
+
+                {#if editing.type === "multistate"}
+                  <div class="value-labels">
+                    <span class="label-mono">Values (value → label)</span>
+                    {#each Object.entries(editing.states ?? {}) as [value, label] (value)}
+                      <div class="state-row">
+                        <input
+                          class="mono label-value"
+                          type="text"
+                          {value}
+                          aria-label={`Value ${value}`}
+                          onchange={(e) => {
+                            const next = e.currentTarget.value.trim();
+                            if (!next || next === value) return;
+                            removeStateLabel(value);
+                            setStateLabel(next, label);
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={label}
+                          aria-label={`Label for ${value}`}
+                          oninput={(e) =>
+                            setStateLabel(value, e.currentTarget.value)}
+                        />
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          title="Remove"
+                          aria-label={`Remove state ${value}`}
+                          onclick={() => removeStateLabel(value)}
+                        >
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </div>
+                    {/each}
+                    <div class="state-row">
+                      <input
+                        class="mono label-value"
+                        type="text"
+                        placeholder="value"
+                        bind:value={newStateValue}
+                      />
+                      <input
+                        type="text"
+                        placeholder="label"
+                        bind:value={newStateLabel}
+                      />
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        title="Add"
+                        aria-label="Add state label"
+                        onclick={addStateLabel}
+                      >
+                        <span class="material-symbols-outlined">add</span>
+                      </button>
+                    </div>
+                  </div>
                 {/if}
               {/if}
 
@@ -955,6 +1078,24 @@
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
+  }
+
+  .value-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--surface-container-low);
+  }
+
+  .value-labels .label-value {
+    flex: 0 0 6rem;
+  }
+
+  .value-labels input:not(.label-value) {
+    flex: 1 1 auto;
   }
 
   /* The fixed `Variables.` prefix of an iHome state: visible, not editable. */
