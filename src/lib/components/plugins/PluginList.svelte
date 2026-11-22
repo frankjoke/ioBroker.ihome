@@ -21,6 +21,7 @@
     busy = false,
     onToggle,
     onselect,
+    onEditCollection,
     initialOpenId = "",
   }: {
     plugins: PluginView[];
@@ -32,6 +33,8 @@
     ) => void;
     /** Reports the unfolded plugin (or null) so the page can remember it. */
     onselect?: (id: string | null) => void;
+    /** Opens the capture wizard for a collection plugin. */
+    onEditCollection?: (id: string) => void;
     /** The plugin that was open on the last visit, when it still exists. */
     initialOpenId?: string;
   } = $props();
@@ -277,6 +280,7 @@
             {plugin}
             bind:dirty={editorDirty}
             bind:valid={editorValid}
+            {onEditCollection}
             onSaved={() => {
               selectedId = "";
               resetDraft();

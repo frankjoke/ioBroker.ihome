@@ -10,13 +10,15 @@
   import { resolveVariable } from "$lib/config/variables";
   import { readMetaText } from "$lib/config/meta-files";
   import { unwrapPluginReply } from "$lib/config/plugin-call";
-  import { installPlugin } from "$lib/stores/plugins.svelte";
+  import { installPlugin, applyCollection } from "$lib/stores/plugins.svelte";
+  import CollectionConflicts from "./CollectionConflicts.svelte";
   import { validPluginId } from "$adapter/plugin-ops";
   import {
     collectionTileDefinition,
     suggestCollectionStates,
   } from "$lib/config/collection-capture";
   import type { PluginView } from "$adapter/plugin-admin";
+  import type { CollectionConflict } from "$adapter/plugin-collection";
   import type { Template } from "$lib/types/display";
   import type { LogicDef } from "$logic/types";
 
@@ -52,6 +54,7 @@
   let extraState = $state("");
   let error = $state("");
   let busy = $state(false);
+  let conflicts = $state<CollectionConflict[]>([]);
 
   const selectedLogics = $derived(
     logics.filter((logic) => logicIds.includes(logic.id)),
@@ -194,7 +197,11 @@
         },
       });
       unwrapPluginReply(reply);
-      await installPlugin(id);
+      const applied = await installPlugin(id);
+      if (applied.length > 0) {
+        conflicts = applied;
+        return;
+      }
       onSaved();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -416,6 +423,21 @@
     </div>
   </div>
 </div>
+
+{#if conflicts.length}
+  <CollectionConflicts
+    {conflicts}
+    onCancel={() => (conflicts = [])}
+    onOverwrite={() => {
+      conflicts = [];
+      void applyCollection(id, true)
+        .then(() => onSaved())
+        .catch((failure) => {
+          error = failure instanceof Error ? failure.message : String(failure);
+        });
+    }}
+  />
+{/if}
 
 <style>
   .modal {

@@ -2,10 +2,12 @@ import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { unwrapPluginReply } from "$lib/config/plugin-call";
 import type { PluginPatch, PluginView } from "$adapter/plugin-admin";
 import type { ImportedPlugin, PluginFile } from "$adapter/plugin-file";
+import type { CollectionConflict } from "$adapter/plugin-collection";
 
 interface PluginsResult {
   plugins: PluginView[];
   restartRequired?: string[];
+  collection?: { id: string; conflicts: CollectionConflict[] };
 }
 
 let plugins = $state<PluginView[]>([]);
@@ -91,10 +93,25 @@ export async function reloadPlugin(id: string): Promise<void> {
 }
 
 /** The folder was written by the page; add or refresh its runtime entry. */
-export async function installPlugin(id: string): Promise<void> {
+export async function installPlugin(id: string): Promise<CollectionConflict[]> {
   const result = await command<PluginsResult>("install", { id });
   plugins = result.plugins;
   bumpVersion();
+  return result.collection?.conflicts ?? [];
+}
+
+/** Retry a collection update after the user accepted overwriting conflicts. */
+export async function applyCollection(
+  id: string,
+  overwrite = false,
+): Promise<CollectionConflict[]> {
+  const result = await command<PluginsResult>("collection.apply", {
+    id,
+    overwrite,
+  });
+  plugins = result.plugins;
+  bumpVersion();
+  return result.collection?.conflicts ?? [];
 }
 
 /** Drop the runtime entry; the caller removes the folder. */

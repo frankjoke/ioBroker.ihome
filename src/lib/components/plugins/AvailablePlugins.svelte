@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import CollectionConflicts from "./CollectionConflicts.svelte";
   import { parsePluginFile } from "$adapter/plugin-file";
   import { BUILTIN_PLUGINS } from "$adapter/plugin-ops";
   import { writePluginFiles } from "$lib/config/plugin-storage";
@@ -13,9 +14,11 @@
   import {
     getPlugins,
     installPlugin,
+    applyCollection,
     loadPlugins,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
+  import type { CollectionConflict } from "$adapter/plugin-collection";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 
   let entries = $state<PluginCatalogEntry[]>([]);
@@ -23,6 +26,10 @@
   let error = $state("");
   let busy = $state("");
   let pending = $state<PluginCatalogEntry | null>(null);
+  let conflicts = $state<{
+    id: string;
+    list: CollectionConflict[];
+  } | null>(null);
 
   const installed = $derived(new Set(getPlugins().map((plugin) => plugin.id)));
   /** Installed state is only trustworthy once the plugin list has arrived. */
@@ -83,7 +90,11 @@
       // The folder is the truth: write it first, then the adapter adds the
       // disabled runtime entry and reads the files back.
       await writePluginFiles(plugin);
-      await installPlugin(plugin.id);
+      const installedConflicts = await installPlugin(plugin.id);
+      if (installedConflicts.length > 0) {
+        conflicts = { id: plugin.id, list: installedConflicts };
+        return;
+      }
       if (plugin.settings || plugin.timeoutMs !== undefined) {
         await savePlugin({
           id: plugin.id,
@@ -148,6 +159,23 @@
     <p class="hint text-danger">{error}</p>
   {/if}
 </section>
+
+{#if conflicts}
+  <CollectionConflicts
+    conflicts={conflicts.list}
+    onCancel={() => (conflicts = null)}
+    onOverwrite={() => {
+      const id = conflicts?.id;
+      conflicts = null;
+      if (!id) return;
+      void applyCollection(id, true)
+        .then(() => loadPlugins())
+        .catch((failure) => {
+          error = failure instanceof Error ? failure.message : String(failure);
+        });
+    }}
+  />
+{/if}
 
 {#if pending}
   <ConfirmModal

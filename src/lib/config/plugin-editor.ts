@@ -33,6 +33,15 @@ export function pluginEditorTabs(plugin: PluginView): PluginEditorTab[] {
             hint: "Templates and snippets this plugin offers",
           },
         ]),
+    ...(plugin.collection
+      ? [
+          {
+            id: "collection",
+            label: "Collection",
+            hint: "States, logic and tiles this plugin owns",
+          },
+        ]
+      : []),
     ...(plugin.hasCode && !plugin.builtin
       ? [{ id: "code", label: "Code", hint: "Plugin code and file state" }]
       : []),

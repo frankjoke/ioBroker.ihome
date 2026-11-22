@@ -188,6 +188,12 @@
         onToggle={toggle}
         initialOpenId={savedView?.openId ?? ""}
         onselect={(id) => patchView("/plugins", { openId: id })}
+        onEditCollection={(id) => {
+          const entry = plugins.find((item) => item.id === id);
+          if (!entry) return;
+          wizardPlugin = entry;
+          wizardOpen = true;
+        }}
       />
     {/if}
 

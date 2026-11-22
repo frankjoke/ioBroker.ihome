@@ -35,11 +35,13 @@
     dirty = $bindable(false),
     valid = $bindable(true),
     onSaved,
+    onEditCollection,
   }: {
     plugin: PluginView;
     dirty?: boolean;
     valid?: boolean;
     onSaved: () => void;
+    onEditCollection?: (id: string) => void;
   } = $props();
 
   // Drafts: the page keys this editor by plugin id, so one initial read is
@@ -71,6 +73,11 @@
   let initialContributions = $state<string | null>(null);
   let contributionsError = $state("");
   let copiedSnippet = $state("");
+  let collectionItems = $state<{
+    states: string[];
+    logics: string[];
+    tiles: string[];
+  } | null>(null);
   // The code is read once per plugin; a list refresh must not replace a draft.
   let readFor = "";
 
@@ -128,6 +135,35 @@
           if (raw.contributions && typeof raw.contributions === "object") {
             value = JSON.stringify(raw.contributions, null, 2);
           }
+          const owned = raw.collection as
+            | {
+                states?: { id?: unknown }[];
+                logics?: { id?: unknown }[];
+              }
+            | undefined;
+          collectionItems = owned
+            ? {
+                states: (owned.states ?? [])
+                  .map((entry) => String(entry.id ?? ""))
+                  .filter(Boolean),
+                logics: (owned.logics ?? [])
+                  .map((entry) => String(entry.id ?? ""))
+                  .filter(Boolean),
+                tiles: Array.isArray(
+                  (
+                    raw.contributions as
+                      { tiles?: { id?: unknown }[] } | undefined
+                  )?.tiles,
+                )
+                  ? (
+                      (raw.contributions as { tiles?: { id?: unknown }[] })
+                        .tiles ?? []
+                    )
+                      .map((entry) => String(entry.id ?? ""))
+                      .filter(Boolean)
+                  : [],
+              }
+            : null;
         } catch {
           value = "";
         }
@@ -471,6 +507,40 @@
       plugin offers. The adapter validates ids, sizes and the envelope when you
       save; applying a template creates your own copy.
     </p>
+  {:else if activeTab === "collection"}
+    <p class="hint text-muted">
+      This plugin owns {plugin.collection?.states ?? 0} state(s),
+      {plugin.collection?.logics ?? 0} logic and
+      {plugin.collection?.tiles ?? 0} tile(s). The plugin lifecycle enables and disables
+      the owned logic; state values are never captured.
+    </p>
+    {#if collectionItems}
+      {#if collectionItems.states.length}
+        <p class="label-mono">States</p>
+        <p class="hint text-muted mono">{collectionItems.states.join(", ")}</p>
+      {/if}
+      {#if collectionItems.logics.length}
+        <p class="label-mono">Logic</p>
+        <p class="hint text-muted mono">{collectionItems.logics.join(", ")}</p>
+      {/if}
+      {#if collectionItems.tiles.length}
+        <p class="label-mono">Tiles</p>
+        <p class="hint text-muted mono">{collectionItems.tiles.join(", ")}</p>
+      {/if}
+    {:else}
+      <p class="hint text-muted">The plugin manifest is unreadable.</p>
+    {/if}
+    <div class="collection-actions">
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        disabled={busy}
+        onclick={() => onEditCollection?.(plugin.id)}
+      >
+        Save as new version
+      </button>
+      <a class="btn btn-sm" href="#/logic">Open Logic</a>
+    </div>
   {:else if activeTab === "code" && !plugin.builtin}
     <label class="field">
       <span class="label-mono">Code (JavaScript)</span>
@@ -548,6 +618,12 @@
   .restart {
     margin: 0;
     color: var(--warning-color);
+  }
+
+  .collection-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .restart a {

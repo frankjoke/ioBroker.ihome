@@ -2,8 +2,12 @@
   import {
     importPlugin,
     installPlugin,
+    applyCollection,
+    loadPlugins,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
+  import CollectionConflicts from "./CollectionConflicts.svelte";
+  import type { CollectionConflict } from "$adapter/plugin-collection";
   import { writePluginFiles } from "$lib/config/plugin-storage";
   import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { NUT_EXAMPLE } from "$lib/config/plugin-examples";
@@ -21,6 +25,10 @@
   let error = $state("");
   let warnings = $state<string[]>([]);
   let busy = $state(false);
+  let conflicts = $state<{
+    id: string;
+    list: CollectionConflict[];
+  } | null>(null);
 
   function contributionCount(value: ImportedPlugin): number {
     return Object.values(value.contributions ?? {}).reduce(
@@ -61,7 +69,11 @@
         // The folder is the truth: write it first, then let the adapter add
         // the disabled runtime entry and read the files back.
         await writePluginFiles(plugin);
-        await installPlugin(plugin.id);
+        const installedConflicts = await installPlugin(plugin.id);
+        if (installedConflicts.length > 0) {
+          conflicts = { id: plugin.id, list: installedConflicts };
+          return;
+        }
         if (plugin.settings || plugin.timeoutMs !== undefined) {
           await savePlugin({
             id: plugin.id,
@@ -179,6 +191,24 @@
     </div>
   </div>
 </div>
+
+{#if conflicts}
+  <CollectionConflicts
+    conflicts={conflicts.list}
+    onCancel={() => (conflicts = null)}
+    onOverwrite={() => {
+      const id = conflicts?.id;
+      conflicts = null;
+      if (!id) return;
+      void applyCollection(id, true)
+        .then(() => loadPlugins())
+        .then(() => onImported())
+        .catch((failure) => {
+          error = failure instanceof Error ? failure.message : String(failure);
+        });
+    }}
+  />
+{/if}
 
 <style>
   .modal {
