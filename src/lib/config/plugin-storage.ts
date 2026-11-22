@@ -12,6 +12,7 @@ import {
   type SettingsTabDef,
 } from "$adapter/plugin-ops";
 import type { ImportedPlugin } from "$adapter/plugin-file";
+import type { PluginCollection } from "$adapter/plugin-collection-types";
 import {
   META_ADAPTER,
   deleteMetaFile,
@@ -60,6 +61,7 @@ interface StoredManifest {
   settingsSchema?: PluginSettingDef[];
   settingsTabs?: SettingsTabDef[];
   contributions?: PluginContributions;
+  collection?: PluginCollection;
 }
 
 /** Rewrite the manifest fields the editor owns; code and contributions stay. */
@@ -101,6 +103,7 @@ export async function savePluginManifest(
       : {}),
     ...(current.settingsTabs ? { settingsTabs: current.settingsTabs } : {}),
     ...(contributions ? { contributions } : {}),
+    ...(current.collection ? { collection: current.collection } : {}),
   });
   await verifiedWrite(META_ADAPTER, path, JSON.stringify(manifest, null, 2));
 }
