@@ -100,6 +100,8 @@ export function adminPageUrl(sources: {
   hostPort?: string;
   brokerUrl?: string | null;
   cloudHost?: string;
+  /** The configured admin port, read from `system.adapter.admin.0`. */
+  adminPort?: number;
   protocol: string;
   host: string;
   tab?: string;
@@ -133,7 +135,14 @@ export function adminPageUrl(sources: {
   }
   const stored = (sources.hostPort ?? "").trim();
   const brokerHost = /^[a-z]+:\/\/([^/]+)/i.exec(brokerUrl)?.[1];
-  const authority = stored || `${hostnameOf(brokerHost || sources.host)}:8081`;
+  const port =
+    Number.isInteger(sources.adminPort) &&
+    (sources.adminPort ?? 0) > 0 &&
+    (sources.adminPort ?? 0) < 65536
+      ? sources.adminPort
+      : 8081;
+  const authority =
+    stored || `${hostnameOf(brokerHost || sources.host)}:${port}`;
   return `${secure ? "https" : "http"}://${authority}/${hash}`;
 }
 

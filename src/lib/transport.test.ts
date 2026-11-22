@@ -230,6 +230,25 @@ it("derives the admin host from the broker, on the admin port", () => {
   ).toBe("http://host:8081/#tab-overview");
 });
 
+it("uses the configured admin port and the page host", () => {
+  expect(
+    adminPageUrl({
+      protocol: "http:",
+      host: "192.168.178.22:18082",
+      adminPort: 18081,
+    }),
+  ).toBe("http://192.168.178.22:18081/#tab-overview");
+  // A stored Host:Port still wins.
+  expect(
+    adminPageUrl({
+      hostPort: "10.0.0.5:8085",
+      protocol: "http:",
+      host: "192.168.178.22:18082",
+      adminPort: 18081,
+    }),
+  ).toBe("http://10.0.0.5:8085/#tab-overview");
+});
+
 it("uses the proxied admin path on a cloud host", () => {
   expect(
     adminPageUrl({

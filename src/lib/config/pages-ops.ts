@@ -308,19 +308,14 @@ export const SEED_HOME_HTML = `<!doctype html>
   a { color: #4a9eff; text-decoration: none; }
   a:hover { text-decoration: underline; }
 </style>
-<script>
-  function go(path) {
-    parent.location.hash = path;
-  }
-</script>
 </head>
 <body>
   <h2>Welcome to iHome</h2>
   <p>This page is yours. A few ways to start:</p>
   <ul>
-    <li><a href="#" onclick="go('#/templates'); return false">Templates</a> — apply a ready-made tile.</li>
-    <li><a href="#" onclick="go('#/devices'); return false">Devices</a> — add a state or device.</li>
-    <li><a href="#" onclick="go('#/logic'); return false">Logic</a> — automate it.</li>
+    <li><a href="#/templates" target="_top">Templates</a> — apply a ready-made tile.</li>
+    <li><a href="#/devices" target="_top">Devices</a> — add a state or device.</li>
+    <li><a href="#/logic" target="_top">Logic</a> — automate it.</li>
     <li>Use the pencil in the top bar to edit this page and add tiles.</li>
   </ul>
 </body>

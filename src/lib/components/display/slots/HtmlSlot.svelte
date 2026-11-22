@@ -60,7 +60,7 @@
     class="html-slot"
     srcdoc={html}
     title={slot.label || "HTML"}
-    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation"
   ></iframe>
 {:else}
   <p class="empty text-muted">No HTML set — edit the slot in the pane.</p>

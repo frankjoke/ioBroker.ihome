@@ -17,6 +17,16 @@
     return tab === "objects" || tab === "enums" ? tab : "overview";
   }
 
+  /** The configured admin port, so a non-default admin instance still opens
+   *  from the host this page was served from. */
+  const adminPort = $derived(
+    Number(
+      (ioBroker.objects as unknown as Map<string, any>).get(
+        "system.adapter.admin.0",
+      )?.native?.port,
+    ) || undefined,
+  );
+
   /** The stored Host:Port may hold an unsaved edit; when it is empty the live
    *  broker address decides where the admin UI is. */
   const url = $derived(
@@ -24,6 +34,7 @@
       hostPort: storage.hostPort,
       brokerUrl: ioBroker.brokerUrl,
       cloudHost: storage.cloudHost,
+      adminPort,
       protocol: typeof location === "undefined" ? "http:" : location.protocol,
       host: typeof location === "undefined" ? "" : location.host,
       tab: adminTab(),
