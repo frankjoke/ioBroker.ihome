@@ -283,53 +283,83 @@ export function toFilterable<
   };
 }
 
-/** One group id per enum id, stable across re-seeds. */
-function groupId(prefix: string, id: string): string {
-  return `${prefix}:${id}`;
-}
-
 /**
- * The first-run page set: a room page (rooms lead — `Device.room` is populated,
- * while `Device.functions` is a new field nothing has filled yet) and a function
- * page. Both use filters, so a device added later appears without touching the
- * pages.
+ * The first-run page set: one Home page with a getting-started tile. Rooms and
+ * functions are not seeded automatically — a fresh install should open on a
+ * page the user can shape, not on generated sections that may not match how
+ * they organise their devices.
  */
-export function seedPages(
-  functions: { id: string; label: string }[],
-  rooms: { id: string; label: string }[],
-): PageRegistry {
-  const pages: Page[] = [];
-  if (rooms.length) {
-    pages.push({
-      id: "rooms",
-      title: "Rooms",
-      icon: "meeting_room",
-      groups: rooms.map((r) => ({
-        id: groupId("room", r.id),
-        title: r.label,
-        member: { room: r.id },
-      })),
-    });
+export const SEED_HOME_HTML = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; }
+  body {
+    box-sizing: border-box;
+    padding: 12px;
+    font: 13px/1.45 system-ui, sans-serif;
+    color: #9aa0a6;
   }
-  if (functions.length) {
-    pages.push({
-      id: "home",
-      title: "Home",
-      icon: "home",
-      groups: functions.map((f) => ({
-        id: groupId("fn", f.id),
-        title: f.label,
-        member: { function: f.id },
-      })),
-    });
+  h2 { margin: 0 0 6px; font-size: 16px; color: #4a9eff; }
+  p { margin: 0 0 8px; }
+  ul { margin: 0; padding-left: 1.1rem; }
+  li { margin: 2px 0; }
+  a { color: #4a9eff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+<script>
+  function go(path) {
+    parent.location.hash = path;
   }
+</script>
+</head>
+<body>
+  <h2>Welcome to iHome</h2>
+  <p>This page is yours. A few ways to start:</p>
+  <ul>
+    <li><a href="#" onclick="go('#/templates'); return false">Templates</a> — apply a ready-made tile.</li>
+    <li><a href="#" onclick="go('#/devices'); return false">Devices</a> — add a state or device.</li>
+    <li><a href="#" onclick="go('#/logic'); return false">Logic</a> — automate it.</li>
+    <li>Use the pencil in the top bar to edit this page and add tiles.</li>
+  </ul>
+</body>
+</html>`;
+
+export function seedPages(): PageRegistry {
   return {
     version: 0,
     updatedAt: Date.now(),
     seeded: true,
-    // Only axes that exist: an axis with no enums would seed a page that can
-    // never show a device (`Device.functions` has nothing to match).
-    pages,
+    sizeUnit: SIZE_UNIT,
+    pages: [
+      {
+        id: "home",
+        title: "Home",
+        icon: "home",
+        groups: [
+          {
+            id: "getting-started",
+            title: "Start",
+            tiles: [
+              {
+                id: "welcome",
+                tile: {
+                  size: { w: 12, h: 4 },
+                  slots: [
+                    {
+                      kind: "html",
+                      label: "Getting started",
+                      options: { html: SEED_HOME_HTML },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
   };
 }
 

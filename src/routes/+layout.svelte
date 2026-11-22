@@ -40,7 +40,6 @@
   import { initPhone } from "$lib/stores/phone.svelte";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
   import { seedPages } from "$lib/config/pages-ops";
-  import { enumLabelFromObject } from "$lib/config/rooms";
   import { applyTheme, getTheme, themeStorage } from "$lib/theme.svelte.js";
   import {
     configNeedsPin,
@@ -421,18 +420,9 @@
     })();
   });
 
-  /** The first-run page set: seeded from the broker's own room/function enums. */
+  /** The first-run page set: one Home page with a getting-started tile. */
   function seedDisplayPages() {
-    return seedPages(
-      (ioBroker.enums.getList("functions") ?? []).map((e) => ({
-        id: e._id,
-        label: enumLabelFromObject(e),
-      })),
-      (ioBroker.enums.getList("rooms") ?? []).map((e) => ({
-        id: e._id,
-        label: enumLabelFromObject(e),
-      })),
-    );
+    return seedPages();
   }
 
   $effect(() => {

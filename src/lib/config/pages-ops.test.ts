@@ -11,6 +11,7 @@ import {
   PAGE_REGISTRY_VERSION,
   resolveByMember,
   resolvePage,
+  SEED_HOME_HTML,
   seedPages,
   toFilterable,
   type FilterableDevice,
@@ -143,22 +144,22 @@ it("filters by chip", () => {
   );
 });
 
-it("seeds one page of function groups and one page of room groups", () => {
-  const reg = seedPages(
-    [{ id: "enum.functions.Licht", label: "Licht" }],
-    [{ id: "enum.rooms.WZ", label: "Wohn-Ess-Z" }],
-  );
+it("seeds one Home page with a getting-started tile", () => {
+  const reg = seedPages();
   expect(reg.seeded).toBe(true);
-  // Rooms lead: they are populated today, while `functions` on a device is a new
-  // field nobody has filled yet, so a function page would open empty.
-  expect(reg.pages.map((p) => p.id)).toEqual(["rooms", "home"]);
-  expect(reg.pages[0].groups[0].member).toEqual({ room: "enum.rooms.WZ" });
-  expect(reg.pages[0].groups[0].title).toBe("Wohn-Ess-Z");
-  expect(reg.pages[0].groups[0].id).toBe("room:enum.rooms.WZ");
-  expect(reg.pages[1].groups[0].member).toEqual({
-    function: "enum.functions.Licht",
-  });
-  expect(reg.pages[1].groups[0].title).toBe("Licht");
+  expect(reg.pages.map((p) => p.id)).toEqual(["home"]);
+  const page = reg.pages[0];
+  expect(page.title).toBe("Home");
+  expect(page.groups).toHaveLength(1);
+  const tile = page.groups[0].tiles?.[0];
+  expect(tile?.id).toBe("welcome");
+  expect(tile?.tile?.size).toEqual({ w: 12, h: 4 });
+  const html = tile?.tile?.slots?.[0]?.options?.html;
+  expect(html).toBe(SEED_HOME_HTML);
+  expect(html).toContain("#/templates");
+  expect(html).toContain("#/devices");
+  expect(html).toContain("#/logic");
+  expect(parsePageRegistry(reg)).not.toBeNull();
 });
 
 it("parses a page registry and rejects junk", () => {
@@ -239,25 +240,11 @@ it("treats a group without a member as matching nothing", () => {
   expect(matchesMember(dev({}), undefined as never)).toBe(false);
 });
 
-it("seeds only the axes that can actually render", () => {
-  const both = seedPages(
-    [{ id: "enum.functions.Licht", label: "Licht" }],
-    [{ id: "enum.rooms.WZ", label: "WZ" }],
-  );
-  expect(both.pages.map((p) => p.id)).toEqual(["rooms", "home"]);
-
-  const roomsOnly = seedPages([], [{ id: "enum.rooms.WZ", label: "WZ" }]);
-  expect(roomsOnly.pages.map((p) => p.id)).toEqual(["rooms"]);
-
-  const functionsOnly = seedPages(
-    [{ id: "enum.functions.Licht", label: "Licht" }],
-    [],
-  );
-  expect(functionsOnly.pages.map((p) => p.id)).toEqual(["home"]);
-
-  // A broker with neither axis gets no pages (the display says so honestly)
-  // rather than a page that can never show anything.
-  expect(seedPages([], []).pages).toEqual([]);
+it("does not seed generated rooms or functions pages", () => {
+  const reg = seedPages();
+  expect(reg.pages.some((p) => p.id === "rooms")).toBe(false);
+  expect(reg.pages[0].groups.some((g) => g.member)).toBe(false);
+  expect(reg.pages[0].groups[0].tiles).toHaveLength(1);
 });
 
 it("backfills device functions and favorites from the broker enums", () => {
