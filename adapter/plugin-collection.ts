@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { validateLogicDocument } from "./logic/validate";
 import type { LogicDef, LogicDocument } from "./logic/types";
+import type { AdapterPlugin } from "./plugin-ops";
 
 export const MAX_COLLECTION_STATES = 200;
 export const MAX_COLLECTION_LOGICS = 100;
@@ -208,4 +209,356 @@ export function baselineOf(value: unknown, kind: "logic" | "state"): string {
     }
   }
   return createHash("sha256").update(canonicalJson(copy)).digest("hex");
+}
+
+export interface CollectionHost {
+  getObject(id: string): Promise<Record<string, unknown> | undefined>;
+  setObject(id: string, object: Record<string, unknown>): Promise<void>;
+  deleteObject(id: string): Promise<void>;
+  readLogicDocument(): Promise<LogicDocument | null>;
+  writeLogicDocument(doc: LogicDocument): Promise<void>;
+  resolveVariable(name: string): string | undefined;
+  log(level: "info" | "warn" | "error", message: string): void;
+  /** Optional: every live object id, so dropped states can be found. */
+  listObjects?(): Promise<string[]>;
+}
+
+export interface CollectionPlugin {
+  id: string;
+  version: string;
+  collection: PluginCollection;
+}
+
+export type CollectionConflict = {
+  kind: "state" | "logic";
+  id: string;
+  reason: "conflict" | "foreign";
+};
+
+export interface CollectionReport {
+  conflicts: CollectionConflict[];
+  missing: string[];
+  droppedLogics: string[];
+  droppedStates: string[];
+}
+
+interface Inspection extends CollectionReport {
+  doc: LogicDocument;
+}
+
+const pluginMarkerOf = (value: unknown): Record<string, unknown> | undefined =>
+  plainObject(value) ? value : undefined;
+
+/** The part of a state object a manifest declaration owns. */
+function stateContent(value: Record<string, unknown>): Record<string, unknown> {
+  const native = plainObject(value.native) ? { ...value.native } : {};
+  delete native.ihomeCollection;
+  return {
+    id: value.id,
+    type: value.type,
+    common: value.common,
+    ...(Object.keys(native).length ? { native } : {}),
+  };
+}
+
+const stateBaseline = (value: Record<string, unknown>): string =>
+  baselineOf(stateContent(value), "state");
+
+function stateMarker(
+  value: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  return plainObject(value.native)
+    ? pluginMarkerOf(value.native.ihomeCollection)
+    : undefined;
+}
+
+/** A configured plugin with a version is a collection plugin. */
+export function collectionPluginOf(
+  plugin: AdapterPlugin,
+): CollectionPlugin | undefined {
+  if (!plugin.collection || !plugin.version) return undefined;
+  return {
+    id: plugin.id,
+    version: plugin.version,
+    collection: plugin.collection,
+  };
+}
+
+async function inspect(
+  host: CollectionHost,
+  plugin: CollectionPlugin,
+): Promise<Inspection> {
+  const doc = await host.readLogicDocument();
+  if (!doc) throw new Error("logic document unreadable");
+  const conflicts: CollectionConflict[] = [];
+  const missing: string[] = [];
+  const declaredStates = new Set(
+    plugin.collection.states.map((decl) => decl.id),
+  );
+  const declaredLogics = new Set(
+    plugin.collection.logics.map((decl) => decl.id),
+  );
+
+  for (const decl of plugin.collection.states) {
+    const live = await host.getObject(decl.id);
+    if (!live) {
+      missing.push(decl.id);
+      continue;
+    }
+    const marker = stateMarker(live);
+    if (!marker || marker.plugin !== plugin.id) {
+      conflicts.push({ kind: "state", id: decl.id, reason: "foreign" });
+    } else if (stateBaseline(live) !== marker.baseline) {
+      conflicts.push({ kind: "state", id: decl.id, reason: "conflict" });
+    }
+  }
+
+  const logics = doc.logics ?? [];
+  for (const decl of plugin.collection.logics) {
+    const live = logics.find((entry) => entry.id === decl.id);
+    if (!live) {
+      missing.push(decl.id);
+      continue;
+    }
+    if (!live.managed || live.managed.plugin !== plugin.id) {
+      conflicts.push({ kind: "logic", id: decl.id, reason: "foreign" });
+    } else if (baselineOf(live, "logic") !== live.managed.baseline) {
+      conflicts.push({ kind: "logic", id: decl.id, reason: "conflict" });
+    }
+  }
+
+  const droppedLogics = logics
+    .filter(
+      (entry) =>
+        entry.managed?.plugin === plugin.id && !declaredLogics.has(entry.id),
+    )
+    .map((entry) => entry.id);
+
+  const droppedStates: string[] = [];
+  if (host.listObjects) {
+    for (const id of await host.listObjects()) {
+      if (declaredStates.has(id)) continue;
+      const live = await host.getObject(id);
+      const marker = live ? stateMarker(live) : undefined;
+      if (marker?.plugin === plugin.id) droppedStates.push(id);
+    }
+  }
+
+  return {
+    doc,
+    conflicts,
+    missing,
+    droppedLogics,
+    droppedStates,
+  };
+}
+
+/** Report missing, conflicting, foreign and dropped items without writing. */
+export async function classifyCollection(
+  host: CollectionHost,
+  plugin: CollectionPlugin,
+): Promise<CollectionReport> {
+  const result = await inspect(host, plugin);
+  return {
+    conflicts: result.conflicts,
+    missing: result.missing,
+    droppedLogics: result.droppedLogics,
+    droppedStates: result.droppedStates,
+  };
+}
+
+async function ensureParentObjects(
+  host: CollectionHost,
+  id: string,
+): Promise<void> {
+  const parts = id.split(".");
+  if (parts[0] === "system") return;
+  // adapter.instance is the instance root; system objects are never created.
+  for (let index = 2; index < parts.length - 1; index += 1) {
+    const parentId = parts.slice(0, index + 1).join(".");
+    if (await host.getObject(parentId)) continue;
+    await host.setObject(parentId, {
+      id: parentId,
+      type: "folder",
+      common: { name: parts[index] },
+      native: {},
+    });
+  }
+}
+
+function same(a: unknown, b: unknown): boolean {
+  return canonicalJson(a) === canonicalJson(b);
+}
+
+/**
+ * Create or update the owned items. Conflicts and foreign items abort before
+ * any write; `sync` keeps a locally edited definition and only sets `enabled`.
+ */
+export async function applyCollection(
+  host: CollectionHost,
+  plugin: CollectionPlugin,
+  options: {
+    enabled: boolean;
+    mode: "sync" | "reconcile";
+    overwrite?: boolean;
+  },
+): Promise<{
+  applied: boolean;
+  conflicts: CollectionConflict[];
+  changed: boolean;
+}> {
+  const { doc, conflicts, droppedStates } = await inspect(host, plugin);
+  const foreign = conflicts.some((entry) => entry.reason === "foreign");
+  const conflictsBlock =
+    options.mode === "reconcile" &&
+    !options.overwrite &&
+    conflicts.some((entry) => entry.reason === "conflict");
+  if (foreign || conflictsBlock) {
+    return { applied: false, conflicts, changed: false };
+  }
+
+  let changed = false;
+
+  for (const decl of plugin.collection.states) {
+    const live = await host.getObject(decl.id);
+    if (!live) {
+      await ensureParentObjects(host, decl.id);
+      await host.setObject(decl.id, {
+        id: decl.id,
+        type: decl.type,
+        common: decl.common,
+        native: {
+          ...decl.native,
+          ihomeCollection: {
+            plugin: plugin.id,
+            version: plugin.version,
+            baseline: baselineOf(decl, "state"),
+          },
+        },
+      });
+      changed = true;
+      continue;
+    }
+    if (options.mode !== "reconcile") continue;
+    const next = {
+      ...live,
+      id: decl.id,
+      type: decl.type,
+      common: decl.common,
+      native: {
+        ...(plainObject(live.native) ? live.native : {}),
+        ...decl.native,
+        ihomeCollection: {
+          plugin: plugin.id,
+          version: plugin.version,
+          baseline: baselineOf(decl, "state"),
+        },
+      },
+    };
+    if (!same(next, live)) {
+      await host.setObject(decl.id, next);
+      changed = true;
+    }
+  }
+
+  if (options.mode === "reconcile") {
+    for (const id of droppedStates) {
+      const live = await host.getObject(id);
+      if (!live || !plainObject(live.native)) continue;
+      const native = { ...live.native };
+      delete native.ihomeCollection;
+      const next: Record<string, unknown> = { ...live, native };
+      if (Object.keys(native).length === 0) delete next.native;
+      await host.setObject(id, next);
+      changed = true;
+    }
+  }
+
+  const declared = new Set(plugin.collection.logics.map((entry) => entry.id));
+  const logics = (doc.logics ?? []).filter(
+    (entry) =>
+      options.mode !== "reconcile" ||
+      entry.managed?.plugin !== plugin.id ||
+      declared.has(entry.id),
+  );
+  const removed = logics.length !== (doc.logics ?? []).length;
+  changed = changed || removed;
+
+  for (const decl of plugin.collection.logics) {
+    const index = logics.findIndex((entry) => entry.id === decl.id);
+    if (index < 0) {
+      logics.push({
+        ...decl,
+        enabled: options.enabled,
+        managed: {
+          plugin: plugin.id,
+          version: plugin.version,
+          baseline: baselineOf(decl, "logic"),
+        },
+      });
+      changed = true;
+      continue;
+    }
+    if (options.mode === "sync") {
+      if (logics[index].enabled !== options.enabled) {
+        logics[index] = { ...logics[index], enabled: options.enabled };
+        changed = true;
+      }
+      continue;
+    }
+    const next = {
+      ...decl,
+      enabled: options.enabled,
+      managed: {
+        plugin: plugin.id,
+        version: plugin.version,
+        baseline: baselineOf(decl, "logic"),
+      },
+    } as LogicDef;
+    const before = logics[index];
+    if (
+      before.name !== next.name ||
+      before.kind !== next.kind ||
+      baselineOf(before, "logic") !== baselineOf(next, "logic") ||
+      before.enabled !== next.enabled ||
+      !same(before.managed, next.managed)
+    ) {
+      logics[index] = next;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await host.writeLogicDocument({ ...doc, logics });
+  }
+  return { applied: true, conflicts, changed };
+}
+
+/** Remove the owned logic; states stay (and keep their marker) unless asked. */
+export async function removeCollection(
+  host: CollectionHost,
+  plugin: CollectionPlugin,
+  options: { removeStates: boolean },
+): Promise<{ changed: boolean }> {
+  const doc = await host.readLogicDocument();
+  if (!doc) throw new Error("logic document unreadable");
+  const logics = (doc.logics ?? []).filter(
+    (entry) => entry.managed?.plugin !== plugin.id,
+  );
+  let changed = logics.length !== (doc.logics ?? []).length;
+
+  if (options.removeStates) {
+    for (const decl of plugin.collection.states) {
+      const live = await host.getObject(decl.id);
+      if (live && stateMarker(live)?.plugin === plugin.id) {
+        await host.deleteObject(decl.id);
+        changed = true;
+      }
+    }
+  }
+
+  if (logics.length !== (doc.logics ?? []).length) {
+    await host.writeLogicDocument({ ...doc, logics });
+  }
+  return { changed };
 }
