@@ -79,6 +79,9 @@
       (id) => !id.startsWith("$") && !suggestions.some((row) => row.id === id),
     ),
   );
+  const selectedTiles = $derived(
+    tileChoices.filter((tile) => tileIds.includes(tile.id)),
+  );
   const steps = ["Basics", "Logic", "States", "Tiles", "Review"];
 
   function nextVersion(value: string | undefined): string {
@@ -404,11 +407,40 @@
         <p>
           {logicIds.length} logic · {stateIds.length} states · {tileIds.length} tiles
         </p>
+        {#if logicIds.length}
+          <div class="summary-badges">
+            <span class="label-mono">Logic</span>
+            {#each logicIds as logicId (logicId)}
+              <span class="badge" title={logicId}
+                >{logics.find((logic) => logic.id === logicId)?.name ??
+                  logicId}</span
+              >
+            {/each}
+          </div>
+        {/if}
         {#if stateIds.length}
-          <p class="hint text-muted mono">{stateIds.join(", ")}</p>
+          <div class="summary-badges">
+            <span class="label-mono">States</span>
+            {#each stateIds as stateId (stateId)}
+              <span class="badge mono" title={stateId}>{stateId}</span>
+            {/each}
+          </div>
         {/if}
         {#if uses.length}
-          <p class="hint text-muted">Uses: {uses.join(", ")}</p>
+          <div class="summary-badges">
+            <span class="label-mono">Uses</span>
+            {#each uses as stateId (stateId)}
+              <span class="badge mono" title={stateId}>{stateId}</span>
+            {/each}
+          </div>
+        {/if}
+        {#if selectedTiles.length}
+          <div class="summary-badges">
+            <span class="label-mono">Tiles</span>
+            {#each selectedTiles as tile (tile.id)}
+              <span class="badge" title={tile.id}>{tile.name}</span>
+            {/each}
+          </div>
         {/if}
         <p class="warning-banner">
           Saving claims the selected items for this plugin. Logic runs while the
@@ -591,6 +623,19 @@
 
   .state-chip .material-symbols-outlined {
     font-size: 1rem;
+  }
+
+  .summary-badges {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.25rem 0;
+  }
+
+  .summary-badges .badge {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .review p {

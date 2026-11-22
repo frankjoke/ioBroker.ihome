@@ -76,7 +76,7 @@
   let collectionItems = $state<{
     states: string[];
     logics: string[];
-    tiles: string[];
+    tiles: { id: string; name: string }[];
     uses: string[];
   } | null>(null);
   let collectionLoading = $state(false);
@@ -173,12 +173,22 @@
           }
         | undefined;
       const tiles = Array.isArray(
-        (raw.contributions as { tiles?: { id?: unknown }[] } | undefined)
-          ?.tiles,
+        (
+          raw.contributions as
+            { tiles?: { id?: unknown; name?: unknown }[] } | undefined
+        )?.tiles,
       )
-        ? ((raw.contributions as { tiles?: { id?: unknown }[] }).tiles ?? [])
-            .map((entry) => String(entry.id ?? ""))
-            .filter(Boolean)
+        ? (
+            (
+              raw.contributions as
+                { tiles?: { id?: unknown; name?: unknown }[] } | undefined
+            ).tiles ?? []
+          )
+            .map((entry) => ({
+              id: String(entry.id ?? ""),
+              name: typeof entry.name === "string" ? entry.name : "",
+            }))
+            .filter((entry) => entry.id)
         : [];
       collectionItems = owned
         ? {
@@ -551,19 +561,35 @@
     {:else if collectionItems}
       {#if collectionItems.states.length}
         <p class="label-mono">States</p>
-        <p class="hint text-muted mono">{collectionItems.states.join(", ")}</p>
+        <div class="collection-badges">
+          {#each collectionItems.states as stateId (stateId)}
+            <span class="badge mono" title={stateId}>{stateId}</span>
+          {/each}
+        </div>
       {/if}
       {#if collectionItems.logics.length}
         <p class="label-mono">Logic</p>
-        <p class="hint text-muted mono">{collectionItems.logics.join(", ")}</p>
+        <div class="collection-badges">
+          {#each collectionItems.logics as logicId (logicId)}
+            <span class="badge mono" title={logicId}>{logicId}</span>
+          {/each}
+        </div>
       {/if}
       {#if collectionItems.uses.length}
         <p class="label-mono">Uses</p>
-        <p class="hint text-muted mono">{collectionItems.uses.join(", ")}</p>
+        <div class="collection-badges">
+          {#each collectionItems.uses as stateId (stateId)}
+            <span class="badge mono" title={stateId}>{stateId}</span>
+          {/each}
+        </div>
       {/if}
       {#if collectionItems.tiles.length}
         <p class="label-mono">Tiles</p>
-        <p class="hint text-muted mono">{collectionItems.tiles.join(", ")}</p>
+        <div class="collection-badges">
+          {#each collectionItems.tiles as tile (tile.id)}
+            <span class="badge" title={tile.id}>{tile.name || tile.id}</span>
+          {/each}
+        </div>
       {/if}
     {:else}
       <p class="hint text-muted">The plugin manifest is unreadable.</p>
@@ -662,6 +688,17 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .collection-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .collection-badges .badge {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .restart a {
