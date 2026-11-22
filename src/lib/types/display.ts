@@ -330,6 +330,9 @@ export interface Slot {
   /** Template-only: the state this role was captured from. Applying the
    *  template pre-binds the row when that state still exists. */
   origin?: string;
+  /** Show the value but ignore writes on the tile and its detail page, even
+   *  when the state is writable. */
+  readonly?: boolean;
 }
 
 export interface Template {

@@ -142,10 +142,24 @@
   /** The tile as configured: its slots carry the sources the rules name. */
   const rawTile = $derived(tile ?? placement?.tile);
 
-  /** Hidden controls are not part of the tile at all. */
-  const shownControls = $derived(
-    (device.controls ?? []).filter((c) => !c.hidden),
-  );
+  /** Hidden controls are not part of the tile at all. A read-only slot still
+   *  shows its reading but loses write access, including the tile tap. */
+  const shownControls = $derived.by(() => {
+    const controls = (device.controls ?? []).filter((c) => !c.hidden);
+    const locked = new Set(
+      (workingTile?.slots ?? [])
+        .filter(
+          (slot) => slot.readonly === true && typeof slot.source === "string",
+        )
+        .map((slot) => resolveControl(controls, slot.source as string))
+        .filter((control): control is EnrichedControl => !!control),
+    );
+    return locked.size === 0
+      ? controls
+      : controls.map((control) =>
+          locked.has(control) ? { ...control, writable: false } : control,
+        );
+  });
 
   const span = $derived(clampSpan(workingTile?.size ?? { w: 2, h: 2 }, bp));
   /** What the grid actually gives it — never more columns than the section has. */

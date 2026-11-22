@@ -283,7 +283,10 @@ export function tileParts(
     )
     .map((r) => ({
       slot: r.slot,
-      control: r.control,
+      control:
+        r.slot.readonly === true && r.control
+          ? { ...r.control, writable: false }
+          : r.control,
       style: styleOf(r.slot, r.control),
     }));
   const rows = resolvedRows.filter((r) => r.style.hidden !== true);
@@ -310,7 +313,10 @@ export function tileParts(
     )
     .map((r) => ({
       slot: r.slot,
-      control: r.control,
+      control:
+        r.slot.readonly === true && r.control
+          ? { ...r.control, writable: false }
+          : r.control,
       style: {},
     }))
     .filter((r) => inDetail(r.slot));

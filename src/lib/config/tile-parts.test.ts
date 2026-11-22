@@ -176,6 +176,36 @@ it("a writable state source yields a switch row", () => {
   });
 });
 
+it("a read-only slot keeps its reading but loses write access", () => {
+  const stateId = "0_userdata.0.x";
+  const resolution = resolveTile(
+    {
+      slots: [
+        {
+          kind: "switch",
+          source: { kind: "state", stateId },
+          readonly: true,
+          detail: "full",
+        },
+      ],
+    },
+    "Lamp",
+    {
+      states: new Map([[stateId, { val: false }]]),
+      objects: new Map([
+        [stateId, { common: { name: "Lamp", type: "boolean", write: true } }],
+      ]),
+    },
+  );
+  const parts = tileParts(resolution.device, resolution.tile, none);
+  expect(parts.rows[0].control).toMatchObject({
+    widget: "switch",
+    writable: false,
+    liveValue: false,
+  });
+  expect(parts.modal[0].control).toMatchObject({ writable: false });
+});
+
 it("a blank tile does not inherit the preset chain", () => {
   const parts = tileParts(blankDevice(), undefined, []);
   expect(parts.slots).toEqual([]);

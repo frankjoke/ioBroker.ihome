@@ -415,6 +415,15 @@
     "history-list",
   ];
 
+  /** Kinds that can write a state; only they get the read-only switch. */
+  const WRITABLE_KINDS: SlotKind[] = [
+    "switch",
+    "level",
+    "color",
+    "enum",
+    "button",
+  ];
+
   /** The three homes a slot can have (A34), in click order, and their icons. */
   const WHERE_GLYPH = {
     tile: "crop_square",
@@ -2566,6 +2575,26 @@
                           onCycle={() => cycleValueWhere(i, slot)}
                         />
                       </span>
+                    {/if}
+                    {#if WRITABLE_KINDS.includes(slot.kind)}
+                      <label
+                        class="check"
+                        title="Show the value but ignore taps and drags on the tile and in the detail page, even when the state is writable"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={slot.readonly === true}
+                          onchange={(e) =>
+                            edit((t) =>
+                              patchSlot(t, i, {
+                                readonly: e.currentTarget.checked
+                                  ? true
+                                  : undefined,
+                              }),
+                            )}
+                        />
+                        <span>Read-only</span>
+                      </label>
                     {/if}
                   </div>
                   {#if slot.icon && slot.icon.enabled !== false && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
