@@ -465,7 +465,7 @@
   .check {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.2rem;
     font-size: var(--label-mono-size);
     cursor: pointer;
   }

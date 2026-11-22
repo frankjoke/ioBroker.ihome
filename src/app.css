@@ -316,7 +316,10 @@ button {
   display: inline-flex;
   align-items: center;
   flex-direction: row-reverse;
-  gap: 0.4rem;
+  /* The box hugs its own label; the removed space separates the groups to its
+     right, so a box is never equidistant between two labels. */
+  gap: 0.2rem;
+  margin-inline-end: 0.2rem;
   font-family: var(--font-family);
   font-size: var(--label-mono-size);
   font-weight: 500;

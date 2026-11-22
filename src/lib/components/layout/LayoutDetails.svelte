@@ -2574,27 +2574,27 @@
                           active={valueWhereOf(slot) !== "both"}
                           onCycle={() => cycleValueWhere(i, slot)}
                         />
+                        {#if WRITABLE_KINDS.includes(slot.kind)}
+                          <label
+                            class="check"
+                            title="Show the value but ignore taps and drags on the tile and in the detail page, even when the state is writable"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={slot.readonly === true}
+                              onchange={(e) =>
+                                edit((t) =>
+                                  patchSlot(t, i, {
+                                    readonly: e.currentTarget.checked
+                                      ? true
+                                      : undefined,
+                                  }),
+                                )}
+                            />
+                            <span>Read-only</span>
+                          </label>
+                        {/if}
                       </span>
-                    {/if}
-                    {#if WRITABLE_KINDS.includes(slot.kind)}
-                      <label
-                        class="check"
-                        title="Show the value but ignore taps and drags on the tile and in the detail page, even when the state is writable"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={slot.readonly === true}
-                          onchange={(e) =>
-                            edit((t) =>
-                              patchSlot(t, i, {
-                                readonly: e.currentTarget.checked
-                                  ? true
-                                  : undefined,
-                              }),
-                            )}
-                        />
-                        <span>Read-only</span>
-                      </label>
                     {/if}
                   </div>
                   {#if slot.icon && slot.icon.enabled !== false && !slot.icon.glyph && !(slot.rules ?? []).some((r) => r.icon)}
@@ -3187,7 +3187,7 @@
   .check {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.2rem;
     font-size: var(--label-mono-size);
   }
 

@@ -888,7 +888,7 @@
   .check {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.2rem;
     font-size: var(--label-mono-size);
     white-space: nowrap;
   }

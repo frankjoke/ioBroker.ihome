@@ -433,7 +433,7 @@
   .check {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.2rem;
     font-size: var(--label-mono-size);
     cursor: pointer;
   }

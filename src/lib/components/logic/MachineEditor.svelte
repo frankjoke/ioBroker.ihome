@@ -977,7 +977,7 @@
   .check {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.2rem;
     min-height: 2rem;
     font-size: var(--label-mono-size);
   }
