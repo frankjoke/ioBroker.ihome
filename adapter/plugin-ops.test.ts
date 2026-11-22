@@ -144,6 +144,7 @@ describe("validAdapterPlugins", () => {
         debug: false,
         help: BUILTIN_PLUGINS[0].help,
         usage: BUILTIN_PLUGINS[0].usage,
+        settingsSchema: BUILTIN_PLUGINS[0].settingsSchema,
         code: undefined,
       },
     ]);
@@ -154,6 +155,19 @@ describe("validAdapterPlugins", () => {
       expect(builtin.help?.trim()).toBeTruthy();
       expect(builtin.usage?.trim()).toBeTruthy();
     }
+  });
+
+  it("parses the network.info endpoint schema", () => {
+    const def = BUILTIN_PLUGINS.find(
+      (entry) => entry.id === "network.info",
+    );
+    const schema = pluginSettingsSchema(def?.settingsSchema);
+    expect(schema).not.toBeNull();
+    expect(schema?.[0]).toMatchObject({ name: "endpoints", type: "array" });
+    const settings = {
+      endpoints: [{ id: "tv", name: "TV", host: "10.0.0.2" }],
+    };
+    expect(settingsProblem(schema, settings)).toBeNull();
   });
 
   it("logs dropped and duplicate entries without changing the raw config", () => {
@@ -315,6 +329,7 @@ describe("seedBuiltinPlugins", () => {
         debug: false,
         help: BUILTIN_PLUGINS[0].help,
         usage: BUILTIN_PLUGINS[0].usage,
+        settingsSchema: BUILTIN_PLUGINS[0].settingsSchema,
         code: undefined,
       },
       {

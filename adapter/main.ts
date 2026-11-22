@@ -22,7 +22,11 @@ import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
 import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
 import { NetworkPresenceService } from "./network-presence";
-import { validNetworkDevices } from "./logic/network-ops";
+import {
+  networkEndpoints,
+  validNetworkDevices,
+  type NetworkDevice,
+} from "./logic/network-ops";
 import { createPluginApi } from "./plugin-api";
 import {
   applyPluginPatches,
@@ -268,6 +272,11 @@ class IHome extends utils.Adapter {
   private logicStateTimer?: ReturnType<typeof setTimeout>;
   /** The LAN presence pollers configured under native.networkDevices. */
   private networkPresence?: NetworkPresenceService;
+  /** The live list `api.network` reads; settings changes mutate it in place. */
+  private networkDeviceList: NetworkDevice[] = [];
+  /** Set once startup finished; before that the settings echo must not start
+   *  a second presence service. */
+  private running = false;
   /** The admin-managed adapter-side plugins. */
   private pluginHost?: PluginHost;
   /** The plugin list as the adapter currently knows it. */
@@ -1198,6 +1207,7 @@ class IHome extends utils.Adapter {
     this.pluginConfig = next;
     this.pluginSettings = doc;
     this.pluginSettingsText = text;
+    if (this.running) await this.reloadNetworkDevices();
   }
 
   private pluginViewOf(plugin: AdapterPlugin): PluginView {
@@ -1418,6 +1428,48 @@ class IHome extends utils.Adapter {
     return changed;
   }
 
+  /** Endpoints from the network.info settings; undefined keeps the native list. */
+  private networkDevicesFromSettings(): NetworkDevice[] | undefined {
+    const plugin = this.pluginConfig.find(
+      (entry) => entry.id === "network.info",
+    );
+    return networkEndpoints(plugin?.settings);
+  }
+
+  /** Existing native devices move into the plugin settings once, so the form
+   *  shows them instead of an empty list. */
+  private async adoptNativeNetworkDevices(
+    fallback: NetworkDevice[],
+  ): Promise<void> {
+    if (fallback.length === 0) return;
+    const plugin = this.pluginConfig.find(
+      (entry) => entry.id === "network.info",
+    );
+    if (!plugin || networkEndpoints(plugin.settings) !== undefined) return;
+    plugin.settings = { ...(plugin.settings ?? {}), endpoints: fallback };
+    this.pluginSettings = {
+      ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
+      staged: this.pluginSettings.staged,
+      removals: this.pluginSettings.removals,
+    };
+    await this.savePluginSettings();
+  }
+
+  /** Apply the plugin's endpoint list without an adapter restart. */
+  private async reloadNetworkDevices(): Promise<void> {
+    const devices = this.networkDevicesFromSettings();
+    if (devices === undefined) return;
+    const next = JSON.stringify(devices);
+    if (next === JSON.stringify(this.networkDeviceList)) return;
+    this.networkDeviceList.splice(0, this.networkDeviceList.length, ...devices);
+    await this.networkPresence?.stop();
+    this.networkPresence = undefined;
+    if (devices.length > 0) {
+      this.networkPresence = new NetworkPresenceService(this, [...devices]);
+      await this.networkPresence.start();
+    }
+  }
+
   private pluginViews(): PluginView[] {
     const activeIds = new Set(this.pluginConfig.map((plugin) => plugin.id));
     const views = this.pluginConfig.map((plugin) => {
@@ -1632,6 +1684,14 @@ class IHome extends utils.Adapter {
         removals: this.pluginSettings.removals,
       };
       await this.savePluginSettings();
+      if (
+        activePatches.some(
+          (patch) =>
+            patch.id === "network.info" && patch.settings !== undefined,
+        )
+      ) {
+        await this.reloadNetworkDevices();
+      }
       const views = this.pluginViews();
       return pluginReply({
         plugins: views,
@@ -2533,7 +2593,7 @@ class IHome extends utils.Adapter {
         void this.loadLogics();
       }
     });
-    const networkDevices = validNetworkDevices(
+    const nativeNetworkDevices = validNetworkDevices(
       (this.config as { networkDevices?: unknown }).networkDevices,
     );
 
@@ -2635,6 +2695,10 @@ class IHome extends utils.Adapter {
     await this.migratePluginCodeToFiles();
     await this.migrateExternalAccessToFile();
     this.pluginConfig = await this.mergePluginFiles(this.pluginConfig);
+    await this.adoptNativeNetworkDevices(nativeNetworkDevices);
+    const networkDevices =
+      this.networkDevicesFromSettings() ?? nativeNetworkDevices;
+    this.networkDeviceList = networkDevices;
     await this.syncCollections();
     if (!updateFailed) {
       // File-backed plugins belong in the settings document too, or the next
@@ -2652,7 +2716,7 @@ class IHome extends utils.Adapter {
         createPluginApi(plugin.id, {
           namespace: this.namespace,
           config: this.config as Record<string, unknown>,
-          networkDevices,
+          networkDevices: this.networkDeviceList,
           getState: (id) => this.getStateAsync(id),
           setState: (id, value, ack) =>
             this.setStateAsync(id, {
@@ -2702,11 +2766,14 @@ class IHome extends utils.Adapter {
     await this.loadLogics();
 
     if (networkDevices.length > 0) {
-      this.networkPresence = new NetworkPresenceService(this, networkDevices);
+      this.networkPresence = new NetworkPresenceService(this, [
+        ...networkDevices,
+      ]);
       await this.networkPresence.start();
     }
 
     this.log.info(`iHome ${this.version ?? ""} started (${this.namespace})`);
+    this.running = true;
     this.heartbeat = setInterval(() => {
       const minutes = Math.round((Date.now() - this.startedAt) / 60_000);
       this.log.info(`iHome alive (${minutes} min, ${this.namespace})`);

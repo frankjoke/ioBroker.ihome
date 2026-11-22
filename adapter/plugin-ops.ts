@@ -126,7 +126,7 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
   {
     id: "network.info",
     name: "Network device info",
-    help: "Shows the network devices iHome knows about — for example a phone, tablet or TV — or one device by its id.",
+    help: "Shows the network devices iHome knows about — configured under this plugin's Settings — or one device by its id.",
     usage: [
       "**From a logic**",
       "",
@@ -143,6 +143,8 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "{ id?: string } // optional: omit to list all network devices",
       "```",
       "",
+      "Add the endpoints under **Settings → Endpoints**. They replace the Admin Network devices list.",
+      "",
       "**From an HTML tile**",
       "",
       "```js",
@@ -151,6 +153,68 @@ export const BUILTIN_PLUGINS: readonly BuiltinPluginDef[] = [
       "",
       "Without an `id` it returns `{ devices: [...] }`.",
     ].join("\n"),
+    settingsSchema: [
+      {
+        name: "endpoints",
+        label: "Endpoints",
+        type: "array",
+        description:
+          "Devices to track on the local network. These entries replace the Admin Network devices list; an empty list tracks nothing.",
+        item: {
+          fields: [
+            {
+              name: "id",
+              label: "ID",
+              type: "string",
+              required: true,
+              description:
+                "Short id used by network.info and network.wake, e.g. tv.",
+            },
+            {
+              name: "name",
+              label: "Name",
+              type: "string",
+              required: true,
+              description: "Name returned with the device.",
+            },
+            {
+              name: "host",
+              label: "IP / host",
+              type: "string",
+              required: true,
+              description: "IPv4/IPv6 address or hostname to probe.",
+            },
+            {
+              name: "mac",
+              label: "MAC (optional)",
+              type: "string",
+              description: "Needed by network.wake for Wake-on-LAN.",
+            },
+            {
+              name: "interval",
+              label: "Every (s)",
+              type: "number",
+              default: 60,
+              description: "Seconds between probes (10–3600).",
+            },
+            {
+              name: "timeout",
+              label: "Timeout (s)",
+              type: "number",
+              default: 2,
+              description: "Seconds per probe (1–30).",
+            },
+            {
+              name: "port",
+              label: "TCP port",
+              type: "number",
+              default: 0,
+              description: "0 = ICMP ping; above 0 = TCP connect.",
+            },
+          ],
+        },
+      },
+    ],
   },
   {
     id: "network.wake",

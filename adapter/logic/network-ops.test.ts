@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialPresence,
+  networkEndpoints,
   nextPresence,
   presenceFromJson,
   presenceJsonValue,
@@ -78,6 +79,30 @@ describe("validNetworkDevice", () => {
       ]).map((device) => `${device.id}:${device.name}`),
     ).toEqual(["a:First", "b:B"]);
     expect(validNetworkDevices("nope")).toEqual([]);
+  });
+
+  it("reads endpoints from plugin settings; absent means unset", () => {
+    expect(networkEndpoints(undefined)).toBeUndefined();
+    expect(networkEndpoints({})).toBeUndefined();
+    expect(networkEndpoints({ endpoints: "nope" })).toBeUndefined();
+    expect(networkEndpoints({ endpoints: [] })).toEqual([]);
+    expect(
+      networkEndpoints({
+        endpoints: [
+          { id: "tv", name: "TV", host: "10.0.0.2", interval: 15 },
+          { id: "bad.id", name: "Bad", host: "10.0.0.3" },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "tv",
+        name: "TV",
+        host: "10.0.0.2",
+        interval: 15,
+        timeout: 2,
+        port: 0,
+      },
+    ]);
   });
 });
 

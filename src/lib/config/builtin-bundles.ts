@@ -6,7 +6,7 @@ export const NETWORK_DEVICE_BUNDLE: TemplateBundle = {
   id: "network-device",
   name: "Network device",
   description:
-    "Shows whether a phone, tablet or laptop is visible on the local network and when it last connected or disconnected. Configure the host under the adapter's Network devices first, then pick its JSON state here.",
+    "Shows whether a phone, tablet or laptop is visible on the local network and when it last connected or disconnected. Configure the host under the Network device info plugin's Settings (Endpoints) first, then pick its JSON state here.",
   help: `Shows whether a phone, tablet or laptop is on the local network.
 
 **Before applying:** add the device under the adapter's *Network devices* with its host, then pick its JSON state here. The tile shows online/offline and when it was last connected or disconnected.
@@ -89,7 +89,7 @@ export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
   id: "samsung-tv-remote",
   name: "Samsung TV remote",
   description:
-    "A Samsung TV remote. Configure the TV in the adapter's Network devices (host and MAC) and set its id here; the remote reads the host and wakes the TV through the adapter plugin.",
+    "A Samsung TV remote. Configure the TV under the Network device info plugin's Settings (Endpoints: host and MAC) and set its id here; the remote reads the host and wakes the TV through the adapter plugin.",
   help: `A Samsung TV remote: a presence tile plus a full remote in a modal.
 
 **Before applying:** add the TV under the adapter's *Network devices* with its host and MAC address (the MAC is needed for Wake-on-LAN), then set that device's id here.
@@ -102,7 +102,7 @@ export const SAMSUNG_TV_BUNDLE: TemplateBundle = {
       type: "string",
       default: "tv",
       description:
-        "The id from the adapter's Network devices list. It must have a MAC for Wake-on-LAN.",
+        "The id from the Network device info plugin's endpoints list. It must have a MAC for Wake-on-LAN.",
     },
   ],
   device: {

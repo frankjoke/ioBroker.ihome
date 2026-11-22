@@ -85,6 +85,14 @@ export function validNetworkDevices(value: unknown): NetworkDevice[] {
   return devices;
 }
 
+/** The endpoints from the `network.info` settings; undefined = not configured. */
+export function networkEndpoints(
+  settings: unknown,
+): NetworkDevice[] | undefined {
+  if (!record(settings) || !Array.isArray(settings.endpoints)) return undefined;
+  return validNetworkDevices(settings.endpoints);
+}
+
 export function initialPresence(): NetworkPresence {
   return {
     online: false,
