@@ -51,6 +51,22 @@ it("ignores pseudo refs such as $logic sources", () => {
   ).not.toContain("$logic.TestAction");
 });
 
+it("finds state refs inside machine exit code", () => {
+  const machine = {
+    id: "m",
+    name: "Machine",
+    kind: "machine" as const,
+    states: {
+      Idle: {
+        exit: { code: 'set("0_userdata.0.machineExit", 1)' },
+      },
+    },
+  } as unknown as LogicDef;
+  expect(
+    suggestCollectionStates([machine], () => undefined).map((row) => row.id),
+  ).toEqual(["0_userdata.0.machineExit"]);
+});
+
 it("resolves variables and strips tile provenance", () => {
   const varLogic: LogicDef = {
     ...logic,

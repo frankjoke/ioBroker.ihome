@@ -73,6 +73,12 @@
       .filter((row) => !stateIds.includes(row.id))
       .map((row) => row.id),
   );
+  /** Manually added states that no selected logic suggested. */
+  const extraStates = $derived(
+    stateIds.filter(
+      (id) => !id.startsWith("$") && !suggestions.some((row) => row.id === id),
+    ),
+  );
   const steps = ["Basics", "Logic", "States", "Tiles", "Review"];
 
   function nextVersion(value: string | undefined): string {
@@ -348,6 +354,24 @@
           >Add state</button
         >
       </div>
+      {#if extraStates.length}
+        <div class="added-states">
+          <span class="label-mono">Added</span>
+          {#each extraStates as stateId (stateId)}
+            <span class="state-chip">
+              <span class="mono">{stateId}</span>
+              <button
+                type="button"
+                title="Remove"
+                aria-label={`Remove ${stateId}`}
+                onclick={() => toggleState(stateId)}
+              >
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </span>
+          {/each}
+        </div>
+      {/if}
       {#if uses.length}
         <p class="hint text-muted">
           Used but not owned: {uses.join(", ")}
@@ -525,6 +549,48 @@
 
   .add-row input {
     flex: 1 1 auto;
+  }
+
+  .added-states {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+  }
+
+  .state-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.2rem 0.15rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill);
+    background: var(--surface-container);
+    font-size: var(--body-sm);
+  }
+
+  .state-chip button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .state-chip button:hover {
+    background: var(--surface-container-high);
+    color: var(--text-color);
+  }
+
+  .state-chip .material-symbols-outlined {
+    font-size: 1rem;
   }
 
   .review p {

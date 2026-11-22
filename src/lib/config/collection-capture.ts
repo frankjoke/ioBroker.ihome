@@ -22,6 +22,18 @@ function collectRefs(value: unknown, out: string[]): void {
   }
 }
 
+/** Every `code` string in a logic, including machine rows and enter/exit blocks. */
+function collectCode(value: unknown, out: string[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectCode(item, out);
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "code" && typeof item === "string") out.push(item);
+      else collectCode(item, out);
+    }
+  }
+}
+
 /** Every state the selected logics touch, with the output marked for ownership. */
 export function suggestCollectionStates(
   logics: LogicDef[],
@@ -48,10 +60,12 @@ export function suggestCollectionStates(
     const outputRef =
       logic.output?.scope === "state" ? logic.output.ref : undefined;
     for (const ref of refs) add(ref, logic.name, ref === outputRef);
-    const calls =
-      logic.kind === "function" ? extractRefCalls(logic.expr?.code ?? "") : [];
-    for (const call of calls) {
-      add(call.name, logic.name, false);
+    const code: string[] = [];
+    collectCode(logic, code);
+    for (const snippet of code) {
+      for (const call of extractRefCalls(snippet)) {
+        add(call.name, logic.name, false);
+      }
     }
   }
 
