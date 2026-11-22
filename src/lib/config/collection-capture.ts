@@ -29,8 +29,9 @@ export function suggestCollectionStates(
 ): StateSuggestion[] {
   const rows = new Map<string, StateSuggestion>();
   const add = (ref: string, name: string, owned: boolean): void => {
+    if (!ref || ref.startsWith("$")) return;
     const id = ref.includes(".") ? ref : resolveVariable(ref);
-    if (!id || !id.includes(".")) return;
+    if (!id || id.startsWith("$") || !id.includes(".")) return;
     const row = rows.get(id) ?? {
       id,
       usedBy: [],

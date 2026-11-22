@@ -197,7 +197,7 @@
           name: name.trim(),
           version: version.trim(),
           logicIds,
-          stateIds,
+          stateIds: stateIds.filter((stateId) => !stateId.startsWith("$")),
           tiles: chosen,
         },
       });

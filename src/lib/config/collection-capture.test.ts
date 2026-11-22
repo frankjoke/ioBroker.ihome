@@ -36,6 +36,21 @@ it("suggests refs and code calls, with the output owned", () => {
   ).toBe(false);
 });
 
+it("ignores pseudo refs such as $logic sources", () => {
+  const dependency: LogicDef = {
+    ...logic,
+    inputs: {
+      follow: {
+        from: { type: "state", ref: "$logic.TestAction" },
+        kind: "event",
+      },
+    },
+  };
+  expect(
+    suggestCollectionStates([dependency], () => undefined).map((row) => row.id),
+  ).not.toContain("$logic.TestAction");
+});
+
 it("resolves variables and strips tile provenance", () => {
   const varLogic: LogicDef = {
     ...logic,

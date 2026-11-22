@@ -448,6 +448,9 @@ export async function captureCollection(
 
   const states: PluginStateDecl[] = [];
   for (const id of request.stateIds) {
+    if (id.startsWith("$")) {
+      throw new Error(`invalid state id: ${id}`);
+    }
     const live = await host.getObject(id);
     if (!live) throw new Error(`missing state: ${id}`);
     const marker = stateMarker(live);
