@@ -159,10 +159,43 @@ it("refuses a live definition that differs from its baseline", async () => {
   expect(host.writes).toEqual([]);
 });
 
-it("refuses an unmanaged item as foreign", async () => {
+it("claims an unmanaged item only on explicit overwrite", async () => {
   const host = fakeHost({ version: 3, logics: [structuredClone(logic)] });
   const report = await classifyCollection(host, plugin());
   expect(report.conflicts).toEqual([
+    { kind: "logic", id: "calc", reason: "unmanaged" },
+  ]);
+  expect(
+    await applyCollection(host, plugin(), {
+      enabled: true,
+      mode: "reconcile",
+    }),
+  ).toMatchObject({ applied: false, changed: false });
+  expect(host.doc.logics[0].managed).toBeUndefined();
+  const applied = await applyCollection(host, plugin(), {
+    enabled: true,
+    mode: "reconcile",
+    overwrite: true,
+  });
+  expect(applied.applied).toBe(true);
+  expect(host.doc.logics[0].managed?.plugin).toBe("col.test");
+});
+
+it("refuses another plugin's item even with overwrite", async () => {
+  const host = fakeHost({
+    version: 3,
+    logics: [
+      {
+        ...logic,
+        managed: {
+          plugin: "other.plugin",
+          version: "1.0.0",
+          baseline: "0".repeat(64),
+        },
+      } as LogicDef,
+    ],
+  });
+  expect((await classifyCollection(host, plugin())).conflicts).toEqual([
     { kind: "logic", id: "calc", reason: "foreign" },
   ]);
   expect(

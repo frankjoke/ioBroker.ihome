@@ -4,7 +4,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import CollectionConflicts from "./CollectionConflicts.svelte";
-  import { parsePluginFile } from "$adapter/plugin-file";
+  import { parsePluginFile, type ImportedPlugin } from "$adapter/plugin-file";
   import { BUILTIN_PLUGINS } from "$adapter/plugin-ops";
   import { writePluginFiles } from "$lib/config/plugin-storage";
   import {
@@ -30,6 +30,16 @@
     id: string;
     list: CollectionConflict[];
   } | null>(null);
+  let pendingMissing = $state<{
+    entry: PluginCatalogEntry;
+    ids: string[];
+  } | null>(null);
+
+  function missingStates(plugin: ImportedPlugin): string[] {
+    return (plugin.collection?.states ?? [])
+      .map((state) => state.id)
+      .filter((id) => !ioBroker.objects.has(id) && !ioBroker.states.has(id));
+  }
 
   const installed = $derived(new Set(getPlugins().map((plugin) => plugin.id)));
   /** Installed state is only trustworthy once the plugin list has arrived. */
@@ -69,7 +79,10 @@
     }
   }
 
-  async function apply(entry: PluginCatalogEntry): Promise<void> {
+  async function apply(
+    entry: PluginCatalogEntry,
+    skipMissing = false,
+  ): Promise<void> {
     if (!listReady) return;
     pending = null;
     busy = entry.id;
@@ -86,6 +99,13 @@
       const plugin = parsed.plugin;
       if (plugin.id !== entry.id) {
         throw new Error("The plugin file names another id.");
+      }
+      if (!skipMissing) {
+        const missing = missingStates(plugin);
+        if (missing.length > 0) {
+          pendingMissing = { entry, ids: missing };
+          return;
+        }
       }
       // The folder is the truth: write it first, then the adapter adds the
       // disabled runtime entry and reads the files back.
@@ -160,6 +180,30 @@
   {/if}
 </section>
 
+{#if pendingMissing}
+  <ConfirmModal
+    title="Create missing states?"
+    confirmLabel="Create and install"
+    onConfirm={() => {
+      const pendingEntry = pendingMissing;
+      pendingMissing = null;
+      if (pendingEntry) void apply(pendingEntry.entry, true);
+    }}
+    onCancel={() => (pendingMissing = null)}
+  >
+    <p class="text-muted">
+      These declared states do not exist on this instance yet. The plugin owns
+      them; install will create the state objects with their definitions. State
+      values are not part of the plugin.
+    </p>
+    <ul class="missing-states">
+      {#each pendingMissing.ids as stateId (stateId)}
+        <li class="mono">{stateId}</li>
+      {/each}
+    </ul>
+  </ConfirmModal>
+{/if}
+
 {#if conflicts}
   <CollectionConflicts
     conflicts={conflicts.list}
@@ -209,5 +253,10 @@
 
   .description {
     margin: 0.25rem 0.5rem 0;
+  }
+
+  .missing-states {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
   }
 </style>

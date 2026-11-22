@@ -6,6 +6,8 @@
     loadPlugins,
     savePlugin,
   } from "$lib/stores/plugins.svelte";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import CollectionConflicts from "./CollectionConflicts.svelte";
   import type { CollectionConflict } from "$adapter/plugin-collection-types";
   import { writePluginFiles } from "$lib/config/plugin-storage";
@@ -29,6 +31,13 @@
     id: string;
     list: CollectionConflict[];
   } | null>(null);
+  let missingStates = $state<string[]>([]);
+
+  function missingCollectionStates(value: ImportedPlugin): string[] {
+    return (value.collection?.states ?? [])
+      .map((state) => state.id)
+      .filter((id) => !ioBroker.objects.has(id) && !ioBroker.states.has(id));
+  }
 
   function contributionCount(value: ImportedPlugin): number {
     return Object.values(value.contributions ?? {}).reduce(
@@ -62,29 +71,39 @@
 
   async function confirm(): Promise<void> {
     if (!plugin || busy) return;
+    const missing = plugin.builtin ? [] : missingCollectionStates(plugin);
+    if (missing.length > 0) {
+      missingStates = missing;
+      return;
+    }
+    await doImport(plugin);
+  }
+
+  async function doImport(value: ImportedPlugin): Promise<void> {
+    if (busy) return;
     error = "";
     busy = true;
     try {
-      if (!plugin.builtin) {
+      if (!value.builtin) {
         // The folder is the truth: write it first, then let the adapter add
         // the disabled runtime entry and read the files back.
-        await writePluginFiles(plugin);
-        const installedConflicts = await installPlugin(plugin.id);
+        await writePluginFiles(value);
+        const installedConflicts = await installPlugin(value.id);
         if (installedConflicts.length > 0) {
-          conflicts = { id: plugin.id, list: installedConflicts };
+          conflicts = { id: value.id, list: installedConflicts };
           return;
         }
-        if (plugin.settings || plugin.timeoutMs !== undefined) {
+        if (value.settings || value.timeoutMs !== undefined) {
           await savePlugin({
-            id: plugin.id,
-            ...(plugin.timeoutMs !== undefined
-              ? { timeoutMs: plugin.timeoutMs }
+            id: value.id,
+            ...(value.timeoutMs !== undefined
+              ? { timeoutMs: value.timeoutMs }
               : {}),
-            ...(plugin.settings ? { settings: plugin.settings } : {}),
+            ...(value.settings ? { settings: value.settings } : {}),
           });
         }
       } else {
-        await importPlugin(plugin);
+        await importPlugin(value);
       }
       onImported();
     } catch (failure) {
@@ -192,6 +211,30 @@
   </div>
 </div>
 
+{#if missingStates.length}
+  <ConfirmModal
+    title="Create missing states?"
+    confirmLabel="Create and install"
+    onConfirm={() => {
+      const value = plugin;
+      missingStates = [];
+      if (value) void doImport(value);
+    }}
+    onCancel={() => (missingStates = [])}
+  >
+    <p class="text-muted">
+      These declared states do not exist on this instance yet. The plugin owns
+      them; install will create the state objects with their definitions. State
+      values are not part of the plugin.
+    </p>
+    <ul class="missing-states">
+      {#each missingStates as stateId (stateId)}
+        <li class="mono">{stateId}</li>
+      {/each}
+    </ul>
+  </ConfirmModal>
+{/if}
+
 {#if conflicts}
   <CollectionConflicts
     conflicts={conflicts.list}
@@ -227,6 +270,11 @@
     max-height: 90vh;
     overflow-y: auto;
     padding: 1rem;
+  }
+
+  .missing-states {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
   }
 
   .field {

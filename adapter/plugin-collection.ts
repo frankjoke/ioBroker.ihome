@@ -148,7 +148,9 @@ async function inspect(
       continue;
     }
     const marker = stateMarker(live);
-    if (!marker || marker.plugin !== plugin.id) {
+    if (!marker) {
+      conflicts.push({ kind: "state", id: decl.id, reason: "unmanaged" });
+    } else if (marker.plugin !== plugin.id) {
       conflicts.push({ kind: "state", id: decl.id, reason: "foreign" });
     } else if (stateBaseline(live) !== marker.baseline) {
       conflicts.push({ kind: "state", id: decl.id, reason: "conflict" });
@@ -162,7 +164,9 @@ async function inspect(
       missing.push(decl.id);
       continue;
     }
-    if (!live.managed || live.managed.plugin !== plugin.id) {
+    if (!live.managed) {
+      conflicts.push({ kind: "logic", id: decl.id, reason: "unmanaged" });
+    } else if (live.managed.plugin !== plugin.id) {
       conflicts.push({ kind: "logic", id: decl.id, reason: "foreign" });
     } else if (baselineOf(live, "logic") !== live.managed.baseline) {
       conflicts.push({ kind: "logic", id: decl.id, reason: "conflict" });
@@ -254,8 +258,15 @@ export async function applyCollection(
   const conflictsBlock =
     options.mode === "reconcile" &&
     !options.overwrite &&
-    conflicts.some((entry) => entry.reason === "conflict");
-  if (foreign || conflictsBlock) {
+    conflicts.some(
+      (entry) => entry.reason === "conflict" || entry.reason === "unmanaged",
+    );
+  // Unmanaged items may be claimed only by an explicit reconcile+overwrite;
+  // enable/disable sync must never touch them.
+  const unmanagedBlock =
+    conflicts.some((entry) => entry.reason === "unmanaged") &&
+    !(options.mode === "reconcile" && options.overwrite === true);
+  if (foreign || conflictsBlock || unmanagedBlock) {
     return { applied: false, conflicts, changed: false };
   }
 

@@ -21,7 +21,10 @@ export interface PluginCollection {
 export type CollectionConflict = {
   kind: "state" | "logic";
   id: string;
-  reason: "conflict" | "foreign";
+  /** `conflict`: this plugin's own item was edited locally.
+   *  `unmanaged`: an ordinary user item exists; overwrite may claim it.
+   *  `foreign`: another plugin owns it; overwrite is refused. */
+  reason: "conflict" | "unmanaged" | "foreign";
 };
 
 export interface CaptureRequest {
