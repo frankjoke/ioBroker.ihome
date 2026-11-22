@@ -16,6 +16,7 @@
     seedOverrideName,
   } from "$lib/config/source-overrides";
   import { normalizeStates } from "$lib/config/state-meta";
+  import { statesForOverride } from "$lib/config/override-states";
   import { isInfrastructure } from "$lib/config/template-suggest";
   import { formatValue, localizeName } from "$lib/config/format";
   import { stateIdFor } from "$lib/config/variables";
@@ -64,7 +65,9 @@
   }
 
   function seed(): SourceOverride {
-    if (override) return { ...override };
+    if (override) {
+      return { ...override, states: statesForOverride(override, common) };
+    }
     const { name, label } = seedOverrideName(stateId, object, existingNames);
     return {
       id: newId(),
@@ -75,7 +78,7 @@
       unit: text(common.unit) || undefined,
       type: text(common.type) || undefined,
       role: text(common.role) || undefined,
-      states: normalizeStates(common.states),
+      states: statesForOverride(undefined, common),
       min: typeof common.min === "number" ? common.min : undefined,
       max: typeof common.max === "number" ? common.max : undefined,
       step: typeof common.step === "number" ? common.step : undefined,
@@ -405,7 +408,7 @@
           <span class="label-mono">Type</span>
           <select bind:value={draft.type}>
             <option value="">— inherit —</option>
-            {#each ["boolean", "number", "string", "mixed", "array", "object"] as t (t)}
+            {#each ["boolean", "number", "string", "mixed", "multistate", "array", "object"] as t (t)}
               <option value={t}>{t}</option>
             {/each}
           </select>

@@ -175,7 +175,7 @@
       <option value={opt.value}>{opt.label}</option>
     {/each}
   </select>
-{:else if widget === "button"}
+{:else if showValue && widget === "button"}
   <button
     type="button"
     class="btn"
