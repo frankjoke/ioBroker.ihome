@@ -20,6 +20,7 @@
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
   import { renameMemoryRefs, renameLogicRefs } from "$lib/config/logic-rename";
+  import { keepManaged } from "$lib/config/logic-managed";
   import { validateLogicDocument } from "$logic/validate";
   import type { Issue } from "$logic/validate";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -385,7 +386,7 @@
 
   function save() {
     if (!canSave || !draft) return;
-    const next = normalizeRefs(draft);
+    const next = keepManaged(normalizeRefs(draft), selectedLogic);
     const old = selectedLogic;
     if (old && old.id !== next.id) {
       const problem = nameProblem(next.id, old.id);
@@ -693,6 +694,14 @@
                 </button>
               {/if}
               <span class="mono hint text-muted">{outputLabel(logic)}</span>
+              {#if logic.managed}
+                <span
+                  class="badge"
+                  title={`Managed by ${logic.managed.plugin} v${logic.managed.version}`}
+                >
+                  {logic.managed.plugin}
+                </span>
+              {/if}
               {#if reading}
                 <span class="reading mono">{reading}</span>
               {/if}
@@ -751,6 +760,15 @@
             {/if}
             {#if open && draft}
               <div class="item-editor" bind:this={inlineForm}>
+                {#if logic.managed}
+                  <p class="hint text-muted managed-hint">
+                    Managed by plugin <span class="mono"
+                      >{logic.managed.plugin}</span
+                    >
+                    · v{logic.managed.version}. The plugin lifecycle controls
+                    <em>enabled</em>.
+                  </p>
+                {/if}
                 <LogicEditor bind:draft {issues} logics={doc.logics} {dirty} />
               </div>
             {/if}
