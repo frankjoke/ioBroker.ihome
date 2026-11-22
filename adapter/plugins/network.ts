@@ -95,6 +95,9 @@ export function createNetworkPlugins(
         }
         return { devices: api.network.list() };
       },
+      // The adapter reloads its presence poller itself when these settings
+      // change; the plugin has no listener to restart.
+      reload() {},
     }),
   };
 }

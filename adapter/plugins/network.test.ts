@@ -46,6 +46,9 @@ describe("createNetworkPlugins", () => {
   it("returns one device or the whole list", async () => {
     const plugins = createNetworkPlugins();
     const api = fakeNetworkApi();
+    const mod = plugins["network.info"](api);
+    expect(typeof mod.reload).toBe("function");
+    expect(mod.reload!()).toBeUndefined();
     expect(await plugins["network.info"](api).call!({ id: "tv" })).toEqual({
       id: "tv",
       name: "TV",
