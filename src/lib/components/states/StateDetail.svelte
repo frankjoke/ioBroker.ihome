@@ -7,6 +7,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { localizeName } from "$lib/config/format";
   import {
+    defaultHistoryAdapter,
     historyKeys as historyKeysOf,
     isHistoryCustom,
   } from "$lib/config/state-settings";
@@ -44,6 +45,7 @@
   const common = $derived((object?.common ?? {}) as Record<string, any>);
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const historyKeys = $derived(historyKeysOf(common.custom));
+  const defaultHistory = $derived(defaultHistoryAdapter(objects));
   const hasOverrides = $derived(overrides.length > 0);
   const hasHistory = $derived(historyKeys.length > 0);
   const tabs = $derived([
@@ -68,6 +70,7 @@
   ]);
   const historyCandidates = $derived.by(() => {
     const out: string[] = [];
+    if (defaultHistory) out.push(defaultHistory);
     for (const entry of objects.values()) {
       const custom = entry?.common?.custom;
       if (!custom || typeof custom !== "object") continue;
@@ -89,6 +92,7 @@
   const hasUnusedHistory = $derived(
     historyCandidates.some((key) => !historyKeys.includes(key)),
   );
+  const historyInstalled = $derived(defaultHistory !== "");
   const live = $derived(
     (ioBroker.states as unknown as Map<string, any>)?.get?.(id),
   );
@@ -111,6 +115,10 @@
   }
 
   async function addHistory(): Promise<void> {
+    if (!defaultHistory) {
+      message = "No default history adapter is configured.";
+      return;
+    }
     const key = historyCandidates.find(
       (candidate) => !historyKeys.includes(candidate),
     );
@@ -207,7 +215,7 @@
           >+ Override</button
         >
       {/if}
-      {#if hasUnusedHistory}
+      {#if historyInstalled && hasUnusedHistory}
         <button
           type="button"
           class="btn btn-sm"
@@ -301,7 +309,12 @@
         </div>
       {:else}
         {#key id}
-          <HistoryData stateId={id} customKeys={historyKeys} />
+          <HistoryData
+            stateId={id}
+            customKeys={historyKeys}
+            {object}
+            defaultAdapter={defaultHistory}
+          />
         {/key}
       {/if}
     {/snippet}

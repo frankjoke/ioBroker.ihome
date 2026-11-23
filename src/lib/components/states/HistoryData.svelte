@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     chartPoints,
@@ -13,9 +12,13 @@
   let {
     stateId,
     customKeys,
+    object,
+    defaultAdapter,
   }: {
     stateId: string;
     customKeys: string[];
+    object: any;
+    defaultAdapter: string;
   } = $props();
 
   const DURATIONS = [
@@ -25,7 +28,7 @@
     { value: "168", label: "7 days" },
   ];
 
-  let adapter = $state(untrack(() => customKeys[0] ?? ""));
+  let openAdapter = $state("");
   let duration = $state("24");
   let featuresReply = $state<unknown>(null);
   let points = $state<Array<{ ts: number; val: number }>>([]);
@@ -35,6 +38,8 @@
   let pending = $state<{ kind: "range" | "all" } | null>(null);
   let rangeStart = $state("");
   let rangeEnd = $state("");
+
+  const adapter = $derived(openAdapter);
 
   function localInput(time: number): string {
     const date = new Date(time);
@@ -48,6 +53,50 @@
     rangeEnd = localInput(end);
   }
   resetRange();
+
+  function customValue(key: string): Record<string, unknown> | undefined {
+    const custom = object?.common?.custom;
+    const value =
+      custom && typeof custom === "object" ? custom[key] : undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  }
+
+  function enabledOf(key: string): boolean {
+    return customValue(key)?.enabled !== false;
+  }
+
+  async function setEnabled(key: string, enabled: boolean): Promise<void> {
+    const value = customValue(key);
+    if (!value) return;
+    const custom = {
+      ...((object?.common?.custom ?? {}) as Record<string, unknown>),
+      [key]: { ...value, enabled },
+    };
+    try {
+      const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
+        action: "custom.write",
+        id: stateId,
+        custom,
+      })) as { ok?: boolean; error?: string } | undefined;
+      if (!reply?.ok) {
+        throw new Error(reply?.error ?? "The adapter rejected the change.");
+      }
+      message = `${key} ${enabled ? "enabled" : "disabled"}.`;
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    }
+  }
+
+  function toggle(key: string): void {
+    openAdapter = openAdapter === key ? "" : key;
+    error = "";
+    message = "";
+    featuresReply = null;
+    points = [];
+    resetRange();
+  }
 
   function replyError(reply: unknown): string {
     if (reply && typeof reply === "object") {
@@ -159,10 +208,12 @@
   }
 
   $effect(() => {
-    if (customKeys.length && !customKeys.includes(adapter)) {
-      adapter = customKeys[0];
-    }
+    if (!openAdapter) return;
     void chooseAdapter();
+  });
+
+  $effect(() => {
+    if (openAdapter && !customKeys.includes(openAdapter)) openAdapter = "";
   });
 </script>
 
@@ -173,70 +224,103 @@
       line first.
     </p>
   {:else}
-    <div class="row">
-      <label class="small">
-        <span class="label-mono">Adapter</span>
-        <select bind:value={adapter} onchange={() => void chooseAdapter()}>
-          {#each customKeys as key (key)}
-            <option value={key}>{key}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="small">
-        <span class="label-mono">Range</span>
-        <select bind:value={duration} onchange={() => void loadChart()}>
-          {#each DURATIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </label>
+    <div class="items">
+      {#each customKeys as key (key)}
+        {@const enabled = enabledOf(key)}
+        <div class="item" class:open={openAdapter === key}>
+          <div class="item-line">
+            <button
+              type="button"
+              class="name"
+              aria-expanded={openAdapter === key}
+              onclick={() => toggle(key)}>{key}</button
+            >
+            <span class="badge" class:badge-secondary={!enabled}
+              >{enabled ? "enabled" : "disabled"}</span
+            >
+            {#if key === defaultAdapter}
+              <span class="badge badge-secondary">default</span>
+            {/if}
+          </div>
+          {#if openAdapter === key}
+            <div class="item-editor">
+              <label class="enabled">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  disabled={loading}
+                  onchange={(event) =>
+                    void setEnabled(key, event.currentTarget.checked)}
+                />
+                <span>Enabled</span>
+              </label>
+
+              <div class="row">
+                <label class="small">
+                  <span class="label-mono">Range</span>
+                  <select
+                    bind:value={duration}
+                    onchange={() => void loadChart()}
+                  >
+                    {#each DURATIONS as option (option.value)}
+                      <option value={option.value}>{option.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              </div>
+
+              {#if !featuresReply}
+                <p class="hint text-muted">
+                  {adapter} does not report history features.
+                </p>
+              {:else if hasHistoryFeature(featuresReply, "getHistory")}
+                {#if loading}
+                  <p class="hint text-muted">Loading…</p>
+                {:else}
+                  <HistoryChart {points} />
+                {/if}
+              {:else}
+                <p class="hint text-muted">
+                  {adapter} does not support getHistory.
+                </p>
+              {/if}
+
+              <div class="row wrap">
+                <label class="small">
+                  <span class="label-mono">From</span>
+                  <input type="datetime-local" bind:value={rangeStart} />
+                </label>
+                <label class="small">
+                  <span class="label-mono">To</span>
+                  <input type="datetime-local" bind:value={rangeEnd} />
+                </label>
+                {#if hasHistoryFeature(featuresReply, "deleteRange")}
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={loading}
+                    onclick={() => (pending = { kind: "range" })}
+                    >Delete range</button
+                  >
+                {/if}
+                {#if hasHistoryFeature(featuresReply, "deleteAll")}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    disabled={loading}
+                    onclick={() => (pending = { kind: "all" })}
+                    >Delete all</button
+                  >
+                {/if}
+              </div>
+
+              {#if message}<p class="hint text-muted">{message}</p>{/if}
+              {#if error}<p class="hint text-danger">{error}</p>{/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
     </div>
-
-    {#if !featuresReply}
-      <p class="hint text-muted">
-        {adapter} does not report history features.
-      </p>
-    {:else if hasHistoryFeature(featuresReply, "getHistory")}
-      {#if loading}
-        <p class="hint text-muted">Loading…</p>
-      {:else}
-        <HistoryChart {points} />
-      {/if}
-    {:else}
-      <p class="hint text-muted">
-        {adapter} does not support getHistory.
-      </p>
-    {/if}
-
-    <div class="row wrap">
-      <label class="small">
-        <span class="label-mono">From</span>
-        <input type="datetime-local" bind:value={rangeStart} />
-      </label>
-      <label class="small">
-        <span class="label-mono">To</span>
-        <input type="datetime-local" bind:value={rangeEnd} />
-      </label>
-      {#if hasHistoryFeature(featuresReply, "deleteRange")}
-        <button
-          type="button"
-          class="btn btn-sm"
-          disabled={loading}
-          onclick={() => (pending = { kind: "range" })}>Delete range</button
-        >
-      {/if}
-      {#if hasHistoryFeature(featuresReply, "deleteAll")}
-        <button
-          type="button"
-          class="btn btn-sm btn-danger"
-          disabled={loading}
-          onclick={() => (pending = { kind: "all" })}>Delete all</button
-        >
-      {/if}
-    </div>
-
-    {#if message}<p class="hint text-muted">{message}</p>{/if}
-    {#if error}<p class="hint text-danger">{error}</p>{/if}
   {/if}
 </div>
 
@@ -261,6 +345,18 @@
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+  }
+
+  .items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .enabled {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
   .row {

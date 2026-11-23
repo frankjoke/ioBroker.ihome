@@ -72,6 +72,13 @@ export function historyKeys(custom: unknown): string[] {
     .sort();
 }
 
+/** The default history instance from ioBroker's system settings. Empty when
+ *  none is configured; then no history adapter is available. */
+export function defaultHistoryAdapter(objects: Map<string, any>): string {
+  const value = objects.get("system.config")?.common?.defaultHistory;
+  return typeof value === "string" ? value.trim() : "";
+}
+
 /** The adapter instance a state id belongs to: `adapter.0`, or the fuller
  *  `system.adapter.<adapter>.0` / `system.host.<host>` namespaces. */
 export function instanceOf(id: string): string {

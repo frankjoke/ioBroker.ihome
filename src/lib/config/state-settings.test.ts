@@ -9,6 +9,7 @@ import {
   instanceOf,
   isHistoryAdapter,
   isHistoryCustom,
+  defaultHistoryAdapter,
   restoreSelection,
   stateEntries,
   stateMatches,
@@ -95,6 +96,17 @@ describe("instances and restore", () => {
     };
     expect(isHistoryCustom(custom["iqontrol.0"])).toBe(false);
     expect(historyKeys(custom)).toEqual(["history.0", "influxdb.0"]);
+  });
+
+  it("reads the default history adapter from system.config", () => {
+    const config = (value: unknown) =>
+      new Map<string, any>([
+        ["system.config", { common: { defaultHistory: value } }],
+      ]);
+    expect(defaultHistoryAdapter(config("history.0"))).toBe("history.0");
+    expect(defaultHistoryAdapter(config(""))).toBe("");
+    expect(defaultHistoryAdapter(config(4))).toBe("");
+    expect(defaultHistoryAdapter(new Map())).toBe("");
   });
 
   it("restores the remembered state, else a sibling, else the first", () => {
