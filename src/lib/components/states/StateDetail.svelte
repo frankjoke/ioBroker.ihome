@@ -3,6 +3,7 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
   import CustomSettings from "./CustomSettings.svelte";
+  import HistoryData from "./HistoryData.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue } from "$lib/config/format";
   import {
@@ -177,9 +178,12 @@
           />
         {/key}
       {:else}
-        <p class="hint text-muted">
-          The history chart and delete actions are added in the next task.
-        </p>
+        {#key id}
+          <HistoryData
+            stateId={id}
+            customKeys={Object.keys(common.custom ?? {}).sort()}
+          />
+        {/key}
       {/if}
     {/snippet}
   </OptionTabs>

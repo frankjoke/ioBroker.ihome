@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     customJsonProblem,
@@ -15,11 +16,15 @@
     onchanged: (custom: Record<string, unknown>) => void;
   } = $props();
 
-  let custom = $state<Record<string, unknown>>({
-    ...((object?.common?.custom ?? {}) as Record<string, unknown>),
-  });
-  let key = $state(Object.keys(custom)[0] ?? "");
-  let text = $state(JSON.stringify(key ? (custom[key] ?? {}) : {}, null, 2));
+  let custom = $state<Record<string, unknown>>(
+    untrack(() => ({
+      ...((object?.common?.custom ?? {}) as Record<string, unknown>),
+    })),
+  );
+  let key = $state(untrack(() => Object.keys(custom)[0] ?? ""));
+  let text = $state(
+    untrack(() => JSON.stringify(key ? (custom[key] ?? {}) : {}, null, 2)),
+  );
   let newKey = $state("");
   let error = $state("");
   let message = $state("");
