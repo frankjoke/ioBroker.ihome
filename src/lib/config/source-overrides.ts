@@ -1,4 +1,5 @@
 import { num, parseDoc } from "$lib/config/doc-parse";
+import { customOverridesOf } from "$adapter/override-common";
 import { localizeName } from "$lib/config/format";
 import { applyRead } from "$lib/utils/transform";
 import {
@@ -421,4 +422,32 @@ export function evaluateOverride(
   const { value, error } = evaluateVirtual(expr, scope);
   if (error) return { value: undefined, error, inputs };
   return { value: roundValue(value, override.precision), inputs };
+}
+
+/** The valid overrides attached to one state object. */
+export function overridesFromObject(object: unknown): SourceOverride[] {
+  return customOverridesOf(object)
+    .map(normalizeOverride)
+    .filter((override): override is SourceOverride => override !== null);
+}
+
+/**
+ * Merge object metadata over the saved list. Object entries win for the same
+ * state and case-insensitive name; list-only and object-only entries stay.
+ * Derived inputs are recomputed by the store after this merge.
+ */
+export function mergeObjectOverrides(
+  registry: OverrideRegistry,
+  objects: Iterable<unknown>,
+): OverrideRegistry {
+  const key = (override: SourceOverride): string =>
+    `${override.stateId.trim().toLowerCase()}\u0000${override.name.trim().toLowerCase()}`;
+  const byKey = new Map<string, SourceOverride>();
+  for (const override of registry.overrides) byKey.set(key(override), override);
+  for (const object of objects) {
+    for (const override of overridesFromObject(object)) {
+      byKey.set(key(override), override);
+    }
+  }
+  return { ...registry, overrides: [...byKey.values()] };
 }

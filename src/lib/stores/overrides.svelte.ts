@@ -7,6 +7,7 @@ import {
   emptyOverrideRegistry,
   ensureRepairOverride,
   evaluateOverride,
+  mergeObjectOverrides,
   normalizeOverrideRegistry,
   overrideById,
   overrideGroup,
@@ -107,6 +108,10 @@ function withInputs(doc: OverrideRegistry): OverrideRegistry {
     return { ...override, inputs };
   });
   return { ...doc, overrides };
+}
+
+function mergeFromObjects(doc: OverrideRegistry): OverrideRegistry {
+  return mergeObjectOverrides(doc, objectsSource().values());
 }
 
 function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
@@ -276,7 +281,7 @@ export function initOverrides(): Promise<void> {
       if (!empty) {
         const doc = normalizeOverrideRegistry(value);
         if (doc) {
-          use(withInputs(doc), "loaded");
+          use(withInputs(mergeFromObjects(doc)), "loaded");
           return;
         }
         loadKind = "unreadable";
@@ -285,7 +290,7 @@ export function initOverrides(): Promise<void> {
         );
         return;
       }
-      use(emptyOverrideRegistry(), "absent");
+      use(withInputs(mergeFromObjects(emptyOverrideRegistry())), "absent");
     })().catch((e) => {
       console.error("initOverrides:", e);
       initPromise = null;

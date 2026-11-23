@@ -289,3 +289,25 @@ it("a derived error is reported, not thrown", async () => {
     error: 'unknown derived override "missing"',
   });
 });
+
+it("merges object metadata into the registry", async () => {
+  const objectOverride = repair("obj", "0_userdata.0.x", "level");
+  const store = await load(null, {
+    objects: [
+      [
+        "0_userdata.0.x",
+        {
+          common: {
+            custom: {
+              ihome: { version: 1, overrides: [objectOverride] },
+            },
+          },
+        },
+      ],
+    ],
+  });
+  expect(store.getOverrideRegistry().overrides).toMatchObject([
+    { id: "obj", stateId: "0_userdata.0.x", name: "level" },
+  ]);
+  expect(h.registered).toContain("0_userdata.0.x");
+});

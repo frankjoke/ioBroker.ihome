@@ -6,6 +6,7 @@ import {
   ensureRepairOverride,
   evaluateOverride,
   matchingOverride,
+  mergeObjectOverrides,
   normalizeOverrideRegistry,
   overrideById,
   overrideGroup,
@@ -639,5 +640,50 @@ describe("variable-named state ids", () => {
     expect(
       overrideNameTaken(reg, "0_userdata.0.lamp", "power", "a", variables),
     ).toBe(false);
+  });
+});
+
+describe("mergeObjectOverrides", () => {
+  const objectWith = (...overrides: unknown[]) => ({
+    common: { custom: { ihome: { version: 1, overrides } } },
+  });
+
+  it("adds object-only overrides and keeps list-only entries", () => {
+    const reg: OverrideRegistry = {
+      ...emptyOverrideRegistry(),
+      overrides: [repair({ id: "list", stateId: "a", name: "level" })],
+    };
+    const merged = mergeObjectOverrides(reg, [
+      objectWith(repair({ id: "obj", stateId: "b", name: "sum" })),
+    ]);
+    expect(merged.overrides.map((o) => o.id).sort()).toEqual(["list", "obj"]);
+  });
+
+  it("lets object metadata win for the same state and name", () => {
+    const reg: OverrideRegistry = {
+      ...emptyOverrideRegistry(),
+      overrides: [repair({ id: "a", stateId: "s", name: "level" })],
+    };
+    const merged = mergeObjectOverrides(reg, [
+      objectWith(repair({ id: "b", stateId: "s", name: "level", min: 5 })),
+    ]);
+    expect(merged.overrides).toMatchObject([{ id: "b", min: 5 }]);
+  });
+
+  it("keeps several overrides on one state", () => {
+    const merged = mergeObjectOverrides(emptyOverrideRegistry(), [
+      objectWith(repair({ id: "a", stateId: "s", name: "level" }), {
+        ...repair({ id: "b", stateId: "s", name: "sum" }),
+        kind: "derived",
+      }),
+    ]);
+    expect(merged.overrides).toHaveLength(2);
+  });
+
+  it("ignores other adapters' custom keys", () => {
+    const merged = mergeObjectOverrides(emptyOverrideRegistry(), [
+      { common: { custom: { "history.0": { enabled: true } } } },
+    ]);
+    expect(merged.overrides).toEqual([]);
   });
 });
