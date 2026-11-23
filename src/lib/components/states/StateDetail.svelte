@@ -139,6 +139,16 @@
     tab = "override";
   }
 
+  function onOverrideLineClick(event: MouseEvent, overrideId: string): void {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    openOverrideId = openOverrideId === overrideId ? null : overrideId;
+  }
+
   async function addHistory(): Promise<void> {
     if (!defaultHistory) {
       message = "No default history adapter is configured.";
@@ -274,7 +284,13 @@
         <div class="items">
           {#each overrides as override (override.id)}
             <div class="item" class:open={openOverrideId === override.id}>
-              <div class="item-line">
+              <!-- The free line area is a mouse convenience; the name button is the keyboard control. -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="item-line"
+                onclick={(event) => onOverrideLineClick(event, override.id)}
+              >
                 <button
                   type="button"
                   class="name"
@@ -387,9 +403,5 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-  }
-
-  .items .item-line {
-    cursor: default;
   }
 </style>

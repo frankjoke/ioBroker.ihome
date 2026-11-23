@@ -149,6 +149,16 @@
     resetRange();
   }
 
+  function onHistoryLineClick(event: MouseEvent, key: string): void {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".item-actions, button, input, select, textarea, a, label")
+    ) {
+      return;
+    }
+    toggle(key);
+  }
+
   function replyError(reply: unknown): string {
     if (reply && typeof reply === "object") {
       const value = reply as Record<string, unknown>;
@@ -334,7 +344,13 @@
         {@const enabled =
           open && draftEnabled !== null ? draftEnabled : enabledOf(key)}
         <div class="item" class:open>
-          <div class="item-line">
+          <!-- The free line area is a mouse convenience; the name button is the keyboard control. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="item-line"
+            onclick={(event) => onHistoryLineClick(event, key)}
+          >
             <button
               type="button"
               class="name"
@@ -552,10 +568,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-  }
-
-  .items .item-line {
-    cursor: default;
   }
 
   .enabled {
