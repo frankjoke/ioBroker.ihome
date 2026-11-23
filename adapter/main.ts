@@ -23,6 +23,12 @@ import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
 import { NetworkPresenceService } from "./network-presence";
 import {
+  OVERRIDE_LIST_ID,
+  parseOverrideList,
+  type CustomOverride,
+} from "./override-common";
+import { syncOverrideObjects } from "./override-sync";
+import {
   networkEndpoints,
   validNetworkDevices,
   validNetworkHost,
@@ -276,6 +282,9 @@ class IHome extends utils.Adapter {
   private networkPresence?: NetworkPresenceService;
   /** The live list `api.network` reads; settings changes mutate it in place. */
   private networkDeviceList: NetworkDevice[] = [];
+  /** The override list last mirrored onto state objects. */
+  private overrideSnapshot: CustomOverride[] = [];
+  private overrideSyncTail: Promise<void> = Promise.resolve();
   /** Set once startup finished; before that the settings echo must not start
    *  a second presence service. */
   private running = false;
@@ -1467,6 +1476,35 @@ class IHome extends utils.Adapter {
     await this.savePluginSettings();
   }
 
+  /** Mirror the current override list onto state objects, serialized. */
+  private async applyOverrideList(value: unknown): Promise<void> {
+    const next = parseOverrideList(value);
+    if (!next) return;
+    const run = async () => {
+      const result = await syncOverrideObjects(
+        {
+          getObject: async (id) =>
+            (await this.getForeignObjectAsync(id)) as Record<
+              string,
+              unknown
+            > | null,
+          setObject: (id, object) =>
+            this.setForeignObjectAsync(id, object as ioBroker.SettableObject),
+        },
+        next,
+        this.overrideSnapshot,
+      );
+      this.overrideSnapshot = next;
+      if (result.updated || result.removed || result.failed) {
+        this.log.debug(
+          `overrides: ${result.updated} state(s) updated, ${result.removed} cleaned, ${result.failed} failed`,
+        );
+      }
+    };
+    this.overrideSyncTail = this.overrideSyncTail.then(run, run);
+    await this.overrideSyncTail;
+  }
+
   /** Apply the plugin's endpoint list without an adapter restart. */
   private async reloadNetworkDevices(): Promise<void> {
     const devices = this.networkDevicesFromSettings();
@@ -2557,8 +2595,13 @@ class IHome extends utils.Adapter {
     this.subscribeStates(`${CONFIG_FOLDER}.pluginSettings`);
     this.on("stateChange", (id, state) => {
       if (!state) return;
-      // Compare against the cached value before overwriting it: ack-only
-      // updates are not a change (D6).
+      if (id === OVERRIDE_LIST_ID) {
+        void this.applyOverrideList(state.val).catch((error) =>
+          this.log.warn(`overrides: ${String(error)}`),
+        );
+      }
+      // Compare against the cached value before overwriting it (ack-only
+      // updates are not a change, D6).
       const previous = this.logicValues.get(id)?.val;
       const changed = !Object.is(previous, state.val);
       this.logicValues.set(id, {
@@ -2645,6 +2688,9 @@ class IHome extends utils.Adapter {
         void this.loadLogics();
       }
     });
+    await this.subscribeForeignStatesAsync([OVERRIDE_LIST_ID]);
+    const overrideState = await this.getForeignStateAsync(OVERRIDE_LIST_ID);
+    await this.applyOverrideList(overrideState?.val);
     const nativeNetworkDevices = validNetworkDevices(
       (this.config as { networkDevices?: unknown }).networkDevices,
     );
