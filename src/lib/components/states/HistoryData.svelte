@@ -469,7 +469,11 @@
                   <button
                     type="button"
                     class="btn btn-sm btn-danger"
-                    disabled={loading || !rangeTouched || !rangeBounds.valid}
+                    disabled={loading ||
+                      rangeCounting ||
+                      !rangeTouched ||
+                      !rangeBounds.valid ||
+                      rangeCount === 0}
                     onclick={() => (pending = { kind: "range" })}
                     >Delete range</button
                   >
@@ -519,9 +523,21 @@
       void (pending?.kind === "all" ? deleteAll() : deleteRange())}
     onCancel={() => (pending = null)}
   >
-    <p class="text-muted">
-      {adapter} · <span class="mono">{stateId}</span>. This cannot be undone.
-    </p>
+    {#if pending.kind === "all"}
+      <p class="text-muted">
+        All stored data for <span class="mono">{adapter}</span> ·
+        <span class="mono">{stateId}</span> will be deleted. This cannot be undone.
+      </p>
+    {:else}
+      <p class="text-muted">
+        {rangeCount}{rangeCount >= RAW_LIMIT ? "+" : ""}
+        {rangeCount === 1 ? "datapoint" : "datapoints"} from
+        <span class="mono">{new Date(rangeStart).toLocaleString()}</span> to
+        <span class="mono">{new Date(rangeEnd).toLocaleString()}</span> on
+        <span class="mono">{adapter}</span> ·
+        <span class="mono">{stateId}</span> will be deleted. This cannot be undone.
+      </p>
+    {/if}
   </ConfirmModal>
 {/if}
 
