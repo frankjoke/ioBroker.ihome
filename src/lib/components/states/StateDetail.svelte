@@ -11,6 +11,7 @@
     historyKeys as historyKeysOf,
     isHistoryCustom,
   } from "$lib/config/state-settings";
+  import { writeStateCustom } from "$lib/config/state-write";
   import {
     commitOverrides,
     getOverrideRegistry,
@@ -143,14 +144,10 @@
           changesOnly: false,
         };
     try {
-      const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
-        action: "custom.write",
-        id,
-        custom: { ...(common.custom ?? {}), [key]: config },
-      })) as { ok?: boolean; error?: string } | undefined;
-      if (!reply?.ok) {
-        throw new Error(reply?.error ?? "The adapter rejected the change.");
-      }
+      await writeStateCustom(id, {
+        ...(common.custom ?? {}),
+        [key]: config,
+      });
       await ioBroker.getObject(id, true).catch(() => undefined);
       message = `History adapter ${key} added.`;
       tab = "history";

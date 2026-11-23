@@ -8,6 +8,7 @@
   } from "$lib/config/state-settings";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import HistoryChart from "./HistoryChart.svelte";
+  import { writeStateCustom } from "$lib/config/state-write";
 
   let {
     stateId,
@@ -89,14 +90,7 @@
       [key]: { ...value, enabled },
     };
     try {
-      const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
-        action: "custom.write",
-        id: stateId,
-        custom,
-      })) as { ok?: boolean; error?: string } | undefined;
-      if (!reply?.ok) {
-        throw new Error(reply?.error ?? "The adapter rejected the change.");
-      }
+      await writeStateCustom(stateId, custom);
       message = `${key} ${enabled ? "enabled" : "disabled"}.`;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);

@@ -3,6 +3,7 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue, localizeName } from "$lib/config/format";
   import { stateRoles } from "$lib/config/state-settings";
+  import { writeStateCommon } from "$lib/config/state-write";
   import { enumLabelFromObject, enumsOf, roomList } from "$lib/config/rooms";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
 
@@ -216,14 +217,7 @@
     try {
       const nextSaved = { ...saved };
       if (Object.keys(patch).length > 0) {
-        const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
-          action: "common.write",
-          id,
-          common: patch,
-        })) as { ok?: boolean; error?: string } | undefined;
-        if (!reply?.ok) {
-          throw new Error(reply?.error ?? "The adapter rejected the change.");
-        }
+        await writeStateCommon(id, patch);
         Object.assign(nextSaved, {
           name,
           type: draft.type,
