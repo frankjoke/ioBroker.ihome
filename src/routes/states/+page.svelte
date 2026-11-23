@@ -8,6 +8,7 @@
   } from "$lib/stores/overrides.svelte";
   import { patchView, readView } from "$lib/stores/page-view";
   import StateList from "$lib/components/states/StateList.svelte";
+  import StateDetail from "$lib/components/states/StateDetail.svelte";
   import {
     stateEntries,
     stateMatches,
@@ -71,11 +72,7 @@
 
     <section class="detail card">
       {#if selected}
-        <h2>{String(selected.common?.name ?? selectedId)}</h2>
-        <p class="mono text-muted">{selectedId}</p>
-        <p class="hint text-muted">
-          The detail editor is being built in the next task.
-        </p>
+        <StateDetail id={selectedId} object={selected} {variables} />
       {:else}
         <p class="hint text-muted">Select a state on the left.</p>
       {/if}
@@ -112,11 +109,6 @@
     padding: 1rem;
     min-height: 12rem;
     min-width: 0;
-  }
-
-  .detail h2 {
-    margin: 0 0 0.25rem;
-    font-size: var(--headline-sm);
   }
 
   @media (max-width: 820px) {
