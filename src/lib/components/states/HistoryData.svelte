@@ -29,6 +29,8 @@
   ];
 
   let openAdapter = $state("");
+  let draftEnabled = $state<boolean | null>(null);
+  let saving = $state(false);
   let duration = $state("24");
   let featuresReply = $state<unknown>(null);
   let points = $state<Array<{ ts: number; val: number }>>([]);
@@ -67,9 +69,21 @@
     return customValue(key)?.enabled !== false;
   }
 
-  async function setEnabled(key: string, enabled: boolean): Promise<void> {
+  const enabledDirty = $derived(
+    openAdapter !== "" &&
+      draftEnabled !== null &&
+      draftEnabled !== enabledOf(openAdapter),
+  );
+
+  async function saveEnabled(): Promise<void> {
+    const key = openAdapter;
+    const enabled = draftEnabled;
+    if (!key || enabled === null) return;
     const value = customValue(key);
     if (!value) return;
+    saving = true;
+    error = "";
+    message = "";
     const custom = {
       ...((object?.common?.custom ?? {}) as Record<string, unknown>),
       [key]: { ...value, enabled },
@@ -86,11 +100,14 @@
       message = `${key} ${enabled ? "enabled" : "disabled"}.`;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      saving = false;
     }
   }
 
   function toggle(key: string): void {
     openAdapter = openAdapter === key ? "" : key;
+    draftEnabled = openAdapter ? enabledOf(openAdapter) : null;
     error = "";
     message = "";
     featuresReply = null;
@@ -213,7 +230,10 @@
   });
 
   $effect(() => {
-    if (openAdapter && !customKeys.includes(openAdapter)) openAdapter = "";
+    if (openAdapter && !customKeys.includes(openAdapter)) {
+      openAdapter = "";
+      draftEnabled = null;
+    }
   });
 </script>
 
@@ -226,7 +246,10 @@
   {:else}
     <div class="items">
       {#each customKeys as key (key)}
-        {@const enabled = enabledOf(key)}
+        {@const enabled =
+          openAdapter === key && draftEnabled !== null
+            ? draftEnabled
+            : enabledOf(key)}
         <div class="item" class:open={openAdapter === key}>
           <div class="item-line">
             <button
@@ -241,16 +264,27 @@
             {#if key === defaultAdapter}
               <span class="badge badge-secondary">default</span>
             {/if}
+            {#if openAdapter === key}
+              <span class="item-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={!enabledDirty || saving}
+                  onclick={() => void saveEnabled()}
+                  >{saving ? "Saving…" : "Save"}</button
+                >
+              </span>
+            {/if}
           </div>
           {#if openAdapter === key}
             <div class="item-editor">
               <label class="enabled">
                 <input
                   type="checkbox"
-                  checked={enabled}
-                  disabled={loading}
+                  checked={draftEnabled ?? enabledOf(key)}
+                  disabled={saving}
                   onchange={(event) =>
-                    void setEnabled(key, event.currentTarget.checked)}
+                    (draftEnabled = event.currentTarget.checked)}
                 />
                 <span>Enabled</span>
               </label>
