@@ -94,11 +94,18 @@
   }
 
   let draft = $state<SourceOverride>(untrack(seed));
+  let savedDraft = $state<SourceOverride>(
+    untrack(() => JSON.parse(JSON.stringify(draft)) as SourceOverride),
+  );
   let confirmDelete = $state(false);
   let error = $state("");
   let busy = $state(false);
   let newValue = $state("");
   let newLabel = $state("");
+
+  const dirty = $derived(
+    !override || JSON.stringify(draft) !== JSON.stringify(savedDraft),
+  );
 
   const objects = $derived(ioBroker.objects as Map<string, any>);
   const states = $derived(ioBroker.states as Map<string, any>);
@@ -296,6 +303,7 @@
     busy = true;
     try {
       await onSave(clean());
+      savedDraft = JSON.parse(JSON.stringify(draft)) as SourceOverride;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -661,7 +669,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          disabled={busy}
+          disabled={busy || !dirty}
           onclick={save}
         >
           Save
@@ -711,7 +719,7 @@
           <button
             type="button"
             class="btn btn-primary"
-            disabled={busy}
+            disabled={busy || !dirty}
             onclick={save}
           >
             Save
