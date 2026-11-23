@@ -97,11 +97,7 @@ describe("syncOverrideObjects", () => {
       },
     };
     const h = host(objects);
-    await syncOverrideObjects(
-      h,
-      [{ ...repair, max: 10 }],
-      [repair],
-    );
+    await syncOverrideObjects(h, [{ ...repair, max: 10 }], [repair]);
     expect(h.writes[0].object.native).toEqual({ keep: true });
     expect(h.writes[0].object.common.ihome).toBeUndefined();
     expect(h.writes[0].object.common.custom.ihome.overrides[0].max).toBe(10);
@@ -117,7 +113,7 @@ describe("syncOverrideObjects", () => {
     expect(await syncOverrideObjects(h, [], [repair])).toMatchObject({
       removed: 1,
     });
-    expect(h.writes[0].object.common.custom).toEqual({});
+    expect(h.writes[0].object.common.custom).toEqual({ ihome: null });
   });
 
   it("skips a missing state and reports it", async () => {
@@ -181,9 +177,7 @@ describe("syncOverrideObjects", () => {
     expect(await syncOverrideObjects(h, [], [repair])).toMatchObject({
       removed: 1,
     });
-    expect(h.writes[0].object.common.custom.ihome.overrides).toEqual([
-      foreign,
-    ]);
+    expect(h.writes[0].object.common.custom.ihome.overrides).toEqual([foreign]);
   });
 
   it("reads a state's overrides without writing", async () => {

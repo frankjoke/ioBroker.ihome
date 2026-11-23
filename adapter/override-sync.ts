@@ -1,4 +1,5 @@
 import {
+  OVERRIDE_CUSTOM_KEY,
   customOverridesOf,
   withCustomOverrides,
   type CustomOverride,
@@ -6,9 +7,7 @@ import {
 
 /** The object surface the sync needs; the adapter supplies foreign objects. */
 export interface OverrideObjectHost {
-  getObject(
-    id: string,
-  ): Promise<Record<string, unknown> | null | undefined>;
+  getObject(id: string): Promise<Record<string, unknown> | null | undefined>;
   setObject(id: string, object: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -131,11 +130,14 @@ export async function syncOverrideObjects(
     if (existing.length === 0) continue;
     const kept = existing.filter((override) => !removedIds.has(override.id));
     if (sameOverrideGroup(existing, kept)) continue;
+    const custom = withCustomOverrides(customOf(object), kept);
+    if (kept.length === 0) {
+      // ioBroker's object merge keeps a missing nested key; null removes the
+      // value for our reader while other custom keys stay untouched.
+      custom[OVERRIDE_CUSTOM_KEY] = null;
+    }
     try {
-      await host.setObject(
-        stateId,
-        withCustom(object, withCustomOverrides(customOf(object), kept)),
-      );
+      await host.setObject(stateId, withCustom(object, custom));
       result.removed += 1;
     } catch {
       result.failed += 1;
