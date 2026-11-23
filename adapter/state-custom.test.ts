@@ -15,19 +15,45 @@ describe("customProblem", () => {
 });
 
 describe("settableCustomObject", () => {
-  it("writes only type/native/common and preserves other common fields", () => {
+  it("marks removed custom keys as null for the object db", () => {
     const object = {
       _id: "s",
       type: "state",
       from: "old",
       ts: 1,
-      common: { name: "X", custom: { "history.0": { enabled: true } } },
+      common: {
+        name: "X",
+        custom: { "history.0": { enabled: true }, "influxdb.0": {} },
+      },
       native: { keep: 1 },
     };
+    // The object db preserves common.custom keys unless they are null.
     expect(settableCustomObject(object, { "influxdb.0": {} })).toEqual({
       type: "state",
       native: { keep: 1 },
-      common: { name: "X", custom: { "influxdb.0": {} } },
+      common: {
+        name: "X",
+        custom: { "influxdb.0": {}, "history.0": null },
+      },
+    });
+  });
+
+  it("keeps every key the page sends", () => {
+    const object = {
+      _id: "s",
+      type: "state",
+      common: { name: "X", custom: { "history.0": {} } },
+      native: { keep: 1 },
+    };
+    expect(
+      settableCustomObject(object, { "history.0": {}, "influxdb.0": {} }),
+    ).toEqual({
+      type: "state",
+      native: { keep: 1 },
+      common: {
+        name: "X",
+        custom: { "history.0": {}, "influxdb.0": {} },
+      },
     });
   });
 });
