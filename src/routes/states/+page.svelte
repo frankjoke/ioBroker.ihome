@@ -7,9 +7,11 @@
     initOverrides,
   } from "$lib/stores/overrides.svelte";
   import { patchView, readView } from "$lib/stores/page-view";
+  import { takeRequestedStateConfig } from "$lib/pages.js";
   import StateList from "$lib/components/states/StateList.svelte";
   import StateDetail from "$lib/components/states/StateDetail.svelte";
   import {
+    restoreSelection,
     stateEntries,
     stateMatches,
     type StateFilters,
@@ -18,25 +20,48 @@
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const variables = $derived(getVariables());
   const saved = readView("/states");
+  const restoreId = takeRequestedStateConfig() || saved?.openId || "";
+  let restored = false;
   let query = $state("");
   let filters = $state<StateFilters>({});
-  let selectedId = $state(saved?.openId ?? "");
+  let instance = $state("");
+  let selectedId = $state("");
 
   const entries = $derived(
     stateEntries(objects, getOverrideRegistry().overrides, variables),
   );
+  const instances = $derived(
+    [...new Set(entries.map((entry) => entry.instance))].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+  );
   const shown = $derived(
-    entries.filter((entry) => stateMatches(entry, query, filters)),
+    entries.filter((entry) =>
+      stateMatches(entry, query, { ...filters, instance }),
+    ),
   );
   const selected = $derived(objects.get(selectedId));
 
   $effect(() => {
-    if (!selectedId && shown.length) selectedId = shown[0].id;
+    if (restored || entries.length === 0) return;
+    restored = true;
+    const id = restoreSelection(entries, restoreId);
+    if (id) select(id);
   });
 
   function select(id: string): void {
     selectedId = id;
     patchView("/states", { openId: id });
+  }
+
+  function setInstance(value: string): void {
+    instance = value;
+    const next = entries.filter((entry) =>
+      stateMatches(entry, query, { ...filters, instance: value }),
+    );
+    if (next.length && !next.some((entry) => entry.id === selectedId)) {
+      select(next[0].id);
+    }
   }
 
   onMount(() => {
@@ -63,9 +88,12 @@
     <StateList
       entries={shown}
       {selectedId}
+      {instances}
+      {instance}
       {query}
       {filters}
       onselect={select}
+      oninstance={setInstance}
       onquery={(value) => (query = value)}
       onfilters={(value) => (filters = value)}
     />

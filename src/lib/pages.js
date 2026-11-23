@@ -93,6 +93,28 @@ export function wantsTileConfig(event) {
   return !!(event?.metaKey || event?.ctrlKey);
 }
 
+const STATE_EDIT_KEY = "iHome.editState";
+
+/** Ask the states page to open one state's editor, then navigate. */
+export function requestStateConfig(id) {
+  try {
+    sessionStorage.setItem(STATE_EDIT_KEY, id);
+  } catch {
+    /* private mode: the shortcut just navigates without selecting */
+  }
+}
+
+/** The requested state id, cleared as it is taken. */
+export function takeRequestedStateConfig() {
+  try {
+    const id = sessionStorage.getItem(STATE_EDIT_KEY) || "";
+    sessionStorage.removeItem(STATE_EDIT_KEY);
+    return id;
+  } catch {
+    return "";
+  }
+}
+
 const CONFIG_PLACEMENT_KEY = "iHome.editLayout";
 
 /**

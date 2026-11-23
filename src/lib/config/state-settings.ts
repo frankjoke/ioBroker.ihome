@@ -8,11 +8,13 @@ export interface StateEntry {
   name: string;
   type: string;
   role: string;
+  instance: string;
   customKeys: string[];
   overrideCount: number;
 }
 
 export interface StateFilters {
+  instance?: string;
   override?: boolean;
   history?: boolean;
   custom?: boolean;
@@ -22,6 +24,36 @@ const MAX_CUSTOM = 64 * 1024;
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** The adapter instance a state id belongs to: `adapter.0`, or the fuller
+ *  `system.adapter.<adapter>.0` / `system.host.<host>` namespaces. */
+export function instanceOf(id: string): string {
+  const parts = id.split(".");
+  if (parts[0] === "system" && parts[1] === "adapter") {
+    return parts.slice(0, 4).join(".");
+  }
+  if (parts[0] === "system" && parts[1] === "host") {
+    return parts.slice(0, 3).join(".");
+  }
+  return parts.slice(0, 2).join(".");
+}
+
+/** The row to open on arrival: the remembered state, else the first state in
+ *  its parent folder, else the first row. */
+export function restoreSelection(
+  entries: StateEntry[],
+  rememberedId: string,
+): string {
+  if (!rememberedId) return entries[0]?.id ?? "";
+  if (entries.some((entry) => entry.id === rememberedId)) return rememberedId;
+  const cut = rememberedId.lastIndexOf(".");
+  if (cut > 0) {
+    const parent = `${rememberedId.slice(0, cut)}.`;
+    const sibling = entries.find((entry) => entry.id.startsWith(parent));
+    if (sibling) return sibling.id;
+  }
+  return entries[0]?.id ?? "";
 }
 
 /** The state objects as list rows, sorted by display name. */
@@ -43,6 +75,7 @@ export function stateEntries(
       name: localizeName(common.name) || id,
       type: String(common.type ?? ""),
       role: String(common.role ?? ""),
+      instance: instanceOf(id),
       customKeys,
       overrideCount: overrides.filter(
         (override) => stateIdFor(override.stateId, variables) === wanted,
@@ -62,6 +95,7 @@ export function stateMatches(
   filters: StateFilters,
 ): boolean {
   const text = query.trim().toLowerCase();
+  if (filters.instance && entry.instance !== filters.instance) return false;
   if (
     text &&
     !`${entry.name} ${entry.id} ${entry.role}`.toLowerCase().includes(text)

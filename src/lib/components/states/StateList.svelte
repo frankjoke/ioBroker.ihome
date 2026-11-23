@@ -4,17 +4,23 @@
   let {
     entries,
     selectedId,
+    instances,
+    instance,
     query,
     filters,
     onselect,
+    oninstance,
     onquery,
     onfilters,
   }: {
     entries: StateEntry[];
     selectedId: string;
+    instances: string[];
+    instance: string;
     query: string;
     filters: StateFilters;
     onselect: (id: string) => void;
+    oninstance: (value: string) => void;
     onquery: (value: string) => void;
     onfilters: (value: StateFilters) => void;
   } = $props();
@@ -24,6 +30,18 @@
 
 <div class="state-list">
   <div class="list-head">
+    <label class="instance">
+      <span class="label-mono">Instance</span>
+      <select
+        value={instance}
+        onchange={(event) => oninstance(event.currentTarget.value)}
+      >
+        <option value="">--all--</option>
+        {#each instances as name (name)}
+          <option value={name}>{name}</option>
+        {/each}
+      </select>
+    </label>
     <label class="search">
       <span class="material-symbols-outlined" aria-hidden="true">search</span>
       <input
@@ -75,8 +93,10 @@
         onclick={() => onselect(entry.id)}
       >
         <span class="row-main">
+          <span class="mono id" title={entry.id}
+            ><span dir="ltr">{entry.id}</span></span
+          >
           <span class="name">{entry.name}</span>
-          <span class="mono id">{entry.id}</span>
         </span>
         <span class="row-meta">
           {#if entry.role}<span class="badge">{entry.role}</span>{/if}
@@ -120,6 +140,17 @@
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background: var(--surface-color);
+  }
+
+  .instance {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .instance select {
+    width: 100%;
+    min-width: 0;
   }
 
   .search .material-symbols-outlined {
@@ -183,17 +214,27 @@
   }
 
   .name {
-    font-weight: 500;
+    color: var(--text-muted);
+    font-size: var(--body-sm);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .id {
-    color: var(--text-muted);
+    font-weight: 500;
+    color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* The tail (SET/ACTUAL, the state name) is the distinguishing part; clip
+       the shared prefix instead. */
+    direction: rtl;
+    text-align: left;
+  }
+
+  .id > span {
+    direction: ltr;
   }
 
   .row-meta {
