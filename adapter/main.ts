@@ -35,7 +35,12 @@ import {
   type NetworkDevice,
 } from "./logic/network-ops";
 import { discoverMac } from "./network-mac";
-import { commonProblem, settableCommonObject } from "./state-common";
+import {
+  commonProblem,
+  newStateObject,
+  settableCommonObject,
+  stateIdProblem,
+} from "./state-common";
 import { customProblem, settableCustomObject } from "./state-custom";
 import { createPluginApi } from "./plugin-api";
 import {
@@ -1191,7 +1196,8 @@ class IHome extends utils.Adapter {
       if (
         !isRecord(obj.message) ||
         (obj.message.action !== "custom.write" &&
-          obj.message.action !== "common.write")
+          obj.message.action !== "common.write" &&
+          obj.message.action !== "create")
       ) {
         reply({ ok: false, error: "unknown states action" });
         return;
@@ -1201,6 +1207,33 @@ class IHome extends utils.Adapter {
         typeof obj.message.id === "string" ? obj.message.id.trim() : "";
       if (!id) {
         reply({ ok: false, error: "state id required" });
+        return;
+      }
+      if (action === "create") {
+        const problem = stateIdProblem(id) ?? commonProblem(obj.message.common);
+        if (problem) {
+          reply({ ok: false, error: problem });
+          return;
+        }
+        const common = obj.message.common as Record<string, unknown>;
+        if (typeof common.name !== "string" || !common.name.trim()) {
+          reply({ ok: false, error: "The state name must not be empty." });
+          return;
+        }
+        if (typeof common.type !== "string" || !common.type) {
+          reply({ ok: false, error: "Choose a state type." });
+          return;
+        }
+        if (await this.getForeignObjectAsync(id)) {
+          reply({ ok: false, error: `The state already exists: ${id}` });
+          return;
+        }
+        const created = newStateObject(id, common);
+        await this.setForeignObjectAsync(
+          id,
+          created as ioBroker.SettableObject,
+        );
+        reply({ ok: true, id, common: created.common });
         return;
       }
       const object = (await this.getForeignObjectAsync(id)) as Record<

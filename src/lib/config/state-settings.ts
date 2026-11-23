@@ -17,10 +17,36 @@ export interface StateFilters {
   instance?: string;
   override?: boolean;
   history?: boolean;
-  custom?: boolean;
 }
 
-const MAX_CUSTOM = 64 * 1024;
+/** Common state roles, before the roles the broker already carries. */
+export const STATE_ROLE_SEED = [
+  "value",
+  "value.temperature",
+  "value.humidity",
+  "value.power",
+  "switch",
+  "level",
+  "level.dimmer",
+  "level.switch",
+  "level.state",
+  "state",
+  "indicator",
+  "text",
+] as const;
+
+/** Role choices: the seed plus every role already used by an object. */
+export function stateRoles(objects: Map<string, any>, current = ""): string[] {
+  const list: string[] = [...STATE_ROLE_SEED];
+  for (const entry of objects.values()) {
+    const role = entry?.common?.role;
+    if (typeof role === "string" && role && !list.includes(role)) {
+      list.push(role);
+    }
+  }
+  if (current && !list.includes(current)) list.push(current);
+  return list.sort();
+}
 
 function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -67,7 +93,9 @@ export function stateEntries(
     if (!object || object.type !== "state") continue;
     const common = record(object.common) ? object.common : {};
     const customKeys = record(common.custom)
-      ? Object.keys(common.custom).sort()
+      ? Object.keys(common.custom)
+          .filter((key) => key !== "ihome")
+          .sort()
       : [];
     const wanted = stateIdFor(id, variables);
     rows.push({
@@ -103,35 +131,8 @@ export function stateMatches(
     return false;
   }
   if (filters.override && entry.overrideCount === 0) return false;
-  if (filters.custom && entry.customKeys.length === 0) return false;
   if (filters.history && entry.customKeys.length === 0) return false;
   return true;
-}
-
-/** Parse a custom editor's JSON as a plain object. */
-export function parseCustomJson(text: string): Record<string, unknown> | null {
-  try {
-    const value = JSON.parse(text);
-    return record(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Why the editor's JSON cannot be saved, or null when it can. */
-export function customJsonProblem(text: string): string | null {
-  if (!text.trim()) return "Custom settings must be a JSON object.";
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch (error) {
-    return `Invalid JSON: ${error instanceof Error ? error.message : String(error)}`;
-  }
-  if (!record(value)) return "Custom settings must be a JSON object.";
-  if (JSON.stringify(value).length > MAX_CUSTOM) {
-    return "Custom settings are too large.";
-  }
-  return null;
 }
 
 /** The `supportedFeatures` list of a history adapter reply. */

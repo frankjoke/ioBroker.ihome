@@ -10,6 +10,7 @@
   import { takeRequestedStateConfig } from "$lib/pages.js";
   import StateList from "$lib/components/states/StateList.svelte";
   import StateDetail from "$lib/components/states/StateDetail.svelte";
+  import StateCreateModal from "$lib/components/states/StateCreateModal.svelte";
   import {
     restoreSelection,
     stateEntries,
@@ -26,6 +27,7 @@
   let filters = $state<StateFilters>({});
   let instance = $state("");
   let selectedId = $state("");
+  let creating = $state(false);
 
   const entries = $derived(
     stateEntries(objects, getOverrideRegistry().overrides, variables),
@@ -64,6 +66,15 @@
     }
   }
 
+  function created(id: string): void {
+    creating = false;
+    instance = "";
+    query = "";
+    filters = {};
+    select(id);
+    void ioBroker.getObject(id, true).catch(() => undefined);
+  }
+
   onMount(() => {
     void initOverrides().catch(() => undefined);
   });
@@ -78,10 +89,18 @@
     <div>
       <h1>States</h1>
       <p class="hint text-muted">
-        Override, custom metadata and stored history for one state — without
+        Override, state settings and stored history for one state — without
         leaving this page.
       </p>
     </div>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick={() => (creating = true)}
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">add</span>
+      New state
+    </button>
   </header>
 
   <div class="states-grid">
@@ -108,6 +127,10 @@
   </div>
 </div>
 
+{#if creating}
+  <StateCreateModal oncreated={created} onclose={() => (creating = false)} />
+{/if}
+
 <style>
   .states-page {
     display: flex;
@@ -115,6 +138,13 @@
     gap: 1rem;
     max-width: 1200px;
     margin: 0 auto;
+  }
+
+  .page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
   }
 
   .page-head h1 {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { commonProblem, settableCommonObject } from "./state-common";
+import {
+  commonProblem,
+  newStateObject,
+  settableCommonObject,
+  stateIdProblem,
+} from "./state-common";
 
 describe("commonProblem", () => {
   it("accepts the editable state fields", () => {
@@ -18,6 +23,15 @@ describe("commonProblem", () => {
       }),
     ).toBeNull();
     expect(commonProblem({ min: null, max: null, step: null })).toBeNull();
+    expect(
+      commonProblem({ states: { "0": "Idle", "1": "Busy" }, type: "number" }),
+    ).toBeNull();
+  });
+
+  it("rejects enum labels that are not text", () => {
+    expect(commonProblem({ states: [1, 2] })).toMatch(/labels/i);
+    expect(commonProblem({ states: { "0": 1 } })).toMatch(/label/i);
+    expect(commonProblem({ states: null })).toBeNull();
   });
 
   it("rejects an empty name, an unknown type and bad field shapes", () => {
@@ -29,6 +43,44 @@ describe("commonProblem", () => {
     expect(commonProblem({ min: "1" })).toMatch(/min/i);
     expect(commonProblem({ read: "yes" })).toMatch(/read/i);
     expect(commonProblem([])).toMatch(/object/i);
+  });
+});
+
+describe("new states", () => {
+  it("validates the id shape", () => {
+    expect(stateIdProblem("0_userdata.0.lamp")).toBeNull();
+    expect(stateIdProblem(" 0_userdata.0.lamp ")).toBeNull();
+    expect(stateIdProblem("")).toMatch(/id/i);
+    expect(stateIdProblem("lamp")).toMatch(/namespace/i);
+    expect(stateIdProblem("0_userdata..lamp")).toMatch(/segment/i);
+    expect(stateIdProblem("0_userdata.0.my lamp")).toMatch(/spaces/i);
+    expect(stateIdProblem("0_userdata.0.*")).toMatch(/wildcards/i);
+    expect(stateIdProblem("system.host.x")).toMatch(/system/i);
+  });
+
+  it("builds a state with readable defaults", () => {
+    expect(
+      newStateObject("0_userdata.0.lamp", {
+        name: "Lamp",
+        type: "number",
+        role: "level",
+        unit: "%",
+        read: true,
+        write: false,
+      }),
+    ).toEqual({
+      _id: "0_userdata.0.lamp",
+      type: "state",
+      common: {
+        name: "Lamp",
+        type: "number",
+        role: "level",
+        unit: "%",
+        read: true,
+        write: false,
+      },
+      native: {},
+    });
   });
 });
 
@@ -103,5 +155,20 @@ describe("settableCommonObject", () => {
     expect("min" in common).toBe(false);
     expect("max" in common).toBe(false);
     expect("step" in common).toBe(false);
+  });
+
+  it("replaces or removes enum labels", () => {
+    const object = {
+      type: "state",
+      common: { name: "X", type: "number", states: { "0": "Off" } },
+      native: {},
+    };
+    const replaced = settableCommonObject(object, {
+      states: { "0": "Idle", "1": "Busy" },
+    }).common as Record<string, unknown>;
+    expect(replaced.states).toEqual({ "0": "Idle", "1": "Busy" });
+    const removed = settableCommonObject(object, { states: null })
+      .common as Record<string, unknown>;
+    expect("states" in removed).toBe(false);
   });
 });

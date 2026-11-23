@@ -2,6 +2,9 @@
   import { untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue, localizeName } from "$lib/config/format";
+  import { stateRoles } from "$lib/config/state-settings";
+  import { enumLabelFromObject, enumsOf, roomList } from "$lib/config/rooms";
+  import MultiSelect from "$lib/components/common/MultiSelect.svelte";
 
   const TYPES = [
     "boolean",
@@ -12,18 +15,20 @@
     "array",
     "json",
   ];
-
   interface Draft {
     name: string;
     type: string;
     role: string;
     unit: string;
     desc: string;
+    states: string;
     min: string;
     max: string;
     step: string;
     read: boolean;
     write: boolean;
+    rooms: string[];
+    functions: string[];
   }
 
   let {
@@ -38,6 +43,29 @@
     onchanged: () => void;
   } = $props();
 
+  const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
+  const roomOptions = $derived(
+    roomList(ioBroker.enums).map((room) => ({
+      value: room.id,
+      label: room.label,
+      icon: room.icon,
+    })),
+  );
+  const functionOptions = $derived(
+    (((ioBroker.enums as any)?.getList("functions") as any[]) ?? []).map(
+      (entry: any) => ({
+        value: entry._id,
+        label: enumLabelFromObject(entry),
+      }),
+    ),
+  );
+  const roles = $derived(stateRoles(objects));
+
+  function statesText(value: unknown): string {
+    if (!value) return "{}";
+    return JSON.stringify(value, null, 2);
+  }
+
   function draftOf(common: Record<string, any>): Draft {
     return {
       name: localizeName(common.name),
@@ -45,11 +73,14 @@
       role: String(common.role ?? ""),
       unit: String(common.unit ?? ""),
       desc: String(common.desc ?? ""),
+      states: statesText(common.states),
       min: common.min === undefined ? "" : String(common.min),
       max: common.max === undefined ? "" : String(common.max),
       step: common.step === undefined ? "" : String(common.step),
       read: common.read !== false,
       write: common.write === true,
+      rooms: enumsOf(ioBroker.enums, id, "rooms"),
+      functions: enumsOf(ioBroker.enums, id, "functions"),
     };
   }
 
@@ -72,6 +103,56 @@
     if (!value) return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : text;
+  }
+
+  function sameList(left: string[], right: string[]): boolean {
+    return left.length === right.length && left.every((v) => right.includes(v));
+  }
+
+  function parseStates(text: string): Record<string, string> | null {
+    if (!text.trim()) return null;
+    const value: unknown = JSON.parse(text);
+    if (value == null || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("The enums must be a JSON object.");
+    }
+    const states: Record<string, string> = {};
+    for (const [key, label] of Object.entries(value)) {
+      if (typeof label !== "string") {
+        throw new Error(`The label for ${key} must be text.`);
+      }
+      states[key] = label;
+    }
+    return states;
+  }
+
+  async function applyEnums(
+    kind: "rooms" | "functions",
+    selected: string[],
+  ): Promise<void> {
+    const options = kind === "rooms" ? roomOptions : functionOptions;
+    const current = enumsOf(ioBroker.enums, id, kind);
+    for (const option of options) {
+      const want = selected.includes(option.value);
+      if (current.includes(option.value) === want) continue;
+      const enumObject = (await ioBroker.emitAsync(
+        "getObject",
+        option.value,
+      )) as Record<string, any> | null;
+      if (!enumObject) throw new Error(`Enum not found: ${option.value}`);
+      const members = Array.isArray(enumObject.common?.members)
+        ? enumObject.common.members
+        : [];
+      const next = want
+        ? [...members.filter((member: string) => member !== id), id]
+        : members.filter((member: string) => member !== id);
+      if (next.length === members.length && want === members.includes(id)) {
+        continue;
+      }
+      await ioBroker.emitAsync("setObject", option.value, {
+        ...enumObject,
+        common: { ...enumObject.common, members: next },
+      });
+    }
   }
 
   async function save(): Promise<void> {
@@ -103,6 +184,16 @@
       error = "Min must not be greater than max.";
       return;
     }
+    let states: Record<string, string> | null = null;
+    const statesChanged = draft.states !== saved.states;
+    if (statesChanged) {
+      try {
+        states = parseStates(draft.states);
+      } catch (failure) {
+        error = failure instanceof Error ? failure.message : String(failure);
+        return;
+      }
+    }
     const patch: Record<string, unknown> = {};
     if (name !== saved.name) patch.name = name;
     if (draft.type !== saved.type) patch.type = draft.type;
@@ -114,19 +205,47 @@
     if (draft.step !== saved.step) patch.step = step;
     if (draft.read !== saved.read) patch.read = draft.read;
     if (draft.write !== saved.write) patch.write = draft.write;
-    if (Object.keys(patch).length === 0) return;
+    if (statesChanged) patch.states = states;
+    const roomsChanged = !sameList(draft.rooms, saved.rooms);
+    const functionsChanged = !sameList(draft.functions, saved.functions);
+    if (Object.keys(patch).length === 0 && !roomsChanged && !functionsChanged) {
+      return;
+    }
     busy = true;
     error = "";
     try {
-      const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
-        action: "common.write",
-        id,
-        common: patch,
-      })) as { ok?: boolean; error?: string } | undefined;
-      if (!reply?.ok) {
-        throw new Error(reply?.error ?? "The adapter rejected the change.");
+      const nextSaved = { ...saved };
+      if (Object.keys(patch).length > 0) {
+        const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
+          action: "common.write",
+          id,
+          common: patch,
+        })) as { ok?: boolean; error?: string } | undefined;
+        if (!reply?.ok) {
+          throw new Error(reply?.error ?? "The adapter rejected the change.");
+        }
+        Object.assign(nextSaved, {
+          name,
+          type: draft.type,
+          role: draft.role,
+          unit: draft.unit,
+          desc: draft.desc,
+          min: draft.min,
+          max: draft.max,
+          step: draft.step,
+          read: draft.read,
+          write: draft.write,
+          states: draft.states,
+        });
+        saved = { ...nextSaved };
       }
-      saved = { ...draft, name };
+      if (roomsChanged) await applyEnums("rooms", draft.rooms);
+      if (functionsChanged) {
+        await applyEnums("functions", draft.functions);
+      }
+      nextSaved.rooms = [...draft.rooms];
+      nextSaved.functions = [...draft.functions];
+      saved = { ...nextSaved };
       onchanged();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -136,7 +255,11 @@
   }
 
   function reset(): void {
-    draft = { ...saved };
+    draft = {
+      ...saved,
+      rooms: [...saved.rooms],
+      functions: [...saved.functions],
+    };
     error = "";
   }
 </script>
@@ -171,7 +294,11 @@
     </label>
     <label class="field">
       <span class="label-mono">Role</span>
-      <input class="mono" bind:value={draft.role} />
+      <select class="mono" bind:value={draft.role}>
+        {#each roles as role (role)}
+          <option value={role}>{role}</option>
+        {/each}
+      </select>
     </label>
     <label class="field">
       <span class="label-mono">Unit</span>
@@ -195,6 +322,41 @@
     <label class="field">
       <span class="label-mono">Step</span>
       <input inputmode="decimal" bind:value={draft.step} />
+    </label>
+  </div>
+
+  <div class="grid">
+    <label class="field">
+      <span class="label-mono">Rooms</span>
+      <MultiSelect
+        options={roomOptions}
+        selected={draft.rooms}
+        enums={ioBroker.enums}
+        placeholder="No room"
+        onChange={(ids) => (draft.rooms = ids)}
+      />
+    </label>
+    <label class="field">
+      <span class="label-mono">Functions</span>
+      <MultiSelect
+        options={functionOptions}
+        selected={draft.functions}
+        enums={ioBroker.enums}
+        placeholder="No function"
+        onChange={(ids) => (draft.functions = ids)}
+      />
+    </label>
+    <label class="field wide">
+      <span class="label-mono">Enums</span>
+      <textarea
+        class="enums"
+        rows="4"
+        spellcheck="false"
+        bind:value={draft.states}
+      ></textarea>
+      <span class="hint text-muted">
+        Value to label, as a JSON object (for example 0 = Idle, 1 = Busy).
+      </span>
     </label>
   </div>
 
@@ -264,6 +426,14 @@
     flex-direction: column;
     gap: 0.2rem;
     min-width: 0;
+  }
+
+  .enums {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--font-code);
+    font-size: var(--body-sm);
+    resize: vertical;
   }
 
   .checks {

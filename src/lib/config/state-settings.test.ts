@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   chartPoints,
-  customJsonProblem,
   deleteAllPayload,
   deleteRangePayload,
   hasHistoryFeature,
   historyFeatures,
   instanceOf,
   isHistoryAdapter,
-  parseCustomJson,
   restoreSelection,
   stateEntries,
   stateMatches,
@@ -108,24 +106,6 @@ describe("instances and restore", () => {
     expect(restoreSelection(rows, "gone.0.x")).toBe("0_userdata.0.a");
     expect(restoreSelection(rows, "")).toBe("0_userdata.0.a");
     expect(restoreSelection([], "x")).toBe("");
-  });
-});
-
-describe("custom JSON", () => {
-  it("accepts an object and rejects arrays, scalars and junk", () => {
-    expect(customJsonProblem('{"a":1}')).toBeNull();
-    expect(customJsonProblem("{}")).toBeNull();
-    expect(customJsonProblem("[1,2]")).toMatch(/object/i);
-    expect(customJsonProblem('"text"')).toMatch(/object/i);
-    expect(customJsonProblem("not json")).toMatch(/JSON/i);
-    expect(parseCustomJson('{"a":1}')).toEqual({ a: 1 });
-    expect(parseCustomJson("[1]")).toBeNull();
-  });
-
-  it("refuses an oversized custom object", () => {
-    expect(
-      customJsonProblem(JSON.stringify({ text: "x".repeat(70_000) })),
-    ).toMatch(/large/i);
   });
 });
 
