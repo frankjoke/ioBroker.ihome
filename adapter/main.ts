@@ -35,6 +35,7 @@ import {
   type NetworkDevice,
 } from "./logic/network-ops";
 import { discoverMac } from "./network-mac";
+import { customProblem, settableCustomObject } from "./state-custom";
 import { createPluginApi } from "./plugin-api";
 import {
   applyPluginPatches,
@@ -319,6 +320,7 @@ class IHome extends utils.Adapter {
       else if (obj.command === "logicTest") void this.onLogicTestMessage(obj);
       else if (obj.command === "plugin") void this.onPluginMessage(obj);
       else if (obj.command === "plugins") void this.onPluginsMessage(obj);
+      else if (obj.command === "states") void this.onStatesMessage(obj);
     });
   }
 
@@ -1181,6 +1183,47 @@ class IHome extends utils.Adapter {
     if (!this.pluginHost)
       return reply(pluginError("plugins are not available"));
     reply(await this.callPlugin(parsed.message.id, parsed.message.payload));
+  }
+
+  private async onStatesMessage(obj: ioBroker.Message): Promise<void> {
+    const reply = (result: unknown): void => {
+      if (obj.callback)
+        this.sendTo(obj.from, obj.command, result, obj.callback);
+    };
+    try {
+      if (!isRecord(obj.message) || obj.message.action !== "custom.write") {
+        reply({ ok: false, error: "unknown states action" });
+        return;
+      }
+      const id =
+        typeof obj.message.id === "string" ? obj.message.id.trim() : "";
+      if (!id) {
+        reply({ ok: false, error: "state id required" });
+        return;
+      }
+      const problem = customProblem(obj.message.custom);
+      if (problem) {
+        reply({ ok: false, error: problem });
+        return;
+      }
+      const object = (await this.getForeignObjectAsync(id)) as Record<
+        string,
+        unknown
+      > | null;
+      if (!object || object.type !== "state") {
+        reply({ ok: false, error: `not a state: ${id}` });
+        return;
+      }
+      const custom = obj.message.custom as Record<string, unknown>;
+      await this.setForeignObjectAsync(
+        id,
+        settableCustomObject(object, custom) as ioBroker.SettableObject,
+      );
+      reply({ ok: true, custom });
+    } catch (error) {
+      this.log.warn(`state custom: ${String(error)}`);
+      reply({ ok: false, error: String(error) });
+    }
   }
 
   private pluginSettingsStateId(): string {
