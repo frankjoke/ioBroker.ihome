@@ -265,7 +265,7 @@
           <button
             type="button"
             class="btn btn-sm btn-primary"
-            onclick={addOverride}>Add override</button
+            onclick={addOverride}>+ Add override</button
           >
         </div>
         {#if overrides.length === 0 && openOverrideId !== "new"}
@@ -387,5 +387,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+  }
+
+  .items .item-line {
+    cursor: default;
   }
 </style>

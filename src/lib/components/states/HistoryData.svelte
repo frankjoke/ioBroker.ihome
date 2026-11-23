@@ -554,6 +554,10 @@
     gap: 0.3rem;
   }
 
+  .items .item-line {
+    cursor: default;
+  }
+
   .enabled {
     display: flex;
     align-items: center;
