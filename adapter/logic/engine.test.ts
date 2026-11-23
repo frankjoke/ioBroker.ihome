@@ -716,6 +716,36 @@ it("exposes $value and $previous to logic code", () => {
   expect(engine.memoryValue("calc")).toBe("6|8|temp|0_userdata.0.T");
 });
 
+it("init messages report init, not an event", () => {
+  const { h, engine } = engineWith(
+    doc({
+      mode: "statements",
+      output: { scope: "memory" },
+      expr: code(
+        'message("in={{$input}} src={{$source}} init={{$init}} v={{$value}}");',
+      ),
+    }),
+  );
+  engine.start();
+  expect(h.messages.at(-1)?.message).toBe("in=— src=$init init=true v=—");
+});
+
+it("interpolates the event names in message text", () => {
+  const { h, engine } = engineWith(
+    doc({
+      init: { run: false },
+      mode: "statements",
+      output: { scope: "memory" },
+      expr: code(
+        'message("in={{$input}} src={{$source}} v={{$value}} p={{$previous}}"); return $value;',
+      ),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 6);
+  expect(h.messages.at(-1)?.message).toBe("in=temp src=0_userdata.0.T v=6 p=3");
+});
+
 it("$source names a timer's schedule", () => {
   const timed: LogicDocument = {
     version: 3,

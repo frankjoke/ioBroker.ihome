@@ -268,6 +268,11 @@
               source ref
             </li>
             <li><code>$from</code> — the writer</li>
+            <li>
+              Test and init runs have no event: <code>$input</code>,
+              <code>$source</code>, <code>$value</code>, <code>$previous</code>
+              are undefined
+            </li>
           </ul>
         {/snippet}
       </CodeField>
