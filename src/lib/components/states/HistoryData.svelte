@@ -46,11 +46,13 @@
       hint: "History as time and value rows.",
     },
   ];
+  const RAW_LIMIT = 100000;
 
   let draftEnabled = $state<boolean | null>(null);
   let saving = $state(false);
   let duration = $state("24");
   let mode = $state<"graphic" | "table">("graphic");
+  let newestFirst = $state(false);
   let featuresReply = $state<unknown>(null);
   let rows = $state<Array<{ ts: number; val: unknown }>>([]);
   let points = $state<Array<{ ts: number; val: number }>>([]);
@@ -60,6 +62,17 @@
   let pending = $state<{ kind: "range" | "all" } | null>(null);
   let rangeStart = $state("");
   let rangeEnd = $state("");
+
+  const rangeSummary = $derived(
+    loading
+      ? "Loading…"
+      : rows.length === 0
+        ? "No entries in this range."
+        : `${rows.length}${rows.length >= RAW_LIMIT ? "+" : ""} ${
+            rows.length === 1 ? "entry" : "entries"
+          } in this range`,
+  );
+  const tableRows = $derived(newestFirst ? [...rows].reverse() : rows);
 
   const adapter = $derived(openAdapter);
 
@@ -171,7 +184,7 @@
           end,
           // The adapter defaults to "average"; the table needs every raw row.
           aggregate: "none",
-          limit: 100000,
+          limit: RAW_LIMIT,
           ignoreNull: true,
         },
       });
@@ -318,6 +331,14 @@
                   tabs={FORMAT_TABS}
                   collapsible={false}
                 >
+                  {#snippet trailing()}
+                    {#if mode === "table"}
+                      <label class="sort">
+                        <input type="checkbox" bind:checked={newestFirst} />
+                        <span>Newest first</span>
+                      </label>
+                    {/if}
+                  {/snippet}
                   {#snippet actions()}
                     <label class="range">
                       <span class="label-mono">Display range</span>
@@ -348,7 +369,7 @@
                             </tr>
                           </thead>
                           <tbody>
-                            {#each rows as row, index (index)}
+                            {#each tableRows as row, index (index)}
                               <tr>
                                 <td class="mono"
                                   >{new Date(row.ts).toLocaleString()}</td
@@ -403,7 +424,9 @@
                 {/if}
               </div>
 
-              {#if message}<p class="hint text-muted">{message}</p>{/if}
+              <p class="hint text-muted">
+                {rangeSummary}{message ? ` · ${message}` : ""}
+              </p>
               {#if error}<p class="hint text-danger">{error}</p>{/if}
             </div>
           {/if}
@@ -453,6 +476,14 @@
     align-items: center;
     gap: 0.35rem;
     font-size: var(--body-sm);
+  }
+
+  .sort {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--body-sm);
+    white-space: nowrap;
   }
 
   .table-wrap {

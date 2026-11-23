@@ -12,6 +12,7 @@
     showHint = true,
     children,
     actions,
+    trailing,
     onchange,
   }: {
     tabs: readonly {
@@ -33,6 +34,8 @@
     children?: Snippet<[T | null]>;
     /** Create actions on the right side of the tab line. */
     actions?: Snippet;
+    /** A control that sits directly after the tabs, before the actions. */
+    trailing?: Snippet;
     /** Called after a click with the new open id (null when closed). */
     onchange?: (value: T | null) => void;
   } = $props();
@@ -61,6 +64,9 @@
         {t.label}
       </button>
     {/each}
+    {#if trailing}
+      <div class="option-tabs-trailing">{@render trailing()}</div>
+    {/if}
     {#if actions}
       <div class="option-tabs-actions">{@render actions()}</div>
     {/if}
@@ -89,6 +95,13 @@
     align-items: center;
     gap: 0.25rem;
     margin-left: auto;
+    padding-bottom: 2px;
+  }
+
+  .option-tabs-trailing {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     padding-bottom: 2px;
   }
 </style>
