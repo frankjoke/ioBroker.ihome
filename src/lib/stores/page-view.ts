@@ -13,6 +13,12 @@ export interface PageView {
   kind?: string;
   /** The active page tab. */
   tab?: string;
+  /** A list's search text. */
+  query?: string;
+  /** A list's selected instance filter. */
+  instance?: string;
+  /** Boolean list filters (override, history, …). */
+  filters?: Record<string, boolean>;
 }
 
 const KEY = "iHome.pageView";

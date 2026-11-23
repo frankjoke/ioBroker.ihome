@@ -23,9 +23,12 @@
   const saved = readView("/states");
   const restoreId = takeRequestedStateConfig() || saved?.openId || "";
   let restored = false;
-  let query = $state("");
-  let filters = $state<StateFilters>({});
-  let instance = $state("");
+  let query = $state(saved?.query ?? "");
+  let filters = $state<StateFilters>({
+    override: saved?.filters?.override === true,
+    history: saved?.filters?.history === true,
+  });
+  let instance = $state(saved?.instance ?? "");
   let selectedId = $state("");
   let creating = $state(false);
 
@@ -49,6 +52,17 @@
     restored = true;
     const id = restoreSelection(entries, restoreId);
     if (id) select(id);
+  });
+
+  $effect(() => {
+    patchView("/states", {
+      query,
+      instance,
+      filters: {
+        override: filters.override === true,
+        history: filters.history === true,
+      },
+    });
   });
 
   function select(id: string): void {

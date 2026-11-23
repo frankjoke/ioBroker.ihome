@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import type { StateEntry, StateFilters } from "$lib/config/state-settings";
 
   let {
@@ -26,6 +27,23 @@
   } = $props();
 
   const count = $derived(entries.length);
+  let rowsEl = $state<HTMLDivElement>();
+  let scrolledFor = "";
+
+  $effect(() => {
+    if (!rowsEl || !selectedId || selectedId === scrolledFor) return;
+    scrolledFor = selectedId;
+    void tick().then(() => {
+      const row = rowsEl?.querySelector<HTMLElement>(".state-row.active");
+      if (!row || !rowsEl) return;
+      const list = rowsEl.getBoundingClientRect();
+      const box = row.getBoundingClientRect();
+      if (box.top < list.top) rowsEl.scrollTop -= list.top - box.top;
+      else if (box.bottom > list.bottom) {
+        rowsEl.scrollTop += box.bottom - list.bottom;
+      }
+    });
+  });
 </script>
 
 <div class="state-list">
@@ -75,7 +93,7 @@
     <span class="hint text-muted">{count} state{count === 1 ? "" : "s"}</span>
   </div>
 
-  <div class="rows">
+  <div class="rows" bind:this={rowsEl}>
     {#each entries as entry (entry.id)}
       <button
         type="button"
