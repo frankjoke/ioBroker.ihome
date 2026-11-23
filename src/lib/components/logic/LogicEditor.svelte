@@ -269,6 +269,10 @@
             </li>
             <li><code>$from</code> — the writer</li>
             <li>
+              <code>get("name")</code> reads an input, memory, variable, or any
+              dotted state id; <code>set("name", value)</code> writes the same
+            </li>
+            <li>
               In <code>message</code>/<code>log</code> text use
               <code>{`{{$input}}`}</code>; in code use <code>$input</code> or
               <code>get("$input")</code>
