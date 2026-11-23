@@ -1,5 +1,6 @@
 import {
   OVERRIDE_CUSTOM_KEY,
+  customEntryOf,
   customOverridesOf,
   withCustomOverrides,
   type CustomOverride,
@@ -16,6 +17,13 @@ export interface OverrideSyncResult {
   removed: number;
   skipped: number;
   failed: number;
+}
+
+export interface OverrideSyncOptions {
+  /** `updatedAt` of the list being mirrored; 0 means the list is unknown. */
+  updatedAt?: number;
+  /** Resolve a variable-named state id to the concrete broker state id. */
+  resolveStateId?: (stateId: string) => string | undefined;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -66,7 +74,11 @@ function withCustom(
   custom: Record<string, unknown>,
 ): Record<string, unknown> {
   const common = record(object.common) ? object.common : {};
-  return { ...object, common: { ...common, custom } };
+  return {
+    ...(object.type !== undefined ? { type: object.type } : {}),
+    ...(record(object.native) ? { native: object.native } : {}),
+    common: { ...common, custom },
+  };
 }
 
 /**
@@ -78,6 +90,7 @@ export async function syncOverrideObjects(
   host: OverrideObjectHost,
   next: CustomOverride[],
   previous: CustomOverride[] = [],
+  options: OverrideSyncOptions = {},
 ): Promise<OverrideSyncResult> {
   const result: OverrideSyncResult = {
     updated: 0,
@@ -85,33 +98,51 @@ export async function syncOverrideObjects(
     skipped: 0,
     failed: 0,
   };
-  const nextGroups = groupOverrides(next);
-  const previousGroups = groupOverrides(previous);
-  const nextIds = new Set(next.map((override) => override.id));
-  const removedIds = new Set(
-    previous
-      .filter((override) => !nextIds.has(override.id))
-      .map((override) => override.id),
-  );
+  const listUpdatedAt = options.updatedAt ?? 0;
+  const resolve = (override: CustomOverride): CustomOverride => {
+    const stateId =
+      options.resolveStateId?.(override.stateId) ?? override.stateId;
+    return stateId === override.stateId ? override : { ...override, stateId };
+  };
+  const current = next.map(resolve);
+  const prior = previous.map(resolve);
+  const nextGroups = groupOverrides(current);
+  const previousGroups = groupOverrides(prior);
 
   for (const [stateId, overrides] of nextGroups) {
-    const object = await host.getObject(stateId);
-    if (!object) {
+    let object: Record<string, unknown> | null | undefined;
+    try {
+      object = await host.getObject(stateId);
+    } catch {
+      result.failed += 1;
+      continue;
+    }
+    if (!object || (object.type !== undefined && object.type !== "state")) {
       result.skipped += 1;
       continue;
     }
-    const existing = customOverridesOf(object);
-    const kept = existing.filter((override) => !removedIds.has(override.id));
-    const merged = new Map(kept.map((override) => [override.id, override]));
-    for (const override of overrides) merged.set(override.id, override);
-    const group = [...merged.values()].sort((left, right) =>
+    const entry = customEntryOf(object);
+    // A newer object (or a lost list) wins: do not regress its metadata.
+    if (entry && (listUpdatedAt === 0 || entry.updatedAt > listUpdatedAt)) {
+      continue;
+    }
+    const group = [...overrides].sort((left, right) =>
       left.id.localeCompare(right.id),
     );
-    if (sameOverrideGroup(existing, group)) continue;
+    if (
+      entry &&
+      entry.updatedAt === listUpdatedAt &&
+      sameOverrideGroup(entry.overrides, group)
+    ) {
+      continue;
+    }
     try {
       await host.setObject(
         stateId,
-        withCustom(object, withCustomOverrides(customOf(object), group)),
+        withCustom(
+          object,
+          withCustomOverrides(customOf(object), group, listUpdatedAt),
+        ),
       );
       result.updated += 1;
     } catch {
@@ -121,22 +152,25 @@ export async function syncOverrideObjects(
 
   for (const stateId of previousGroups.keys()) {
     if (nextGroups.has(stateId)) continue;
-    const object = await host.getObject(stateId);
-    if (!object) {
+    let object: Record<string, unknown> | null | undefined;
+    try {
+      object = await host.getObject(stateId);
+    } catch {
+      result.failed += 1;
+      continue;
+    }
+    if (!object || (object.type !== undefined && object.type !== "state")) {
       result.skipped += 1;
       continue;
     }
-    const existing = customOverridesOf(object);
-    if (existing.length === 0) continue;
-    const kept = existing.filter((override) => !removedIds.has(override.id));
-    if (sameOverrideGroup(existing, kept)) continue;
-    const custom = withCustomOverrides(customOf(object), kept);
-    if (kept.length === 0) {
-      // ioBroker's object merge keeps a missing nested key; null removes the
-      // value for our reader while other custom keys stay untouched.
-      custom[OVERRIDE_CUSTOM_KEY] = null;
+    const entry = customEntryOf(object);
+    if (!entry || listUpdatedAt === 0 || entry.updatedAt > listUpdatedAt) {
+      continue;
     }
     try {
+      const custom = withCustomOverrides(customOf(object), [], listUpdatedAt);
+      // The object merge keeps a missing nested key; null is the tombstone.
+      custom[OVERRIDE_CUSTOM_KEY] = null;
       await host.setObject(stateId, withCustom(object, custom));
       result.removed += 1;
     } catch {

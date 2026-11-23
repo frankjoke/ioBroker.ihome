@@ -24,7 +24,7 @@ import { createLogBuffer } from "./log-buffer";
 import { NetworkPresenceService } from "./network-presence";
 import {
   OVERRIDE_LIST_ID,
-  parseOverrideList,
+  parseOverrideDocument,
   type CustomOverride,
 } from "./override-common";
 import { syncOverrideObjects } from "./override-sync";
@@ -284,6 +284,7 @@ class IHome extends utils.Adapter {
   private networkDeviceList: NetworkDevice[] = [];
   /** The override list last mirrored onto state objects. */
   private overrideSnapshot: CustomOverride[] = [];
+  private overrideListUpdatedAt = 0;
   private overrideSyncTail: Promise<void> = Promise.resolve();
   /** Set once startup finished; before that the settings echo must not start
    *  a second presence service. */
@@ -1478,8 +1479,8 @@ class IHome extends utils.Adapter {
 
   /** Mirror the current override list onto state objects, serialized. */
   private async applyOverrideList(value: unknown): Promise<void> {
-    const next = parseOverrideList(value);
-    if (!next) return;
+    const doc = parseOverrideDocument(value);
+    if (!doc || doc.updatedAt < this.overrideListUpdatedAt) return;
     const run = async () => {
       const result = await syncOverrideObjects(
         {
@@ -1491,10 +1492,15 @@ class IHome extends utils.Adapter {
           setObject: (id, object) =>
             this.setForeignObjectAsync(id, object as ioBroker.SettableObject),
         },
-        next,
+        doc.overrides,
         this.overrideSnapshot,
+        {
+          updatedAt: doc.updatedAt,
+          resolveStateId: (id) => this.variables.states[id]?.stateId,
+        },
       );
-      this.overrideSnapshot = next;
+      this.overrideSnapshot = doc.overrides;
+      this.overrideListUpdatedAt = doc.updatedAt;
       if (result.updated || result.removed || result.failed) {
         this.log.debug(
           `overrides: ${result.updated} state(s) updated, ${result.removed} cleaned, ${result.failed} failed`,
@@ -2690,7 +2696,11 @@ class IHome extends utils.Adapter {
     });
     await this.subscribeForeignStatesAsync([OVERRIDE_LIST_ID]);
     const overrideState = await this.getForeignStateAsync(OVERRIDE_LIST_ID);
-    await this.applyOverrideList(overrideState?.val);
+    try {
+      await this.applyOverrideList(overrideState?.val);
+    } catch (error) {
+      this.log.warn(`overrides: ${String(error)}`);
+    }
     const nativeNetworkDevices = validNetworkDevices(
       (this.config as { networkDevices?: unknown }).networkDevices,
     );

@@ -645,7 +645,38 @@ describe("variable-named state ids", () => {
 
 describe("mergeObjectOverrides", () => {
   const objectWith = (...overrides: unknown[]) => ({
-    common: { custom: { ihome: { version: 1, overrides } } },
+    common: {
+      custom: { ihome: { version: 1, updatedAt: 0, overrides } },
+    },
+  });
+  const objectAt = (updatedAt: number, ...overrides: unknown[]) => ({
+    common: {
+      custom: { ihome: { version: 1, updatedAt, overrides } },
+    },
+  });
+
+  it("ignores object metadata older than the list", () => {
+    const reg: OverrideRegistry = {
+      version: 1,
+      updatedAt: 10,
+      overrides: [],
+    };
+    const merged = mergeObjectOverrides(reg, [
+      objectAt(5, repair({ id: "old", stateId: "s", name: "old" })),
+    ]);
+    expect(merged.overrides).toEqual([]);
+  });
+
+  it("lets a newer object group replace the list's entries for that state", () => {
+    const reg: OverrideRegistry = {
+      version: 1,
+      updatedAt: 10,
+      overrides: [repair({ id: "list", stateId: "s", name: "old" })],
+    };
+    const merged = mergeObjectOverrides(reg, [
+      objectAt(20, repair({ id: "obj", stateId: "s", name: "new" })),
+    ]);
+    expect(merged.overrides).toMatchObject([{ id: "obj" }]);
   });
 
   it("adds object-only overrides and keeps list-only entries", () => {

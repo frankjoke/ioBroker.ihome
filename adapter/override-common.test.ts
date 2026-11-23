@@ -77,10 +77,10 @@ describe("customOverridesOf", () => {
 describe("withCustomOverrides", () => {
   it("preserves other custom keys and writes the versioned array", () => {
     expect(
-      withCustomOverrides({ "history.0": { enabled: true } }, [repair]),
+      withCustomOverrides({ "history.0": { enabled: true } }, [repair], 7),
     ).toEqual({
       "history.0": { enabled: true },
-      ihome: { version: 1, overrides: [repair] },
+      ihome: { version: 1, updatedAt: 7, overrides: [repair] },
     });
   });
 

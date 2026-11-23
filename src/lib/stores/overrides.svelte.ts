@@ -111,7 +111,7 @@ function withInputs(doc: OverrideRegistry): OverrideRegistry {
 }
 
 function mergeFromObjects(doc: OverrideRegistry): OverrideRegistry {
-  return mergeObjectOverrides(doc, objectsSource().values());
+  return mergeObjectOverrides(doc, objectsSource().values(), getVariables());
 }
 
 function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
@@ -276,6 +276,11 @@ export function initOverrides(): Promise<void> {
         console.error("initOverrides ensureOverridesObject:", e);
       }
       const state = await readState();
+      // The socket is connected before the object cache is filled; wait briefly
+      // so object-only overrides survive a normal page load.
+      for (let i = 0; i < 20 && ioBroker.objects.size === 0; i++) {
+        await ioBroker.wait(100);
+      }
       const value = state?.value;
       const empty = value === null || value === undefined || value === "";
       if (!empty) {

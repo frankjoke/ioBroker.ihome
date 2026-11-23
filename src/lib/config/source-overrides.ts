@@ -1,5 +1,5 @@
 import { num, parseDoc } from "$lib/config/doc-parse";
-import { customOverridesOf } from "$adapter/override-common";
+import { customEntryOf } from "$adapter/override-common";
 import { localizeName } from "$lib/config/format";
 import { applyRead } from "$lib/utils/transform";
 import {
@@ -426,26 +426,45 @@ export function evaluateOverride(
 
 /** The valid overrides attached to one state object. */
 export function overridesFromObject(object: unknown): SourceOverride[] {
-  return customOverridesOf(object)
+  return (customEntryOf(object)?.overrides ?? [])
     .map(normalizeOverride)
     .filter((override): override is SourceOverride => override !== null);
 }
 
 /**
- * Merge object metadata over the saved list. Object entries win for the same
- * state and case-insensitive name; list-only and object-only entries stay.
- * Derived inputs are recomputed by the store after this merge.
+ * Merge object metadata over the saved list. Object metadata is trusted only
+ * when the list is unknown (`updatedAt` 0) or older; a newer list wins, so a
+ * delete made while the adapter was stopped cannot be resurrected. Derived
+ * inputs are recomputed by the store after this merge.
  */
 export function mergeObjectOverrides(
   registry: OverrideRegistry,
   objects: Iterable<unknown>,
+  variables: GlobalVariable[] = [],
 ): OverrideRegistry {
   const key = (override: SourceOverride): string =>
-    `${override.stateId.trim().toLowerCase()}\u0000${override.name.trim().toLowerCase()}`;
+    `${stateIdFor(override.stateId, variables)}\u0000${override.name.trim().toLowerCase()}`;
   const byKey = new Map<string, SourceOverride>();
   for (const override of registry.overrides) byKey.set(key(override), override);
+  const trustedStates = new Set<string>();
   for (const object of objects) {
-    for (const override of overridesFromObject(object)) {
+    const entry = customEntryOf(object);
+    if (!entry) continue;
+    if (registry.updatedAt !== 0 && entry.updatedAt <= registry.updatedAt) {
+      continue;
+    }
+    for (const raw of entry.overrides) {
+      const override = normalizeOverride(raw);
+      if (!override) continue;
+      const stateId = stateIdFor(override.stateId, variables);
+      if (!trustedStates.has(stateId)) {
+        trustedStates.add(stateId);
+        for (const [existingKey, existing] of byKey) {
+          if (stateIdFor(existing.stateId, variables) === stateId) {
+            byKey.delete(existingKey);
+          }
+        }
+      }
       byKey.set(key(override), override);
     }
   }
