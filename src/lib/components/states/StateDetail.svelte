@@ -62,7 +62,7 @@
     {
       id: "override" as const,
       label: "Override",
-      hint: "Repairs and derived values for this state.",
+      hint: "UI-only repairs and derived values for this state.",
       disabled: !hasOverrides && !openOverrideId,
     },
     {
@@ -258,7 +258,9 @@
         <div class="section-head">
           <p class="hint text-muted">
             Repairs change how this state is displayed; derived values are
-            computed from its group. One state may have several.
+            computed from its group. Overrides are used by the iHome UI only —
+            the logic engine never sees them; use the real state or a variable
+            in logic. One state may have several.
           </p>
           <button
             type="button"
