@@ -1282,7 +1282,7 @@ it("matches the state to the current output value, first declaration wins", () =
   const engine = createEngine(doc, h.deps);
   h.attach(engine);
   engine.start();
-  // Adopting is silent: no write, only the state choice.
+  // Adopting is silent: no write, only the state choice and its timer.
   expect(h.writes).toEqual([]);
   expect(h.logs.some((l) => l.message.includes("starts in “On”"))).toBe(true);
 
@@ -1296,7 +1296,7 @@ it("matches the state to the current output value, first declaration wins", () =
   );
 });
 
-it("adopts a boolean output by its On prefix without writing or entering", () => {
+it("adopts a boolean output by its On prefix without writing or entering, and arms its timeout", () => {
   const doc = startup(
     { scope: "state", ref: "0_userdata.0.B", type: "boolean" },
     undefined,
@@ -1313,8 +1313,15 @@ it("adopts a boolean output by its On prefix without writing or entering", () =>
   h.attach(engine);
   engine.start();
   expect(h.writes).toEqual([]); // no output write and no enter action
-  expect(h.clock.pending).toBe(0); // and no `after` timer
+  expect(h.clock.pending).toBe(1); // the adopted state's `after` timer
   expect(h.logs.some((l) => l.message.includes("starts in “On”"))).toBe(true);
+  h.clock.advance(60_000);
+  expect(h.writes).toEqual([
+    { id: "0_userdata.0.B", value: false, ack: false },
+  ]);
+  expect(
+    h.logs.some((l) => l.message.includes("moves from “On” to “Idle”")),
+  ).toBe(true);
 });
 
 it("falls back when the output value matches no state", () => {

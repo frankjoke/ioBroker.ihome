@@ -1344,10 +1344,14 @@ export function createEngine(
     if (names.length === 0) return;
     const chosen = chooseStart(rt, def, names);
     rt.init = true;
-    // Silent adoption (D27): set the state and nothing else — no exit/enter, no
-    // `after` timer, no output command. Only an explicit `$init` goto acts.
+    // Silent adoption (D27): set the state — no exit/enter and no output
+    // command. The state's own `after` timer is armed (a timeout is a maximum
+    // dwell time). Only an explicit `$init` goto transitions at start.
     rt.state = chosen;
     deps.report?.(def.id, { state: chosen, ts: deps.now() });
+    // A timeout is a maximum dwell, so the adopted state gets its timer even
+    // though no entry ran. Enter actions and the output stay untouched (D27).
+    armAfter(rt, chosen, def.states[chosen]);
     const output = rt.output;
     if (output.scope === "memory") {
       // The machine's own state readout, stored without emitting an event.

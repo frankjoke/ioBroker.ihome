@@ -633,8 +633,9 @@
             <p class="hint text-muted">
               Starts in the state whose value matches the current output (a
               boolean's <code>On*</code> or an explicit map); otherwise in the
-              first state. Adopting is silent: no enter actions, no timer, no
-              output write. Use an init state or a <code>$init</code> row to act.
+              first state. Adopting runs no enter actions and writes no output,
+              but arms the state's <code>after</code> timeout. Use an init state
+              or a <code>$init</code> row to act.
             </p>
             {#if init.state !== undefined}
               <div class="row">
