@@ -27,7 +27,7 @@
 
   let adapter = $state(untrack(() => customKeys[0] ?? ""));
   let duration = $state("24");
-  let features = $state<string[]>([]);
+  let featuresReply = $state<unknown>(null);
   let points = $state<Array<{ ts: number; val: number }>>([]);
   let loading = $state(false);
   let error = $state("");
@@ -61,30 +61,22 @@
 
   async function probeFeatures(): Promise<void> {
     if (!adapter) {
-      features = [];
+      featuresReply = null;
       return;
     }
     try {
       const reply = await ioBroker.sendTo(adapter, "features", {});
       const errorText = replyError(reply);
       if (errorText) throw new Error(errorText);
-      const value = reply as { supportedFeatures?: unknown };
-      features = Array.isArray(value?.supportedFeatures)
-        ? value.supportedFeatures.filter(
-            (entry): entry is string => typeof entry === "string",
-          )
-        : [];
+      featuresReply = reply;
     } catch (failure) {
-      features = [];
+      featuresReply = null;
       error = `Features from ${adapter}: ${failure instanceof Error ? failure.message : String(failure)}`;
     }
   }
 
   async function loadChart(): Promise<void> {
-    if (
-      !adapter ||
-      !hasHistoryFeature({ supportedFeatures: features }, "getHistory")
-    ) {
+    if (!adapter || !hasHistoryFeature(featuresReply, "getHistory")) {
       return;
     }
     loading = true;
@@ -116,7 +108,7 @@
     error = "";
     message = "";
     await probeFeatures();
-    if (features.includes("getHistory")) await loadChart();
+    if (hasHistoryFeature(featuresReply, "getHistory")) await loadChart();
     else points = [];
   }
 
@@ -200,11 +192,11 @@
       </label>
     </div>
 
-    {#if features.length === 0}
+    {#if !featuresReply}
       <p class="hint text-muted">
         {adapter} does not report history features.
       </p>
-    {:else if hasHistoryFeature({ supportedFeatures: features }, "getHistory")}
+    {:else if hasHistoryFeature(featuresReply, "getHistory")}
       {#if loading}
         <p class="hint text-muted">Loading…</p>
       {:else}
@@ -225,7 +217,7 @@
         <span class="label-mono">To</span>
         <input type="datetime-local" bind:value={rangeEnd} />
       </label>
-      {#if hasHistoryFeature({ supportedFeatures: features }, "deleteRange")}
+      {#if hasHistoryFeature(featuresReply, "deleteRange")}
         <button
           type="button"
           class="btn btn-sm"
@@ -233,7 +225,7 @@
           onclick={() => (pending = { kind: "range" })}>Delete range</button
         >
       {/if}
-      {#if hasHistoryFeature({ supportedFeatures: features }, "deleteAll")}
+      {#if hasHistoryFeature(featuresReply, "deleteAll")}
         <button
           type="button"
           class="btn btn-sm btn-danger"

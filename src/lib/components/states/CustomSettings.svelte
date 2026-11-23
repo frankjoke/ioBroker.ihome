@@ -5,6 +5,7 @@
     customJsonProblem,
     parseCustomJson,
   } from "$lib/config/state-settings";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
 
   let {
     stateId,
@@ -29,6 +30,7 @@
   let error = $state("");
   let message = $state("");
   let busy = $state(false);
+  let pendingRemove = $state(false);
 
   const keys = $derived(Object.keys(custom).sort());
 
@@ -150,8 +152,11 @@
     </label>
 
     <div class="actions">
-      <button type="button" class="btn btn-sm" disabled={busy} onclick={remove}
-        >Remove key</button
+      <button
+        type="button"
+        class="btn btn-sm"
+        disabled={busy}
+        onclick={() => (pendingRemove = true)}>Remove key</button
       >
       <button
         type="button"
@@ -165,6 +170,23 @@
   {#if error}<p class="hint text-danger">{error}</p>{/if}
   {#if message}<p class="hint text-muted">{message}</p>{/if}
 </div>
+
+{#if pendingRemove}
+  <ConfirmModal
+    title={`Delete custom settings ${key}?`}
+    confirmLabel="Delete"
+    onConfirm={() => {
+      pendingRemove = false;
+      void remove();
+    }}
+    onCancel={() => (pendingRemove = false)}
+  >
+    <p class="text-muted">
+      This removes <span class="mono">{key}</span> from
+      <span class="mono">{stateId}</span>. Other custom keys stay.
+    </p>
+  </ConfirmModal>
+{/if}
 
 <style>
   .custom-settings {

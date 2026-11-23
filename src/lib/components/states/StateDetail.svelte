@@ -60,6 +60,10 @@
     (ioBroker.states as unknown as Map<string, any>)?.get?.(id),
   );
 
+  function customSaved(): void {
+    message = "Custom settings saved.";
+  }
+
   async function saveOverride(next: SourceOverride): Promise<void> {
     const registry = getOverrideRegistry();
     const result = await commitOverrides(
@@ -171,11 +175,7 @@
         {/if}
       {:else if active === "custom"}
         {#key id}
-          <CustomSettings
-            stateId={id}
-            {object}
-            onchanged={() => (message = "Custom settings saved.")}
-          />
+          <CustomSettings stateId={id} {object} onchanged={customSaved} />
         {/key}
       {:else}
         {#key id}

@@ -110,7 +110,20 @@ export function historyFeatures(reply: unknown): string[] {
     : [];
 }
 
+/** A reply to a history adapter's `features` command. */
+export function isHistoryAdapter(reply: unknown): boolean {
+  const nested = record(reply)
+    ? record(reply.result)
+      ? reply.result
+      : reply
+    : null;
+  return !!nested && Array.isArray(nested.supportedFeatures);
+}
+
+/** `getHistory` is the baseline command a history adapter answers without
+ *  listing it (history.0 reports only update/delete/deleteRange/deleteAll). */
 export function hasHistoryFeature(reply: unknown, feature: string): boolean {
+  if (feature === "getHistory") return isHistoryAdapter(reply);
   return historyFeatures(reply).includes(feature);
 }
 

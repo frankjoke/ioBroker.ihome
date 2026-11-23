@@ -6,6 +6,7 @@ import {
   deleteRangePayload,
   hasHistoryFeature,
   historyFeatures,
+  isHistoryAdapter,
   parseCustomJson,
   stateEntries,
   stateMatches,
@@ -98,6 +99,17 @@ describe("history adapter helpers", () => {
     expect(historyFeatures({ supportedFeatures: "nope" })).toEqual([]);
     expect(hasHistoryFeature(reply, "deleteRange")).toBe(true);
     expect(hasHistoryFeature({}, "deleteAll")).toBe(false);
+  });
+
+  it("treats getHistory as the baseline of a history adapter", () => {
+    const bare = { supportedFeatures: ["deleteRange", "deleteAll"] };
+    expect(isHistoryAdapter(bare)).toBe(true);
+    expect(isHistoryAdapter({})).toBe(false);
+    expect(hasHistoryFeature(bare, "getHistory")).toBe(true);
+    expect(hasHistoryFeature({ supportedFeatures: [] }, "getHistory")).toBe(
+      true,
+    );
+    expect(hasHistoryFeature({}, "getHistory")).toBe(false);
   });
 
   it("builds the standard delete payloads", () => {
