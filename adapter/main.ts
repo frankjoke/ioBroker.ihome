@@ -9,7 +9,7 @@ import {
   type LogicReading,
   type StateChange,
 } from "./logic/engine";
-import { isRecord, parseLogicDocument } from "./logic/validate";
+import { isRecord, logicDocumentValue } from "./logic/validate";
 import { expandInputPatterns } from "./logic/pattern-ops";
 import { toStatementBodies } from "./logic/function-bodies";
 import { logicSubscriptions, subscriptionDiff } from "./logic/subscriptions";
@@ -682,16 +682,12 @@ class IHome extends utils.Adapter {
     const target = `${CONFIG_FOLDER}.logicList`;
     let doc: LogicDocument | null = { version: 3, logics: [] };
     try {
-      const stored = await this.getStateAsync(target);
-      const raw = stored?.val;
-      if (raw != null && raw !== "") {
-        doc = parseLogicDocument(raw);
-        if (!doc) {
-          this.log.warn(
-            `${target} is unreadable or newer than this adapter — keeping the running logic engine`,
-          );
-          return;
-        }
+      doc = logicDocumentValue((await this.getStateAsync(target))?.val);
+      if (!doc) {
+        this.log.warn(
+          `${target} is unreadable or newer than this adapter — keeping the running logic engine`,
+        );
+        return;
       }
     } catch (error) {
       this.log.warn(`cannot read ${target}: ${error}`);
@@ -1449,7 +1445,7 @@ class IHome extends utils.Adapter {
       },
       deleteObject: (id) => this.delForeignObjectAsync(id),
       readLogicDocument: async () =>
-        parseLogicDocument(
+        logicDocumentValue(
           (await this.getStateAsync(`${CONFIG_FOLDER}.logicList`))?.val,
         ),
       writeLogicDocument: async (doc) => {

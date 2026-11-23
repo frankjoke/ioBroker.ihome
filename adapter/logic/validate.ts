@@ -67,6 +67,16 @@ export function parseLogicDocument(raw: unknown): LogicDocument | null {
   return null;
 }
 
+/**
+ * The stored document for callers that must not confuse "never written" with
+ * "unreadable": a missing or empty value is the empty document, while a value
+ * that fails to parse is still null.
+ */
+export function logicDocumentValue(raw: unknown): LogicDocument | null {
+  if (raw == null || raw === "") return { version: 3, logics: [] };
+  return parseLogicDocument(raw);
+}
+
 export function logicHasErrors(issues: Issue[], logicId: string): boolean {
   return issues.some(
     (issue) => issue.logicId === logicId && issue.severity === "error",

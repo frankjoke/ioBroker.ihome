@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  logicDocumentValue,
   logicHasErrors,
   parseLogicDocument,
   validateLogicDocument,
@@ -36,6 +37,16 @@ it("parses a JSON string or object and rejects everything else", () => {
   for (const bad of [null, "", "{bad", "[1,2]", { version: 4, logics: [] }]) {
     expect(parseLogicDocument(bad)).toBeNull();
   }
+});
+
+it("reads a never-written document as empty, not unreadable", () => {
+  for (const missing of [undefined, null, ""]) {
+    expect(logicDocumentValue(missing)).toEqual({ version: 3, logics: [] });
+  }
+  for (const broken of ["{bad", "[1,2]"]) {
+    expect(logicDocumentValue(broken)).toBeNull();
+  }
+  expect(logicDocumentValue(JSON.stringify(doc))?.logics).toHaveLength(1);
 });
 
 it("migrates a v1 document in memory", () => {
