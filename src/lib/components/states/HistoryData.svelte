@@ -12,6 +12,7 @@
   import HistoryChart from "./HistoryChart.svelte";
   import { writeStateCustom } from "$lib/config/state-write";
   import { formatValue } from "$lib/config/format";
+  import { debounce } from "$lib/utils/debounce";
 
   let {
     stateId,
@@ -62,16 +63,21 @@
   let pending = $state<{ kind: "range" | "all" } | null>(null);
   let rangeStart = $state("");
   let rangeEnd = $state("");
+  let rangeTouched = $state(false);
+  let rangeCount = $state(0);
+  let rangeCounting = $state(false);
+  let rangeError = $state("");
+  let countSeq = 0;
 
-  const rangeSummary = $derived(
-    loading
-      ? "Loading…"
-      : rows.length === 0
-        ? "No entries in this range."
-        : `${rows.length}${rows.length >= RAW_LIMIT ? "+" : ""} ${
-            rows.length === 1 ? "entry" : "entries"
-          } in this range`,
-  );
+  const rangeBounds = $derived.by(() => {
+    const start = new Date(rangeStart).getTime();
+    const end = new Date(rangeEnd).getTime();
+    return {
+      start,
+      end,
+      valid: Number.isFinite(start) && Number.isFinite(end) && start < end,
+    };
+  });
   const tableRows = $derived(newestFirst ? [...rows].reverse() : rows);
 
   const adapter = $derived(openAdapter);
@@ -86,6 +92,7 @@
     const end = Date.now();
     rangeStart = localInput(end - 24 * 3600_000);
     rangeEnd = localInput(end);
+    rangeTouched = false;
   }
   resetRange();
 
@@ -209,16 +216,54 @@
     else points = [];
   }
 
+  async function countRange(): Promise<void> {
+    if (!adapter || !rangeBounds.valid) {
+      rangeCount = 0;
+      rangeError = "";
+      rangeCounting = false;
+      return;
+    }
+    const seq = ++countSeq;
+    rangeCounting = true;
+    try {
+      const reply = await ioBroker.sendTo(adapter, "getHistory", {
+        id: stateId,
+        options: {
+          start: rangeBounds.start,
+          end: rangeBounds.end,
+          aggregate: "none",
+          limit: RAW_LIMIT,
+          ignoreNull: true,
+        },
+      });
+      if (seq !== countSeq) return;
+      const errorText = replyError(reply);
+      if (errorText) throw new Error(errorText);
+      rangeCount = historyRows(reply).length;
+      rangeError = "";
+    } catch (failure) {
+      if (seq !== countSeq) return;
+      rangeCount = 0;
+      rangeError = `Count from ${adapter}: ${
+        failure instanceof Error ? failure.message : String(failure)
+      }`;
+    } finally {
+      if (seq === countSeq) rangeCounting = false;
+    }
+  }
+  const scheduleCount = debounce(() => void countRange(), 300);
+
   async function deleteRange(): Promise<void> {
-    const start = new Date(rangeStart).getTime();
-    const end = new Date(rangeEnd).getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+    if (!rangeBounds.valid) {
       error = "The range needs a start before the end.";
       pending = null;
       return;
     }
     pending = null;
-    await remove("deleteRange", deleteRangePayload(stateId, start, end));
+    await remove(
+      "deleteRange",
+      deleteRangePayload(stateId, rangeBounds.start, rangeBounds.end),
+    );
   }
 
   async function deleteAll(): Promise<void> {
@@ -248,6 +293,7 @@
       message =
         command === "deleteAll" ? "All stored data deleted." : "Range deleted.";
       await loadChart();
+      await countRange();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -265,6 +311,13 @@
       openAdapter = "";
       draftEnabled = null;
     }
+  });
+
+  $effect(() => {
+    rangeStart;
+    rangeEnd;
+    adapter;
+    scheduleCount();
   });
 </script>
 
@@ -398,17 +451,25 @@
               <div class="row wrap">
                 <label class="small">
                   <span class="label-mono">From</span>
-                  <input type="datetime-local" bind:value={rangeStart} />
+                  <input
+                    type="datetime-local"
+                    bind:value={rangeStart}
+                    oninput={() => (rangeTouched = true)}
+                  />
                 </label>
                 <label class="small">
                   <span class="label-mono">To</span>
-                  <input type="datetime-local" bind:value={rangeEnd} />
+                  <input
+                    type="datetime-local"
+                    bind:value={rangeEnd}
+                    oninput={() => (rangeTouched = true)}
+                  />
                 </label>
                 {#if hasHistoryFeature(featuresReply, "deleteRange")}
                   <button
                     type="button"
-                    class="btn btn-sm"
-                    disabled={loading}
+                    class="btn btn-sm btn-danger"
+                    disabled={loading || !rangeTouched || !rangeBounds.valid}
                     onclick={() => (pending = { kind: "range" })}
                     >Delete range</button
                   >
@@ -425,8 +486,20 @@
               </div>
 
               <p class="hint text-muted">
-                {rangeSummary}{message ? ` · ${message}` : ""}
+                {#if rangeCounting}
+                  Counting…
+                {:else if !rangeBounds.valid}
+                  Set a valid delete range.
+                {:else if rangeCount === 0}
+                  No entries in the selected range.
+                {:else}
+                  {rangeCount}{rangeCount >= RAW_LIMIT ? "+" : ""} entries in the
+                  selected range
+                {/if}
+                {#if message}
+                  · {message}{/if}
               </p>
+              {#if rangeError}<p class="hint text-danger">{rangeError}</p>{/if}
               {#if error}<p class="hint text-danger">{error}</p>{/if}
             </div>
           {/if}
