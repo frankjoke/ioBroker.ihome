@@ -248,7 +248,6 @@
         allowNoop
         {logics}
         inputs={draft.inputs}
-        eventNames={["$input", "$value", "$previous", "$source", "$from"]}
         onfocus={() => (inputRow = null)}
         onchange={(code) => patch({ expr: { code } })}
       >
