@@ -30,6 +30,7 @@
     stateNames = [],
     logics = [],
     inputs = {},
+    eventNames = [],
     quickInserts = [],
     onfocus,
   }: {
@@ -51,6 +52,8 @@
     logics?: LogicDef[];
     /** The logic's own variables/events, as quick-insert badges. */
     inputs?: Record<string, Input>;
+    /** Event names as badges: shows `$value`, inserts `{{$value}}`. */
+    eventNames?: string[];
     /** Extra quick-insert badges (e.g. the override's $.siblings). */
     quickInserts?: { label: string; insert: string; title?: string }[];
     /** The field took focus (the caller may close another editor). */
@@ -210,7 +213,7 @@
       onBeforeOpen={rememberSelection}
       onInsert={insertText}
     />
-    {#if inputEntries.length > 0}
+    {#if inputEntries.length > 0 || eventNames.length > 0}
       <div class="badges">
         <span class="label-mono">Insert</span>
         {#each inputEntries as [name, input] (name)}
@@ -223,6 +226,16 @@
             aria-label={`Insert get(${JSON.stringify(name)})`}
             onmousedown={rememberSelection}
             onclick={() => insertReference(name)}>{name}</button
+          >
+        {/each}
+        {#each eventNames as name (name)}
+          <button
+            type="button"
+            class="badge badge-secondary badge-button"
+            title={`Insert {{${name}}} (message/log text)`}
+            aria-label={`Insert {{${name}}}`}
+            onmousedown={rememberSelection}
+            onclick={() => insertText(`{{${name}}}`)}>{name}</button
           >
         {/each}
       </div>
