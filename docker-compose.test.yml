@@ -25,3 +25,6 @@ services:
 
 volumes:
   ihome-dev-data:
+    # Pinned so the broker keeps its data even if the compose file is started
+    # from another folder. Do not use `down -v` unless you want a fresh install.
+    name: iobrokerihome_ihome-dev-data
