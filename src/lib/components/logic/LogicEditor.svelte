@@ -244,14 +244,33 @@
         code={draft.expr.code}
         label="Result"
         placeholder={RESULT_PLACEHOLDER}
-        hint="return the output; this, $value, $previous, $source, $input are available"
         mode="statements"
         allowNoop
         {logics}
         inputs={draft.inputs}
         onfocus={() => (inputRow = null)}
         onchange={(code) => patch({ expr: { code } })}
-      />
+      >
+        {#snippet hint()}
+          <ul class="result-help">
+            <li><code>return value</code> — write it as the result</li>
+            <li><code>return;</code> or no return — write nothing</li>
+            <li>
+              <code>noop()</code> / <code>this.NOOP</code> — write nothing
+            </li>
+            <li><code>this</code> — kept across runs until reload</li>
+            <li>
+              <code>$value</code>, <code>$previous</code> — the event's value and
+              the one before
+            </li>
+            <li>
+              <code>$input</code>, <code>$source</code> — which input fired and its
+              source ref
+            </li>
+            <li><code>$from</code> — the writer</li>
+          </ul>
+        {/snippet}
+      </CodeField>
       {#if dirty}
         <p class="test-hint">Save the logic before testing.</p>
       {:else if draft.enabled === false}
@@ -307,6 +326,15 @@
     margin: 0;
     font-size: var(--body-sm);
     color: var(--text-muted);
+  }
+
+  .result-help {
+    margin: 0.2rem 0 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    line-height: 1.4;
   }
 
   .issues {

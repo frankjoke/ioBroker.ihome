@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import type { Snippet } from "svelte";
   import {
     checkExpression,
     checkStatement,
@@ -36,8 +37,8 @@
     onchange: (code: string) => void;
     label: string;
     placeholder?: string;
-    /** One muted line under the field; the fetchJson signature. */
-    hint?: string;
+    /** Muted help under the field: a line, or a list snippet. */
+    hint?: string | Snippet;
     minRows?: number;
     allowNoop?: boolean;
     /** A single expression, or a block of statements. */
@@ -293,7 +294,13 @@
     <p id={errorId} class="text-danger">{problem}</p>
   {/if}
   {#if hint}
-    <p id={hintId} class="hint text-muted">{hint}</p>
+    {#if typeof hint === "string"}
+      <p id={hintId} class="hint text-muted">{hint}</p>
+    {:else}
+      <div id={hintId} class="hint text-muted">
+        {@render hint()}
+      </div>
+    {/if}
   {/if}
 </div>
 
