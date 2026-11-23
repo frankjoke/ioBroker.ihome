@@ -1,8 +1,7 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
-  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
-  import CustomSettings from "./CustomSettings.svelte";
   import HistoryData from "./HistoryData.svelte";
   import StateGeneral from "./StateGeneral.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -16,7 +15,6 @@
     removeOverride as removeOverrideEntry,
     upsertOverride,
   } from "$lib/config/source-overrides";
-  import { deleteTitle } from "$lib/utils/delete-title";
   import type { SourceOverride } from "$lib/types/overrides";
   import type { GlobalVariable } from "$lib/config/variables";
 
@@ -30,39 +28,106 @@
     variables: GlobalVariable[];
   } = $props();
 
-  const TABS = [
-    { id: "state", label: "State", hint: "The broker object and live value." },
-    {
-      id: "override",
-      label: "Override",
-      hint: "Repairs and derived values for this state.",
-    },
-    {
-      id: "custom",
-      label: "Custom",
-      hint: "common.custom entries, including history configuration.",
-    },
-    {
-      id: "history",
-      label: "History",
-      hint: "Stored data through the history adapter.",
-    },
-  ] as const;
-  let tab = $state<"state" | "override" | "custom" | "history">("state");
-  let overrideForm = $state<{ override?: SourceOverride } | null>(null);
-  let pendingDelete = $state<SourceOverride | null>(null);
+  type Tab = "state" | "override" | "history";
+
+  let tab = $state<Tab>("state");
+  let openOverrideId = $state<string | null>(null);
   let message = $state("");
 
   const overrides = $derived(
     overridesForState(getOverrideRegistry(), id, variables),
   );
   const common = $derived((object?.common ?? {}) as Record<string, any>);
+  const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
+  const customKeys = $derived(
+    Object.keys(common.custom ?? {})
+      .filter((key) => key !== "ihome")
+      .sort(),
+  );
+  const hasOverrides = $derived(overrides.length > 0);
+  const hasHistory = $derived(customKeys.length > 0);
+  const tabs = $derived([
+    {
+      id: "state" as const,
+      label: "State",
+      hint: "The broker object and live value.",
+      disabled: false,
+    },
+    {
+      id: "override" as const,
+      label: "Override",
+      hint: "Repairs and derived values for this state.",
+      disabled: !hasOverrides && !openOverrideId,
+    },
+    {
+      id: "history" as const,
+      label: "History",
+      hint: "Stored data through the history adapter.",
+      disabled: !hasHistory,
+    },
+  ]);
+  const historyCandidates = $derived.by(() => {
+    const out: string[] = [];
+    for (const entry of objects.values()) {
+      const custom = entry?.common?.custom;
+      if (!custom || typeof custom !== "object") continue;
+      for (const key of Object.keys(custom)) {
+        if (key !== "ihome" && key.includes(".") && !out.includes(key)) {
+          out.push(key);
+        }
+      }
+    }
+    const known = ["history", "influxdb", "sql", "timescaledb"];
+    for (const objectId of objects.keys()) {
+      const match = /^system\.adapter\.([^.]+)\.(\d+)\.alive$/.exec(objectId);
+      if (!match || !known.includes(match[1])) continue;
+      const key = `${match[1]}.${match[2]}`;
+      if (!out.includes(key)) out.push(key);
+    }
+    return out;
+  });
   const live = $derived(
     (ioBroker.states as unknown as Map<string, any>)?.get?.(id),
   );
 
-  function customSaved(): void {
-    message = "Custom settings saved.";
+  let lastId = untrack(() => id);
+  $effect(() => {
+    if (id === lastId) return;
+    lastId = id;
+    openOverrideId = null;
+    tab = "state";
+  });
+  $effect(() => {
+    if (tab === "override" && !hasOverrides && !openOverrideId) tab = "state";
+    if (tab === "history" && !hasHistory) tab = "state";
+  });
+
+  function addOverride(): void {
+    openOverrideId = "new";
+    tab = "override";
+  }
+
+  async function addHistory(): Promise<void> {
+    const key = historyCandidates[0];
+    if (!key) {
+      message = "No history adapter found.";
+      return;
+    }
+    try {
+      const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
+        action: "custom.write",
+        id,
+        custom: { ...(common.custom ?? {}), [key]: {} },
+      })) as { ok?: boolean; error?: string } | undefined;
+      if (!reply?.ok) {
+        throw new Error(reply?.error ?? "The adapter rejected the change.");
+      }
+      await ioBroker.getObject(id, true).catch(() => undefined);
+      message = `History adapter ${key} added.`;
+      tab = "history";
+    } catch (failure) {
+      message = failure instanceof Error ? failure.message : String(failure);
+    }
   }
 
   async function saveOverride(next: SourceOverride): Promise<void> {
@@ -71,15 +136,15 @@
       upsertOverride(registry, next),
       registry.updatedAt,
     );
-    if (result === "saved") {
-      overrideForm = null;
-      message = "Override saved.";
-    } else {
-      message =
+    if (result !== "saved") {
+      throw new Error(
         result === "conflict"
           ? "The override list changed in another tab; reload and try again."
-          : "The override could not be saved.";
+          : "The override could not be saved.",
+      );
     }
+    openOverrideId = next.id;
+    message = "Override saved.";
   }
 
   async function deleteOverride(idToRemove: string): Promise<void> {
@@ -88,13 +153,15 @@
       removeOverrideEntry(registry, idToRemove),
       registry.updatedAt,
     );
-    pendingDelete = null;
-    message =
-      result === "saved"
-        ? "Override removed."
-        : result === "conflict"
+    if (result !== "saved") {
+      throw new Error(
+        result === "conflict"
           ? "The override list changed in another tab; reload and try again."
-          : "The override could not be removed.";
+          : "The override could not be removed.",
+      );
+    }
+    openOverrideId = null;
+    message = "Override removed.";
   }
 </script>
 
@@ -110,9 +177,23 @@
   <OptionTabs
     bind:value={tab}
     label="State sections"
-    tabs={TABS}
+    {tabs}
     collapsible={false}
   >
+    {#snippet actions()}
+      {#if !hasOverrides}
+        <button type="button" class="btn btn-sm" onclick={addOverride}
+          >+ Override</button
+        >
+      {/if}
+      {#if !hasHistory}
+        <button
+          type="button"
+          class="btn btn-sm"
+          onclick={() => void addHistory()}>+ History</button
+        >
+      {/if}
+    {/snippet}
     {#snippet children(active)}
       {#if active === "state"}
         {#key id}
@@ -132,46 +213,74 @@
           <button
             type="button"
             class="btn btn-sm btn-primary"
-            onclick={() => (overrideForm = {})}>Add override</button
+            onclick={addOverride}>Add override</button
           >
         </div>
-        {#if overrides.length === 0}
+        {#if overrides.length === 0 && openOverrideId !== "new"}
           <p class="hint text-muted">No override on this state.</p>
-        {:else}
-          <ul class="rows">
-            {#each overrides as override (override.id)}
-              <li class="item-line">
+        {/if}
+        <div class="items">
+          {#each overrides as override (override.id)}
+            <div class="item" class:open={openOverrideId === override.id}>
+              <div class="item-line">
+                <button
+                  type="button"
+                  class="name"
+                  aria-expanded={openOverrideId === override.id}
+                  onclick={() =>
+                    (openOverrideId =
+                      openOverrideId === override.id ? null : override.id)}
+                >
+                  {override.name}
+                </button>
                 <span class="badge">{override.kind}</span>
-                <span class="name">{override.name}</span>
                 <span class="mono hint text-muted">
                   {override.role ?? override.type ?? ""}
                 </span>
-                <span class="item-actions">
-                  <button
-                    type="button"
-                    class="btn btn-sm"
-                    onclick={() => (overrideForm = { override })}>Edit</button
-                  >
-                  <button
-                    type="button"
-                    class="btn btn-sm"
-                    onclick={() => (pendingDelete = override)}>Delete</button
-                  >
-                </span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      {:else if active === "custom"}
-        {#key id}
-          <CustomSettings stateId={id} {object} onchanged={customSaved} />
-        {/key}
+                {#if override.history}
+                  <span class="badge badge-secondary">history</span>
+                {/if}
+              </div>
+              {#if openOverrideId === override.id}
+                <div class="item-editor">
+                  <SourceOverrideModal
+                    inline
+                    stateId={id}
+                    {object}
+                    {override}
+                    existingNames={overrides.map((entry) => entry.name)}
+                    historyAvailable={hasHistory}
+                    onSave={saveOverride}
+                    onDelete={deleteOverride}
+                    onClose={() => (openOverrideId = null)}
+                  />
+                </div>
+              {/if}
+            </div>
+          {/each}
+          {#if openOverrideId === "new"}
+            <div class="item open">
+              <div class="item-line">
+                <span class="name">New override</span>
+              </div>
+              <div class="item-editor">
+                <SourceOverrideModal
+                  inline
+                  stateId={id}
+                  {object}
+                  existingNames={overrides.map((entry) => entry.name)}
+                  historyAvailable={hasHistory}
+                  onSave={saveOverride}
+                  onDelete={deleteOverride}
+                  onClose={() => (openOverrideId = null)}
+                />
+              </div>
+            </div>
+          {/if}
+        </div>
       {:else}
         {#key id}
-          <HistoryData
-            stateId={id}
-            customKeys={Object.keys(common.custom ?? {}).sort()}
-          />
+          <HistoryData stateId={id} {customKeys} />
         {/key}
       {/if}
     {/snippet}
@@ -179,35 +288,6 @@
 
   {#if message}<p class="hint text-muted">{message}</p>{/if}
 </div>
-
-{#if overrideForm}
-  <SourceOverrideModal
-    stateId={id}
-    {object}
-    override={overrideForm.override}
-    existingNames={overrides.map((override) => override.name)}
-    onSave={saveOverride}
-    onDelete={(overrideId) => {
-      const found = overrides.find((override) => override.id === overrideId);
-      if (found) pendingDelete = found;
-    }}
-    onClose={() => (overrideForm = null)}
-  />
-{/if}
-
-{#if pendingDelete}
-  <ConfirmModal
-    title={deleteTitle("override", pendingDelete.name)}
-    confirmLabel="Delete"
-    onConfirm={() => void deleteOverride(pendingDelete!.id)}
-    onCancel={() => (pendingDelete = null)}
-  >
-    <p class="text-muted">
-      This removes the override from <span class="mono">{id}</span>. The state
-      itself stays.
-    </p>
-  </ConfirmModal>
-{/if}
 
 <style>
   .detail-body {
@@ -245,31 +325,9 @@
     margin: 0;
   }
 
-  .rows {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  .items {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  .item-line {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-  }
-
-  .item-line .name {
-    font-weight: 500;
-  }
-
-  .item-actions {
-    display: flex;
     gap: 0.3rem;
-    margin-left: auto;
   }
 </style>

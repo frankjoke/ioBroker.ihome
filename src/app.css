@@ -629,6 +629,14 @@ textarea {
   background: var(--surface-container-highest);
 }
 
+.option-tab:disabled,
+.option-tab:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--text-muted);
+  background: var(--surface-container-high);
+}
+
 .option-tab.active {
   color: var(--primary-color);
   background: var(--option-tab-bg, var(--surface-color));

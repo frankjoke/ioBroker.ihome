@@ -25,10 +25,13 @@
     control,
     onChange,
     onClose,
+    inline = false,
   }: {
     control: Control;
     onChange: (c: Control) => void;
     onClose: () => void;
+    /** Render the fields in place instead of a modal on top of another one. */
+    inline?: boolean;
   } = $props();
 
   let draft = $state<HistorySpec>(
@@ -104,6 +107,14 @@
     entry ? sparklinePoints(entry.series, 240, 48, 4) : "",
   );
 
+  // Inline mode is part of the caller's form: publish each change live and
+  // leave saving to the caller's own Save.
+  $effect(() => {
+    if (!inline) return;
+    const next = { ...draft };
+    untrack(() => onChange({ ...control, history: next }));
+  });
+
   function refresh() {
     if (control.stateId) refreshHistory(ioBroker, control.stateId, draftSpec);
   }
@@ -119,120 +130,136 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === "Escape") onClose();
+    if (e.key === "Escape" && !inline) onClose();
   }}
 />
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="History">
-  <div class="modal-card card">
-    <h3>History — {control.label || control.feature}</h3>
+{#snippet body()}
+  <div class="grid">
+    <label class="field"
+      ><span class="label-mono">Duration</span>
+      <input
+        type="number"
+        min="1"
+        value={draft.duration}
+        oninput={(e) => (draft.duration = Number(e.currentTarget.value) || 1)}
+      /></label
+    >
+    <label class="field"
+      ><span class="label-mono">Unit</span>
+      <select
+        value={draft.durationUnit}
+        onchange={(e) =>
+          (draft.durationUnit = e.currentTarget.value as HistoryDurationUnit)}
+      >
+        <option value="hours">hours</option>
+        <option value="days">days</option>
+      </select></label
+    >
+  </div>
 
-    <div class="grid">
-      <label class="field"
-        ><span class="label-mono">Duration</span>
-        <input
-          type="number"
-          min="1"
-          value={draft.duration}
-          oninput={(e) => (draft.duration = Number(e.currentTarget.value) || 1)}
-        /></label
+  <div class="grid">
+    <label class="field"
+      ><span class="label-mono">Samples</span>
+      <input
+        type="number"
+        min="1"
+        value={draft.count ?? ""}
+        oninput={(e) => (draft.count = num(e.currentTarget.value))}
+      /></label
+    >
+    <span class="hint text-muted">count wins when set</span>
+  </div>
+
+  <div class="grid three">
+    <label class="field"
+      ><span class="label-mono">Interval</span>
+      <input
+        type="number"
+        value={draft.step ?? ""}
+        oninput={(e) => (draft.step = num(e.currentTarget.value))}
+      /></label
+    >
+    <label class="field"
+      ><span class="label-mono">Step unit</span>
+      <select
+        value={draft.stepUnit ?? "minutes"}
+        onchange={(e) =>
+          (draft.stepUnit = e.currentTarget.value as
+            "seconds" | "minutes" | "hours")}
       >
-      <label class="field"
-        ><span class="label-mono">Unit</span>
-        <select
-          value={draft.durationUnit}
-          onchange={(e) =>
-            (draft.durationUnit = e.currentTarget.value as HistoryDurationUnit)}
-        >
-          <option value="hours">hours</option>
-          <option value="days">days</option>
-        </select></label
+        {#each STEP_UNITS as u (u)}
+          <option value={u}>{u}</option>
+        {/each}
+      </select></label
+    >
+    <label class="field"
+      ><span class="label-mono">Aggregate</span>
+      <select
+        value={draft.aggregate ?? "average"}
+        onchange={(e) =>
+          (draft.aggregate = e.currentTarget.value as HistoryAggregate)}
       >
+        {#each AGGREGATES as a (a)}
+          <option value={a}>{a}</option>
+        {/each}
+      </select></label
+    >
+  </div>
+
+  <div class="preview">
+    <span class="label-mono"
+      >{durationLabel(draft)} · {granularityLabel(draft)}</span
+    >
+    <svg viewBox="0 0 240 48" class="spark" aria-hidden="true">
+      <polyline {points} fill="none" />
+    </svg>
+    <div class="status text-muted">
+      {#if !entry}
+        …
+      {:else if entry.status === "loading"}
+        loading…
+      {:else if entry.status === "empty"}
+        no data in range
+      {:else if entry.status === "error"}
+        <span class="err">{entry.error}</span>
+      {:else if summary}
+        {summary.count} points · {summary.min}–{summary.max}{control.unit
+          ? ` ${control.unit}`
+          : ""}
+      {/if}
     </div>
+  </div>
+{/snippet}
 
-    <div class="grid">
-      <label class="field"
-        ><span class="label-mono">Samples</span>
-        <input
-          type="number"
-          min="1"
-          value={draft.count ?? ""}
-          oninput={(e) => (draft.count = num(e.currentTarget.value))}
-        /></label
-      >
-      <span class="hint text-muted">count wins when set</span>
-    </div>
-
-    <div class="grid three">
-      <label class="field"
-        ><span class="label-mono">Interval</span>
-        <input
-          type="number"
-          value={draft.step ?? ""}
-          oninput={(e) => (draft.step = num(e.currentTarget.value))}
-        /></label
-      >
-      <label class="field"
-        ><span class="label-mono">Step unit</span>
-        <select
-          value={draft.stepUnit ?? "minutes"}
-          onchange={(e) =>
-            (draft.stepUnit = e.currentTarget.value as
-              "seconds" | "minutes" | "hours")}
-        >
-          {#each STEP_UNITS as u (u)}
-            <option value={u}>{u}</option>
-          {/each}
-        </select></label
-      >
-      <label class="field"
-        ><span class="label-mono">Aggregate</span>
-        <select
-          value={draft.aggregate ?? "average"}
-          onchange={(e) =>
-            (draft.aggregate = e.currentTarget.value as HistoryAggregate)}
-        >
-          {#each AGGREGATES as a (a)}
-            <option value={a}>{a}</option>
-          {/each}
-        </select></label
-      >
-    </div>
-
-    <div class="preview">
-      <span class="label-mono"
-        >{durationLabel(draft)} · {granularityLabel(draft)}</span
-      >
-      <svg viewBox="0 0 240 48" class="spark" aria-hidden="true">
-        <polyline {points} fill="none" />
-      </svg>
-      <div class="status text-muted">
-        {#if !entry}
-          …
-        {:else if entry.status === "loading"}
-          loading…
-        {:else if entry.status === "empty"}
-          no data in range
-        {:else if entry.status === "error"}
-          <span class="err">{entry.error}</span>
-        {:else if summary}
-          {summary.count} points · {summary.min}–{summary.max}{control.unit
-            ? ` ${control.unit}`
-            : ""}
-        {/if}
-      </div>
-    </div>
-
+{#if inline}
+  <div class="inline">
+    {@render body()}
     <div class="actions">
       {#if control.history}
         <button type="button" class="btn" onclick={remove}>Remove</button>
       {/if}
       <button type="button" class="btn" onclick={refresh}>Refresh</button>
-      <button type="button" class="btn" onclick={onClose}>Cancel</button>
-      <button type="button" class="btn btn-primary" onclick={save}>Save</button>
     </div>
   </div>
-</div>
+{:else}
+  <div class="modal" role="dialog" aria-modal="true" aria-label="History">
+    <div class="modal-card card">
+      <h3>History — {control.label || control.feature}</h3>
+      {@render body()}
+      <div class="actions">
+        {#if control.history}
+          <button type="button" class="btn" onclick={remove}>Remove</button>
+        {/if}
+        <button type="button" class="btn" onclick={refresh}>Refresh</button>
+        <button type="button" class="btn" onclick={onClose}>Cancel</button>
+        <button type="button" class="btn btn-primary" onclick={save}
+          >Save</button
+        >
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .modal {
@@ -244,6 +271,12 @@
     justify-content: center;
     z-index: 1100;
     padding: 1rem;
+  }
+
+  .inline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .modal-card {

@@ -71,15 +71,6 @@
         />
         <span>History</span>
       </label>
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={filters.custom === true}
-          onchange={(event) =>
-            onfilters({ ...filters, custom: event.currentTarget.checked })}
-        />
-        <span>Custom</span>
-      </label>
     </div>
     <span class="hint text-muted">{count} state{count === 1 ? "" : "s"}</span>
   </div>
@@ -105,11 +96,6 @@
           {#if entry.overrideCount}
             <span class="badge badge-secondary"
               >override {entry.overrideCount}</span
-            >
-          {/if}
-          {#if entry.customKeys.length}
-            <span class="badge" title={entry.customKeys.join(", ")}
-              >custom {entry.customKeys.length}</span
             >
           {/if}
         </span>

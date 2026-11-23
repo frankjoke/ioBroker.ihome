@@ -39,6 +39,8 @@
     onSave,
     onDelete,
     onClose,
+    inline = false,
+    historyAvailable = true,
   }: {
     stateId: string;
     object: any;
@@ -48,6 +50,10 @@
     onSave: (override: SourceOverride) => void | Promise<void>;
     onDelete: (id: string) => void | Promise<void>;
     onClose: () => void;
+    /** Render in place, under the override row, instead of as a modal. */
+    inline?: boolean;
+    /** Show the history/sparkline editor only when the state has history. */
+    historyAvailable?: boolean;
   } = $props();
 
   const common = $derived(object?.common ?? {});
@@ -88,7 +94,6 @@
   }
 
   let draft = $state<SourceOverride>(untrack(seed));
-  let showHistory = $state(false);
   let confirmDelete = $state(false);
   let error = $state("");
   let busy = $state(false);
@@ -325,10 +330,6 @@
         confirmDelete = false;
         return;
       }
-      if (showHistory) {
-        showHistory = false;
-        return;
-      }
       onClose();
     };
     window.addEventListener("keydown", onKey, true);
@@ -336,303 +337,308 @@
   });
 </script>
 
-<div class="modal" role="dialog" aria-modal="true" aria-label="Source override">
-  <div class="modal-content">
-    <div class="modal-head">
-      <div>
-        <h3>Override — {objectName || stateId}</h3>
-        <span class="state-id mono">{stateId}</span>
-      </div>
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Close"
-        onclick={onClose}
-      >
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
+{#snippet body()}
+  <div class="option-tabs" role="tablist" aria-label="Override kind">
+    <button
+      type="button"
+      role="tab"
+      aria-selected={draft.kind === "repair"}
+      class="option-tab"
+      class:active={draft.kind === "repair"}
+      onclick={() => setKind("repair")}
+    >
+      Repair
+    </button>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={draft.kind === "derived"}
+      class="option-tab"
+      class:active={draft.kind === "derived"}
+      onclick={() => setKind("derived")}
+    >
+      Derived
+    </button>
+  </div>
 
-    <div class="option-tabs" role="tablist" aria-label="Override kind">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={draft.kind === "repair"}
-        class="option-tab"
-        class:active={draft.kind === "repair"}
-        onclick={() => setKind("repair")}
-      >
-        Repair
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={draft.kind === "derived"}
-        class="option-tab"
-        class:active={draft.kind === "derived"}
-        onclick={() => setKind("derived")}
-      >
-        Derived
-      </button>
+  <div class="grid">
+    <label class="field">
+      <span class="label-mono">Name (rules use it)</span>
+      <input
+        type="text"
+        bind:value={draft.name}
+        placeholder="power"
+        autocomplete="off"
+      />
+    </label>
+    <label class="field">
+      <span class="label-mono">Label</span>
+      <input
+        type="text"
+        bind:value={draft.label}
+        placeholder={draft.name || "falls back to the name"}
+      />
+    </label>
+  </div>
+
+  {#if existingNames.length}
+    <p class="hint text-muted">
+      Names on this state: {existingNames.join(", ")}
+    </p>
+  {/if}
+
+  {#if draft.kind === "repair"}
+    <div class="grid">
+      <label class="field">
+        <span class="label-mono">Type</span>
+        <select bind:value={draft.type}>
+          <option value="">— inherit —</option>
+          {#each ["boolean", "number", "string", "mixed", "multistate", "array", "object"] as t (t)}
+            <option value={t}>{t}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label-mono">Role</span>
+        <select bind:value={draft.role}>
+          <option value="">— inherit —</option>
+          {#each roleOptions as role (role)}
+            <option value={role}>{role}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label-mono">Unit</span>
+        <input
+          type="text"
+          bind:value={draft.unit}
+          placeholder={text(common.unit) || "— none —"}
+        />
+      </label>
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={draft.hideUnit === true}
+          onchange={(e) =>
+            (draft.hideUnit = e.currentTarget.checked || undefined)}
+        /> hide unit
+      </label>
     </div>
 
     <div class="grid">
       <label class="field">
-        <span class="label-mono">Name (rules use it)</span>
+        <span class="label-mono">Min</span>
         <input
-          type="text"
-          bind:value={draft.name}
-          placeholder="power"
-          autocomplete="off"
+          type="number"
+          value={draft.min ?? ""}
+          oninput={(e) => (draft.min = numOrUndef(e.currentTarget.value))}
         />
       </label>
       <label class="field">
-        <span class="label-mono">Label</span>
+        <span class="label-mono">Max</span>
         <input
-          type="text"
-          bind:value={draft.label}
-          placeholder={draft.name || "falls back to the name"}
+          type="number"
+          value={draft.max ?? ""}
+          oninput={(e) => (draft.max = numOrUndef(e.currentTarget.value))}
+        />
+      </label>
+      <label class="field">
+        <span class="label-mono">Step</span>
+        <input
+          type="number"
+          value={draft.step ?? ""}
+          oninput={(e) => (draft.step = numOrUndef(e.currentTarget.value))}
+        />
+      </label>
+      <label class="field">
+        <span class="label-mono">Decimals</span>
+        <input
+          type="number"
+          min="0"
+          max="10"
+          value={draft.decimals ?? ""}
+          oninput={(e) => (draft.decimals = numOrUndef(e.currentTarget.value))}
         />
       </label>
     </div>
 
-    {#if existingNames.length}
-      <p class="hint text-muted">
-        Names on this state: {existingNames.join(", ")}
-      </p>
-    {/if}
+    <div class="checks">
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={draft.read ?? common.read === true}
+          onchange={(e) => (draft.read = e.currentTarget.checked)}
+        /> readable
+      </label>
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={draft.write ?? common.write === true}
+          onchange={(e) => (draft.write = e.currentTarget.checked)}
+        /> writable (metadata)
+      </label>
+    </div>
 
-    {#if draft.kind === "repair"}
-      <div class="grid">
-        <label class="field">
-          <span class="label-mono">Type</span>
-          <select bind:value={draft.type}>
-            <option value="">— inherit —</option>
-            {#each ["boolean", "number", "string", "mixed", "multistate", "array", "object"] as t (t)}
-              <option value={t}>{t}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field">
-          <span class="label-mono">Role</span>
-          <select bind:value={draft.role}>
-            <option value="">— inherit —</option>
-            {#each roleOptions as role (role)}
-              <option value={role}>{role}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field">
-          <span class="label-mono">Unit</span>
-          <input
-            type="text"
-            bind:value={draft.unit}
-            placeholder={text(common.unit) || "— none —"}
-          />
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={draft.hideUnit === true}
-            onchange={(e) =>
-              (draft.hideUnit = e.currentTarget.checked || undefined)}
-          /> hide unit
-        </label>
-      </div>
-
-      <div class="grid">
-        <label class="field">
-          <span class="label-mono">Min</span>
-          <input
-            type="number"
-            value={draft.min ?? ""}
-            oninput={(e) => (draft.min = numOrUndef(e.currentTarget.value))}
-          />
-        </label>
-        <label class="field">
-          <span class="label-mono">Max</span>
-          <input
-            type="number"
-            value={draft.max ?? ""}
-            oninput={(e) => (draft.max = numOrUndef(e.currentTarget.value))}
-          />
-        </label>
-        <label class="field">
-          <span class="label-mono">Step</span>
-          <input
-            type="number"
-            value={draft.step ?? ""}
-            oninput={(e) => (draft.step = numOrUndef(e.currentTarget.value))}
-          />
-        </label>
-        <label class="field">
-          <span class="label-mono">Decimals</span>
-          <input
-            type="number"
-            min="0"
-            max="10"
-            value={draft.decimals ?? ""}
-            oninput={(e) =>
-              (draft.decimals = numOrUndef(e.currentTarget.value))}
-          />
-        </label>
-      </div>
-
-      <div class="checks">
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={draft.read ?? common.read === true}
-            onchange={(e) => (draft.read = e.currentTarget.checked)}
-          /> readable
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={draft.write ?? common.write === true}
-            onchange={(e) => (draft.write = e.currentTarget.checked)}
-          /> writable (metadata)
-        </label>
-      </div>
-
-      <div class="section-panel states">
-        <span class="label-mono">States (value → label)</span>
-        {#each stateRows as [value, label] (value)}
-          <div class="state-row">
-            <input
-              class="mono"
-              type="text"
-              {value}
-              aria-label={`Value ${value}`}
-              onchange={(e) => {
-                if (e.currentTarget.value === value) return;
-                removeState(value);
-                setState(e.currentTarget.value, label);
-              }}
-            />
-            <input
-              type="text"
-              value={label}
-              aria-label={`Label for ${value}`}
-              oninput={(e) => setState(value, e.currentTarget.value)}
-            />
-            <button
-              type="button"
-              class="icon-btn"
-              title="Remove"
-              aria-label={`Remove state ${value}`}
-              onclick={() => removeState(value)}
-            >
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          </div>
-        {/each}
+    <div class="section-panel states">
+      <span class="label-mono">States (value → label)</span>
+      {#each stateRows as [value, label] (value)}
         <div class="state-row">
           <input
             class="mono"
             type="text"
-            placeholder="value"
-            bind:value={newValue}
+            {value}
+            aria-label={`Value ${value}`}
+            onchange={(e) => {
+              if (e.currentTarget.value === value) return;
+              removeState(value);
+              setState(e.currentTarget.value, label);
+            }}
           />
-          <input type="text" placeholder="label" bind:value={newLabel} />
+          <input
+            type="text"
+            value={label}
+            aria-label={`Label for ${value}`}
+            oninput={(e) => setState(value, e.currentTarget.value)}
+          />
           <button
             type="button"
             class="icon-btn"
-            title="Add"
-            aria-label="Add state label"
-            onclick={addState}
+            title="Remove"
+            aria-label={`Remove state ${value}`}
+            onclick={() => removeState(value)}
           >
-            <span class="material-symbols-outlined">add</span>
+            <span class="material-symbols-outlined">delete</span>
           </button>
         </div>
-      </div>
-
-      <TransformEditor
-        transform={draft.transform}
-        sampleValue={liveValue}
-        onChange={(t) => (draft.transform = t)}
-      />
-
-      <div class="feed">
-        <span class="label-mono">History</span>
-        <span class="text-muted hint">{historyText}</span>
+      {/each}
+      <div class="state-row">
+        <input
+          class="mono"
+          type="text"
+          placeholder="value"
+          bind:value={newValue}
+        />
+        <input type="text" placeholder="label" bind:value={newLabel} />
         <button
           type="button"
-          class="btn btn-sm"
-          onclick={() => (showHistory = true)}
+          class="icon-btn"
+          title="Add"
+          aria-label="Add state label"
+          onclick={addState}
         >
-          <span class="material-symbols-outlined">timeline</span>
-          Configure…
+          <span class="material-symbols-outlined">add</span>
         </button>
       </div>
-    {:else}
-      <div class="grid">
-        <label class="field">
-          <span class="label-mono">Type</span>
-          <select bind:value={draft.type}>
-            <option value="">— none —</option>
-            {#each ["number", "string", "boolean"] as t (t)}
-              <option value={t}>{t}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field">
-          <span class="label-mono">Unit</span>
-          <input type="text" bind:value={draft.unit} placeholder="°C" />
-        </label>
-        <label class="field">
-          <span class="label-mono">Role</span>
-          <select bind:value={draft.role}>
-            <option value="">— none —</option>
-            {#each roleOptions as role (role)}
-              <option value={role}>{role}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="field">
-          <span class="label-mono">Precision</span>
-          <input
-            type="number"
-            min="0"
-            max="10"
-            value={draft.precision ?? ""}
-            oninput={(e) =>
-              (draft.precision = numOrUndef(e.currentTarget.value))}
-          />
-        </label>
-      </div>
+    </div>
 
-      <CodeField
-        label="Expression"
-        mode="expression"
-        minRows={2}
-        code={draft.expr ?? ""}
-        onchange={(code) => (draft.expr = code)}
-        placeholder="$.humidity * 0.5 + $.temperature * 0.5"
-        logics={getLogicDocument().logics}
-        quickInserts={siblings.map((sibling) => ({
-          label: `$.${sibling.name}`,
-          insert: `$.${sibling.name}`,
-          title: `$.${sibling.name} = ${sibling.value}`,
-        }))}
-      />
+    <TransformEditor
+      transform={draft.transform}
+      sampleValue={liveValue}
+      onChange={(t) => (draft.transform = t)}
+    />
+  {:else}
+    <div class="grid">
+      <label class="field">
+        <span class="label-mono">Type</span>
+        <select bind:value={draft.type}>
+          <option value="">— none —</option>
+          {#each ["number", "string", "boolean"] as t (t)}
+            <option value={t}>{t}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label-mono">Unit</span>
+        <input type="text" bind:value={draft.unit} placeholder="°C" />
+      </label>
+      <label class="field">
+        <span class="label-mono">Role</span>
+        <select bind:value={draft.role}>
+          <option value="">— none —</option>
+          {#each roleOptions as role (role)}
+            <option value={role}>{role}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label-mono">Precision</span>
+        <input
+          type="number"
+          min="0"
+          max="10"
+          value={draft.precision ?? ""}
+          oninput={(e) => (draft.precision = numOrUndef(e.currentTarget.value))}
+        />
+      </label>
+    </div>
 
-      <div class="preview">
-        <span class="label-mono">Result</span>
-        {#if preview?.error}
-          <span class="err">{preview.error}</span>
-        {:else if preview}
-          <span class="mono">{formatValue(preview.value, draft.unit)}</span>
-        {:else}
-          <span class="text-muted">—</span>
+    <CodeField
+      label="Expression"
+      mode="expression"
+      minRows={2}
+      code={draft.expr ?? ""}
+      onchange={(code) => (draft.expr = code)}
+      placeholder="$.humidity * 0.5 + $.temperature * 0.5"
+      logics={getLogicDocument().logics}
+      quickInserts={siblings.map((sibling) => ({
+        label: `$.${sibling.name}`,
+        insert: `$.${sibling.name}`,
+        title: `$.${sibling.name} = ${sibling.value}`,
+      }))}
+    />
+
+    <div class="preview">
+      <span class="label-mono">Result</span>
+      {#if preview?.error}
+        <span class="err">{preview.error}</span>
+      {:else if preview}
+        <span class="mono">{formatValue(preview.value, draft.unit)}</span>
+      {:else}
+        <span class="text-muted">—</span>
+      {/if}
+    </div>
+  {/if}
+
+  {#if historyAvailable}
+    <div class="history-section">
+      <div class="feed">
+        <span class="label-mono">History / sparkline</span>
+        <span class="text-muted hint">{historyText}</span>
+        {#if !draft.history}
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() =>
+              (draft.history = {
+                duration: 24,
+                durationUnit: "hours",
+                count: 200,
+              })}
+          >
+            <span class="material-symbols-outlined">timeline</span>
+            Add history
+          </button>
         {/if}
       </div>
-    {/if}
+      {#if draft.history}
+        <HistoryEditor
+          inline
+          control={historyControl}
+          onChange={(c) => (draft.history = c.history)}
+          onClose={() => undefined}
+        />
+      {/if}
+    </div>
+  {/if}
 
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
+  {#if error}
+    <p class="error">{error}</p>
+  {/if}
+{/snippet}
 
+{#if inline}
+  <div class="override-inline">
+    {@render body()}
     <div class="actions">
       <div class="actions-left">
         {#if override}
@@ -648,7 +654,7 @@
         {/if}
       </div>
       <div class="actions-buttons">
-        <button type="button" class="btn" onclick={onClose}>Cancel</button>
+        <button type="button" class="btn" onclick={onClose}>Close</button>
         <button
           type="button"
           class="btn btn-primary"
@@ -660,17 +666,57 @@
       </div>
     </div>
   </div>
-</div>
-
-{#if showHistory}
-  <HistoryEditor
-    control={historyControl}
-    onChange={(c) => {
-      draft.history = c.history;
-      showHistory = false;
-    }}
-    onClose={() => (showHistory = false)}
-  />
+{:else}
+  <div
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Source override"
+  >
+    <div class="modal-content">
+      <div class="modal-head">
+        <div>
+          <h3>Override — {objectName || stateId}</h3>
+          <span class="state-id mono">{stateId}</span>
+        </div>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Close"
+          onclick={onClose}
+        >
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      {@render body()}
+      <div class="actions">
+        <div class="actions-left">
+          {#if override}
+            <button
+              type="button"
+              class="btn btn-danger"
+              disabled={busy}
+              onclick={() => (confirmDelete = true)}
+            >
+              <span class="material-symbols-outlined">delete</span>
+              Delete
+            </button>
+          {/if}
+        </div>
+        <div class="actions-buttons">
+          <button type="button" class="btn" onclick={onClose}>Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={busy}
+            onclick={save}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 {/if}
 
 {#if confirmDelete}
@@ -780,6 +826,12 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+  }
+
+  .history-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .preview {

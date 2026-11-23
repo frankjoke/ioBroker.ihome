@@ -11,9 +11,15 @@
     collapsible = true,
     showHint = true,
     children,
+    actions,
     onchange,
   }: {
-    tabs: readonly { id: T; label: string; hint: string }[];
+    tabs: readonly {
+      id: T;
+      label: string;
+      hint: string;
+      disabled?: boolean;
+    }[];
     /** The open tab; null = all closed. Bind it to keep the state. */
     value?: T | null;
     /** Accessible name of the strip. */
@@ -25,6 +31,8 @@
     showHint?: boolean;
     /** The open group's body, called with the open id. */
     children?: Snippet<[T | null]>;
+    /** Create actions on the right side of the tab line. */
+    actions?: Snippet;
     /** Called after a click with the new open id (null when closed). */
     onchange?: (value: T | null) => void;
   } = $props();
@@ -41,8 +49,11 @@
         class="option-tab"
         class:active={value === t.id}
         aria-expanded={value === t.id}
+        aria-disabled={t.disabled === true}
+        disabled={t.disabled === true}
         title={t.hint}
         onclick={() => {
+          if (t.disabled) return;
           value = value === t.id ? (collapsible ? null : value) : t.id;
           onchange?.(value);
         }}
@@ -50,6 +61,9 @@
         {t.label}
       </button>
     {/each}
+    {#if actions}
+      <div class="option-tabs-actions">{@render actions()}</div>
+    {/if}
   </div>
   {#if showHint && openHint}
     <p class="option-tab-hint touch-only">{openHint}</p>
@@ -68,5 +82,13 @@
     margin: 0;
     font-size: var(--body-sm);
     color: var(--text-muted);
+  }
+
+  .option-tabs-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    padding-bottom: 2px;
   }
 </style>
