@@ -3,12 +3,14 @@
 // iobroker.pro the *cloud adapter* forwards each one into the tunnel, and a
 // chatty installation trips the cloud's event budget within seconds (the
 // account is then blocked for five minutes and the portal answers with its
-// retry page). So the firehose is gone:
+// retry page). So the state firehose is gone:
 //
-//  - the ids the app actually uses (`getUsedStateIds` — the same set it filters
-//    incoming changes by anyway), and
-//  - the adapter's own namespace (`ihome.0.*`), so everything the adapter
-//    carries stays live, now and later.
+//  - states: the ids the app actually uses (`getUsedStateIds` — the same set
+//    it filters incoming changes by anyway), plus the adapter's own namespace
+//    (`ihome.0.*`), so everything the adapter carries stays live, now and later.
+//  - objects: everything (`*`). Object changes are configuration writes, not
+//    normal operation, so the rate stays low and the cache stays exact — a
+//    page that writes an object sees its own change without refetching.
 
 /** `ihome.0.*` — the adapter's own states and objects. Empty namespace, none. */
 export function namespaceWildcard(namespace: string): string {
@@ -16,9 +18,8 @@ export function namespaceWildcard(namespace: string): string {
 }
 
 /**
- * The ids to subscribe to, for states and objects alike: the used ids, then
- * the namespace wildcard last (so the shape is stable and testable). Junk and
- * repeats are dropped; a wildcard already in the list is not repeated.
+ * The ids to subscribe to: narrow states, every object. Junk and repeats are
+ * dropped; a wildcard already in the state list is not repeated.
  */
 export function subscriptionPlan(
   usedIds: Iterable<unknown>,
@@ -35,5 +36,5 @@ export function subscriptionPlan(
     states.push(id);
   }
   if (wildcard && !seen.has(wildcard)) states.push(wildcard);
-  return { states, objects: [...states] };
+  return { states, objects: ["*"] };
 }

@@ -11,7 +11,7 @@ it("subscribes to the used ids plus the adapter's own namespace", () => {
     "ihome.0.config.pageList",
     "ihome.0.*",
   ]);
-  expect(plan.objects).toEqual(plan.states);
+  expect(plan.objects).toEqual(["*"]);
 });
 
 it("never repeats an id, whatever order it comes in", () => {
@@ -20,6 +20,7 @@ it("never repeats an id, whatever order it comes in", () => {
     "ihome.0",
   );
   expect(plan.states).toEqual(["a.0.x", "b.0.y", "ihome.0.*"]);
+  expect(plan.objects).toEqual(["*"]);
 });
 
 it("drops junk and trims, and still carries the namespace", () => {
@@ -29,6 +30,7 @@ it("drops junk and trims, and still carries the namespace", () => {
   );
   expect(plan.states).toEqual(["a.0.x", "ihome.0.*"]);
   expect(subscriptionPlan([], "ihome.0").states).toEqual(["ihome.0.*"]);
+  expect(subscriptionPlan([], "ihome.0").objects).toEqual(["*"]);
 });
 
 it("an empty namespace changes nothing (the wildcard is the namespace's)", () => {
