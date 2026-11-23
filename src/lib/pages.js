@@ -30,6 +30,7 @@ export const pages = [
     title: "Templates",
   },
   { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
+  { id: "/states", label: "States", icon: "database", title: "States" },
   {
     id: "/plugins",
     label: "Plugins",
