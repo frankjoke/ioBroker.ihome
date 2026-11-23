@@ -269,6 +269,11 @@
             </li>
             <li><code>$from</code> — the writer</li>
             <li>
+              In <code>message</code>/<code>log</code> text use
+              <code>{`{{$input}}`}</code>; in code use <code>$input</code> or
+              <code>get("$input")</code>
+            </li>
+            <li>
               Test and init runs have no event: <code>$input</code>,
               <code>$source</code>, <code>$value</code>, <code>$previous</code>
               are undefined
