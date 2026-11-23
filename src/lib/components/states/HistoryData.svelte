@@ -5,10 +5,13 @@
     deleteAllPayload,
     deleteRangePayload,
     hasHistoryFeature,
+    historyRows,
   } from "$lib/config/state-settings";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import HistoryChart from "./HistoryChart.svelte";
   import { writeStateCustom } from "$lib/config/state-write";
+  import { formatValue } from "$lib/config/format";
 
   let {
     stateId,
@@ -31,11 +34,25 @@
     { value: "24", label: "24 hours" },
     { value: "168", label: "7 days" },
   ];
+  const FORMAT_TABS = [
+    {
+      id: "graphic" as const,
+      label: "Graphic",
+      hint: "History as a chart.",
+    },
+    {
+      id: "table" as const,
+      label: "Table",
+      hint: "History as time and value rows.",
+    },
+  ];
 
   let draftEnabled = $state<boolean | null>(null);
   let saving = $state(false);
   let duration = $state("24");
+  let mode = $state<"graphic" | "table">("graphic");
   let featuresReply = $state<unknown>(null);
+  let rows = $state<Array<{ ts: number; val: unknown }>>([]);
   let points = $state<Array<{ ts: number; val: number }>>([]);
   let loading = $state(false);
   let error = $state("");
@@ -108,6 +125,7 @@
     message = "";
     featuresReply = null;
     points = [];
+    rows = [];
     resetRange();
   }
 
@@ -151,15 +169,19 @@
         options: {
           start,
           end,
-          aggregate: "average",
-          step: Math.max(60_000, (end - start) / 300),
+          // The adapter defaults to "average"; the table needs every raw row.
+          aggregate: "none",
+          limit: 100000,
+          ignoreNull: true,
         },
       });
       const errorText = replyError(reply);
       if (errorText) throw new Error(errorText);
+      rows = historyRows(reply);
       points = chartPoints(reply);
     } catch (failure) {
       points = [];
+      rows = [];
       error = `History from ${adapter}: ${failure instanceof Error ? failure.message : String(failure)}`;
     } finally {
       loading = false;
@@ -285,30 +307,67 @@
           </div>
           {#if open}
             <div class="item-editor">
-              <div class="row">
-                <label class="small">
-                  <span class="label-mono">Display range</span>
-                  <select
-                    bind:value={duration}
-                    onchange={() => void loadChart()}
-                  >
-                    {#each DURATIONS as option (option.value)}
-                      <option value={option.value}>{option.label}</option>
-                    {/each}
-                  </select>
-                </label>
-              </div>
-
               {#if !featuresReply}
                 <p class="hint text-muted">
                   {adapter} does not report history features.
                 </p>
               {:else if hasHistoryFeature(featuresReply, "getHistory")}
-                {#if loading}
-                  <p class="hint text-muted">Loading…</p>
-                {:else}
-                  <HistoryChart {points} />
-                {/if}
+                <OptionTabs
+                  bind:value={mode}
+                  label="History format"
+                  tabs={FORMAT_TABS}
+                  collapsible={false}
+                >
+                  {#snippet actions()}
+                    <label class="range">
+                      <span class="label-mono">Display range</span>
+                      <select
+                        bind:value={duration}
+                        onchange={() => void loadChart()}
+                      >
+                        {#each DURATIONS as option (option.value)}
+                          <option value={option.value}>{option.label}</option>
+                        {/each}
+                      </select>
+                    </label>
+                  {/snippet}
+                  {#snippet children(active)}
+                    {#if loading}
+                      <p class="hint text-muted">Loading…</p>
+                    {:else if active === "graphic"}
+                      <HistoryChart {points} />
+                    {:else if rows.length === 0}
+                      <p class="hint text-muted">No data in this range.</p>
+                    {:else}
+                      <div class="table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Time</th>
+                              <th>Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {#each rows as row, index (index)}
+                              <tr>
+                                <td class="mono"
+                                  >{new Date(row.ts).toLocaleString()}</td
+                                >
+                                <td class="mono">
+                                  {formatValue(
+                                    row.val,
+                                    object?.common?.unit,
+                                    object?.common?.role,
+                                  )}
+                                </td>
+                              </tr>
+                            {/each}
+                          </tbody>
+                        </table>
+                      </div>
+                    {/if}
+                  {/snippet}
+                </OptionTabs>
               {:else}
                 <p class="hint text-muted">
                   {adapter} does not support getHistory.
@@ -389,6 +448,45 @@
     gap: 0.35rem;
   }
 
+  .range {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--body-sm);
+  }
+
+  .table-wrap {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm, 4px);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--body-sm);
+  }
+
+  th,
+  td {
+    padding: 0.25rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-color);
+  }
+
+  td:last-child,
+  th:last-child {
+    text-align: right;
+  }
+
   .row {
     display: flex;
     align-items: flex-end;
@@ -406,7 +504,6 @@
     font-size: var(--body-sm);
   }
 
-  .small select,
   .small input {
     min-width: 0;
   }

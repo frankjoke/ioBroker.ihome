@@ -186,17 +186,31 @@ export function hasHistoryFeature(reply: unknown, feature: string): boolean {
 }
 
 /** Numeric chart points; boolean samples become 0/1, other values are skipped. */
-export function chartPoints(
-  reply: unknown,
-): Array<{ ts: number; val: number }> {
+export interface HistoryRow {
+  ts: number;
+  val: unknown;
+}
+
+/** Every raw history row (any value type), sorted by time. */
+export function historyRows(reply: unknown): HistoryRow[] {
   const rows = Array.isArray(reply)
     ? reply
     : record(reply) && Array.isArray(reply.result)
       ? reply.result
       : [];
-  const points: Array<{ ts: number; val: number }> = [];
+  const out: HistoryRow[] = [];
   for (const row of rows) {
     if (!record(row) || typeof row.ts !== "number") continue;
+    out.push({ ts: row.ts, val: row.val });
+  }
+  return out.sort((left, right) => left.ts - right.ts);
+}
+
+export function chartPoints(
+  reply: unknown,
+): Array<{ ts: number; val: number }> {
+  const points: Array<{ ts: number; val: number }> = [];
+  for (const row of historyRows(reply)) {
     const value =
       typeof row.val === "number"
         ? row.val
@@ -208,7 +222,7 @@ export function chartPoints(
     if (value === undefined || !Number.isFinite(value)) continue;
     points.push({ ts: row.ts, val: value });
   }
-  return points.sort((left, right) => left.ts - right.ts);
+  return points;
 }
 
 /** The array shape the history adapters accept for one state's range. */

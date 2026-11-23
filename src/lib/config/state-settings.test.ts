@@ -6,6 +6,7 @@ import {
   hasHistoryFeature,
   historyFeatures,
   historyKeys,
+  historyRows,
   instanceOf,
   isHistoryAdapter,
   isHistoryCustom,
@@ -178,6 +179,20 @@ describe("history adapter helpers", () => {
     ).toEqual([
       { ts: 1, val: 3 },
       { ts: 2, val: 0 },
+    ]);
+  });
+
+  it("keeps every raw row for the table", () => {
+    expect(
+      historyRows([
+        { ts: 2, val: "text" },
+        { ts: 1, val: 3 },
+        { ts: 3, val: null },
+      ]),
+    ).toEqual([
+      { ts: 1, val: 3 },
+      { ts: 2, val: "text" },
+      { ts: 3, val: null },
     ]);
   });
 });
