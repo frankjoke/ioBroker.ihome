@@ -260,7 +260,7 @@
             Repairs change how this state is displayed; derived values are
             computed from its group. Overrides are used by the iHome UI only —
             the logic engine never sees them; use the real state or a variable
-            in logic. One state may have several.
+            in logic. One state may have several overrides.
           </p>
           <button
             type="button"
