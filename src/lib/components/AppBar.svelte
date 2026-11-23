@@ -95,10 +95,6 @@
         ? "settings_applications"
         : (currentConfig?.icon ?? "settings"),
   );
-  const homeAdapter = ioBroker.namespace.split(".")[0] ?? "ihome";
-  const pluginsIcon = $derived(
-    adapterIcon(ioBroker.objects as Map<string, any>, homeAdapter),
-  );
   const adminIcon = $derived(
     adapterIcon(ioBroker.objects as Map<string, any>, "admin"),
   );
@@ -341,17 +337,9 @@
                 href={pageHref(p.id, base)}
                 aria-current={routeId === p.id ? "page" : undefined}
               >
-                {#if pluginsIcon}
-                  <Icon
-                    value={pluginsIcon.value}
-                    owner={pluginsIcon.owner}
-                    size={18}
-                  />
-                {:else}
-                  <span class="material-symbols-outlined" aria-hidden="true"
-                    >{p.icon}</span
-                  >
-                {/if}
+                <span class="material-symbols-outlined" aria-hidden="true"
+                  >{p.icon}</span
+                >
                 <span class="tab-label">{p.label}</span>
               </a>
               <button
@@ -603,17 +591,9 @@
             aria-current={routeId === "/plugins" ? "page" : undefined}
             onclick={() => (cogMenuOpen = false)}
           >
-            {#if pluginsIcon}
-              <Icon
-                value={pluginsIcon.value}
-                owner={pluginsIcon.owner}
-                size={18}
-              />
-            {:else}
-              <span class="material-symbols-outlined" aria-hidden="true"
-                >extension</span
-              >
-            {/if}
+            <span class="material-symbols-outlined" aria-hidden="true"
+              >{pluginsPage?.icon ?? "extension"}</span
+            >
             <span>Plugins</span>
           </a>
           {#if adminPage}
