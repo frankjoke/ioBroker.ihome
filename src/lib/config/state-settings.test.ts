@@ -5,8 +5,10 @@ import {
   deleteRangePayload,
   hasHistoryFeature,
   historyFeatures,
+  historyKeys,
   instanceOf,
   isHistoryAdapter,
+  isHistoryCustom,
   restoreSelection,
   stateEntries,
   stateMatches,
@@ -31,7 +33,7 @@ describe("stateEntries", () => {
           common: {
             name: "Beta",
             role: "level",
-            custom: { "history.0": {} },
+            custom: { "history.0": { enabled: true, debounceTime: 0 } },
           },
         },
       ],
@@ -44,7 +46,7 @@ describe("stateEntries", () => {
       name: "Beta",
       role: "level",
       instance: "b",
-      customKeys: ["history.0"],
+      historyKeys: ["history.0"],
       overrideCount: 1,
     });
   });
@@ -56,7 +58,7 @@ describe("stateEntries", () => {
       type: "number",
       role: "level",
       instance: "0_userdata.0",
-      customKeys: ["history.0"],
+      historyKeys: ["history.0"],
       overrideCount: 1,
     };
     expect(stateMatches(entry, "lam", {})).toBe(true);
@@ -84,6 +86,17 @@ describe("instances and restore", () => {
     expect(instanceOf("lonely")).toBe("lonely");
   });
 
+  it("recognises history configs, not other custom entries", () => {
+    const custom = {
+      "iqontrol.0": { enabled: true },
+      "history.0": { enabled: true, debounceTime: 0 },
+      "influxdb.0": { enabled: true, changesOnly: false },
+      ihome: { overrides: [] },
+    };
+    expect(isHistoryCustom(custom["iqontrol.0"])).toBe(false);
+    expect(historyKeys(custom)).toEqual(["history.0", "influxdb.0"]);
+  });
+
   it("restores the remembered state, else a sibling, else the first", () => {
     const row = (id: string): StateEntry => ({
       id,
@@ -91,7 +104,7 @@ describe("instances and restore", () => {
       type: "number",
       role: "value",
       instance: instanceOf(id),
-      customKeys: [],
+      historyKeys: [],
       overrideCount: 0,
     });
     const rows = [

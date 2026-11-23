@@ -9,7 +9,8 @@ export interface StateEntry {
   type: string;
   role: string;
   instance: string;
-  customKeys: string[];
+  /** Real history adapter configs (`history.0`, `influxdb.0`, …). */
+  historyKeys: string[];
   overrideCount: number;
 }
 
@@ -52,6 +53,25 @@ function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+/** A common.custom entry that is a real history adapter config. Both the
+ *  history and influxdb adapters carry these fields; iQontrol and other
+ *  adapters do not. */
+export function isHistoryCustom(value: unknown): boolean {
+  return (
+    record(value) &&
+    ("debounceTime" in value || "blockTime" in value || "changesOnly" in value)
+  );
+}
+
+/** The adapter keys of a state's real history configurations. */
+export function historyKeys(custom: unknown): string[] {
+  if (!record(custom)) return [];
+  return Object.entries(custom)
+    .filter(([key, value]) => key !== "ihome" && isHistoryCustom(value))
+    .map(([key]) => key)
+    .sort();
+}
+
 /** The adapter instance a state id belongs to: `adapter.0`, or the fuller
  *  `system.adapter.<adapter>.0` / `system.host.<host>` namespaces. */
 export function instanceOf(id: string): string {
@@ -92,11 +112,7 @@ export function stateEntries(
   for (const [id, object] of objects) {
     if (!object || object.type !== "state") continue;
     const common = record(object.common) ? object.common : {};
-    const customKeys = record(common.custom)
-      ? Object.keys(common.custom)
-          .filter((key) => key !== "ihome")
-          .sort()
-      : [];
+    const custom = record(common.custom) ? common.custom : {};
     const wanted = stateIdFor(id, variables);
     rows.push({
       id,
@@ -104,7 +120,7 @@ export function stateEntries(
       type: String(common.type ?? ""),
       role: String(common.role ?? ""),
       instance: instanceOf(id),
-      customKeys,
+      historyKeys: historyKeys(custom),
       overrideCount: overrides.filter(
         (override) => stateIdFor(override.stateId, variables) === wanted,
       ).length,
@@ -131,7 +147,7 @@ export function stateMatches(
     return false;
   }
   if (filters.override && entry.overrideCount === 0) return false;
-  if (filters.history && entry.customKeys.length === 0) return false;
+  if (filters.history && entry.historyKeys.length === 0) return false;
   return true;
 }
 

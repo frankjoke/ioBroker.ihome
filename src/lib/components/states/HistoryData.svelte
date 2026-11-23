@@ -169,8 +169,8 @@
 <div class="history">
   {#if customKeys.length === 0}
     <p class="hint text-muted">
-      No custom settings on this state. Add a history adapter key in Custom
-      first.
+      No history adapter is configured for this state. Use + History on the tab
+      line first.
     </p>
   {:else}
     <div class="row">

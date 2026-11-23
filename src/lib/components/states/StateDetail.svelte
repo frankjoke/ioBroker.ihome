@@ -7,6 +7,10 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { localizeName } from "$lib/config/format";
   import {
+    historyKeys as historyKeysOf,
+    isHistoryCustom,
+  } from "$lib/config/state-settings";
+  import {
     commitOverrides,
     getOverrideRegistry,
   } from "$lib/stores/overrides.svelte";
@@ -39,13 +43,9 @@
   );
   const common = $derived((object?.common ?? {}) as Record<string, any>);
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
-  const customKeys = $derived(
-    Object.keys(common.custom ?? {})
-      .filter((key) => key !== "ihome")
-      .sort(),
-  );
+  const historyKeys = $derived(historyKeysOf(common.custom));
   const hasOverrides = $derived(overrides.length > 0);
-  const hasHistory = $derived(customKeys.length > 0);
+  const hasHistory = $derived(historyKeys.length > 0);
   const tabs = $derived([
     {
       id: "state" as const,
@@ -71,8 +71,8 @@
     for (const entry of objects.values()) {
       const custom = entry?.common?.custom;
       if (!custom || typeof custom !== "object") continue;
-      for (const key of Object.keys(custom)) {
-        if (key !== "ihome" && key.includes(".") && !out.includes(key)) {
+      for (const [key, value] of Object.entries(custom)) {
+        if (key !== "ihome" && isHistoryCustom(value) && !out.includes(key)) {
           out.push(key);
         }
       }
@@ -86,6 +86,9 @@
     }
     return out;
   });
+  const hasUnusedHistory = $derived(
+    historyCandidates.some((key) => !historyKeys.includes(key)),
+  );
   const live = $derived(
     (ioBroker.states as unknown as Map<string, any>)?.get?.(id),
   );
@@ -108,16 +111,34 @@
   }
 
   async function addHistory(): Promise<void> {
-    const key = historyCandidates[0];
+    const key = historyCandidates.find(
+      (candidate) => !historyKeys.includes(candidate),
+    );
     if (!key) {
       message = "No history adapter found.";
       return;
     }
+    let template: Record<string, unknown> | undefined;
+    for (const entry of objects.values()) {
+      const value = entry?.common?.custom?.[key];
+      if (isHistoryCustom(value)) {
+        template = { ...(value as Record<string, unknown>) };
+        break;
+      }
+    }
+    const config = template
+      ? { ...template, enabled: true }
+      : {
+          enabled: true,
+          debounceTime: 0,
+          blockTime: 0,
+          changesOnly: false,
+        };
     try {
       const reply = (await ioBroker.sendTo(ioBroker.namespace, "states", {
         action: "custom.write",
         id,
-        custom: { ...(common.custom ?? {}), [key]: {} },
+        custom: { ...(common.custom ?? {}), [key]: config },
       })) as { ok?: boolean; error?: string } | undefined;
       if (!reply?.ok) {
         throw new Error(reply?.error ?? "The adapter rejected the change.");
@@ -186,7 +207,7 @@
           >+ Override</button
         >
       {/if}
-      {#if !hasHistory}
+      {#if hasUnusedHistory}
         <button
           type="button"
           class="btn btn-sm"
@@ -280,7 +301,7 @@
         </div>
       {:else}
         {#key id}
-          <HistoryData stateId={id} {customKeys} />
+          <HistoryData stateId={id} customKeys={historyKeys} />
         {/key}
       {/if}
     {/snippet}
