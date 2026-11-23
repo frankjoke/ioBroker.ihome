@@ -99,6 +99,8 @@
           <span class="name">{entry.name}</span>
         </span>
         <span class="row-meta">
+          {#if entry.type}<span class="badge badge-secondary">{entry.type}</span
+            >{/if}
           {#if entry.role}<span class="badge">{entry.role}</span>{/if}
           {#if entry.overrideCount}
             <span class="badge badge-secondary"

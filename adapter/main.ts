@@ -35,6 +35,7 @@ import {
   type NetworkDevice,
 } from "./logic/network-ops";
 import { discoverMac } from "./network-mac";
+import { commonProblem, settableCommonObject } from "./state-common";
 import { customProblem, settableCustomObject } from "./state-custom";
 import { createPluginApi } from "./plugin-api";
 import {
@@ -1187,19 +1188,19 @@ class IHome extends utils.Adapter {
         this.sendTo(obj.from, obj.command, result, obj.callback);
     };
     try {
-      if (!isRecord(obj.message) || obj.message.action !== "custom.write") {
+      if (
+        !isRecord(obj.message) ||
+        (obj.message.action !== "custom.write" &&
+          obj.message.action !== "common.write")
+      ) {
         reply({ ok: false, error: "unknown states action" });
         return;
       }
+      const action = obj.message.action;
       const id =
         typeof obj.message.id === "string" ? obj.message.id.trim() : "";
       if (!id) {
         reply({ ok: false, error: "state id required" });
-        return;
-      }
-      const problem = customProblem(obj.message.custom);
-      if (problem) {
-        reply({ ok: false, error: problem });
         return;
       }
       const object = (await this.getForeignObjectAsync(id)) as Record<
@@ -1210,14 +1211,31 @@ class IHome extends utils.Adapter {
         reply({ ok: false, error: `not a state: ${id}` });
         return;
       }
-      const custom = obj.message.custom as Record<string, unknown>;
-      await this.setForeignObjectAsync(
-        id,
-        settableCustomObject(object, custom) as ioBroker.SettableObject,
-      );
-      reply({ ok: true, custom });
+      if (action === "custom.write") {
+        const problem = customProblem(obj.message.custom);
+        if (problem) {
+          reply({ ok: false, error: problem });
+          return;
+        }
+        const custom = obj.message.custom as Record<string, unknown>;
+        await this.setForeignObjectAsync(
+          id,
+          settableCustomObject(object, custom) as ioBroker.SettableObject,
+        );
+        reply({ ok: true, custom });
+        return;
+      }
+      const problem = commonProblem(obj.message.common);
+      if (problem) {
+        reply({ ok: false, error: problem });
+        return;
+      }
+      const patch = obj.message.common as Record<string, unknown>;
+      const next = settableCommonObject(object, patch);
+      await this.setForeignObjectAsync(id, next as ioBroker.SettableObject);
+      reply({ ok: true, common: next.common });
     } catch (error) {
-      this.log.warn(`state custom: ${String(error)}`);
+      this.log.warn(`state write: ${String(error)}`);
       reply({ ok: false, error: String(error) });
     }
   }

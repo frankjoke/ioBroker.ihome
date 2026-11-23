@@ -4,8 +4,9 @@
   import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
   import CustomSettings from "./CustomSettings.svelte";
   import HistoryData from "./HistoryData.svelte";
+  import StateGeneral from "./StateGeneral.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { formatValue } from "$lib/config/format";
+  import { localizeName } from "$lib/config/format";
   import {
     commitOverrides,
     getOverrideRegistry,
@@ -100,7 +101,7 @@
 <div class="detail-body">
   <div class="title-row">
     <div>
-      <h2>{String(common.name ?? id)}</h2>
+      <h2>{localizeName(common.name) || id}</h2>
       <p class="mono text-muted">{id}</p>
     </div>
     <span class="badge">{common.type || "state"}</span>
@@ -114,26 +115,14 @@
   >
     {#snippet children(active)}
       {#if active === "state"}
-        <dl class="summary">
-          <dt>Name</dt>
-          <dd>{String(common.name ?? "")}</dd>
-          <dt>Role</dt>
-          <dd class="mono">{String(common.role ?? "")}</dd>
-          <dt>Unit</dt>
-          <dd>{String(common.unit ?? "")}</dd>
-          <dt>Read / write</dt>
-          <dd>
-            {common.read === false ? "read-only" : "read"} / {common.write ===
-            true
-              ? "writable"
-              : "read-only"}
-          </dd>
-          <dt>Value</dt>
-          <dd class="mono">
-            {formatValue(live?.val, common.unit, common.role)}
-            {#if live?.from}<span class="text-muted"> · {live.from}</span>{/if}
-          </dd>
-        </dl>
+        {#key id}
+          <StateGeneral
+            {id}
+            {object}
+            {live}
+            onchanged={() => (message = "State settings saved.")}
+          />
+        {/key}
       {:else if active === "override"}
         <div class="section-head">
           <p class="hint text-muted">
@@ -242,24 +231,6 @@
 
   .title-row p {
     margin: 0.1rem 0 0;
-  }
-
-  .summary {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 0.3rem 0.8rem;
-    margin: 0;
-  }
-
-  .summary dt {
-    color: var(--text-muted);
-    font-size: var(--body-sm);
-  }
-
-  .summary dd {
-    margin: 0;
-    min-width: 0;
-    overflow-wrap: anywhere;
   }
 
   .section-head {
