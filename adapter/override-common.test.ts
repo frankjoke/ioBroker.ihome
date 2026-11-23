@@ -25,15 +25,19 @@ describe("parseOverrideList", () => {
   it("parses a JSON list and filters incomplete entries", () => {
     expect(
       parseOverrideList(
-        JSON.stringify({ version: 1, overrides: [repair, derived, { id: "x" }] }),
+        JSON.stringify({
+          version: 1,
+          overrides: [repair, derived, { id: "x" }],
+        }),
       ),
     ).toEqual([repair, derived]);
   });
 
   it("accepts a document object and a state envelope", () => {
     expect(parseOverrideList({ overrides: [repair] })).toEqual([repair]);
-    expect(parseOverrideList({ val: JSON.stringify({ overrides: [repair] }) }))
-      .toEqual([repair]);
+    expect(
+      parseOverrideList({ val: JSON.stringify({ overrides: [repair] }) }),
+    ).toEqual([repair]);
   });
 
   it("rejects unusable data", () => {
