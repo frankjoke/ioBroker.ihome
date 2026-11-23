@@ -55,6 +55,10 @@ export function baselineOf(value: unknown, kind: "logic" | "state"): string {
       delete copy.native.ihomeCollection;
       if (Object.keys(copy.native).length === 0) delete copy.native;
     }
+    if (kind === "state" && plainObject(copy.common)) {
+      // Local metadata, not the plugin's definition.
+      delete copy.common.custom;
+    }
   }
   return createHash("sha256").update(canonicalJson(copy)).digest("hex");
 }
@@ -91,16 +95,32 @@ interface Inspection extends CollectionReport {
 const pluginMarkerOf = (value: unknown): Record<string, unknown> | undefined =>
   plainObject(value) ? value : undefined;
 
-/** The part of a state object a manifest declaration owns. */
+/** The part of a state object a manifest declaration owns. `common.custom` is
+ *  local metadata (iHome overrides, history adapters), never collection content. */
 function stateContent(value: Record<string, unknown>): Record<string, unknown> {
   const native = plainObject(value.native) ? { ...value.native } : {};
   delete native.ihomeCollection;
+  const common = plainObject(value.common) ? { ...value.common } : value.common;
+  if (plainObject(common)) delete common.custom;
   return {
     id: value.id ?? value._id,
     type: value.type,
-    common: value.common,
+    common,
     ...(Object.keys(native).length ? { native } : {}),
   };
+}
+
+/** The manifest's common, with local `custom` metadata kept from the live
+ *  object (and never taken from the manifest). */
+function collectionCommon(
+  declCommon: unknown,
+  liveCommon: unknown,
+): Record<string, unknown> {
+  const next = plainObject(declCommon) ? { ...declCommon } : {};
+  delete next.custom;
+  const custom = plainObject(liveCommon) ? liveCommon.custom : undefined;
+  if (plainObject(custom)) next.custom = custom;
+  return next;
 }
 
 const stateBaseline = (value: Record<string, unknown>): string =>
@@ -279,7 +299,7 @@ export async function applyCollection(
       await host.setObject(decl.id, {
         id: decl.id,
         type: decl.type,
-        common: decl.common,
+        common: collectionCommon(decl.common, undefined),
         native: {
           ...decl.native,
           ihomeCollection: {
@@ -297,7 +317,7 @@ export async function applyCollection(
       ...live,
       id: decl.id,
       type: decl.type,
-      common: decl.common,
+      common: collectionCommon(decl.common, live.common),
       native: {
         ...(plainObject(live.native) ? live.native : {}),
         ...decl.native,
@@ -470,13 +490,15 @@ export async function captureCollection(
     }
     const native = plainObject(live.native) ? { ...live.native } : {};
     delete native.ihomeCollection;
+    const common = plainObject(live.common) ? { ...live.common } : {};
+    delete common.custom;
     if (live.type !== "state" && live.type !== "folder") {
       throw new Error(`state ${id} has no valid type`);
     }
     states.push({
       id,
       type: live.type,
-      common: (live.common ?? {}) as Record<string, unknown>,
+      common,
       ...(Object.keys(native).length ? { native } : {}),
     });
   }

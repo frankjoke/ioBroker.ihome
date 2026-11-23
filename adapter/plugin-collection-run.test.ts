@@ -297,6 +297,46 @@ it("keeps states and their marker when the plugin is removed", async () => {
   });
 });
 
+it("ignores local common.custom in the baseline and keeps it on apply", async () => {
+  const localCustom = { ihome: { version: 1, updatedAt: 1, overrides: [] } };
+  const live = {
+    id: state.id,
+    type: "state",
+    common: { ...state.common, custom: localCustom },
+    native: {
+      ihomeCollection: {
+        plugin: "col.test",
+        version: "1.0.0",
+        baseline: baselineOf(state, "state"),
+      },
+    },
+  };
+  const host = fakeHost({ version: 3, logics: [] }, { [state.id]: live });
+  expect((await classifyCollection(host, plugin())).conflicts).toEqual([]);
+  const result = await applyCollection(host, plugin(), {
+    enabled: true,
+    mode: "reconcile",
+  });
+  expect(result.applied).toBe(true);
+  expect(
+    (host.objects[state.id].common as Record<string, unknown>).custom,
+  ).toEqual(localCustom);
+});
+
+it("keeps local common.custom out of the captured state", async () => {
+  const host = captureHost();
+  (host.objects[state.id].common as Record<string, unknown>).custom = {
+    ihome: { version: 1 },
+  };
+  const result = await captureCollection(host, request());
+  expect(
+    (result.collection.states[0].common as Record<string, unknown>).custom,
+  ).toBeUndefined();
+  expect(
+    (host.objects[state.id].common as Record<string, unknown>).custom,
+  ).toEqual({ ihome: { version: 1 } });
+});
+
 it("deletes states only when removal is explicit", async () => {
   const host = fakeHost();
   await applyCollection(host, plugin(), { enabled: true, mode: "reconcile" });
