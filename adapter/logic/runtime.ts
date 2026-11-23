@@ -264,6 +264,7 @@ export function createLogicRuntime(
     "$value",
     "$previous",
     "$input",
+    "$source",
   ]) {
     defineLive(name);
   }

@@ -705,7 +705,7 @@ it("exposes $value and $previous to logic code", () => {
       init: { run: false },
       output: { scope: "memory" },
       expr: code(
-        '`${get("$previous")}|${get("$value")}|${get("$input")}|${get("$source")}`',
+        '`${get("$previous")}|${get("$value")}|${get("$input")}|${$source}`',
       ),
     }),
   );
