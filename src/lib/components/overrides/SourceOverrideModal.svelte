@@ -601,10 +601,17 @@
 
   {#if historyAvailable}
     <div class="history-section">
-      <div class="feed">
-        <span class="label-mono">History / sparkline</span>
-        <span class="text-muted hint">{historyText}</span>
-        {#if !draft.history}
+      {#if draft.history}
+        <HistoryEditor
+          inline
+          control={historyControl}
+          onChange={(c) => (draft.history = c.history)}
+          onClose={() => undefined}
+        />
+      {:else}
+        <div class="feed">
+          <span class="label-mono">History / sparkline</span>
+          <span class="text-muted hint">{historyText}</span>
           <button
             type="button"
             class="btn btn-sm"
@@ -618,15 +625,7 @@
             <span class="material-symbols-outlined">timeline</span>
             Add history
           </button>
-        {/if}
-      </div>
-      {#if draft.history}
-        <HistoryEditor
-          inline
-          control={historyControl}
-          onChange={(c) => (draft.history = c.history)}
-          onClose={() => undefined}
-        />
+        </div>
       {/if}
     </div>
   {/if}
@@ -654,7 +653,11 @@
         {/if}
       </div>
       <div class="actions-buttons">
-        <button type="button" class="btn" onclick={onClose}>Close</button>
+        <button type="button" class="btn" onclick={onClose}>
+          <span class="material-symbols-outlined" aria-hidden="true">close</span
+          >
+          Close
+        </button>
         <button
           type="button"
           class="btn btn-primary"

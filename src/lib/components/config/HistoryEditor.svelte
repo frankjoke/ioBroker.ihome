@@ -103,6 +103,11 @@
     control.stateId ? readHistory(control.stateId, draftSpec) : undefined,
   );
   const summary = $derived(entry ? summarize(entry.series) : undefined);
+  const settingSummary = $derived(
+    `${durationLabel(draft)} · ${granularityLabel(draft)}${
+      draft.count ? ` · ${draft.count} samples` : ""
+    }`,
+  );
   const points = $derived(
     entry ? sparklinePoints(entry.series, 240, 48, 4) : "",
   );
@@ -234,13 +239,27 @@
 
 {#if inline}
   <div class="inline">
-    {@render body()}
-    <div class="actions">
-      {#if control.history}
-        <button type="button" class="btn" onclick={remove}>Remove</button>
-      {/if}
-      <button type="button" class="btn" onclick={refresh}>Refresh</button>
+    <div class="inline-head">
+      <span class="label-mono">History / sparkline</span>
+      <span class="hint text-muted">{settingSummary}</span>
+      <span class="item-actions">
+        {#if control.history}
+          <button type="button" class="btn btn-sm" onclick={remove}>
+            <span class="material-symbols-outlined" aria-hidden="true"
+              >delete</span
+            >
+            Remove
+          </button>
+        {/if}
+        <button type="button" class="btn btn-sm" onclick={refresh}>
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >refresh</span
+          >
+          Refresh
+        </button>
+      </span>
     </div>
+    {@render body()}
   </div>
 {:else}
   <div class="modal" role="dialog" aria-modal="true" aria-label="History">
@@ -249,13 +268,29 @@
       {@render body()}
       <div class="actions">
         {#if control.history}
-          <button type="button" class="btn" onclick={remove}>Remove</button>
+          <button type="button" class="btn" onclick={remove}>
+            <span class="material-symbols-outlined" aria-hidden="true"
+              >delete</span
+            >
+            Remove
+          </button>
         {/if}
-        <button type="button" class="btn" onclick={refresh}>Refresh</button>
-        <button type="button" class="btn" onclick={onClose}>Cancel</button>
-        <button type="button" class="btn btn-primary" onclick={save}
-          >Save</button
-        >
+        <button type="button" class="btn" onclick={refresh}>
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >refresh</span
+          >
+          Refresh
+        </button>
+        <button type="button" class="btn" onclick={onClose}>
+          <span class="material-symbols-outlined" aria-hidden="true">close</span
+          >
+          Cancel
+        </button>
+        <button type="button" class="btn btn-primary" onclick={save}>
+          <span class="material-symbols-outlined" aria-hidden="true">check</span
+          >
+          Save
+        </button>
       </div>
     </div>
   </div>
@@ -277,6 +312,24 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .inline-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .inline-head .hint {
+    padding-bottom: 0;
+  }
+
+  .inline-head .item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
   }
 
   .modal-card {
