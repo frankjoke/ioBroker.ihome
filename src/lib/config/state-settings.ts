@@ -64,9 +64,7 @@ export function stateMatches(
   const text = query.trim().toLowerCase();
   if (
     text &&
-    !`${entry.name} ${entry.id} ${entry.role}`
-      .toLowerCase()
-      .includes(text)
+    !`${entry.name} ${entry.id} ${entry.role}`.toLowerCase().includes(text)
   ) {
     return false;
   }

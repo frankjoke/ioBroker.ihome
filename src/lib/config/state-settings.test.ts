@@ -59,7 +59,9 @@ describe("stateEntries", () => {
     expect(stateMatches(entry, "nope", {})).toBe(false);
     expect(stateMatches(entry, "", { history: true })).toBe(true);
     expect(stateMatches(entry, "", { override: true })).toBe(true);
-    expect(stateMatches({ ...entry, overrideCount: 0 }, "", { override: true })).toBe(false);
+    expect(
+      stateMatches({ ...entry, overrideCount: 0 }, "", { override: true }),
+    ).toBe(false);
   });
 });
 
@@ -75,9 +77,9 @@ describe("custom JSON", () => {
   });
 
   it("refuses an oversized custom object", () => {
-    expect(customJsonProblem(JSON.stringify({ text: "x".repeat(70_000) }))).toMatch(
-      /large/i,
-    );
+    expect(
+      customJsonProblem(JSON.stringify({ text: "x".repeat(70_000) })),
+    ).toMatch(/large/i);
   });
 });
 
