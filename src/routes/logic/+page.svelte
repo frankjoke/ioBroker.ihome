@@ -81,9 +81,15 @@
   let restoreId = $state("");
   let wroteOpen = false;
   let skipAutoScroll = false;
+  const savedLogic = readView("/logic");
+  const savedTab = savedLogic?.tab;
+  const initialTab =
+    savedTab === "machine" || savedTab === "function" || savedTab === "help"
+      ? savedTab
+      : "machine";
   onMount(() => {
     requestedId = takeRequestedLogicConfig();
-    if (!requestedId) restoreId = readView("/logic")?.openId ?? "";
+    if (!requestedId) restoreId = savedLogic?.openId ?? "";
   });
   $effect(() => {
     if (!restoreId) return;
@@ -97,6 +103,9 @@
     if (!wroteOpen && selectedId === null) return;
     wroteOpen = true;
     patchView("/logic", { openId: selectedId });
+  });
+  $effect(() => {
+    patchView("/logic", { tab: view });
   });
   $effect(() => {
     if (!requestedId) return;
@@ -203,8 +212,8 @@
   let pendingSelect = $state<LogicDef | null>(null);
 
   let search = $state("");
-  let view = $state<"machine" | "function" | "help">("machine");
-  let tabValue = $state<"machine" | "function" | "help" | null>("machine");
+  let view = $state<"machine" | "function" | "help">(initialTab);
+  let tabValue = $state<"machine" | "function" | "help" | null>(initialTab);
   let roomFilter = $state("");
   let functionFilter = $state("");
 
@@ -323,6 +332,8 @@
   function openLogic(logic: LogicDef) {
     const stored = doc.logics.find((item) => item.id === logic.id) ?? logic;
     selectedId = stored.id;
+    view = stored.kind === "function" ? "function" : "machine";
+    tabValue = view;
     draft = $state.snapshot(stored) as LogicDef;
     askClose = false;
     pendingSelect = null;

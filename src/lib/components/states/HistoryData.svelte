@@ -15,11 +15,14 @@
     customKeys,
     object,
     defaultAdapter,
+    openAdapter = $bindable(""),
   }: {
     stateId: string;
     customKeys: string[];
     object: any;
     defaultAdapter: string;
+    /** The open adapter; owned by the parent so it survives tab switches. */
+    openAdapter?: string;
   } = $props();
 
   const DURATIONS = [
@@ -29,7 +32,6 @@
     { value: "168", label: "7 days" },
   ];
 
-  let openAdapter = $state("");
   let draftEnabled = $state<boolean | null>(null);
   let saving = $state(false);
   let duration = $state("24");

@@ -38,6 +38,9 @@
 
   let tab = $state<Tab>("state");
   let openOverrideId = $state<string | null>(null);
+  let openHistoryAdapter = $state("");
+  let overrideAutoTried = false;
+  let historyAutoTried = false;
   let message = $state("");
 
   const overrides = $derived(
@@ -103,7 +106,28 @@
     if (id === lastId) return;
     lastId = id;
     openOverrideId = null;
+    openHistoryAdapter = "";
     tab = "state";
+  });
+  $effect(() => {
+    if (tab !== "override") {
+      overrideAutoTried = false;
+      return;
+    }
+    if (overrideAutoTried) return;
+    if (!overrides.length) return;
+    overrideAutoTried = true;
+    if (!openOverrideId) openOverrideId = overrides[0].id;
+  });
+  $effect(() => {
+    if (tab !== "history") {
+      historyAutoTried = false;
+      return;
+    }
+    if (historyAutoTried) return;
+    if (!historyKeys.length) return;
+    historyAutoTried = true;
+    if (!openHistoryAdapter) openHistoryAdapter = historyKeys[0];
   });
   $effect(() => {
     if (tab === "override" && !hasOverrides && !openOverrideId) tab = "state";
@@ -311,6 +335,7 @@
             customKeys={historyKeys}
             {object}
             defaultAdapter={defaultHistory}
+            bind:openAdapter={openHistoryAdapter}
           />
         {/key}
       {/if}
