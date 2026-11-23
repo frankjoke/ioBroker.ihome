@@ -24,8 +24,9 @@ import { newId } from "$lib/utils/ids";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 import type { TemplateReference } from "$lib/config/template-reference";
 
-/** The config document every override lives in. */
-export const OVERRIDE_LIST_ID = "ihome.0.config.overrideList";
+import { OVERRIDE_LIST_ID } from "$adapter/override-common";
+
+export { OVERRIDE_LIST_ID };
 
 export function emptyOverrideRegistry(): OverrideRegistry {
   return { version: 1, updatedAt: 0, overrides: [] };
