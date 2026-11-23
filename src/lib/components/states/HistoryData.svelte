@@ -242,26 +242,37 @@
   {:else}
     <div class="items">
       {#each customKeys as key (key)}
+        {@const open = openAdapter === key}
         {@const enabled =
-          openAdapter === key && draftEnabled !== null
-            ? draftEnabled
-            : enabledOf(key)}
-        <div class="item" class:open={openAdapter === key}>
+          open && draftEnabled !== null ? draftEnabled : enabledOf(key)}
+        <div class="item" class:open>
           <div class="item-line">
             <button
               type="button"
               class="name"
-              aria-expanded={openAdapter === key}
+              aria-expanded={open}
               onclick={() => toggle(key)}>{key}</button
-            >
-            <span class="badge" class:badge-secondary={!enabled}
-              >{enabled ? "enabled" : "disabled"}</span
             >
             {#if key === defaultAdapter}
               <span class="badge badge-secondary">default</span>
             {/if}
-            {#if openAdapter === key}
-              <span class="item-actions">
+            <span class="item-actions">
+              <label
+                class="enabled"
+                title={open
+                  ? "Toggles the enabled flag; Save applies it"
+                  : "Fold out to change"}
+              >
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  disabled={!open || saving}
+                  onchange={(event) =>
+                    (draftEnabled = event.currentTarget.checked)}
+                />
+                <span>Enabled</span>
+              </label>
+              {#if open}
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
@@ -269,25 +280,14 @@
                   onclick={() => void saveEnabled()}
                   >{saving ? "Saving…" : "Save"}</button
                 >
-              </span>
-            {/if}
+              {/if}
+            </span>
           </div>
-          {#if openAdapter === key}
+          {#if open}
             <div class="item-editor">
-              <label class="enabled">
-                <input
-                  type="checkbox"
-                  checked={draftEnabled ?? enabledOf(key)}
-                  disabled={saving}
-                  onchange={(event) =>
-                    (draftEnabled = event.currentTarget.checked)}
-                />
-                <span>Enabled</span>
-              </label>
-
               <div class="row">
                 <label class="small">
-                  <span class="label-mono">Range</span>
+                  <span class="label-mono">Display range</span>
                   <select
                     bind:value={duration}
                     onchange={() => void loadChart()}
