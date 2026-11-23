@@ -1,8 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
-  import { toSeries } from "$lib/config/history-ops";
   import {
+    chartPoints,
     deleteAllPayload,
     deleteRangePayload,
     hasHistoryFeature,
@@ -103,7 +103,7 @@
       });
       const errorText = replyError(reply);
       if (errorText) throw new Error(errorText);
-      points = toSeries(reply);
+      points = chartPoints(reply);
     } catch (failure) {
       points = [];
       error = `History from ${adapter}: ${failure instanceof Error ? failure.message : String(failure)}`;

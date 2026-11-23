@@ -114,6 +114,32 @@ export function hasHistoryFeature(reply: unknown, feature: string): boolean {
   return historyFeatures(reply).includes(feature);
 }
 
+/** Numeric chart points; boolean samples become 0/1, other values are skipped. */
+export function chartPoints(
+  reply: unknown,
+): Array<{ ts: number; val: number }> {
+  const rows = Array.isArray(reply)
+    ? reply
+    : record(reply) && Array.isArray(reply.result)
+      ? reply.result
+      : [];
+  const points: Array<{ ts: number; val: number }> = [];
+  for (const row of rows) {
+    if (!record(row) || typeof row.ts !== "number") continue;
+    const value =
+      typeof row.val === "number"
+        ? row.val
+        : typeof row.val === "boolean"
+          ? row.val
+            ? 1
+            : 0
+          : undefined;
+    if (value === undefined || !Number.isFinite(value)) continue;
+    points.push({ ts: row.ts, val: value });
+  }
+  return points.sort((left, right) => left.ts - right.ts);
+}
+
 /** The array shape the history adapters accept for one state's range. */
 export function deleteRangePayload(
   id: string,

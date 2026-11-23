@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chartPoints,
   customJsonProblem,
   deleteAllPayload,
   deleteRangePayload,
@@ -104,5 +105,18 @@ describe("history adapter helpers", () => {
       { id: "s", start: 10, end: 20 },
     ]);
     expect(deleteAllPayload("s")).toEqual({ id: "s" });
+  });
+
+  it("turns numeric and boolean history rows into chart points", () => {
+    expect(
+      chartPoints([
+        { ts: 2, val: false },
+        { ts: 1, val: 3 },
+        { ts: 3, val: "text" },
+      ]),
+    ).toEqual([
+      { ts: 1, val: 3 },
+      { ts: 2, val: 0 },
+    ]);
   });
 });
