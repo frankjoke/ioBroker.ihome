@@ -74,6 +74,12 @@
     isLayoutWritable,
   } from "$lib/stores/pages.svelte.js";
   import { getTemplateRegistry } from "$lib/stores/templates.svelte.js";
+  import ContextMenu from "$lib/components/common/ContextMenu.svelte";
+  import {
+    layoutMenuItems,
+    layoutMenuTargetKind,
+    type LayoutMenuId,
+  } from "$lib/config/layout-menu";
   import {
     ensurePluginContributions,
     getPluginContributions,
@@ -113,6 +119,12 @@
    *  must not pull the cursor back to the page it was on. */
   let restoring = $state(!!(sheet.selection ?? rememberedSelection));
   let pendingDelete = $state<LayoutSelection | null>(null);
+  /** The edit-mode pointer menu, positioned in viewport coordinates. */
+  let menu = $state<{
+    x: number;
+    y: number;
+    target: LayoutSelection | null;
+  } | null>(null);
   /** The '+' asks for a name first; nothing is created until it is submitted. */
   let pendingCreate = $state<
     { kind: "page" } | { kind: "section"; pageId: string } | null
@@ -389,6 +401,59 @@
   function openNewTile(pageId: string, sectionId: string, at?: number): void {
     if (!pageId || !sectionId) return;
     pickerFor = { kind: "newTile", pageId, sectionId, at };
+  }
+
+  /** The display's pointer menu: select what was hit, then show the actions. */
+  export function openContext(event: {
+    x: number;
+    y: number;
+    hit: LayoutSelection | null;
+  }): void {
+    pageOpen = false;
+    sectionOpen = false;
+    if (event.hit) selection = event.hit;
+    menu = { x: event.x, y: event.y, target: event.hit };
+  }
+
+  function runMenu(id: LayoutMenuId, target: LayoutSelection | null): void {
+    if (id === "edit") {
+      if (target) selection = target;
+      return;
+    }
+    if (id === "delete" && target) {
+      pendingDelete = target;
+      return;
+    }
+    if (id === "duplicate" && target?.kind === "tile") {
+      commitLayout(
+        duplicatePlacement(
+          registry,
+          target.pageId,
+          target.sectionId,
+          target.placementId,
+        ),
+      );
+      return;
+    }
+    if (id === "move" && target?.kind === "tile") {
+      tileMoveOpen = true;
+      return;
+    }
+    if (id === "add-tile") {
+      const atPage = target && "pageId" in target ? target.pageId : pageId;
+      const atSection =
+        target?.kind === "tile" || target?.kind === "section"
+          ? target.sectionId
+          : sectionId;
+      openNewTile(atPage, atSection);
+      return;
+    }
+    if (id === "add-section") {
+      const atPage = target && "pageId" in target ? target.pageId : pageId;
+      if (atPage) pendingCreate = { kind: "section", pageId: atPage };
+      return;
+    }
+    if (id === "add-page") pendingCreate = { kind: "page" };
   }
 
   function createBlankTile(
@@ -1202,6 +1267,29 @@
     currentSectionId={tileAnchor.sectionId}
     onMove={moveTileToSection}
     onClose={() => (tileMoveOpen = false)}
+  />
+{/if}
+
+{#if menu}
+  {@const target = menu.target}
+  {@const kind = layoutMenuTargetKind(target)}
+  <ContextMenu
+    x={menu.x}
+    y={menu.y}
+    label={kind === "tile"
+      ? "Tile actions"
+      : kind === "section"
+        ? "Section actions"
+        : "Page actions"}
+    items={layoutMenuItems(kind, {
+      writable,
+      hasSection: kind === "empty" ? !!sectionId : true,
+      hasPage: !!pageId,
+    }).map((entry) => ({
+      ...entry,
+      run: () => runMenu(entry.id, target),
+    }))}
+    onclose={() => (menu = null)}
   />
 {/if}
 

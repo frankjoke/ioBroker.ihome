@@ -8,6 +8,7 @@
   import { goto } from "$app/navigation";
   import { placementUnder, sectionTitleUnder } from "$lib/config/tile-hit";
   import type { LayoutSelection } from "$lib/config/layout-ops";
+  import { createLongPress } from "$lib/utils/long-press";
   import type { Page } from "$lib/types/display";
 
   /** The display as one page shows it — at "/" (the page the wall left behind)
@@ -24,31 +25,79 @@
 
   /** The tile or section the last click in the display landed on (A48). */
   let picked = $state<LayoutSelection | null>(null);
+  /** The sheet's imperative corner: it owns the menu and its actions. */
+  let layoutSheet = $state<{
+    openContext: (event: {
+      x: number;
+      y: number;
+      hit: LayoutSelection | null;
+    }) => void;
+  } | null>(null);
 
-  function pick(event: MouseEvent): void {
+  const longPress = createLongPress({
+    onTrigger: (x, y) => openContext(x, y),
+  });
+
+  function hitAt(x: number, y: number): LayoutSelection | null {
     // The tiles are inside the inert stage, so they cannot be hit-tested: the
     // boxes are walked instead (the layer is the only target there is).
     const hit = placementUnder(
       [...document.querySelectorAll(".stage [data-placement-id]")],
-      event.clientX,
-      event.clientY,
+      x,
+      y,
     );
     if (hit) {
       // The cursor's page is the display's page (A45), so the page moves here —
       // one state write, in the click, not an effect reading the display's page
       // it would then re-apply on every later page change.
       setLastPage(hit.pageId);
-      picked = { kind: "tile", ...hit };
-      return;
+      return { kind: "tile", ...hit };
     }
     const section = sectionTitleUnder(
       [...document.querySelectorAll(".stage [data-section-title]")],
-      event.clientX,
-      event.clientY,
+      x,
+      y,
     );
-    if (!section) return;
+    if (!section) return null;
     setLastPage(section.pageId);
-    picked = { kind: "section", ...section };
+    return { kind: "section", ...section };
+  }
+
+  function pick(event: MouseEvent): void {
+    // A long-press already opened the menu; its click is not a new pick.
+    if (longPress.consume()) return;
+    const hit = hitAt(event.clientX, event.clientY);
+    if (hit) picked = hit;
+  }
+
+  function openContext(x: number, y: number): void {
+    if (!sheet.open) return;
+    layoutSheet?.openContext({ x, y, hit: hitAt(x, y) });
+  }
+
+  function onContextMenu(event: MouseEvent): void {
+    if (!sheet.open) return;
+    event.preventDefault();
+    longPress.cancel();
+    longPress.consume(); // a native long-press menu must not swallow later clicks
+    openContext(event.clientX, event.clientY);
+  }
+
+  function onPointerDown(event: PointerEvent): void {
+    if (event.pointerType !== "touch" || event.button !== 0) return;
+    longPress.down(event.clientX, event.clientY);
+  }
+
+  function onPointerMove(event: PointerEvent): void {
+    longPress.move(event.clientX, event.clientY);
+  }
+
+  function onPointerUp(): void {
+    longPress.up();
+  }
+
+  function onPointerCancel(): void {
+    longPress.cancel();
   }
 
   // A pick is spent when the sheet closes: reopening must not jump back to the
@@ -106,7 +155,14 @@
       class="pick-layer"
       tabindex="-1"
       aria-hidden="true"
+      title="Right-click or long-press for tile actions"
       onclick={pick}
+      oncontextmenu={onContextMenu}
+      onpointerdown={onPointerDown}
+      onpointermove={onPointerMove}
+      onpointerup={onPointerUp}
+      onpointercancel={onPointerCancel}
+      onpointerleave={onPointerCancel}
     ></button>
   {/if}
 </div>
@@ -116,6 +172,7 @@
      mounts with no page at all — that is where "Add page" lives (A44). -->
 {#if sheet.open}
   <LayoutSheet
+    bind:this={layoutSheet}
     pageId={page?.id ?? ""}
     onPage={showPage}
     onClose={() => (sheet.open = false)}
@@ -152,6 +209,8 @@
     border: 0;
     background: transparent;
     cursor: pointer;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   /* Wide: the sheet takes the right-hand strip, the display keeps the rest (it
