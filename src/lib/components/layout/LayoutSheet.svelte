@@ -403,7 +403,8 @@
     pickerFor = { kind: "newTile", pageId, sectionId, at };
   }
 
-  /** The display's pointer menu: select what was hit, then show the actions. */
+  /** The display's pointer menu: show the actions without moving the sheet.
+   *  Only the menu's Edit item selects the target. */
   export function openContext(event: {
     x: number;
     y: number;
@@ -411,7 +412,6 @@
   }): void {
     pageOpen = false;
     sectionOpen = false;
-    if (event.hit) selection = event.hit;
     menu = { x: event.x, y: event.y, target: event.hit };
   }
 
@@ -451,6 +451,10 @@
     if (id === "add-section") {
       const atPage = target && "pageId" in target ? target.pageId : pageId;
       if (atPage) pendingCreate = { kind: "section", pageId: atPage };
+      return;
+    }
+    if (id === "delete-page" && pageId) {
+      pendingDelete = { kind: "page", pageId };
       return;
     }
     if (id === "add-page") pendingCreate = { kind: "page" };

@@ -8,7 +8,8 @@ export type LayoutMenuId =
   | "delete"
   | "add-tile"
   | "add-section"
-  | "add-page";
+  | "add-page"
+  | "delete-page";
 
 export interface LayoutMenuEntry {
   id: LayoutMenuId;
@@ -97,7 +98,15 @@ export function layoutMenuItems(
       disabled: locked || !context.hasPage,
     },
     ...(context.hasPage
-      ? []
+      ? [
+          {
+            id: "delete-page" as const,
+            label: "Delete page",
+            icon: "delete",
+            danger: true,
+            disabled: locked,
+          },
+        ]
       : [
           {
             id: "add-page" as const,

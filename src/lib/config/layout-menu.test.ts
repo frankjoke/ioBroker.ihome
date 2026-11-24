@@ -42,10 +42,15 @@ it("adds a tile from a section and offers its deletion", () => {
   expect(items.find((item) => item.id === "delete")?.danger).toBe(true);
 });
 
-it("offers add tile and add section on empty space", () => {
+it("offers add tile, add section and delete page on empty space", () => {
   const items = layoutMenuItems("empty", editable);
-  expect(items.map((item) => item.id)).toEqual(["add-tile", "add-section"]);
+  expect(items.map((item) => item.id)).toEqual([
+    "add-tile",
+    "add-section",
+    "delete-page",
+  ]);
   expect(items.every((item) => !item.disabled)).toBe(true);
+  expect(items.find((item) => item.id === "delete-page")?.danger).toBe(true);
 });
 
 it("disables empty-space creation without a section or page", () => {
@@ -63,6 +68,11 @@ it("only offers Add page while no page exists", () => {
       (item) => item.id === "add-page",
     ),
   ).toBe(true);
+  expect(
+    layoutMenuItems("empty", { ...editable, hasPage: false }).some(
+      (item) => item.id === "delete-page",
+    ),
+  ).toBe(false);
 });
 
 it("reads the menu kind from the current selection", () => {
