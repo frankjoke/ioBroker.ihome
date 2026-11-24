@@ -423,6 +423,15 @@ describe("parsePluginsCommand", () => {
     });
     expect(
       parsePluginsCommand({
+        action: "collection.apply",
+        id: "col.test",
+        restore: true,
+      }),
+    ).toEqual({
+      command: { action: "collection.apply", id: "col.test", restore: true },
+    });
+    expect(
+      parsePluginsCommand({
         action: "collection.capture",
         request: {
           id: "col.test",

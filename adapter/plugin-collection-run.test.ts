@@ -101,7 +101,12 @@ it("reconciles owned states and logics without touching unrelated ones", async (
     enabled: false,
     mode: "reconcile",
   });
-  expect(result).toEqual({ applied: true, conflicts: [], changed: true });
+  expect(result).toEqual({
+    applied: true,
+    conflicts: [],
+    modified: [],
+    changed: true,
+  });
   expect(host.doc.logics.map((entry) => entry.id)).toEqual(["mine", "calc"]);
   const added = host.doc.logics.find((entry) => entry.id === "calc");
   expect(added).toMatchObject({
@@ -131,7 +136,7 @@ it("enables owned logic when the plugin is enabled", async () => {
   expect(host.doc.logics[0].enabled).toBe(true);
 });
 
-it("refuses a live definition that differs from its baseline", async () => {
+it("keeps a locally modified definition and reports it as modified", async () => {
   const host = fakeHost({
     version: 3,
     logics: [
@@ -147,16 +152,48 @@ it("refuses a live definition that differs from its baseline", async () => {
     ],
   });
   const report = await classifyCollection(host, plugin());
-  expect(report.conflicts).toEqual([
-    { kind: "logic", id: "calc", reason: "conflict" },
+  expect(report.conflicts).toEqual([]);
+  expect(report.modified).toEqual([
+    { kind: "logic", id: "calc", reason: "modified" },
   ]);
   const result = await applyCollection(host, plugin(), {
     enabled: true,
     mode: "reconcile",
   });
-  expect(result).toMatchObject({ applied: false, changed: false });
+  expect(result).toMatchObject({
+    applied: true,
+    conflicts: [],
+    modified: [{ kind: "logic", id: "calc", reason: "modified" }],
+  });
   expect(host.doc.logics[0].expr).toEqual({ code: "9" });
-  expect(host.writes).toEqual([]);
+  expect(host.doc.logics[0].enabled).toBe(true);
+  expect(host.doc.logics[0].managed?.plugin).toBe("col.test");
+});
+
+it("keeps applying the other items while one is locally modified", async () => {
+  const host = fakeHost({
+    version: 3,
+    logics: [
+      {
+        ...logic,
+        expr: { code: "9" },
+        managed: {
+          plugin: "col.test",
+          version: "0.9.0",
+          baseline: "0".repeat(64),
+        },
+      } as LogicDef,
+    ],
+  });
+  const result = await applyCollection(host, plugin(), {
+    enabled: true,
+    mode: "reconcile",
+  });
+  expect(result.applied).toBe(true);
+  expect(result.conflicts).toEqual([]);
+  expect(host.writes).toContain(state.id);
+  expect(host.objects[state.id]).toMatchObject({ type: "state" });
+  expect(host.doc.logics[0].expr).toEqual({ code: "9" });
 });
 
 it("claims an unmanaged item only on explicit overwrite", async () => {
@@ -208,7 +245,7 @@ it("refuses another plugin's item even with overwrite", async () => {
   expect(host.writes).toEqual([]);
 });
 
-it("overwrites a conflict only when asked", async () => {
+it("restores a locally modified item only when asked", async () => {
   const live = {
     ...logic,
     expr: { code: "9" },
@@ -219,14 +256,34 @@ it("overwrites a conflict only when asked", async () => {
     },
   } as LogicDef;
   const host = fakeHost({ version: 3, logics: [live] });
+
+  const normal = await applyCollection(host, plugin(), {
+    enabled: true,
+    mode: "reconcile",
+  });
+  expect(normal.applied).toBe(true);
+  expect(host.doc.logics[0].expr).toEqual({ code: "9" });
+
+  const restored = await applyCollection(host, plugin(), {
+    enabled: true,
+    mode: "reconcile",
+    restore: true,
+  });
+  expect(restored.applied).toBe(true);
+  expect(host.doc.logics[0].expr).toEqual({ code: "1" });
+  expect(host.doc.logics[0].managed?.baseline).toBe(baselineOf(logic, "logic"));
+});
+
+it("restore does not claim an unmanaged item", async () => {
+  const host = fakeHost({ version: 3, logics: [structuredClone(logic)] });
   const result = await applyCollection(host, plugin(), {
     enabled: true,
     mode: "reconcile",
-    overwrite: true,
+    restore: true,
   });
-  expect(result.applied).toBe(true);
-  expect(host.doc.logics[0].expr).toEqual({ code: "1" });
-  expect(host.doc.logics[0].managed?.baseline).toBe(baselineOf(logic, "logic"));
+  expect(result.applied).toBe(false);
+  expect(host.doc.logics[0].managed).toBeUndefined();
+  expect(host.writes).toEqual([]);
 });
 
 it("sync keeps a conflicting definition and only sets enabled", async () => {

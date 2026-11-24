@@ -7,7 +7,11 @@ import type { CollectionConflict } from "$adapter/plugin-collection-types";
 interface PluginsResult {
   plugins: PluginView[];
   restartRequired?: string[];
-  collection?: { id: string; conflicts: CollectionConflict[] };
+  collection?: {
+    id: string;
+    conflicts: CollectionConflict[];
+    modified?: CollectionConflict[];
+  };
 }
 
 let plugins = $state<PluginView[]>([]);
@@ -108,6 +112,19 @@ export async function applyCollection(
   const result = await command<PluginsResult>("collection.apply", {
     id,
     overwrite,
+  });
+  plugins = result.plugins;
+  bumpVersion();
+  return result.collection?.conflicts ?? [];
+}
+
+/** Restore the plugin's own items, keeping unmanaged user items untouched. */
+export async function restoreCollection(
+  id: string,
+): Promise<CollectionConflict[]> {
+  const result = await command<PluginsResult>("collection.apply", {
+    id,
+    restore: true,
   });
   plugins = result.plugins;
   bumpVersion();

@@ -302,6 +302,8 @@ class IHome extends utils.Adapter {
   private pluginConfig: AdapterPlugin[] = [];
   /** Why a file-backed plugin cannot be used, per id. */
   private readonly pluginProblems = new Map<string, string>();
+  /** Kept local collection edits, shown as a warning until a restore. */
+  private readonly collectionWarnings = new Map<string, string[]>();
   /** Page-managed plugin settings, staged imports and removals. */
   private pluginSettings: PluginSettingsDocument = {
     version: 1,
@@ -1510,6 +1512,33 @@ class IHome extends utils.Adapter {
     };
   }
 
+  /** Keep the plugin view in step with a collection report: blocking conflicts
+   *  are problems; kept local edits are warnings until a restore. */
+  private rememberCollectionReport(
+    id: string,
+    result: {
+      applied: boolean;
+      conflicts: CollectionConflict[];
+      modified: CollectionConflict[];
+    },
+    restored = false,
+  ): void {
+    if (!result.applied) {
+      const ids = result.conflicts.map((item) => item.id).join(", ");
+      this.pluginProblems.set(id, `collection conflicts: ${ids}`);
+    } else if (this.pluginProblems.get(id)?.startsWith("collection")) {
+      this.pluginProblems.delete(id);
+    }
+    if (!restored && result.modified.length > 0) {
+      const ids = result.modified.map((item) => item.id).join(", ");
+      this.collectionWarnings.set(id, [
+        `locally modified: ${ids} — restore the plugin's items to reset.`,
+      ]);
+    } else {
+      this.collectionWarnings.delete(id);
+    }
+  }
+
   /** Create/update every collection at start and follow the plugin's enabled flag. */
   private async syncCollections(): Promise<boolean> {
     const host = this.collectionHost();
@@ -1523,14 +1552,19 @@ class IHome extends utils.Adapter {
           mode: "reconcile",
         });
         changed = changed || result.changed;
-        if (result.conflicts.length > 0) {
-          const ids = result.conflicts.map((item) => item.id).join(", ");
-          this.pluginProblems.set(entry.id, `collection conflicts: ${ids}`);
-          this.log.warn(`plugin ${entry.id}: collection conflicts: ${ids}`);
-        } else if (
-          this.pluginProblems.get(entry.id)?.startsWith("collection")
-        ) {
-          this.pluginProblems.delete(entry.id);
+        this.rememberCollectionReport(entry.id, result);
+        if (!result.applied) {
+          this.log.warn(
+            `plugin ${entry.id}: collection conflicts: ${result.conflicts
+              .map((item) => item.id)
+              .join(", ")}`,
+          );
+        } else if (result.modified.length > 0) {
+          this.log.info(
+            `plugin ${entry.id}: locally modified: ${result.modified
+              .map((item) => item.id)
+              .join(", ")}`,
+          );
         }
       } catch (error) {
         this.pluginProblems.set(entry.id, `collection: ${String(error)}`);
@@ -1621,7 +1655,11 @@ class IHome extends utils.Adapter {
     const views = this.pluginConfig.map((plugin) => {
       const view = this.pluginViewOf(plugin);
       const problem = this.pluginProblems.get(plugin.id);
-      return problem ? { ...view, problem } : view;
+      const warnings = this.collectionWarnings.get(plugin.id);
+      const withWarnings = warnings?.length
+        ? { ...view, warnings: [...(view.warnings ?? []), ...warnings] }
+        : view;
+      return problem ? { ...withWarnings, problem } : withWarnings;
     });
     for (const imported of this.pluginSettings.staged) {
       if (activeIds.has(imported.id)) continue;
@@ -1802,15 +1840,13 @@ class IHome extends utils.Adapter {
                 owned,
                 { enabled: entry.enabled, mode: "sync" },
               );
+              this.rememberCollectionReport(entry.id, result);
               if (!result.applied) {
                 return pluginError(
                   `collection conflicts: ${result.conflicts
                     .map((item) => item.id)
                     .join(", ")}`,
                 );
-              }
-              if (this.pluginProblems.get(entry.id)?.startsWith("collection")) {
-                this.pluginProblems.delete(entry.id);
               }
               if (result.changed) await this.loadLogics();
             }
@@ -1969,23 +2005,25 @@ class IHome extends utils.Adapter {
         : [...this.pluginConfig, merged];
       await host.restart(merged);
       let collection:
-        { id: string; conflicts: CollectionConflict[] } | undefined;
+        | {
+            id: string;
+            conflicts: CollectionConflict[];
+            modified: CollectionConflict[];
+          }
+        | undefined;
       const owned = collectionPluginOf(merged);
       if (owned) {
         const applied = await applyCollection(this.collectionHost(), owned, {
           enabled: merged.enabled,
           mode: "reconcile",
         });
+        this.rememberCollectionReport(merged.id, applied);
         if (applied.changed) await this.loadLogics();
-        if (applied.conflicts.length > 0) {
-          const ids = applied.conflicts.map((item) => item.id).join(", ");
-          this.pluginProblems.set(merged.id, `collection conflicts: ${ids}`);
-        } else if (
-          this.pluginProblems.get(merged.id)?.startsWith("collection")
-        ) {
-          this.pluginProblems.delete(merged.id);
-        }
-        collection = { id: merged.id, conflicts: applied.conflicts };
+        collection = {
+          id: merged.id,
+          conflicts: applied.conflicts,
+          modified: applied.modified,
+        };
       }
       this.pluginSettings = {
         ...pluginSettingsDoc(this.pluginConfig, this.pluginSettings.settings),
@@ -2105,23 +2143,26 @@ class IHome extends utils.Adapter {
       if (!plugin) {
         return pluginError(`plugin ${command.id} has no collection`);
       }
+      const restored = command.overwrite === true || command.restore === true;
       const result = await applyCollection(this.collectionHost(), plugin, {
         enabled: entry.enabled,
         mode: "reconcile",
         overwrite: command.overwrite === true,
+        restore: command.restore === true,
       });
+      this.rememberCollectionReport(entry.id, result, restored);
       if (!result.applied) {
         const ids = result.conflicts.map((item) => item.id).join(", ");
-        this.pluginProblems.set(entry.id, `collection conflicts: ${ids}`);
         return pluginError(`collection conflicts: ${ids}`);
-      }
-      if (this.pluginProblems.get(entry.id)?.startsWith("collection")) {
-        this.pluginProblems.delete(entry.id);
       }
       if (result.changed) await this.loadLogics();
       return pluginReply({
         plugins: this.pluginViews(),
-        collection: { id: command.id, conflicts: result.conflicts },
+        collection: {
+          id: command.id,
+          conflicts: result.conflicts,
+          modified: result.modified,
+        },
       });
     }
 

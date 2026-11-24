@@ -83,7 +83,12 @@ export type PluginsCommand =
   | { action: "reload"; id: string }
   | { action: "install"; id: string }
   | { action: "collection.capture"; request: CaptureRequest }
-  | { action: "collection.apply"; id: string; overwrite?: boolean }
+  | {
+      action: "collection.apply";
+      id: string;
+      overwrite?: boolean;
+      restore?: boolean;
+    }
   | { action: "lookupMac"; host: string }
   | { action: "remove"; id: string; removeCollectionStates?: boolean };
 
@@ -91,6 +96,7 @@ export type PluginsCommand =
 export interface CollectionReply {
   id: string;
   conflicts: CollectionConflict[];
+  modified: CollectionConflict[];
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -448,11 +454,15 @@ export function parsePluginsCommand(
     if (value.overwrite !== undefined && typeof value.overwrite !== "boolean") {
       return { problem: "overwrite must be true or false" };
     }
+    if (value.restore !== undefined && typeof value.restore !== "boolean") {
+      return { problem: "restore must be true or false" };
+    }
     return {
       command: {
         action: "collection.apply",
         id: value.id.trim(),
         ...(value.overwrite === true ? { overwrite: true } : {}),
+        ...(value.restore === true ? { restore: true } : {}),
       },
     };
   }

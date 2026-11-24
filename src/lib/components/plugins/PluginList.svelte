@@ -4,7 +4,12 @@
   import IconButton from "$lib/components/common/IconButton.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
-  import { exportPlugin, removePlugin } from "$lib/stores/plugins.svelte";
+  import {
+    exportPlugin,
+    removePlugin,
+    restoreCollection,
+  } from "$lib/stores/plugins.svelte";
+  import { toast } from "$lib/stores/toasts.svelte";
   import { removePluginFolder } from "$lib/config/plugin-storage";
   import { pluginFile, serializePluginFile } from "$adapter/plugin-file";
   import { downloadJson } from "$lib/utils/download";
@@ -79,6 +84,7 @@
   let exportingId = $state("");
   let rowError = $state("");
   let pendingDelete = $state<PluginView | null>(null);
+  let pendingRestore = $state<PluginView | null>(null);
   let pendingEdit = $state<PluginView | null>(null);
   let askDiscard = $state(false);
 
@@ -149,6 +155,20 @@
       }
     } catch (failure) {
       rowError = failure instanceof Error ? failure.message : String(failure);
+    }
+  }
+
+  async function restoreItems(): Promise<void> {
+    const plugin = pendingRestore;
+    pendingRestore = null;
+    if (!plugin) return;
+    try {
+      await restoreCollection(plugin.id);
+      toast.success(`${plugin.name}: plugin items restored`);
+    } catch (failure) {
+      toast.error(
+        `Restore failed: ${failure instanceof Error ? failure.message : String(failure)}`,
+      );
     }
   }
 
@@ -271,6 +291,16 @@
           <p class="row-error text-warning hint">
             {plugin.warnings.join(" ")}
           </p>
+          {#if plugin.collection && plugin.warnings.some( (warning) => warning.includes("locally modified") )}
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={busy}
+              onclick={() => (pendingRestore = plugin)}
+            >
+              Restore plugin items
+            </button>
+          {/if}
         {/if}
       </div>
       {#if open}
@@ -301,6 +331,20 @@
   >
     <p class="text-muted">
       The plugin and its code are removed now. Exported copies are unaffected.
+    </p>
+  </ConfirmModal>
+{/if}
+
+{#if pendingRestore}
+  <ConfirmModal
+    title={`Restore ${pendingRestore.name}'s items?`}
+    confirmLabel="Restore"
+    onConfirm={restoreItems}
+    onCancel={() => (pendingRestore = null)}
+  >
+    <p class="text-muted">
+      Local changes to this plugin's states and logics are replaced by the
+      plugin's versions. State values are kept.
     </p>
   </ConfirmModal>
 {/if}

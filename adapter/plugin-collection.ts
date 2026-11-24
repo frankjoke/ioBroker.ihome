@@ -83,6 +83,8 @@ export interface CollectionPlugin {
 
 export interface CollectionReport {
   conflicts: CollectionConflict[];
+  /** Owned items edited locally; kept and skipped until an explicit restore. */
+  modified: CollectionConflict[];
   missing: string[];
   droppedLogics: string[];
   droppedStates: string[];
@@ -153,6 +155,7 @@ async function inspect(
   const doc = await host.readLogicDocument();
   if (!doc) throw new Error("logic document unreadable");
   const conflicts: CollectionConflict[] = [];
+  const modified: CollectionConflict[] = [];
   const missing: string[] = [];
   const declaredStates = new Set(
     plugin.collection.states.map((decl) => decl.id),
@@ -173,7 +176,7 @@ async function inspect(
     } else if (marker.plugin !== plugin.id) {
       conflicts.push({ kind: "state", id: decl.id, reason: "foreign" });
     } else if (stateBaseline(live) !== marker.baseline) {
-      conflicts.push({ kind: "state", id: decl.id, reason: "conflict" });
+      modified.push({ kind: "state", id: decl.id, reason: "modified" });
     }
   }
 
@@ -189,7 +192,7 @@ async function inspect(
     } else if (live.managed.plugin !== plugin.id) {
       conflicts.push({ kind: "logic", id: decl.id, reason: "foreign" });
     } else if (baselineOf(live, "logic") !== live.managed.baseline) {
-      conflicts.push({ kind: "logic", id: decl.id, reason: "conflict" });
+      modified.push({ kind: "logic", id: decl.id, reason: "modified" });
     }
   }
 
@@ -213,6 +216,7 @@ async function inspect(
   return {
     doc,
     conflicts,
+    modified,
     missing,
     droppedLogics,
     droppedStates,
@@ -227,6 +231,7 @@ export async function classifyCollection(
   const result = await inspect(host, plugin);
   return {
     conflicts: result.conflicts,
+    modified: result.modified,
     missing: result.missing,
     droppedLogics: result.droppedLogics,
     droppedStates: result.droppedStates,
@@ -266,30 +271,36 @@ export async function applyCollection(
   options: {
     enabled: boolean;
     mode: "sync" | "reconcile";
+    /** Claim unmanaged items and restore locally modified ones. */
     overwrite?: boolean;
+    /** Restore locally modified owned items, but never claim unmanaged ones. */
+    restore?: boolean;
   },
 ): Promise<{
   applied: boolean;
   conflicts: CollectionConflict[];
+  modified: CollectionConflict[];
   changed: boolean;
 }> {
-  const { doc, conflicts, droppedStates } = await inspect(host, plugin);
+  const { doc, conflicts, modified, droppedStates } = await inspect(
+    host,
+    plugin,
+  );
   const foreign = conflicts.some((entry) => entry.reason === "foreign");
-  const conflictsBlock =
-    options.mode === "reconcile" &&
-    !options.overwrite &&
-    conflicts.some(
-      (entry) => entry.reason === "conflict" || entry.reason === "unmanaged",
-    );
   // Unmanaged items may be claimed only by an explicit reconcile+overwrite;
-  // enable/disable sync must never touch them.
+  // enable/disable sync and a plain restore must never touch them.
   const unmanagedBlock =
     conflicts.some((entry) => entry.reason === "unmanaged") &&
     !(options.mode === "reconcile" && options.overwrite === true);
-  if (foreign || conflictsBlock || unmanagedBlock) {
-    return { applied: false, conflicts, changed: false };
+  if (foreign || unmanagedBlock) {
+    return { applied: false, conflicts, modified, changed: false };
   }
 
+  const restoreModified =
+    options.overwrite === true || options.restore === true;
+  const modifiedKeys = new Set(
+    modified.map((entry) => `${entry.kind}:${entry.id}`),
+  );
   let changed = false;
 
   for (const decl of plugin.collection.states) {
@@ -313,6 +324,7 @@ export async function applyCollection(
       continue;
     }
     if (options.mode !== "reconcile") continue;
+    if (modifiedKeys.has(`state:${decl.id}`) && !restoreModified) continue;
     const next = {
       ...live,
       id: decl.id,
@@ -348,11 +360,15 @@ export async function applyCollection(
   }
 
   const declared = new Set(plugin.collection.logics.map((entry) => entry.id));
+  const modifiedLogicIds = new Set(
+    modified.filter((entry) => entry.kind === "logic").map((entry) => entry.id),
+  );
   const logics = (doc.logics ?? []).filter(
     (entry) =>
       options.mode !== "reconcile" ||
       entry.managed?.plugin !== plugin.id ||
-      declared.has(entry.id),
+      declared.has(entry.id) ||
+      (!restoreModified && modifiedLogicIds.has(entry.id)),
   );
   const removed = logics.length !== (doc.logics ?? []).length;
   changed = changed || removed;
@@ -373,6 +389,14 @@ export async function applyCollection(
       continue;
     }
     if (options.mode === "sync") {
+      if (logics[index].enabled !== options.enabled) {
+        logics[index] = { ...logics[index], enabled: options.enabled };
+        changed = true;
+      }
+      continue;
+    }
+    if (modifiedLogicIds.has(decl.id) && !restoreModified) {
+      // Keep the local definition; still follow the plugin's enabled flag.
       if (logics[index].enabled !== options.enabled) {
         logics[index] = { ...logics[index], enabled: options.enabled };
         changed = true;
@@ -404,7 +428,7 @@ export async function applyCollection(
   if (changed) {
     await host.writeLogicDocument({ ...doc, logics });
   }
-  return { applied: true, conflicts, changed };
+  return { applied: true, conflicts, modified, changed };
 }
 
 /** Remove the owned logic; states stay (and keep their marker) unless asked. */

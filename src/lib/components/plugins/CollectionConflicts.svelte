@@ -18,7 +18,7 @@
   function reasonLabel(reason: CollectionConflict["reason"]): string {
     if (reason === "foreign") return "owned by another plugin";
     if (reason === "unmanaged") return "existing user item";
-    return "edited since capture";
+    return "locally modified";
   }
 </script>
 

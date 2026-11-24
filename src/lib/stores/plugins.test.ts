@@ -10,11 +10,15 @@ vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   },
 }));
 
-import { applyCollection, installPlugin } from "./plugins.svelte";
+import {
+  applyCollection,
+  installPlugin,
+  restoreCollection,
+} from "./plugins.svelte";
 
 it("returns install conflicts and applies an overwrite", async () => {
   const conflicts = [
-    { kind: "logic", id: "calc", reason: "conflict" as const },
+    { kind: "logic", id: "calc", reason: "modified" as const },
   ];
   h.sendTo.mockResolvedValueOnce({
     ok: true,
@@ -35,5 +39,16 @@ it("returns install conflicts and applies an overwrite", async () => {
     action: "collection.apply",
     id: "col.test",
     overwrite: true,
+  });
+
+  h.sendTo.mockResolvedValueOnce({
+    ok: true,
+    result: { plugins: [], collection: { id: "col.test", conflicts: [] } },
+  });
+  expect(await restoreCollection("col.test")).toEqual([]);
+  expect(h.sendTo).toHaveBeenLastCalledWith("ihome.0", "plugins", {
+    action: "collection.apply",
+    id: "col.test",
+    restore: true,
   });
 });
