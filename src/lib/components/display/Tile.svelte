@@ -799,7 +799,7 @@
   onpointerleave={cancelPress}
 >
   {#if editingTarget}
-    <EditingOutline />
+    <EditingOutline inset={surfaceOnly} />
   {/if}
   {#if chartFull && chart.length}
     <div class="tile-chart-full">
