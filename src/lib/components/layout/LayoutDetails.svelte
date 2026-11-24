@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { requestStateConfig } from "$lib/pages.js";
   import {
     patchPage,
     patchPlacement,
@@ -71,6 +73,8 @@
   import { isValidPin } from "$lib/config/pin.svelte";
   import { evaluateVirtual } from "$lib/config/virtual-ops";
   import { getVirtualPool } from "$lib/stores/state-pool.svelte";
+  import { toast } from "$lib/stores/toasts.svelte";
+  import { copyText } from "$lib/utils/clipboard";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import GroupSection from "$lib/components/display/GroupSection.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
@@ -79,6 +83,7 @@
   import { iconTitle } from "$lib/config/icon-html";
   import BackgroundEditor from "$lib/components/common/BackgroundEditor.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import ContextMenu from "$lib/components/common/ContextMenu.svelte";
   import WhereButton from "$lib/components/layout/WhereButton.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import UrlTemplatePreview from "$lib/components/display/UrlTemplatePreview.svelte";
@@ -231,6 +236,8 @@
   let tileIconPicker = $state(false);
   /** The slot whose trash button was pressed; the modal decides. */
   let pendingSlotDelete = $state<number | null>(null);
+  /** The state-id copy menu opened from a right-clicked state field. */
+  let copyMenu = $state<{ x: number; y: number; id: string } | null>(null);
   /** Save/apply a template from the Slots line. */
   let saveTemplateOpen = $state(false);
   let saveTemplateError = $state("");
@@ -978,6 +985,28 @@
     return resolveSlotSource(source, sourceLook)?.stateId ?? "";
   }
 
+  /** A right-clicked field that holds a state offers its id on the clipboard. */
+  function openStateCopy(event: MouseEvent, id: string): void {
+    if (!id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    copyMenu = { x: event.clientX, y: event.clientY, id };
+  }
+
+  async function copyStateId(id: string): Promise<void> {
+    if (await copyText(id)) {
+      toast.success(`Copied ${id}`, { key: "state-id-copy" });
+    } else {
+      toast.error("Could not copy the state id");
+    }
+  }
+
+  /** Open the States page with this state selected in its editor. */
+  function openStateEditor(id: string): void {
+    requestStateConfig(id);
+    void goto("#/states");
+  }
+
   /** The text a frame's URL really comes from: its state while that holds a
    *  string, else the fixed URL. */
   function framePreviewText(slot: Slot): string {
@@ -1480,7 +1509,12 @@
                 <span class="material-symbols-outlined">edit</span>
               </button>
               {#if activeCond?.source && !usesMainState}
-                <span class="source-name" title={sourceLabel(activeCond.source)}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span
+                  class="source-name"
+                  title={sourceLabel(activeCond.source)}
+                  oncontextmenu={(e) =>
+                    openStateCopy(e, sourceStateId(activeCond.source))}
                   >{sourceLabel(activeCond.source)}</span
                 >
               {/if}
@@ -1912,7 +1946,12 @@
                 {#if slot.spark && slot.spark.enabled !== false}
                   <Icon value="show_chart" size={15} />
                 {/if}
-                <span class="slot-summary" title={slotLabel(slot)}>
+                <span
+                  class="slot-summary"
+                  title={slotLabel(slot)}
+                  oncontextmenu={(e) =>
+                    openStateCopy(e, sourceStateId(slot.source))}
+                >
                   <span class="slot-name">{slotLabel(slot)}</span>
                 </span>
                 {#if slot === tileHeadlineSlot(shownSlots)}
@@ -2087,6 +2126,8 @@
                         class="btn btn-sm source-pick"
                         title="Read the frame URL from a state's string value"
                         onclick={() => (frameSourceFor = i)}
+                        oncontextmenu={(e) =>
+                          openStateCopy(e, sourceStateId(slot.source))}
                       >
                         <Icon value="edit" size={15} />
                         <span class="source-name">{stateSourceLabel(slot)}</span
@@ -2133,6 +2174,8 @@
                             class="btn btn-sm source-pick"
                             title="Read the HTML from a state's string value"
                             onclick={() => (htmlSourceFor = i)}
+                            oncontextmenu={(e) =>
+                              openStateCopy(e, sourceStateId(slot.source))}
                           >
                             <Icon value="edit" size={15} />
                             <span class="source-name"
@@ -2167,6 +2210,8 @@
                           ? `Change source — now ${slotLabel(slot)}`
                           : "Choose a source"}
                         onclick={() => (sourcePickerFor = i)}
+                        oncontextmenu={(e) =>
+                          openStateCopy(e, sourceStateId(slot.source))}
                       >
                         <Icon value="edit" size={15} />
                         <span class="source-name">{slotLabel(slot)}</span>
@@ -3082,6 +3127,33 @@
         if (index !== null) removeSlotAt(index);
       }}
       onCancel={() => (pendingSlotDelete = null)}
+    />
+  {/if}
+
+  {#if copyMenu}
+    {@const id = copyMenu.id}
+    <ContextMenu
+      x={copyMenu.x}
+      y={copyMenu.y}
+      heading={id}
+      label="State id"
+      items={[
+        {
+          id: "copy",
+          label: "Copy state ID",
+          icon: "content_copy",
+          run: () => {
+            void copyStateId(id);
+          },
+        },
+        {
+          id: "open",
+          label: "Open in States",
+          icon: "database",
+          run: () => openStateEditor(id),
+        },
+      ]}
+      onclose={() => (copyMenu = null)}
     />
   {/if}
 </div>

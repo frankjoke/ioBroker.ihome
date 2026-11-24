@@ -169,11 +169,7 @@
       name: `${entry.value.name} — ${entry.plugin.name}`,
     })),
   );
-  const pluginProblems = $derived(
-    [pluginContributionsProblem(), ...getPluginContributions().problems]
-      .filter(Boolean)
-      .join(" "),
-  );
+  const pluginProblems = $derived(pluginContributionsProblem());
   /** A secured tile is local-only, in the sheet as on the display. */
   const visibleTile = (placement: Placement) =>
     local || placement.tile?.secured !== true;
