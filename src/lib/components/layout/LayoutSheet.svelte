@@ -1277,9 +1277,28 @@
 {#if menu}
   {@const target = menu.target}
   {@const kind = layoutMenuTargetKind(target)}
+  {@const targetPage =
+    target && "pageId" in target
+      ? registry.pages.find((p) => p.id === target.pageId)
+      : page}
+  {@const targetSection =
+    target?.kind === "tile" || target?.kind === "section"
+      ? targetPage?.groups.find((g) => g.id === target.sectionId)
+      : undefined}
+  {@const targetTile =
+    target?.kind === "tile"
+      ? targetSection?.tiles.find((t) => t.id === target.placementId)
+      : undefined}
+  {@const heading =
+    target?.kind === "tile"
+      ? targetTile?.title?.trim() || "Tile"
+      : target?.kind === "section"
+        ? targetSection?.title?.trim() || "Section"
+        : targetPage?.title?.trim() || "Page"}
   <ContextMenu
     x={menu.x}
     y={menu.y}
+    {heading}
     label={kind === "tile"
       ? "Tile actions"
       : kind === "section"

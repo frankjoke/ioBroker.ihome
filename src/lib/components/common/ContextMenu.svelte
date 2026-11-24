@@ -13,12 +13,15 @@
     y,
     items,
     label = "Actions",
+    heading = "",
     onclose,
   }: {
     x: number;
     y: number;
     items: MenuItem[];
     label?: string;
+    /** The target's name, shown above the items. */
+    heading?: string;
     onclose: () => void;
   } = $props();
 
@@ -105,7 +108,7 @@
 <div
   class="context-menu"
   role="menu"
-  aria-label={label}
+  aria-label={heading ? `${heading} actions` : label}
   tabindex="-1"
   bind:this={root}
   style="left: {left}px; top: {top}px; visibility: {ready
@@ -113,6 +116,9 @@
     : 'hidden'}"
   oncontextmenu={(event) => event.preventDefault()}
 >
+  {#if heading}
+    <p class="menu-heading">{heading}</p>
+  {/if}
   {#each items as item (item.id)}
     <button
       type="button"
@@ -163,6 +169,18 @@
     font-size: var(--body-md);
     text-align: left;
     cursor: pointer;
+  }
+
+  .menu-heading {
+    max-width: 240px;
+    margin: 0 0 2px;
+    padding: 0.25rem 0.5rem 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: var(--body-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .context-menu button:hover:not(:disabled),
