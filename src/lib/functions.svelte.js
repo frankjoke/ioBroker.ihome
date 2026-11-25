@@ -5,7 +5,7 @@
 // failed read is never replaced by "no functions".
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  FUNCTION_LIST_ID,
+  functionListId,
   getFunctionLibrary,
   isFunctionsWritable,
   setFunctionLibrary,
@@ -38,9 +38,9 @@ function readFunctionLibrary(raw) {
 }
 
 async function ensureFunctionObject() {
-  const obj = await ioBroker.getObject(FUNCTION_LIST_ID);
+  const obj = await ioBroker.getObject(functionListId(ioBroker.namespace));
   if (!obj) {
-    await ioBroker.emitAsync("setObject", FUNCTION_LIST_ID, {
+    await ioBroker.emitAsync("setObject", functionListId(ioBroker.namespace), {
       type: "state",
       common: {
         name: "iHome function templates",
@@ -69,7 +69,7 @@ export function saveFunctions() {
     }
     lastSent = snapshot;
     ioBroker
-      .setState(FUNCTION_LIST_ID, snapshot)
+      .setState(functionListId(ioBroker.namespace), snapshot)
       .then(() => setFunctionSaveFailed(false))
       .catch((e) => {
         setFunctionSaveFailed(true);
@@ -90,7 +90,10 @@ export function initFunctions() {
       } catch (e) {
         console.error("initFunctions ensureFunctionObject:", e);
       }
-      const st = await ioBroker.getState(FUNCTION_LIST_ID, true);
+      const st = await ioBroker.getState(
+        functionListId(ioBroker.namespace),
+        true,
+      );
       if (!st) {
         setFunctionsLoadKind("absent");
         initPromise = null;

@@ -4,7 +4,7 @@
 // `templateBundleList` state is read once for migration and then left untouched.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  TEMPLATE_BUNDLE_LIST_ID,
+  templateBundleListId,
   getTemplateBundleLibrary,
   isTemplateBundlesWritable,
   setTemplateBundleLibrary,
@@ -91,7 +91,10 @@ export function initTemplateBundles() {
       // No files yet: migrate the legacy document once (never written again).
       let state = null;
       try {
-        state = await ioBroker.getState(TEMPLATE_BUNDLE_LIST_ID, true);
+        state = await ioBroker.getState(
+          templateBundleListId(ioBroker.namespace),
+          true,
+        );
       } catch (e) {
         console.error("initTemplateBundles legacy:", e);
       }

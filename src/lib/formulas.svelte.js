@@ -6,7 +6,7 @@
 // replaced by "no formulas".
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  FORMULA_LIST_ID,
+  formulaListId,
   getFormulaLibrary,
   isFormulasWritable,
   setFormulaLibrary,
@@ -24,7 +24,7 @@ import { registerProgramStateId } from "$lib/stores/program-states.svelte";
  * the library changes — `registerProgramStateId` only bumps for new ids.
  */
 function registerFormulaStateIds() {
-  registerProgramStateId(FORMULA_LIST_ID);
+  registerProgramStateId(formulaListId(ioBroker.namespace));
   for (const template of getFormulaLibrary().templates ?? []) {
     for (const id of stateIdsInExpression(template.expr ?? "")) {
       registerProgramStateId(id);
@@ -56,9 +56,9 @@ function readFormulaLibrary(raw) {
 }
 
 async function ensureFormulaObject() {
-  const obj = await ioBroker.getObject(FORMULA_LIST_ID);
+  const obj = await ioBroker.getObject(formulaListId(ioBroker.namespace));
   if (!obj) {
-    await ioBroker.emitAsync("setObject", FORMULA_LIST_ID, {
+    await ioBroker.emitAsync("setObject", formulaListId(ioBroker.namespace), {
       type: "state",
       common: {
         name: "iHome formula templates",
@@ -88,7 +88,7 @@ export function saveFormulas() {
     }
     lastSent = snapshot;
     ioBroker
-      .setState(FORMULA_LIST_ID, snapshot)
+      .setState(formulaListId(ioBroker.namespace), snapshot)
       .then(() => setFormulaSaveFailed(false))
       .catch((e) => {
         setFormulaSaveFailed(true);
@@ -110,7 +110,10 @@ export function initFormulas() {
         console.error("initFormulas ensureFormulaObject:", e);
       }
       registerFormulaStateIds();
-      const st = await ioBroker.getState(FORMULA_LIST_ID, true);
+      const st = await ioBroker.getState(
+        formulaListId(ioBroker.namespace),
+        true,
+      );
       if (!st) {
         setFormulasLoadKind("absent");
         initPromise = null;

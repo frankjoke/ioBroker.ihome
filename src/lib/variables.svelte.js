@@ -4,7 +4,7 @@
 // library: one JSON document, onUpdate with echo suppression, debounced writes.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  VARIABLE_LIST_ID,
+  variableListId,
   getVariableLibrary,
   setVariableLibrary,
 } from "$lib/stores/variables.svelte.ts";
@@ -25,7 +25,7 @@ let lastSent = null;
  *  The list document itself is registered too, so an edit from another device
  *  reaches this one live (same as the formula library). */
 function registerVariableStateIds() {
-  registerProgramStateId(VARIABLE_LIST_ID);
+  registerProgramStateId(variableListId(ioBroker.namespace));
   for (const v of getVariableLibrary().variables ?? []) {
     if (v.kind === "state" && v.stateId) registerProgramStateId(v.stateId);
   }
@@ -43,9 +43,9 @@ function hydrateVariableStates() {
 }
 
 async function ensureVariableObject() {
-  const obj = await ioBroker.getObject(VARIABLE_LIST_ID);
+  const obj = await ioBroker.getObject(variableListId(ioBroker.namespace));
   if (!obj) {
-    await ioBroker.emitAsync("setObject", VARIABLE_LIST_ID, {
+    await ioBroker.emitAsync("setObject", variableListId(ioBroker.namespace), {
       type: "state",
       common: {
         name: "iHome global variables",
@@ -147,7 +147,7 @@ export function saveVariables() {
   saveTimer = setTimeout(() => {
     lastSent = snapshot;
     ioBroker
-      .setState(VARIABLE_LIST_ID, snapshot)
+      .setState(variableListId(ioBroker.namespace), snapshot)
       .catch((e) => console.error("save variables:", e));
   }, 250);
 }
@@ -165,7 +165,10 @@ export function initVariables() {
         console.error("initVariables ensureVariableObject:", e);
       }
       registerVariableStateIds();
-      const st = await ioBroker.getState(VARIABLE_LIST_ID, true);
+      const st = await ioBroker.getState(
+        variableListId(ioBroker.namespace),
+        true,
+      );
       if (st) {
         st.onUpdate = (_cl, state) => {
           const raw = state?.val;

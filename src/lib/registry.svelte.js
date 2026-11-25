@@ -5,7 +5,7 @@
 // writes back to ioBroker.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  DEVICE_LIST_ID,
+  deviceListId,
   getCanonicalRegistry,
   setCanonicalRegistry,
 } from "$lib/stores/devices.svelte";
@@ -51,9 +51,9 @@ function parseRegistry(raw) {
 }
 
 async function ensureRegistryObject() {
-  const obj = await ioBroker.getObject(DEVICE_LIST_ID);
+  const obj = await ioBroker.getObject(deviceListId());
   if (!obj) {
-    await ioBroker.emitAsync("setObject", DEVICE_LIST_ID, {
+    await ioBroker.emitAsync("setObject", deviceListId(), {
       type: "state",
       common: {
         name: "iHome device list",
@@ -103,7 +103,7 @@ export function saveRegistry() {
   saveTimer = setTimeout(() => {
     lastSent = snapshot;
     ioBroker
-      .setState(DEVICE_LIST_ID, snapshot)
+      .setState(deviceListId(), snapshot)
       .then(() => console.log("[registry] setState OK"))
       .catch((e) => console.error("save registry:", e));
   }, 250);
@@ -121,7 +121,7 @@ export function initRegistry() {
       } catch (e) {
         console.error("initRegistry ensureRegistryObject:", e);
       }
-      const st = await ioBroker.getState(DEVICE_LIST_ID, true);
+      const st = await ioBroker.getState(deviceListId(), true);
       if (st) {
         st.onUpdate = (_cl, state) => {
           const parsed = parseRegistry(state?.val);
