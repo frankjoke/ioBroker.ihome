@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   OVERRIDE_CUSTOM_KEY,
   customOverridesOf,
+  overrideListId,
   parseOverrideList,
   withCustomOverrides,
 } from "./override-common";
+
+it("builds the override list id per instance", () => {
+  expect(overrideListId("ihome.42")).toBe("ihome.42.config.overrideList");
+});
 
 const repair = {
   id: "a",

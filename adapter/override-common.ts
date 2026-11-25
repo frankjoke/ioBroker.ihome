@@ -6,6 +6,11 @@ export const OVERRIDE_LIST_ID = "ihome.0.config.overrideList";
 export const OVERRIDE_CUSTOM_KEY = "ihome";
 export const OVERRIDE_CUSTOM_VERSION = 1;
 
+/** The override list of one iHome instance. */
+export function overrideListId(instance: string): string {
+  return `${instance}.config.overrideList`;
+}
+
 /** One override as it travels on a state object (structurally SourceOverride). */
 export interface CustomOverride {
   id: string;
