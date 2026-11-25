@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { ioBroker, DEFAULT_NAMESPACE } from "$lib/ioBrokerConnect.svelte.js";
   import { getStorage } from "$lib/tools.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
+  import { iHomeInstanceIds } from "$lib/config/instance-options";
+  import { profileUrl } from "$lib/config/profile-url";
   import {
     effectivePin,
     isDefaultPin,
@@ -27,6 +29,12 @@
 
   const storage = getStorage();
   const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
+  const installedInstances = $derived(
+    iHomeInstanceIds(ioBroker.objects as Map<string, any>),
+  );
+  const instanceMissing = $derived(
+    !!storage.namespace && !installedInstances.includes(storage.namespace),
+  );
   function setPinCache(patch: Partial<PinCache>): void {
     storage.pinCache = withPinCache(storage.pinCache, storage.namespace, patch);
   }
@@ -75,7 +83,26 @@
   }
 
   function applyAndReload() {
+    const next = String(storage.namespace ?? "").trim() || DEFAULT_NAMESPACE;
+    storage.namespace = next;
+    const url = new URL(location.href);
+    url.searchParams.set("namespace", next);
+    history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     location.reload();
+  }
+
+  let profileMessage = $state("");
+
+  async function copyProfileLink(): Promise<void> {
+    try {
+      const instance =
+        String(storage.namespace ?? "").trim() || DEFAULT_NAMESPACE;
+      await navigator.clipboard.writeText(profileUrl(location.href, instance));
+      profileMessage = "Profile link copied.";
+    } catch (failure) {
+      profileMessage =
+        failure instanceof Error ? failure.message : String(failure);
+    }
   }
 
   function toggle(id: string) {
@@ -222,12 +249,35 @@
               <input
                 id="settings-ns"
                 type="text"
+                list="ihome-instance-list"
                 bind:value={storage.namespace}
               />
+              <datalist id="ihome-instance-list">
+                {#each [...new Set([...installedInstances, storage.namespace].filter(Boolean))] as instance (instance)}
+                  <option value={instance}>{instance}</option>
+                {/each}
+              </datalist>
               <span class="hint text-muted"
                 >Identity stamped as "from" on every write, e.g. ihome.0 — the
-                adapter's io-package name plus instance.</span
+                adapter's io-package name plus instance. The URL profile
+                <span class="mono">?namespace=ihome.N</span> pins a device or
+                bookmark to one instance.</span
               >
+              {#if instanceMissing}
+                <span class="hint text-danger"
+                  >Instance {storage.namespace} does not exist. Create it in
+                  Admin → Instances.</span
+                >
+              {/if}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => void copyProfileLink()}
+                >Copy profile link</button
+              >
+              {#if profileMessage}
+                <span class="hint text-muted">{profileMessage}</span>
+              {/if}
             </div>
 
             <div class="field">
