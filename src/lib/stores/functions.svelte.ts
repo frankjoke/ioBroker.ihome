@@ -1,6 +1,8 @@
+import { configId } from "$lib/config/config-id";
 import type { FunctionLibrary, FunctionTemplate } from "$lib/types/device";
 
-export const FUNCTION_LIST_ID = "ihome.0.config.functionList";
+export const functionListId = (instance: string) =>
+  configId("functionList", instance);
 
 const defaultLibrary: FunctionLibrary = {
   version: 0,

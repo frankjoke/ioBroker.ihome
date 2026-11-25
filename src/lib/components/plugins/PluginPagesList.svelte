@@ -239,7 +239,7 @@
   {#if !isPluginPagesWritable()}
     <p class="text-danger hint">
       The page list could not be read — nothing is saved. Fix the
-      <code>ihome.0.config.pluginPages</code> state first.
+      <code>config.pluginPages</code> state first.
     </p>
   {/if}
 

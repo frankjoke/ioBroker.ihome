@@ -374,7 +374,7 @@
   <div class="card empty-state">
     <p class="text-muted">
       {loadKind === "unreadable"
-        ? "The icon library document is unreadable. Fix or remove ihome.0.config.iconPool before editing."
+        ? "The icon library document is unreadable. Fix or remove the instance's config.iconPool before editing."
         : "Loading icon library…"}
     </p>
   </div>

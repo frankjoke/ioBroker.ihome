@@ -25,6 +25,7 @@ vi.mock("$lib/config/icon-files", () => ({
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
+    namespace: "ihome.42",
     connected: true,
     getState: vi.fn(async () =>
       h.state.value === null ? null : { value: h.state.value },
@@ -100,8 +101,9 @@ it("saves the state first and refreshes the mirror", async () => {
     defaults: { roles: {}, templates: {} },
   };
   expect(await store.commitIconPool(next, 1)).toBe("saved");
+  expect(store.iconPoolId()).toBe("ihome.42.config.iconPool");
   expect(h.setState).toHaveBeenCalledWith(
-    store.ICON_POOL_ID,
+    store.iconPoolId(),
     JSON.stringify(next),
   );
   expect(h.writeLibraryFile).toHaveBeenCalledTimes(1);

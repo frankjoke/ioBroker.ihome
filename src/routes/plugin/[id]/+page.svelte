@@ -46,7 +46,7 @@
       <p class="text-muted">
         {#if loadKind === "unreadable"}
           The page list is unreadable — fix
-          <code>ihome.0.config.pluginPages</code>.
+          <code>config.pluginPages</code>.
         {:else if entry}
           This page has no valid URL.
         {:else}

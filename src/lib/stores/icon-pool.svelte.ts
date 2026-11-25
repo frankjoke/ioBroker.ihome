@@ -1,9 +1,10 @@
-// The icon library lives in `ihome.0.config.iconPool` — one state every iHome
+// The icon library lives in `instance.config.iconPool` — one state every iHome
 // instance already shares, with the conflict model the rest of the app uses.
 // `ihome.meta/icons/library.json` is a best-effort mirror for browsing/other
 // tools, never the source of truth: a broken mirror must not break the library.
 
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   emptyIconPool,
   ensureBuiltinDefaults,
@@ -12,7 +13,7 @@ import {
 } from "$lib/config/icon-library";
 import { readLibraryFile, writeLibraryFile } from "$lib/config/icon-files";
 
-export const ICON_POOL_ID = "ihome.0.config.iconPool";
+export const iconPoolId = () => configId("iconPool", ioBroker.namespace);
 
 /** The result of a save attempt, so the manager can word the outcome. */
 export type IconPoolSave = "saved" | "conflict" | "failed";
@@ -49,10 +50,10 @@ export function iconPoolLoadKind():
 }
 
 async function readState(): Promise<{ value?: unknown } | null> {
-  let state = await ioBroker.getState(ICON_POOL_ID, true).catch(() => null);
+  let state = await ioBroker.getState(iconPoolId(), true).catch(() => null);
   if (!state) {
     await ioBroker.wait(300);
-    state = await ioBroker.getState(ICON_POOL_ID, true).catch(() => null);
+    state = await ioBroker.getState(iconPoolId(), true).catch(() => null);
   }
   return state;
 }
@@ -115,7 +116,7 @@ export async function commitIconPool(
   }
 
   try {
-    await ioBroker.setState(ICON_POOL_ID, JSON.stringify(next));
+    await ioBroker.setState(iconPoolId(), JSON.stringify(next));
   } catch (e) {
     saveFailed = true;
     console.error("save icon library:", e);
@@ -167,7 +168,7 @@ export function initIconPool(): Promise<void> {
         const dirty = seeded !== chosen;
         if (dirty || !stateDoc || stateDoc.updatedAt < seeded.updatedAt) {
           void ioBroker
-            .setState(ICON_POOL_ID, JSON.stringify(seeded))
+            .setState(iconPoolId(), JSON.stringify(seeded))
             .catch(() => undefined);
         }
         if (dirty || !fileDoc || fileDoc.updatedAt < seeded.updatedAt) {
@@ -181,7 +182,7 @@ export function initIconPool(): Promise<void> {
         iconPool = seeded;
         loadKind = "absent";
         void ioBroker
-          .setState(ICON_POOL_ID, JSON.stringify(seeded))
+          .setState(iconPoolId(), JSON.stringify(seeded))
           .catch(() => undefined);
         void writeMirror(seeded);
         initPromise = null;

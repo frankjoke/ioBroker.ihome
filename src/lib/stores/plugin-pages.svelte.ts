@@ -1,4 +1,4 @@
-// The page list under the cog menu's Plugins group (ihome.0.config.pluginPages).
+// The page list under the cog menu's Plugins group (instance.config.pluginPages).
 // Same document pattern as the logic list: strict parse, a debounced whole-
 // document write, and a refusal to overwrite a document we could not read.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";

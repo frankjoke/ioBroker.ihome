@@ -1,4 +1,4 @@
-// The legacy device document (ihome.0.config.deviceList). The display no longer
+// The legacy device document (instance.config.deviceList). The display no longer
 // reads it: the one-time migration (`device-migration.svelte.ts`) converts it
 // into source overrides, and until that marker is set an un-migrated
 // installation still needs its state ids subscribed, so this store keeps the

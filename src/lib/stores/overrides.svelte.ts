@@ -1,4 +1,4 @@
-// The override document lives in one state (`ihome.0.config.overrideList`),
+// The override document lives in one state (`instance.config.overrideList`),
 // shared by every iHome instance. Loading is fail-closed: a document that cannot
 // be read is never replaced, the store stays read-only.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";

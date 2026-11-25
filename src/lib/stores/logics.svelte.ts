@@ -1,4 +1,4 @@
-// The logic document (ihome.0.config.logicList), edited by the SPA and run by
+// The logic document (instance.config.logicList), edited by the SPA and run by
 // the adapter. Same registry pattern as pages/templates: a debounced
 // whole-document write, a load kind that refuses to overwrite an unreadable
 // document, and an echo guard for our own write.

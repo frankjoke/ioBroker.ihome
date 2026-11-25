@@ -1,6 +1,8 @@
+import { configId } from "$lib/config/config-id";
 import type { FormulaLibrary, FormulaTemplate } from "$lib/types/device";
 
-export const FORMULA_LIST_ID = "ihome.0.config.formulaList";
+export const formulaListId = (instance: string) =>
+  configId("formulaList", instance);
 
 const defaultLibrary: FormulaLibrary = {
   version: 0,

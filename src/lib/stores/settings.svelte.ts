@@ -1,4 +1,4 @@
-// The shared settings document (ihome.0.config.settings). One JSON object, read
+// The shared settings document (instance.config.settings). One JSON object, read
 // and written over the same socket as the other config documents; the local
 // storage keys the app keeps are its cache, never the truth (settings-ops.ts
 // owns what a document may contain, +layout.svelte mirrors it into the cache).
@@ -12,9 +12,10 @@ import {
   type Settings,
 } from "$lib/config/settings-ops";
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import { registerProgramStateId } from "$lib/stores/program-states.svelte";
 
-export const SETTINGS_ID = "ihome.0.config.settings";
+export const settingsId = () => configId("settings", ioBroker.namespace);
 
 let settings = $state<Settings>({});
 let loaded = $state(false);
@@ -37,9 +38,9 @@ export function settingsSaveFailed(): boolean {
 }
 
 async function ensureSettingsObject() {
-  const obj = await ioBroker.getObject(SETTINGS_ID);
+  const obj = await ioBroker.getObject(settingsId());
   if (!obj) {
-    await ioBroker.emitAsync("setObject", SETTINGS_ID, {
+    await ioBroker.emitAsync("setObject", settingsId(), {
       type: "state",
       common: {
         name: "iHome settings",
@@ -63,7 +64,7 @@ async function writeDocument(patch: Partial<Settings>): Promise<boolean> {
   const next = mergeSettings(settings, patch);
   settings = next;
   try {
-    await ioBroker.setState(SETTINGS_ID, JSON.stringify(next));
+    await ioBroker.setState(settingsId(), JSON.stringify(next));
     loaded = true;
     saveFailed = false;
     applier?.(next);
@@ -118,14 +119,14 @@ export function initSettings(
       } catch (e) {
         console.error("initSettings ensureSettingsObject:", e);
       }
-      registerProgramStateId(SETTINGS_ID);
-      let st = await ioBroker.getState(SETTINGS_ID, true);
+      registerProgramStateId(settingsId());
+      let st = await ioBroker.getState(settingsId(), true);
       if (!st) {
         // A state that has never been written reads as "not found" on this
         // client (it omits a null value) — but so does a failed read. Ask once
         // more before treating the document as empty.
         await ioBroker.wait(300);
-        st = await ioBroker.getState(SETTINGS_ID, true);
+        st = await ioBroker.getState(settingsId(), true);
       }
       if (!st) {
         // The object was ensured above and two reads found no value: an empty
@@ -134,7 +135,7 @@ export function initSettings(
           initPromise = null;
           return;
         }
-        st = await ioBroker.getState(SETTINGS_ID, true);
+        st = await ioBroker.getState(settingsId(), true);
         if (!st) {
           initPromise = null;
           return;

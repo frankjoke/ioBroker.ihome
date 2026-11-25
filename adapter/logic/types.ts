@@ -1,4 +1,4 @@
-// The logic document as stored in ihome.0.config.logicList. Every field the
+// The logic document as stored in instance.config.logicList. Every field the
 // engine, the validator and the editor share lives here; the expression spec
 // (docs/superpowers/specs/2026-11-04-logic-code-expressions-design.md) is the
 // authority for Expr, the action spec
