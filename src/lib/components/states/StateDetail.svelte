@@ -354,6 +354,7 @@
             customKeys={historyKeys}
             {object}
             defaultAdapter={defaultHistory}
+            adapters={historyCandidates}
             bind:openAdapter={openHistoryAdapter}
           />
         {/key}

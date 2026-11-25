@@ -12,8 +12,16 @@
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import HistoryChart from "./HistoryChart.svelte";
   import HistoryResample from "./HistoryResample.svelte";
+  import HistoryTransfer from "./HistoryTransfer.svelte";
   import { writeStateCustom } from "$lib/config/state-write";
   import { csvText } from "$lib/config/history-resample";
+  import { jsonText, parseHistoryText } from "$lib/config/history-file";
+  import {
+    retentionDays,
+    retentionLabel,
+    retentionValues,
+    supportsStateRetention,
+  } from "$lib/config/history-retention";
   import { downloadText } from "$lib/utils/download";
   import { formatValue, localizeName } from "$lib/config/format";
   import { debounce } from "$lib/utils/debounce";
@@ -23,12 +31,15 @@
     customKeys,
     object,
     defaultAdapter,
+    adapters = [],
     openAdapter = $bindable(""),
   }: {
     stateId: string;
     customKeys: string[];
     object: any;
     defaultAdapter: string;
+    /** Installed history adapters, for the copy/move destination. */
+    adapters?: string[];
     /** The open adapter; owned by the parent so it survives tab switches. */
     openAdapter?: string;
   } = $props();
@@ -38,6 +49,9 @@
     { value: "6", label: "6 hours" },
     { value: "24", label: "24 hours" },
     { value: "168", label: "7 days" },
+    { value: "720", label: "30 days" },
+    { value: "2160", label: "90 days" },
+    { value: "8760", label: "1 year" },
   ];
   const FORMAT_TABS = [
     {
@@ -55,6 +69,8 @@
 
   let draftEnabled = $state<boolean | null>(null);
   let draftAlias = $state<string | null>(null);
+  let draftRetention = $state<string | null>(null);
+  let draftRetentionDays = $state("");
   let saving = $state(false);
   let duration = $state("24");
   let mode = $state<"graphic" | "table">("graphic");
@@ -72,6 +88,8 @@
   let rangeCount = $state(0);
   let rangeCounting = $state(false);
   let rangeError = $state("");
+  let fileBusy = $state(false);
+  let fileInput = $state<HTMLInputElement>();
   let countSeq = 0;
 
   const rangeBounds = $derived.by(() => {
@@ -119,6 +137,33 @@
     return typeof value === "string" ? value : "";
   }
 
+  function retentionPresetOf(key: string): string {
+    const days = retentionDays(customValue(key));
+    if (days === undefined) return "";
+    const rounded = Math.round(days);
+    if ([0, 30, 90, 180, 365, 730].includes(rounded)) {
+      return String(rounded);
+    }
+    return "custom";
+  }
+
+  const retentionOk = $derived(
+    draftRetention !== "custom" ||
+      (Number.isFinite(Number(draftRetentionDays)) &&
+        Number(draftRetentionDays) >= 0),
+  );
+
+  const retentionDirty = $derived.by(() => {
+    if (openAdapter === "" || draftRetention === null) return false;
+    if (draftRetention !== retentionPresetOf(openAdapter)) return true;
+    if (draftRetention !== "custom") return false;
+    const current = retentionDays(customValue(openAdapter));
+    return (
+      draftRetentionDays !==
+      (current === undefined ? "" : String(Math.round(current)))
+    );
+  });
+
   const aliasOptions = $derived.by(() => {
     const options: Array<{ id: string; name: string }> = [];
     for (const [id, entry] of ioBroker.objects as Map<string, any>) {
@@ -142,7 +187,8 @@
   const configDirty = $derived(
     openAdapter !== "" &&
       ((draftEnabled !== null && draftEnabled !== enabledOf(openAdapter)) ||
-        (draftAlias !== null && draftAlias !== aliasOf(openAdapter))),
+        (draftAlias !== null && draftAlias !== aliasOf(openAdapter)) ||
+        retentionDirty),
   );
 
   async function saveConfig(): Promise<void> {
@@ -155,14 +201,37 @@
     saving = true;
     error = "";
     message = "";
+    const next: Record<string, unknown> = { ...value, enabled, aliasId: alias };
+    const retention = draftRetention ?? retentionPresetOf(key);
+    if (retention === "") {
+      delete next.retention;
+      delete next.customRetentionDuration;
+    } else {
+      const days =
+        retention === "custom" ? Number(draftRetentionDays) : Number(retention);
+      if (Number.isFinite(days) && days >= 0) {
+        const fields = retentionValues(days);
+        next.retention = fields.retention;
+        next.customRetentionDuration = fields.customRetentionDuration;
+      }
+    }
     const custom = {
       ...((object?.common?.custom ?? {}) as Record<string, unknown>),
-      [key]: { ...value, enabled, aliasId: alias },
+      [key]: next,
     };
     try {
       await writeStateCustom(stateId, custom);
       draftEnabled = enabled;
       draftAlias = alias;
+      const savedDays = retentionDays(next);
+      draftRetention =
+        savedDays === undefined
+          ? ""
+          : [0, 30, 90, 180, 365, 730].includes(Math.round(savedDays))
+            ? String(Math.round(savedDays))
+            : "custom";
+      draftRetentionDays =
+        savedDays === undefined ? "" : String(Math.round(savedDays));
       message = alias
         ? `${key}: history alias ${alias}.`
         : `${key} ${enabled ? "enabled" : "disabled"}.`;
@@ -189,6 +258,10 @@
     openAdapter = openAdapter === key ? "" : key;
     draftEnabled = openAdapter ? enabledOf(openAdapter) : null;
     draftAlias = openAdapter ? aliasOf(openAdapter) : null;
+    draftRetention = openAdapter ? retentionPresetOf(openAdapter) : null;
+    draftRetentionDays = openAdapter
+      ? String(Math.round(retentionDays(customValue(openAdapter)) ?? 0))
+      : "";
     error = "";
     message = "";
     featuresReply = null;
@@ -311,6 +384,169 @@
   }
   const scheduleCount = debounce(() => void countRange(), 300);
 
+  function sameValue(actual: unknown, expected: unknown): boolean {
+    if (typeof actual === "number" && typeof expected === "number") {
+      // sql.0 rounds stored numbers to its instance precision (default 4 decimals).
+      return (
+        Math.abs(actual - expected) <= Math.max(1e-4, Math.abs(expected) * 1e-4)
+      );
+    }
+    return JSON.stringify(actual) === JSON.stringify(expected);
+  }
+
+  function withTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    label: string,
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+        ms,
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (failure) => {
+          clearTimeout(timer);
+          reject(failure);
+        },
+      );
+    });
+  }
+
+  async function readRange(start: number, end: number) {
+    const reply = await withTimeout(
+      ioBroker.sendTo(adapter, "getHistory", {
+        id: stateId,
+        options: {
+          start,
+          end,
+          aggregate: "none",
+          limit: RAW_LIMIT,
+          ignoreNull: true,
+        },
+      }) as Promise<unknown>,
+      30_000,
+      "getHistory",
+    );
+    const errorText = replyError(reply);
+    if (errorText) throw new Error(errorText);
+    return historyRows(reply);
+  }
+
+  function rangeFileName(kind: string, start: number, end: number): string {
+    const safe = stateId.replace(/[^A-Za-z0-9._-]+/g, "-");
+    const from = new Date(start).toISOString().slice(0, 16).replace(":", "");
+    const to = new Date(end).toISOString().slice(0, 16).replace(":", "");
+    return `${safe}-history-${kind}-${from}-${to}.${kind}`;
+  }
+
+  async function exportRange(kind: "csv" | "json"): Promise<void> {
+    if (!rangeBounds.valid || fileBusy) return;
+    fileBusy = true;
+    error = "";
+    message = "";
+    try {
+      const rows = await readRange(rangeBounds.start, rangeBounds.end);
+      if (rows.length === 0) {
+        message = "No entries in the selected range.";
+        return;
+      }
+      downloadText(
+        rangeFileName(kind, rangeBounds.start, rangeBounds.end),
+        kind === "csv" ? csvText(rows) : jsonText(rows),
+        kind === "csv" ? "text/csv;charset=utf-8" : "application/json",
+      );
+      message = `Exported ${rows.length} rows from ${adapter}.`;
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      fileBusy = false;
+    }
+  }
+
+  async function importFile(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || fileBusy) return;
+    if (!hasHistoryFeature(featuresReply, "storeState")) {
+      error = `${adapter} cannot store imported history.`;
+      return;
+    }
+    fileBusy = true;
+    error = "";
+    message = "";
+    try {
+      const rows = parseHistoryText(await file.text());
+      if (rows.length > RAW_LIMIT) {
+        throw new Error(
+          `The file has ${rows.length} rows; the limit is ${RAW_LIMIT}. Split it.`,
+        );
+      }
+      const start = rows[0].ts;
+      const end = rows[rows.length - 1].ts + 1;
+      for (let index = 0; index < rows.length; index += 5000) {
+        const batch = rows.slice(index, index + 5000).map((row) => ({
+          ts: row.ts,
+          val: row.val,
+          ack: true,
+          from: ioBroker.namespace,
+        }));
+        const reply = await withTimeout(
+          ioBroker.sendTo(adapter, "storeState", {
+            id: stateId,
+            state: batch,
+          }) as Promise<unknown>,
+          30_000,
+          "storeState",
+        );
+        const errorText = replyError(reply);
+        if (errorText) throw new Error(`storeState: ${errorText}`);
+      }
+      // sql.0 acknowledges storeState before its SQL insert has run.
+      const wanted = new Set(rows.map((row) => row.ts));
+      const deadline = Date.now() + 15_000;
+      let actual = new Map<number, unknown>();
+      for (;;) {
+        actual = new Map(
+          (await readRange(start, end)).map((row) => [row.ts, row.val]),
+        );
+        if (
+          [...wanted].every((ts) => actual.has(ts)) ||
+          Date.now() >= deadline
+        ) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      let checked = 0;
+      for (const row of rows) {
+        if (!actual.has(row.ts)) {
+          throw new Error(
+            `Verification: ${new Date(row.ts).toLocaleString()} is missing.`,
+          );
+        }
+        if (!sameValue(actual.get(row.ts), row.val)) {
+          throw new Error(
+            `Verification: ${new Date(row.ts).toLocaleString()} differs.`,
+          );
+        }
+        checked += 1;
+      }
+      message = `Imported ${checked} rows into ${adapter} · ${stateId}.`;
+      await loadChart();
+      await countRange();
+    } catch (failure) {
+      error = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      fileBusy = false;
+    }
+  }
+
   async function deleteRange(): Promise<void> {
     if (!rangeBounds.valid) {
       error = "The range needs a start before the end.";
@@ -391,6 +627,7 @@
         {@const open = openAdapter === key}
         {@const enabled =
           open && draftEnabled !== null ? draftEnabled : enabledOf(key)}
+        {@const retention = retentionDays(customValue(key))}
         <div class="item" class:open>
           <!-- The free line area is a mouse convenience; the name button is the keyboard control. -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -407,6 +644,11 @@
             >
             {#if key === defaultAdapter}
               <span class="badge badge-secondary">default</span>
+            {/if}
+            {#if retention !== undefined && supportsStateRetention(key)}
+              <span class="badge badge-secondary"
+                >{retentionLabel(retention)}</span
+              >
             {/if}
             <span class="item-actions">
               <label
@@ -428,7 +670,7 @@
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  disabled={!configDirty || saving}
+                  disabled={!configDirty || !retentionOk || saving}
                   onclick={() => void saveConfig()}
                   >{saving ? "Saving…" : "Save"}</button
                 >
@@ -461,6 +703,54 @@
                 Reads and writes this state's history under the selected state
                 id. The old entries stay there after the alias state is removed.
               </p>
+              {#if supportsStateRetention(key)}
+                <div class="row wrap">
+                  <label class="small">
+                    <span class="label-mono">Retention</span>
+                    <select
+                      value={draftRetention ?? retentionPresetOf(key)}
+                      disabled={saving}
+                      onchange={(event) =>
+                        (draftRetention = event.currentTarget.value)}
+                    >
+                      <option value="">Adapter default</option>
+                      <option value="0">Keep forever</option>
+                      <option value="30">1 month</option>
+                      <option value="90">3 months</option>
+                      <option value="180">6 months</option>
+                      <option value="365">1 year</option>
+                      <option value="730">2 years</option>
+                      <option value="custom">Custom…</option>
+                    </select>
+                  </label>
+                  {#if (draftRetention ?? retentionPresetOf(key)) === "custom"}
+                    <label class="small">
+                      <span class="label-mono">Days</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draftRetentionDays}
+                        disabled={saving}
+                        oninput={(event) =>
+                          (draftRetentionDays = event.currentTarget.value)}
+                      />
+                    </label>
+                  {/if}
+                </div>
+                <p class="hint text-muted">
+                  Retention is enforced by the history adapter. “Adapter
+                  default” leaves the instance setting in charge; use 1 month
+                  for most temperatures and 1–2 years for states you compare
+                  yearly.
+                </p>
+              {:else}
+                <p class="hint text-muted">
+                  {key} keeps history per instance or database, not per state. Use
+                  separate adapter instances or databases for different retention
+                  tiers; the retention fields here would be ignored.
+                </p>
+              {/if}
               {#if !featuresReply}
                 <p class="hint text-muted">
                   {adapter} does not report history features.
@@ -600,12 +890,61 @@
               </p>
               {#if rangeError}<p class="hint text-danger">{rangeError}</p>{/if}
               {#if error}<p class="hint text-danger">{error}</p>{/if}
+              <div class="row wrap">
+                <span class="label-mono">Data file</span>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={fileBusy || !rangeBounds.valid}
+                  onclick={() => void exportRange("csv")}>Export CSV</button
+                >
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={fileBusy || !rangeBounds.valid}
+                  onclick={() => void exportRange("json")}>Export JSON</button
+                >
+                {#if hasHistoryFeature(featuresReply, "storeState")}
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={fileBusy}
+                    onclick={() => fileInput?.click()}
+                    >{fileBusy ? "Working…" : "Import…"}</button
+                  >
+                  <input
+                    bind:this={fileInput}
+                    type="file"
+                    accept=".csv,.json,text/csv,application/json"
+                    hidden
+                    onchange={(event) => void importFile(event)}
+                  />
+                {/if}
+              </div>
+              <p class="hint text-muted">
+                Export uses the From/To range. Import adds rows to this state's
+                {adapter} history; it never deletes. To replace a range, delete it
+                first.
+              </p>
               <HistoryResample
                 {adapter}
                 {stateId}
                 {object}
                 config={customValue(key) ?? {}}
                 {featuresReply}
+                rangeStart={rangeBounds.start}
+                rangeEnd={rangeBounds.end}
+                rangeValid={rangeBounds.valid}
+                onDone={async () => {
+                  await chooseAdapter();
+                  await countRange();
+                }}
+              />
+              <HistoryTransfer
+                {adapter}
+                {stateId}
+                {featuresReply}
+                {adapters}
                 rangeStart={rangeBounds.start}
                 rangeEnd={rangeBounds.end}
                 rangeValid={rangeBounds.valid}

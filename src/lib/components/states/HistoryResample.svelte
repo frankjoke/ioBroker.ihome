@@ -196,9 +196,29 @@
   }
 
   function sameValue(actual: number, expected: number): boolean {
+    // sql.0 rounds stored numbers to its instance precision (default 4 decimals).
     return (
-      Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 1e-6)
+      Math.abs(actual - expected) <= Math.max(1e-4, Math.abs(expected) * 1e-4)
     );
+  }
+
+  /** sql.0 acknowledges storeState before its SQL insert has run. */
+  async function waitForTimestamps(
+    id: string,
+    start: number,
+    end: number,
+    expected: ResamplePoint[],
+  ): Promise<ResamplePoint[]> {
+    const wanted = new Set(expected.map((point) => point.ts));
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const rows = numericWithin(await readRange(id, start, end), start, end);
+      const have = new Set(rows.map((point) => point.ts));
+      if ([...wanted].every((ts) => have.has(ts)) || Date.now() >= deadline) {
+        return rows;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
   }
 
   function assertTemp(
@@ -231,7 +251,9 @@
       type: "state",
       common: {
         name: `History resample ${object?.common?.name ?? stateId}`,
-        type: object?.common?.type ?? "mixed",
+        // Resample points are numbers; a concrete type lets sql.0 pick its
+        // numeric table instead of falling back to strings.
+        type: "number",
         role: object?.common?.role ?? "state",
         read: true,
         write: false,
@@ -287,11 +309,7 @@
     end: number,
   ): Promise<ResamplePoint[]> {
     await storePoints(stateId, points);
-    const actual = numericWithin(
-      await readRange(stateId, start, end),
-      start,
-      end,
-    );
+    const actual = await waitForTimestamps(stateId, start, end, points);
     const byTime = new Map(actual.map((point) => [point.ts, point.val]));
     for (const point of points) {
       if (!byTime.has(point.ts)) {
@@ -353,10 +371,11 @@
       tempId = `${ioBroker.namespace}.historyResample.${newId()}`;
       await createTempState(tempId);
       await storePoints(tempId, job.points);
-      verified = numericWithin(
-        await readRange(tempId, job.start, job.end),
+      verified = await waitForTimestamps(
+        tempId,
         job.start,
         job.end,
+        job.points,
       );
       assertTemp(verified, job.points);
 
