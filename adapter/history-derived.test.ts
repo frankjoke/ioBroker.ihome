@@ -129,6 +129,43 @@ it("retries a failed write with the next window and keeps the queue bounded", as
   expect(last[2].state.length).toBeGreaterThan(1);
 });
 
+it("keeps points when an older write fails during a newer write", async () => {
+  const pending: Array<(error: Error) => void> = [];
+  const sendTo = vi.fn((adapter: string, command: string, payload: unknown) => {
+    if (adapter !== "history.0" || command !== "storeState") {
+      return Promise.reject(new Error("unexpected command"));
+    }
+    if (pending.length < 2) {
+      return new Promise((_resolve, reject) => {
+        pending.push(reject);
+      });
+    }
+    return Promise.resolve({ success: true, payload });
+  });
+  let value = 0;
+  const make = () =>
+    entry({
+      intervalMs: 1_000,
+      startDelayMs: 0,
+      relogMs: 0,
+      run: () => ++value,
+    });
+  const h = service([make()], sendTo);
+  h.svc.load([make()]);
+  await vi.advanceTimersByTimeAsync(1_000);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(sendTo).toHaveBeenCalledTimes(2);
+  pending[1](new Error("down"));
+  await vi.advanceTimersByTimeAsync(0);
+  pending[0](new Error("down"));
+  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(1_000);
+  const last = sendTo.mock.calls.at(-1)!;
+  expect(last[2].state.map((point: { ts: number }) => point.ts)).toEqual([
+    1_000, 2_000, 3_000,
+  ]);
+});
+
 it("stops its timers and reports source ids", async () => {
   const h = service([entry(), entry({ id: "0_userdata.0.U" })]);
   h.svc.load([entry(), entry({ id: "0_userdata.0.U", startDelayMs: 2_000 })]);

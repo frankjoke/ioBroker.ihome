@@ -233,6 +233,9 @@ export class DerivedHistoryService {
   private async flush(state: EntryState): Promise<void> {
     if (state.stopped || !state.queue.length) return;
     const points = state.queue;
+    // New points can arrive while storeState is in flight; only this snapshot
+    // is cleared after a successful send.
+    state.queue = [];
     try {
       const reply = await this.deps.sendTo(state.entry.adapter, "storeState", {
         id: state.entry.id,
@@ -248,11 +251,11 @@ export class DerivedHistoryService {
       const last = points[points.length - 1];
       state.lastWritten = last.val;
       state.lastWrittenTs = last.ts;
-      state.queue = [];
     } catch (error) {
-      if (points.length > MAX_DERIVED_QUEUE) {
-        const dropped = points.length - MAX_DERIVED_QUEUE;
-        state.queue = points.slice(-MAX_DERIVED_QUEUE);
+      state.queue = [...points, ...state.queue];
+      if (state.queue.length > MAX_DERIVED_QUEUE) {
+        const dropped = state.queue.length - MAX_DERIVED_QUEUE;
+        state.queue = state.queue.slice(-MAX_DERIVED_QUEUE);
         this.deps.log.warn(
           `derived ${state.entry.id}/${state.entry.adapter}: dropped ${dropped} queued point(s)`,
         );
