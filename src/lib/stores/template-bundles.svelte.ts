@@ -2,8 +2,10 @@ import type {
   TemplateBundle,
   TemplateBundleLibrary,
 } from "$lib/types/templates";
+import { configId } from "$lib/config/config-id";
 
-export const TEMPLATE_BUNDLE_LIST_ID = "ihome.0.config.templateBundleList";
+export const templateBundleListId = (instance: string) =>
+  configId("templateBundleList", instance);
 
 const defaultLibrary: TemplateBundleLibrary = {
   version: 0,

@@ -3,6 +3,7 @@
 // `templateList` state is read once for migration and then left untouched.
 // Built-in presets stay in code and are never stored.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   migrateTemplateRegistry,
   parseTemplateRegistry,
@@ -17,7 +18,7 @@ import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { TemplateRegistry } from "$lib/types/display";
 import type { Template } from "$lib/types/display";
 
-export const TEMPLATE_LIST_ID = "ihome.0.config.templateList";
+export const templateListId = () => configId("templateList", ioBroker.namespace);
 
 const emptyRegistry: TemplateRegistry = {
   version: 0,
@@ -144,7 +145,7 @@ export async function commitTemplatesNow(
  * sources and rules must be in the used set too.
  */
 function registerTemplateStateIds(): void {
-  registerProgramStateId(TEMPLATE_LIST_ID);
+  registerProgramStateId(templateListId());
   const variables = getVariableLibrary().variables ?? [];
   for (const template of getTemplateRegistry().templates ?? []) {
     for (const slot of template?.slots ?? []) {
@@ -193,7 +194,7 @@ export function initTemplates(): Promise<void> {
       // No files yet: migrate the legacy document once (never written again).
       let state: { value?: unknown } | null = null;
       try {
-        state = await ioBroker.getState(TEMPLATE_LIST_ID, true);
+        state = await ioBroker.getState(templateListId(), true);
       } catch (e) {
         console.error("initTemplates legacy:", e);
       }

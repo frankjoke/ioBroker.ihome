@@ -4,21 +4,27 @@ const h = vi.hoisted(() => ({
   legacy: null as unknown,
   writes: [] as string[],
   deletes: [] as string[],
+  stateCalls: [] as string[],
+  registered: [] as string[],
 }));
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
+    namespace: "ihome.42",
     connected: true,
     wait: vi.fn(async () => {}),
     emitAsync: vi.fn(async () => undefined),
-    getState: vi.fn(async () =>
-      h.legacy === null ? null : { value: h.legacy },
-    ),
+    getState: vi.fn(async (id: string) => {
+      h.stateCalls.push(id);
+      return h.legacy === null ? null : { value: h.legacy };
+    }),
     setState: vi.fn(async () => undefined),
   },
 }));
 vi.mock("$lib/stores/program-states.svelte", () => ({
-  registerProgramStateId: vi.fn(),
+  registerProgramStateId: vi.fn((id: string) => {
+    h.registered.push(id);
+  }),
 }));
 vi.mock("$lib/stores/variables.svelte", () => ({
   getVariableLibrary: () => ({ variables: [] }),
@@ -90,6 +96,8 @@ beforeEach(() => {
   h.legacy = null;
   h.writes.length = 0;
   h.deletes.length = 0;
+  h.stateCalls.length = 0;
+  h.registered.length = 0;
 });
 
 it("loads templates from the folder", async () => {
@@ -99,6 +107,7 @@ it("loads templates from the folder", async () => {
     }),
   );
   expect(mod.isTemplatesWritable()).toBe(true);
+  expect(h.registered).toContain("ihome.42.config.templateList");
   // The file name is the id, whatever the definition carried.
   expect(mod.getTemplateRegistry().templates.map((t) => t.id)).toEqual([
     "light",

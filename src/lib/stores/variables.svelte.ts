@@ -1,3 +1,4 @@
+import { configId } from "$lib/config/config-id";
 import {
   constantValues,
   type GlobalVariable,
@@ -5,7 +6,8 @@ import {
   type VariableLibrary,
 } from "$lib/config/variables";
 
-export const VARIABLE_LIST_ID = "ihome.0.config.variableList";
+export const variableListId = (instance: string) =>
+  configId("variableList", instance);
 
 const defaultLibrary: VariableLibrary = {
   version: 0,
