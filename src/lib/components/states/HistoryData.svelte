@@ -170,15 +170,15 @@
 
   const derivedAvailable = $derived(
     openAdapter !== "" &&
-      object?.common?.type === "number" &&
+      (object?.common?.type === "number" || object?.common?.type === "mixed") &&
       hasHistoryFeature(featuresReply, "storeState") &&
       (draftAlias ?? aliasOf(openAdapter)).trim() === "",
   );
 
   const derivedProblem = $derived.by(() => {
     if (openAdapter === "" || draftMode !== "derived") return "";
-    if (object?.common?.type !== "number") {
-      return "Derived history is only available for number states.";
+    if (object?.common?.type !== "number" && object?.common?.type !== "mixed") {
+      return "Derived history is only available for number and mixed states.";
     }
     if (!hasHistoryFeature(featuresReply, "storeState")) {
       return `${openAdapter} does not support storeState.`;
@@ -198,6 +198,7 @@
     if (relog === null || relog < 0) {
       return "Repeat interval must be a duration, e.g. 1h.";
     }
+    if (!draftFunction.trim()) return "The derived function needs code.";
     const codeProblem = checkStatement(draftFunction);
     if (codeProblem) return codeProblem;
     if (!isHistoryDerivedLoaded()) {
@@ -884,8 +885,8 @@
               </div>
               {#if !derivedAvailable && draftMode !== "derived"}
                 <p class="hint text-muted">
-                  Derived history needs a number state, storeState from {key},
-                  and an empty alias.
+                  Derived history needs a number or mixed state, storeState from
+                  {key}, and an empty alias.
                 </p>
               {/if}
               {#if draftMode === "derived"}

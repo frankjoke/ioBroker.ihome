@@ -16,6 +16,7 @@ import { logicSubscriptions, subscriptionDiff } from "./logic/subscriptions";
 import { parseDuration } from "./logic/duration";
 import {
   derivedEntryProblemForObject,
+  derivedNumber,
   parseDerivedDocument,
 } from "./history-derived-common";
 import {
@@ -959,18 +960,20 @@ class IHome extends utils.Adapter {
         continue;
       }
       const source = await this.readDerivedState(entry.id);
-      const previous: DerivedSample | null = source
-        ? {
-            ts:
-              typeof source.ts === "number" && Number.isFinite(source.ts)
-                ? source.ts
-                : Date.now(),
-            val: source.val,
-            ack: source.ack,
-            from: source.from,
-            changed: false,
-          }
-        : null;
+      const sourceValue = source ? derivedNumber(source.val) : null;
+      const previous: DerivedSample | null =
+        source && sourceValue !== null
+          ? {
+              ts:
+                typeof source.ts === "number" && Number.isFinite(source.ts)
+                  ? source.ts
+                  : Date.now(),
+              val: sourceValue,
+              ack: source.ack,
+              from: source.from,
+              changed: false,
+            }
+          : null;
       entries.push({
         id: entry.id,
         adapter: entry.adapter,

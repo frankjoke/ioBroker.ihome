@@ -1,4 +1,5 @@
 import {
+  derivedNumber,
   MAX_DERIVED_QUEUE,
   shouldWrite,
   type DerivedPoint,
@@ -60,13 +61,15 @@ function sampleOf(state: {
   from?: string;
   changed?: boolean;
   lc?: number;
-}): DerivedSample {
+}): DerivedSample | null {
+  const val = derivedNumber(state.val);
+  if (val === null) return null;
   return {
     ts:
       typeof state.ts === "number" && Number.isFinite(state.ts)
         ? state.ts
         : Date.now(),
-    val: state.val,
+    val,
     ack: state.ack,
     from: state.from,
     changed: state.changed,
@@ -141,6 +144,7 @@ export class DerivedHistoryService {
     },
   ): void {
     const sample = sampleOf(state);
+    if (!sample) return;
     for (const entry of this.entries.values()) {
       if (entry.entry.id !== id) continue;
       const from = entry.nextTo - entry.entry.intervalMs;

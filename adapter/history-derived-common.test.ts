@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   derivedEntryProblemForObject,
+  derivedNumber,
   parseDerivedDocument,
   shouldWrite,
 } from "./history-derived-common";
@@ -60,7 +61,7 @@ it("skips equal values until the relog boundary", () => {
   expect(shouldWrite({ ...base, changesOnly: false, to: 900_000 })).toBe(true);
 });
 
-it("selects only a number state with raw off and no alias", () => {
+it("selects a number or mixed state with raw off and no alias", () => {
   const config = { enabled: false, aliasId: "" };
   const object = {
     common: {
@@ -71,10 +72,16 @@ it("selects only a number state with raw off and no alias", () => {
   expect(derivedEntryProblemForObject(object, "history.0")).toBeNull();
   expect(
     derivedEntryProblemForObject(
+      { common: { type: "mixed", custom: { "history.0": config } } },
+      "history.0",
+    ),
+  ).toBeNull();
+  expect(
+    derivedEntryProblemForObject(
       { common: { type: "string", custom: { "history.0": config } } },
       "history.0",
     ),
-  ).toContain("number");
+  ).toContain("mixed");
   expect(
     derivedEntryProblemForObject(
       {
@@ -94,4 +101,15 @@ it("selects only a number state with raw off and no alias", () => {
       "history.0",
     ),
   ).toContain("alias");
+});
+
+it("coerces sample values to finite numbers", () => {
+  expect(derivedNumber(12.5)).toBe(12.5);
+  expect(derivedNumber("12.5")).toBe(12.5);
+  expect(derivedNumber(true)).toBe(1);
+  expect(derivedNumber(false)).toBe(0);
+  expect(derivedNumber("nope")).toBeNull();
+  expect(derivedNumber({ value: 1 })).toBeNull();
+  expect(derivedNumber(Number.NaN)).toBeNull();
+  expect(derivedNumber(Number.POSITIVE_INFINITY)).toBeNull();
 });

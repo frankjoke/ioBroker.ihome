@@ -53,6 +53,25 @@ it("loads an empty document and saves under the instance id", async () => {
   expect(store.getHistoryDerived().entries).toHaveLength(1);
 });
 
+it("refuses to save an entry with an empty function", async () => {
+  const store = await import("./history-derived.svelte");
+  await store.initHistoryDerived();
+  const entries = [
+    {
+      id: "0_userdata.0.T",
+      adapter: "history.0",
+      interval: "15m",
+      startDelay: "0s",
+      changesOnly: true,
+      relogInterval: "1h",
+      function: { code: "   " },
+    },
+  ];
+  expect(await store.saveHistoryDerived(entries)).toBe(false);
+  expect(h.writes).toEqual([]);
+  expect(store.historyDerivedSaveFailed()).toBe(true);
+});
+
 it("keeps an unreadable document read-only", async () => {
   h.raw = "{not json";
   const store = await import("./history-derived.svelte");

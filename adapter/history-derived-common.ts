@@ -90,9 +90,22 @@ export function parseDerivedDocument(value: unknown): DerivedDocument | null {
   return { version: 1, entries };
 }
 
+/** A sample value as a finite number, or null when it cannot be one. */
+export function derivedNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  try {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * The state/adapter gate: derived only runs for a number state whose history
- * item is present, disabled and alias-free. Raw logging wins otherwise.
+ * The state/adapter gate: derived only runs for a number or mixed state whose
+ * history item is present, disabled and alias-free. Raw logging wins otherwise.
  */
 export function derivedEntryProblemForObject(
   object: unknown,
@@ -102,7 +115,9 @@ export function derivedEntryProblemForObject(
     return "state does not exist";
   }
   const common = object.common;
-  if (common.type !== "number") return "derived history needs a number state";
+  if (common.type !== "number" && common.type !== "mixed") {
+    return "derived history needs a number or mixed state";
+  }
   const custom = record(common.custom) ? common.custom : {};
   const config = custom[adapter];
   if (!record(config)) return "history item is missing";

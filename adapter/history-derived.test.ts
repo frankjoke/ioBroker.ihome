@@ -77,6 +77,22 @@ it("splits windows and carries the previous value", async () => {
   expect(h.sendTo.mock.calls[1][2].state[0].val).toBe(30);
 });
 
+it("coerces mixed values and skips samples that are not numeric", async () => {
+  const h = service([entry({ intervalMs: 10_000, startDelayMs: 0 })]);
+  h.svc.load([entry({ intervalMs: 10_000, startDelayMs: 0 })]);
+  h.svc.onStateChange("0_userdata.0.T", { ts: 1_000, val: "10" });
+  h.svc.onStateChange("0_userdata.0.T", { ts: 2_000, val: true });
+  h.svc.onStateChange("0_userdata.0.T", { ts: 3_000, val: "nope" });
+  h.svc.onStateChange("0_userdata.0.T", {
+    ts: 4_000,
+    val: { value: 99 },
+  });
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(h.sendTo).toHaveBeenCalledTimes(1);
+  const [, , payload] = h.sendTo.mock.calls[0];
+  expect(payload.state[0].val).toBe(5.5);
+});
+
 it("skips equal values and writes again at the relog boundary", async () => {
   const run = () => 5;
   const h = service([

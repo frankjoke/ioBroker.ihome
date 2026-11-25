@@ -1,6 +1,7 @@
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import { configId } from "$lib/config/config-id";
 import {
+  derivedEntryProblem,
   parseDerivedDocument,
   type DerivedDocument,
   type DerivedEntry,
@@ -95,7 +96,7 @@ export function initHistoryDerived(): Promise<void> {
 export async function saveHistoryDerived(
   entries: DerivedEntry[],
 ): Promise<boolean> {
-  if (!loaded) {
+  if (!loaded || entries.some((entry) => derivedEntryProblem(entry))) {
     saveFailed = true;
     return false;
   }
