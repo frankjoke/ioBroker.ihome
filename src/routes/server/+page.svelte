@@ -17,7 +17,11 @@
   } from "$lib/stores/settings.svelte";
   import { appBaseUrl } from "$lib/config/frame-url";
   import { adminUrlBase } from "$lib/transport";
-  import { pinCacheFor, withPinCache, type PinCache } from "$lib/config/pin-cache";
+  import {
+    pinCacheFor,
+    withPinCache,
+    type PinCache,
+  } from "$lib/config/pin-cache";
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
@@ -29,9 +33,11 @@
 
   const storage = getStorage();
   const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
-  const installedInstances = $derived(
-    iHomeInstanceIds(ioBroker.objects as Map<string, any>),
-  );
+  const installedInstances = $derived.by(() => {
+    const objects = ioBroker.objects as Map<string, any>;
+    void objects.size; // track the object cache filling after the first connect
+    return iHomeInstanceIds(objects);
+  });
   const instanceMissing = $derived(
     !!storage.namespace && !installedInstances.includes(storage.namespace),
   );
@@ -260,20 +266,19 @@
               <span class="hint text-muted"
                 >Identity stamped as "from" on every write, e.g. ihome.0 — the
                 adapter's io-package name plus instance. The URL profile
-                <span class="mono">?namespace=ihome.N</span> pins a device or
-                bookmark to one instance.</span
+                <span class="mono">?namespace=ihome.N</span> pins a device or bookmark
+                to one instance.</span
               >
               {#if instanceMissing}
                 <span class="hint text-danger"
-                  >Instance {storage.namespace} does not exist. Create it in
-                  Admin → Instances.</span
+                  >Instance {storage.namespace} does not exist. Create it in Admin
+                  → Instances.</span
                 >
               {/if}
               <button
                 type="button"
                 class="btn btn-sm"
-                onclick={() => void copyProfileLink()}
-                >Copy profile link</button
+                onclick={() => void copyProfileLink()}>Copy profile link</button
               >
               {#if profileMessage}
                 <span class="hint text-muted">{profileMessage}</span>

@@ -177,7 +177,11 @@
     storage.namespace,
     DEFAULT_NAMESPACE,
   );
-  if (queryNamespace && namespace === queryNamespace && storage.namespace !== namespace) {
+  if (
+    queryNamespace &&
+    namespace === queryNamespace &&
+    storage.namespace !== namespace
+  ) {
     storage.namespace = namespace;
   }
 

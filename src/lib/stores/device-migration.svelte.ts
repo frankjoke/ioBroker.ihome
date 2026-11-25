@@ -10,10 +10,7 @@ import {
   type DeviceMigrationInput,
 } from "$lib/config/migrate-overrides";
 import { isRegistryWritable } from "$lib/registry.svelte.js";
-import {
-  getCanonicalRegistry,
-  deviceListId,
-} from "$lib/stores/devices.svelte";
+import { getCanonicalRegistry, deviceListId } from "$lib/stores/devices.svelte";
 import {
   commitLayoutNow,
   getPageRegistry,

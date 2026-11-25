@@ -175,7 +175,10 @@ it("a save writes the document with a fresh updatedAt", async () => {
     overrides: [repair("o1", "s.0.a", "current")],
   };
   expect(await store.commitOverrides(next, 1)).toBe("saved");
-  expect(h.setState).toHaveBeenCalledWith(overrideListId("ihome.42"), expect.any(String));
+  expect(h.setState).toHaveBeenCalledWith(
+    overrideListId("ihome.42"),
+    expect.any(String),
+  );
   const written = JSON.parse(h.state.value as string);
   expect(written.overrides[0].name).toBe("current");
   expect(written.updatedAt).toBeGreaterThan(1);

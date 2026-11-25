@@ -18,7 +18,8 @@ import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { TemplateRegistry } from "$lib/types/display";
 import type { Template } from "$lib/types/display";
 
-export const templateListId = () => configId("templateList", ioBroker.namespace);
+export const templateListId = () =>
+  configId("templateList", ioBroker.namespace);
 
 const emptyRegistry: TemplateRegistry = {
   version: 0,

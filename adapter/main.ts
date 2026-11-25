@@ -2853,7 +2853,9 @@ class IHome extends utils.Adapter {
       }
     });
     await this.subscribeForeignStatesAsync([overrideListId(this.namespace)]);
-    const overrideState = await this.getForeignStateAsync(overrideListId(this.namespace));
+    const overrideState = await this.getForeignStateAsync(
+      overrideListId(this.namespace),
+    );
     try {
       await this.applyOverrideList(overrideState?.val);
     } catch (error) {

@@ -31,6 +31,7 @@ export function programStateVersion(): number {
 
 /** Every id registered directly, plus the current instance's device document. */
 export function programStateIds(): Set<string> {
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const ids = new Set(PROGRAM_STATE_IDS);
   ids.add(deviceListId());
   return ids;

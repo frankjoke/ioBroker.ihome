@@ -129,10 +129,14 @@ function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
 }
 
 async function readState(): Promise<{ value?: unknown } | null> {
-  let state = await ioBroker.getState(overrideListId(ioBroker.namespace), true).catch(() => null);
+  let state = await ioBroker
+    .getState(overrideListId(ioBroker.namespace), true)
+    .catch(() => null);
   if (!state) {
     await ioBroker.wait(300);
-    state = await ioBroker.getState(overrideListId(ioBroker.namespace), true).catch(() => null);
+    state = await ioBroker
+      .getState(overrideListId(ioBroker.namespace), true)
+      .catch(() => null);
   }
   return state;
 }
@@ -202,7 +206,10 @@ export async function commitOverrides(
 
   const doc = withInputs({ ...next, version: 1, updatedAt: Date.now() });
   try {
-    await ioBroker.setState(overrideListId(ioBroker.namespace), JSON.stringify(doc));
+    await ioBroker.setState(
+      overrideListId(ioBroker.namespace),
+      JSON.stringify(doc),
+    );
   } catch (e) {
     saveFailed = true;
     console.error("save overrides:", e);
