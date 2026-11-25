@@ -13,7 +13,7 @@ import {
 } from "$lib/stores/program-states.svelte";
 import { SvelteSet } from "svelte/reactivity";
 
-export { DEVICE_LIST_ID } from "$lib/stores/program-states.svelte";
+export { deviceListId } from "$lib/stores/program-states.svelte";
 
 const defaultRegistry: DeviceRegistry = {
   version: 0,

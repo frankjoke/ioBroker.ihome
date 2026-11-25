@@ -4,6 +4,7 @@
 // the marker. Nothing calls the write path automatically — the user confirms
 // it; `dryRunDeviceMigration()` only reads and logs.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   migrateDevices,
   type DeviceMigrationInput,
@@ -11,13 +12,13 @@ import {
 import { isRegistryWritable } from "$lib/registry.svelte.js";
 import {
   getCanonicalRegistry,
-  DEVICE_LIST_ID,
+  deviceListId,
 } from "$lib/stores/devices.svelte";
 import {
   commitLayoutNow,
   getPageRegistry,
   isLayoutWritable,
-  PAGE_LIST_ID,
+  pageListId,
 } from "$lib/stores/pages.svelte";
 import {
   commitTemplatesNow,
@@ -33,9 +34,12 @@ import { getVariableLibrary } from "$lib/stores/variables.svelte";
 import { toast } from "$lib/stores/toasts.svelte";
 
 /** The three pre-migration documents, kept once (never overwritten). */
-export const DEVICE_BACKUP_ID = "ihome.0.config.deviceListPreOverrides";
-export const PAGE_BACKUP_ID = "ihome.0.config.pageListPreOverrides";
-export const TEMPLATE_BACKUP_ID = "ihome.0.config.templateListPreOverrides";
+export const deviceBackupId = () =>
+  configId("deviceListPreOverrides", ioBroker.namespace);
+export const pageMigrationBackupId = () =>
+  configId("pageListPreOverrides", ioBroker.namespace);
+export const templateBackupId = () =>
+  configId("templateListPreOverrides", ioBroker.namespace);
 
 export interface DeviceMigrationRun {
   /** `ready` is the dry run's "this is what would happen". */
@@ -139,25 +143,25 @@ async function planMigration(): Promise<Plan | Refusal> {
   };
 
   const [deviceRaw, pageRaw] = await Promise.all([
-    readDocument(DEVICE_LIST_ID),
-    readDocument(PAGE_LIST_ID),
+    readDocument(deviceListId()),
+    readDocument(pageListId()),
   ]);
   return {
     status: "ready",
     input,
     backups: [
       {
-        id: DEVICE_BACKUP_ID,
+        id: deviceBackupId(),
         name: "iHome device list (pre-source-overrides backup)",
         value: deviceRaw ?? JSON.stringify(canonical),
       },
       {
-        id: PAGE_BACKUP_ID,
+        id: pageMigrationBackupId(),
         name: "iHome display pages (pre-source-overrides backup)",
         value: pageRaw ?? JSON.stringify(pages),
       },
       {
-        id: TEMPLATE_BACKUP_ID,
+        id: templateBackupId(),
         // Templates are file-backed: the legacy state is stale on upgraded
         // installs, so back up what was actually loaded. Restoring this means
         // rewriting the files (`syncKind`), not copying a directory back.

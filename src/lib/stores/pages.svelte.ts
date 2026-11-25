@@ -6,6 +6,7 @@
 // global): Vite HMR can hand this module two instances, and a module-global
 // client then desyncs them — see the 2026-10-13 handoff.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   loadPages,
   mayWritePages,
@@ -40,9 +41,9 @@ import { SIZE_UNIT } from "$lib/config/size-ops";
 import type { Device } from "$lib/types/device";
 import type { PageRegistry, Template } from "$lib/types/display";
 
-export const PAGE_LIST_ID = "ihome.0.config.pageList";
+export const pageListId = () => configId("pageList", ioBroker.namespace);
 /** The one-time v1 document, kept before the first v2 write. */
-export const PAGE_BACKUP_ID = "ihome.0.config.pageListV1";
+export const pageBackupId = () => configId("pageListV1", ioBroker.namespace);
 
 const emptyRegistry: PageRegistry = { version: 0, updatedAt: 0, pages: [] };
 
@@ -147,9 +148,9 @@ export function isLayoutWritable(): boolean {
 }
 
 async function ensurePagesObject() {
-  const obj = await ioBroker.getObject(PAGE_LIST_ID);
+  const obj = await ioBroker.getObject(pageListId());
   if (!obj) {
-    await ioBroker.emitAsync("setObject", PAGE_LIST_ID, {
+    await ioBroker.emitAsync("setObject", pageListId(), {
       type: "state",
       common: {
         name: "iHome display pages",
@@ -176,7 +177,7 @@ export function savePages(): void {
     // The first write of a seed may race a stored document (the seed incident):
     // re-read before writing, and let the stored document win.
     if (pagesLoadKind === "seeded") {
-      const st = await ioBroker.getState(PAGE_LIST_ID, true);
+      const st = await ioBroker.getState(pageListId(), true);
       const raw = st?.val ?? st?.value;
       const stored = parsePageRegistry(raw);
       if (stored) {
@@ -189,7 +190,7 @@ export function savePages(): void {
     }
     lastSent = snapshot;
     ioBroker
-      .setState(PAGE_LIST_ID, snapshot)
+      .setState(pageListId(), snapshot)
       .then(() => {
         saveFailed = false;
         // The seed/edit is stored now: later writes need no guard.
@@ -242,7 +243,7 @@ export async function commitLayoutNow(next: PageRegistry): Promise<boolean> {
   }
   const snapshot = JSON.stringify(next);
   try {
-    await ioBroker.setState(PAGE_LIST_ID, snapshot);
+    await ioBroker.setState(pageListId(), snapshot);
   } catch (e) {
     saveFailed = true;
     console.error("save pages:", e);
@@ -264,7 +265,7 @@ export async function commitLayoutNow(next: PageRegistry): Promise<boolean> {
  *  False means the backup could not be secured, so the v2 write must not run. */
 async function writeBackupOnce(raw: string): Promise<boolean> {
   try {
-    const existing = await ioBroker.getState(PAGE_BACKUP_ID, true);
+    const existing = await ioBroker.getState(pageBackupId(), true);
     if (
       existing &&
       existing.val !== undefined &&
@@ -273,9 +274,9 @@ async function writeBackupOnce(raw: string): Promise<boolean> {
     ) {
       return true;
     }
-    const obj = await ioBroker.getObject(PAGE_BACKUP_ID);
+    const obj = await ioBroker.getObject(pageBackupId());
     if (!obj) {
-      await ioBroker.emitAsync("setObject", PAGE_BACKUP_ID, {
+      await ioBroker.emitAsync("setObject", pageBackupId(), {
         type: "state",
         common: {
           name: "iHome display pages (v1 backup)",
@@ -287,7 +288,7 @@ async function writeBackupOnce(raw: string): Promise<boolean> {
         native: {},
       });
     }
-    await ioBroker.setState(PAGE_BACKUP_ID, raw);
+    await ioBroker.setState(pageBackupId(), raw);
     return true;
   } catch (e) {
     console.error("backup pages v1:", e);
@@ -312,7 +313,7 @@ export async function migrateLayout(
   // is what persists it. A loaded document is the only thing we migrate to disk.
   let write = true;
   if (pagesLoadKind !== "loaded") {
-    const st = await ioBroker.getState(PAGE_LIST_ID, true);
+    const st = await ioBroker.getState(pageListId(), true);
     const raw = st?.val ?? st?.value;
     const stored = parsePageRegistry(raw);
     if (stored) {
@@ -370,7 +371,7 @@ export async function migrateLayout(
  * have rooms and functions to point at.
  */
 export function initPages(seed?: () => PageRegistry): Promise<void> {
-  registerProgramStateId(PAGE_LIST_ID);
+  registerProgramStateId(pageListId());
   if (!initPromise) {
     initPromise = (async () => {
       const until = Date.now() + 10_000;
@@ -384,7 +385,7 @@ export function initPages(seed?: () => PageRegistry): Promise<void> {
       }
       // Seeding from an empty enum cache would write pages with no groups.
       await waitForEnumCache();
-      const st = await ioBroker.getState(PAGE_LIST_ID, true);
+      const st = await ioBroker.getState(pageListId(), true);
       rawPages =
         st?.val !== undefined && st?.val !== null && st?.val !== ""
           ? typeof st.val === "string"

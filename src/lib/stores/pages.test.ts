@@ -1,34 +1,34 @@
 import { it, expect, vi } from "vitest";
 import type { Device } from "$lib/types/device";
 
-const PAGE_LIST_ID = "ihome.0.config.pageList";
-const PAGE_BACKUP_ID = "ihome.0.config.pageListV1";
-
 const h = vi.hoisted(() => {
+  const pageList = "ihome.42.config.pageList";
+  const pageBackup = "ihome.42.config.pageListV1";
   const state = {
     pageRaw: null as unknown,
     backup: null as unknown,
     failBackup: false,
   };
   const getState = vi.fn(async (id: string) =>
-    id === "ihome.0.config.pageList"
+    id === pageList
       ? { val: state.pageRaw }
-      : id === "ihome.0.config.pageListV1" && state.backup !== null
+      : id === pageBackup && state.backup !== null
         ? { val: state.backup }
         : null,
   );
   const setState = vi.fn(async (id: string, value: unknown) => {
-    if (id === "ihome.0.config.pageListV1" && state.failBackup) {
+    if (id === pageBackup && state.failBackup) {
       throw new Error("backup unavailable");
     }
-    if (id === "ihome.0.config.pageList") state.pageRaw = value;
-    if (id === "ihome.0.config.pageListV1") state.backup = value;
+    if (id === pageList) state.pageRaw = value;
+    if (id === pageBackup) state.backup = value;
   });
-  return { state, getState, setState };
+  return { state, getState, setState, pageList, pageBackup };
 });
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
+    namespace: "ihome.42",
     connected: true,
     getState: h.getState,
     setState: h.setState,
@@ -104,8 +104,8 @@ it("re-reads the stored v1 document before migrating a seed", async () => {
     device: "light",
     control: "c1",
   });
-  expect(h.setState).toHaveBeenCalledWith(PAGE_BACKUP_ID, JSON.stringify(v1));
-  expect(h.setState).toHaveBeenCalledWith(PAGE_LIST_ID, expect.any(String));
+  expect(h.setState).toHaveBeenCalledWith(h.pageBackup, JSON.stringify(v1));
+  expect(h.setState).toHaveBeenCalledWith(h.pageList, expect.any(String));
 });
 
 it("does not write v2 when the backup cannot be secured", async () => {
@@ -118,7 +118,7 @@ it("does not write v2 when the backup cannot be secured", async () => {
 
   expect(await mod.migrateLayout([light], [])).toBe(false);
   expect(h.state.pageRaw).toBe(v1);
-  expect(h.setState).toHaveBeenCalledWith(PAGE_BACKUP_ID, JSON.stringify(v1));
+  expect(h.setState).toHaveBeenCalledWith(h.pageBackup, JSON.stringify(v1));
 });
 
 it("materialises a fresh seed in memory without writing it", async () => {

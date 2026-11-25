@@ -1,6 +1,12 @@
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
+
+vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
+  ioBroker: { namespace: "ihome.42" },
+  DEFAULT_NAMESPACE: "ihome.0",
+}));
+
 import {
-  DEVICE_LIST_ID,
+  deviceListId,
   getUsedStateIds,
   setCanonicalRegistry,
 } from "$lib/stores/devices.svelte";
@@ -51,7 +57,7 @@ it("the used set covers a virtual control's expression and the rules", () => {
   } as never);
 
   const used = [...getUsedStateIds()];
-  expect(used).toContain(DEVICE_LIST_ID);
+  expect(used).toContain(deviceListId());
   expect(used).toContain("state.0.read");
   expect(used).toContain("watch.0.one");
   expect(used).toContain("rule.0.input");

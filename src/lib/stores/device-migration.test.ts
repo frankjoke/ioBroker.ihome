@@ -85,6 +85,7 @@ const h = vi.hoisted(() => {
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
+    namespace: "ihome.0",
     connected: true,
     objects: new Map(),
     getObject: vi.fn(async () => ({})),
@@ -116,7 +117,7 @@ vi.mock("$lib/registry.svelte.js", () => ({
 }));
 
 vi.mock("$lib/stores/devices.svelte", () => ({
-  DEVICE_LIST_ID: "ihome.0.config.deviceList",
+  deviceListId: () => "ihome.0.config.deviceList",
   getCanonicalRegistry: () => ({
     version: 1,
     updatedAt: 1,
@@ -125,7 +126,7 @@ vi.mock("$lib/stores/devices.svelte", () => ({
 }));
 
 vi.mock("$lib/stores/pages.svelte", () => ({
-  PAGE_LIST_ID: h.PAGE_LIST,
+  pageListId: () => h.PAGE_LIST,
   getPageRegistry: () => h.pages,
   isLayoutWritable: () => true,
   commitLayoutNow: async () => {
@@ -165,10 +166,10 @@ vi.mock("$lib/stores/toasts.svelte", () => ({
 
 import {
   applyDeviceMigration,
-  DEVICE_BACKUP_ID,
+  deviceBackupId,
   dryRunDeviceMigration,
-  PAGE_BACKUP_ID,
-  TEMPLATE_BACKUP_ID,
+  pageMigrationBackupId,
+  templateBackupId,
 } from "./device-migration.svelte";
 import { toast } from "$lib/stores/toasts.svelte";
 
@@ -215,9 +216,9 @@ describe("device migration runner", () => {
       "overrides",
     ]);
     expect(h.state.calls.slice(0, 3).map((call) => call.id)).toEqual([
-      DEVICE_BACKUP_ID,
-      PAGE_BACKUP_ID,
-      TEMPLATE_BACKUP_ID,
+      deviceBackupId(),
+      pageMigrationBackupId(),
+      templateBackupId(),
     ]);
     // Templates are file-backed: the backup is the loaded registry, never the
     // stale legacy state.
@@ -231,7 +232,7 @@ describe("device migration runner", () => {
   });
 
   it("a failed backup stops before any document write", async () => {
-    reset({ failBackup: PAGE_BACKUP_ID });
+    reset({ failBackup: pageMigrationBackupId() });
     const run = await applyDeviceMigration(true);
     expect(run.status).toBe("failed");
     expect(h.state.calls.map((call) => call.kind)).toEqual(["write", "write"]);
