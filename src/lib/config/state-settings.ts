@@ -109,6 +109,14 @@ export function restoreSelection(
   return entries[0]?.id ?? "";
 }
 
+/** A remembered instance filter survives only while that instance still exists.
+ *  While the state list is still loading, keep it so a valid saved filter is
+ *  not dropped on a slow start. */
+export function keptInstance(instance: string, instances: string[]): string {
+  if (!instance || instances.length === 0) return instance;
+  return instances.includes(instance) ? instance : "";
+}
+
 /** The state objects as list rows, sorted by display name. */
 export function stateEntries(
   objects: Map<string, any>,

@@ -12,6 +12,7 @@
   import StateDetail from "$lib/components/states/StateDetail.svelte";
   import StateCreateModal from "$lib/components/states/StateCreateModal.svelte";
   import {
+    keptInstance,
     restoreSelection,
     stateEntries,
     stateMatches,
@@ -46,6 +47,13 @@
     ),
   );
   const selected = $derived(objects.get(selectedId));
+
+  // A view remembered in the previous run can name an instance that is gone;
+  // the select would show --all-- while the filter still hid every state.
+  $effect(() => {
+    const next = keptInstance(instance, instances);
+    if (next !== instance) instance = next;
+  });
 
   $effect(() => {
     if (restored || entries.length === 0) return;

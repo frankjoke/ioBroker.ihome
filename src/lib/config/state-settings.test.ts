@@ -10,6 +10,7 @@ import {
   instanceOf,
   isHistoryAdapter,
   isHistoryCustom,
+  keptInstance,
   defaultHistoryAdapter,
   restoreSelection,
   stateEntries,
@@ -77,6 +78,13 @@ describe("stateEntries", () => {
 });
 
 describe("instances and restore", () => {
+  it("drops a remembered instance that no longer exists", () => {
+    expect(keptInstance("", [])).toBe("");
+    expect(keptInstance("ihome.0", [])).toBe("ihome.0");
+    expect(keptInstance("ihome.0", ["ihome.0", "sql.0"])).toBe("ihome.0");
+    expect(keptInstance("gone.0", ["ihome.0", "sql.0"])).toBe("");
+  });
+
   it("groups state ids by adapter instance", () => {
     expect(instanceOf("0_userdata.0.lamp")).toBe("0_userdata.0");
     expect(instanceOf("ihome.0.Variables.x")).toBe("ihome.0");
