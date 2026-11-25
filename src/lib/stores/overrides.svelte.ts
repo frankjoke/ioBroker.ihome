@@ -3,7 +3,7 @@
 // be read is never replaced, the store stays read-only.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
 import {
-  OVERRIDE_LIST_ID,
+  overrideListId,
   emptyOverrideRegistry,
   ensureRepairOverride,
   evaluateOverride,
@@ -117,7 +117,7 @@ function mergeFromObjects(doc: OverrideRegistry): OverrideRegistry {
 function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
   registry = doc;
   loadKind = kind;
-  registerProgramStateId(OVERRIDE_LIST_ID);
+  registerProgramStateId(overrideListId(ioBroker.namespace));
   const variables = getVariables();
   for (const override of doc.overrides) {
     // A watch override has no slot to register its state (spec §3.3); the
@@ -129,10 +129,10 @@ function use(doc: OverrideRegistry, kind: "loaded" | "absent"): void {
 }
 
 async function readState(): Promise<{ value?: unknown } | null> {
-  let state = await ioBroker.getState(OVERRIDE_LIST_ID, true).catch(() => null);
+  let state = await ioBroker.getState(overrideListId(ioBroker.namespace), true).catch(() => null);
   if (!state) {
     await ioBroker.wait(300);
-    state = await ioBroker.getState(OVERRIDE_LIST_ID, true).catch(() => null);
+    state = await ioBroker.getState(overrideListId(ioBroker.namespace), true).catch(() => null);
   }
   return state;
 }
@@ -140,9 +140,9 @@ async function readState(): Promise<{ value?: unknown } | null> {
 /** The adapter owns the document objects, but an old adapter may not have run
  *  since the SPA was updated: create it so the first save cannot be rejected. */
 async function ensureOverridesObject(): Promise<void> {
-  const obj = await ioBroker.getObject(OVERRIDE_LIST_ID);
+  const obj = await ioBroker.getObject(overrideListId(ioBroker.namespace));
   if (!obj) {
-    await ioBroker.emitAsync("setObject", OVERRIDE_LIST_ID, {
+    await ioBroker.emitAsync("setObject", overrideListId(ioBroker.namespace), {
       type: "state",
       common: {
         name: "iHome source overrides",
@@ -202,7 +202,7 @@ export async function commitOverrides(
 
   const doc = withInputs({ ...next, version: 1, updatedAt: Date.now() });
   try {
-    await ioBroker.setState(OVERRIDE_LIST_ID, JSON.stringify(doc));
+    await ioBroker.setState(overrideListId(ioBroker.namespace), JSON.stringify(doc));
   } catch (e) {
     saveFailed = true;
     console.error("save overrides:", e);
@@ -253,7 +253,7 @@ export function createOverrideEnsurer(): OverrideEnsurer {
 
 /** Load the document; an absent one is a valid empty registry. */
 export function initOverrides(): Promise<void> {
-  registerProgramStateId(OVERRIDE_LIST_ID);
+  registerProgramStateId(overrideListId(ioBroker.namespace));
   if (!initPromise) {
     initPromise = (async () => {
       const until = Date.now() + 10_000;

@@ -2,13 +2,14 @@
 // Same document pattern as the logic list: strict parse, a debounced whole-
 // document write, and a refusal to overwrite a document we could not read.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   emptyPluginPages,
   parsePluginPages,
   type PluginPagesDocument,
 } from "$lib/config/plugin-pages";
 
-export const PLUGIN_PAGES_ID = "ihome.0.config.pluginPages";
+export const pluginPagesId = () => configId("pluginPages", ioBroker.namespace);
 
 let document = $state<PluginPagesDocument>(emptyPluginPages());
 let loadKind = $state<"pending" | "absent" | "loaded" | "unreadable">(
@@ -36,9 +37,9 @@ export function isPluginPagesWritable(): boolean {
 }
 
 async function ensurePluginPagesObject(): Promise<void> {
-  const obj = await ioBroker.getObject(PLUGIN_PAGES_ID);
+  const obj = await ioBroker.getObject(pluginPagesId());
   if (!obj) {
-    await ioBroker.emitAsync("setObject", PLUGIN_PAGES_ID, {
+    await ioBroker.emitAsync("setObject", pluginPagesId(), {
       type: "state",
       common: {
         name: "iHome plugin pages",
@@ -70,7 +71,7 @@ function scheduleSave(): void {
       return;
     }
     ioBroker
-      .setState(PLUGIN_PAGES_ID, JSON.stringify(parsed))
+      .setState(pluginPagesId(), JSON.stringify(parsed))
       .then(() => {
         saveFailed = false;
       })
@@ -108,7 +109,7 @@ export function initPluginPages(): Promise<void> {
       } catch (error) {
         console.error("initPluginPages ensure:", error);
       }
-      const st = await ioBroker.getState(PLUGIN_PAGES_ID, true);
+      const st = await ioBroker.getState(pluginPagesId(), true);
       if (!st) {
         loadKind = "absent";
         return;

@@ -16,6 +16,7 @@ const h = vi.hoisted(() => {
 
 vi.mock("$lib/ioBrokerConnect.svelte.js", () => ({
   ioBroker: {
+    namespace: "ihome.42",
     get connected() {
       return h.link.connected;
     },
@@ -40,7 +41,7 @@ vi.mock("$lib/stores/program-states.svelte", () => ({
 }));
 
 import {
-  OVERRIDE_LIST_ID,
+  overrideListId,
   emptyOverrideRegistry,
 } from "$lib/config/source-overrides";
 import type { SourceOverride } from "$lib/types/overrides";
@@ -130,7 +131,7 @@ it("registers every override's state and its derived inputs", async () => {
 
 it("creates the document object when the adapter has not made it yet", async () => {
   const store = await load(null);
-  expect(h.docObject.created).toContain(OVERRIDE_LIST_ID);
+  expect(h.docObject.created).toContain(overrideListId("ihome.42"));
   expect(store.isOverridesWritable()).toBe(true);
 
   // An object that already exists is left alone.
@@ -174,7 +175,7 @@ it("a save writes the document with a fresh updatedAt", async () => {
     overrides: [repair("o1", "s.0.a", "current")],
   };
   expect(await store.commitOverrides(next, 1)).toBe("saved");
-  expect(h.setState).toHaveBeenCalledWith(OVERRIDE_LIST_ID, expect.any(String));
+  expect(h.setState).toHaveBeenCalledWith(overrideListId("ihome.42"), expect.any(String));
   const written = JSON.parse(h.state.value as string);
   expect(written.overrides[0].name).toBe("current");
   expect(written.updatedAt).toBeGreaterThan(1);
@@ -259,7 +260,7 @@ it("derives the value and inputs from the live state group", async () => {
   // The stored inputs are not trusted: the live expression decides.
   expect(h.registered).toContain("s.0.temperature");
   expect(h.registered).not.toContain("stale.0.id");
-  expect(h.registered).toContain(OVERRIDE_LIST_ID);
+  expect(h.registered).toContain(overrideListId("ihome.42"));
   expect(store.getOverrideRegistry().overrides[0].inputs).toEqual([
     "s.0.temperature",
   ]);

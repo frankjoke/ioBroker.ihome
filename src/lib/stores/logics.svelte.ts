@@ -3,6 +3,7 @@
 // whole-document write, a load kind that refuses to overwrite an unreadable
 // document, and an echo guard for our own write.
 import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+import { configId } from "$lib/config/config-id";
 import {
   parseLogicDocument,
   validateLogicDocument,
@@ -11,7 +12,7 @@ import {
 import type { LogicDocument } from "$logic/types";
 import { toStatementBodies } from "$logic/function-bodies";
 
-export const LOGIC_LIST_ID = "ihome.0.config.logicList";
+export const logicListId = () => configId("logicList", ioBroker.namespace);
 
 const emptyDocument = (): LogicDocument => ({ version: 3, logics: [] });
 
@@ -53,9 +54,9 @@ export function isLogicsWritable(): boolean {
 }
 
 async function ensureLogicsObject() {
-  const obj = await ioBroker.getObject(LOGIC_LIST_ID);
+  const obj = await ioBroker.getObject(logicListId());
   if (!obj) {
-    await ioBroker.emitAsync("setObject", LOGIC_LIST_ID, {
+    await ioBroker.emitAsync("setObject", logicListId(), {
       type: "state",
       common: {
         name: "iHome logic documents",
@@ -93,7 +94,7 @@ export function saveLogics(): void {
     }
     lastSent = snapshot;
     ioBroker
-      .setState(LOGIC_LIST_ID, snapshot)
+      .setState(logicListId(), snapshot)
       .then(() => {
         saveFailed = false;
       })
@@ -131,7 +132,7 @@ export function initLogics(): Promise<void> {
       } catch (e) {
         console.error("initLogics ensureLogicsObject:", e);
       }
-      const st = await ioBroker.getState(LOGIC_LIST_ID, true);
+      const st = await ioBroker.getState(logicListId(), true);
       if (!st) {
         loadKind = "absent";
         initPromise = null;

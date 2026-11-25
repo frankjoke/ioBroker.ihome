@@ -25,9 +25,9 @@ import { newId } from "$lib/utils/ids";
 import type { OverrideRegistry, SourceOverride } from "$lib/types/overrides";
 import type { TemplateReference } from "$lib/config/template-reference";
 
-import { OVERRIDE_LIST_ID } from "$adapter/override-common";
+import { overrideListId } from "$adapter/override-common";
 
-export { OVERRIDE_LIST_ID };
+export { overrideListId };
 
 export function emptyOverrideRegistry(): OverrideRegistry {
   return { version: 1, updatedAt: 0, overrides: [] };
