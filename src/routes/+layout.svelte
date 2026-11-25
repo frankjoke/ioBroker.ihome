@@ -148,6 +148,9 @@
 
   const storage = defineStorage(
     ["hostPort", { init: "" }],
+    // Explicit admin page base (Docker port mappings, reverse proxies, or a
+    // preferred Admin start page). Empty derives it like before.
+    ["adminUrl", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
     ["pin", { init: "" }],
     // Cache of the shared doc's lock flag (settings.svelte.ts): the broker value

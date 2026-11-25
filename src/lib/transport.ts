@@ -90,11 +90,38 @@ export function resolveTransport(sources: Sources): {
 }
 
 /**
+ * The operator's explicit admin address as a URL: `host:port`, a
+ * protocol-relative `//host`, or a full `http(s)://host[:port][/path]` URL.
+ * Returns null for an invalid or non-http(s) value, so the caller can fall
+ * back to the derived address.
+ */
+export function adminUrlBase(value: string, secure: boolean): URL | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+    ? raw
+    : raw.startsWith("//")
+      ? `${secure ? "https:" : "http:"}${raw}`
+      : `${secure ? "https" : "http"}://${raw}`;
+  try {
+    const url = new URL(withScheme);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where the ioBroker admin UI lives: the stored host:port when the operator
  * set one, else the host this app talks to (the live broker URL, then the
  * page) on the admin port 8081 — which is also where the ws socket lives, but
  * not the web adapter that serves this page. The scheme follows an https page
  * or broker, so an https page never embeds a mixed-content http frame.
+ *
+ * An explicit `adminUrl` wins over all of that. A value starting with a single
+ * `/` keeps the derived host:port and changes only the page path/hash, e.g.
+ * `/#tab-instances` or `/admin/`. Its hash is the admin start page; a request
+ * for Objects/Enums still replaces it with that admin tab.
  */
 export function adminPageUrl(sources: {
   hostPort?: string;
@@ -102,6 +129,8 @@ export function adminPageUrl(sources: {
   cloudHost?: string;
   /** The configured admin port, read from `system.adapter.admin.0`. */
   adminPort?: number;
+  /** An operator's full admin address; its hash selects the start page. */
+  adminUrl?: string;
   protocol: string;
   host: string;
   tab?: string;
@@ -110,6 +139,41 @@ export function adminPageUrl(sources: {
   const brokerUrl = String(sources.brokerUrl ?? "");
   const secure =
     sources.protocol === "https:" || /^(https|wss):/i.test(brokerUrl);
+  const derived = derivedAdminPageUrl(sources, tab, secure);
+  const rawAdminUrl = String(sources.adminUrl ?? "").trim();
+  if (!rawAdminUrl) return derived;
+  // A single leading slash is a page address only: keep the derived host:port.
+  if (rawAdminUrl.startsWith("/") && !rawAdminUrl.startsWith("//")) {
+    return pathOnlyAdminUrl(derived, rawAdminUrl, tab);
+  }
+  const normalTab = rawAdminUrl.endsWith("/*");
+  const overrideValue = normalTab ? rawAdminUrl.slice(0, -1) : rawAdminUrl;
+  const override =
+    overrideValue === "/" ? null : adminUrlBase(overrideValue, secure);
+  if (override) {
+    if (normalTab || tab !== "overview" || !override.hash) {
+      override.hash = `tab-${tab}`;
+    }
+    return override.toString();
+  }
+  return derived;
+}
+
+/** The old derivation, without an operator override. */
+function derivedAdminPageUrl(
+  sources: {
+    hostPort?: string;
+    brokerUrl?: string | null;
+    cloudHost?: string;
+    adminPort?: number;
+    protocol: string;
+    host: string;
+  },
+  tab: string,
+  secure: boolean,
+): string {
+  const brokerUrl = String(sources.brokerUrl ?? "");
+  const hash = `#tab-${tab}`;
   const pageHost = hostnameOf(sources.host).toLowerCase();
   const cloudHost = hostnameOf(
     String(sources.cloudHost ?? "")
@@ -117,7 +181,6 @@ export function adminPageUrl(sources: {
       .replace(/^https?:\/\//i, "")
       .replace(/\/.*$/, ""),
   ).toLowerCase();
-  const hash = `#tab-${tab}`;
   // Through iobroker.pro (or another configured cloud host) the admin is
   // proxied under /admin/, not exposed on the socket's :8081.
   if (
@@ -144,6 +207,34 @@ export function adminPageUrl(sources: {
   const authority =
     stored || `${hostnameOf(brokerHost || sources.host)}:${port}`;
   return `${secure ? "https" : "http"}://${authority}/${hash}`;
+}
+
+/**
+ * A path-only admin address (`/#tab-instances`, `/admin/`, `/*`): keep the
+ * derived host, port and — for a bare hash — the derived path. A real path
+ * in the value replaces the derived path; `/*` means the normal Admin tab.
+ */
+function pathOnlyAdminUrl(derived: string, value: string, tab: string): string {
+  const normalTab = value === "/*" || value.endsWith("/*");
+  const path = normalTab ? value.slice(0, -1) : value;
+  const hashAt = path.indexOf("#");
+  const pathPart = hashAt >= 0 ? path.slice(0, hashAt) : path;
+  const hashPart = hashAt >= 0 ? path.slice(hashAt) : "";
+  const chosenHash =
+    normalTab || tab !== "overview" || !hashPart ? `#tab-${tab}` : hashPart;
+  try {
+    const base = new URL(derived);
+    if (pathPart !== "" && pathPart !== "/") {
+      const queryAt = pathPart.indexOf("?");
+      base.pathname =
+        (queryAt >= 0 ? pathPart.slice(0, queryAt) : pathPart) || "/";
+      base.search = queryAt >= 0 ? pathPart.slice(queryAt) : "";
+    }
+    base.hash = chosenHash.slice(1);
+    return base.toString();
+  } catch {
+    return derived;
+  }
 }
 
 /** A host as something to compare: scheme and path stripped, lower-cased. */

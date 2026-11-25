@@ -32,6 +32,7 @@
   const url = $derived(
     adminPageUrl({
       hostPort: storage.hostPort,
+      adminUrl: storage.adminUrl,
       brokerUrl: ioBroker.brokerUrl,
       cloudHost: storage.cloudHost,
       adminPort,

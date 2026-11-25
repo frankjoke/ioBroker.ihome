@@ -14,6 +14,7 @@
     updateSettings,
   } from "$lib/stores/settings.svelte";
   import { appBaseUrl } from "$lib/config/frame-url";
+  import { adminUrlBase } from "$lib/transport";
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
@@ -99,6 +100,17 @@
   /** What the prompt compares an entry against. */
   const storedPin = $derived(effectivePin(storage.pin));
 
+  /** Empty, `/*` or a leading `/` means "derive the host; page only". */
+  const adminUrlValid = $derived.by(() => {
+    const raw = String(storage.adminUrl ?? "").trim();
+    if (!raw) return true;
+    if (raw.startsWith("/") && !raw.startsWith("//")) return true;
+    return !!adminUrlBase(
+      raw,
+      typeof location === "undefined" ? false : location.protocol === "https:",
+    );
+  });
+
   /**
    * The connection save. While the default PIN is still in force it does not
    * proceed: the change prompt opens instead, and the reload happens from there
@@ -169,6 +181,36 @@
                 >. Relative in production, so frames/HTML work locally and
                 through iobroker.pro; in dev it points at the broker.</span
               >
+            </div>
+            <div class="field">
+              <label class="label-mono" for="settings-admin-url"
+                >Admin page address</label
+              >
+              <input
+                id="settings-admin-url"
+                type="text"
+                bind:value={storage.adminUrl}
+                placeholder="e.g. /#tab-instances or http://host:18083/"
+              />
+              <span class="hint text-muted"
+                >Optional. Leave empty to derive the admin URL from Host:Port
+                and the admin adapter's port. Use a full URL or host:port for
+                Docker port mappings or a reverse proxy.</span
+              >
+              <span class="hint text-muted"
+                >A value starting with <span class="mono">/</span> keeps the
+                derived host:port and changes only the page, e.g.
+                <span class="mono">/#tab-instances</span> or
+                <span class="mono">/admin/</span>. A
+                <span class="mono">#tab-…</span> hash selects the fixed start
+                page; Objects/Enums still open their own tabs. End with
+                <span class="mono">/*</span> to use the normal Admin tab.</span
+              >
+              {#if !adminUrlValid}
+                <span class="hint text-danger"
+                  >Enter a host:port, an http(s) URL, or a page starting with /.</span
+                >
+              {/if}
             </div>
             <div class="field">
               <label class="label-mono" for="settings-ns">Namespace</label>

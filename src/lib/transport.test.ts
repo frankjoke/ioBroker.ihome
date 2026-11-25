@@ -249,6 +249,142 @@ it("uses the configured admin port and the page host", () => {
   ).toBe("http://10.0.0.5:8085/#tab-overview");
 });
 
+it("uses an explicit admin URL and keeps its start page", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "http://192.168.1.10:18083/#tab-instances",
+      hostPort: "10.0.0.5:8081",
+      protocol: "http:",
+      host: "192.168.178.9:8082",
+    }),
+  ).toBe("http://192.168.1.10:18083/#tab-instances");
+});
+
+it("replaces the explicit start page for objects and enums", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "http://192.168.1.10:18083/#tab-instances",
+      protocol: "http:",
+      host: "host:8082",
+      tab: "objects",
+    }),
+  ).toBe("http://192.168.1.10:18083/#tab-objects");
+});
+
+it("accepts an explicit host:port or a path without a scheme", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "192.168.1.10:18083",
+      protocol: "http:",
+      host: "host:8082",
+    }),
+  ).toBe("http://192.168.1.10:18083/#tab-overview");
+  expect(
+    adminPageUrl({
+      adminUrl: "192.168.1.10:18083/admin/",
+      protocol: "https:",
+      host: "home.example",
+      tab: "objects",
+    }),
+  ).toBe("https://192.168.1.10:18083/admin/#tab-objects");
+});
+
+it("keeps the query of an explicit admin URL", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "http://host:18083/?x=1#tab-instances",
+      protocol: "http:",
+      host: "host:8082",
+      tab: "enums",
+    }),
+  ).toBe("http://host:18083/?x=1#tab-enums");
+});
+
+it("treats a trailing /* as the normal admin tab", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "http://192.168.1.10:18083/*",
+      protocol: "http:",
+      host: "host:8082",
+      tab: "objects",
+    }),
+  ).toBe("http://192.168.1.10:18083/#tab-objects");
+  expect(
+    adminPageUrl({
+      adminUrl: "192.168.1.10:18083/admin/*",
+      protocol: "http:",
+      host: "host:8082",
+      tab: "overview",
+    }),
+  ).toBe("http://192.168.1.10:18083/admin/#tab-overview");
+});
+
+it("treats /* alone as the derived admin address", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "/*",
+      hostPort: "10.0.0.5:8081",
+      protocol: "http:",
+      host: "host:8082",
+    }),
+  ).toBe("http://10.0.0.5:8081/#tab-overview");
+  expect(
+    adminPageUrl({
+      adminUrl: "/*",
+      protocol: "http:",
+      host: "host:8082",
+      adminPort: 18083,
+      tab: "objects",
+    }),
+  ).toBe("http://host:18083/#tab-objects");
+});
+
+it("a leading slash changes only the derived page address", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "/#tab-instances",
+      hostPort: "10.0.0.5:8081",
+      protocol: "http:",
+      host: "host:8082",
+    }),
+  ).toBe("http://10.0.0.5:8081/#tab-instances");
+  expect(
+    adminPageUrl({
+      adminUrl: "/#tab-instances",
+      hostPort: "10.0.0.5:8081",
+      protocol: "http:",
+      host: "host:8082",
+      tab: "objects",
+    }),
+  ).toBe("http://10.0.0.5:8081/#tab-objects");
+  expect(
+    adminPageUrl({
+      adminUrl: "/#easy",
+      protocol: "http:",
+      host: "host:8082",
+      adminPort: 18083,
+    }),
+  ).toBe("http://host:18083/#easy");
+  expect(
+    adminPageUrl({
+      adminUrl: "/admin/",
+      protocol: "http:",
+      host: "host:8082",
+      adminPort: 18083,
+    }),
+  ).toBe("http://host:18083/admin/#tab-overview");
+});
+
+it("falls back when the explicit admin URL is invalid", () => {
+  expect(
+    adminPageUrl({
+      adminUrl: "ftp://host",
+      protocol: "http:",
+      host: "host:8082",
+    }),
+  ).toBe("http://host:8081/#tab-overview");
+});
+
 it("uses the proxied admin path on a cloud host", () => {
   expect(
     adminPageUrl({
