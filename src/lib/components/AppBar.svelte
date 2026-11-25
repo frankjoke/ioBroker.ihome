@@ -36,6 +36,7 @@
     initPluginPages,
   } from "$lib/stores/plugin-pages.svelte";
   import { getStorage } from "$lib/tools.svelte";
+  import { pinCacheFor } from "$lib/config/pin-cache";
   import { effectivePin, unlock } from "$lib/config/pin.svelte";
   import { getSettings, isSettingsLoaded } from "$lib/stores/settings.svelte";
   import { effectiveHidePencil } from "$lib/config/settings-ops";
@@ -212,7 +213,8 @@
   }
 
   const storage = getStorage();
-  const storedPin = $derived(effectivePin(storage.pin));
+  const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
+  const storedPin = $derived(effectivePin(pinCache.pin));
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.
    *  Capture phase: SvelteKit's router listens earlier than a delegated

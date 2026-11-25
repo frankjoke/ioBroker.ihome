@@ -1,7 +1,6 @@
 import { it, expect, vi } from "vitest";
 import {
   DEFAULT_PIN,
-  PIN_STORAGE_KEY,
   configNeedsPin,
   effectivePin,
   isDefaultPin,
@@ -66,10 +65,8 @@ it("tileNeedsPin asks only for a valid pin on a tile that has a detail page", ()
   expect(tileNeedsPin("1234", false)).toBe(false); // nothing to protect
 });
 
-it("the shipped default and the storage key are the constants", () => {
+it("the shipped default is the constant", () => {
   expect(DEFAULT_PIN).toBe("4321");
-  // The layout's defineStorage composes "__VISUAL__:pin" from this name.
-  expect(PIN_STORAGE_KEY).toBe("pin");
 });
 
 it("the unlock flag lives in memory only", () => {

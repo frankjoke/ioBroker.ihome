@@ -9,20 +9,20 @@
 // nothing that changes it.
 //
 // The stored value lives in the broker's settings document,
-// ihome.0.config.settings (settings.svelte.ts), and is shared by every device.
-// localStorage["__VISUAL__:pin"] is only this browser's cache/offline fallback,
-// written by the layout's defineStorage call under the app's existing
-// "__VISUAL__:" prefix — plaintext, like the document itself. This is a
+// `<instance>.config.settings` (settings.svelte.ts), and is shared by every
+// device of that instance. localStorage["__VISUAL__:pinCache"] is only this
+// browser's per-instance cache/offline fallback, written by the layout's
+// defineStorage call — plaintext, like the document itself. This is a
 // convenience lock, NOT a security boundary: anyone with broker read access (or
 // devtools on this device) can read or delete the value and walk in. The lock
 // keeps a curious tap on the wall display away from the config; it protects
 // nothing on the broker.
 //
 // Removing the pin from the settings document re-seeds the default, and
-// clearing "__VISUAL__:pin" is still the per-browser recovery recipe: the cache
-// falls back to "4321" until the document is read (and the next connection save
-// re-arms the forced change). The in-app change UI is the Security card in
-// Settings.
+// clearing the instance's cache is still the per-browser recovery recipe: the
+// cache falls back to "4321" until the document is read (and the next
+// connection save re-arms the forced change). The in-app change UI is the
+// Security card in Settings.
 //
 // Per-tile detail PINs live on the tile itself (TileConfig.pin): a tile that
 // has one asks for it on every open of its detail page, and only there — see
@@ -35,9 +35,6 @@
 // every gate reads the same flag.
 
 export const DEFAULT_PIN = "4321";
-
-/** The name the layout's defineStorage call composes into `__VISUAL__:pin`. */
-export const PIN_STORAGE_KEY = "pin";
 
 /** Digits only, 4 to 6, as a string — a number is not a PIN. */
 export function isValidPin(value: unknown): value is string {

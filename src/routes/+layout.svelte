@@ -11,6 +11,8 @@
   } from "$lib/ioBrokerConnect.svelte.js";
   import { FALLBACK_BROKER } from "$lib/broker-config";
   import { cloudPageUrl, shouldJumpToCloud } from "$lib/transport";
+  import { resolveNamespace } from "$lib/config/namespace-profile";
+  import { pinCacheFor, withPinCache } from "$lib/config/pin-cache";
   import { SIZE_UNIT } from "$lib/config/size-ops";
   import { defineStorage, canReload } from "$lib/tools.svelte";
   import { loadUsedStates, reloadUsedStates } from "$lib/states.svelte.js";
@@ -152,15 +154,9 @@
     // preferred Admin start page). Empty derives it like before.
     ["adminUrl", { init: "" }],
     ["namespace", { init: DEFAULT_NAMESPACE }],
-    ["pin", { init: "" }],
-    // Cache of the shared doc's lock flag (settings.svelte.ts): the broker value
-    // wins once loaded; this keeps the pencil gate working before/without a
-    // socket. Ships off — the editor is used a lot during installation.
-    ["lockPencil", { init: false }],
-    // Testing switch: the configuration routes ask for no PIN when this is on.
-    // Cached here so a page refresh does not fall back to the prompt before the
-    // settings document has loaded.
-    ["pinDisabled", { init: false }],
+    // Per-instance browser cache of the shared settings document: the PIN, the
+    // pencil lock and the PIN bypass. The broker's document wins once loaded.
+    ["pinCache", { init: {} }],
     // The iobroker.pro fallback (transport.ts): when the local ioBroker stays
     // unreachable, the app navigates to its own page on the cloud host, where
     // the browser's portal session takes over. Off by default — a wall display
@@ -171,14 +167,19 @@
     { prefix: "__VISUAL__:" },
   );
 
-  // Earlier builds persisted their own default (`iHome`, before that `admin.0`);
-  // those values are not a real namespace, so they count as "unset" — otherwise
-  // writes keep the old identity instead of the adapter's. Read once, at connect.
-  const LEGACY_NAMESPACES = ["admin.0", "iHome", "0_userdata.0.Test.AiHome"];
-  const namespace =
-    !storage.namespace || LEGACY_NAMESPACES.includes(storage.namespace)
-      ? DEFAULT_NAMESPACE
-      : storage.namespace;
+  // A `?namespace=ihome.N` profile wins over the stored value; legacy stored
+  // namespaces (`admin.0`, `iHome`, …) fall back to the default.
+  const queryNamespace = (
+    new URLSearchParams(location.search).get("namespace") ?? ""
+  ).trim();
+  const namespace = resolveNamespace(
+    queryNamespace,
+    storage.namespace,
+    DEFAULT_NAMESPACE,
+  );
+  if (queryNamespace && namespace === queryNamespace && storage.namespace !== namespace) {
+    storage.namespace = namespace;
+  }
 
   // Where the app talks to ioBroker is not decided here: the connect resolves
   // it (transport.ts) — an explicit address, the stored host:port, the web
@@ -273,10 +274,14 @@
    * repeat it. The route's content is not rendered while locked: the page
    * cannot mount, so nothing in it can run. Cancelling goes back to the display.
    */
-  const storedPin = $derived(effectivePin(storage.pin));
+  const pinCache = $derived(pinCacheFor(storage.pinCache, namespace));
+  const storedPin = $derived(effectivePin(pinCache.pin));
   const configLocked = $derived(
-    configNeedsPin(isDisplay, isUnlocked(), storage.pinDisabled === true),
+    configNeedsPin(isDisplay, isUnlocked(), pinCache.pinDisabled === true),
   );
+  function setPinCache(patch) {
+    storage.pinCache = withPinCache(storage.pinCache, namespace, patch);
+  }
   /** The display defaults, published as custom properties for every component. */
   const ui = $derived(effectiveUi(getSettings()));
 
@@ -301,11 +306,13 @@
    * @param {Record<string, unknown>} s
    */
   function applySettings(s) {
-    if (isValidPin(s.pin)) storage.pin = s.pin;
     // The flag has no third state: an absent key means off (D-3), so a stale
     // cache can never claim the editor is locked.
-    storage.lockPencil = s.lockPencil === true;
-    storage.pinDisabled = s.pinDisabled === true;
+    setPinCache({
+      lockPencil: s.lockPencil === true,
+      pinDisabled: s.pinDisabled === true,
+      ...(isValidPin(s.pin) ? { pin: s.pin } : {}),
+    });
   }
 
   // The used set grows while the app loads (the registry and the pages arrive

@@ -15,6 +15,7 @@
   } from "$lib/stores/settings.svelte";
   import { appBaseUrl } from "$lib/config/frame-url";
   import { adminUrlBase } from "$lib/transport";
+  import { pinCacheFor, withPinCache, type PinCache } from "$lib/config/pin-cache";
   import ioPackage from "../../../io-package.json";
   import PhoneCard from "$lib/components/config/PhoneCard.svelte";
   import ExternalAccessCard from "$lib/components/config/ExternalAccessCard.svelte";
@@ -25,9 +26,13 @@
   import { showsExternalPolicyCard } from "$lib/config/locality";
 
   const storage = getStorage();
+  const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
+  function setPinCache(patch: Partial<PinCache>): void {
+    storage.pinCache = withPinCache(storage.pinCache, storage.namespace, patch);
+  }
   const isConnected = $derived(!!ioBroker.connected);
   /** The fieldset is editable after an unlock, or when the PIN is skipped. */
-  const locked = $derived(!isUnlocked() && storage.pinDisabled !== true);
+  const locked = $derived(!isUnlocked() && pinCache.pinDisabled !== true);
   /** The plugin card is optional; the core policy card must stay reachable,
    *  including while force-external is on (it is the only way back). */
   const caddyPlugin = $derived(
@@ -96,9 +101,9 @@
   let pushMessage = $state("");
 
   /** True while the shipped default (or a missing/malformed value) is in force. */
-  const pinIsDefault = $derived(isDefaultPin(storage.pin));
+  const pinIsDefault = $derived(isDefaultPin(pinCache.pin));
   /** What the prompt compares an entry against. */
-  const storedPin = $derived(effectivePin(storage.pin));
+  const storedPin = $derived(effectivePin(pinCache.pin));
 
   /** Empty, `/*` or a leading `/` means "derive the host; page only". */
   const adminUrlValid = $derived.by(() => {
@@ -297,9 +302,13 @@
             <label class="check">
               <input
                 type="checkbox"
-                bind:checked={storage.lockPencil}
-                onchange={() =>
-                  void updateSettings({ lockPencil: storage.lockPencil })}
+                checked={pinCache.lockPencil === true}
+                onchange={(event) => {
+                  setPinCache({ lockPencil: event.currentTarget.checked });
+                  void updateSettings({
+                    lockPencil: event.currentTarget.checked,
+                  });
+                }}
               />
               <span
                 >Ask for the PIN before the layout editor (the pencil) opens</span
@@ -308,9 +317,13 @@
             <label class="check">
               <input
                 type="checkbox"
-                bind:checked={storage.pinDisabled}
-                onchange={() =>
-                  void updateSettings({ pinDisabled: storage.pinDisabled })}
+                checked={pinCache.pinDisabled === true}
+                onchange={(event) => {
+                  setPinCache({ pinDisabled: event.currentTarget.checked });
+                  void updateSettings({
+                    pinDisabled: event.currentTarget.checked,
+                  });
+                }}
               />
               <span
                 >Skip the PIN for the configuration pages (testing only — anyone
@@ -445,7 +458,7 @@
         hint="The shipped default PIN is still in use — set your own before the connection can be saved."
         confirmLabel="Save PIN"
         onSubmit={(pin) => {
-          storage.pin = pin;
+          setPinCache({ pin });
           askingPin = false;
           // The reload must not beat the broker write, or the new PIN never
           // reaches the settings document; a failed write keeps the page open
@@ -476,7 +489,7 @@
         hint="Digits only, 4 to 6 characters. It guards the configuration on every device."
         confirmLabel="Save PIN"
         onSubmit={(pin) => {
-          storage.pin = pin;
+          setPinCache({ pin });
           void updateSettings({ pin });
           pinStep = "off";
         }}
