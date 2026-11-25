@@ -1199,7 +1199,8 @@ class IHome extends utils.Adapter {
         !isRecord(obj.message) ||
         (obj.message.action !== "custom.write" &&
           obj.message.action !== "common.write" &&
-          obj.message.action !== "create")
+          obj.message.action !== "create" &&
+          obj.message.action !== "delete")
       ) {
         reply({ ok: false, error: "unknown states action" });
         return;
@@ -1209,6 +1210,25 @@ class IHome extends utils.Adapter {
         typeof obj.message.id === "string" ? obj.message.id.trim() : "";
       if (!id) {
         reply({ ok: false, error: "state id required" });
+        return;
+      }
+      if (action === "delete") {
+        const problem =
+          stateIdProblem(id) ??
+          (id.startsWith(`${this.namespace}.`)
+            ? null
+            : "Only this instance's states can be deleted here.");
+        if (problem) {
+          reply({ ok: false, error: problem });
+          return;
+        }
+        const existing = await this.getForeignObjectAsync(id);
+        if (existing && existing.type !== "state") {
+          reply({ ok: false, error: `not a state: ${id}` });
+          return;
+        }
+        if (existing) await this.delForeignObjectAsync(id);
+        reply({ ok: true, id });
         return;
       }
       if (action === "create") {

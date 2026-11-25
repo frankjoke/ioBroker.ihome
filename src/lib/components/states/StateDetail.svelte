@@ -170,12 +170,13 @@
       }
     }
     const config = template
-      ? { ...template, enabled: true }
+      ? { ...template, enabled: true, aliasId: "" }
       : {
           enabled: true,
           debounceTime: 0,
           blockTime: 0,
           changesOnly: false,
+          aliasId: "",
         };
     try {
       await writeStateCustom(id, {

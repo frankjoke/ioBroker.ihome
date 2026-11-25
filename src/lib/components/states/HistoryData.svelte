@@ -6,12 +6,16 @@
     deleteRangePayload,
     hasHistoryFeature,
     historyRows,
+    isHistoryCustom,
   } from "$lib/config/state-settings";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
   import HistoryChart from "./HistoryChart.svelte";
+  import HistoryResample from "./HistoryResample.svelte";
   import { writeStateCustom } from "$lib/config/state-write";
-  import { formatValue } from "$lib/config/format";
+  import { csvText } from "$lib/config/history-resample";
+  import { downloadText } from "$lib/utils/download";
+  import { formatValue, localizeName } from "$lib/config/format";
   import { debounce } from "$lib/utils/debounce";
 
   let {
@@ -50,6 +54,7 @@
   const RAW_LIMIT = 100000;
 
   let draftEnabled = $state<boolean | null>(null);
+  let draftAlias = $state<string | null>(null);
   let saving = $state(false);
   let duration = $state("24");
   let mode = $state<"graphic" | "table">("graphic");
@@ -109,16 +114,42 @@
     return customValue(key)?.enabled !== false;
   }
 
-  const enabledDirty = $derived(
+  function aliasOf(key: string): string {
+    const value = customValue(key)?.aliasId;
+    return typeof value === "string" ? value : "";
+  }
+
+  const aliasOptions = $derived.by(() => {
+    const options: Array<{ id: string; name: string }> = [];
+    for (const [id, entry] of ioBroker.objects as Map<string, any>) {
+      if (id === stateId || entry?.type !== "state") continue;
+      const custom = entry?.common?.custom;
+      if (!custom || typeof custom !== "object") continue;
+      const hasHistory = Object.entries(custom).some(
+        ([key, value]) => key !== "ihome" && isHistoryCustom(value),
+      );
+      if (!hasHistory) continue;
+      options.push({ id, name: localizeName(entry.common?.name) });
+    }
+    options.sort((left, right) => left.id.localeCompare(right.id));
+    const current = openAdapter ? aliasOf(openAdapter) : "";
+    if (current && !options.some((option) => option.id === current)) {
+      options.unshift({ id: current, name: "(removed)" });
+    }
+    return options;
+  });
+
+  const configDirty = $derived(
     openAdapter !== "" &&
-      draftEnabled !== null &&
-      draftEnabled !== enabledOf(openAdapter),
+      ((draftEnabled !== null && draftEnabled !== enabledOf(openAdapter)) ||
+        (draftAlias !== null && draftAlias !== aliasOf(openAdapter))),
   );
 
-  async function saveEnabled(): Promise<void> {
+  async function saveConfig(): Promise<void> {
     const key = openAdapter;
-    const enabled = draftEnabled;
-    if (!key || enabled === null) return;
+    if (!key) return;
+    const enabled = draftEnabled ?? enabledOf(key);
+    const alias = (draftAlias ?? aliasOf(key)).trim();
     const value = customValue(key);
     if (!value) return;
     saving = true;
@@ -126,11 +157,17 @@
     message = "";
     const custom = {
       ...((object?.common?.custom ?? {}) as Record<string, unknown>),
-      [key]: { ...value, enabled },
+      [key]: { ...value, enabled, aliasId: alias },
     };
     try {
       await writeStateCustom(stateId, custom);
-      message = `${key} ${enabled ? "enabled" : "disabled"}.`;
+      draftEnabled = enabled;
+      draftAlias = alias;
+      message = alias
+        ? `${key}: history alias ${alias}.`
+        : `${key} ${enabled ? "enabled" : "disabled"}.`;
+      await chooseAdapter();
+      await countRange();
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -138,9 +175,20 @@
     }
   }
 
+  function downloadRows(): void {
+    if (!rows.length) return;
+    const safe = stateId.replace(/[^A-Za-z0-9._-]+/g, "-");
+    downloadText(
+      `${safe}-history-${duration}h.csv`,
+      csvText(rows),
+      "text/csv;charset=utf-8",
+    );
+  }
+
   function toggle(key: string): void {
     openAdapter = openAdapter === key ? "" : key;
     draftEnabled = openAdapter ? enabledOf(openAdapter) : null;
+    draftAlias = openAdapter ? aliasOf(openAdapter) : null;
     error = "";
     message = "";
     featuresReply = null;
@@ -380,8 +428,8 @@
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  disabled={!enabledDirty || saving}
-                  onclick={() => void saveEnabled()}
+                  disabled={!configDirty || saving}
+                  onclick={() => void saveConfig()}
                   >{saving ? "Saving…" : "Save"}</button
                 >
               {/if}
@@ -389,6 +437,30 @@
           </div>
           {#if open}
             <div class="item-editor">
+              <div class="row wrap">
+                <label class="small grow">
+                  <span class="label-mono">History alias</span>
+                  <select
+                    value={draftAlias ?? aliasOf(key)}
+                    disabled={saving}
+                    onchange={(event) =>
+                      (draftAlias = event.currentTarget.value)}
+                  >
+                    <option value="">No alias (own id)</option>
+                    {#each aliasOptions as option (option.id)}
+                      <option value={option.id}
+                        >{option.id}{option.name
+                          ? ` · ${option.name}`
+                          : ""}</option
+                      >
+                    {/each}
+                  </select>
+                </label>
+              </div>
+              <p class="hint text-muted">
+                Reads and writes this state's history under the selected state
+                id. The old entries stay there after the alias state is removed.
+              </p>
               {#if !featuresReply}
                 <p class="hint text-muted">
                   {adapter} does not report history features.
@@ -420,6 +492,13 @@
                         {/each}
                       </select>
                     </label>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      disabled={!rows.length}
+                      title="Download the displayed rows as CSV"
+                      onclick={downloadRows}>CSV</button
+                    >
                   {/snippet}
                   {#snippet children(active)}
                     {#if loading}
@@ -521,6 +600,20 @@
               </p>
               {#if rangeError}<p class="hint text-danger">{rangeError}</p>{/if}
               {#if error}<p class="hint text-danger">{error}</p>{/if}
+              <HistoryResample
+                {adapter}
+                {stateId}
+                {object}
+                config={customValue(key) ?? {}}
+                {featuresReply}
+                rangeStart={rangeBounds.start}
+                rangeEnd={rangeBounds.end}
+                rangeValid={rangeBounds.valid}
+                onDone={async () => {
+                  await chooseAdapter();
+                  await countRange();
+                }}
+              />
             </div>
           {/if}
         </div>
