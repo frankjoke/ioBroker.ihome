@@ -290,6 +290,30 @@ describe("contributionsReply", () => {
     ]);
   });
 
+  it("substitutes the instance in contribution snippets", () => {
+    const contributions = {
+      snippets: [
+        {
+          id: "s",
+          name: "S",
+          code: 'sendTo("{{namespace}}", "plugin", {})',
+        },
+      ],
+    };
+    const reply = contributionsReply(
+      [
+        userPlugin("a", true, "", {
+          contributions,
+        }),
+      ],
+      new Map(),
+      "ihome.1",
+    );
+    expect(reply.plugins[0].contributions.snippets?.[0].code).toBe(
+      'sendTo("ihome.1", "plugin", {})',
+    );
+  });
+
   it("lists the owned states and logic outputs a tile may bind", () => {
     const reply = contributionsReply(
       [

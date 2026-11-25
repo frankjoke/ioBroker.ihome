@@ -1350,7 +1350,7 @@ The tile offers the external (HTTPS) link and, when OpenCode reports a LAN addre
       description:
         "Run from an ioBroker script; the reply carries the external and LAN links.",
       language: "js",
-      code: `const reply = await sendTo("ihome.0", "plugin", {
+      code: `const reply = await sendTo("{{namespace}}", "plugin", {
   id: "external-access",
   payload: { action: "site.pair", id: "site-8444" },
 });

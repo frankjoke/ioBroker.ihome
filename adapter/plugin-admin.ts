@@ -329,11 +329,21 @@ export function contributionsReply(
     plugins: plugins.map((plugin) => {
       const problem = problems.get(plugin.id);
       const owned = ownedItems(plugin.collection, namespace);
+      const contributions =
+        plugin.contributions && namespace && plugin.contributions.snippets
+          ? {
+              ...plugin.contributions,
+              snippets: plugin.contributions.snippets.map((snippet) => ({
+                ...snippet,
+                code: snippet.code.replaceAll("{{namespace}}", namespace),
+              })),
+            }
+          : (plugin.contributions ?? {});
       return {
         id: plugin.id,
         name: plugin.name,
         enabled: plugin.enabled,
-        contributions: plugin.contributions ?? {},
+        contributions,
         ...(owned ? { owned } : {}),
         ...(problem ? { problem } : {}),
       };

@@ -230,7 +230,7 @@ const PVFORECAST_TILE_HTML = `<!doctype html>
   <p class="error hidden" id="error"></p>
 <script>
   (function () {
-    var JSON_ID = (ihome.namespace || "ihome.0") + ".plugins.pvforecast.json";
+    var JSON_ID = ihome.namespace + ".plugins.pvforecast.json";
     var $ = function (id) { return document.getElementById(id); };
     function show(id, text) {
       var el = $(id);

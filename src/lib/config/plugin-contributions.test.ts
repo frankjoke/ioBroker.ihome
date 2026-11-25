@@ -200,7 +200,7 @@ describe("readPluginContributions", () => {
     expect(html).toContain("execCommand");
     expect(html).not.toContain("window.open");
     expect(contributions.snippets[0].code).toContain(
-      'sendTo("ihome.0", "plugin"',
+      'sendTo("{{namespace}}", "plugin"',
     );
   });
 
