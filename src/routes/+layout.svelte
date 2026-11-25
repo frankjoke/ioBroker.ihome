@@ -66,6 +66,7 @@
   } from "$lib/stores/connection.svelte";
   import { toast } from "$lib/stores/toasts.svelte";
   import { initIconPool } from "$lib/stores/icon-pool.svelte";
+  import { initHistoryDerived } from "$lib/stores/history-derived.svelte";
   import { flushViews, patchView, readView } from "$lib/stores/page-view";
 
   let { children } = $props();
@@ -384,6 +385,7 @@
       // Settings carry the installation's size-unit marker; load them before
       // the registries so a migrated document is never doubled a second time.
       await initSettings(applySettings);
+      await initHistoryDerived();
       // both gates: the registry must be loaded and the enum cache populated
       await initRegistry();
       await waitForEnumCache();
@@ -464,6 +466,7 @@
     // dashboard must register and heartbeat without opening Server & Security.
     initPhone();
     void initSettings(applySettings);
+    void initHistoryDerived();
     loadViewState();
     // Registered here rather than by SvelteKit: its own call uses
     // `updateViaCache: 'imports'`, and the ioBroker web adapter serves
