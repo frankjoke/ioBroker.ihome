@@ -34,6 +34,10 @@
   import { downloadText } from "$lib/utils/download";
   import { formatValue, localizeName } from "$lib/config/format";
   import { debounce } from "$lib/utils/debounce";
+  import {
+    DEFAULT_DERIVED_FUNCTION,
+    DERIVED_FUNCTION_EXAMPLES,
+  } from "$lib/config/history-derived-examples";
 
   let {
     stateId,
@@ -78,8 +82,6 @@
   const DEFAULT_INTERVAL = "15m";
   const DEFAULT_START_DELAY = "0s";
   const DEFAULT_RELOG = "1h";
-  const DEFAULT_FUNCTION =
-    'const values = samples\n  .filter((sample) => typeof sample.val === "number")\n  .map((sample) => sample.val);\nreturn values.length ? mean(values) : NOOP;';
   type LoggingMode = "raw" | "derived" | "off";
 
   let draftMode = $state<LoggingMode>("raw");
@@ -87,7 +89,7 @@
   let draftStartDelay = $state(DEFAULT_START_DELAY);
   let draftChangesOnly = $state(true);
   let draftRelog = $state(DEFAULT_RELOG);
-  let draftFunction = $state(DEFAULT_FUNCTION);
+  let draftFunction = $state(DEFAULT_DERIVED_FUNCTION);
   let draftAlias = $state<string | null>(null);
   let draftRetention = $state<string | null>(null);
   let draftRetentionDays = $state("");
@@ -388,7 +390,7 @@
     draftStartDelay = entry?.startDelay ?? DEFAULT_START_DELAY;
     draftChangesOnly = entry?.changesOnly ?? true;
     draftRelog = entry?.relogInterval ?? DEFAULT_RELOG;
-    draftFunction = entry?.function.code ?? DEFAULT_FUNCTION;
+    draftFunction = entry?.function.code ?? DEFAULT_DERIVED_FUNCTION;
     draftAlias = openAdapter ? aliasOf(openAdapter) : null;
     draftRetention = openAdapter ? retentionPresetOf(openAdapter) : null;
     draftRetentionDays = openAdapter
@@ -968,6 +970,7 @@
                   code={draftFunction}
                   onchange={(code) => (draftFunction = code)}
                   minRows={4}
+                  examples={DERIVED_FUNCTION_EXAMPLES}
                   hint="samples, previous, from, to · mean, timeWeightedMean, median, sum, min, max · return NOOP to skip"
                 />
                 {#if derivedProblem}

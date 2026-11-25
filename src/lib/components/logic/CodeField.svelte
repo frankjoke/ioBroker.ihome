@@ -31,6 +31,7 @@
     logics = [],
     inputs = {},
     quickInserts = [],
+    examples = [],
     onfocus,
   }: {
     code: string;
@@ -53,6 +54,8 @@
     inputs?: Record<string, Input>;
     /** Extra quick-insert badges (e.g. the override's $.siblings). */
     quickInserts?: { label: string; insert: string; title?: string }[];
+    /** Whole-body examples; replaces the generic snippet picker. */
+    examples?: { id: string; name: string; code: string }[];
     /** The field took focus (the caller may close another editor). */
     onfocus?: () => void;
   } = $props();
@@ -205,11 +208,31 @@
     >
       <span class="mono">/* */</span>
     </button>
-    <SnippetSelect
-      {mode}
-      onBeforeOpen={rememberSelection}
-      onInsert={insertText}
-    />
+    {#if examples.length}
+      <select
+        class="example-picker"
+        aria-label="Load a function example"
+        title="Load a function example"
+        value=""
+        onchange={(event) => {
+          const select = event.currentTarget;
+          const example = examples.find((entry) => entry.id === select.value);
+          select.selectedIndex = 0;
+          if (example) onchange(example.code);
+        }}
+      >
+        <option value="">— example —</option>
+        {#each examples as example (example.id)}
+          <option value={example.id}>{example.name}</option>
+        {/each}
+      </select>
+    {:else}
+      <SnippetSelect
+        {mode}
+        onBeforeOpen={rememberSelection}
+        onInsert={insertText}
+      />
+    {/if}
     {#if inputEntries.length > 0}
       <div class="badges">
         <span class="label-mono">Insert</span>
