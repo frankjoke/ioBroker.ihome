@@ -103,7 +103,8 @@ beforeEach(() => {
 it("loads templates from the folder", async () => {
   const mod = await store(
     space({
-      "ihome.meta/templates/device/light.json": serializeTemplateFile(device),
+      "ihome.meta/templates/ihome.42/device/light.json":
+        serializeTemplateFile(device),
     }),
   );
   expect(mod.isTemplatesWritable()).toBe(true);
@@ -143,14 +144,17 @@ it("migrates the legacy state into files once", async () => {
   const mod = await store(space({}));
   expect(mod.getTemplateRegistry().templates).toHaveLength(1);
   expect(
-    h.writes.some((path) => path.endsWith("templates/device/Light.json")),
+    h.writes.some((path) =>
+      path.endsWith("templates/ihome.42/device/Light.json"),
+    ),
   ).toBe(true);
 });
 
 it("writes changed templates and removes deleted ones", async () => {
   const mod = await store(
     space({
-      "ihome.meta/templates/device/light.json": serializeTemplateFile(device),
+      "ihome.meta/templates/ihome.42/device/light.json":
+        serializeTemplateFile(device),
     }),
   );
   const changed = {

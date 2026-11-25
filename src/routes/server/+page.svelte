@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { ioBroker, DEFAULT_NAMESPACE } from "$lib/ioBrokerConnect.svelte.js";
+  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { untrack } from "svelte";
   import { getStorage } from "$lib/tools.svelte";
   import PinModal from "$lib/components/common/PinModal.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import { iHomeInstanceIds } from "$lib/config/instance-options";
   import { profileUrl } from "$lib/config/profile-url";
+  import { NAMESPACE_PATTERN } from "$lib/config/namespace-profile";
   import {
     effectivePin,
     isDefaultPin,
@@ -32,19 +34,37 @@
   import { showsExternalPolicyCard } from "$lib/config/locality";
 
   const storage = getStorage();
-  const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
+  let namespaceDraft = $state(untrack(() => ioBroker.namespace ?? ""));
+  let lastRunningNamespace = "";
+  $effect(() => {
+    if (ioBroker.namespace && ioBroker.namespace !== lastRunningNamespace) {
+      lastRunningNamespace = ioBroker.namespace;
+      namespaceDraft = ioBroker.namespace;
+    }
+  });
+  const namespaceValid = $derived(
+    NAMESPACE_PATTERN.test(namespaceDraft.trim()),
+  );
+  const pinCache = $derived(pinCacheFor(storage.pinCache, ioBroker.namespace));
+  const isConnected = $derived(!!ioBroker.connected);
   const installedInstances = $derived.by(() => {
     const objects = ioBroker.objects as Map<string, any>;
     void objects.size; // track the object cache filling after the first connect
     return iHomeInstanceIds(objects);
   });
   const instanceMissing = $derived(
-    !!storage.namespace && !installedInstances.includes(storage.namespace),
+    isConnected &&
+      installedInstances.length > 0 &&
+      !!namespaceDraft.trim() &&
+      !installedInstances.includes(namespaceDraft.trim()),
   );
   function setPinCache(patch: Partial<PinCache>): void {
-    storage.pinCache = withPinCache(storage.pinCache, storage.namespace, patch);
+    storage.pinCache = withPinCache(
+      storage.pinCache,
+      ioBroker.namespace,
+      patch,
+    );
   }
-  const isConnected = $derived(!!ioBroker.connected);
   /** The fieldset is editable after an unlock, or when the PIN is skipped. */
   const locked = $derived(!isUnlocked() && pinCache.pinDisabled !== true);
   /** The plugin card is optional; the core policy card must stay reachable,
@@ -89,7 +109,11 @@
   }
 
   function applyAndReload() {
-    const next = String(storage.namespace ?? "").trim() || DEFAULT_NAMESPACE;
+    const next = namespaceDraft.trim();
+    if (!NAMESPACE_PATTERN.test(next)) {
+      profileMessage = "Namespace must look like ihome.0 or ihome.1.";
+      return;
+    }
     storage.namespace = next;
     const url = new URL(location.href);
     url.searchParams.set("namespace", next);
@@ -101,8 +125,11 @@
 
   async function copyProfileLink(): Promise<void> {
     try {
-      const instance =
-        String(storage.namespace ?? "").trim() || DEFAULT_NAMESPACE;
+      const instance = namespaceDraft.trim();
+      if (!NAMESPACE_PATTERN.test(instance)) {
+        profileMessage = "Namespace must look like ihome.0 or ihome.1.";
+        return;
+      }
       await navigator.clipboard.writeText(profileUrl(location.href, instance));
       profileMessage = "Profile link copied.";
     } catch (failure) {
@@ -155,6 +182,10 @@
    * once a real PIN is stored (D-04).
    */
   function saveConnection() {
+    if (!namespaceValid) {
+      profileMessage = "Namespace must look like ihome.0 or ihome.1.";
+      return;
+    }
     if (pinIsDefault) {
       askingPin = true;
       return;
@@ -256,10 +287,10 @@
                 id="settings-ns"
                 type="text"
                 list="ihome-instance-list"
-                bind:value={storage.namespace}
+                bind:value={namespaceDraft}
               />
               <datalist id="ihome-instance-list">
-                {#each [...new Set([...installedInstances, storage.namespace].filter(Boolean))] as instance (instance)}
+                {#each [...new Set([...installedInstances, namespaceDraft.trim()].filter(Boolean))] as instance (instance)}
                   <option value={instance}>{instance}</option>
                 {/each}
               </datalist>
@@ -269,9 +300,13 @@
                 <span class="mono">?namespace=ihome.N</span> pins a device or bookmark
                 to one instance.</span
               >
-              {#if instanceMissing}
+              {#if !namespaceValid}
                 <span class="hint text-danger"
-                  >Instance {storage.namespace} does not exist. Create it in Admin
+                  >Use the form ihome.0, ihome.1, …</span
+                >
+              {:else if instanceMissing}
+                <span class="hint text-danger"
+                  >Instance {namespaceDraft.trim()} does not exist. Create it in Admin
                   → Instances.</span
                 >
               {/if}

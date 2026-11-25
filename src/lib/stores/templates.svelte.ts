@@ -76,7 +76,12 @@ export function saveTemplates(): void {
     }
     void (async () => {
       try {
-        await syncKind("device", templates, Object.keys(knownIds));
+        await syncKind(
+          "device",
+          templates,
+          Object.keys(knownIds),
+          ioBroker.namespace,
+        );
         knownIds = Object.fromEntries(
           templates.map((template) => [template.id, true]),
         );
@@ -126,7 +131,12 @@ export async function commitTemplatesNow(
   }
   const templates = next.templates ?? [];
   try {
-    await syncKind("device", templates, Object.keys(knownIds));
+    await syncKind(
+      "device",
+      templates,
+      Object.keys(knownIds),
+      ioBroker.namespace,
+    );
   } catch (e) {
     saveFailed = true;
     console.error("save templates:", e);
@@ -178,7 +188,7 @@ export function initTemplates(): Promise<void> {
         return;
       }
 
-      const files = await listTemplates("device");
+      const files = await listTemplates("device", ioBroker.namespace);
       const readable = files.filter(
         (row): row is { id: string; file: NonNullable<typeof row.file> } =>
           !!row.file,
@@ -208,7 +218,12 @@ export function initTemplates(): Promise<void> {
         setTemplateRegistry(migrated.registry);
         templatesLoadKind = "loaded";
         try {
-          await syncKind("device", migrated.registry.templates, []);
+          await syncKind(
+            "device",
+            migrated.registry.templates,
+            [],
+            ioBroker.namespace,
+          );
           knownIds = Object.fromEntries(
             migrated.registry.templates.map((template) => [template.id, true]),
           );

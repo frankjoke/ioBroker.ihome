@@ -32,7 +32,6 @@ export function renderHtmlTemplate(
 const BRIDGE = `<script>
 (function () {
   var api = {
-    namespace: parent.__IHOME__.namespace,
     baseUrl: parent.__IHOME__.baseUrl,
     origin: parent.__IHOME__.origin,
     setState: function (id, value) { return parent.__IHOME__.setState(id, value); },
@@ -42,6 +41,10 @@ const BRIDGE = `<script>
     getVariable: function (name) { return parent.__IHOME__.getVariable(name); },
     call: function (id, payload) { return parent.__IHOME__.call(id, payload); }
   };
+  Object.defineProperty(api, "namespace", {
+    enumerable: true,
+    get: function () { return parent.__IHOME__.namespace; }
+  });
   window.ihome = api;
   window.setState = api.setState;
   window.getState = api.getState;

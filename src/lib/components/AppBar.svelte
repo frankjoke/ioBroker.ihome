@@ -213,7 +213,7 @@
   }
 
   const storage = getStorage();
-  const pinCache = $derived(pinCacheFor(storage.pinCache, storage.namespace));
+  const pinCache = $derived(pinCacheFor(storage.pinCache, ioBroker.namespace));
   const storedPin = $derived(effectivePin(pinCache.pin));
 
   /** Ctrl/Cmd+click a page tab → open that page in the layout sheet.

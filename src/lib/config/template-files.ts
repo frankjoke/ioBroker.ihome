@@ -19,6 +19,7 @@ import {
 
 const ADAPTER = "ihome.meta";
 const DIR = "templates";
+const DEFAULT_INSTANCE = "ihome.0";
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const KINDS = new Set<string>(TEMPLATE_KINDS);
 
@@ -31,17 +32,29 @@ export function isTemplateKind(value: unknown): value is TemplateKind {
   return typeof value === "string" && KINDS.has(value);
 }
 
-export function templateMetaPath(kind: TemplateKind, id: string): string {
-  return `${DIR}/${kind}/${id}.json`;
+function templateFolder(kind: TemplateKind, instance: string): string {
+  return instance === DEFAULT_INSTANCE
+    ? `${DIR}/${kind}`
+    : `${DIR}/${instance}/${kind}`;
+}
+
+export function templateMetaPath(
+  kind: TemplateKind,
+  id: string,
+  instance = DEFAULT_INSTANCE,
+): string {
+  return `${templateFolder(kind, instance)}/${id}.json`;
 }
 
 /** `templates/device/a.json` → `{kind: "device", id: "a"}`. */
 export function parseTemplateMetaPath(
   path: string,
 ): { kind: TemplateKind; id: string } | null {
-  const match = /^templates\/([^/]+)\/([^/]+)\.json$/.exec(String(path));
+  const match = /^templates\/(?:(ihome\.\d+)\/)?([^/]+)\/([^/]+)\.json$/.exec(
+    String(path),
+  );
   if (!match) return null;
-  const [, kind, id] = match;
+  const [, , kind, id] = match;
   if (!isTemplateKind(kind) || !validTemplateId(id)) return null;
   return { kind, id };
 }
@@ -55,8 +68,12 @@ export function templateIdFromFile(name: string): string | null {
 export async function readTemplate(
   kind: TemplateKind,
   id: string,
+  instance = DEFAULT_INSTANCE,
 ): Promise<TemplateFile | null> {
-  const text = await readMetaText(ADAPTER, templateMetaPath(kind, id));
+  const text = await readMetaText(
+    ADAPTER,
+    templateMetaPath(kind, id, instance),
+  );
   if (text === null) return null;
   let raw: unknown = text;
   try {
@@ -79,13 +96,14 @@ export async function writeTemplate(
   kind: TemplateKind,
   id: string,
   file: TemplateFile,
+  instance = DEFAULT_INSTANCE,
 ): Promise<void> {
   if (validTemplateId(id) !== id) {
     throw new Error(`invalid template id: ${id}`);
   }
   await verifiedWrite(
     ADAPTER,
-    templateMetaPath(kind, id),
+    templateMetaPath(kind, id, instance),
     serializeTemplateFile(file),
   );
 }
@@ -93,21 +111,23 @@ export async function writeTemplate(
 export async function deleteTemplate(
   kind: TemplateKind,
   id: string,
+  instance = DEFAULT_INSTANCE,
 ): Promise<void> {
-  await deleteMetaFile(ADAPTER, templateMetaPath(kind, id));
+  await deleteMetaFile(ADAPTER, templateMetaPath(kind, id, instance));
 }
 
 /** Every template file of one kind; corrupt files stay listed with an error. */
 export async function listTemplates(
   kind: TemplateKind,
+  instance = DEFAULT_INSTANCE,
 ): Promise<{ id: string; file: TemplateFile | null; error?: string }[]> {
-  const entries = await listMetaDir(ADAPTER, `${DIR}/${kind}`);
+  const entries = await listMetaDir(ADAPTER, templateFolder(kind, instance));
   const out: { id: string; file: TemplateFile | null; error?: string }[] = [];
   for (const entry of entries) {
     if (entry.isDir) continue;
     const id = templateIdFromFile(entry.name);
     if (!id) continue;
-    const file = await readTemplate(kind, id);
+    const file = await readTemplate(kind, id, instance);
     out.push(
       file
         ? { id, file }
@@ -131,12 +151,18 @@ export async function syncKind(
   kind: TemplateKind,
   definitions: { id: string }[],
   previousIds: Iterable<string>,
+  instance = DEFAULT_INSTANCE,
 ): Promise<void> {
   const ids = new Set(definitions.map((definition) => definition.id));
   for (const definition of definitions) {
-    await writeTemplate(kind, definition.id, templateFile(kind, definition));
+    await writeTemplate(
+      kind,
+      definition.id,
+      templateFile(kind, definition),
+      instance,
+    );
   }
   for (const id of previousIds) {
-    if (!ids.has(id)) await deleteTemplate(kind, id);
+    if (!ids.has(id)) await deleteTemplate(kind, id, instance);
   }
 }

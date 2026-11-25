@@ -73,6 +73,12 @@ it("builds and parses paths", () => {
   });
   expect(parseTemplateMetaPath("templates/unknown/x.json")).toBeNull();
   expect(parseTemplateMetaPath("templates/device/bad id.json")).toBeNull();
+  expect(templateMetaPath("device", "lamp-1", "ihome.1")).toBe(
+    "templates/ihome.1/device/lamp-1.json",
+  );
+  expect(parseTemplateMetaPath("templates/ihome.1/device/lamp-1.json")).toEqual(
+    { kind: "device", id: "lamp-1" },
+  );
 });
 
 it("takes ids from file names only", () => {

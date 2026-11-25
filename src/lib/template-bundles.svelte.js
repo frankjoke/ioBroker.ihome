@@ -52,7 +52,12 @@ export function saveTemplateBundles() {
     }
     void (async () => {
       try {
-        await syncKind("bundle", bundles, Object.keys(knownIds));
+        await syncKind(
+          "bundle",
+          bundles,
+          Object.keys(knownIds),
+          ioBroker.namespace,
+        );
         knownIds = Object.fromEntries(
           bundles.map((bundle) => [bundle.id, true]),
         );
@@ -77,7 +82,7 @@ export function initTemplateBundles() {
         return;
       }
 
-      const files = await listTemplates("bundle");
+      const files = await listTemplates("bundle", ioBroker.namespace);
       const readable = files.filter((row) => !!row.file);
       if (files.length) {
         setTemplateBundlesLoadKind("loaded");
@@ -109,7 +114,12 @@ export function initTemplateBundles() {
       setTemplateBundleLibrary(read.library);
       if (read.kind === "loaded") {
         try {
-          await syncKind("bundle", read.library.bundles ?? [], []);
+          await syncKind(
+            "bundle",
+            read.library.bundles ?? [],
+            [],
+            ioBroker.namespace,
+          );
           knownIds = Object.fromEntries(
             (read.library.bundles ?? []).map((bundle) => [bundle.id, true]),
           );

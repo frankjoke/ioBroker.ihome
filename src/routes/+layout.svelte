@@ -446,6 +446,12 @@
   });
 
   onMount(() => {
+    if (queryNamespace && namespace !== queryNamespace) {
+      toast.warning(
+        `Profile “${queryNamespace}” is not a valid iHome instance; using ${namespace}.`,
+        { key: "namespace" },
+      );
+    }
     initRegistry();
     initFormulas();
     initFunctions();

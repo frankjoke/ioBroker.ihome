@@ -34,7 +34,9 @@ it("puts the bridge before a document's own scripts", () => {
     withHead.indexOf("<script>run()"),
   );
   expect(withHead).toContain("call:");
-  expect(withHead).toContain("namespace: parent.__IHOME__.namespace");
+  expect(withHead).toContain(
+    "get: function () { return parent.__IHOME__.namespace; }",
+  );
   expect(withHead).toContain("baseUrl: parent.__IHOME__.baseUrl");
   expect(withHead).toContain("origin: parent.__IHOME__.origin");
 
