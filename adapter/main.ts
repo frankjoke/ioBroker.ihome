@@ -13,6 +13,16 @@ import { isRecord, logicDocumentValue } from "./logic/validate";
 import { expandInputPatterns } from "./logic/pattern-ops";
 import { toStatementBodies } from "./logic/function-bodies";
 import { logicSubscriptions, subscriptionDiff } from "./logic/subscriptions";
+import { parseDuration } from "./logic/duration";
+import {
+  derivedEntryProblemForObject,
+  parseDerivedDocument,
+} from "./history-derived-common";
+import { DerivedHistoryService, type RuntimeDerivedEntry } from "./history-derived";
+import {
+  compileDerivedFunction,
+  type DerivedSample,
+} from "./history-derived-runtime";
 import {
   stateCommonDiff,
   stateObjectWithDiff,
@@ -148,6 +158,7 @@ const DOCS = [
   "overrideList",
   "pluginPages",
   "pluginSettings",
+  "historyList",
 ] as const;
 
 // Data of the pre-adapter test namespace; copied once, then left untouched.
@@ -260,6 +271,13 @@ class IHome extends utils.Adapter {
   private engine?: Engine;
   /** External ids the current engine subscribes to (for unsubscribing). */
   private logicIds: string[] = [];
+  /** Source ids the derived-history service needs. */
+  private derivedIds: string[] = [];
+  /** Union of logic and derived ids actually subscribed. */
+  private watchedIds: string[] = [];
+  /** Guards overlapping historyList reloads: only the newest may swap. */
+  private derivedLoad = 0;
+  private derivedHistory?: DerivedHistoryService;
   /** Last seen state per logic-referenced id; `read` never awaits. */
   private logicValues = new Map<string, StateChange>();
   /** `common.type` of a referenced state, for writes. */
@@ -733,28 +751,11 @@ class IHome extends utils.Adapter {
 
     // Anything a removed/disabled logic or a deleted variable no longer names
     // is unsubscribed here, so the broker stops sending it and nothing keeps
-    // running for it.
+    // running for it. The union with derived-history sources means one feature
+    // never removes a state the other still needs.
     // Subscribe before warming: a change between the two is then delivered
     // instead of being lost and leaving the engine on a stale value.
-    const diff = subscriptionDiff(this.logicIds, ids, this.namespace);
-    try {
-      if (diff.own.add.length) await this.subscribeStatesAsync(diff.own.add);
-      if (diff.foreign.add.length) {
-        await this.subscribeForeignStatesAsync(diff.foreign.add);
-      }
-      if (diff.own.remove.length) {
-        await this.unsubscribeStatesAsync(diff.own.remove);
-      }
-      if (diff.foreign.remove.length) {
-        await this.unsubscribeForeignStatesAsync(diff.foreign.remove);
-      }
-    } catch (error) {
-      // Keeping the old engine is better than running one that gets no events.
-      this.log.warn(
-        `logic subscriptions — keeping the running engine: ${error}`,
-      );
-      return;
-    }
+    if (!(await this.syncWatchedSubscriptions(ids))) return;
     if (loadId !== this.logicLoad) return;
 
     await this.warmLogicCache(ids);
@@ -835,6 +836,169 @@ class IHome extends utils.Adapter {
     const active = doc.logics.filter((logic) => logic.enabled !== false).length;
     this.log.info(
       `Logic engine: ${doc.logics.length} logic(s) (${active} active), ${ids.length} subscribed state(s)`,
+    );
+  }
+
+  /** Subscribe to the union of logic and derived sources, never less. */
+  private async syncWatchedSubscriptions(
+    logicIds: string[],
+  ): Promise<boolean> {
+    const next = [...new Set([...logicIds, ...this.derivedIds])];
+    const diff = subscriptionDiff(this.watchedIds, next, this.namespace);
+    try {
+      if (diff.own.add.length) await this.subscribeStatesAsync(diff.own.add);
+      if (diff.foreign.add.length) {
+        await this.subscribeForeignStatesAsync(diff.foreign.add);
+      }
+      if (diff.own.remove.length) {
+        await this.unsubscribeStatesAsync(diff.own.remove);
+      }
+      if (diff.foreign.remove.length) {
+        await this.unsubscribeForeignStatesAsync(diff.foreign.remove);
+      }
+    } catch (error) {
+      this.log.warn(
+        `state subscriptions — keeping the running set: ${String(error)}`,
+      );
+      return false;
+    }
+    this.watchedIds = next;
+    return true;
+  }
+
+  /** Read a source state, own or foreign, without failing the whole load. */
+  private async readDerivedState(
+    id: string,
+  ): Promise<{ val?: unknown; ts?: number; ack?: boolean; from?: string } | null> {
+    try {
+      const state = id.startsWith(`${this.namespace}.`)
+        ? await this.getStateAsync(id)
+        : await this.getForeignStateAsync(id);
+      return state ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Load `${instance}.config.historyList`, validate each state/adapter pair,
+   * compile its function and hand the surviving entries to the service.
+   */
+  private async loadDerivedHistory(): Promise<void> {
+    const loadId = ++this.derivedLoad;
+    const state = await this.getStateAsync(`${CONFIG_FOLDER}.historyList`);
+    if (loadId !== this.derivedLoad) return;
+    const text = state?.val;
+    const doc = parseDerivedDocument(text);
+    if (!doc) {
+      if (loadId !== this.derivedLoad) return;
+      this.derivedHistory?.stop();
+      const previous = this.derivedIds;
+      this.derivedIds = [];
+      if (!(await this.syncWatchedSubscriptions(this.logicIds))) {
+        this.derivedIds = previous;
+      }
+      if (text != null && String(text).trim() !== "") {
+        this.log.warn("historyList is invalid; derived history stopped");
+      }
+      return;
+    }
+
+    const entries: RuntimeDerivedEntry[] = [];
+    for (const entry of doc.entries) {
+      const object = await this.getForeignObjectAsync(entry.id).catch(
+        () => null,
+      );
+      const problem = derivedEntryProblemForObject(object, entry.adapter);
+      if (problem) {
+        this.log.warn(`derived ${entry.id}/${entry.adapter}: ${problem}`);
+        continue;
+      }
+      let features: unknown = null;
+      try {
+        features = await this.sendToAsync(entry.adapter, "features", {});
+      } catch {
+        // A temporarily down adapter may still support storeState; try writes.
+      }
+      const supported =
+        features && typeof features === "object"
+          ? (features as { supportedFeatures?: unknown }).supportedFeatures
+          : undefined;
+      if (Array.isArray(supported) && !supported.includes("storeState")) {
+        this.log.warn(
+          `derived ${entry.id}/${entry.adapter}: storeState is not supported`,
+        );
+        continue;
+      }
+      const intervalMs = parseDuration(entry.interval);
+      const startDelayMs = parseDuration(entry.startDelay);
+      const relogMs = parseDuration(entry.relogInterval);
+      if (
+        intervalMs === null ||
+        intervalMs <= 0 ||
+        startDelayMs === null ||
+        startDelayMs < 0 ||
+        relogMs === null ||
+        relogMs < 0
+      ) {
+        continue;
+      }
+      let run;
+      try {
+        run = compileDerivedFunction(entry.function.code);
+      } catch (error) {
+        this.log.warn(
+          `derived ${entry.id}/${entry.adapter}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        continue;
+      }
+      const source = await this.readDerivedState(entry.id);
+      const previous: DerivedSample | null = source
+        ? {
+            ts:
+              typeof source.ts === "number" && Number.isFinite(source.ts)
+                ? source.ts
+                : Date.now(),
+            val: source.val,
+            ack: source.ack,
+            from: source.from,
+            changed: false,
+          }
+        : null;
+      entries.push({
+        id: entry.id,
+        adapter: entry.adapter,
+        intervalMs,
+        startDelayMs,
+        changesOnly: entry.changesOnly,
+        relogMs,
+        run,
+        previous,
+      });
+    }
+    if (loadId !== this.derivedLoad) return;
+
+    this.derivedHistory ??= new DerivedHistoryService({
+      namespace: this.namespace,
+      now: () => Date.now(),
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (handle) => clearTimeout(handle),
+      sendTo: (adapter, command, payload) =>
+        this.sendToAsync(adapter, command, payload),
+      log: this.log,
+    });
+
+    const previousIds = this.derivedIds;
+    this.derivedIds = [...new Set(entries.map((entry) => entry.id))];
+    if (!(await this.syncWatchedSubscriptions(this.logicIds))) {
+      this.derivedIds = previousIds;
+      return;
+    }
+    this.derivedHistory.load(entries);
+    this.log.info(
+      `Derived history: ${entries.length} active entr${entries.length === 1 ? "y" : "ies"}`,
     );
   }
 
@@ -2757,6 +2921,7 @@ class IHome extends utils.Adapter {
     this.subscribeStates(`${CONFIG_FOLDER}.variableList`);
     this.subscribeStates(`${CONFIG_FOLDER}.logicList`);
     this.subscribeStates(`${CONFIG_FOLDER}.pluginSettings`);
+    this.subscribeStates(`${CONFIG_FOLDER}.historyList`);
     this.on("stateChange", (id, state) => {
       if (!state) return;
       if (id === overrideListId(this.namespace)) {
@@ -2784,6 +2949,7 @@ class IHome extends utils.Adapter {
         ts: state.ts,
         changed,
       });
+      this.derivedHistory?.onStateChange(id, state);
       if (id === `${this.namespace}.info.logClear`) {
         if (state.val === true) {
           this.logs.clear();
@@ -2850,6 +3016,11 @@ class IHome extends utils.Adapter {
           `${CONFIG_FOLDER}.logicList changed; reloading the engine`,
         );
         void this.loadLogics();
+      } else if (id === `${this.namespace}.${CONFIG_FOLDER}.historyList`) {
+        this.log.debug(
+          `${CONFIG_FOLDER}.historyList changed; reloading derived history`,
+        );
+        void this.loadDerivedHistory();
       }
     });
     await this.subscribeForeignStatesAsync([overrideListId(this.namespace)]);
@@ -3031,6 +3202,7 @@ class IHome extends utils.Adapter {
     );
     await this.pluginHost.start();
 
+    await this.loadDerivedHistory();
     await this.loadLogics();
 
     if (networkDevices.length > 0) {
