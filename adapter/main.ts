@@ -21,9 +21,10 @@ import {
 import { logicOutputSpec, numberStatesOf } from "./logic/state-specs";
 import type { AstroEvent, LogicDocument } from "./logic/types";
 import { createLogBuffer } from "./log-buffer";
+import { legacyMigrationAllowed } from "./legacy-migration";
 import { NetworkPresenceService } from "./network-presence";
 import {
-  OVERRIDE_LIST_ID,
+  overrideListId,
   parseOverrideDocument,
   type CustomOverride,
 } from "./override-common";
@@ -2705,7 +2706,10 @@ class IHome extends utils.Adapter {
               : "present"
         }`,
       );
-      if (current?.val == null || isPlaceholder(current.val)) {
+      if (
+        legacyMigrationAllowed(this.namespace) &&
+        (current?.val == null || isPlaceholder(current.val))
+      ) {
         // oldest first: the test namespace, then the plain state in the root
         const fromLegacy = await this.getForeignStateAsync(
           LEGACY_PREFIX + name,
@@ -2726,7 +2730,10 @@ class IHome extends utils.Adapter {
       }
 
       // the documents belong to config.* — drop the old state in the root
-      if (await this.getObjectAsync(name)) {
+      if (
+        legacyMigrationAllowed(this.namespace) &&
+        (await this.getObjectAsync(name))
+      ) {
         if (
           (await this.getStateAsync(target))?.val == null &&
           (await this.getStateAsync(name))?.val != null
@@ -2752,7 +2759,7 @@ class IHome extends utils.Adapter {
     this.subscribeStates(`${CONFIG_FOLDER}.pluginSettings`);
     this.on("stateChange", (id, state) => {
       if (!state) return;
-      if (id === OVERRIDE_LIST_ID) {
+      if (id === overrideListId(this.namespace)) {
         void this.applyOverrideList(state.val).catch((error) =>
           this.log.warn(`overrides: ${String(error)}`),
         );
@@ -2845,8 +2852,8 @@ class IHome extends utils.Adapter {
         void this.loadLogics();
       }
     });
-    await this.subscribeForeignStatesAsync([OVERRIDE_LIST_ID]);
-    const overrideState = await this.getForeignStateAsync(OVERRIDE_LIST_ID);
+    await this.subscribeForeignStatesAsync([overrideListId(this.namespace)]);
+    const overrideState = await this.getForeignStateAsync(overrideListId(this.namespace));
     try {
       await this.applyOverrideList(overrideState?.val);
     } catch (error) {

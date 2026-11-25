@@ -118,7 +118,7 @@
     "type": "visualization",
     "compact": false,
     "logTransporter": true,
-    "singleton": true,
+    "singleton": false,
     "noConfig": true,
     "localLinks": {
       "ihome": {

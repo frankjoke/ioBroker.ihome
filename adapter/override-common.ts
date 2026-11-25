@@ -2,7 +2,6 @@
 // `common.custom.ihome = { version: 1, overrides: [...] }`.
 // The adapter mirrors the SPA's override list here; the SPA reads it back.
 
-export const OVERRIDE_LIST_ID = "ihome.0.config.overrideList";
 export const OVERRIDE_CUSTOM_KEY = "ihome";
 export const OVERRIDE_CUSTOM_VERSION = 1;
 

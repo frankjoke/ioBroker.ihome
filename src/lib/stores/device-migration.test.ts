@@ -10,7 +10,6 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    OVERRIDE_LIST: "ihome.0.config.overrideList",
     PAGE_LIST: "ihome.0.config.pageList",
     TEMPLATE_LIST: "ihome.0.config.templateList",
     devices: [
@@ -146,7 +145,6 @@ vi.mock("$lib/stores/templates.svelte", () => ({
 }));
 
 vi.mock("$lib/stores/overrides.svelte", () => ({
-  OVERRIDE_LIST_ID: h.OVERRIDE_LIST,
   getOverrideRegistry: () => h.state.registry,
   isOverridesWritable: () => true,
   commitOverrides: async (next: any) => {
