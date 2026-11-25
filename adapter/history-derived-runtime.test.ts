@@ -26,9 +26,9 @@ it("computes a time-weighted mean with the previous value", () => {
     { ts: 1000, val: 10 },
     { ts: 2000, val: 20 },
   ];
-  expect(
-    timeWeightedMean(samples, 0, 3000, { ts: -1000, val: 0 }),
-  ).toBeCloseTo(10);
+  expect(timeWeightedMean(samples, 0, 3000, { ts: -1000, val: 0 })).toBeCloseTo(
+    10,
+  );
   expect(timeWeightedMean(samples, 0, 3000, null)).toBeCloseTo(15);
   expect(timeWeightedMean([], 0, 3000, { ts: 0, val: 7 })).toBe(7);
 });

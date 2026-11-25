@@ -13,6 +13,15 @@
   import HistoryChart from "./HistoryChart.svelte";
   import HistoryResample from "./HistoryResample.svelte";
   import HistoryTransfer from "./HistoryTransfer.svelte";
+  import CodeField from "$lib/components/logic/CodeField.svelte";
+  import { checkStatement } from "$logic/expr-code";
+  import { parseDuration } from "$adapter/logic/duration";
+  import {
+    getHistoryDerived,
+    isHistoryDerivedLoaded,
+    saveHistoryDerived,
+  } from "$lib/stores/history-derived.svelte";
+  import type { DerivedEntry } from "$adapter/history-derived-common";
   import { writeStateCustom } from "$lib/config/state-write";
   import { csvText } from "$lib/config/history-resample";
   import { jsonText, parseHistoryText } from "$lib/config/history-file";
@@ -66,8 +75,19 @@
     },
   ];
   const RAW_LIMIT = 100000;
+  const DEFAULT_INTERVAL = "15m";
+  const DEFAULT_START_DELAY = "0s";
+  const DEFAULT_RELOG = "1h";
+  const DEFAULT_FUNCTION =
+    'const values = samples\n  .filter((sample) => typeof sample.val === "number")\n  .map((sample) => sample.val);\nreturn values.length ? mean(values) : NOOP;';
+  type LoggingMode = "raw" | "derived" | "off";
 
-  let draftEnabled = $state<boolean | null>(null);
+  let draftMode = $state<LoggingMode>("raw");
+  let draftInterval = $state(DEFAULT_INTERVAL);
+  let draftStartDelay = $state(DEFAULT_START_DELAY);
+  let draftChangesOnly = $state(true);
+  let draftRelog = $state(DEFAULT_RELOG);
+  let draftFunction = $state(DEFAULT_FUNCTION);
   let draftAlias = $state<string | null>(null);
   let draftRetention = $state<string | null>(null);
   let draftRetentionDays = $state("");
@@ -137,6 +157,70 @@
     return typeof value === "string" ? value : "";
   }
 
+  function derivedEntryOf(key: string): DerivedEntry | undefined {
+    return getHistoryDerived().entries.find(
+      (entry) => entry.id === stateId && entry.adapter === key,
+    );
+  }
+
+  function loggingModeOf(key: string): LoggingMode {
+    if (derivedEntryOf(key)) return "derived";
+    return enabledOf(key) ? "raw" : "off";
+  }
+
+  const derivedAvailable = $derived(
+    openAdapter !== "" &&
+      object?.common?.type === "number" &&
+      hasHistoryFeature(featuresReply, "storeState") &&
+      (draftAlias ?? aliasOf(openAdapter)).trim() === "",
+  );
+
+  const derivedProblem = $derived.by(() => {
+    if (openAdapter === "" || draftMode !== "derived") return "";
+    if (object?.common?.type !== "number") {
+      return "Derived history is only available for number states.";
+    }
+    if (!hasHistoryFeature(featuresReply, "storeState")) {
+      return `${openAdapter} does not support storeState.`;
+    }
+    if ((draftAlias ?? aliasOf(openAdapter)).trim()) {
+      return "Clear the history alias before using derived history.";
+    }
+    const interval = parseDuration(draftInterval);
+    if (interval === null || interval <= 0) {
+      return "Interval must be a positive duration, e.g. 15m.";
+    }
+    const startDelay = parseDuration(draftStartDelay);
+    if (startDelay === null || startDelay < 0) {
+      return "Start delay must be a duration, e.g. 10s.";
+    }
+    const relog = parseDuration(draftRelog);
+    if (relog === null || relog < 0) {
+      return "Repeat interval must be a duration, e.g. 1h.";
+    }
+    const codeProblem = checkStatement(draftFunction);
+    if (codeProblem) return codeProblem;
+    if (!isHistoryDerivedLoaded()) {
+      return "The derived history document is still loading.";
+    }
+    return "";
+  });
+
+  const derivedDirty = $derived.by(() => {
+    if (openAdapter === "") return false;
+    if (draftMode !== loggingModeOf(openAdapter)) return true;
+    if (draftMode !== "derived") return false;
+    const entry = derivedEntryOf(openAdapter);
+    if (!entry) return true;
+    return (
+      draftInterval !== entry.interval ||
+      draftStartDelay !== entry.startDelay ||
+      draftChangesOnly !== entry.changesOnly ||
+      draftRelog !== entry.relogInterval ||
+      draftFunction !== entry.function.code
+    );
+  });
+
   function retentionPresetOf(key: string): string {
     const days = retentionDays(customValue(key));
     if (days === undefined) return "";
@@ -186,22 +270,30 @@
 
   const configDirty = $derived(
     openAdapter !== "" &&
-      ((draftEnabled !== null && draftEnabled !== enabledOf(openAdapter)) ||
-        (draftAlias !== null && draftAlias !== aliasOf(openAdapter)) ||
-        retentionDirty),
+      ((draftAlias !== null && draftAlias !== aliasOf(openAdapter)) ||
+        retentionDirty ||
+        derivedDirty),
   );
 
   async function saveConfig(): Promise<void> {
     const key = openAdapter;
     if (!key) return;
-    const enabled = draftEnabled ?? enabledOf(key);
+    const mode = draftMode;
     const alias = (draftAlias ?? aliasOf(key)).trim();
     const value = customValue(key);
     if (!value) return;
+    if (mode === "derived" && derivedProblem) {
+      error = derivedProblem;
+      return;
+    }
     saving = true;
     error = "";
     message = "";
-    const next: Record<string, unknown> = { ...value, enabled, aliasId: alias };
+    const next: Record<string, unknown> = {
+      ...value,
+      enabled: mode === "raw",
+      aliasId: alias,
+    };
     const retention = draftRetention ?? retentionPresetOf(key);
     if (retention === "") {
       delete next.retention;
@@ -219,9 +311,35 @@
       ...((object?.common?.custom ?? {}) as Record<string, unknown>),
       [key]: next,
     };
+    const entries = getHistoryDerived().entries.filter(
+      (entry) => !(entry.id === stateId && entry.adapter === key),
+    );
+    if (mode === "derived") {
+      entries.push({
+        id: stateId,
+        adapter: key,
+        interval: draftInterval.trim(),
+        startDelay: draftStartDelay.trim(),
+        changesOnly: draftChangesOnly,
+        relogInterval: draftRelog.trim(),
+        function: { code: draftFunction },
+      });
+    }
+    const hadDerived = !!derivedEntryOf(key);
     try {
+      // Removing first avoids the service writing while the item is switched
+      // off; adding writes the raw-off config first so the adapter never sees
+      // both raw and derived active.
+      if (mode !== "derived" && hadDerived) {
+        if (!(await saveHistoryDerived(entries))) {
+          throw new Error("Derived history config could not be removed.");
+        }
+      }
       await writeStateCustom(stateId, custom);
-      draftEnabled = enabled;
+      if (mode === "derived" && !(await saveHistoryDerived(entries))) {
+        throw new Error("Derived history config could not be saved.");
+      }
+      draftMode = mode;
       draftAlias = alias;
       const savedDays = retentionDays(next);
       draftRetention =
@@ -232,9 +350,12 @@
             : "custom";
       draftRetentionDays =
         savedDays === undefined ? "" : String(Math.round(savedDays));
-      message = alias
-        ? `${key}: history alias ${alias}.`
-        : `${key} ${enabled ? "enabled" : "disabled"}.`;
+      message =
+        mode === "derived"
+          ? `${key}: derived logging saved.`
+          : alias
+            ? `${key}: history alias ${alias}.`
+            : `${key} ${mode === "raw" ? "enabled" : "off"}.`;
       await chooseAdapter();
       await countRange();
     } catch (failure) {
@@ -256,7 +377,13 @@
 
   function toggle(key: string): void {
     openAdapter = openAdapter === key ? "" : key;
-    draftEnabled = openAdapter ? enabledOf(openAdapter) : null;
+    draftMode = openAdapter ? loggingModeOf(openAdapter) : "raw";
+    const entry = openAdapter ? derivedEntryOf(openAdapter) : undefined;
+    draftInterval = entry?.interval ?? DEFAULT_INTERVAL;
+    draftStartDelay = entry?.startDelay ?? DEFAULT_START_DELAY;
+    draftChangesOnly = entry?.changesOnly ?? true;
+    draftRelog = entry?.relogInterval ?? DEFAULT_RELOG;
+    draftFunction = entry?.function.code ?? DEFAULT_FUNCTION;
     draftAlias = openAdapter ? aliasOf(openAdapter) : null;
     draftRetention = openAdapter ? retentionPresetOf(openAdapter) : null;
     draftRetentionDays = openAdapter
@@ -603,7 +730,7 @@
   $effect(() => {
     if (openAdapter && !customKeys.includes(openAdapter)) {
       openAdapter = "";
-      draftEnabled = null;
+      draftMode = "raw";
     }
   });
 
@@ -625,8 +752,7 @@
     <div class="items">
       {#each customKeys as key (key)}
         {@const open = openAdapter === key}
-        {@const enabled =
-          open && draftEnabled !== null ? draftEnabled : enabledOf(key)}
+        {@const itemMode = loggingModeOf(key)}
         {@const retention = retentionDays(customValue(key))}
         <div class="item" class:open>
           <!-- The free line area is a mouse convenience; the name button is the keyboard control. -->
@@ -645,32 +771,25 @@
             {#if key === defaultAdapter}
               <span class="badge badge-secondary">default</span>
             {/if}
+            {#if itemMode === "derived"}
+              <span class="badge">derived</span>
+            {:else if itemMode === "off"}
+              <span class="badge badge-secondary">off</span>
+            {/if}
             {#if retention !== undefined && supportsStateRetention(key)}
               <span class="badge badge-secondary"
                 >{retentionLabel(retention)}</span
               >
             {/if}
             <span class="item-actions">
-              <label
-                class="enabled"
-                title={open
-                  ? "Toggles the enabled flag; Save applies it"
-                  : "Fold out to change"}
-              >
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  disabled={!open || saving}
-                  onchange={(event) =>
-                    (draftEnabled = event.currentTarget.checked)}
-                />
-                <span>Enabled</span>
-              </label>
               {#if open}
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  disabled={!configDirty || !retentionOk || saving}
+                  disabled={!configDirty ||
+                    !retentionOk ||
+                    (draftMode === "derived" && !!derivedProblem) ||
+                    saving}
                   onclick={() => void saveConfig()}
                   >{saving ? "Saving…" : "Save"}</button
                 >
@@ -749,6 +868,102 @@
                   {key} keeps history per instance or database, not per state. Use
                   separate adapter instances or databases for different retention
                   tiers; the retention fields here would be ignored.
+                </p>
+              {/if}
+              <div class="row wrap">
+                <label class="small">
+                  <span class="label-mono">Logging</span>
+                  <select bind:value={draftMode} disabled={saving}>
+                    <option value="raw">Raw (adapter logs)</option>
+                    <option value="derived" disabled={!derivedAvailable}
+                      >Derived (iHome computes)</option
+                    >
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+              </div>
+              {#if !derivedAvailable && draftMode !== "derived"}
+                <p class="hint text-muted">
+                  Derived history needs a number state, storeState from {key},
+                  and an empty alias.
+                </p>
+              {/if}
+              {#if draftMode === "derived"}
+                <div class="row wrap">
+                  <label class="small">
+                    <span class="label-mono">Interval</span>
+                    <input
+                      type="text"
+                      list="derived-intervals"
+                      bind:value={draftInterval}
+                      disabled={saving}
+                      placeholder="15m"
+                    />
+                    <datalist id="derived-intervals">
+                      <option value="5m"></option>
+                      <option value="15m"></option>
+                      <option value="30m"></option>
+                      <option value="1h"></option>
+                    </datalist>
+                  </label>
+                  <label class="small">
+                    <span class="label-mono">Start delay</span>
+                    <input
+                      type="text"
+                      list="derived-start-delays"
+                      bind:value={draftStartDelay}
+                      disabled={saving}
+                      placeholder="0s"
+                    />
+                    <datalist id="derived-start-delays">
+                      <option value="0s"></option>
+                      <option value="5s"></option>
+                      <option value="10s"></option>
+                      <option value="30s"></option>
+                      <option value="1m"></option>
+                    </datalist>
+                  </label>
+                  <label class="check">
+                    <input
+                      type="checkbox"
+                      bind:checked={draftChangesOnly}
+                      disabled={saving}
+                    />
+                    <span>Skip unchanged</span>
+                  </label>
+                  <label class="small">
+                    <span class="label-mono">Repeat at least every</span>
+                    <input
+                      type="text"
+                      list="derived-relogs"
+                      bind:value={draftRelog}
+                      disabled={saving || !draftChangesOnly}
+                      placeholder="1h"
+                    />
+                    <datalist id="derived-relogs">
+                      <option value="0s"></option>
+                      <option value="15m"></option>
+                      <option value="1h"></option>
+                      <option value="6h"></option>
+                      <option value="24h"></option>
+                    </datalist>
+                  </label>
+                </div>
+                <CodeField
+                  mode="statements"
+                  label="Derived function"
+                  code={draftFunction}
+                  onchange={(code) => (draftFunction = code)}
+                  minRows={4}
+                  hint="samples, previous, from, to · mean, timeWeightedMean, median, sum, min, max · return NOOP to skip"
+                />
+                {#if derivedProblem}
+                  <p class="hint text-danger">{derivedProblem}</p>
+                {/if}
+                <p class="hint text-muted">
+                  The function runs once per interval and writes one point at
+                  the scheduled interval end. Raw logging stays off; derived
+                  points exist only while iHome is running.
                 </p>
               {/if}
               {#if !featuresReply}
@@ -1000,12 +1215,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-  }
-
-  .enabled {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
   }
 
   .range {

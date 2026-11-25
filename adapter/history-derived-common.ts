@@ -82,7 +82,9 @@ export function parseDerivedDocument(value: unknown): DerivedDocument | null {
       startDelay: String(entry.startDelay).trim(),
       changesOnly: entry.changesOnly === true,
       relogInterval: String(entry.relogInterval).trim(),
-      function: { code: String((entry.function as Record<string, unknown>).code) },
+      function: {
+        code: String((entry.function as Record<string, unknown>).code),
+      },
     });
   }
   return { version: 1, entries };

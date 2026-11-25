@@ -135,9 +135,7 @@ export function compileDerivedFunction(
     const result = script.runInContext(vm, { timeout: 100 });
     if (result === NOOP) return NOOP;
     if (!numeric(result)) {
-      throw new Error(
-        "derived function must return a finite number or NOOP",
-      );
+      throw new Error("derived function must return a finite number or NOOP");
     }
     return result;
   };

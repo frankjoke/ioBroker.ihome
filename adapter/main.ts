@@ -18,7 +18,10 @@ import {
   derivedEntryProblemForObject,
   parseDerivedDocument,
 } from "./history-derived-common";
-import { DerivedHistoryService, type RuntimeDerivedEntry } from "./history-derived";
+import {
+  DerivedHistoryService,
+  type RuntimeDerivedEntry,
+} from "./history-derived";
 import {
   compileDerivedFunction,
   type DerivedSample,
@@ -840,9 +843,7 @@ class IHome extends utils.Adapter {
   }
 
   /** Subscribe to the union of logic and derived sources, never less. */
-  private async syncWatchedSubscriptions(
-    logicIds: string[],
-  ): Promise<boolean> {
+  private async syncWatchedSubscriptions(logicIds: string[]): Promise<boolean> {
     const next = [...new Set([...logicIds, ...this.derivedIds])];
     const diff = subscriptionDiff(this.watchedIds, next, this.namespace);
     try {
@@ -867,9 +868,12 @@ class IHome extends utils.Adapter {
   }
 
   /** Read a source state, own or foreign, without failing the whole load. */
-  private async readDerivedState(
-    id: string,
-  ): Promise<{ val?: unknown; ts?: number; ack?: boolean; from?: string } | null> {
+  private async readDerivedState(id: string): Promise<{
+    val?: unknown;
+    ts?: number;
+    ack?: boolean;
+    from?: string;
+  } | null> {
     try {
       const state = id.startsWith(`${this.namespace}.`)
         ? await this.getStateAsync(id)

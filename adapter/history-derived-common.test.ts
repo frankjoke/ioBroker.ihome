@@ -77,7 +77,9 @@ it("selects only a number state with raw off and no alias", () => {
   ).toContain("number");
   expect(
     derivedEntryProblemForObject(
-      { common: { type: "number", custom: { "history.0": { enabled: true } } } },
+      {
+        common: { type: "number", custom: { "history.0": { enabled: true } } },
+      },
       "history.0",
     ),
   ).toContain("enabled");

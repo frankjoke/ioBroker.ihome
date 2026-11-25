@@ -62,9 +62,10 @@ function sampleOf(state: {
   lc?: number;
 }): DerivedSample {
   return {
-    ts: typeof state.ts === "number" && Number.isFinite(state.ts)
-      ? state.ts
-      : Date.now(),
+    ts:
+      typeof state.ts === "number" && Number.isFinite(state.ts)
+        ? state.ts
+        : Date.now(),
     val: state.val,
     ack: state.ack,
     from: state.from,
@@ -123,7 +124,9 @@ export class DerivedHistoryService {
   }
 
   sourceIds(): string[] {
-    return [...new Set([...this.entries.values()].map((state) => state.entry.id))];
+    return [
+      ...new Set([...this.entries.values()].map((state) => state.entry.id)),
+    ];
   }
 
   /** Feed one broker change. It is sampled only for matching entries. */
@@ -170,9 +173,7 @@ export class DerivedHistoryService {
     );
     state.samples = state.samples.filter((sample) => sample.ts >= to);
     const previous = state.previous;
-    const lastBefore = samples.length
-      ? samples[samples.length - 1]
-      : previous;
+    const lastBefore = samples.length ? samples[samples.length - 1] : previous;
     state.previous = lastBefore;
 
     let value: unknown = NOOP;
@@ -233,19 +234,15 @@ export class DerivedHistoryService {
     if (state.stopped || !state.queue.length) return;
     const points = state.queue;
     try {
-      const reply = await this.deps.sendTo(
-        state.entry.adapter,
-        "storeState",
-        {
-          id: state.entry.id,
-          state: points.map((point) => ({
-            ts: point.ts,
-            val: point.val,
-            ack: true,
-            from: this.deps.namespace,
-          })),
-        },
-      );
+      const reply = await this.deps.sendTo(state.entry.adapter, "storeState", {
+        id: state.entry.id,
+        state: points.map((point) => ({
+          ts: point.ts,
+          val: point.val,
+          ack: true,
+          from: this.deps.namespace,
+        })),
+      });
       const problem = replyProblem(reply);
       if (problem) throw new Error(problem);
       const last = points[points.length - 1];

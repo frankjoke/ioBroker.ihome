@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { DerivedHistoryService, type RuntimeDerivedEntry } from "./history-derived";
-import { compileDerivedFunction, type DerivedContext } from "./history-derived-runtime";
+import {
+  DerivedHistoryService,
+  type RuntimeDerivedEntry,
+} from "./history-derived";
+import { compileDerivedFunction } from "./history-derived-runtime";
 
 const mean = compileDerivedFunction(
   "const v = samples.filter(s => typeof s.val === 'number'); return v.length ? mean(v.map(s => s.val)) : NOOP;",
@@ -19,7 +22,10 @@ function entry(over: Partial<RuntimeDerivedEntry> = {}): RuntimeDerivedEntry {
   };
 }
 
-function service(t: RuntimeDerivedEntry[], sendTo = vi.fn(async () => ({ success: true }))) {
+function service(
+  t: RuntimeDerivedEntry[],
+  sendTo = vi.fn(async () => ({ success: true })),
+) {
   const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
   return {
     sendTo,
@@ -72,15 +78,13 @@ it("splits windows and carries the previous value", async () => {
 });
 
 it("skips equal values and writes again at the relog boundary", async () => {
-  let seq = 0;
-  const run = () => {
-    seq += 1;
-    return 5;
-  };
+  const run = () => 5;
   const h = service([
     entry({ intervalMs: 10_000, startDelayMs: 0, relogMs: 30_000, run }),
   ]);
-  h.svc.load([entry({ intervalMs: 10_000, startDelayMs: 0, relogMs: 30_000, run })]);
+  h.svc.load([
+    entry({ intervalMs: 10_000, startDelayMs: 0, relogMs: 30_000, run }),
+  ]);
   await vi.advanceTimersByTimeAsync(10_000);
   await vi.advanceTimersByTimeAsync(10_000);
   await vi.advanceTimersByTimeAsync(10_000);
@@ -128,10 +132,7 @@ it("retries a failed write with the next window and keeps the queue bounded", as
 it("stops its timers and reports source ids", async () => {
   const h = service([entry(), entry({ id: "0_userdata.0.U" })]);
   h.svc.load([entry(), entry({ id: "0_userdata.0.U", startDelayMs: 2_000 })]);
-  expect(h.svc.sourceIds()).toEqual([
-    "0_userdata.0.T",
-    "0_userdata.0.U",
-  ]);
+  expect(h.svc.sourceIds()).toEqual(["0_userdata.0.T", "0_userdata.0.U"]);
   h.svc.stop();
   expect(vi.getTimerCount()).toBe(0);
 });
