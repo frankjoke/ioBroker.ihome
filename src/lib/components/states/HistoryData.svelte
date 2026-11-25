@@ -168,11 +168,15 @@
     return enabledOf(key) ? "raw" : "off";
   }
 
+  const currentAlias = $derived(
+    (draftAlias ?? (openAdapter ? aliasOf(openAdapter) : "")).trim(),
+  );
+
   const derivedAvailable = $derived(
     openAdapter !== "" &&
       (object?.common?.type === "number" || object?.common?.type === "mixed") &&
       hasHistoryFeature(featuresReply, "storeState") &&
-      (draftAlias ?? aliasOf(openAdapter)).trim() === "",
+      currentAlias === "",
   );
 
   const derivedProblem = $derived.by(() => {
@@ -183,8 +187,8 @@
     if (!hasHistoryFeature(featuresReply, "storeState")) {
       return `${openAdapter} does not support storeState.`;
     }
-    if ((draftAlias ?? aliasOf(openAdapter)).trim()) {
-      return "Clear the history alias before using derived history.";
+    if (currentAlias) {
+      return `Clear the History alias ${currentAlias} before using derived history.`;
     }
     const interval = parseDuration(draftInterval);
     if (interval === null || interval <= 0) {
@@ -885,8 +889,13 @@
               </div>
               {#if !derivedAvailable && draftMode !== "derived"}
                 <p class="hint text-muted">
-                  Derived history needs a number or mixed state, storeState from
-                  {key}, and an empty alias.
+                  {#if currentAlias}
+                    Derived history needs an empty History alias. Set “No alias
+                    (own id)” above to replace {currentAlias}.
+                  {:else}
+                    Derived history needs a number or mixed state, storeState
+                    from {key}, and an empty alias.
+                  {/if}
                 </p>
               {/if}
               {#if draftMode === "derived"}
@@ -894,6 +903,7 @@
                   <label class="small">
                     <span class="label-mono">Interval</span>
                     <input
+                      class="duration"
                       type="text"
                       list="derived-intervals"
                       bind:value={draftInterval}
@@ -901,15 +911,16 @@
                       placeholder="15m"
                     />
                     <datalist id="derived-intervals">
-                      <option value="5m"></option>
-                      <option value="15m"></option>
-                      <option value="30m"></option>
-                      <option value="1h"></option>
+                      <option value="5m">5m</option>
+                      <option value="15m">15m</option>
+                      <option value="30m">30m</option>
+                      <option value="1h">1h</option>
                     </datalist>
                   </label>
                   <label class="small">
                     <span class="label-mono">Start delay</span>
                     <input
+                      class="duration"
                       type="text"
                       list="derived-start-delays"
                       bind:value={draftStartDelay}
@@ -917,11 +928,11 @@
                       placeholder="0s"
                     />
                     <datalist id="derived-start-delays">
-                      <option value="0s"></option>
-                      <option value="5s"></option>
-                      <option value="10s"></option>
-                      <option value="30s"></option>
-                      <option value="1m"></option>
+                      <option value="0s">0s</option>
+                      <option value="5s">5s</option>
+                      <option value="10s">10s</option>
+                      <option value="30s">30s</option>
+                      <option value="1m">1m</option>
                     </datalist>
                   </label>
                   <label class="check">
@@ -933,8 +944,9 @@
                     <span>Skip unchanged</span>
                   </label>
                   <label class="small">
-                    <span class="label-mono">Repeat at least every</span>
+                    <span class="label-mono">Write at least every</span>
                     <input
+                      class="duration"
                       type="text"
                       list="derived-relogs"
                       bind:value={draftRelog}
@@ -942,11 +954,11 @@
                       placeholder="1h"
                     />
                     <datalist id="derived-relogs">
-                      <option value="0s"></option>
-                      <option value="15m"></option>
-                      <option value="1h"></option>
-                      <option value="6h"></option>
-                      <option value="24h"></option>
+                      <option value="0s">0s</option>
+                      <option value="15m">15m</option>
+                      <option value="1h">1h</option>
+                      <option value="6h">6h</option>
+                      <option value="24h">24h</option>
                     </datalist>
                   </label>
                 </div>
@@ -1284,5 +1296,9 @@
 
   .small input {
     min-width: 0;
+  }
+
+  .small input.duration {
+    width: 7rem;
   }
 </style>
