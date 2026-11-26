@@ -186,6 +186,35 @@
     storage.namespace = namespace;
   }
 
+  // Keep the profile in the address bar. Internal links are plain `#/…`
+  // hrefs and drop the query; without this, a refresh falls back to the
+  // stored namespace (and a fresh browser to ihome.0). The default instance
+  // stays clean unless the URL asked for it explicitly.
+  function pinNamespaceInUrl() {
+    const url = new URL(location.href);
+    if (url.searchParams.get("namespace") === namespace) return;
+    if (namespace === DEFAULT_NAMESPACE && !queryNamespace) return;
+    url.searchParams.set("namespace", namespace);
+    history.replaceState(history.state, "", url);
+  }
+
+  afterNavigate(() => pinNamespaceInUrl());
+
+  $effect(() => {
+    page.url.href;
+    pinNamespaceInUrl();
+  });
+
+  onMount(() => {
+    const pin = () => pinNamespaceInUrl();
+    window.addEventListener("hashchange", pin);
+    window.addEventListener("popstate", pin);
+    return () => {
+      window.removeEventListener("hashchange", pin);
+      window.removeEventListener("popstate", pin);
+    };
+  });
+
   // Where the app talks to ioBroker is not decided here: the connect resolves
   // it (transport.ts) — an explicit address, the stored host:port, the web
   // adapter's own socket when one serves this page, or the admin port. The
