@@ -90,7 +90,6 @@
     id: string;
     action: "history" | "override" | "delete";
   } | null>(null);
-  const iconRequests = new SvelteSet<string>();
 
   const entries = $derived(
     stateEntries(
@@ -257,35 +256,61 @@
     history.replaceState(history.state, "", `#/states?tab=${tab}`);
   });
 
-  // The object cache starts with states; fetch the meta/device/folder ancestors
-  // and the adapter instance when a row needs an icon.
-  $effect(() => {
-    const ids = new SvelteSet<string>();
-    for (const entry of shown) {
-      let cur = entry.id;
-      while (cur) {
-        ids.add(cur);
-        const cut = cur.lastIndexOf(".");
-        if (cut < 0) break;
-        cur = cur.slice(0, cut);
+  // The object cache starts with states; fetch a row's meta/device/folder
+  // ancestors and adapter instance only when the row is actually in view.
+  // Walking every state up front floods the socket on a full broker.
+  const iconRequests = new SvelteSet<string>();
+  const iconQueue: string[] = [];
+  let pumpingIcons = false;
+  let iconObserver: IntersectionObserver | null = null;
+  let rowsObserver: MutationObserver | null = null;
+
+  function watchRowIcons(root: HTMLElement): void {
+    root
+      .querySelectorAll<HTMLElement>(".state-row[data-state-id]")
+      .forEach((row) => iconObserver?.observe(row));
+  }
+
+  function queueRowAncestors(stateId: string): void {
+    const ids: string[] = [];
+    let cur = stateId;
+    while (cur) {
+      ids.push(cur);
+      const cut = cur.lastIndexOf(".");
+      if (cut < 0) break;
+      cur = cur.slice(0, cut);
+    }
+    const { adapter, instance: ownerInstance } = ownerOf(stateId);
+    if (adapter) {
+      if (ownerInstance) {
+        ids.push(`system.adapter.${adapter}.${ownerInstance}`);
       }
-      const { adapter, instance: ownerInstance } = ownerOf(entry.id);
-      if (adapter) {
-        if (ownerInstance) {
-          ids.add(`system.adapter.${adapter}.${ownerInstance}`);
-        }
-        ids.add(`system.adapter.${adapter}`);
-      }
+      ids.push(`system.adapter.${adapter}`);
     }
     for (const id of ids) {
       if (ioBroker.objects.has(id) || iconRequests.has(id)) continue;
       iconRequests.add(id);
-      void ioBroker
-        .getObject(id, true)
-        .catch(() => undefined)
-        .finally(() => iconRequests.delete(id));
+      iconQueue.push(id);
     }
-  });
+    void pumpRowIcons();
+  }
+
+  async function pumpRowIcons(): Promise<void> {
+    if (pumpingIcons) return;
+    pumpingIcons = true;
+    try {
+      while (iconQueue.length) {
+        const batch = iconQueue.splice(0, 8);
+        await Promise.allSettled(
+          batch.map((id) =>
+            ioBroker.getObject(id, true).catch(() => undefined),
+          ),
+        );
+      }
+    } finally {
+      pumpingIcons = false;
+    }
+  }
 
   $effect(() => {
     patchView("/states", {
@@ -303,6 +328,29 @@
 
   onMount(() => {
     void initOverrides().catch(() => undefined);
+    iconObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = (entry.target as HTMLElement).dataset.stateId;
+          if (id) queueRowAncestors(id);
+        }
+      },
+      { rootMargin: "200px 0px" },
+    );
+    const rows = document.querySelector<HTMLElement>(".state-list .rows");
+    if (rows) {
+      watchRowIcons(rows);
+      rowsObserver = new MutationObserver(() => {
+        iconObserver?.disconnect();
+        watchRowIcons(rows);
+      });
+      rowsObserver.observe(rows, { childList: true });
+    }
+    return () => {
+      iconObserver?.disconnect();
+      rowsObserver?.disconnect();
+    };
   });
 </script>
 

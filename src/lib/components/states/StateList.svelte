@@ -147,6 +147,7 @@
         type="button"
         class="state-row"
         class:active={entry.id === selectedId}
+        data-state-id={entry.id}
         style={`--state-depth:${depth};--state-icon-space:${
           entry.icon ? "1.05rem" : "0rem"
         }`}
