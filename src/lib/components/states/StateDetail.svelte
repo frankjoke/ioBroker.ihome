@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import IconButton from "$lib/components/common/IconButton.svelte";
+  import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import SourceOverrideModal from "$lib/components/overrides/SourceOverrideModal.svelte";
   import HistoryData from "./HistoryData.svelte";
   import StateGeneral from "./StateGeneral.svelte";
@@ -28,10 +30,12 @@
     id,
     object,
     variables,
+    ondelete,
   }: {
     id: string;
     object: any;
     variables: GlobalVariable[];
+    ondelete?: (id: string) => void;
   } = $props();
 
   type Tab = "state" | "override" | "history";
@@ -42,6 +46,8 @@
   let overrideAutoTried = false;
   let historyAutoTried = false;
   let message = $state("");
+  let deleting = $state(false);
+  let deleteBusy = $state(false);
 
   const overrides = $derived(
     overridesForState(getOverrideRegistry(), id, variables),
@@ -208,6 +214,28 @@
     message = "Override saved.";
   }
 
+  /** Remove the broker object and its value; history and iHome references stay. */
+  async function deleteState(): Promise<void> {
+    if (deleteBusy) return;
+    deleteBusy = true;
+    message = "";
+    try {
+      await ioBroker.emitAsync("delObject", id);
+      await ioBroker.emitAsync("delState", id).catch(() => undefined);
+      ioBroker.objects.delete(id);
+      ioBroker.states.delete(id);
+      deleting = false;
+      ondelete?.(id);
+    } catch (error) {
+      deleting = false;
+      message = `Delete failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    } finally {
+      deleteBusy = false;
+    }
+  }
+
   async function deleteOverride(idToRemove: string): Promise<void> {
     const registry = getOverrideRegistry();
     const result = await commitOverrides(
@@ -254,6 +282,12 @@
           onclick={() => void addHistory()}>+ History</button
         >
       {/if}
+      <IconButton
+        icon="delete"
+        danger
+        label={`Delete state ${id}`}
+        onclick={() => (deleting = true)}
+      />
     {/snippet}
     {#snippet children(active)}
       {#if active === "state"}
@@ -361,6 +395,27 @@
       {/if}
     {/snippet}
   </OptionTabs>
+
+  {#if deleting}
+    <ConfirmModal
+      title={`Delete ${localizeName(common.name) || id}?`}
+      confirmLabel={deleteBusy ? "Deleting…" : "Delete"}
+      onConfirm={() => void deleteState()}
+      onCancel={() => (deleting = false)}
+    >
+      <p>This removes the ioBroker state object and its current value.</p>
+      {#if object?.native?.ihomeCollection?.plugin}
+        <p class="hint text-danger">
+          This state is managed by plugin {object.native.ihomeCollection
+            .plugin}; a plugin update may recreate it.
+        </p>
+      {/if}
+      <p class="hint text-muted">
+        Stored history, iHome overrides and variables that reference this state
+        are not removed.
+      </p>
+    </ConfirmModal>
+  {/if}
 
   {#if message}<p class="hint text-muted">{message}</p>{/if}
 </div>

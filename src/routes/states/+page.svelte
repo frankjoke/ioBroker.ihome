@@ -153,6 +153,12 @@
     select(id);
   }
 
+  function deletedState(id: string): void {
+    const next = shown.find((entry) => entry.id !== id);
+    selectedId = next?.id ?? "";
+    patchView("/states", { openId: next?.id ?? null });
+  }
+
   function setInstance(value: string): void {
     instance = value;
     const next = entries.filter((entry) =>
@@ -305,7 +311,12 @@
 
       <section class="detail card">
         {#if selected}
-          <StateDetail id={selectedId} object={selected} {variables} />
+          <StateDetail
+            id={selectedId}
+            object={selected}
+            {variables}
+            ondelete={deletedState}
+          />
         {:else}
           <p class="hint text-muted">Select a state on the left.</p>
         {/if}

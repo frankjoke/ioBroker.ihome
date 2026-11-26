@@ -365,30 +365,31 @@
     </label>
   </div>
 
-  <div class="actions">
-    <button
-      type="button"
-      class="btn btn-sm"
-      disabled={!dirty || busy}
-      onclick={reset}>Reset</button
-    >
-    <button
-      type="button"
-      class="btn btn-primary btn-sm"
-      disabled={!dirty || busy}
-      onclick={() => void save()}>{busy ? "Saving…" : "Save"}</button
-    >
-  </div>
-
   {#if error}<p class="hint text-danger">{error}</p>{/if}
 
-  <dl class="summary">
-    <dt>Value</dt>
-    <dd class="mono">
-      {formatValue(live?.val, common.unit, common.role)}
-      {#if live?.from}<span class="text-muted"> · {live.from}</span>{/if}
-    </dd>
-  </dl>
+  <div class="footer">
+    <dl class="summary">
+      <dt>Value</dt>
+      <dd class="mono">
+        {formatValue(live?.val, common.unit, common.role)}
+        {#if live?.from}<span class="text-muted"> · {live.from}</span>{/if}
+      </dd>
+    </dl>
+    <div class="actions">
+      <button
+        type="button"
+        class="btn btn-sm"
+        disabled={!dirty || busy}
+        onclick={reset}>Reset</button
+      >
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        disabled={!dirty || busy}
+        onclick={() => void save()}>{busy ? "Saving…" : "Save"}</button
+      >
+    </div>
+  </div>
 </div>
 
 <style>
@@ -442,17 +443,27 @@
     gap: 0.3rem;
   }
 
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
   .actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.4rem;
+    margin-left: auto;
   }
 
   .summary {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 0.3rem 0.8rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
     margin: 0;
+    flex: 1 1 16rem;
+    min-width: 0;
   }
 
   .summary dt {
