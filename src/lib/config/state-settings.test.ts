@@ -10,6 +10,7 @@ import {
   instanceOf,
   isHistoryAdapter,
   isHistoryCustom,
+  isIhomeConfigState,
   isSystemInstance,
   keptInstance,
   defaultHistoryAdapter,
@@ -128,6 +129,14 @@ describe("instances and restore", () => {
     expect(keptInstance("ihome.0", [])).toBe("ihome.0");
     expect(keptInstance("ihome.0", ["ihome.0", "sql.0"])).toBe("ihome.0");
     expect(keptInstance("gone.0", ["ihome.0", "sql.0"])).toBe("");
+  });
+
+  it("recognises iHome config documents as internal", () => {
+    expect(isIhomeConfigState("ihome.0.config.logicList")).toBe(true);
+    expect(isIhomeConfigState("ihome.12.config.settings")).toBe(true);
+    expect(isIhomeConfigState("ihome.0.Logic.Test")).toBe(false);
+    expect(isIhomeConfigState("0_userdata.0.config.x")).toBe(false);
+    expect(isIhomeConfigState("ihome.0.configuration.x")).toBe(false);
   });
 
   it("keeps ioBroker controller instances out of the state list", () => {

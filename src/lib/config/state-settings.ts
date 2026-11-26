@@ -23,6 +23,11 @@ export function isSystemInstance(instance: string): boolean {
   return String(instance ?? "").startsWith("system.");
 }
 
+/** iHome's own config documents are internal, not user-editable state. */
+export function isIhomeConfigState(id: string): boolean {
+  return /^ihome\.\d+\.config\./.test(String(id ?? ""));
+}
+
 export interface StateFilters {
   instance?: string;
   role?: string;

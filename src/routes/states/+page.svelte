@@ -16,6 +16,7 @@
   import StateCreateModal from "$lib/components/states/StateCreateModal.svelte";
   import VariablesPanel from "$lib/components/variables/VariablesPanel.svelte";
   import {
+    isIhomeConfigState,
     isSystemInstance,
     keptInstance,
     restoreSelection,
@@ -76,7 +77,10 @@
       getOverrideRegistry().overrides,
       variables,
       ioBroker.enums,
-    ).filter((entry) => !isSystemInstance(entry.instance)),
+    ).filter(
+      (entry) =>
+        !isSystemInstance(entry.instance) && !isIhomeConfigState(entry.id),
+    ),
   );
   const instances = $derived(
     [...new Set(entries.map((entry) => entry.instance))].sort((left, right) =>
