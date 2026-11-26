@@ -90,6 +90,7 @@
   let draftChangesOnly = $state(true);
   let draftRelog = $state(DEFAULT_RELOG);
   let draftFunction = $state(DEFAULT_DERIVED_FUNCTION);
+  let seededDocument = $state(false);
   let draftAlias = $state<string | null>(null);
   let draftRetention = $state<string | null>(null);
   let draftRetentionDays = $state("");
@@ -168,6 +169,14 @@
   function loggingModeOf(key: string): LoggingMode {
     if (derivedEntryOf(key)) return "derived";
     return enabledOf(key) ? "raw" : "off";
+  }
+
+  function seedDerivedDrafts(entry: DerivedEntry | undefined): void {
+    draftInterval = entry?.interval ?? DEFAULT_INTERVAL;
+    draftStartDelay = entry?.startDelay ?? DEFAULT_START_DELAY;
+    draftChangesOnly = entry?.changesOnly ?? true;
+    draftRelog = entry?.relogInterval ?? DEFAULT_RELOG;
+    draftFunction = entry?.function.code ?? DEFAULT_DERIVED_FUNCTION;
   }
 
   const currentAlias = $derived(
@@ -357,7 +366,7 @@
             : "custom";
       draftRetentionDays =
         savedDays === undefined ? "" : String(Math.round(savedDays));
-      message =
+      const savedMessage =
         mode === "derived"
           ? `${key}: derived logging saved.`
           : alias
@@ -365,6 +374,7 @@
             : `${key} ${mode === "raw" ? "enabled" : "off"}.`;
       await chooseAdapter();
       await countRange();
+      message = savedMessage;
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     } finally {
@@ -386,11 +396,8 @@
     openAdapter = openAdapter === key ? "" : key;
     draftMode = openAdapter ? loggingModeOf(openAdapter) : "raw";
     const entry = openAdapter ? derivedEntryOf(openAdapter) : undefined;
-    draftInterval = entry?.interval ?? DEFAULT_INTERVAL;
-    draftStartDelay = entry?.startDelay ?? DEFAULT_START_DELAY;
-    draftChangesOnly = entry?.changesOnly ?? true;
-    draftRelog = entry?.relogInterval ?? DEFAULT_RELOG;
-    draftFunction = entry?.function.code ?? DEFAULT_DERIVED_FUNCTION;
+    seedDerivedDrafts(entry);
+    seededDocument = !openAdapter || isHistoryDerivedLoaded();
     draftAlias = openAdapter ? aliasOf(openAdapter) : null;
     draftRetention = openAdapter ? retentionPresetOf(openAdapter) : null;
     draftRetentionDays = openAdapter
@@ -403,6 +410,18 @@
     rows = [];
     resetRange();
   }
+
+  // The document may arrive after the item was opened; seed then, so saving
+  // does not replace a stored entry with the defaults.
+  $effect(() => {
+    if (seededDocument || !openAdapter || !isHistoryDerivedLoaded()) return;
+    seededDocument = true;
+    if (draftMode === "derived") return;
+    const entry = derivedEntryOf(openAdapter);
+    if (!entry) return;
+    draftMode = "derived";
+    seedDerivedDrafts(entry);
+  });
 
   function onHistoryLineClick(event: MouseEvent, key: string): void {
     const target = event.target as HTMLElement;
@@ -780,6 +799,13 @@
             {/if}
             {#if itemMode === "derived"}
               <span class="badge">derived</span>
+              {#if enabledOf(key) || aliasOf(key).trim()}
+                <span
+                  class="badge badge-warning"
+                  title="The adapter ignores derived while raw logging or an alias is set."
+                  >inactive</span
+                >
+              {/if}
             {:else if itemMode === "off"}
               <span class="badge badge-secondary">off</span>
             {/if}
@@ -964,6 +990,11 @@
                     </datalist>
                   </label>
                 </div>
+                <p class="hint text-muted">
+                  Start delay staggers entries that would otherwise write at the
+                  same moment. Changing the interval or delay restarts this
+                  entry's window; a function-only edit keeps it.
+                </p>
                 <CodeField
                   mode="statements"
                   label="Derived function"

@@ -12,9 +12,7 @@ export const historyListId = () => configId("historyList", ioBroker.namespace);
 
 let document = $state<DerivedDocument>({ version: 1, entries: [] });
 let loaded = $state(false);
-let saveFailed = $state(false);
 let initPromise: Promise<void> | null = null;
-let lastSent: string | null = null;
 
 export function getHistoryDerived(): DerivedDocument {
   return document;
@@ -22,10 +20,6 @@ export function getHistoryDerived(): DerivedDocument {
 
 export function isHistoryDerivedLoaded(): boolean {
   return loaded;
-}
-
-export function historyDerivedSaveFailed(): boolean {
-  return saveFailed;
 }
 
 async function ensureHistoryObject(): Promise<void> {
@@ -63,16 +57,12 @@ export function initHistoryDerived(): Promise<void> {
       const state = await ioBroker.getState(historyListId(), true);
       const raw = state?.val;
       if (raw == null || String(raw).trim() === "") {
-        const empty: DerivedDocument = { version: 1, entries: [] };
-        document = empty;
-        lastSent = JSON.stringify(empty);
+        document = { version: 1, entries: [] };
         loaded = true;
-        saveFailed = false;
         return;
       }
       const parsed = parseDerivedDocument(raw);
       if (!parsed) {
-        saveFailed = true;
         loaded = false;
         console.error(
           "historyList is unreadable; derived history is read-only",
@@ -81,9 +71,7 @@ export function initHistoryDerived(): Promise<void> {
         return;
       }
       document = parsed;
-      lastSent = JSON.stringify(parsed);
       loaded = true;
-      saveFailed = false;
     })().catch((error) => {
       console.error("initHistoryDerived:", error);
       initPromise = null;
@@ -97,25 +85,16 @@ export async function saveHistoryDerived(
   entries: DerivedEntry[],
 ): Promise<boolean> {
   if (!loaded || entries.some((entry) => derivedEntryProblem(entry))) {
-    saveFailed = true;
     return false;
   }
   const next: DerivedDocument = { version: 1, entries };
   const text = JSON.stringify(next);
-  lastSent = text;
-  document = next;
   try {
     await ioBroker.setState(historyListId(), text);
-    saveFailed = false;
+    document = next;
     return true;
   } catch (error) {
-    saveFailed = true;
     console.error("save derived history:", error);
     return false;
   }
-}
-
-/** True when the last write was our own echo (used by a future live reload). */
-export function isHistoryDerivedEcho(value: unknown): boolean {
-  return typeof value === "string" && value === lastSent;
 }
