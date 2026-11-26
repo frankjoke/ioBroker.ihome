@@ -47,10 +47,10 @@
     removeSlot,
     setLook,
     setSlotDetail,
-    setSlotSource,
     setSlotTile,
     slotTileMode,
   } from "$lib/config/tile-ops";
+  import { setMainSlotSource } from "$lib/config/tile-main";
   import {
     chartLayout,
     tileHeadlineSlot,
@@ -2976,7 +2976,7 @@
         const slotIndex = sourcePickerFor;
         sourcePickerFor = null;
         if (slotIndex === null) return;
-        edit((t) => setSlotSource(t, slotIndex, source));
+        edit((t) => setMainSlotSource(t, slotIndex, source));
       }}
       onClose={() => (sourcePickerFor = null)}
     />
