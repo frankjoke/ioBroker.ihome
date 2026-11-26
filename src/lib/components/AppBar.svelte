@@ -513,6 +513,9 @@
     {/if}
 
     {#if !isDisplay}
+      <span class="instance-chip" title={`Connected to ${ioBroker.namespace}`}
+        >{ioBroker.namespace}</span
+      >
       <a
         class="icon-btn"
         href={`${base}/#/`}
@@ -854,6 +857,15 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    white-space: nowrap;
+  }
+
+  .instance-chip {
+    font-family: var(--font-family);
+    font-size: var(--label-mono-size);
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 0 0.2rem;
     white-space: nowrap;
   }
 
