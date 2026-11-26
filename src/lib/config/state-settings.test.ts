@@ -55,6 +55,20 @@ describe("stateEntries", () => {
     });
   });
 
+  it("sorts rows by id, not by the repeated display name", () => {
+    const objects = new Map<string, any>([
+      [
+        "ihome.0.network.WZ_TV.host",
+        { type: "state", common: { name: "Host" } },
+      ],
+      ["ihome.0.network.PC.host", { type: "state", common: { name: "Host" } }],
+    ]);
+    expect(stateEntries(objects, [], []).map((entry) => entry.id)).toEqual([
+      "ihome.0.network.PC.host",
+      "ihome.0.network.WZ_TV.host",
+    ]);
+  });
+
   it("reads room and function memberships through the parent channel", () => {
     const objects = new Map<string, any>([
       ["0_userdata.0.room.lamp", { type: "state", common: {} }],

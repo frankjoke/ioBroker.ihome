@@ -129,7 +129,7 @@ export function keptInstance(instance: string, instances: string[]): string {
   return instances.includes(instance) ? instance : "";
 }
 
-/** The state objects as list rows, sorted by display name. */
+/** The state objects as list rows, sorted by broker id. */
 export function stateEntries(
   objects: Map<string, any>,
   overrides: SourceOverride[],
@@ -156,9 +156,10 @@ export function stateEntries(
       functions: enums ? enumsOfState(enums, id, "functions") : [],
     });
   }
-  return rows.sort(
-    (left, right) =>
-      left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+  // Sort by broker id: equal display names ("Host", "Online", …) from
+  // different networks would otherwise interleave.
+  return rows.sort((left, right) =>
+    left.id.localeCompare(right.id, undefined, { numeric: true }),
   );
 }
 
