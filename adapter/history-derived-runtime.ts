@@ -30,7 +30,10 @@ export function mean(values: unknown[]): number {
 }
 
 export function sum(values: unknown[]): number {
-  return values.filter(numeric).reduce((total, value) => total + value, 0);
+  const numbers = values.filter(numeric);
+  return numbers.length
+    ? numbers.reduce((total, value) => total + value, 0)
+    : NaN;
 }
 
 export function min(values: unknown[]): number {
@@ -98,8 +101,9 @@ function errorText(error: unknown): string {
 }
 
 /**
- * Compile once; run in a fresh context per interval. The function sees only
- * the window and the helper set, never the broker or the process.
+ * Compile once; run in a fresh context per interval. The function gets only
+ * the window and the helper set — no broker globals. This is trusted admin
+ * code, not a security boundary between users.
  */
 export function compileDerivedFunction(
   code: string,
@@ -133,7 +137,7 @@ export function compileDerivedFunction(
     // Node injects a console into every context; the function API has none.
     runInContext("delete globalThis.console", vm);
     const result = script.runInContext(vm, { timeout: 100 });
-    if (result === NOOP) return NOOP;
+    if (result === NOOP || result === undefined) return NOOP;
     if (!numeric(result)) {
       throw new Error("derived function must return a finite number or NOOP");
     }

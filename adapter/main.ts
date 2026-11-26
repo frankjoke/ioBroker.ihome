@@ -16,17 +16,13 @@ import { logicSubscriptions, subscriptionDiff } from "./logic/subscriptions";
 import { parseDuration } from "./logic/duration";
 import {
   derivedEntryProblemForObject,
-  derivedNumber,
-  parseDerivedDocument,
+  parseDerivedDocumentResult,
 } from "./history-derived-common";
 import {
   DerivedHistoryService,
   type RuntimeDerivedEntry,
 } from "./history-derived";
-import {
-  compileDerivedFunction,
-  type DerivedSample,
-} from "./history-derived-runtime";
+import { compileDerivedFunction } from "./history-derived-runtime";
 import {
   stateCommonDiff,
   stateObjectWithDiff,
@@ -211,6 +207,31 @@ interface Variables {
  * old bundle). Such a placeholder counts as empty here — otherwise the real
  * documents could never come across. A document with any tile is never touched.
  */
+const FEATURE_TIMEOUT_MS = 2_000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function isPlaceholder(val: unknown): boolean {
   try {
     const doc = (typeof val === "string" ? JSON.parse(val) : val) as {
@@ -279,6 +300,10 @@ class IHome extends utils.Adapter {
   private derivedIds: string[] = [];
   /** Union of logic and derived ids actually subscribed. */
   private watchedIds: string[] = [];
+  /** Latest logic ids requested; committed when a subscription sync passes. */
+  private desiredLogicIds: string[] = [];
+  /** One reconciliation at a time; overlapping loads would diff stale sets. */
+  private subscriptionSync: Promise<boolean> = Promise.resolve(true);
   /** Guards overlapping historyList reloads: only the newest may swap. */
   private derivedLoad = 0;
   private derivedHistory?: DerivedHistoryService;
@@ -836,16 +861,36 @@ class IHome extends utils.Adapter {
       return;
     }
 
-    this.logicIds = ids;
     const active = doc.logics.filter((logic) => logic.enabled !== false).length;
     this.log.info(
       `Logic engine: ${doc.logics.length} logic(s) (${active} active), ${ids.length} subscribed state(s)`,
     );
   }
 
-  /** Subscribe to the union of logic and derived sources, never less. */
-  private async syncWatchedSubscriptions(logicIds: string[]): Promise<boolean> {
-    const next = [...new Set([...logicIds, ...this.derivedIds])];
+  /**
+   * Subscribe to the union of logic and derived sources, never less. Calls are
+   * serialized; a derived reload without an argument reuses the latest logic
+   * set instead of committing a stale one.
+   */
+  private syncWatchedSubscriptions(logicIds?: string[]): Promise<boolean> {
+    if (logicIds) this.desiredLogicIds = logicIds;
+    const run = async () => {
+      try {
+        return await this.applyWatchedSubscriptions();
+      } catch (error) {
+        this.log.warn(
+          `state subscriptions — keeping the running set: ${String(error)}`,
+        );
+        return false;
+      }
+    };
+    const next = this.subscriptionSync.then(run, run);
+    this.subscriptionSync = next.catch(() => false);
+    return next;
+  }
+
+  private async applyWatchedSubscriptions(): Promise<boolean> {
+    const next = [...new Set([...this.desiredLogicIds, ...this.derivedIds])];
     const diff = subscriptionDiff(this.watchedIds, next, this.namespace);
     try {
       if (diff.own.add.length) await this.subscribeStatesAsync(diff.own.add);
@@ -865,12 +910,13 @@ class IHome extends utils.Adapter {
       return false;
     }
     this.watchedIds = next;
+    this.logicIds = [...this.desiredLogicIds];
     return true;
   }
 
   /** Read a source state, own or foreign, without failing the whole load. */
   private async readDerivedState(id: string): Promise<{
-    val?: unknown;
+    val: unknown;
     ts?: number;
     ack?: boolean;
     from?: string;
@@ -891,50 +937,87 @@ class IHome extends utils.Adapter {
    */
   private async loadDerivedHistory(): Promise<void> {
     const loadId = ++this.derivedLoad;
-    const state = await this.getStateAsync(`${CONFIG_FOLDER}.historyList`);
+    let state: { val?: unknown } | null | undefined;
+    try {
+      state = await this.getStateAsync(`${CONFIG_FOLDER}.historyList`);
+    } catch (error) {
+      this.log.warn(
+        `cannot read ${CONFIG_FOLDER}.historyList; keeping derived history: ${String(error)}`,
+      );
+      return;
+    }
     if (loadId !== this.derivedLoad) return;
     const text = state?.val;
-    const doc = parseDerivedDocument(text);
-    if (!doc) {
+    const parsed = parseDerivedDocumentResult(text);
+    if (!parsed) {
       if (loadId !== this.derivedLoad) return;
       this.derivedHistory?.stop();
       const previous = this.derivedIds;
       this.derivedIds = [];
-      if (!(await this.syncWatchedSubscriptions(this.logicIds))) {
-        this.derivedIds = previous;
+      if (!(await this.syncWatchedSubscriptions())) {
+        if (loadId === this.derivedLoad) this.derivedIds = previous;
       }
+      if (loadId !== this.derivedLoad) return;
       if (text != null && String(text).trim() !== "") {
         this.log.warn("historyList is invalid; derived history stopped");
       }
       return;
     }
+    for (const problem of parsed.problems) {
+      this.log.warn(`derived history ${problem}`);
+    }
+    const doc = parsed.document;
+
+    const probes = new Map<string, Promise<boolean>>();
+    const supportsStoreState = (adapter: string): Promise<boolean> => {
+      let probe = probes.get(adapter);
+      if (!probe) {
+        probe = (async () => {
+          let reply: unknown = null;
+          try {
+            reply = await withTimeout(
+              this.sendToAsync(adapter, "features", {}),
+              FEATURE_TIMEOUT_MS,
+              `features from ${adapter}`,
+            );
+          } catch {
+            // Unknown (down or slow) keeps the entry active; writes retry.
+            return true;
+          }
+          if (!reply || typeof reply !== "object") return true;
+          const outer = reply as Record<string, unknown>;
+          const nested =
+            outer.result &&
+            typeof outer.result === "object" &&
+            !Array.isArray(outer.result)
+              ? (outer.result as Record<string, unknown>)
+              : outer;
+          const supported = nested.supportedFeatures;
+          return !Array.isArray(supported) || supported.includes("storeState");
+        })();
+        probes.set(adapter, probe);
+      }
+      return probe;
+    };
 
     const entries: RuntimeDerivedEntry[] = [];
     for (const entry of doc.entries) {
       const object = await this.getForeignObjectAsync(entry.id).catch(
         () => null,
       );
+      if (loadId !== this.derivedLoad) return;
       const problem = derivedEntryProblemForObject(object, entry.adapter);
       if (problem) {
         this.log.warn(`derived ${entry.id}/${entry.adapter}: ${problem}`);
         continue;
       }
-      let features: unknown = null;
-      try {
-        features = await this.sendToAsync(entry.adapter, "features", {});
-      } catch {
-        // A temporarily down adapter may still support storeState; try writes.
-      }
-      const supported =
-        features && typeof features === "object"
-          ? (features as { supportedFeatures?: unknown }).supportedFeatures
-          : undefined;
-      if (Array.isArray(supported) && !supported.includes("storeState")) {
+      if (!(await supportsStoreState(entry.adapter))) {
         this.log.warn(
           `derived ${entry.id}/${entry.adapter}: storeState is not supported`,
         );
         continue;
       }
+      if (loadId !== this.derivedLoad) return;
       const intervalMs = parseDuration(entry.interval);
       const startDelayMs = parseDuration(entry.startDelay);
       const relogMs = parseDuration(entry.relogInterval);
@@ -959,21 +1042,6 @@ class IHome extends utils.Adapter {
         );
         continue;
       }
-      const source = await this.readDerivedState(entry.id);
-      const sourceValue = source ? derivedNumber(source.val) : null;
-      const previous: DerivedSample | null =
-        source && sourceValue !== null
-          ? {
-              ts:
-                typeof source.ts === "number" && Number.isFinite(source.ts)
-                  ? source.ts
-                  : Date.now(),
-              val: sourceValue,
-              ack: source.ack,
-              from: source.from,
-              changed: false,
-            }
-          : null;
       entries.push({
         id: entry.id,
         adapter: entry.adapter,
@@ -982,7 +1050,6 @@ class IHome extends utils.Adapter {
         changesOnly: entry.changesOnly,
         relogMs,
         run,
-        previous,
       });
     }
     if (loadId !== this.derivedLoad) return;
@@ -994,16 +1061,42 @@ class IHome extends utils.Adapter {
       clearTimeout: (handle) => clearTimeout(handle),
       sendTo: (adapter, command, payload) =>
         this.sendToAsync(adapter, command, payload),
+      entryProblem: async (entry) => {
+        const object = await this.getForeignObjectAsync(entry.id).catch(
+          () => undefined,
+        );
+        // Unknown/unreadable keeps writing; only a read config may stop it.
+        if (object === undefined) return null;
+        return derivedEntryProblemForObject(object, entry.adapter);
+      },
       log: this.log,
     });
 
     const previousIds = this.derivedIds;
     this.derivedIds = [...new Set(entries.map((entry) => entry.id))];
-    if (!(await this.syncWatchedSubscriptions(this.logicIds))) {
-      this.derivedIds = previousIds;
+    if (!(await this.syncWatchedSubscriptions())) {
+      if (loadId === this.derivedLoad) this.derivedIds = previousIds;
       return;
     }
+    if (loadId !== this.derivedLoad) return;
+
+    // Subscribe before loading, then feed the warm value through the service:
+    // a change during the read is delivered to the service instead of lost,
+    // and an older value self-seeds `previous`.
     this.derivedHistory.load(entries);
+    const sources = new Map<
+      string,
+      { val: unknown; ts?: number; ack?: boolean; from?: string } | null
+    >();
+    for (const entry of entries) {
+      if (sources.has(entry.id)) continue;
+      sources.set(entry.id, await this.readDerivedState(entry.id));
+      if (loadId !== this.derivedLoad) return;
+    }
+    for (const entry of entries) {
+      const source = sources.get(entry.id);
+      if (source) this.derivedHistory.onStateChange(entry.id, source);
+    }
     this.log.info(
       `Derived history: ${entries.length} active entr${entries.length === 1 ? "y" : "ies"}`,
     );
@@ -3027,7 +3120,9 @@ class IHome extends utils.Adapter {
         this.log.debug(
           `${CONFIG_FOLDER}.historyList changed; reloading derived history`,
         );
-        void this.loadDerivedHistory();
+        void this.loadDerivedHistory().catch((error) =>
+          this.log.warn(`derived history: ${String(error)}`),
+        );
       }
     });
     await this.subscribeForeignStatesAsync([overrideListId(this.namespace)]);
@@ -3209,8 +3304,10 @@ class IHome extends utils.Adapter {
     );
     await this.pluginHost.start();
 
-    await this.loadDerivedHistory();
     await this.loadLogics();
+    void this.loadDerivedHistory().catch((error) =>
+      this.log.warn(`derived history: ${String(error)}`),
+    );
 
     if (networkDevices.length > 0) {
       this.networkPresence = new NetworkPresenceService(this, [
@@ -3263,8 +3360,13 @@ class IHome extends utils.Adapter {
       this.engine.stop();
       this.engine = undefined;
     }
-    const ids = this.logicIds;
+    this.derivedHistory?.stop();
+    this.derivedHistory = undefined;
+    const ids = this.watchedIds;
     this.logicIds = [];
+    this.derivedIds = [];
+    this.desiredLogicIds = [];
+    this.watchedIds = [];
     const own = ids.filter((id) => id.startsWith(`${this.namespace}.`));
     const foreign = ids.filter((id) => !id.startsWith(`${this.namespace}.`));
     if (own.length) void this.unsubscribeStatesAsync(own).catch(() => {});

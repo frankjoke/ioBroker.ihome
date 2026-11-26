@@ -58,8 +58,19 @@ export function derivedEntryProblem(value: unknown): string | null {
   return null;
 }
 
-/** A document is either a JSON string or an already parsed object. */
-export function parseDerivedDocument(value: unknown): DerivedDocument | null {
+export interface ParsedDerivedDocument {
+  document: DerivedDocument;
+  /** One line per entry that was skipped; the rest still run. */
+  problems: string[];
+}
+
+/**
+ * A document is either a JSON string or an already parsed object. A broken
+ * envelope is unreadable, but one broken entry only drops that entry.
+ */
+export function parseDerivedDocumentResult(
+  value: unknown,
+): ParsedDerivedDocument | null {
   let raw: unknown = value;
   if (typeof raw === "string") {
     try {
@@ -72,10 +83,16 @@ export function parseDerivedDocument(value: unknown): DerivedDocument | null {
     return null;
   }
   const entries: DerivedEntry[] = [];
-  for (const candidate of raw.entries) {
-    if (derivedEntryProblem(candidate)) return null;
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  for (const [index, candidate] of raw.entries.entries()) {
+    const problem = derivedEntryProblem(candidate);
+    if (problem) {
+      problems.push(`entry ${index + 1}: ${problem}`);
+      continue;
+    }
     const entry = candidate as Record<string, unknown>;
-    entries.push({
+    const normalized: DerivedEntry = {
       id: String(entry.id).trim(),
       adapter: String(entry.adapter).trim(),
       interval: String(entry.interval).trim(),
@@ -85,9 +102,23 @@ export function parseDerivedDocument(value: unknown): DerivedDocument | null {
       function: {
         code: String((entry.function as Record<string, unknown>).code),
       },
-    });
+    };
+    const key = `${normalized.adapter}\u0000${normalized.id}`;
+    if (seen.has(key)) {
+      problems.push(
+        `entry ${index + 1}: duplicate ${normalized.id}/${normalized.adapter}`,
+      );
+      continue;
+    }
+    seen.add(key);
+    entries.push(normalized);
   }
-  return { version: 1, entries };
+  return { document: { version: 1, entries }, problems };
+}
+
+/** The runnable part of a document, or null when the envelope is unreadable. */
+export function parseDerivedDocument(value: unknown): DerivedDocument | null {
+  return parseDerivedDocumentResult(value)?.document ?? null;
 }
 
 /** A sample value as a finite number, or null when it cannot be one. */

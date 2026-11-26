@@ -14,6 +14,7 @@ it("computes the numeric helpers", () => {
   expect(mean([1, 2, 3])).toBe(2);
   expect(mean([])).toBeNaN();
   expect(sum([1, 2, 3])).toBe(6);
+  expect(sum([])).toBeNaN();
   expect(min([3, 1, 2])).toBe(1);
   expect(max([3, 1, 2])).toBe(3);
   expect(median([1, 3, 2])).toBe(2);
@@ -67,6 +68,16 @@ it("returns NOOP and rejects invalid results", () => {
       to: 1,
     }),
   ).toBe(NOOP);
+  for (const code of ["return;", "const unused = 1;"]) {
+    expect(
+      compileDerivedFunction(code)({
+        samples: [],
+        previous: null,
+        from: 0,
+        to: 1,
+      }),
+    ).toBe(NOOP);
+  }
   for (const code of [
     "return 'x';",
     "return NaN;",

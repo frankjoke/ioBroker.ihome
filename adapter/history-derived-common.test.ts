@@ -3,6 +3,7 @@ import {
   derivedEntryProblemForObject,
   derivedNumber,
   parseDerivedDocument,
+  parseDerivedDocumentResult,
   shouldWrite,
 } from "./history-derived-common";
 
@@ -23,25 +24,53 @@ it("parses one valid entry and rejects malformed documents", () => {
   });
   expect(parseDerivedDocument(doc)?.entries).toHaveLength(1);
   expect(parseDerivedDocument("{nope")).toBeNull();
-  expect(
-    parseDerivedDocument('{"version":1,"entries":[{"id":"x"}]}'),
-  ).toBeNull();
-  expect(
-    parseDerivedDocument({
-      version: 1,
-      entries: [
-        {
-          id: "0_userdata.0.T",
-          adapter: "history.0",
-          interval: "0s",
-          startDelay: "0s",
-          changesOnly: true,
-          relogInterval: "0s",
-          function: { code: "return 1;" },
-        },
-      ],
-    }),
-  ).toBeNull();
+  const brokenEntry = parseDerivedDocumentResult(
+    '{"version":1,"entries":[{"id":"x"}]}',
+  );
+  expect(brokenEntry?.document.entries).toHaveLength(0);
+  expect(brokenEntry?.problems).toHaveLength(1);
+  const badInterval = parseDerivedDocumentResult({
+    version: 1,
+    entries: [
+      {
+        id: "0_userdata.0.T",
+        adapter: "history.0",
+        interval: "0s",
+        startDelay: "0s",
+        changesOnly: true,
+        relogInterval: "0s",
+        function: { code: "return 1;" },
+      },
+    ],
+  });
+  expect(badInterval?.document.entries).toHaveLength(0);
+  expect(badInterval?.problems).toHaveLength(1);
+});
+
+it("keeps valid entries and drops duplicate or broken ones", () => {
+  const valid = {
+    id: "0_userdata.0.T",
+    adapter: "history.0",
+    interval: "15m",
+    startDelay: "0s",
+    changesOnly: true,
+    relogInterval: "1h",
+    function: { code: "return 1;" },
+  };
+  const parsed = parseDerivedDocumentResult({
+    version: 1,
+    entries: [
+      valid,
+      { ...valid },
+      { ...valid, id: "0_userdata.0.U", function: { code: "" } },
+    ],
+  });
+  expect(parsed?.document.entries.map((entry) => entry.id)).toEqual([
+    "0_userdata.0.T",
+  ]);
+  expect(parsed?.problems).toHaveLength(2);
+  expect(parsed?.problems[0]).toContain("duplicate");
+  expect(parsed?.problems[1]).toContain("function");
 });
 
 it("skips equal values until the relog boundary", () => {

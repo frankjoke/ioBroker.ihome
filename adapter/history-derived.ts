@@ -35,8 +35,13 @@ export interface DerivedServiceDeps {
   setTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout>;
   clearTimeout(handle: ReturnType<typeof setTimeout>): void;
   sendTo(adapter: string, command: string, payload: unknown): Promise<unknown>;
+  /** Re-check the state/adapter config before a write; null keeps writing. */
+  entryProblem?(entry: RuntimeDerivedEntry): Promise<string | null>;
   log: DerivedLogger;
 }
+
+/** Node clamps larger setTimeout values to 1 ms; wake up in chunks instead. */
+const MAX_TIMER_MS = 2_147_483_647;
 
 interface EntryState {
   entry: RuntimeDerivedEntry;
@@ -48,6 +53,7 @@ interface EntryState {
   lastWrittenTs?: number;
   queue: DerivedPoint[];
   stopped: boolean;
+  gateProblem?: string;
 }
 
 function keyOf(entry: RuntimeDerivedEntry): string {
@@ -78,9 +84,15 @@ function sampleOf(state: {
 
 function replyProblem(reply: unknown): string {
   if (!reply || typeof reply !== "object") return "";
-  const value = reply as Record<string, unknown>;
+  const outer = reply as Record<string, unknown>;
+  const value =
+    outer.result &&
+    typeof outer.result === "object" &&
+    !Array.isArray(outer.result)
+      ? (outer.result as Record<string, unknown>)
+      : outer;
   if (typeof value.error === "string" && value.error) return value.error;
-  if (value.success === false) {
+  if (value.success === false || value.ok === false) {
     return typeof value.message === "string"
       ? value.message
       : "storeState was rejected";
@@ -100,11 +112,34 @@ export class DerivedHistoryService {
     this.deps = deps;
   }
 
-  /** Replace every entry and re-anchor from now. */
+  /**
+   * Apply the document. An entry whose schedule is unchanged keeps its timer,
+   * window and last-written value; a function-only edit takes effect at the
+   * next boundary instead of discarding the open window.
+   */
   load(entries: RuntimeDerivedEntry[]): void {
-    this.stop();
     const now = this.deps.now();
-    for (const entry of entries) {
+    const next = new Map<string, RuntimeDerivedEntry>();
+    for (const entry of entries) next.set(keyOf(entry), entry);
+
+    for (const [key, state] of [...this.entries]) {
+      const entry = next.get(key);
+      if (
+        !entry ||
+        entry.intervalMs !== state.entry.intervalMs ||
+        entry.startDelayMs !== state.entry.startDelayMs
+      ) {
+        state.stopped = true;
+        if (state.timer) this.deps.clearTimeout(state.timer);
+        this.entries.delete(key);
+        continue;
+      }
+      state.entry = entry;
+    }
+
+    for (const entry of next.values()) {
+      const key = keyOf(entry);
+      if (this.entries.has(key)) continue;
       const state: EntryState = {
         entry,
         nextTo: now + entry.startDelayMs + entry.intervalMs,
@@ -113,7 +148,7 @@ export class DerivedHistoryService {
         queue: [],
         stopped: false,
       };
-      this.entries.set(keyOf(entry), state);
+      this.entries.set(key, state);
       this.schedule(state);
     }
   }
@@ -160,9 +195,16 @@ export class DerivedHistoryService {
   private schedule(state: EntryState): void {
     if (state.stopped) return;
     const wait = Math.max(0, state.nextTo - this.deps.now());
-    state.timer = this.deps.setTimeout(() => {
-      void this.closeWindow(state);
-    }, wait);
+    state.timer = this.deps.setTimeout(
+      () => {
+        if (this.deps.now() < state.nextTo) {
+          this.schedule(state);
+          return;
+        }
+        void this.closeWindow(state);
+      },
+      Math.min(wait, MAX_TIMER_MS),
+    );
   }
 
   private async closeWindow(state: EntryState): Promise<void> {
@@ -171,6 +213,10 @@ export class DerivedHistoryService {
     }
     const entry = state.entry;
     const to = state.nextTo;
+    if (this.deps.now() < to) {
+      this.schedule(state);
+      return;
+    }
     const from = to - entry.intervalMs;
     const samples = state.samples.filter(
       (sample) => sample.ts >= from && sample.ts < to,
@@ -206,6 +252,27 @@ export class DerivedHistoryService {
     this.schedule(state);
 
     if (value !== NOOP && typeof value === "number" && Number.isFinite(value)) {
+      let problem: string | null = null;
+      if (this.deps.entryProblem) {
+        try {
+          problem = await this.deps.entryProblem(entry);
+        } catch {
+          // An unreadable object is unknown, not a reason to drop data.
+          problem = null;
+        }
+      }
+      if (problem) {
+        if (state.gateProblem !== problem) {
+          this.deps.log.warn(
+            `derived ${entry.id}/${entry.adapter}: ${problem}`,
+          );
+        }
+        state.gateProblem = problem;
+        state.queue = [];
+        return;
+      }
+      const resumed = state.gateProblem !== undefined;
+      state.gateProblem = undefined;
       if (
         shouldWrite({
           value,
@@ -216,6 +283,11 @@ export class DerivedHistoryService {
           relogMs: entry.relogMs,
         })
       ) {
+        if (resumed) {
+          this.deps.log.info(
+            `derived ${entry.id}/${entry.adapter}: writing again`,
+          );
+        }
         state.queue.push({ ts: to, val: value });
         if (state.queue.length > MAX_DERIVED_QUEUE) {
           const dropped = state.queue.length - MAX_DERIVED_QUEUE;
@@ -241,6 +313,8 @@ export class DerivedHistoryService {
     // is cleared after a successful send.
     state.queue = [];
     try {
+      // At least once: a timeout after the adapter stored the point may
+      // retry it, because storeState has no idempotency key.
       const reply = await this.deps.sendTo(state.entry.adapter, "storeState", {
         id: state.entry.id,
         state: points.map((point) => ({
@@ -252,9 +326,13 @@ export class DerivedHistoryService {
       });
       const problem = replyProblem(reply);
       if (problem) throw new Error(problem);
+      // A newer flush may have succeeded while this one was in flight; an
+      // older timestamp must not move the relog clock backwards.
       const last = points[points.length - 1];
-      state.lastWritten = last.val;
-      state.lastWrittenTs = last.ts;
+      if (state.lastWrittenTs === undefined || last.ts >= state.lastWrittenTs) {
+        state.lastWritten = last.val;
+        state.lastWrittenTs = last.ts;
+      }
     } catch (error) {
       state.queue = [...points, ...state.queue];
       if (state.queue.length > MAX_DERIVED_QUEUE) {
