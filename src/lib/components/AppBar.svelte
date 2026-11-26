@@ -496,6 +496,12 @@
     <!-- The editor's mode switch: it sits with the other action icons, not in
          the tab row, so the tabs stay pages and nothing else. The eye is the
          same switch, read the other way. -->
+    {#if ioBroker.namespace && (!isDisplay || ioBroker.namespace !== "ihome.0")}
+      <span class="instance-chip" title={`Connected to ${ioBroker.namespace}`}
+        >{ioBroker.namespace}</span
+      >
+    {/if}
+
     {#if isDisplay}
       {#if !hidePencil || sheet.open}
         <a
@@ -513,9 +519,6 @@
     {/if}
 
     {#if !isDisplay}
-      <span class="instance-chip" title={`Connected to ${ioBroker.namespace}`}
-        >{ioBroker.namespace}</span
-      >
       <a
         class="icon-btn"
         href={`${base}/#/`}
