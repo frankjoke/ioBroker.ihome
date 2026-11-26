@@ -50,3 +50,71 @@ it("keeps a string main source in the active condition", () => {
   const next = setMainSlotSource(tile(), 0, "alias.0.B.SET");
   expect(next.active?.source).toBe("alias.0.B.SET");
 });
+
+it("rewrites another slot that used the old state", () => {
+  const before: TileConfig = {
+    ...tile(),
+    slots: [
+      ...(tile().slots ?? []),
+      {
+        kind: "badge",
+        source: source("alias.0.A.SET"),
+        options: { pick: "old" },
+      },
+    ],
+  };
+  const next = setMainSlotSource(before, 0, source("alias.0.B.SET"));
+  expect(next.slots?.[2].source).toEqual(source("alias.0.B.SET"));
+  // A source replacement drops the old readout hint.
+  expect(next.slots?.[2].options?.pick).toBeUndefined();
+});
+
+it("rewrites a badge's watched state in options.of", () => {
+  const before: TileConfig = {
+    ...tile(),
+    slots: [
+      ...(tile().slots ?? []),
+      {
+        kind: "badge",
+        source: "ago",
+        options: { of: "alias.0.A.SET", from: "lc" },
+      },
+    ],
+  };
+  const next = setMainSlotSource(before, 0, source("alias.0.B.SET"));
+  expect(next.slots?.[2].options?.of).toBe("alias.0.B.SET");
+  expect(next.slots?.[2].options?.from).toBe("lc");
+});
+
+it("matches the old state even when the other slot carries an override", () => {
+  const before: TileConfig = {
+    ...tile(),
+    slots: [
+      ...(tile().slots ?? []),
+      {
+        kind: "badge",
+        source: {
+          kind: "state",
+          stateId: "alias.0.A.SET",
+          override: "other",
+        },
+      },
+    ],
+  };
+  const next = setMainSlotSource(before, 0, source("alias.0.B.SET"));
+  expect(next.slots?.[2].source).toEqual(source("alias.0.B.SET"));
+});
+
+it("leaves unrelated slots alone", () => {
+  const before: TileConfig = {
+    ...tile(),
+    slots: [
+      ...(tile().slots ?? []),
+      { kind: "badge", source: "ago" },
+      { kind: "value", source: source("alias.0.C.SET") },
+    ],
+  };
+  const next = setMainSlotSource(before, 0, source("alias.0.B.SET"));
+  expect(next.slots?.[2]).toEqual(before.slots?.[2]);
+  expect(next.slots?.[3]).toEqual(before.slots?.[3]);
+});
