@@ -2,7 +2,7 @@
   import { base } from "$app/paths";
   import { goto } from "$app/navigation";
   import { page as route } from "$app/state";
-  import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
+  import { DEFAULT_NAMESPACE, ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import {
     getPageRegistry,
     setLastPage,
@@ -496,7 +496,7 @@
     <!-- The editor's mode switch: it sits with the other action icons, not in
          the tab row, so the tabs stay pages and nothing else. The eye is the
          same switch, read the other way. -->
-    {#if ioBroker.namespace}
+    {#if ioBroker.namespace && (!isDisplay || ioBroker.namespace !== DEFAULT_NAMESPACE || route.url.searchParams.get("namespace") === ioBroker.namespace)}
       <span class="instance-chip" title={`Connected to ${ioBroker.namespace}`}
         >{ioBroker.namespace}</span
       >
