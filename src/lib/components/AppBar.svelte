@@ -12,6 +12,7 @@
     closeSheet,
     isPinAsked,
     openSheetGated,
+    pinAskTitle,
     resolvePinAsk,
     sheet,
   } from "$lib/stores/sheet.svelte.js";
@@ -708,7 +709,7 @@
 
 {#if isPinAsked()}
   <PinModal
-    title="Enter PIN for the layout editor"
+    title={pinAskTitle()}
     expected={storedPin}
     onSubmit={() => {
       unlock();

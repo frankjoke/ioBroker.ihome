@@ -1,6 +1,7 @@
 <script lang="ts">
   import PageView from "$lib/components/display/PageView.svelte";
   import LayoutSheet from "$lib/components/layout/LayoutSheet.svelte";
+  import DisplayTileMenu from "$lib/components/display/DisplayTileMenu.svelte";
   import { getPagesLoadKind, setLastPage } from "$lib/stores/pages.svelte.js";
   import { pagePlaceholder } from "$lib/config/pages-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -25,6 +26,12 @@
 
   /** The tile or section the last click in the display landed on (A48). */
   let picked = $state<LayoutSelection | null>(null);
+  /** The eye-view tile menu: a right-click while the layout sheet is closed. */
+  let displayMenu = $state<{
+    x: number;
+    y: number;
+    selection: Extract<LayoutSelection, { kind: "tile" }>;
+  } | null>(null);
   /** The sheet's imperative corner: it owns the menu and its actions. */
   let layoutSheet = $state<{
     openContext: (event: {
@@ -83,6 +90,20 @@
     openContext(event.clientX, event.clientY);
   }
 
+  /** In eye view a tile right-click opens the quick menu; the browser keeps its
+   *  own menu over inputs and editable text, and over gaps. */
+  function onStageContextMenu(event: MouseEvent): void {
+    if (sheet.open) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']"))
+      return;
+    const hit = hitAt(event.clientX, event.clientY);
+    if (hit?.kind !== "tile") return;
+    event.preventDefault();
+    event.stopPropagation();
+    displayMenu = { x: event.clientX, y: event.clientY, selection: hit };
+  }
+
   function onPointerDown(event: PointerEvent): void {
     if (event.pointerType !== "touch" || event.button !== 0) return;
     longPress.down(event.clientX, event.clientY);
@@ -124,7 +145,12 @@
     <!-- The display is a picture while the sheet is open (A43): inert takes it
          out of reach of keyboard as well as pointer — the pick layer below is
          the only thing a press can land on. -->
-    <div class="stage" inert={sheet.open}>
+    <div
+      class="stage"
+      role="presentation"
+      inert={sheet.open}
+      oncontextmenu={onStageContextMenu}
+    >
       {#key page.id}
         <PageView {page} />
       {/key}
@@ -164,6 +190,15 @@
       onpointercancel={onPointerCancel}
       onpointerleave={onPointerCancel}
     ></button>
+  {/if}
+
+  {#if displayMenu}
+    <DisplayTileMenu
+      x={displayMenu.x}
+      y={displayMenu.y}
+      selection={displayMenu.selection}
+      onclose={() => (displayMenu = null)}
+    />
   {/if}
 </div>
 

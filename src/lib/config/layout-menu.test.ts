@@ -1,7 +1,9 @@
 import { it, expect } from "vitest";
 import {
+  displayTileMenuItems,
   layoutMenuItems,
   layoutMenuTargetKind,
+  type DisplayTileMenuContext,
   type LayoutMenuContext,
 } from "$lib/config/layout-menu";
 
@@ -89,4 +91,42 @@ it("reads the menu kind from the current selection", () => {
   ).toBe("section");
   expect(layoutMenuTargetKind({ kind: "page", pageId: "p" })).toBe("empty");
   expect(layoutMenuTargetKind(null)).toBe("empty");
+});
+
+const liveTile: DisplayTileMenuContext = {
+  writable: true,
+  templatesWritable: true,
+};
+
+it("offers the four eye-view tile actions in order", () => {
+  const items = displayTileMenuItems(liveTile);
+  expect(items.map((item) => item.id)).toEqual([
+    "edit",
+    "duplicate",
+    "save-template",
+    "delete",
+  ]);
+  expect(items.find((item) => item.id === "delete")?.danger).toBe(true);
+});
+
+it("keeps edit available but locks layout writes in the eye-view menu", () => {
+  const items = displayTileMenuItems({
+    writable: false,
+    templatesWritable: false,
+  });
+  expect(items.find((item) => item.id === "edit")?.disabled).not.toBe(true);
+  for (const id of ["duplicate", "save-template", "delete"] as const) {
+    expect(items.find((item) => item.id === id)?.disabled).toBe(true);
+  }
+});
+
+it("saves a template even when the layout document is read-only", () => {
+  const items = displayTileMenuItems({
+    writable: false,
+    templatesWritable: true,
+  });
+  expect(items.find((item) => item.id === "save-template")?.disabled).not.toBe(
+    true,
+  );
+  expect(items.find((item) => item.id === "duplicate")?.disabled).toBe(true);
 });

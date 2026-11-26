@@ -90,10 +90,10 @@
   import SaveTemplateModal from "$lib/components/templates/SaveTemplateModal.svelte";
   import ApplyTemplateModal from "$lib/components/templates/ApplyTemplateModal.svelte";
   import {
-    collectTileTemplate,
     inferTemplateType,
     tileSourceCount,
   } from "$lib/config/tile-template";
+  import { planSaveTileTemplate } from "$lib/config/tile-template-save";
   import {
     autoFillRoles,
     materializeTemplateTileFromFills,
@@ -102,7 +102,6 @@
     templateBindingRows,
   } from "$lib/config/slot-create";
   import { PRESETS } from "$lib/config/presets";
-  import { visualTemplateProblem } from "$lib/config/visual-templates";
   import {
     commitTemplates,
     getTemplateRegistry,
@@ -679,52 +678,23 @@
     saveTemplateError = "";
     const config = tile?.tile;
     if (!config) return;
-    const templateRegistry = getTemplateRegistry();
-    const wanted = name.trim().toLowerCase();
-    if (
-      (templateRegistry.templates ?? []).some(
-        (template) =>
-          String(template.name ?? "")
-            .trim()
-            .toLowerCase() === wanted,
-      )
-    ) {
-      saveTemplateError = `A template named “${name}” already exists.`;
-      return;
-    }
-    const result = collectTileTemplate(config, {
-      id: newId(),
-      name,
-      type,
-      look: sourceLook,
-    });
-    if (hint) result.template.stateHint = hint;
-    if (!result.template.roles?.length) {
-      saveTemplateError = "No slot in this tile could be bound to a role.";
-      return;
-    }
-    const problem = visualTemplateProblem(
-      result.template,
-      (templateRegistry.templates ?? []).map((template) => template.id),
+    const plan = planSaveTileTemplate(
+      getTemplateRegistry(),
+      config,
+      sourceLook,
+      { id: newId(), name, type, hint },
     );
-    if (problem) {
-      saveTemplateError = problem;
+    if (plan.error || !plan.next) {
+      saveTemplateError =
+        plan.error ?? "The template document could not be saved.";
       return;
     }
-    if (
-      !isTemplatesWritable() ||
-      !commitTemplates({
-        ...templateRegistry,
-        templates: [...(templateRegistry.templates ?? []), result.template],
-      })
-    ) {
+    if (!isTemplatesWritable() || !commitTemplates(plan.next)) {
       saveTemplateError = "The template document could not be saved.";
       return;
     }
     saveTemplateOpen = false;
-    saveTemplateNote = `Saved “${name}”${
-      result.omitted ? ` — ${result.omitted} slot(s) left out` : ""
-    }.`;
+    saveTemplateNote = plan.note ?? "";
   }
 
   async function applyTemplate(template: Template): Promise<void> {

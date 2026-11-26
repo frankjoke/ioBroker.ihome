@@ -5,6 +5,7 @@ export type LayoutMenuId =
   | "edit"
   | "duplicate"
   | "move"
+  | "save-template"
   | "delete"
   | "add-tile"
   | "add-section"
@@ -26,6 +27,42 @@ export interface LayoutMenuContext {
 }
 
 export type LayoutMenuTargetKind = "tile" | "section" | "empty";
+
+export interface DisplayTileMenuContext {
+  /** The page document accepts writes. */
+  writable: boolean;
+  /** The template document accepts writes (independent of the page). */
+  templatesWritable: boolean;
+}
+
+/** The eye-view menu on a tile: only the actions that fit a quick pass, in the
+ *  order they are reached for. Edit is the one entry that leaves the display. */
+export function displayTileMenuItems(
+  context: DisplayTileMenuContext,
+): LayoutMenuEntry[] {
+  return [
+    { id: "edit", label: "Edit tile", icon: "edit" },
+    {
+      id: "duplicate",
+      label: "Duplicate tile",
+      icon: "content_copy",
+      disabled: !context.writable,
+    },
+    {
+      id: "save-template",
+      label: "Save as template",
+      icon: "bookmark_add",
+      disabled: !context.templatesWritable,
+    },
+    {
+      id: "delete",
+      label: "Delete tile",
+      icon: "delete",
+      danger: true,
+      disabled: !context.writable,
+    },
+  ];
+}
 
 /** What a selection means to the menu; a page has no actions of its own. */
 export function layoutMenuTargetKind(

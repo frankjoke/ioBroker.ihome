@@ -20,6 +20,8 @@ export const sheet = $state<{
 /* A gated entrance waits here while the PIN is asked — module state too, so a
  * reload drops the ask and the entrance has to be made again. */
 let pinAsked = $state(false);
+let pinTitle = $state("Enter PIN for the layout editor");
+let pendingAction: (() => void) | null = null;
 
 export function openSheet(): void {
   sheet.open = true;
@@ -39,12 +41,27 @@ export function closeSheet(): void {
  * +layout.svelte.
  */
 export function openSheetGated(): void {
+  runSheetGated(() => {
+    sheet.open = true;
+  });
+}
+
+/**
+ * Run a layout write behind the same pencil lock. A destructive display action
+ * (delete) uses this without opening the sheet; `title` labels its PIN ask.
+ */
+export function runSheetGated(
+  action: () => void,
+  title = "Enter PIN for the layout editor",
+): void {
   const lockPencil = isSettingsLoaded() ? getSettings().lockPencil : true;
   if (layoutNeedsPin(lockPencil, isUnlocked())) {
+    pendingAction = action;
+    pinTitle = title;
     pinAsked = true;
     return;
   }
-  sheet.open = true;
+  action();
 }
 
 /** True while a gated entrance waits for the PIN — the AppBar shows the ask. */
@@ -52,9 +69,17 @@ export function isPinAsked(): boolean {
   return pinAsked;
 }
 
-/** The ask is over: `open` opens the editor at whatever target the entrance
- *  already handed over, else the attempt is dropped. */
+/** The PIN prompt's heading, naming the action that is waiting. */
+export function pinAskTitle(): string {
+  return pinTitle;
+}
+
+/** The ask is over: `open` runs the waiting action, else the attempt is
+ *  dropped. The pending action is cleared before it runs, so a second resolve
+ *  cannot repeat a delete. */
 export function resolvePinAsk(open: boolean): void {
   pinAsked = false;
-  if (open) sheet.open = true;
+  const action = pendingAction;
+  pendingAction = null;
+  if (open) action?.();
 }
