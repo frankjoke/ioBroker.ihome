@@ -481,6 +481,67 @@ it("a control's own hidden rule silences its badge", () => {
   expect(badges).toEqual([]);
 });
 
+it("lets a badge rule read self like the editor's live dot", () => {
+  const deviceFor = (value: boolean) => ({
+    controls: [{ available: true, feature: "actual", liveValue: value }],
+  });
+  const gate: Slot = {
+    kind: "badge",
+    source: "actual",
+    rules: [{ when: "self", only: true }],
+  };
+  expect(resolveBadges([gate], deviceFor(true), undefined, NOW)).toHaveLength(
+    1,
+  );
+  expect(resolveBadges([gate], deviceFor(false), undefined, NOW)).toEqual([]);
+
+  const hide: Slot = {
+    kind: "badge",
+    source: "actual",
+    rules: [{ when: "!self", hidden: true }],
+  };
+  expect(resolveBadges([hide], deviceFor(true), undefined, NOW)).toHaveLength(
+    1,
+  );
+  expect(resolveBadges([hide], deviceFor(false), undefined, NOW)).toEqual([]);
+});
+
+it("reads self from a raw-state badge source", () => {
+  const slot: Slot = {
+    kind: "badge",
+    source: {
+      kind: "state",
+      stateId: "alias.0.AZF.BewegungAZF2.ACTUAL",
+    },
+    rules: [{ when: "self", only: true }],
+  };
+  const rawFor = (value: boolean) => () => ({ liveValue: value });
+  expect(
+    resolveBadges(
+      [slot],
+      { controls: [] },
+      undefined,
+      NOW,
+      [],
+      rawFor(true),
+      false,
+      [],
+    ),
+  ).toHaveLength(1);
+  expect(
+    resolveBadges(
+      [slot],
+      { controls: [] },
+      undefined,
+      NOW,
+      [],
+      rawFor(false),
+      false,
+      [],
+    ),
+  ).toEqual([]);
+});
+
 it("a hidden rule silences the derived ago and offline badges too", () => {
   const online = resolveBadges(
     [

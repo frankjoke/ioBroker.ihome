@@ -370,21 +370,31 @@ function objectSource(
   return undefined;
 }
 
+/** The control a badge slot reads, whichever way it names it. */
+function badgeSourceControl(
+  slot: Slot,
+  device: BadgeDevice,
+  raw?: (source: string) => BadgeControl | undefined,
+): BadgeControl | undefined {
+  const pick =
+    typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
+  const source = typeof slot.source === "string" ? slot.source : undefined;
+  return (
+    objectSource(slot, device, raw)?.control ??
+    badgeControl(device, source, pick) ??
+    (source ? raw?.(source) : undefined)
+  );
+}
+
 function controlBadge(
   slot: Slot,
   device: BadgeDevice,
   scope: Scope,
   raw?: (source: string) => BadgeControl | undefined,
   detail = false,
+  control = badgeSourceControl(slot, device, raw),
 ): ResolvedBadge | undefined {
-  const pick =
-    typeof slot.options?.pick === "string" ? slot.options.pick : undefined;
-  const source = typeof slot.source === "string" ? slot.source : undefined;
   const object = objectSource(slot, device, raw);
-  const control =
-    object?.control ??
-    badgeControl(device, source, pick) ??
-    (source ? raw?.(source) : undefined);
   if (!control) return undefined;
   // Slot rules first, the control's own defaults last (spec §4.1.1).
   const style = resolveStyle(
@@ -466,10 +476,18 @@ export function resolveBadges(
   };
   const out: ResolvedBadge[] = [];
   for (const slot of slots ?? []) {
+    // The rule editor's live dot reads `self` as this slot's reading; the
+    // badge must fold with the same scope or a rule can look green while the
+    // badge does the opposite.
+    const control = badgeSourceControl(slot, device, raw);
+    const slotScope = {
+      ...scope,
+      locals: { ...scope.locals, self: control?.liveValue },
+    };
     // A badge hidden by its own rules produces nothing — including the derived
     // ago/offline badges, which resolve no control and so never reach
     // `controlBadge`'s own guard. The detail chips always show.
-    const style = resolveStyle(slot.rules ?? [], scope);
+    const style = resolveStyle(slot.rules ?? [], slotScope);
     if (!detail && style.hidden === true) continue;
     const tone = TONES.includes(style.tone as BadgeTone)
       ? (style.tone as BadgeTone)
@@ -524,7 +542,7 @@ export function resolveBadges(
     } else if (slot.source || typeof slot.options?.pick === "string") {
       // A badge reads a control either by name or by readout hint — or, failing
       // both, a raw state id through the caller's resolver (A21).
-      badge = controlBadge(slot, device, scope, raw, detail);
+      badge = controlBadge(slot, device, slotScope, raw, detail, control);
     }
     if (badge) {
       // The chip can show just its icon on the tile; the detail page always
