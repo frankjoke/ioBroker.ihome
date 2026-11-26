@@ -28,6 +28,11 @@ export function isIhomeConfigState(id: string): boolean {
   return /^ihome\.\d+\.config\./.test(String(id ?? ""));
 }
 
+/** Path depth below adapter.instance; one level per extra id segment. */
+export function stateDepth(id: string): number {
+  return Math.max(0, String(id ?? "").split(".").length - 2);
+}
+
 export interface StateFilters {
   instance?: string;
   role?: string;

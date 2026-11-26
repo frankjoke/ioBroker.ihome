@@ -140,9 +140,13 @@
     if (tab === "history" && !hasHistory) tab = "state";
   });
 
-  function addOverride(): void {
+  export function addOverride(): void {
     openOverrideId = "new";
     tab = "override";
+  }
+
+  export function requestDelete(): void {
+    deleting = true;
   }
 
   function onOverrideLineClick(event: MouseEvent, overrideId: string): void {
@@ -155,7 +159,7 @@
     openOverrideId = openOverrideId === overrideId ? null : overrideId;
   }
 
-  async function addHistory(): Promise<void> {
+  export async function addHistory(): Promise<void> {
     if (!defaultHistory) {
       message = "No default history adapter is configured.";
       return;

@@ -13,6 +13,7 @@ import {
   isIhomeConfigState,
   isSystemInstance,
   keptInstance,
+  stateDepth,
   defaultHistoryAdapter,
   restoreSelection,
   stateEntries,
@@ -129,6 +130,13 @@ describe("instances and restore", () => {
     expect(keptInstance("ihome.0", [])).toBe("ihome.0");
     expect(keptInstance("ihome.0", ["ihome.0", "sql.0"])).toBe("ihome.0");
     expect(keptInstance("gone.0", ["ihome.0", "sql.0"])).toBe("");
+  });
+
+  it("measures the relative id depth for list indentation", () => {
+    expect(stateDepth("ihome.0.test")).toBe(1);
+    expect(stateDepth("ihome.0.Devices.MyBattery.avgVoltage")).toBe(3);
+    expect(stateDepth("0_userdata.0.example_state")).toBe(1);
+    expect(stateDepth("x.y")).toBe(0);
   });
 
   it("recognises iHome config documents as internal", () => {

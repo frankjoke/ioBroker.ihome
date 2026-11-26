@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { page } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -10,6 +10,7 @@
   import { patchView, readView } from "$lib/stores/page-view";
   import { takeRequestedStateConfig } from "$lib/pages.js";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
+  import ContextMenu from "$lib/components/common/ContextMenu.svelte";
   import HelpSection from "$lib/components/templates/HelpSection.svelte";
   import StateList from "$lib/components/states/StateList.svelte";
   import StateDetail from "$lib/components/states/StateDetail.svelte";
@@ -23,6 +24,7 @@
     stateEntries,
     stateMatches,
     stateRoles,
+    type StateEntry,
     type StateFilters,
   } from "$lib/config/state-settings";
   import { enumShortId, functionList, roomList } from "$lib/config/rooms";
@@ -32,6 +34,8 @@
     type StatesTab,
   } from "$lib/config/states-tabs";
   import { STATES_GUIDE, VARIABLES_GUIDE } from "$lib/config/page-guides";
+  import { copyText } from "$lib/utils/clipboard";
+  import { toast } from "$lib/stores/toasts.svelte";
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
   const variables = $derived(getVariables());
@@ -69,6 +73,20 @@
   let variablesOpen = $state(false);
   let variablesPanel = $state<{
     startAdd: (kind: "state" | "constant") => void;
+  } | null>(null);
+  let detailRef = $state<{
+    addHistory: () => void | Promise<void>;
+    addOverride: () => void;
+    requestDelete: () => void;
+  } | null>(null);
+  let stateMenu = $state<{
+    x: number;
+    y: number;
+    entry: StateEntry;
+  } | null>(null);
+  let pendingAction = $state<{
+    id: string;
+    action: "history" | "override" | "delete";
   } | null>(null);
 
   const entries = $derived(
@@ -162,6 +180,39 @@
     selectedId = next?.id ?? "";
     patchView("/states", { openId: next?.id ?? null });
   }
+
+  function openStateMenu(entry: StateEntry, event: MouseEvent): void {
+    stateMenu = { x: event.clientX, y: event.clientY, entry };
+  }
+
+  async function copyStateField(value: string, label: string): Promise<void> {
+    if (await copyText(value)) {
+      toast.success(`Copied ${label}`, { key: "state-copy" });
+    } else {
+      toast.error(`Could not copy the ${label}`);
+    }
+  }
+
+  function runStateAction(
+    entry: StateEntry,
+    action: "history" | "override" | "delete",
+  ): void {
+    changeTab("states");
+    select(entry.id);
+    pendingAction = { id: entry.id, action };
+  }
+
+  $effect(() => {
+    const pending = pendingAction;
+    if (!pending || selectedId !== pending.id || !detailRef) return;
+    pendingAction = null;
+    void tick().then(() => {
+      if (selectedId !== pending.id) return;
+      if (pending.action === "history") void detailRef?.addHistory();
+      else if (pending.action === "override") detailRef?.addOverride();
+      else detailRef?.requestDelete();
+    });
+  });
 
   function setInstance(value: string): void {
     instance = value;
@@ -311,11 +362,13 @@
         oninstance={setInstance}
         onquery={(value) => (query = value)}
         onfilters={(value) => (filters = value)}
+        oncontext={openStateMenu}
       />
 
       <section class="detail card">
         {#if selected}
           <StateDetail
+            bind:this={detailRef}
             id={selectedId}
             object={selected}
             {variables}
@@ -341,6 +394,54 @@
 
 {#if creating}
   <StateCreateModal oncreated={created} onclose={() => (creating = false)} />
+{/if}
+
+{#if stateMenu}
+  {@const menu = stateMenu}
+  <ContextMenu
+    x={menu.x}
+    y={menu.y}
+    heading={menu.entry.id}
+    label="State"
+    items={[
+      {
+        id: "copy-id",
+        label: "Copy state ID",
+        icon: "content_copy",
+        run: () => {
+          void copyStateField(menu.entry.id, "state ID");
+        },
+      },
+      {
+        id: "copy-name",
+        label: "Copy state name",
+        icon: "label",
+        run: () => {
+          void copyStateField(menu.entry.name, "state name");
+        },
+      },
+      {
+        id: "history",
+        label: "Add history",
+        icon: "history",
+        run: () => runStateAction(menu.entry, "history"),
+      },
+      {
+        id: "override",
+        label: "Add override",
+        icon: "tune",
+        run: () => runStateAction(menu.entry, "override"),
+      },
+      {
+        id: "delete",
+        label: "Delete state",
+        icon: "delete",
+        danger: true,
+        run: () => runStateAction(menu.entry, "delete"),
+      },
+    ]}
+    onclose={() => (stateMenu = null)}
+  />
 {/if}
 
 <style>

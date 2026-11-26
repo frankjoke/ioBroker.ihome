@@ -1,7 +1,11 @@
 <script lang="ts">
   import { tick } from "svelte";
   import SelectField from "$lib/components/common/SelectField.svelte";
-  import type { StateEntry, StateFilters } from "$lib/config/state-settings";
+  import {
+    stateDepth,
+    type StateEntry,
+    type StateFilters,
+  } from "$lib/config/state-settings";
 
   let {
     entries,
@@ -17,6 +21,7 @@
     oninstance,
     onquery,
     onfilters,
+    oncontext,
   }: {
     entries: StateEntry[];
     selectedId: string;
@@ -31,6 +36,7 @@
     oninstance: (value: string) => void;
     onquery: (value: string) => void;
     onfilters: (value: StateFilters) => void;
+    oncontext?: (entry: StateEntry, event: MouseEvent) => void;
   } = $props();
 
   const count = $derived(entries.length);
@@ -134,11 +140,20 @@
 
   <div class="rows" bind:this={rowsEl}>
     {#each entries as entry (entry.id)}
+      {@const depth = stateDepth(entry.id)}
       <button
         type="button"
         class="state-row"
         class:active={entry.id === selectedId}
+        style={`--state-depth:${depth}`}
+        title="Right-click for state actions"
         onclick={() => onselect(entry.id)}
+        oncontextmenu={(event) => {
+          if (!oncontext) return;
+          event.preventDefault();
+          event.stopPropagation();
+          oncontext(entry, event);
+        }}
       >
         <span class="row-main">
           <span class="mono id" title={entry.id}
@@ -271,6 +286,11 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+
+  .name,
+  .row-meta {
+    padding-left: calc(var(--state-depth, 0) * 0.9rem);
   }
 
   .name {
