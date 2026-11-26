@@ -28,9 +28,13 @@
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import { deleteTitle } from "$lib/utils/delete-title";
   import { nextAfterRemoval } from "$lib/utils/list-selection";
+  import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
+  import ContextMenu from "$lib/components/common/ContextMenu.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
+  import { copyText } from "$lib/utils/clipboard";
+  import { toast } from "$lib/stores/toasts.svelte";
   import {
     enumLabelFromObject,
     roomList,
@@ -245,6 +249,41 @@
   /** A row picked while the open draft was dirty. */
   let pendingVar = $state<GlobalVariable | null>(null);
   let askClose = $state(false);
+  let stateMenu = $state<{
+    x: number;
+    y: number;
+    id: string;
+    variable: GlobalVariable;
+  } | null>(null);
+
+  function openStateMenu(
+    event: MouseEvent,
+    id: string,
+    variable: GlobalVariable,
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+    stateMenu = { x: event.clientX, y: event.clientY, id, variable };
+  }
+
+  async function copyStateId(id: string): Promise<void> {
+    if (await copyText(id))
+      toast.success(`Copied ${id}`, { key: "state-copy" });
+    else toast.error("Could not copy the state id");
+  }
+
+  function chooseState(variable: GlobalVariable): void {
+    if (editing?.id === variable.id) {
+      stateMode = "existing";
+      picking = true;
+      return;
+    }
+    requestOpen(variable);
+    if (editing?.id === variable.id) {
+      stateMode = "existing";
+      picking = true;
+    }
+  }
 
   function requestOpen(v: GlobalVariable) {
     if (editing?.id === v.id) {
@@ -541,7 +580,16 @@
               <code class="var-value">{v.value}</code>
             {:else}
               {#if !open}
-                <code class="var-value">{v.stateId ?? "no state"}</code>
+                <code
+                  class="var-value"
+                  class:copyable={!!v.stateId}
+                  title={v.stateId
+                    ? "Right-click for state actions"
+                    : undefined}
+                  oncontextmenu={(event) =>
+                    v.stateId && openStateMenu(event, v.stateId, v)}
+                  >{v.stateId ?? "no state"}</code
+                >
               {/if}
               <span class="var-live" class:missing={!stateExists(v.stateId)}
                 >{stateLabel(v)}</span
@@ -626,18 +674,19 @@
 
                 {#if stateMode === "existing"}
                   <div class="state-row">
-                    <code class="var-value"
-                      >{editing.stateId || "no state chosen"}</code
-                    >
                     <button
                       type="button"
-                      class="btn btn-outline"
+                      class="btn btn-sm source-pick"
+                      title={editing.stateId ? "Change state" : "Set state"}
                       onclick={() => (picking = true)}
-                      ><span
-                        class="material-symbols-outlined"
-                        aria-hidden="true">search</span
-                      >Choose…</button
+                      oncontextmenu={(event) =>
+                        openStateMenu(event, editing.stateId ?? "", editing)}
                     >
+                      <Icon value="edit" size={15} />
+                      <span class="source-name"
+                        >{editing.stateId || "Choose a state…"}</span
+                      >
+                    </button>
                   </div>
                   {#if editing.stateId && !stateExists(editing.stateId)}
                     <p class="hint error">
@@ -839,6 +888,47 @@
     </div>
   {/if}
 
+  {#if stateMenu}
+    {@const menu = stateMenu}
+    <ContextMenu
+      x={menu.x}
+      y={menu.y}
+      heading={menu.id || menu.variable.name}
+      label="State"
+      items={[
+        ...(menu.id
+          ? [
+              {
+                id: "copy",
+                label: "Copy state ID",
+                icon: "content_copy",
+                run: () => {
+                  void copyStateId(menu.id);
+                },
+              },
+              ...(onopenstate
+                ? [
+                    {
+                      id: "open",
+                      label: "Open in States",
+                      icon: "database",
+                      run: () => onopenstate?.(menu.id),
+                    },
+                  ]
+                : []),
+            ]
+          : []),
+        {
+          id: "choose",
+          label: "Choose new state",
+          icon: "edit",
+          run: () => chooseState(menu.variable),
+        },
+      ]}
+      onclose={() => (stateMenu = null)}
+    />
+  {/if}
+
   {#if picking}
     <SourcePicker
       mode="state"
@@ -954,6 +1044,25 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .var-value.copyable {
+    cursor: context-menu;
+  }
+
+  .source-pick {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .source-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
   }
 
   .var-live {
