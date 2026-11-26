@@ -14,8 +14,15 @@
   import { goto } from "$app/navigation";
   import { placementUnder, sectionTitleUnder } from "$lib/config/tile-hit";
   import {
-    dropIndex,
-    movePlacement,
+    dropTargetFrom,
+    planDrop,
+    planUndo,
+    type DragSection,
+    type DragTile,
+    type DropPlan,
+    type DropTarget,
+  } from "$lib/config/drag-drop";
+  import {
     type LayoutSelection,
     type PlacementAnchor,
   } from "$lib/config/layout-ops";
@@ -53,13 +60,6 @@
     }) => void;
   } | null>(null);
 
-  interface DropTarget {
-    pageId: string;
-    sectionId: string;
-    /** The gap index before which the tile is inserted. */
-    index: number;
-    line: { left: number; top: number; height: number };
-  }
   interface DragState {
     anchor: PlacementAnchor;
     x: number;
@@ -78,9 +78,9 @@
   let suppressClick = false;
   /** One-step undo for the last drag drop, cleared when another edit lands. */
   let lastMove: {
-    before: PageRegistry;
-    after: PageRegistry;
-    from: PlacementAnchor;
+    plan: DropPlan;
+    /** The store's registry object after the commit (a Svelte proxy). */
+    committed: PageRegistry;
   } | null = null;
 
   const longPress = createLongPress({
@@ -160,67 +160,25 @@
 
   /** Where a dragged tile would land, with the line to show between tiles. */
   function dropTargetAt(x: number, y: number): DropTarget | null {
-    const tiles = [
+    const tiles: DragTile[] = [
       ...document.querySelectorAll<HTMLElement>(".stage [data-placement-id]"),
-    ];
-    const hit = placementUnder(tiles, x, y);
-    if (hit) {
-      const element = tiles.find(
-        (tile) =>
-          tile.dataset.pageId === hit.pageId &&
-          tile.dataset.sectionId === hit.sectionId &&
-          tile.dataset.placementId === hit.placementId,
-      );
-      if (!element) return null;
-      const sectionTiles = tiles.filter(
-        (tile) =>
-          tile.dataset.pageId === hit.pageId &&
-          tile.dataset.sectionId === hit.sectionId,
-      );
-      const index = sectionTiles.indexOf(element);
-      const rect = element.getBoundingClientRect();
-      const before = x < rect.left + rect.width / 2;
-      return {
-        pageId: hit.pageId,
-        sectionId: hit.sectionId,
-        index: before ? index : index + 1,
-        line: {
-          left: before ? rect.left - 4 : rect.right + 4,
-          top: rect.top,
-          height: rect.height,
-        },
-      };
-    }
-    const sections = [
+    ].map((element) => ({
+      pageId: element.dataset.pageId ?? "",
+      sectionId: element.dataset.sectionId ?? "",
+      placementId: element.dataset.placementId ?? "",
+      rect: element.getBoundingClientRect(),
+    }));
+    const sections: DragSection[] = [
       ...document.querySelectorAll<HTMLElement>(".stage [data-section-box]"),
-    ];
-    const section = sections.find((entry) => {
-      const r = entry.getBoundingClientRect();
-      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-    });
-    if (!section) return null;
-    const sectionId = section.dataset.sectionId ?? "";
-    const targetPageId = section.dataset.pageId ?? page?.id ?? "";
-    if (!sectionId || !targetPageId) return null;
-    const sectionTiles = tiles.filter(
-      (tile) =>
-        tile.dataset.pageId === targetPageId &&
-        tile.dataset.sectionId === sectionId,
-    );
-    const last = sectionTiles.at(-1)?.getBoundingClientRect();
-    const grid = section.querySelector<HTMLElement>(".grid");
-    const box = section.getBoundingClientRect();
-    const gridBox = grid?.getBoundingClientRect();
-    return {
-      pageId: targetPageId,
-      sectionId,
-      index: sectionTiles.length,
-      line: {
-        left: last ? last.right + 4 : (gridBox?.left ?? box.left) + 4,
-        top: last ? last.top : (gridBox?.top ?? box.top) + 8,
-        height: last ? last.height : 40,
-      },
-    };
+    ].map((element) => ({
+      pageId: element.dataset.pageId ?? "",
+      sectionId: element.dataset.sectionId ?? "",
+      rect: element.getBoundingClientRect(),
+      contentRect: element
+        .querySelector<HTMLElement>(".grid")
+        ?.getBoundingClientRect(),
+    }));
+    return dropTargetFrom(tiles, sections, x, y);
   }
 
   function onPointerDown(event: PointerEvent): void {
@@ -307,47 +265,11 @@
   }
 
   function commitDrop(anchor: PlacementAnchor, target: DropTarget): void {
-    const before = getPageRegistry();
-    const sourceSection = before.pages
-      .find((entry) => entry.id === anchor.pageId)
-      ?.groups?.find((group) => group.id === anchor.sectionId);
-    const targetSection = before.pages
-      .find((entry) => entry.id === target.pageId)
-      ?.groups?.find((group) => group.id === target.sectionId);
-    const fromIndex =
-      sourceSection?.tiles?.findIndex(
-        (tile) => tile.id === anchor.placementId,
-      ) ?? -1;
-    if (fromIndex < 0 || !targetSection) return;
-    const same =
-      anchor.pageId === target.pageId && anchor.sectionId === target.sectionId;
-    const toIndex = dropIndex(fromIndex, target.index, same);
-    // Dropping on itself is a no-op only within the same section; moving to
-    // index 0 of another section is a real move even when the indices match.
-    if (same && toIndex === fromIndex) return;
-    const next = movePlacement(
-      before,
-      {
-        pageId: anchor.pageId,
-        sectionId: anchor.sectionId,
-        index: fromIndex,
-      },
-      {
-        pageId: target.pageId,
-        sectionId: target.sectionId,
-        index: toIndex,
-      },
-    );
-    if (next === before || !commitLayout(next)) return;
-    picked = {
-      kind: "tile",
-      pageId: target.pageId,
-      sectionId: target.sectionId,
-      placementId: anchor.placementId,
-    };
-    lastMove = { before, after: getPageRegistry(), from: anchor };
-    const title = sourceSection.tiles?.[fromIndex]?.title?.trim() || "Tile";
-    toast.success(`Moved “${title}”`, {
+    const plan = planDrop(getPageRegistry(), anchor, target);
+    if (!plan || !commitLayout(plan.after)) return;
+    picked = { kind: "tile", ...plan.to };
+    lastMove = { plan, committed: getPageRegistry() };
+    toast.success(`Moved “${plan.title}”`, {
       key: "layout-move",
       timeout: 8000,
       action: { label: "Undo", run: undoMove },
@@ -358,10 +280,9 @@
     const move = lastMove;
     lastMove = null;
     if (!move) return;
-    // A later edit is not overwritten by a stale undo.
-    if (getPageRegistry() !== move.after) return;
-    if (!commitLayout(move.before)) return;
-    picked = { kind: "tile", ...move.from };
+    const restore = planUndo(move.plan, move.committed, getPageRegistry());
+    if (!restore || !commitLayout(restore)) return;
+    picked = { kind: "tile", ...move.plan.from };
   }
 
   const dragTitle = $derived.by(() => {
