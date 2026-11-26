@@ -26,6 +26,16 @@
     >
       <span class="toast-icon" aria-hidden="true">{ICONS[item.level]}</span>
       <span class="toast-message">{item.message}</span>
+      {#if item.action}
+        <button
+          type="button"
+          class="btn btn-sm toast-action"
+          onclick={() => {
+            item.action?.run();
+            toast.dismiss(item.id);
+          }}>{item.action.label}</button
+        >
+      {/if}
       <button
         type="button"
         class="toast-close"
@@ -94,6 +104,10 @@
     flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .toast-action {
+    flex: 0 0 auto;
   }
 
   .toast-close {

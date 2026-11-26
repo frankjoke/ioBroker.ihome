@@ -72,6 +72,9 @@
 
 <section
   class="group"
+  data-section-box=""
+  data-page-id={pageId}
+  data-section-id={group.id}
   class:bordered={group.appearance?.border === true}
   class:new-line={group.newLine === true}
   class:phone={bp === "phone"}

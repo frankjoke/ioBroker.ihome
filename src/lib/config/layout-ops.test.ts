@@ -15,6 +15,7 @@ import {
   movePlacement,
   moveSection,
   moveSectionToPage,
+  dropIndex,
   pageTitleTaken,
   parseLayoutRef,
   patchPage,
@@ -57,6 +58,18 @@ it("moves an item, and does nothing for an equal or out-of-range index", () => {
   // always a copy, never the same array
   const list = ["a"];
   expect(moveItem(list, 0, 0)).not.toBe(list);
+});
+
+it("turns a drop gap into the final index after the dragged item is removed", () => {
+  // Same section: the gap shifts when the tile came from before it.
+  expect(dropIndex(0, 2, true)).toBe(1);
+  expect(dropIndex(0, 3, true)).toBe(2);
+  expect(dropIndex(2, 0, true)).toBe(0);
+  // Dropping on itself (before or after) is a no-op.
+  expect(dropIndex(1, 1, true)).toBe(1);
+  expect(dropIndex(1, 2, true)).toBe(1);
+  // Cross-section: the destination list is untouched until the insert.
+  expect(dropIndex(0, 2, false)).toBe(2);
 });
 
 it("duplicates a section with fresh ids at every level below it", () => {

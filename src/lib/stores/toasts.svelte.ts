@@ -1,5 +1,10 @@
 export type ToastLevel = "info" | "success" | "warning" | "error";
 
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 export interface ToastOptions {
   /** Reuse this key instead of stacking a second toast. */
   key?: string;
@@ -7,6 +12,8 @@ export interface ToastOptions {
   sticky?: boolean;
   /** Auto-dismiss after this many milliseconds. */
   timeout?: number;
+  /** An optional button, e.g. Undo. */
+  action?: ToastAction;
 }
 
 export interface Toast {
@@ -16,6 +23,7 @@ export interface Toast {
   key?: string;
   sticky: boolean;
   timeout: number;
+  action?: ToastAction;
 }
 
 const DEFAULT_TIMEOUT = 6000;
@@ -62,6 +70,7 @@ export function show(
       level,
       sticky: options.sticky ?? existing.sticky,
       timeout: options.timeout ?? existing.timeout,
+      action: options.action ?? existing.action,
     };
     toasts.items = toasts.items.map((toast) =>
       toast.id === existing.id ? next : toast,
@@ -85,6 +94,7 @@ export function show(
     key: options.key,
     sticky: options.sticky ?? false,
     timeout: options.timeout ?? DEFAULT_TIMEOUT,
+    action: options.action,
   };
   toasts.items = [item, ...toasts.items];
   schedule(item);

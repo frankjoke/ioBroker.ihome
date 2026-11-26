@@ -2,15 +2,26 @@
   import PageView from "$lib/components/display/PageView.svelte";
   import LayoutSheet from "$lib/components/layout/LayoutSheet.svelte";
   import DisplayLayoutMenu from "$lib/components/display/DisplayLayoutMenu.svelte";
-  import { getPagesLoadKind, setLastPage } from "$lib/stores/pages.svelte.js";
+  import {
+    commitLayout,
+    getPageRegistry,
+    getPagesLoadKind,
+    setLastPage,
+  } from "$lib/stores/pages.svelte.js";
   import { pagePlaceholder } from "$lib/config/pages-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { sheet } from "$lib/stores/sheet.svelte.js";
   import { goto } from "$app/navigation";
   import { placementUnder, sectionTitleUnder } from "$lib/config/tile-hit";
-  import type { LayoutSelection } from "$lib/config/layout-ops";
+  import {
+    dropIndex,
+    movePlacement,
+    type LayoutSelection,
+    type PlacementAnchor,
+  } from "$lib/config/layout-ops";
   import { createLongPress } from "$lib/utils/long-press";
-  import type { Page } from "$lib/types/display";
+  import { toast } from "$lib/stores/toasts.svelte";
+  import type { Page, PageRegistry } from "$lib/types/display";
 
   /** The display as one page shows it — at "/" (the page the wall left behind)
    *  and at "/p/<id>" alike, so the editor is a mode of both and not just of
@@ -42,6 +53,36 @@
     }) => void;
   } | null>(null);
 
+  interface DropTarget {
+    pageId: string;
+    sectionId: string;
+    /** The gap index before which the tile is inserted. */
+    index: number;
+    line: { left: number; top: number; height: number };
+  }
+  interface DragState {
+    anchor: PlacementAnchor;
+    x: number;
+    y: number;
+    target: DropTarget | null;
+  }
+
+  /** Pointer drag in edit mode: a mouse/pen moves one tile. Touch keeps the
+   *  long-press menu (a drag there would fight page scrolling). */
+  let drag = $state<DragState | null>(null);
+  let dragStart: {
+    x: number;
+    y: number;
+    anchor: PlacementAnchor;
+  } | null = null;
+  let suppressClick = false;
+  /** One-step undo for the last drag drop, cleared when another edit lands. */
+  let lastMove: {
+    before: PageRegistry;
+    after: PageRegistry;
+    from: PlacementAnchor;
+  } | null = null;
+
   const longPress = createLongPress({
     onTrigger: (x, y) => openContext(x, y),
   });
@@ -72,6 +113,11 @@
   }
 
   function pick(event: MouseEvent): void {
+    // The click that follows a drop is not a second pick.
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
     // A long-press already opened the menu; its click is not a new pick.
     if (longPress.consume()) return;
     const hit = hitAt(event.clientX, event.clientY);
@@ -112,22 +158,225 @@
     };
   }
 
+  /** Where a dragged tile would land, with the line to show between tiles. */
+  function dropTargetAt(x: number, y: number): DropTarget | null {
+    const tiles = [
+      ...document.querySelectorAll<HTMLElement>(".stage [data-placement-id]"),
+    ];
+    const hit = placementUnder(tiles, x, y);
+    if (hit) {
+      const element = tiles.find(
+        (tile) =>
+          tile.dataset.pageId === hit.pageId &&
+          tile.dataset.sectionId === hit.sectionId &&
+          tile.dataset.placementId === hit.placementId,
+      );
+      if (!element) return null;
+      const sectionTiles = tiles.filter(
+        (tile) =>
+          tile.dataset.pageId === hit.pageId &&
+          tile.dataset.sectionId === hit.sectionId,
+      );
+      const index = sectionTiles.indexOf(element);
+      const rect = element.getBoundingClientRect();
+      const before = x < rect.left + rect.width / 2;
+      return {
+        pageId: hit.pageId,
+        sectionId: hit.sectionId,
+        index: before ? index : index + 1,
+        line: {
+          left: before ? rect.left - 4 : rect.right + 4,
+          top: rect.top,
+          height: rect.height,
+        },
+      };
+    }
+    const sections = [
+      ...document.querySelectorAll<HTMLElement>(".stage [data-section-box]"),
+    ];
+    const section = sections.find((entry) => {
+      const r = entry.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    });
+    if (!section) return null;
+    const sectionId = section.dataset.sectionId ?? "";
+    const targetPageId = section.dataset.pageId ?? page?.id ?? "";
+    if (!sectionId || !targetPageId) return null;
+    const sectionTiles = tiles.filter(
+      (tile) =>
+        tile.dataset.pageId === targetPageId &&
+        tile.dataset.sectionId === sectionId,
+    );
+    const last = sectionTiles.at(-1)?.getBoundingClientRect();
+    const grid = section.querySelector<HTMLElement>(".grid");
+    const box = section.getBoundingClientRect();
+    const gridBox = grid?.getBoundingClientRect();
+    return {
+      pageId: targetPageId,
+      sectionId,
+      index: sectionTiles.length,
+      line: {
+        left: last ? last.right + 4 : (gridBox?.left ?? box.left) + 4,
+        top: last ? last.top : (gridBox?.top ?? box.top) + 8,
+        height: last ? last.height : 40,
+      },
+    };
+  }
+
   function onPointerDown(event: PointerEvent): void {
-    if (event.pointerType !== "touch" || event.button !== 0) return;
-    longPress.down(event.clientX, event.clientY);
+    if (event.button !== 0) return;
+    if (event.pointerType === "touch") {
+      longPress.down(event.clientX, event.clientY);
+      return;
+    }
+    if (!sheet.open) return;
+    const hit = hitAt(event.clientX, event.clientY);
+    if (hit?.kind !== "tile") return;
+    dragStart = {
+      x: event.clientX,
+      y: event.clientY,
+      anchor: {
+        pageId: hit.pageId,
+        sectionId: hit.sectionId,
+        placementId: hit.placementId,
+      },
+    };
+    picked = hit;
+    try {
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      /* synthetic events and browsers without capture: the layer still gets
+         the moves while the pointer stays over it */
+    }
   }
 
   function onPointerMove(event: PointerEvent): void {
+    if (drag) {
+      event.preventDefault();
+      drag = {
+        ...drag,
+        x: event.clientX,
+        y: event.clientY,
+        target: dropTargetAt(event.clientX, event.clientY),
+      };
+      return;
+    }
+    if (dragStart) {
+      if (
+        Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6
+      ) {
+        return;
+      }
+      drag = {
+        anchor: dragStart.anchor,
+        x: event.clientX,
+        y: event.clientY,
+        target: dropTargetAt(event.clientX, event.clientY),
+      };
+      longPress.cancel();
+      return;
+    }
     longPress.move(event.clientX, event.clientY);
   }
 
   function onPointerUp(): void {
+    if (drag) {
+      const current = drag;
+      drag = null;
+      dragStart = null;
+      suppressClick = true;
+      window.setTimeout(() => {
+        suppressClick = false;
+      }, 300);
+      longPress.consume();
+      if (current.target) commitDrop(current.anchor, current.target);
+      return;
+    }
+    dragStart = null;
     longPress.up();
   }
 
   function onPointerCancel(): void {
+    drag = null;
+    dragStart = null;
     longPress.cancel();
   }
+
+  function onPointerLeave(): void {
+    if (!drag) longPress.cancel();
+  }
+
+  function commitDrop(anchor: PlacementAnchor, target: DropTarget): void {
+    const before = getPageRegistry();
+    const sourceSection = before.pages
+      .find((entry) => entry.id === anchor.pageId)
+      ?.groups?.find((group) => group.id === anchor.sectionId);
+    const targetSection = before.pages
+      .find((entry) => entry.id === target.pageId)
+      ?.groups?.find((group) => group.id === target.sectionId);
+    const fromIndex =
+      sourceSection?.tiles?.findIndex(
+        (tile) => tile.id === anchor.placementId,
+      ) ?? -1;
+    if (fromIndex < 0 || !targetSection) return;
+    const same =
+      anchor.pageId === target.pageId && anchor.sectionId === target.sectionId;
+    const toIndex = dropIndex(fromIndex, target.index, same);
+    // Dropping on itself is a no-op only within the same section; moving to
+    // index 0 of another section is a real move even when the indices match.
+    if (same && toIndex === fromIndex) return;
+    const next = movePlacement(
+      before,
+      {
+        pageId: anchor.pageId,
+        sectionId: anchor.sectionId,
+        index: fromIndex,
+      },
+      {
+        pageId: target.pageId,
+        sectionId: target.sectionId,
+        index: toIndex,
+      },
+    );
+    if (next === before || !commitLayout(next)) return;
+    picked = {
+      kind: "tile",
+      pageId: target.pageId,
+      sectionId: target.sectionId,
+      placementId: anchor.placementId,
+    };
+    lastMove = { before, after: getPageRegistry(), from: anchor };
+    const title = sourceSection.tiles?.[fromIndex]?.title?.trim() || "Tile";
+    toast.success(`Moved “${title}”`, {
+      key: "layout-move",
+      timeout: 8000,
+      action: { label: "Undo", run: undoMove },
+    });
+  }
+
+  function undoMove(): void {
+    const move = lastMove;
+    lastMove = null;
+    if (!move) return;
+    // A later edit is not overwritten by a stale undo.
+    if (getPageRegistry() !== move.after) return;
+    if (!commitLayout(move.before)) return;
+    picked = { kind: "tile", ...move.from };
+  }
+
+  const dragTitle = $derived.by(() => {
+    const anchor = drag?.anchor;
+    if (!anchor) return "";
+    const section = getPageRegistry()
+      .pages.find((entry) => entry.id === anchor.pageId)
+      ?.groups?.find((group) => group.id === anchor.sectionId);
+    return (
+      (
+        section?.tiles?.find((tile) => tile.id === anchor.placementId)?.title ??
+        ""
+      ).trim() || "Tile"
+    );
+  });
 
   // A pick is spent when the sheet closes: reopening must not jump back to the
   // old tile, and a stale pick must not clobber a handoff that arrives with a
@@ -192,17 +441,31 @@
     <button
       type="button"
       class="pick-layer"
+      class:dragging={!!drag}
       tabindex="-1"
       aria-hidden="true"
-      title="Right-click or long-press for tile actions"
+      title="Click to select, drag to move, right-click for actions"
       onclick={pick}
       oncontextmenu={onContextMenu}
       onpointerdown={onPointerDown}
       onpointermove={onPointerMove}
       onpointerup={onPointerUp}
       onpointercancel={onPointerCancel}
-      onpointerleave={onPointerCancel}
+      onpointerleave={onPointerLeave}
     ></button>
+  {/if}
+
+  {#if drag}
+    <div class="drag-ghost" style="left: {drag.x + 14}px; top: {drag.y + 14}px">
+      {dragTitle}
+    </div>
+    {#if drag.target}
+      <div
+        class="drop-line"
+        style="left: {drag.target.line.left}px; top: {drag.target.line
+          .top}px; height: {drag.target.line.height}px"
+      ></div>
+    {/if}
   {/if}
 
   {#if displayMenu}
@@ -260,6 +523,33 @@
     cursor: pointer;
     -webkit-touch-callout: none;
     user-select: none;
+  }
+
+  .pick-layer.dragging {
+    cursor: grabbing;
+  }
+
+  .drag-ghost {
+    position: fixed;
+    z-index: 60;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    font-size: var(--body-sm);
+    box-shadow: var(--shadow-small);
+    pointer-events: none;
+  }
+
+  .drop-line {
+    position: fixed;
+    z-index: 60;
+    width: 3px;
+    border-radius: 2px;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--surface-color);
+    pointer-events: none;
   }
 
   /* Wide: the sheet takes the right-hand strip, the display keeps the rest (it

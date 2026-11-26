@@ -51,3 +51,14 @@ it("keeps at most three non-sticky toasts", () => {
 
   expect(toasts.items.map((t) => t.message)).toEqual(["four", "three", "two"]);
 });
+
+it("carries an action for undo-style toasts", () => {
+  let undone = 0;
+  toast.success("Moved “Lamp”", {
+    key: "layout-move",
+    action: { label: "Undo", run: () => undone++ },
+  });
+  expect(toasts.items[0].action?.label).toBe("Undo");
+  toasts.items[0].action?.run();
+  expect(undone).toBe(1);
+});

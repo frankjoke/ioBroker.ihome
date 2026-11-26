@@ -118,6 +118,17 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
   return copy;
 }
 
+/** The final `moveItem` index when a drag drops into `gap` (the slot before
+ *  the tile at that index). Moving within the same list shifts the gap by one
+ *  once the dragged tile is removed; a cross-section drop does not. */
+export function dropIndex(
+  fromIndex: number,
+  gap: number,
+  sameSection: boolean,
+): number {
+  return sameSection && gap > fromIndex ? gap - 1 : gap;
+}
+
 /**
  * A placement copy with a fresh id. Deep-copied (M2): a plain spread would leave
  * the copy sharing the original's slot/rule arrays, so editing the copy would
