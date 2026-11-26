@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import { page } from "$app/state";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
@@ -35,6 +36,7 @@
   } from "$lib/config/states-tabs";
   import { STATES_GUIDE, VARIABLES_GUIDE } from "$lib/config/page-guides";
   import { copyText } from "$lib/utils/clipboard";
+  import { ownerOf } from "$lib/utils/icon-url";
   import { toast } from "$lib/stores/toasts.svelte";
 
   const objects = $derived(ioBroker.objects as unknown as Map<string, any>);
@@ -88,6 +90,7 @@
     id: string;
     action: "history" | "override" | "delete";
   } | null>(null);
+  const iconRequests = new SvelteSet<string>();
 
   const entries = $derived(
     stateEntries(
@@ -254,6 +257,36 @@
     history.replaceState(history.state, "", `#/states?tab=${tab}`);
   });
 
+  // The object cache starts with states; fetch the meta/device/folder ancestors
+  // and the adapter instance when a row needs an icon.
+  $effect(() => {
+    const ids = new SvelteSet<string>();
+    for (const entry of shown) {
+      let cur = entry.id;
+      while (cur) {
+        ids.add(cur);
+        const cut = cur.lastIndexOf(".");
+        if (cut < 0) break;
+        cur = cur.slice(0, cut);
+      }
+      const { adapter, instance: ownerInstance } = ownerOf(entry.id);
+      if (adapter) {
+        if (ownerInstance) {
+          ids.add(`system.adapter.${adapter}.${ownerInstance}`);
+        }
+        ids.add(`system.adapter.${adapter}`);
+      }
+    }
+    for (const id of ids) {
+      if (ioBroker.objects.has(id) || iconRequests.has(id)) continue;
+      iconRequests.add(id);
+      void ioBroker
+        .getObject(id, true)
+        .catch(() => undefined)
+        .finally(() => iconRequests.delete(id));
+    }
+  });
+
   $effect(() => {
     patchView("/states", {
       query,
@@ -346,7 +379,7 @@
     {/if}
   </div>
 
-  <div class="tab-panel" hidden={tab !== "states"}>
+  <div class="tab-panel states" hidden={tab !== "states"}>
     <div class="states-grid">
       <StateList
         entries={shown}
@@ -451,6 +484,35 @@
     gap: 1rem;
     max-width: 1200px;
     margin: 0 auto;
+    height: calc(100vh - 4.5rem);
+    height: calc(100dvh - 4.5rem);
+    min-height: 0;
+  }
+
+  .tab-panel {
+    min-height: 0;
+  }
+
+  .tab-panel[hidden] {
+    display: none !important;
+  }
+
+  .tab-panel.states {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .tab-panel:not(.states):not([hidden]) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .states-page > .item .item-editor {
+    max-height: calc(100dvh - 12rem);
+    overflow-y: auto;
   }
 
   .title-line {
@@ -481,18 +543,34 @@
     display: grid;
     grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
     gap: 1rem;
-    align-items: start;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
   }
 
   .detail {
     padding: 1rem;
-    min-height: 12rem;
+    min-height: 0;
     min-width: 0;
+    max-height: 100%;
+    overflow-y: auto;
   }
 
   @media (max-width: 820px) {
     .states-grid {
-      grid-template-columns: minmax(0, 1fr);
+      display: flex;
+      flex-direction: column;
+      height: auto;
+    }
+
+    .tab-panel.states {
+      overflow-y: auto;
+    }
+
+    .detail {
+      max-height: none;
+      overflow: visible;
     }
   }
 </style>

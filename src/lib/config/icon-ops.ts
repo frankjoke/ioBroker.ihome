@@ -108,6 +108,46 @@ export function resolveIcon(
   return undefined;
 }
 
+/** Instance/package objects are not state-path icons; their icon is the fallback. */
+const STATE_ROW_SKIP = new Set(["instance", "adapter"]);
+
+/**
+ * The icon a state row shows: the nearest meta/folder/device ancestor with an
+ * icon (including the state itself), else the adapter's own icon.
+ */
+export function stateRowIcon(
+  objects: Map<string, any>,
+  id: string,
+): { from: string; value: string } | undefined {
+  let cur = String(id ?? "");
+  while (cur) {
+    const obj = objects.get(cur);
+    const hit =
+      obj && !STATE_ROW_SKIP.has(String(obj.type))
+        ? objectIconValue(obj)
+        : undefined;
+    if (hit) return { from: cur, value: hit.value };
+    const cut = cur.lastIndexOf(".");
+    if (cut < 0) break;
+    cur = cur.slice(0, cut);
+  }
+  const { adapter, instance } = ownerOf(id);
+  if (!adapter) return undefined;
+  // Prefer the instance's local icon file over the package's remote extIcon.
+  for (const candidate of [
+    instance ? `system.adapter.${adapter}.${instance}` : "",
+    `system.adapter.${adapter}`,
+  ]) {
+    if (!candidate) continue;
+    const local = objects.get(candidate)?.common?.icon;
+    if (typeof local === "string" && local.trim()) {
+      return { from: candidate, value: local.trim() };
+    }
+  }
+  const hit = adapterIcon(objects, adapter);
+  return hit ? { from: hit.owner, value: hit.value } : undefined;
+}
+
 /** The device's icon: the first of its controls whose reading resolves (A65). */
 export function deviceObjectIcon(
   objects: Map<string, any>,

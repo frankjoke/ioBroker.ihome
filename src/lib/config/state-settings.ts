@@ -1,5 +1,6 @@
 import { localizeName } from "$lib/config/format";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
+import { stateRowIcon } from "$lib/config/icon-ops";
 import { enumsOfState } from "$lib/config/rooms";
 import type { SourceOverride } from "$lib/types/overrides";
 
@@ -16,6 +17,8 @@ export interface StateEntry {
   /** Room/function enum ids, including parent-channel memberships. */
   rooms: string[];
   functions: string[];
+  /** Nearest state-path icon, else the adapter icon. */
+  icon?: { from: string; value: string };
 }
 
 /** Everything under `system.*` is ioBroker controller space, not iHome data. */
@@ -164,6 +167,7 @@ export function stateEntries(
       ).length,
       rooms: enums ? enumsOfState(enums, id, "rooms") : [],
       functions: enums ? enumsOfState(enums, id, "functions") : [],
+      icon: stateRowIcon(objects, id),
     });
   }
   // Sort by broker id: equal display names ("Host", "Online", …) from

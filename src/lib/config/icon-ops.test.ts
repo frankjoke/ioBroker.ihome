@@ -10,6 +10,7 @@ import {
   pluginPageIcon,
   presetGlyph,
   resolveIcon,
+  stateRowIcon,
 } from "$lib/config/icon-ops";
 import { ownerOf } from "$lib/utils/icon-url";
 
@@ -109,6 +110,52 @@ it("falls back to the adapter, the instance first (A65)", () => {
   expect(resolveIcon(objects([]), "a.0.C.X")).toBeUndefined();
   // An id with nothing to walk to terminates instead of looping.
   expect(resolveIcon(objects([]), "single")).toBeUndefined();
+});
+
+it("uses a state-path meta/folder/device icon, then the adapter", () => {
+  const withFolder = objects([
+    ["ihome.0.Logic", { type: "folder", common: { icon: "logic.svg" } }],
+    ["ihome.0.Logic.X", { type: "state", common: {} }],
+    ["system.adapter.ihome.0", { common: { icon: "ihome.png" } }],
+  ]);
+  expect(stateRowIcon(withFolder, "ihome.0.Logic.X")).toEqual({
+    from: "ihome.0.Logic",
+    value: "logic.svg",
+  });
+
+  const withMeta = objects([
+    [
+      "0_userdata.0",
+      { type: "meta", common: { icon: "data:image/svg+xml;base64,AA" } },
+    ],
+    ["0_userdata.0.X", { type: "state", common: {} }],
+  ]);
+  expect(stateRowIcon(withMeta, "0_userdata.0.X")).toEqual({
+    from: "0_userdata.0",
+    value: "data:image/svg+xml;base64,AA",
+  });
+
+  const fallback = objects([
+    ["a.0.C.X", { type: "state", common: {} }],
+    ["system.adapter.a.0", { common: { icon: "a.png" } }],
+  ]);
+  expect(stateRowIcon(fallback, "a.0.C.X")).toEqual({
+    from: "system.adapter.a.0",
+    value: "a.png",
+  });
+
+  // The local instance file beats the package's remote extIcon.
+  const local = objects([
+    ["a.0.C.X", { type: "state", common: {} }],
+    [
+      "system.adapter.a.0",
+      { common: { icon: "a.png", extIcon: "https://x/a.png" } },
+    ],
+  ]);
+  expect(stateRowIcon(local, "a.0.C.X")).toEqual({
+    from: "system.adapter.a.0",
+    value: "a.png",
+  });
 });
 
 it("keeps a broker icon portable for a document (A66)", () => {

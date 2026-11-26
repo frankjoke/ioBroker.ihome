@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import Icon from "$lib/components/common/Icon.svelte";
   import SelectField from "$lib/components/common/SelectField.svelte";
   import {
     stateDepth,
@@ -145,7 +146,9 @@
         type="button"
         class="state-row"
         class:active={entry.id === selectedId}
-        style={`--state-depth:${depth}`}
+        style={`--state-depth:${depth};--state-icon-space:${
+          entry.icon ? "1.05rem" : "0rem"
+        }`}
         title="Right-click for state actions"
         onclick={() => onselect(entry.id)}
         oncontextmenu={(event) => {
@@ -159,7 +162,18 @@
           <span class="mono id" title={entry.id}
             ><span dir="ltr">{entry.id}</span></span
           >
-          <span class="name">{entry.name}</span>
+          <span class="name-line">
+            {#if entry.icon}
+              <span class="state-icon" title={entry.icon.from}>
+                <Icon
+                  value={entry.icon.value}
+                  owner={entry.icon.from}
+                  size={14}
+                />
+              </span>
+            {/if}
+            <span class="name">{entry.name}</span>
+          </span>
         </span>
         <span class="row-meta">
           {#if entry.type}<span class="badge badge-secondary">{entry.type}</span
@@ -184,6 +198,7 @@
     flex-direction: column;
     gap: 0.5rem;
     min-height: 0;
+    height: 100%;
   }
 
   .list-head {
@@ -251,11 +266,11 @@
 
   .rows {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 0.2rem;
     overflow-y: auto;
     min-height: 0;
-    max-height: calc(100vh - 15rem);
   }
 
   .state-row {
@@ -288,12 +303,34 @@
     min-width: 0;
   }
 
-  .name,
+  .name-line {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding-left: calc(max(0, var(--state-depth, 1) - 2) * 0.9rem);
+  }
+
   .row-meta {
-    padding-left: calc(var(--state-depth, 0) * 0.9rem);
+    padding-left: calc(
+      max(0, var(--state-depth, 1) - 2) * 0.9rem +
+        var(--state-icon-space, 1.05rem)
+    );
+  }
+
+  .state-icon {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-right: 0.15rem;
+    color: var(--text-muted);
   }
 
   .name {
+    flex: 1 1 auto;
+    min-width: 0;
     color: var(--text-muted);
     font-size: var(--body-sm);
     overflow: hidden;
@@ -325,5 +362,15 @@
 
   .empty {
     padding: 0.5rem;
+  }
+
+  @media (max-width: 820px) {
+    .state-list {
+      height: auto;
+    }
+
+    .rows {
+      overflow: visible;
+    }
   }
 </style>
