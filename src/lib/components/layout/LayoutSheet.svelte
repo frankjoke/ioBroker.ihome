@@ -384,6 +384,11 @@
     const onResize = () => (previewBp = breakpointFor(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
+    const addTarget = sheet.addTileAt;
+    if (addTarget) {
+      sheet.addTileAt = null;
+      openNewTile(addTarget.pageId, addTarget.sectionId, addTarget.at);
+    }
     return () => window.removeEventListener("resize", onResize);
   });
 

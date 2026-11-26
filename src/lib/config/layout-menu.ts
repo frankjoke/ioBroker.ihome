@@ -5,6 +5,7 @@ export type LayoutMenuId =
   | "edit"
   | "duplicate"
   | "move"
+  | "move-section"
   | "save-template"
   | "delete"
   | "add-tile"
@@ -28,38 +29,85 @@ export interface LayoutMenuContext {
 
 export type LayoutMenuTargetKind = "tile" | "section" | "empty";
 
-export interface DisplayTileMenuContext {
+export interface DisplayMenuContext {
   /** The page document accepts writes. */
   writable: boolean;
   /** The template document accepts writes (independent of the page). */
   templatesWritable: boolean;
 }
 
-/** The eye-view menu on a tile: only the actions that fit a quick pass, in the
- *  order they are reached for. Edit is the one entry that leaves the display. */
-export function displayTileMenuItems(
-  context: DisplayTileMenuContext,
+/** The eye-view menu: the quick actions for a tile, a section or free page
+ *  space. Edit and Add tile are the only entries that leave the display. */
+export function displayMenuItems(
+  kind: LayoutMenuTargetKind,
+  context: DisplayMenuContext,
 ): LayoutMenuEntry[] {
+  const locked = !context.writable;
+  if (kind === "tile") {
+    return [
+      { id: "edit", label: "Edit tile", icon: "edit" },
+      {
+        id: "duplicate",
+        label: "Duplicate tile",
+        icon: "content_copy",
+        disabled: locked,
+      },
+      {
+        id: "save-template",
+        label: "Save as template",
+        icon: "bookmark_add",
+        disabled: !context.templatesWritable,
+      },
+      {
+        id: "add-tile",
+        label: "Add tile",
+        icon: "add",
+        disabled: locked,
+      },
+      {
+        id: "move",
+        label: "Move tile",
+        icon: "drive_file_move",
+        disabled: locked,
+      },
+      {
+        id: "delete",
+        label: "Delete tile",
+        icon: "delete",
+        danger: true,
+        disabled: locked,
+      },
+    ];
+  }
+  if (kind === "section") {
+    return [
+      {
+        id: "add-tile",
+        label: "Add tile",
+        icon: "add",
+        disabled: locked,
+      },
+      {
+        id: "move-section",
+        label: "Move section",
+        icon: "drive_file_move",
+        disabled: locked,
+      },
+      {
+        id: "delete",
+        label: "Delete section",
+        icon: "delete",
+        danger: true,
+        disabled: locked,
+      },
+    ];
+  }
   return [
-    { id: "edit", label: "Edit tile", icon: "edit" },
     {
-      id: "duplicate",
-      label: "Duplicate tile",
-      icon: "content_copy",
-      disabled: !context.writable,
-    },
-    {
-      id: "save-template",
-      label: "Save as template",
-      icon: "bookmark_add",
-      disabled: !context.templatesWritable,
-    },
-    {
-      id: "delete",
-      label: "Delete tile",
-      icon: "delete",
-      danger: true,
-      disabled: !context.writable,
+      id: "add-section",
+      label: "Add section",
+      icon: "playlist_add",
+      disabled: locked,
     },
   ];
 }

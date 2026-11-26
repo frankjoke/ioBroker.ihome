@@ -87,3 +87,23 @@ it("asks while the settings document has not been read", async () => {
   expect(calls).toBe(0);
   expect(isPinAsked()).toBe(true);
 });
+
+it("opens the sheet with a pending add-tile target", async () => {
+  const { openSheetForNewTile, sheet } = await gate();
+  openSheetForNewTile({ pageId: "p", sectionId: "s", at: 2 });
+  expect(sheet.open).toBe(true);
+  expect(sheet.addTileAt).toEqual({ pageId: "p", sectionId: "s", at: 2 });
+});
+
+it("drops the pending add-tile target when the ask is cancelled", async () => {
+  lockPencil = true;
+  const { isPinAsked, openSheetForNewTile, resolvePinAsk, sheet } =
+    await gate();
+  openSheetForNewTile({ pageId: "p", sectionId: "s" });
+  expect(sheet.open).toBe(false);
+  expect(sheet.addTileAt).toEqual({ pageId: "p", sectionId: "s" });
+  expect(isPinAsked()).toBe(true);
+  resolvePinAsk(false);
+  expect(sheet.addTileAt).toBeNull();
+  expect(sheet.open).toBe(false);
+});

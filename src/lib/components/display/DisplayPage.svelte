@@ -1,7 +1,7 @@
 <script lang="ts">
   import PageView from "$lib/components/display/PageView.svelte";
   import LayoutSheet from "$lib/components/layout/LayoutSheet.svelte";
-  import DisplayTileMenu from "$lib/components/display/DisplayTileMenu.svelte";
+  import DisplayLayoutMenu from "$lib/components/display/DisplayLayoutMenu.svelte";
   import { getPagesLoadKind, setLastPage } from "$lib/stores/pages.svelte.js";
   import { pagePlaceholder } from "$lib/config/pages-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
@@ -26,11 +26,12 @@
 
   /** The tile or section the last click in the display landed on (A48). */
   let picked = $state<LayoutSelection | null>(null);
-  /** The eye-view tile menu: a right-click while the layout sheet is closed. */
+  /** The eye-view menu: a right-click while the layout sheet is closed. */
   let displayMenu = $state<{
     x: number;
     y: number;
-    selection: Extract<LayoutSelection, { kind: "tile" }>;
+    pageId: string;
+    selection: LayoutSelection | null;
   } | null>(null);
   /** The sheet's imperative corner: it owns the menu and its actions. */
   let layoutSheet = $state<{
@@ -90,18 +91,25 @@
     openContext(event.clientX, event.clientY);
   }
 
-  /** In eye view a tile right-click opens the quick menu; the browser keeps its
-   *  own menu over inputs and editable text, and over gaps. */
+  /** In eye view a right-click opens the quick menu for a tile, a section
+   *  title or free page space; the browser keeps its own menu over inputs and
+   *  editable text. */
   function onStageContextMenu(event: MouseEvent): void {
     if (sheet.open) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("input, textarea, select, [contenteditable='true']"))
       return;
     const hit = hitAt(event.clientX, event.clientY);
-    if (hit?.kind !== "tile") return;
+    const targetPageId = hit && "pageId" in hit ? hit.pageId : (page?.id ?? "");
+    if (!targetPageId) return;
     event.preventDefault();
     event.stopPropagation();
-    displayMenu = { x: event.clientX, y: event.clientY, selection: hit };
+    displayMenu = {
+      x: event.clientX,
+      y: event.clientY,
+      pageId: targetPageId,
+      selection: hit,
+    };
   }
 
   function onPointerDown(event: PointerEvent): void {
@@ -126,6 +134,11 @@
   // fresh sheet (the bug 3911929 fixed).
   $effect(() => {
     if (!sheet.open) picked = null;
+  });
+
+  // The eye-view menu belongs to view mode; opening the editor retires it.
+  $effect(() => {
+    if (sheet.open) displayMenu = null;
   });
 
   /**
@@ -193,9 +206,10 @@
   {/if}
 
   {#if displayMenu}
-    <DisplayTileMenu
+    <DisplayLayoutMenu
       x={displayMenu.x}
       y={displayMenu.y}
+      pageId={displayMenu.pageId}
       selection={displayMenu.selection}
       onclose={() => (displayMenu = null)}
     />

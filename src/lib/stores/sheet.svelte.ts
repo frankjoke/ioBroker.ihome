@@ -15,7 +15,9 @@ export const sheet = $state<{
   /** What the sheet was editing when it closed: the eye/pencil toggle keeps
    *  the tile the user was on, not the first one of the page. */
   selection: LayoutSelection | null;
-}>({ open: false, selection: null });
+  /** An eye-view "Add tile" request for the sheet to open the picker. */
+  addTileAt: { pageId: string; sectionId: string; at?: number } | null;
+}>({ open: false, selection: null, addTileAt: null });
 
 /* A gated entrance waits here while the PIN is asked — module state too, so a
  * reload drops the ask and the entrance has to be made again. */
@@ -29,6 +31,7 @@ export function openSheet(): void {
 
 export function closeSheet(): void {
   sheet.open = false;
+  sheet.addTileAt = null;
 }
 
 /**
@@ -44,6 +47,17 @@ export function openSheetGated(): void {
   runSheetGated(() => {
     sheet.open = true;
   });
+}
+
+/** Open the sheet for an eye-view "Add tile" request: the sheet consumes the
+ *  target on mount and opens its existing source/template picker there. */
+export function openSheetForNewTile(target: {
+  pageId: string;
+  sectionId: string;
+  at?: number;
+}): void {
+  sheet.addTileAt = target;
+  openSheetGated();
 }
 
 /**
@@ -81,5 +95,9 @@ export function resolvePinAsk(open: boolean): void {
   pinAsked = false;
   const action = pendingAction;
   pendingAction = null;
-  if (open) action?.();
+  if (!open) {
+    sheet.addTileAt = null;
+    return;
+  }
+  action?.();
 }

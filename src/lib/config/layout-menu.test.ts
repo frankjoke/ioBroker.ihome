@@ -1,9 +1,9 @@
 import { it, expect } from "vitest";
 import {
-  displayTileMenuItems,
+  displayMenuItems,
   layoutMenuItems,
   layoutMenuTargetKind,
-  type DisplayTileMenuContext,
+  type DisplayMenuContext,
   type LayoutMenuContext,
 } from "$lib/config/layout-menu";
 
@@ -93,35 +93,43 @@ it("reads the menu kind from the current selection", () => {
   expect(layoutMenuTargetKind(null)).toBe("empty");
 });
 
-const liveTile: DisplayTileMenuContext = {
+const liveMenu: DisplayMenuContext = {
   writable: true,
   templatesWritable: true,
 };
 
-it("offers the four eye-view tile actions in order", () => {
-  const items = displayTileMenuItems(liveTile);
+it("offers the eye-view tile actions in order", () => {
+  const items = displayMenuItems("tile", liveMenu);
   expect(items.map((item) => item.id)).toEqual([
     "edit",
     "duplicate",
     "save-template",
+    "add-tile",
+    "move",
     "delete",
   ]);
   expect(items.find((item) => item.id === "delete")?.danger).toBe(true);
 });
 
 it("keeps edit available but locks layout writes in the eye-view menu", () => {
-  const items = displayTileMenuItems({
+  const items = displayMenuItems("tile", {
     writable: false,
     templatesWritable: false,
   });
   expect(items.find((item) => item.id === "edit")?.disabled).not.toBe(true);
-  for (const id of ["duplicate", "save-template", "delete"] as const) {
+  for (const id of [
+    "duplicate",
+    "save-template",
+    "add-tile",
+    "move",
+    "delete",
+  ] as const) {
     expect(items.find((item) => item.id === id)?.disabled).toBe(true);
   }
 });
 
 it("saves a template even when the layout document is read-only", () => {
-  const items = displayTileMenuItems({
+  const items = displayMenuItems("tile", {
     writable: false,
     templatesWritable: true,
   });
@@ -129,4 +137,30 @@ it("saves a template even when the layout document is read-only", () => {
     true,
   );
   expect(items.find((item) => item.id === "duplicate")?.disabled).toBe(true);
+});
+
+it("offers add, move and delete on a section", () => {
+  const items = displayMenuItems("section", liveMenu);
+  expect(items.map((item) => item.id)).toEqual([
+    "add-tile",
+    "move-section",
+    "delete",
+  ]);
+  expect(items.find((item) => item.id === "delete")?.danger).toBe(true);
+  expect(items.every((item) => !item.disabled)).toBe(true);
+});
+
+it("offers add section on free page space", () => {
+  const items = displayMenuItems("empty", liveMenu);
+  expect(items.map((item) => item.id)).toEqual(["add-section"]);
+  expect(items[0].disabled).not.toBe(true);
+});
+
+it("locks the section and empty-space writes when the layout is read-only", () => {
+  const readOnly = { writable: false, templatesWritable: false };
+  for (const kind of ["section", "empty"] as const) {
+    expect(
+      displayMenuItems(kind, readOnly).every((item) => item.disabled),
+    ).toBe(true);
+  }
 });
