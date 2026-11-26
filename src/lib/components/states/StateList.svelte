@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import SelectField from "$lib/components/common/SelectField.svelte";
   import type { StateEntry, StateFilters } from "$lib/config/state-settings";
 
   let {
@@ -9,6 +10,9 @@
     instance,
     query,
     filters,
+    roleOptions,
+    roomOptions,
+    functionOptions,
     onselect,
     oninstance,
     onquery,
@@ -20,6 +24,9 @@
     instance: string;
     query: string;
     filters: StateFilters;
+    roleOptions: { value: string; label: string }[];
+    roomOptions: { value: string; label: string }[];
+    functionOptions: { value: string; label: string }[];
     onselect: (id: string) => void;
     oninstance: (value: string) => void;
     onquery: (value: string) => void;
@@ -27,6 +34,10 @@
   } = $props();
 
   const count = $derived(entries.length);
+  const instanceOptions = $derived([
+    { value: "", label: "--all--" },
+    ...instances.map((name) => ({ value: name, label: name })),
+  ]);
   let rowsEl = $state<HTMLDivElement>();
   let scrolledFor = "";
 
@@ -48,18 +59,46 @@
 
 <div class="state-list">
   <div class="list-head">
-    <label class="instance">
-      <span class="label-mono">Instance</span>
-      <select
-        value={instance}
-        onchange={(event) => oninstance(event.currentTarget.value)}
-      >
-        <option value="">--all--</option>
-        {#each instances as name (name)}
-          <option value={name}>{name}</option>
-        {/each}
-      </select>
-    </label>
+    <div class="select-row">
+      <label class="instance">
+        <span class="label-mono">Instance</span>
+        <SelectField
+          value={instance}
+          options={instanceOptions}
+          onchange={oninstance}
+          label="Instance"
+        />
+      </label>
+      <label>
+        <span class="label-mono">Function</span>
+        <SelectField
+          value={filters.function ?? ""}
+          options={functionOptions}
+          onchange={(fn) => onfilters({ ...filters, function: fn })}
+          label="Filter by function"
+        />
+      </label>
+    </div>
+    <div class="filter-selects">
+      <label>
+        <span class="label-mono">Role</span>
+        <SelectField
+          value={filters.role ?? ""}
+          options={roleOptions}
+          onchange={(role) => onfilters({ ...filters, role })}
+          label="Filter by role"
+        />
+      </label>
+      <label>
+        <span class="label-mono">Room</span>
+        <SelectField
+          value={filters.room ?? ""}
+          options={roomOptions}
+          onchange={(room) => onfilters({ ...filters, room })}
+          label="Filter by room"
+        />
+      </label>
+    </div>
     <label class="search">
       <span class="material-symbols-outlined" aria-hidden="true">search</span>
       <input
@@ -148,15 +187,30 @@
     background: var(--surface-color);
   }
 
-  .instance {
+  .instance,
+  .select-row label,
+  .filter-selects label {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
+    min-width: 0;
   }
 
-  .instance select {
-    width: 100%;
-    min-width: 0;
+  .instance {
+    max-width: 10rem;
+  }
+
+  .select-row {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    gap: 0.35rem;
+    align-items: end;
+  }
+
+  .filter-selects {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
   }
 
   .search .material-symbols-outlined {

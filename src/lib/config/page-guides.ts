@@ -22,6 +22,24 @@ with an ioBroker state.
 One device definition feeds tiles, logic, history and templates. Change a state
 or a label once and every view follows.`;
 
+export const STATES_GUIDE = `## What this page is for
+
+The States tab is the complete view of one broker state: its common metadata,
+the iHome override and the history adapters that store it.
+
+**Functions**
+
+- Search and filter all states by instance, role, room, function, override or
+  history.
+- Open a state to edit its name, type, role, unit, rooms/functions and
+  min/max/step.
+- Add a repair override or a history item without leaving the page.
+
+**Benefits**
+
+Every tile, variable and logic points at the same broker state; changing it
+here updates the definitions that reference it.`;
+
 export const VARIABLES_GUIDE = `## What this page is for
 
 A variable gives a friendly name to an ioBroker state, or holds a fixed value as

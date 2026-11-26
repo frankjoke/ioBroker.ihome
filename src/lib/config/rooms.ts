@@ -31,6 +31,17 @@ export function roomList(
   }));
 }
 
+/** Function list from the enum cache, as {id, label, icon} triples. */
+export function functionList(
+  enums: any,
+): { id: string; label: string; icon?: string }[] {
+  return ((enums?.getList("functions") as any[]) ?? []).map((e: any) => ({
+    id: e._id,
+    label: enumLabelFromObject(e),
+    icon: e.common?.icon || undefined,
+  }));
+}
+
 /** Find an enum object by id across every enum list (rooms, functions, ...). */
 export function findEnum(enums: any, id: string): any | undefined {
   const lists = enums?.list ?? {};

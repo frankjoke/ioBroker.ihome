@@ -1,5 +1,6 @@
 import { localizeName } from "$lib/config/format";
 import { stateIdFor, type GlobalVariable } from "$lib/config/variables";
+import { enumsOfState } from "$lib/config/rooms";
 import type { SourceOverride } from "$lib/types/overrides";
 
 /** One row of the state list. */
@@ -12,10 +13,21 @@ export interface StateEntry {
   /** Real history adapter configs (`history.0`, `influxdb.0`, …). */
   historyKeys: string[];
   overrideCount: number;
+  /** Room/function enum ids, including parent-channel memberships. */
+  rooms: string[];
+  functions: string[];
+}
+
+/** Everything under `system.*` is ioBroker controller space, not iHome data. */
+export function isSystemInstance(instance: string): boolean {
+  return String(instance ?? "").startsWith("system.");
 }
 
 export interface StateFilters {
   instance?: string;
+  role?: string;
+  room?: string;
+  function?: string;
   override?: boolean;
   history?: boolean;
 }
@@ -122,6 +134,7 @@ export function stateEntries(
   objects: Map<string, any>,
   overrides: SourceOverride[],
   variables: GlobalVariable[] = [],
+  enums: any = null,
 ): StateEntry[] {
   const rows: StateEntry[] = [];
   for (const [id, object] of objects) {
@@ -139,6 +152,8 @@ export function stateEntries(
       overrideCount: overrides.filter(
         (override) => stateIdFor(override.stateId, variables) === wanted,
       ).length,
+      rooms: enums ? enumsOfState(enums, id, "rooms") : [],
+      functions: enums ? enumsOfState(enums, id, "functions") : [],
     });
   }
   return rows.sort(
@@ -155,6 +170,11 @@ export function stateMatches(
 ): boolean {
   const text = query.trim().toLowerCase();
   if (filters.instance && entry.instance !== filters.instance) return false;
+  if (filters.role && entry.role !== filters.role) return false;
+  if (filters.room && !entry.rooms.includes(filters.room)) return false;
+  if (filters.function && !entry.functions.includes(filters.function)) {
+    return false;
+  }
   if (
     text &&
     !`${entry.name} ${entry.id} ${entry.role}`.toLowerCase().includes(text)

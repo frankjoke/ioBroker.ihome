@@ -10,6 +10,7 @@ import {
   instanceOf,
   isHistoryAdapter,
   isHistoryCustom,
+  isSystemInstance,
   keptInstance,
   defaultHistoryAdapter,
   restoreSelection,
@@ -54,7 +55,25 @@ describe("stateEntries", () => {
     });
   });
 
-  it("filters by text and badges", () => {
+  it("reads room and function memberships through the parent channel", () => {
+    const objects = new Map<string, any>([
+      ["0_userdata.0.room.lamp", { type: "state", common: {} }],
+    ]);
+    const enums = {
+      get: (id: string) =>
+        id === "0_userdata.0.room"
+          ? {
+              rooms: [{ _id: "enum.rooms.Kitchen" }],
+              functions: [{ _id: "enum.functions.Light" }],
+            }
+          : null,
+    };
+    const [entry] = stateEntries(objects, [], [], enums);
+    expect(entry.rooms).toEqual(["enum.rooms.Kitchen"]);
+    expect(entry.functions).toEqual(["enum.functions.Light"]);
+  });
+
+  it("filters by text, badges, role, room and function", () => {
     const entry = {
       id: "0_userdata.0.lamp",
       name: "Lamp",
@@ -63,6 +82,8 @@ describe("stateEntries", () => {
       instance: "0_userdata.0",
       historyKeys: ["history.0"],
       overrideCount: 1,
+      rooms: ["enum.rooms.Kitchen"],
+      functions: ["enum.functions.Light"],
     };
     expect(stateMatches(entry, "lam", {})).toBe(true);
     expect(stateMatches(entry, "level", {})).toBe(true);
@@ -71,6 +92,16 @@ describe("stateEntries", () => {
     expect(stateMatches(entry, "", { override: true })).toBe(true);
     expect(stateMatches(entry, "", { instance: "0_userdata.0" })).toBe(true);
     expect(stateMatches(entry, "", { instance: "ihome.0" })).toBe(false);
+    expect(stateMatches(entry, "", { role: "level" })).toBe(true);
+    expect(stateMatches(entry, "", { role: "switch" })).toBe(false);
+    expect(stateMatches(entry, "", { room: "enum.rooms.Kitchen" })).toBe(true);
+    expect(stateMatches(entry, "", { room: "enum.rooms.Bath" })).toBe(false);
+    expect(stateMatches(entry, "", { function: "enum.functions.Light" })).toBe(
+      true,
+    );
+    expect(
+      stateMatches(entry, "", { function: "enum.functions.Heating" }),
+    ).toBe(false);
     expect(
       stateMatches({ ...entry, overrideCount: 0 }, "", { override: true }),
     ).toBe(false);
@@ -83,6 +114,29 @@ describe("instances and restore", () => {
     expect(keptInstance("ihome.0", [])).toBe("ihome.0");
     expect(keptInstance("ihome.0", ["ihome.0", "sql.0"])).toBe("ihome.0");
     expect(keptInstance("gone.0", ["ihome.0", "sql.0"])).toBe("");
+  });
+
+  it("keeps ioBroker controller instances out of the state list", () => {
+    for (const instance of [
+      "system.host.x",
+      "system.adapter.admin.0",
+      "system.certificates",
+    ]) {
+      expect(isSystemInstance(instance), instance).toBe(true);
+    }
+    for (const instance of [
+      "0_userdata.0",
+      "ihome.0",
+      "ihome.1",
+      "alias.0",
+      "zigbee2mqtt.0",
+      "admin.0",
+      "web.0",
+      "sql.0",
+      "iqontrol.0",
+    ]) {
+      expect(isSystemInstance(instance), instance).toBe(false);
+    }
   });
 
   it("groups state ids by adapter instance", () => {
@@ -127,6 +181,8 @@ describe("instances and restore", () => {
       instance: instanceOf(id),
       historyKeys: [],
       overrideCount: 0,
+      rooms: [],
+      functions: [],
     });
     const rows = [
       row("0_userdata.0.a"),

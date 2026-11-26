@@ -17,8 +17,8 @@ export interface PageView {
   query?: string;
   /** A list's selected instance filter. */
   instance?: string;
-  /** Boolean list filters (override, history, …). */
-  filters?: Record<string, boolean>;
+  /** List filters (boolean toggles or selected string values). */
+  filters?: Record<string, boolean | string>;
 }
 
 const KEY = "iHome.pageView";

@@ -18,19 +18,13 @@ import { parseLayoutRef } from "$lib/config/layout-ops";
 /** @type {Page[]} */
 export const pages = [
   {
-    id: "/variables",
-    label: "Variables & Constants",
-    icon: "data_object",
-    title: "Variables & Constants",
-  },
-  {
     id: "/templates",
     label: "Templates",
     icon: "dashboard_customize",
     title: "Templates",
   },
-  { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
   { id: "/states", label: "States", icon: "database", title: "States" },
+  { id: "/logic", label: "Logic", icon: "account_tree", title: "Logic" },
   {
     id: "/plugins",
     label: "Plugins",
