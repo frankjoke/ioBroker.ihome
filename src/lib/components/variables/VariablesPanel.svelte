@@ -31,6 +31,7 @@
   import Icon from "$lib/components/common/Icon.svelte";
   import IconButton from "$lib/components/common/IconButton.svelte";
   import ContextMenu from "$lib/components/common/ContextMenu.svelte";
+  import RoleSelect from "$lib/components/common/RoleSelect.svelte";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
   import { copyText } from "$lib/utils/clipboard";
@@ -470,21 +471,16 @@
 {#snippet orgFields()}
   <label class="field"
     ><span class="label-mono">Role</span>
-    <input
-      type="text"
-      list="ihome-state-roles"
+    <RoleSelect
       value={editing?.role ?? ""}
-      placeholder="value"
-      oninput={(e) => {
-        if (editing) editing.role = e.currentTarget.value;
+      options={roleOptions}
+      type={editing?.type}
+      label="Role"
+      onchange={(role) => {
+        if (editing) editing.role = role;
       }}
     /></label
   >
-  <datalist id="ihome-state-roles">
-    {#each roleOptions as r (r)}
-      <option value={r}></option>
-    {/each}
-  </datalist>
 
   <div class="form-grid">
     <label class="field"

@@ -256,6 +256,10 @@ it("suggests a default glyph for a bare state's role", () => {
   expect(glyphForRole("value.battery")).toBe("battery_full");
   expect(glyphForRole("value.temperature")).toBe("thermostat");
   expect(glyphForRole("button")).toBe("touch_app");
+  expect(glyphForRole("text")).toBe("text_fields");
+  expect(glyphForRole("text.json")).toBe("text_fields");
+  expect(glyphForRole("value.time")).toBe("schedule");
+  expect(glyphForRole("indicator.updates")).toBe("sensors");
   expect(glyphForRole("state", "boolean")).toBe("toggle_on");
   expect(glyphForRole("state", "string")).toBeUndefined();
 });

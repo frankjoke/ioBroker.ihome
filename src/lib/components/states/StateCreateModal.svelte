@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { stateRoles } from "$lib/config/state-settings";
+  import RoleSelect from "$lib/components/common/RoleSelect.svelte";
 
   const TYPES = [
     "boolean",
@@ -118,11 +119,13 @@
       </label>
       <label class="field">
         <span class="label-mono">Role</span>
-        <select class="mono" bind:value={role}>
-          {#each roles as entry (entry)}
-            <option value={entry}>{entry}</option>
-          {/each}
-        </select>
+        <RoleSelect
+          value={role}
+          options={roles}
+          {type}
+          label="Role"
+          onchange={(next) => (role = next)}
+        />
       </label>
       <label class="field">
         <span class="label-mono">Unit</span>

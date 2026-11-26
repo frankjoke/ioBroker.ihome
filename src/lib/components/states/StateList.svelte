@@ -2,6 +2,7 @@
   import { tick } from "svelte";
   import Icon from "$lib/components/common/Icon.svelte";
   import SelectField from "$lib/components/common/SelectField.svelte";
+  import { glyphForRole } from "$lib/config/icon-ops";
   import {
     stateDepth,
     type StateEntry,
@@ -178,7 +179,15 @@
         <span class="row-meta">
           {#if entry.type}<span class="badge badge-secondary">{entry.type}</span
             >{/if}
-          {#if entry.role}<span class="badge">{entry.role}</span>{/if}
+          {#if entry.role}
+            <span class="badge role-badge">
+              <Icon
+                value={glyphForRole(entry.role, entry.type) ?? "label"}
+                size={13}
+              />
+              {entry.role}
+            </span>
+          {/if}
           {#if entry.overrideCount}
             <span class="badge badge-secondary"
               >override {entry.overrideCount}</span
@@ -315,6 +324,12 @@
       max(0, var(--state-depth, 1) - 2) * 0.9rem +
         var(--state-icon-space, 1.05rem)
     );
+  }
+
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
   }
 
   .state-icon {

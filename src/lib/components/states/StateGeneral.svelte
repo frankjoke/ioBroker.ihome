@@ -6,6 +6,7 @@
   import { writeStateCommon } from "$lib/config/state-write";
   import { enumLabelFromObject, enumsOf, roomList } from "$lib/config/rooms";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
+  import RoleSelect from "$lib/components/common/RoleSelect.svelte";
 
   const TYPES = [
     "boolean",
@@ -288,11 +289,13 @@
     </label>
     <label class="field">
       <span class="label-mono">Role</span>
-      <select class="mono" bind:value={draft.role}>
-        {#each roles as role (role)}
-          <option value={role}>{role}</option>
-        {/each}
-      </select>
+      <RoleSelect
+        value={draft.role}
+        options={roles}
+        type={draft.type}
+        label="Role"
+        onchange={(role) => (draft.role = role)}
+      />
     </label>
     <label class="field">
       <span class="label-mono">Unit</span>
