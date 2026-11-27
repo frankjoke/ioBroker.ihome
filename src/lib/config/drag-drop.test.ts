@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   dropTargetFrom,
+  handleHit,
   planDrop,
   planUndo,
   type DragRect,
@@ -114,6 +115,14 @@ it("answers null outside every section", () => {
       500,
     ),
   ).toBeNull();
+});
+
+it("recognises the touch handle's top-left hit square", () => {
+  const box = rect(10, 20, 100, 80);
+  expect(handleHit(box, 12, 22)).toBe(true);
+  expect(handleHit(box, 10 + 43, 20 + 43)).toBe(true);
+  expect(handleHit(box, 10 + 45, 20 + 22)).toBe(false);
+  expect(handleHit(box, 12, 20 + 45)).toBe(false);
 });
 
 it("moves a tile to index 0 of another section", () => {

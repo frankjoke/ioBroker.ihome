@@ -772,6 +772,11 @@
   {#if editingTarget}
     <EditingOutline inset={surfaceOnly} />
   {/if}
+  {#if sheet.open && !preview}
+    <span class="drag-handle" data-touch-handle="" aria-hidden="true">
+      <span class="material-symbols-outlined">drag_indicator</span>
+    </span>
+  {/if}
   {#if chartFull && chart.length}
     <div class="tile-chart-full">
       <TileChart
@@ -874,6 +879,34 @@
 {/if}
 
 <style>
+  .drag-handle {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    z-index: 3;
+    display: none;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background-color: var(--surface-container-high);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-small);
+    pointer-events: none;
+  }
+
+  .drag-handle .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  @media (pointer: coarse), (hover: none) {
+    .drag-handle {
+      display: flex;
+    }
+  }
+
   .tile {
     position: relative;
     display: flex;

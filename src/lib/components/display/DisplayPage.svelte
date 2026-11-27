@@ -16,6 +16,7 @@
   import { placementUnder, sectionTitleUnder } from "$lib/config/tile-hit";
   import {
     dropTargetFrom,
+    handleHit,
     planDrop,
     planUndo,
     type DragSection,
@@ -133,6 +134,20 @@
   function clearTouchDrag(): void {
     if (touchDrag) clearTimeout(touchDrag.timer);
     touchDrag = null;
+  }
+
+  function tileRectFor(
+    hit: Extract<LayoutSelection, { kind: "tile" }>,
+  ): DOMRect | null {
+    const tile = [
+      ...document.querySelectorAll<HTMLElement>(".stage [data-placement-id]"),
+    ].find(
+      (element) =>
+        element.dataset.pageId === hit.pageId &&
+        element.dataset.sectionId === hit.sectionId &&
+        element.dataset.placementId === hit.placementId,
+    );
+    return tile?.getBoundingClientRect() ?? null;
   }
 
   /** While a touch drag runs, do not let the page scroll under the finger. */
@@ -273,6 +288,30 @@
       const hit = hitAt(event.clientX, event.clientY);
       if (hit?.kind === "tile") {
         picked = hit;
+        const rect = tileRectFor(hit);
+        // The visible grip starts the drag immediately; no hold or scroll guess.
+        if (rect && handleHit(rect, event.clientX, event.clientY)) {
+          clearTouchDrag();
+          longPress.cancel();
+          drag = {
+            anchor: {
+              pageId: hit.pageId,
+              sectionId: hit.sectionId,
+              placementId: hit.placementId,
+            },
+            x: event.clientX,
+            y: event.clientY,
+            target: null,
+          };
+          try {
+            (event.currentTarget as HTMLElement).setPointerCapture(
+              event.pointerId,
+            );
+          } catch {
+            /* no capture: the layer still receives moves over itself */
+          }
+          return;
+        }
         clearTouchDrag();
         const anchor = {
           pageId: hit.pageId,

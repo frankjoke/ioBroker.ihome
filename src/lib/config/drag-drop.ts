@@ -50,6 +50,19 @@ function contains(rect: DragRect, x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
+/** The touch drag handle's hit square: a 44 px square from a tile's top-left.
+ *  The visual grip is smaller; the extra area is the finger target. */
+export const DRAG_HANDLE_HIT = 44;
+
+export function handleHit(rect: DragRect, x: number, y: number): boolean {
+  return (
+    x >= rect.left &&
+    x <= rect.left + DRAG_HANDLE_HIT &&
+    y >= rect.top &&
+    y <= rect.top + DRAG_HANDLE_HIT
+  );
+}
+
 /** Where a dragged tile would land. A tile answers by its left/right half; a
  *  section hit outside its tiles appends; an empty section uses its grid box. */
 export function dropTargetFrom(
