@@ -74,6 +74,31 @@ it("runs on change only by default and writes only on change", () => {
   expect(h.writes).toHaveLength(base + 1);
 });
 
+it("writes a repeated value when the write carries an explicit ts", () => {
+  const { h, engine } = engineWith(
+    doc({
+      mode: "statements",
+      expr: code('set("0_userdata.0.TS", 7, {ts: get("temp")}); noop()'),
+    }),
+  );
+  engine.start();
+  h.change("0_userdata.0.T", 4);
+  h.change("0_userdata.0.T", 5);
+  const writes = h.writes.filter((write) => write.id === "0_userdata.0.TS");
+  expect(writes).toContainEqual({
+    id: "0_userdata.0.TS",
+    value: 7,
+    ack: false,
+    ts: 4,
+  });
+  expect(writes).toContainEqual({
+    id: "0_userdata.0.TS",
+    value: 7,
+    ack: false,
+    ts: 5,
+  });
+});
+
 it("test runs the saved function action once", () => {
   const { h, engine } = engineWith(
     doc({

@@ -11,6 +11,7 @@ import {
   isHistoryAdapter,
   isHistoryCustom,
   isIhomeConfigState,
+  newestHistoryTs,
   isSystemInstance,
   keptInstance,
   stateDepth,
@@ -289,5 +290,16 @@ describe("history adapter helpers", () => {
       { ts: 2, val: "text" },
       { ts: 3, val: null },
     ]);
+  });
+
+  it("finds the newest timestamp, including planned values", () => {
+    expect(
+      newestHistoryTs([
+        { ts: 2, val: 1 },
+        { ts: 9, val: 0 },
+      ]),
+    ).toBe(9);
+    expect(newestHistoryTs({ result: [{ ts: 6, val: 2 }] })).toBe(6);
+    expect(newestHistoryTs([])).toBeUndefined();
   });
 });

@@ -7,6 +7,7 @@
     hasHistoryFeature,
     historyRows,
     isHistoryCustom,
+    newestHistoryTs,
   } from "$lib/config/state-settings";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
   import OptionTabs from "$lib/components/common/OptionTabs.svelte";
@@ -101,6 +102,8 @@
   let featuresReply = $state<unknown>(null);
   let rows = $state<Array<{ ts: number; val: unknown }>>([]);
   let points = $state<Array<{ ts: number; val: number }>>([]);
+  /** Newest displayed timestamp, so the header can say where the window ends. */
+  let dataEnd = $state<number | null>(null);
   let loading = $state(false);
   let error = $state("");
   let message = $state("");
@@ -459,6 +462,32 @@
     }
   }
 
+  /**
+   * Newest stored timestamp, including planned values ahead of now. Without
+   * `count` the history family stops at the current day; the probe is separate
+   * from the display query because it must not be bounded by "now".
+   */
+  async function newestStoredTs(): Promise<number | undefined> {
+    try {
+      const reply = await ioBroker.sendTo(adapter, "getHistory", {
+        id: stateId,
+        options: {
+          // No start + count reaches the newest rows, not the oldest in a window.
+          count: 1,
+          end: Date.now() + 10 * 365 * 86_400_000,
+          aggregate: "none",
+          ignoreNull: true,
+          returnNewestEntries: true,
+        },
+      });
+      if (replyError(reply)) return undefined;
+      const ts = newestHistoryTs(reply);
+      return typeof ts === "number" && ts > 0 ? ts : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   async function loadChart(): Promise<void> {
     if (!adapter || !hasHistoryFeature(featuresReply, "getHistory")) {
       return;
@@ -466,7 +495,9 @@
     loading = true;
     error = "";
     try {
-      const end = Date.now();
+      // Anchor the range at the stored end, not at now: future market prices
+      // are planned values and must appear in the graph and the table.
+      const end = (await newestStoredTs()) ?? Date.now();
       const start = end - Number(duration) * 3600_000;
       const reply = await ioBroker.sendTo(adapter, "getHistory", {
         id: stateId,
@@ -477,15 +508,18 @@
           aggregate: "none",
           limit: RAW_LIMIT,
           ignoreNull: true,
+          returnNewestEntries: true,
         },
       });
       const errorText = replyError(reply);
       if (errorText) throw new Error(errorText);
       rows = historyRows(reply);
       points = chartPoints(reply);
+      dataEnd = rows.at(-1)?.ts ?? null;
     } catch (failure) {
       points = [];
       rows = [];
+      dataEnd = null;
       error = `History from ${adapter}: ${failure instanceof Error ? failure.message : String(failure)}`;
     } finally {
       loading = false;
@@ -1086,6 +1120,15 @@
                           </tbody>
                         </table>
                       </div>
+                    {/if}
+                    {#if dataEnd !== null}
+                      <p class="hint text-muted">
+                        Newest stored value: {new Date(
+                          dataEnd,
+                        ).toLocaleString()}{dataEnd > Date.now()
+                          ? " — includes planned future values"
+                          : ""}
+                      </p>
                     {/if}
                   {/snippet}
                 </OptionTabs>

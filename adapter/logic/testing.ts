@@ -41,6 +41,7 @@ export interface Write {
   id: string;
   value: unknown;
   ack: boolean;
+  ts?: number;
 }
 
 export interface LogLine {
@@ -150,9 +151,11 @@ export function createHarness(values: Record<string, unknown>): Harness {
 
   const deps: EngineDeps = {
     read: (id) => values[id],
-    write: (id, value, ack) => {
+    write: (id, value, ack, ts) => {
       values[id] = value; // like the broker: a write changes the current value
-      writes.push({ id, value, ack });
+      writes.push(
+        ts === undefined ? { id, value, ack } : { id, value, ack, ts },
+      );
     },
     log: (level, logicId, message) => logs.push({ level, logicId, message }),
     message: (level, logicId, message, timeout) =>

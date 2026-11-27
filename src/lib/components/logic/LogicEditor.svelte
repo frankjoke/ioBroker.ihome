@@ -273,6 +273,17 @@
               dotted state id; <code>set("name", value)</code> writes the same
             </li>
             <li>
+              <code>set("name", value, &#123; ts: epochMs &#125;)</code> writes
+              with the source timestamp (also on
+              <code>state("name").set(...)</code>); repeated values are kept
+              when a <code>ts</code> is given
+            </li>
+            <li>
+              <code>fetchJson(url, callback, &#123; method: "POST" &#125;)</code
+              >
+              fetches JSON; <code>headers</code> and <code>body</code> are optional
+            </li>
+            <li>
               In <code>message</code>/<code>log</code> text use
               <code>{`{{$input}}`}</code>; in code use <code>$input</code> or
               <code>get("$input")</code>

@@ -22,6 +22,7 @@ export interface RuntimeHooks {
     ack: boolean,
     forward: Forward | undefined,
     depth: number,
+    ts?: number,
   ): void;
   log(level: "info" | "warn", message: string): void;
   message(
@@ -348,14 +349,22 @@ export function createLogicRuntime(
 
   const options = (
     opts: unknown,
-  ): { ack: boolean; forward: Forward | undefined } => {
+  ): { ack: boolean; forward: Forward | undefined; ts?: number } => {
     if (typeof opts === "boolean") return { ack: opts, forward: undefined };
     if (isRecord(opts)) {
       const forward = opts.forward;
+      const rawTs = opts.ts;
+      if (
+        rawTs !== undefined &&
+        (typeof rawTs !== "number" || !Number.isFinite(rawTs))
+      ) {
+        throw new Error("ts must be a finite epoch in milliseconds");
+      }
       return {
         ack: opts.ack === true,
         forward:
           forward === "always" || forward === "changed" ? forward : undefined,
+        ts: rawTs as number | undefined,
       };
     }
     return { ack: false, forward: undefined };
@@ -373,8 +382,10 @@ export function createLogicRuntime(
       changed: info?.changed ?? false,
       set(value: unknown, opts?: unknown): void {
         if (!writable) throw new Error(`${name} is not writable`);
-        const { ack, forward } = options(opts);
-        hooks.write(name, value, ack, forward, currentDepth());
+        const { ack, forward, ts } = options(opts);
+        if (ts === undefined)
+          hooks.write(name, value, ack, forward, currentDepth());
+        else hooks.write(name, value, ack, forward, currentDepth(), ts);
       },
     });
   });
@@ -383,8 +394,10 @@ export function createLogicRuntime(
       const info = hooks.describe(name);
       if (info && !info.writable) throw new Error(`${name} is not writable`);
     }
-    const { ack, forward } = options(opts);
-    hooks.write(name, value, ack, forward, currentDepth());
+    const { ack, forward, ts } = options(opts);
+    if (ts === undefined)
+      hooks.write(name, value, ack, forward, currentDepth());
+    else hooks.write(name, value, ack, forward, currentDepth(), ts);
   });
   define("goto", function (state?: unknown): void {
     if (inTask && arguments.length > 0 && state !== NOACTION) {

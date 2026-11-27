@@ -60,7 +60,7 @@ export interface EngineDeps {
   read(id: string): unknown;
   /** The cached state with its metadata; falls back to `read` when absent. */
   readState?(id: string): StateChange | undefined;
-  write(id: string, value: unknown, ack: boolean): void;
+  write(id: string, value: unknown, ack: boolean, ts?: number): void;
   log(level: "info" | "warn", logicId: string, message: string): void;
   message(
     level: "info" | "warn" | "error",
@@ -433,8 +433,8 @@ export function createEngine(
     try {
       rt.vm = createLogicRuntime(def, {
         describe: (name) => describeName(rt, name),
-        write: (name, value, ack, forward, depth) =>
-          writeTarget(rt, name, value, ack, forward, depth),
+        write: (name, value, ack, forward, depth, ts) =>
+          writeTarget(rt, name, value, ack, forward, depth, ts),
         log: (level, message) => deps.log(level, logId(rt), message),
         message: (level, message, timeout) =>
           deps.message(level, logId(rt), message, timeout),
@@ -1082,6 +1082,7 @@ export function createEngine(
     ack: boolean,
     forward: Forward | undefined,
     depth: number,
+    ts?: number,
   ): void {
     if (ref === "$self") {
       writeSelf(rt, value, depth);
@@ -1093,7 +1094,7 @@ export function createEngine(
         writeMemory(input.input.from.ref, value, forward, depth, rt.def.id);
       } else {
         for (const id of input.stateIds) {
-          writeState(rt, id, value, ack, forward);
+          writeState(rt, id, value, ack, forward, ts);
         }
       }
       return;
@@ -1103,12 +1104,12 @@ export function createEngine(
       return;
     }
     if (ref.includes(".")) {
-      writeState(rt, ref, value, ack, forward);
+      writeState(rt, ref, value, ack, forward, ts);
       return;
     }
     const variable = deps.resolveVariable?.(ref);
     if (variable?.kind === "state") {
-      writeState(rt, variable.stateId, value, ack, forward);
+      writeState(rt, variable.stateId, value, ack, forward, ts);
     } else {
       warnOnce(logId(rt), `cannot write ${ref}: not a state or memory name`);
     }
@@ -1140,15 +1141,17 @@ export function createEngine(
     value: unknown,
     ack: boolean,
     forward: Forward | undefined,
+    ts?: number,
   ): void {
     if (
+      ts === undefined &&
       (forward ?? "changed") === "changed" &&
       Object.is(deps.read(id), value)
     ) {
       return;
     }
     noteWrite(id, value, rt.def.id);
-    deps.write(id, value, ack);
+    deps.write(id, value, ack, ts);
   }
 
   function runFunction(

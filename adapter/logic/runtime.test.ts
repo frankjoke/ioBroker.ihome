@@ -101,6 +101,33 @@ it("state() exposes metadata and writes", () => {
   expect(globalSet.writes).toEqual([["a", 9, false, undefined, 0]]);
 });
 
+it("carries an explicit timestamp through set and state.set", () => {
+  const info = {
+    a: { value: 4, ack: true, from: "x", ts: 1, changed: true, writable: true },
+  };
+  const globalSet = runtimeFor('set("a", 9, { ts: 1234567890 })', info);
+  globalSet.runtime.runExpr({ code: 'set("a", 9, { ts: 1234567890 })' }, 0);
+  expect(globalSet.writes).toEqual([["a", 9, false, undefined, 0, 1234567890]]);
+
+  const viaState = runtimeFor('state("a").set(9, { ack: true, ts: 42 })', info);
+  viaState.runtime.runExpr(
+    { code: 'state("a").set(9, { ack: true, ts: 42 })' },
+    0,
+  );
+  expect(viaState.writes).toEqual([["a", 9, true, undefined, 0, 42]]);
+});
+
+it("rejects an invalid explicit timestamp instead of writing now", () => {
+  const info = {
+    a: { value: 4, ack: true, from: "x", ts: 1, changed: true, writable: true },
+  };
+  const invalid = runtimeFor('set("a", 9, { ts: "now" })', info);
+  expect(() =>
+    invalid.runtime.runExpr({ code: 'set("a", 9, { ts: "now" })' }, 0),
+  ).toThrow(/finite epoch/i);
+  expect(invalid.writes).toEqual([]);
+});
+
 it("noop() is a sentinel", () => {
   const { runtime } = runtimeFor("noop()");
   expect(isNoop(runtime.runExpr({ code: "noop()" }, 0))).toBe(true);

@@ -800,8 +800,8 @@ class IHome extends utils.Adapter {
     const deps = {
       read: (id: string) => this.logicValues.get(id)?.val,
       readState: (id: string) => this.logicValues.get(id),
-      write: (id: string, value: unknown, ack: boolean) =>
-        this.writeLogicState(id, value, ack),
+      write: (id: string, value: unknown, ack: boolean, ts?: number) =>
+        this.writeLogicState(id, value, ack, ts),
       log: (level: "info" | "warn", logicId: string, message: string) =>
         this.pushLogicLog(level, logicId, message),
       message: (
@@ -1139,7 +1139,12 @@ class IHome extends utils.Adapter {
     );
   }
 
-  private writeLogicState(id: string, value: unknown, ack: boolean): void {
+  private writeLogicState(
+    id: string,
+    value: unknown,
+    ack: boolean,
+    ts?: number,
+  ): void {
     if (this.stateWritable.get(id) === false) {
       if (!this.warnedWrites.has(id)) {
         this.warnedWrites.add(id);
@@ -1155,6 +1160,7 @@ class IHome extends utils.Adapter {
       // Short, stable origin for other adapters/scripts and the engine's
       // self-attribution (the SPA and the JS adapter both see it).
       from: this.namespace,
+      ...(ts !== undefined ? { ts } : {}),
     };
     const fail = (error: unknown) =>
       this.log.warn(`logic: cannot write ${id}: ${error}`);

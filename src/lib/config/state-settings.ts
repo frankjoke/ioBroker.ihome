@@ -249,6 +249,11 @@ export function historyRows(reply: unknown): HistoryRow[] {
   return out.sort((left, right) => left.ts - right.ts);
 }
 
+/** The newest row's timestamp, which may be a planned value ahead of now. */
+export function newestHistoryTs(reply: unknown): number | undefined {
+  return historyRows(reply).at(-1)?.ts;
+}
+
 export function chartPoints(
   reply: unknown,
 ): Array<{ ts: number; val: number }> {
