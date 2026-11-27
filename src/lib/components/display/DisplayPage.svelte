@@ -2,6 +2,7 @@
   import PageView from "$lib/components/display/PageView.svelte";
   import LayoutSheet from "$lib/components/layout/LayoutSheet.svelte";
   import DisplayLayoutMenu from "$lib/components/display/DisplayLayoutMenu.svelte";
+  import { onMount } from "svelte";
   import {
     commitLayout,
     getPageRegistry,
@@ -168,8 +169,18 @@
   /** In eye view a right-click opens the quick menu for a tile, a section
    *  title or free page space; the browser keeps its own menu over inputs and
    *  editable text. */
+  /** A tile detail is a native top-layer dialog: a fixed menu cannot sit over
+   *  it. The detail wins; the eye-view menu is suppressed while it is open. */
+  function tileDetailOpen(): boolean {
+    return !!document.querySelector("dialog.modal[open]");
+  }
+
   function onStageContextMenu(event: MouseEvent): void {
     if (sheet.open) return;
+    if (tileDetailOpen()) {
+      event.preventDefault();
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (target?.closest("input, textarea, select, [contenteditable='true']"))
       return;
@@ -399,6 +410,20 @@
   // The eye-view menu belongs to view mode; opening the editor retires it.
   $effect(() => {
     if (sheet.open) displayMenu = null;
+  });
+
+  // The tile detail is a native dialog above every z-index; close the eye-view
+  // menu as soon as one opens so it cannot be left hidden underneath.
+  onMount(() => {
+    const observer = new MutationObserver(() => {
+      if (tileDetailOpen()) displayMenu = null;
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["open"],
+      subtree: true,
+    });
+    return () => observer.disconnect();
   });
 
   /**

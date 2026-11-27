@@ -738,13 +738,15 @@
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let suppressClick = false;
 
-  /** Touch long-press (500 ms) opens the modal, like the corner affordance. */
+  /** Touch long-press (500 ms) opens the modal, like the corner affordance —
+   *  but only when there is a detail page. With none, swallow the click and
+   *  let the display's own long-press/contextmenu open the tile menu. */
   function onPointerDown(e: PointerEvent) {
     if (e.pointerType !== "touch") return;
     pressTimer = setTimeout(() => {
       pressTimer = null;
       suppressClick = true;
-      openDetail();
+      if (hasModal) openDetail();
     }, 500);
   }
 
