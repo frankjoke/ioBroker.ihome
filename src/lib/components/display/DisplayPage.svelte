@@ -67,14 +67,23 @@
     target: DropTarget | null;
   }
 
-  /** Pointer drag in edit mode: a mouse/pen moves one tile. Touch keeps the
-   *  long-press menu (a drag there would fight page scrolling). */
+  /** Pointer drag in edit mode: mouse/pen moves immediately; touch arms after
+   *  a short hold so a normal swipe still scrolls the page. */
   let drag = $state<DragState | null>(null);
   let dragStart: {
     x: number;
     y: number;
     anchor: PlacementAnchor;
   } | null = null;
+  interface TouchDrag {
+    x: number;
+    y: number;
+    anchor: PlacementAnchor;
+    pointerId: number;
+    armed: boolean;
+    timer: ReturnType<typeof setTimeout>;
+  }
+  let touchDrag: TouchDrag | null = null;
   let suppressClick = false;
   /** One-step undo for the last drag drop, cleared when another edit lands. */
   let lastMove: {
@@ -84,8 +93,27 @@
   } | null = null;
 
   const longPress = createLongPress({
-    onTrigger: (x, y) => openContext(x, y),
+    onTrigger: (x, y) => {
+      clearTouchDrag();
+      openContext(x, y);
+    },
   });
+
+  function clearTouchDrag(): void {
+    if (touchDrag) clearTimeout(touchDrag.timer);
+    touchDrag = null;
+  }
+
+  /** While a touch drag runs, do not let the page scroll under the finger. */
+  function stopDragScroll(node: HTMLElement) {
+    const stop = (event: TouchEvent) => {
+      if (drag) event.preventDefault();
+    };
+    node.addEventListener("touchmove", stop, { passive: false });
+    return {
+      destroy: () => node.removeEventListener("touchmove", stop),
+    };
+  }
 
   function hitAt(x: number, y: number): LayoutSelection | null {
     // The tiles are inside the inert stage, so they cannot be hit-tested: the
@@ -184,6 +212,27 @@
   function onPointerDown(event: PointerEvent): void {
     if (event.button !== 0) return;
     if (event.pointerType === "touch") {
+      if (!sheet.open) return;
+      const hit = hitAt(event.clientX, event.clientY);
+      if (hit?.kind === "tile") {
+        picked = hit;
+        clearTouchDrag();
+        const anchor = {
+          pageId: hit.pageId,
+          sectionId: hit.sectionId,
+          placementId: hit.placementId,
+        };
+        touchDrag = {
+          x: event.clientX,
+          y: event.clientY,
+          anchor,
+          pointerId: event.pointerId,
+          armed: false,
+          timer: setTimeout(() => {
+            if (touchDrag) touchDrag.armed = true;
+          }, 300),
+        };
+      }
       longPress.down(event.clientX, event.clientY);
       return;
     }
@@ -219,6 +268,41 @@
       };
       return;
     }
+    if (touchDrag) {
+      const distance = Math.hypot(
+        event.clientX - touchDrag.x,
+        event.clientY - touchDrag.y,
+      );
+      // Before the hold: a swipe is a page scroll, not a drag.
+      if (!touchDrag.armed) {
+        if (distance > 8) {
+          clearTouchDrag();
+          longPress.cancel();
+        } else {
+          longPress.move(event.clientX, event.clientY);
+        }
+        return;
+      }
+      // After the hold: moving lifts the tile; the menu still wins if the
+      // finger stays still until the long-press delay.
+      if (distance <= 6) return;
+      const current = touchDrag;
+      clearTouchDrag();
+      longPress.cancel();
+      try {
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      } catch {
+        /* no capture: the layer still receives moves over itself */
+      }
+      drag = {
+        anchor: current.anchor,
+        x: event.clientX,
+        y: event.clientY,
+        target: dropTargetAt(event.clientX, event.clientY),
+      };
+      event.preventDefault();
+      return;
+    }
     if (dragStart) {
       if (
         Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6
@@ -242,6 +326,7 @@
       const current = drag;
       drag = null;
       dragStart = null;
+      clearTouchDrag();
       suppressClick = true;
       window.setTimeout(() => {
         suppressClick = false;
@@ -251,17 +336,22 @@
       return;
     }
     dragStart = null;
+    clearTouchDrag();
     longPress.up();
   }
 
   function onPointerCancel(): void {
     drag = null;
     dragStart = null;
+    clearTouchDrag();
     longPress.cancel();
   }
 
   function onPointerLeave(): void {
-    if (!drag) longPress.cancel();
+    if (!drag) {
+      clearTouchDrag();
+      longPress.cancel();
+    }
   }
 
   function commitDrop(anchor: PlacementAnchor, target: DropTarget): void {
@@ -363,9 +453,10 @@
       type="button"
       class="pick-layer"
       class:dragging={!!drag}
+      use:stopDragScroll
       tabindex="-1"
       aria-hidden="true"
-      title="Click to select, drag to move, right-click for actions"
+      title="Click to select, drag to move (hold first on touch), right-click for actions"
       onclick={pick}
       oncontextmenu={onContextMenu}
       onpointerdown={onPointerDown}
