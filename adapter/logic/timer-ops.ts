@@ -146,3 +146,24 @@ export function timerLabel(timer: TimerSpec): string {
       : timer.days.map((day) => DAY_NAMES[day] ?? day).join(",");
   return `cron ${timer.at} · ${days}`;
 }
+
+/** A code-friendly default input name: `every2m`, `astro_night`, `at20_30`. */
+export function timerInputName(timer: TimerSpec): string {
+  let base: string;
+  if (typeof timer === "string") {
+    base = `every${timer}`;
+  } else if (timer.kind === "astro") {
+    const offset = timer.offset ?? 0;
+    base = `astro_${timer.event}${
+      offset === 0 ? "" : offset > 0 ? `_plus${offset}` : `_minus${-offset}`
+    }`;
+  } else {
+    base = `at${timer.at.replace(/^(?:at:|@)/i, "")}`;
+  }
+  const name = base
+    .replace(/\s+/g, "")
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return name || "timer";
+}

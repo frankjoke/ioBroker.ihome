@@ -14,7 +14,7 @@
   import MultiStateField from "./MultiStateField.svelte";
   import TimerModal from "./TimerModal.svelte";
   import SourcePicker from "$lib/components/discovery/SourcePicker.svelte";
-  import { timerLabel } from "$logic/timer-ops";
+  import { timerInputName, timerLabel } from "$logic/timer-ops";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { roomList, roomsOf as roomsOfEnum } from "$lib/config/rooms";
 
@@ -118,6 +118,15 @@
 
   function uniqueName(base: string): string {
     let index = Object.keys(inputs).length + 1;
+    let name = `${base}${index}`;
+    while (name in inputs) name = `${base}${++index}`;
+    return name;
+  }
+
+  /** The timer's own name when free, otherwise the first free numbered one. */
+  function uniqueNameFrom(base: string): string {
+    if (!(base in inputs)) return base;
+    let index = 2;
     let name = `${base}${index}`;
     while (name in inputs) name = `${base}${++index}`;
     return name;
@@ -372,7 +381,7 @@
 {#if addingTimer}
   <TimerModal
     onSave={(timer) => {
-      const name = uniqueName("timer");
+      const name = uniqueNameFrom(timerInputName(timer));
       onchange({
         ...inputs,
         [name]: { from: timerInput(timer), kind: "event" },
