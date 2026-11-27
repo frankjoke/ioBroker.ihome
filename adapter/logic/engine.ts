@@ -445,6 +445,8 @@ export function createEngine(
         callPlugin: (id, payload, run, depth) =>
           rt.pluginTasks?.enqueue({ id, payload, depth, run }),
         now: () => deps.now(),
+        nextAstro: (event, offset, from) =>
+          deps.nextAstro?.(event, offset, from),
       });
     } catch (error) {
       deps.log("warn", def.id, errorText(error));

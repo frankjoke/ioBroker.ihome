@@ -289,6 +289,10 @@
               fetches JSON; <code>headers</code> and <code>body</code> are optional
             </li>
             <li>
+              <code>astro("dawn", -50, fromMs?)</code> returns the next astro time;
+              the offset is in minutes
+            </li>
+            <li>
               In <code>message</code>/<code>log</code> text use
               <code>{`{{$input}}`}</code>; in code use <code>$input</code> or
               <code>get("$input")</code>

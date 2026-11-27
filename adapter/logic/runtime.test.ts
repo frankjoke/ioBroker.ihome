@@ -16,7 +16,11 @@ const logic = (code: string): FunctionLogic => ({
   expr: { code },
 });
 
-function runtimeFor(source: string, info: Record<string, NameInfo> = {}) {
+function runtimeFor(
+  source: string,
+  info: Record<string, NameInfo> = {},
+  nextAstro?: RuntimeHooks["nextAstro"],
+) {
   const writes: unknown[][] = [];
   const messages: unknown[][] = [];
   const fetches: Array<{
@@ -34,6 +38,7 @@ function runtimeFor(source: string, info: Record<string, NameInfo> = {}) {
     fetchJson: (url, options, run, depth) =>
       fetches.push({ url, options, run, depth }),
     now: () => 1000,
+    nextAstro,
   });
   return { runtime, writes, messages, fetches };
 }
@@ -81,6 +86,28 @@ it("runs a compiled expression with get", () => {
     a: { value: 4, ack: true, from: "x", ts: 1, changed: true, writable: true },
   });
   expect(runtime.runExpr({ code: 'get("a") + 1' }, 0)).toBe(5);
+});
+
+it("asks the engine for the next astro time", () => {
+  const calls: unknown[][] = [];
+  const { runtime } = runtimeFor(
+    'astro("dawn", -50, 1000)',
+    {},
+    (event, offset, from) => {
+      calls.push([event, offset, from]);
+      return 123456;
+    },
+  );
+  expect(runtime.runExpr({ code: 'astro("dawn", -50, 1000)' }, 0)).toBe(123456);
+  expect(calls).toEqual([["dawn", -50, 1000]]);
+  const badEvent = runtimeFor('astro("nope")');
+  expect(() => badEvent.runtime.runExpr({ code: 'astro("nope")' }, 0)).toThrow(
+    /astro/,
+  );
+  const badOffset = runtimeFor('astro("dawn", "x")');
+  expect(() =>
+    badOffset.runtime.runExpr({ code: 'astro("dawn", "x")' }, 0),
+  ).toThrow(/offset/);
 });
 
 it("state() exposes metadata and writes", () => {

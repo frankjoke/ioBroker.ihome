@@ -1,7 +1,8 @@
 import { createContext, runInContext, Script } from "node:vm";
 import { wrapExpression } from "./expr-code";
+import { isAstroEvent } from "./timer-ops";
 import type { FetchOptions } from "./tasks";
-import type { Expr, Forward, LogicDef } from "./types";
+import type { AstroEvent, Expr, Forward, LogicDef } from "./types";
 
 /** How one name looks to `get`/`state`/`set` during an evaluation. */
 export interface NameInfo {
@@ -44,6 +45,12 @@ export interface RuntimeHooks {
     depth: number,
   ): void;
   now(): number;
+  /** The next occurrence of an astro time at/after `from`, in ms. */
+  nextAstro?(
+    event: AstroEvent,
+    offset: number,
+    from: number,
+  ): number | undefined;
 }
 
 export interface LogicRuntime {
@@ -400,6 +407,17 @@ export function createLogicRuntime(
     if (ts === undefined)
       hooks.write(name, value, ack, forward, currentDepth());
     else hooks.write(name, value, ack, forward, currentDepth(), ts);
+  });
+  define("astro", (event: unknown, offset?: unknown, from?: unknown) => {
+    if (typeof event !== "string" || !isAstroEvent(event))
+      throw new Error("astro needs an astro event name");
+    const off = offset === undefined ? 0 : offset;
+    if (typeof off !== "number" || !Number.isFinite(off))
+      throw new Error("astro offset must be a finite number of minutes");
+    const at = from === undefined ? hooks.now() : from;
+    if (typeof at !== "number" || !Number.isFinite(at))
+      throw new Error("astro from must be a finite epoch in milliseconds");
+    return hooks.nextAstro?.(event, off, at);
   });
   define("goto", function (state?: unknown): void {
     if (inTask && arguments.length > 0 && state !== NOACTION) {
