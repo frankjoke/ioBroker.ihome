@@ -381,8 +381,9 @@ export function createLogicRuntime(
       ts: info?.ts ?? hooks.now(),
       changed: info?.changed ?? false,
       set(value: unknown, opts?: unknown): void {
-        if (!writable) throw new Error(`${name} is not writable`);
         const { ack, forward, ts } = options(opts);
+        if (!writable && ack !== true)
+          throw new Error(`${name} is not writable`);
         if (ts === undefined)
           hooks.write(name, value, ack, forward, currentDepth());
         else hooks.write(name, value, ack, forward, currentDepth(), ts);
@@ -390,11 +391,12 @@ export function createLogicRuntime(
     });
   });
   define("set", (name: string, value: unknown, opts?: unknown) => {
+    const { ack, forward, ts } = options(opts);
     if (name !== "$self") {
       const info = hooks.describe(name);
-      if (info && !info.writable) throw new Error(`${name} is not writable`);
+      if (info && !info.writable && ack !== true)
+        throw new Error(`${name} is not writable`);
     }
-    const { ack, forward, ts } = options(opts);
     if (ts === undefined)
       hooks.write(name, value, ack, forward, currentDepth());
     else hooks.write(name, value, ack, forward, currentDepth(), ts);

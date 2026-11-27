@@ -279,6 +279,11 @@
               when a <code>ts</code> is given
             </li>
             <li>
+              <code>&#123; ack: true &#125;</code> may write a read-only status
+              state (an adapter confirmation); a write command without
+              <code>ack</code> is refused
+            </li>
+            <li>
               <code>fetchJson(url, callback, &#123; method: "POST" &#125;)</code
               >
               fetches JSON; <code>headers</code> and <code>body</code> are optional

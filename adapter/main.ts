@@ -311,7 +311,8 @@ class IHome extends utils.Adapter {
   private logicValues = new Map<string, StateChange>();
   /** `common.type` of a referenced state, for writes. */
   private stateTypes = new Map<string, string>();
-  /** `common.write` of a referenced state; read-only targets are never written. */
+  /** `common.write` of a referenced state; read-only targets accept only
+   *  acknowledged (adapter) updates. */
   private stateWritable = new Map<string, boolean>();
   private warnedWrites = new Set<string>();
   /** Guards overlapping reloads: only the newest may swap the engine. */
@@ -1145,11 +1146,11 @@ class IHome extends utils.Adapter {
     ack: boolean,
     ts?: number,
   ): void {
-    if (this.stateWritable.get(id) === false) {
+    if (this.stateWritable.get(id) === false && ack !== true) {
       if (!this.warnedWrites.has(id)) {
         this.warnedWrites.add(id);
         this.log.warn(
-          `logic: refusing to write ${id} — the state is read-only`,
+          `logic: refusing to write ${id} — the state is read-only (ack: false)`,
         );
       }
       return;

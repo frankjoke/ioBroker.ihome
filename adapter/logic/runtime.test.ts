@@ -201,6 +201,31 @@ it("refuses to write a read-only name", () => {
   expect(viaState.writes).toEqual([]);
 });
 
+it("allows an acknowledged write to a read-only name", () => {
+  const info = {
+    c: {
+      value: 1,
+      ack: true,
+      ts: 1,
+      changed: false,
+      writable: false,
+    },
+  };
+  const globalSet = runtimeFor('set("c", 2, { ack: true })', info);
+  globalSet.runtime.runExpr({ code: 'set("c", 2, { ack: true })' }, 0);
+  expect(globalSet.writes).toEqual([["c", 2, true, undefined, 0]]);
+
+  const viaState = runtimeFor('state("c").set(2, { ack: true })', info);
+  viaState.runtime.runExpr({ code: 'state("c").set(2, { ack: true })' }, 0);
+  expect(viaState.writes).toEqual([["c", 2, true, undefined, 0]]);
+
+  const command = runtimeFor('set("c", 3, { ack: false })', info);
+  expect(() =>
+    command.runtime.runExpr({ code: 'set("c", 3, { ack: false })' }, 0),
+  ).toThrow(/not writable/);
+  expect(command.writes).toEqual([]);
+});
+
 it("missing names read undefined and still accept a write", () => {
   const { runtime } = runtimeFor('state("x")');
   expect(runtime.runExpr({ code: 'state("x")' }, 0)).toMatchObject({
