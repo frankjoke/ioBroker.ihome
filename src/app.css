@@ -21,6 +21,9 @@
   --surface-container: #f0f2f8;
   --surface-container-high: #e7e9f2;
   --surface-container-highest: #dfe1ec;
+  /* A half-transparent surface for the touch drag grip; a real alpha token so
+     tablet webviews without color-mix keep the translucency. */
+  --surface-container-high-translucent: rgba(231, 233, 242, 0.5);
   /* The top bar while the layout editor is open: a plain colour on purpose —
      `color-mix()` silently disappears in older Safari/Chrome and tablet
      webviews, and then the mode is invisible again. */
@@ -122,6 +125,7 @@ html.dark {
   --surface-container: #1c2028;
   --surface-container-high: #262a33;
   --surface-container-highest: #31353e;
+  --surface-container-high-translucent: rgba(38, 42, 51, 0.5);
   --edit-mode-bar: #5f2b2d;
   --config-bg: #1b2743;
   --config-bar: #2a3a63;

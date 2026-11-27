@@ -891,7 +891,7 @@
     justify-content: center;
     border: 1px solid var(--border-color);
     border-radius: 50%;
-    background-color: var(--surface-container-high);
+    background-color: var(--surface-container-high-translucent);
     color: var(--primary-color);
     box-shadow: var(--shadow-small);
     pointer-events: none;
