@@ -149,6 +149,10 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### 0.6.4 (2026-11-27)
+
+Logic writes can carry the source timestamp (`set(..., { ts })` / `state().set(..., { ts })`), so values from an API land at their own time and repeated hourly values are kept. Acknowledged writes (`ack: true`) may target read-only status states, while commands without `ack` stay refused. The history tab now anchors its range at the newest stored value, including planned future values. New timers default to a name from their schedule (`every2m`, `at20_30`, `astro_night`), and action code can ask for the next astro time with `astro("dawn", -50, fromMs?)`.
+
 ### 0.4.2 (2026-11-18)
 
 Per-logic reload: saving a logic now restarts only the added, changed or removed logics; unchanged logics keep their `this`, memory output, machine state, `after` timers and task queues. State, memory and `$logic` references live in shared maps and equal timer schedules share one handle. Logic inputs gained `$value`/`$previous`/`$input`/`$source`, statement bodies, state collections and timer inputs. Configuration pages remember scroll, open row and active tab per browser tab. Template lists show descriptions (help as fallback) with the type as a tooltip; visual templates gained a Description field; Devices gained **From template** with the usual state picker.
