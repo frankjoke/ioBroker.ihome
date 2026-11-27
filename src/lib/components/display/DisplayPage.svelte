@@ -100,6 +100,36 @@
     },
   });
 
+  /** View-mode touch: long-press opens the eye-view menu; tap still opens the
+   *  tile detail. The tile's own long-press-to-detail was removed for this. */
+  const viewLongPress = createLongPress({
+    onTrigger: (x, y) => {
+      showViewMenu(x, y);
+    },
+  });
+
+  /** A click that follows the view long-press is not a tile tap. */
+  function catchViewClick(node: HTMLElement) {
+    const capture = (event: MouseEvent) => {
+      if (!viewLongPress.consume()) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    node.addEventListener("click", capture, true);
+    return {
+      destroy: () => node.removeEventListener("click", capture, true),
+    };
+  }
+
+  function showViewMenu(x: number, y: number): boolean {
+    if (sheet.open || tileDetailOpen()) return false;
+    const hit = hitAt(x, y);
+    const targetPageId = hit && "pageId" in hit ? hit.pageId : (page?.id ?? "");
+    if (!targetPageId) return false;
+    displayMenu = { x, y, pageId: targetPageId, selection: hit };
+    return true;
+  }
+
   function clearTouchDrag(): void {
     if (touchDrag) clearTimeout(touchDrag.timer);
     touchDrag = null;
@@ -108,7 +138,9 @@
   /** While a touch drag runs, do not let the page scroll under the finger. */
   function stopDragScroll(node: HTMLElement) {
     const stop = (event: TouchEvent) => {
-      if (drag) event.preventDefault();
+      // Block scroll on the first move after the hold too, or the browser
+      // cancels the pointer before the drag can start.
+      if (drag || touchDrag?.armed) event.preventDefault();
     };
     node.addEventListener("touchmove", stop, { passive: false });
     return {
@@ -184,17 +216,31 @@
     const target = event.target as HTMLElement | null;
     if (target?.closest("input, textarea, select, [contenteditable='true']"))
       return;
-    const hit = hitAt(event.clientX, event.clientY);
-    const targetPageId = hit && "pageId" in hit ? hit.pageId : (page?.id ?? "");
-    if (!targetPageId) return;
+    if (!showViewMenu(event.clientX, event.clientY)) return;
     event.preventDefault();
     event.stopPropagation();
-    displayMenu = {
-      x: event.clientX,
-      y: event.clientY,
-      pageId: targetPageId,
-      selection: hit,
-    };
+  }
+
+  function onViewPointerDown(event: PointerEvent): void {
+    if (sheet.open || event.pointerType !== "touch" || event.button !== 0)
+      return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']"))
+      return;
+    viewLongPress.down(event.clientX, event.clientY);
+  }
+
+  function onViewPointerMove(event: PointerEvent): void {
+    if (sheet.open) return;
+    viewLongPress.move(event.clientX, event.clientY);
+  }
+
+  function onViewPointerUp(): void {
+    viewLongPress.up();
+  }
+
+  function onViewPointerCancel(): void {
+    viewLongPress.cancel();
   }
 
   /** Where a dragged tile would land, with the line to show between tiles. */
@@ -446,8 +492,14 @@
     <div
       class="stage"
       role="presentation"
+      use:catchViewClick
       inert={sheet.open}
       oncontextmenu={onStageContextMenu}
+      onpointerdown={onViewPointerDown}
+      onpointermove={onViewPointerMove}
+      onpointerup={onViewPointerUp}
+      onpointercancel={onViewPointerCancel}
+      onpointerleave={onViewPointerCancel}
     >
       {#key page.id}
         <PageView {page} />

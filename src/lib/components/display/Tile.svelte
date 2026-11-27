@@ -699,11 +699,6 @@
       openEditor();
       return;
     }
-    // A long-press already opened the modal; swallow the click it produced.
-    if (suppressClick) {
-      suppressClick = false;
-      return;
-    }
     // Body tap = enlarge (spec §7) when the tile has a detail page. With none,
     // the whole face acts: a switch toggles, a button presses. Before that the
     // action lived only on the icon/value, which left most of a button tile
@@ -735,28 +730,6 @@
       modalOpen = true;
     });
   });
-  let pressTimer: ReturnType<typeof setTimeout> | null = null;
-  let suppressClick = false;
-
-  /** Touch long-press (500 ms) opens the modal, like the corner affordance —
-   *  but only when there is a detail page. With none, swallow the click and
-   *  let the display's own long-press/contextmenu open the tile menu. */
-  function onPointerDown(e: PointerEvent) {
-    if (e.pointerType !== "touch") return;
-    pressTimer = setTimeout(() => {
-      pressTimer = null;
-      suppressClick = true;
-      if (hasModal) openDetail();
-    }, 500);
-  }
-
-  function cancelPress() {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-  }
-
   function onKey(e: KeyboardEvent) {
     // Enter/Space on a nested control (a slider, a select, a button) must do its
     // own thing, not the tile's.
@@ -795,10 +768,6 @@
   onclickcapture={onCapture}
   onclick={onActivate}
   onkeydown={onKey}
-  onpointerdown={onPointerDown}
-  onpointerup={cancelPress}
-  onpointercancel={cancelPress}
-  onpointerleave={cancelPress}
 >
   {#if editingTarget}
     <EditingOutline inset={surfaceOnly} />
