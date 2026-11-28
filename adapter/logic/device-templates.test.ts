@@ -97,7 +97,6 @@ describe("templateStateSpecs", () => {
         type: "string",
         role: "text.json",
         write: false,
-        states: {},
         def: "{}",
       },
     });

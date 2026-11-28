@@ -264,7 +264,6 @@
       <h2>{localizeName(common.name) || id}</h2>
       <p class="mono text-muted">{id}</p>
     </div>
-    <span class="badge">{common.type || "state"}</span>
   </div>
 
   <OptionTabs
@@ -275,14 +274,16 @@
   >
     {#snippet actions()}
       {#if !hasOverrides}
-        <button type="button" class="btn btn-sm" onclick={addOverride}
-          >+ Override</button
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          onclick={addOverride}>+ Override</button
         >
       {/if}
       {#if historyInstalled && hasUnusedHistory}
         <button
           type="button"
-          class="btn btn-sm"
+          class="btn btn-primary btn-sm"
           onclick={() => void addHistory()}>+ History</button
         >
       {/if}

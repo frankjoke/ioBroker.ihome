@@ -3,10 +3,13 @@
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { formatValue, localizeName } from "$lib/config/format";
   import { stateRoles } from "$lib/config/state-settings";
-  import { writeStateCommon } from "$lib/config/state-write";
+  import { normalizeStates } from "$lib/config/state-meta";
+  import { writeStateCommon, writeStateValue } from "$lib/config/state-write";
+  import { parseValueText, valueText } from "$lib/config/state-value";
   import { enumLabelFromObject, enumsOf, roomList } from "$lib/config/rooms";
   import MultiSelect from "$lib/components/common/MultiSelect.svelte";
   import RoleSelect from "$lib/components/common/RoleSelect.svelte";
+  import StateLabelsEditor from "./StateLabelsEditor.svelte";
 
   const TYPES = [
     "boolean",
@@ -23,7 +26,7 @@
     role: string;
     unit: string;
     desc: string;
-    states: string;
+    states: Record<string, string>;
     min: string;
     max: string;
     step: string;
@@ -63,11 +66,6 @@
   );
   const roles = $derived(stateRoles(objects));
 
-  function statesText(value: unknown): string {
-    if (!value) return "{}";
-    return JSON.stringify(value, null, 2);
-  }
-
   function draftOf(common: Record<string, any>): Draft {
     return {
       name: localizeName(common.name),
@@ -75,7 +73,7 @@
       role: String(common.role ?? ""),
       unit: String(common.unit ?? ""),
       desc: String(common.desc ?? ""),
-      states: statesText(common.states),
+      states: normalizeStates(common.states) ?? {},
       min: common.min === undefined ? "" : String(common.min),
       max: common.max === undefined ? "" : String(common.max),
       step: common.step === undefined ? "" : String(common.step),
@@ -93,12 +91,47 @@
   let saved = $state<Draft>(untrack(() => ({ ...draft })));
   let busy = $state(false);
   let error = $state("");
+  let valueDraft = $state(untrack(() => valueText(live?.val)));
+  let valueBool = $state(untrack(() => live?.val === true));
+  let valueAck = $state(false);
+  let valueBusy = $state(false);
+  let valueError = $state("");
+  let valueMessage = $state("");
+  let valueTouched = false;
 
   const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(saved));
   const common = $derived((object?.common ?? {}) as Record<string, any>);
   const managed = $derived<string | undefined>(
     object?.native?.ihomeCollection?.plugin,
   );
+  const valueKind = $derived(String(common.type ?? "string").toLowerCase());
+  const valueIsBoolean = $derived(valueKind === "boolean");
+  const valueIsNumber = $derived(
+    valueKind === "number" || valueKind === "multistate",
+  );
+  const valueIsLong = $derived(
+    ["object", "array", "json", "mixed"].includes(valueKind) ||
+      common.role === "text.json",
+  );
+  const valuePreview = $derived.by(() => {
+    const text = formatValue(live?.val, common.unit, common.role);
+    return text.length > 80 ? `${text.slice(0, 77)}…` : text;
+  });
+
+  $effect(() => {
+    if (valueTouched) return;
+    const next = valueText(live?.val);
+    if (next !== valueDraft) valueDraft = next;
+    const nextBool = live?.val === true;
+    if (nextBool !== valueBool) valueBool = nextBool;
+  });
+
+  // The states page does not subscribe every row; load the selected state's
+  // value so the editor starts from the broker value, not an empty draft.
+  $effect(() => {
+    if (live) return;
+    void ioBroker.getState(id, true).catch(() => undefined);
+  });
 
   function numberOrNull(text: string): number | null | string {
     const value = text.trim();
@@ -109,22 +142,6 @@
 
   function sameList(left: string[], right: string[]): boolean {
     return left.length === right.length && left.every((v) => right.includes(v));
-  }
-
-  function parseStates(text: string): Record<string, string> | null {
-    if (!text.trim()) return null;
-    const value: unknown = JSON.parse(text);
-    if (value == null || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("The enums must be a JSON object.");
-    }
-    const states: Record<string, string> = {};
-    for (const [key, label] of Object.entries(value)) {
-      if (typeof label !== "string") {
-        throw new Error(`The label for ${key} must be text.`);
-      }
-      states[key] = label;
-    }
-    return states;
   }
 
   async function applyEnums(
@@ -186,16 +203,8 @@
       error = "Min must not be greater than max.";
       return;
     }
-    let states: Record<string, string> | null = null;
-    const statesChanged = draft.states !== saved.states;
-    if (statesChanged) {
-      try {
-        states = parseStates(draft.states);
-      } catch (failure) {
-        error = failure instanceof Error ? failure.message : String(failure);
-        return;
-      }
-    }
+    const statesChanged =
+      JSON.stringify(draft.states) !== JSON.stringify(saved.states);
     const patch: Record<string, unknown> = {};
     if (name !== saved.name) patch.name = name;
     if (draft.type !== saved.type) patch.type = draft.type;
@@ -207,7 +216,9 @@
     if (draft.step !== saved.step) patch.step = step;
     if (draft.read !== saved.read) patch.read = draft.read;
     if (draft.write !== saved.write) patch.write = draft.write;
-    if (statesChanged) patch.states = states;
+    if (statesChanged) {
+      patch.states = Object.keys(draft.states).length ? draft.states : null;
+    }
     const roomsChanged = !sameList(draft.rooms, saved.rooms);
     const functionsChanged = !sameList(draft.functions, saved.functions);
     if (Object.keys(patch).length === 0 && !roomsChanged && !functionsChanged) {
@@ -230,7 +241,7 @@
           step: draft.step,
           read: draft.read,
           write: draft.write,
-          states: draft.states,
+          states: { ...draft.states },
         });
         saved = { ...nextSaved };
       }
@@ -252,10 +263,44 @@
   function reset(): void {
     draft = {
       ...saved,
+      states: { ...saved.states },
       rooms: [...saved.rooms],
       functions: [...saved.functions],
     };
     error = "";
+  }
+
+  function valueChanged(): void {
+    valueTouched = true;
+    valueError = "";
+    valueMessage = "";
+  }
+
+  async function writeValue(): Promise<void> {
+    valueError = "";
+    valueMessage = "";
+    let parsed: unknown;
+    if (valueIsBoolean) {
+      parsed = valueBool;
+    } else {
+      const result = parseValueText(valueDraft, valueKind);
+      if ("error" in result) {
+        valueError = result.error;
+        return;
+      }
+      parsed = result.value;
+    }
+    valueBusy = true;
+    try {
+      await writeStateValue(id, parsed, valueAck);
+      valueTouched = false;
+      valueMessage = `Value written with ack=${valueAck}.`;
+      void ioBroker.getState(id, true).catch(() => undefined);
+    } catch (failure) {
+      valueError = failure instanceof Error ? failure.message : String(failure);
+    } finally {
+      valueBusy = false;
+    }
   }
 </script>
 
@@ -271,120 +316,110 @@
     </p>
   {/if}
 
-  <div class="grid">
-    <label class="field">
-      <span class="label-mono">Name</span>
-      <input bind:value={draft.name} />
-    </label>
-    <label class="field">
-      <span class="label-mono">Type</span>
-      <select bind:value={draft.type}>
-        {#each TYPES as type (type)}
-          <option value={type}>{type}</option>
-        {/each}
-        {#if draft.type && !TYPES.includes(draft.type)}
-          <option value={draft.type}>{draft.type}</option>
-        {/if}
-      </select>
-    </label>
-    <label class="field">
-      <span class="label-mono">Role</span>
-      <RoleSelect
-        value={draft.role}
-        options={roles}
-        type={draft.type}
-        label="Role"
-        onchange={(role) => (draft.role = role)}
-      />
-    </label>
-    <label class="field">
-      <span class="label-mono">Unit</span>
-      <input bind:value={draft.unit} />
-    </label>
-    <label class="field wide">
-      <span class="label-mono">Description</span>
-      <input bind:value={draft.desc} />
-    </label>
-  </div>
+  <div class="form-panel section-panel">
+    <div class="grid">
+      <label class="field">
+        <span class="label-mono">Name</span>
+        <input bind:value={draft.name} />
+      </label>
+      <label class="field">
+        <span class="label-mono">Type</span>
+        <select bind:value={draft.type}>
+          {#each TYPES as type (type)}
+            <option value={type}>{type}</option>
+          {/each}
+          {#if draft.type && !TYPES.includes(draft.type)}
+            <option value={draft.type}>{draft.type}</option>
+          {/if}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label-mono">Role</span>
+        <RoleSelect
+          value={draft.role}
+          options={roles}
+          type={draft.type}
+          label="Role"
+          onchange={(role) => (draft.role = role)}
+        />
+      </label>
+      <label class="field">
+        <span class="label-mono">Unit</span>
+        <input bind:value={draft.unit} />
+      </label>
+      <label class="field wide">
+        <span class="label-mono">Description</span>
+        <input bind:value={draft.desc} />
+      </label>
+    </div>
 
-  <div class="three">
-    <label class="field">
-      <span class="label-mono">Min</span>
-      <input inputmode="decimal" bind:value={draft.min} />
-    </label>
-    <label class="field">
-      <span class="label-mono">Max</span>
-      <input inputmode="decimal" bind:value={draft.max} />
-    </label>
-    <label class="field">
-      <span class="label-mono">Step</span>
-      <input inputmode="decimal" bind:value={draft.step} />
-    </label>
-  </div>
+    <div class="three">
+      <label class="field">
+        <span class="label-mono">Min</span>
+        <input inputmode="decimal" bind:value={draft.min} />
+      </label>
+      <label class="field">
+        <span class="label-mono">Max</span>
+        <input inputmode="decimal" bind:value={draft.max} />
+      </label>
+      <label class="field">
+        <span class="label-mono">Step</span>
+        <input inputmode="decimal" bind:value={draft.step} />
+      </label>
+    </div>
 
-  <div class="grid">
-    <label class="field">
-      <span class="label-mono">Rooms</span>
-      <MultiSelect
-        options={roomOptions}
-        selected={draft.rooms}
-        enums={ioBroker.enums}
-        placeholder="No room"
-        onChange={(ids) => (draft.rooms = ids)}
-      />
-    </label>
-    <label class="field">
-      <span class="label-mono">Functions</span>
-      <MultiSelect
-        options={functionOptions}
-        selected={draft.functions}
-        enums={ioBroker.enums}
-        placeholder="No function"
-        onChange={(ids) => (draft.functions = ids)}
-      />
-    </label>
-    <label class="field wide">
-      <span class="label-mono">Enums</span>
-      <textarea
-        class="enums"
-        rows="4"
-        spellcheck="false"
-        bind:value={draft.states}
-      ></textarea>
-      <span class="hint text-muted">
-        Value to label, as a JSON object (for example 0 = Idle, 1 = Busy).
-      </span>
-    </label>
-  </div>
+    <div class="grid">
+      <label class="field">
+        <span class="label-mono">Rooms</span>
+        <MultiSelect
+          options={roomOptions}
+          selected={draft.rooms}
+          enums={ioBroker.enums}
+          placeholder="No room"
+          onChange={(ids) => (draft.rooms = ids)}
+        />
+      </label>
+      <label class="field">
+        <span class="label-mono">Functions</span>
+        <MultiSelect
+          options={functionOptions}
+          selected={draft.functions}
+          enums={ioBroker.enums}
+          placeholder="No function"
+          onChange={(ids) => (draft.functions = ids)}
+        />
+      </label>
+      <div class="wide">
+        <StateLabelsEditor
+          value={draft.states}
+          onChange={(next) => (draft.states = next ?? {})}
+        />
+      </div>
+    </div>
 
-  <div class="checks">
-    <label class="check">
-      <input type="checkbox" bind:checked={draft.read} />
-      <span>Read</span>
-    </label>
-    <label class="check">
-      <input type="checkbox" bind:checked={draft.write} />
-      <span>Write</span>
-    </label>
-  </div>
+    <div class="checks">
+      <label class="check">
+        <input type="checkbox" bind:checked={draft.read} />
+        <span>Read</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={draft.write} />
+        <span>Write</span>
+      </label>
+    </div>
 
-  {#if error}<p class="hint text-danger">{error}</p>{/if}
+    {#if error}<p class="hint text-danger">{error}</p>{/if}
 
-  <div class="footer">
-    <dl class="summary">
-      <dt>Value</dt>
-      <dd class="mono">
-        {formatValue(live?.val, common.unit, common.role)}
-        {#if live?.from}<span class="text-muted"> · {live.from}</span>{/if}
-      </dd>
-    </dl>
     <div class="actions">
       <button
         type="button"
         class="btn btn-sm"
         disabled={!dirty || busy}
-        onclick={reset}>Reset</button
+        onclick={reset}
       >
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        Cancel
+      </button>
       <button
         type="button"
         class="btn btn-primary btn-sm"
@@ -392,6 +427,84 @@
         onclick={() => void save()}>{busy ? "Saving…" : "Save"}</button
       >
     </div>
+  </div>
+
+  <div class="live-value section-panel">
+    <div class="value-row">
+      <div class="field value-field">
+        <span class="label-mono">Value</span>
+        {#if valueIsBoolean}
+          <label class="check value-check">
+            <input
+              type="checkbox"
+              aria-label="Value"
+              checked={valueBool}
+              onchange={(event) => {
+                valueChanged();
+                valueBool = event.currentTarget.checked;
+              }}
+            />
+            <span>{valueBool ? "true" : "false"}</span>
+          </label>
+        {:else if valueIsNumber}
+          <input
+            aria-label="Value"
+            inputmode="decimal"
+            value={valueDraft}
+            oninput={(event) => {
+              valueDraft = event.currentTarget.value;
+              valueChanged();
+            }}
+          />
+        {:else if valueIsLong}
+          <textarea
+            class="value-textarea"
+            aria-label="Value"
+            rows="3"
+            spellcheck="false"
+            value={valueDraft}
+            oninput={(event) => {
+              valueDraft = event.currentTarget.value;
+              valueChanged();
+            }}
+          ></textarea>
+        {:else}
+          <input
+            type="text"
+            aria-label="Value"
+            value={valueDraft}
+            oninput={(event) => {
+              valueDraft = event.currentTarget.value;
+              valueChanged();
+            }}
+          />
+        {/if}
+      </div>
+      <label class="check ack" title="Write as a confirmed reading (ack=true)">
+        <input type="checkbox" bind:checked={valueAck} />
+        <span>Ack</span>
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        title={valueBusy ? "Writing…" : "Write value"}
+        aria-label={valueBusy ? "Writing value" : "Write value"}
+        disabled={valueBusy}
+        onclick={() => void writeValue()}
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">save</span>
+        {valueBusy ? "Writing…" : "Write"}
+      </button>
+    </div>
+    <p class="hint text-muted value-hint">
+      Current: {valuePreview}
+      {#if live?.from}<span> · {live.from}</span>{/if}
+      {#if common.write === false}
+        <span class="text-warning"> · Read-only state: use Ack.</span>
+      {/if}
+    </p>
+    {#if valueError}<p class="hint text-danger">{valueError}</p>{/if}
+    {#if valueMessage}<p class="hint text-muted">{valueMessage}</p>{/if}
   </div>
 </div>
 
@@ -401,6 +514,12 @@
     flex-direction: column;
     gap: 0.6rem;
     min-width: 0;
+  }
+
+  .form-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
   }
 
   .grid {
@@ -426,14 +545,6 @@
     min-width: 0;
   }
 
-  .enums {
-    width: 100%;
-    box-sizing: border-box;
-    font-family: var(--font-code);
-    font-size: var(--body-sm);
-    resize: vertical;
-  }
-
   .checks {
     display: flex;
     flex-wrap: wrap;
@@ -446,38 +557,49 @@
     gap: 0.3rem;
   }
 
-  .footer {
+  .live-value {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .value-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
     flex-wrap: wrap;
+  }
+
+  .value-field {
+    flex: 1 1 14rem;
+  }
+
+  .value-check {
+    align-self: flex-start;
+  }
+
+  .value-row .btn .material-symbols-outlined,
+  .actions .btn .material-symbols-outlined {
+    font-size: 14px;
+  }
+
+  .value-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--font-code);
+    font-size: var(--body-sm);
+    resize: vertical;
+  }
+
+  .value-hint {
+    margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.4rem;
-    margin-left: auto;
-  }
-
-  .summary {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    margin: 0;
-    flex: 1 1 16rem;
-    min-width: 0;
-  }
-
-  .summary dt {
-    color: var(--text-muted);
-    font-size: var(--body-sm);
-  }
-
-  .summary dd {
-    margin: 0;
-    min-width: 0;
-    overflow-wrap: anywhere;
   }
 
   @media (max-width: 560px) {

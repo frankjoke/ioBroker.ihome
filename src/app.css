@@ -490,9 +490,9 @@ textarea {
   padding: 0.5rem 1.5rem;
   font-size: var(--body-md);
   font-weight: 500;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius-pill);
-  background-color: transparent;
+  background-color: var(--surface-container-lowest);
   color: var(--text-color);
   transition:
     background-color var(--transition-fast),
@@ -502,6 +502,13 @@ textarea {
 
 .btn:hover {
   text-decoration: none;
+}
+
+/* The neutral button is a real button: normal surface, border and a visible
+   hover. Variants override their own fill; close/cancel actions stay neutral. */
+.btn:not(.btn-primary):not(.btn-secondary):not(.btn-outline):not(.btn-danger):hover {
+  background-color: var(--surface-container);
+  border-color: var(--outline-variant);
 }
 
 .btn-primary {

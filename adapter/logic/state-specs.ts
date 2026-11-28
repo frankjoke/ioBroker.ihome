@@ -27,6 +27,7 @@ export function logicOutputSpec(
     output.type !== "object" &&
     output.type !== "mixed";
   const numeric = indexed || output.type === "multistate";
+  const states = numeric ? numberStatesOf(def) : undefined;
   return {
     id: `${namespace}.Logic.${def.id}`,
     common: {
@@ -44,9 +45,11 @@ export function logicOutputSpec(
                 ? (output.role ?? "level.state")
                 : "text",
       read: true,
-      write: true,
+      // Object/mixed outputs hold data written by the logic itself, not a
+      // command another instance may set.
+      write: !object && !mixed,
       unit: indexed || output.type !== "number" ? "" : (output.unit ?? ""),
-      states: numeric ? (numberStatesOf(def) ?? {}) : {},
+      ...(states && Object.keys(states).length ? { states } : {}),
       def: numeric
         ? 0
         : output.type === "boolean"

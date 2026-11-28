@@ -1251,6 +1251,11 @@ export function createEngine(
     return new RegExp(`^${globSource(pattern)}$`).test(name);
   }
 
+  /** Object/mixed outputs hold data, not a device command. */
+  function isDataOutput(output: { type: OutputType }): boolean {
+    return output.type === "object" || output.type === "mixed";
+  }
+
   function writeOutput(
     rt: Runtime,
     value: unknown,
@@ -1305,8 +1310,9 @@ export function createEngine(
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
     stateLog(rt, `writes “${String(mapped)}” to “${target}”${because}`);
-    // A command, not a confirmation: devices act on ack=false only.
-    deps.write(target, mapped, false);
+    // A command, not a confirmation: devices act on ack=false only. Object and
+    // mixed outputs are data, so those are written with ack=true.
+    deps.write(target, mapped, isDataOutput(output));
     emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);
   }
 
@@ -1339,7 +1345,8 @@ export function createEngine(
     rt.lastOutput = mapped;
     rt.hasOutput = true;
     noteWrite(target, mapped, rt.def.id);
-    deps.write(target, mapped, false);
+    // Object/mixed outputs are data: confirm them instead of commanding.
+    deps.write(target, mapped, isDataOutput(output));
     emitLogicOutput(rt, mapped, depth + 1, previous, hasPrevious);
   }
 

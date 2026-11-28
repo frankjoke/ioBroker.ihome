@@ -95,9 +95,9 @@ export type Output =
   | {
       /** A state the adapter creates at `<namespace>.Logic.<logic id>`: a logic
        *  state is a command (writable), hence level.switch / level.state.
-       *  `object` is stored as a JSON string with role `text.json`; a machine
-       *  writes its state index as a `multistate` number; `mixed` holds any
-       *  scalar. */
+       *  `object` is stored as a JSON string with role `text.json` and kept
+       *  read-only; a machine writes its state index as a `multistate` number;
+       *  `mixed` holds any scalar and is also read-only. */
       scope: "logic";
       type: OutputType;
       /** Number only: show the state as local date/time (role `value.time`). */

@@ -47,8 +47,12 @@ export async function writeStateCommon(
     if (typeof patch[key] === "boolean") common[key] = patch[key];
   }
   if ("states" in patch) {
-    if (patch.states === null) delete common.states;
-    else common.states = patch.states;
+    if (
+      patch.states === null ||
+      (record(patch.states) && Object.keys(patch.states).length === 0)
+    ) {
+      delete common.states;
+    } else common.states = patch.states;
   }
   await writeObject(id, {
     ...(object.type !== undefined ? { type: object.type } : {}),
@@ -76,5 +80,20 @@ export async function writeStateCustom(
     ...(object.type !== undefined ? { type: object.type } : {}),
     ...(record(object.native) ? { native: object.native } : {}),
     common: { ...common, custom: next },
+  });
+}
+
+/** Write a live value from the state editor. `ack` distinguishes a command
+ *  from a confirmed reading, so read-only data states can be simulated too. */
+export async function writeStateValue(
+  id: string,
+  value: unknown,
+  ack: boolean,
+): Promise<void> {
+  await ioBroker.emitAsync("setState", id, {
+    val: value,
+    ack,
+    ts: Date.now(),
+    from: `system.adapter.${ioBroker.namespace}`,
   });
 }

@@ -813,7 +813,7 @@
                           <input
                             class="duration"
                             aria-label={`After time for ${name}`}
-                            placeholder="2m"
+                            placeholder="100ms"
                             value={state.after?.time ?? ""}
                             onchange={(e) =>
                               updateState(name, {

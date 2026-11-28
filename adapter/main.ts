@@ -575,9 +575,9 @@ class IHome extends utils.Adapter {
   /**
    * The logic states the adapter owns: `<namespace>.Logic.<logic id>`. Created
    * on demand and kept in step with the document; a state whose logic no longer
-   * has a logic output is pruned. A logic output is a command, so the role is
-   * level.switch (binary) or level.state — never `value`, which the ecosystem
-   * reserves for read-only sensor readings.
+   * has a logic output is pruned. A command output is writable with role
+   * level.switch (binary) or level.state; an object/mixed data output is
+   * read-only — the logic writes it itself.
    */
   private async ensureLogicStates(doc: LogicDocument): Promise<void> {
     const own = doc.logics.filter((def) => def.output?.scope === "logic");

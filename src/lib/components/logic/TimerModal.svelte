@@ -18,7 +18,11 @@
 
   type Kind = "every" | "cron" | "astro";
   const TIMER_TABS = [
-    { id: "every", label: "Every", hint: "A repeating interval, e.g. 5m." },
+    {
+      id: "every",
+      label: "Every",
+      hint: "A repeating interval, e.g. 5m or 100ms.",
+    },
     { id: "cron", label: "Cron", hint: "A time of day on selected weekdays." },
     {
       id: "astro",
@@ -107,7 +111,7 @@
             <input
               class="mono"
               bind:value={every}
-              placeholder="30s / 5m / 1h"
+              placeholder="100ms / 30s / 5m / 1h"
             />
           </label>
         {:else if id === "astro"}
@@ -163,7 +167,7 @@
     {#if !canSave}
       <p class="text-danger error">
         {kind === "every"
-          ? "Use a duration like 30s, 5m or 1h."
+          ? "Use a duration like 100ms, 30s, 5m or 1h."
           : kind === "cron"
             ? "Use HH:MM or HH:MM:SS; * is allowed per part, but not all."
             : ""}

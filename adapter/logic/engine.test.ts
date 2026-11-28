@@ -3648,7 +3648,7 @@ it("writes an object output as JSON text", () => {
   expect(h.writes).toContainEqual({
     id: "0_userdata.0.OUT",
     value: '{"a":1,"b":[2]}',
-    ack: false,
+    ack: true,
   });
 });
 
@@ -3663,7 +3663,7 @@ it("stores an already serialized object output unchanged", () => {
   expect(h.writes).toContainEqual({
     id: "0_userdata.0.OUT",
     value: '{"a":1}',
-    ack: false,
+    ack: true,
   });
 });
 
@@ -3678,7 +3678,7 @@ it("writes undefined as null JSON text", () => {
   expect(h.writes).toContainEqual({
     id: "0_userdata.0.OUT",
     value: "null",
-    ack: false,
+    ack: true,
   });
 });
 
@@ -3721,7 +3721,7 @@ it('machine set("$self") writes an object output as JSON text', () => {
   expect(h.writes).toContainEqual({
     id: "0_userdata.0.OUT",
     value: '{"on":true}',
-    ack: false,
+    ack: true,
   });
 });
 

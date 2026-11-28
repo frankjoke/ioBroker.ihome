@@ -4,6 +4,7 @@
   import HistoryEditor from "$lib/components/config/HistoryEditor.svelte";
   import CodeField from "$lib/components/logic/CodeField.svelte";
   import ConfirmModal from "$lib/components/common/ConfirmModal.svelte";
+  import StateLabelsEditor from "$lib/components/states/StateLabelsEditor.svelte";
   import { ioBroker } from "$lib/ioBrokerConnect.svelte.js";
   import { getVariables } from "$lib/stores/variables.svelte";
   import { getOverrideRegistry } from "$lib/stores/overrides.svelte";
@@ -100,8 +101,6 @@
   let confirmDelete = $state(false);
   let error = $state("");
   let busy = $state(false);
-  let newValue = $state("");
-  let newLabel = $state("");
 
   const dirty = $derived(
     !override || JSON.stringify(draft) !== JSON.stringify(savedDraft),
@@ -111,9 +110,6 @@
   const states = $derived(ioBroker.states as Map<string, any>);
   const anchorId = $derived(stateIdFor(stateId, variables));
   const liveValue = $derived(states.get(anchorId)?.val);
-  const stateRows = $derived(
-    Object.entries(normalizeStates(draft.states) ?? {}),
-  );
   const roleOptions = $derived.by(() => {
     const list = [
       ...new Set(
@@ -220,24 +216,6 @@
   function setKind(next: "repair" | "derived"): void {
     draft.kind = next;
     error = "";
-  }
-
-  function setState(value: string, label: string): void {
-    if (!value.trim()) return;
-    draft.states = { ...(normalizeStates(draft.states) ?? {}), [value]: label };
-  }
-
-  function removeState(value: string): void {
-    const next = { ...(normalizeStates(draft.states) ?? {}) };
-    delete next[value];
-    draft.states = Object.keys(next).length ? next : undefined;
-  }
-
-  function addState(): void {
-    if (!newValue.trim()) return;
-    setState(newValue.trim(), newLabel);
-    newValue = "";
-    newLabel = "";
   }
 
   function clean(): SourceOverride {
@@ -487,57 +465,10 @@
       </label>
     </div>
 
-    <div class="section-panel states">
-      <span class="label-mono">States (value → label)</span>
-      {#each stateRows as [value, label] (value)}
-        <div class="state-row">
-          <input
-            class="mono"
-            type="text"
-            {value}
-            aria-label={`Value ${value}`}
-            onchange={(e) => {
-              if (e.currentTarget.value === value) return;
-              removeState(value);
-              setState(e.currentTarget.value, label);
-            }}
-          />
-          <input
-            type="text"
-            value={label}
-            aria-label={`Label for ${value}`}
-            oninput={(e) => setState(value, e.currentTarget.value)}
-          />
-          <button
-            type="button"
-            class="icon-btn"
-            title="Remove"
-            aria-label={`Remove state ${value}`}
-            onclick={() => removeState(value)}
-          >
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-        </div>
-      {/each}
-      <div class="state-row">
-        <input
-          class="mono"
-          type="text"
-          placeholder="value"
-          bind:value={newValue}
-        />
-        <input type="text" placeholder="label" bind:value={newLabel} />
-        <button
-          type="button"
-          class="icon-btn"
-          title="Add"
-          aria-label="Add state label"
-          onclick={addState}
-        >
-          <span class="material-symbols-outlined">add</span>
-        </button>
-      </div>
-    </div>
+    <StateLabelsEditor
+      value={normalizeStates(draft.states)}
+      onChange={(next) => (draft.states = next)}
+    />
 
     <TransformEditor
       transform={draft.transform}
@@ -622,7 +553,7 @@
           <span class="text-muted hint">{historyText}</span>
           <button
             type="button"
-            class="btn btn-sm"
+            class="btn btn-primary btn-sm"
             onclick={() =>
               (draft.history = {
                 duration: 24,
@@ -651,7 +582,7 @@
         {#if override}
           <button
             type="button"
-            class="btn btn-danger"
+            class="btn btn-danger btn-sm"
             disabled={busy}
             onclick={() => (confirmDelete = true)}
           >
@@ -661,14 +592,14 @@
         {/if}
       </div>
       <div class="actions-buttons">
-        <button type="button" class="btn" onclick={onClose}>
+        <button type="button" class="btn btn-sm" onclick={onClose}>
           <span class="material-symbols-outlined" aria-hidden="true">close</span
           >
           Close
         </button>
         <button
           type="button"
-          class="btn btn-primary"
+          class="btn btn-primary btn-sm"
           disabled={busy || !dirty}
           onclick={save}
         >
@@ -705,7 +636,7 @@
           {#if override}
             <button
               type="button"
-              class="btn btn-danger"
+              class="btn btn-danger btn-sm"
               disabled={busy}
               onclick={() => (confirmDelete = true)}
             >
@@ -715,10 +646,12 @@
           {/if}
         </div>
         <div class="actions-buttons">
-          <button type="button" class="btn" onclick={onClose}>Cancel</button>
+          <button type="button" class="btn btn-sm" onclick={onClose}
+            >Cancel</button
+          >
           <button
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary btn-sm"
             disabled={busy || !dirty}
             onclick={save}
           >
@@ -816,22 +749,6 @@
     gap: 0.2rem;
   }
 
-  .states {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .state-row {
-    display: flex;
-    gap: 0.35rem;
-  }
-
-  .state-row input {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
   .feed {
     display: flex;
     align-items: center;
@@ -881,7 +798,12 @@
   .actions-left,
   .actions-buttons {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
+  }
+
+  .btn .material-symbols-outlined {
+    font-size: 14px;
   }
 
   @media (max-width: 640px) {

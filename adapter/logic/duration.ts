@@ -1,13 +1,19 @@
 /**
- * A duration as the logic document writes it: whole seconds, minutes or hours
- * ("90s", "2m", "1h"). The engine, the validator and the editor all use this
- * one parser, so a value the editor accepts is always one the engine can run.
+ * A duration as the logic document writes it: milliseconds, whole seconds,
+ * minutes or hours ("100ms", "90s", "2m", "1h"). The engine, the validator and
+ * the editor all use this one parser, so a value the editor accepts is always
+ * one the engine can run.
  */
-const UNITS: Record<string, number> = { s: 1_000, m: 60_000, h: 3_600_000 };
+const UNITS: Record<string, number> = {
+  ms: 1,
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+};
 
 export function parseDuration(text: string): number | null {
   if (typeof text !== "string") return null;
-  const match = /^(\d+)([smh])$/.exec(text.trim());
+  const match = /^(\d+)(ms|s|m|h)$/.exec(text.trim());
   if (!match) return null;
   return Number(match[1]) * UNITS[match[2]];
 }

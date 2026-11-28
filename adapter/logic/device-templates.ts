@@ -278,6 +278,7 @@ export function templateStateSpecs(
   return template.itemList.map((item) => {
     const object = item.type === "object";
     const initial = initialFor(item);
+    const states = normalizeStates(item.states);
     const common: Record<string, unknown> = {
       name: item.label ?? item.name,
       type: object ? "string" : item.type,
@@ -285,7 +286,7 @@ export function templateStateSpecs(
       read: true,
       write: item.readOnly !== true,
       unit: item.type === "number" ? (item.unit ?? "") : "",
-      states: normalizeStates(item.states) ?? {},
+      ...(states && Object.keys(states).length ? { states } : {}),
       def: initial,
     };
     if (item.type === "number") {

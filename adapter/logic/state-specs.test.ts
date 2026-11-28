@@ -40,7 +40,6 @@ describe("logicOutputSpec", () => {
         read: true,
         write: true,
         unit: "",
-        states: {},
         def: false,
       },
     });
@@ -81,8 +80,8 @@ describe("logicOutputSpec", () => {
       common: {
         type: "string",
         role: "text.json",
+        write: false,
         def: "{}",
-        states: {},
       },
     });
   });
@@ -94,8 +93,8 @@ describe("logicOutputSpec", () => {
       common: {
         type: "mixed",
         role: "state",
+        write: false,
         def: null,
-        states: {},
       },
     });
   });
@@ -110,7 +109,6 @@ describe("logicOutputSpec", () => {
       common: {
         type: "string",
         role: "text.json",
-        states: {},
         def: "{}",
       },
     });

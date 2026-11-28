@@ -64,6 +64,10 @@ export function stateCommonDiff(
           : Object.is(have, want);
     if (!same) diff[key] = want;
   }
+  if (!("states" in desired)) {
+    const states = normalizeStates(existing.states);
+    if (states && Object.keys(states).length === 0) diff.states = null;
+  }
   return Object.keys(diff).length > 0 ? diff : null;
 }
 
@@ -72,8 +76,10 @@ export function stateObjectWithDiff(
   existing: Record<string, unknown>,
   diff: Record<string, unknown>,
 ): Record<string, unknown> {
-  return {
-    ...existing,
-    common: { ...(existing.common as Record<string, unknown>), ...diff },
+  const common = {
+    ...(existing.common as Record<string, unknown>),
+    ...diff,
   };
+  if (diff.states === null) delete common.states;
+  return { ...existing, common };
 }
