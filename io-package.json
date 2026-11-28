@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "ihome",
-    "version": "0.6.4",
+    "version": "0.6.5",
     "news": {
+      "0.6.5": {
+        "en": "The States editor can now write a live value with a type-aware field and an ack switch, and edits value labels with a shared States (value → label) row editor. Object and mixed data outputs are read-only and written with ack, and empty common.states are no longer created. Logic durations accept milliseconds (100ms, 1500ms) for state timeouts and timer intervals. Forms use a framed property area, neutral buttons have a visible surface/border/hover, and override actions are compact.",
+        "de": "Der States-Editor kann jetzt einen Live-Wert über ein typgerechtes Feld und einen Ack-Schalter schreiben und Wertelabels mit einem gemeinsamen Zeileneditor States (value → label) bearbeiten. Objekt- und Mixed-Datenausgaben sind schreibgeschützt und werden mit ack geschrieben; leere common.states werden nicht mehr angelegt. Logik-Dauern akzeptieren Millisekunden (100ms, 1500ms) für State-Timeouts und Timer-Intervalle. Formulare nutzen einen gerahmten Eigenschaftsbereich, neutrale Buttons haben sichtbare Fläche/Rahmen/Hover, und Override-Aktionen sind kompakt."
+      },
       "0.6.4": {
         "en": "Logic writes can carry the source timestamp (`set(..., { ts })` / `state().set(..., { ts })`), so values from an API land at their own time and repeated hourly values are kept. Acknowledged writes (`ack: true`) may target read-only status states, while commands without `ack` stay refused. The history tab now anchors its range at the newest stored value, including planned future values. New timers default to a name from their schedule (`every2m`, `at20_30`, `astro_night`), and action code can ask for the next astro time with `astro(\"dawn\", -50, fromMs?)`.",
         "de": "Logik-Schreibvorgänge können den Quell-Zeitstempel mitgeben (`set(..., { ts })` / `state().set(..., { ts })`); Werte aus einer API landen damit zu ihrer eigenen Zeit, und wiederholte Stundenwerte bleiben erhalten. Bestätigte Schreibvorgänge (`ack: true`) dürfen schreibgeschützte Status-Zustände setzen, Befehle ohne `ack` bleiben weiterhin abgelehnt. Der History-Tab beginnt jetzt am neuesten gespeicherten Wert, inklusive geplanter zukünftiger Werte. Neue Timer erhalten automatisch einen Namen aus ihrem Zeitplan (`every2m`, `at20_30`, `astro_night`), und Aktionscode kann mit `astro(\"dawn\", -50, fromMs?)` die nächste Astro-Zeit abfragen."

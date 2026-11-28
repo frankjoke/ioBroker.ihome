@@ -149,6 +149,10 @@ IOBROKER_MCP=http://<broker>:8082/mcp/ npm run deploy:www
 `npm run build` before committing UI changes.
 
 ## Changelog
+### 0.6.5 (2026-11-28)
+
+The States editor can now write a live value with a type-aware field and an ack switch, and edits value labels with a shared **States (value → label)** row editor. Object and mixed data outputs are read-only and written with `ack`, and empty `common.states` are no longer created. Logic durations accept milliseconds (`100ms`, `1500ms`) for state timeouts and timer intervals. Forms use a framed property area, neutral buttons have a visible surface/border/hover, and override actions are compact.
+
 ### 0.6.4 (2026-11-27)
 
 Logic writes can carry the source timestamp (`set(..., { ts })` / `state().set(..., { ts })`), so values from an API land at their own time and repeated hourly values are kept. Acknowledged writes (`ack: true`) may target read-only status states, while commands without `ack` stay refused. The history tab now anchors its range at the newest stored value, including planned future values. New timers default to a name from their schedule (`every2m`, `at20_30`, `astro_night`), and action code can ask for the next astro time with `astro("dawn", -50, fromMs?)`.
